@@ -160,34 +160,36 @@ export function NavSidebar({
         {groups.map((group) => (
           <div
             key={group.title}
-            className="rounded-g-md border border-g-line bg-g-surface p-1.5 shadow-g-sm"
+            className="rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-sm"
           >
-            <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 max-[960px]:hidden">
+            <div className="px-2 pt-1 pb-2 text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 max-[960px]:hidden">
               {group.title}
             </div>
-            {group.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="group flex min-h-[36px] w-full items-center gap-2 rounded-g-md px-2.5 py-2 text-left text-[13px] font-medium tracking-[-0.012em] text-g-ink-3 transition-[background,color] duration-[120ms] ease-g [&_svg]:size-4 [&_svg]:shrink-0 hover:not-data-[active=true]:bg-[color-mix(in_srgb,var(--g-surface-2)_84%,transparent)] hover:not-data-[active=true]:text-g-ink-2 [[data-theme=dark]_&]:hover:not-data-[active=true]:bg-g-surface-3 [[data-theme=dark]_&]:hover:not-data-[active=true]:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)] max-[960px]:justify-center"
-                data-active={mode === item.id}
-                aria-label={item.label}
-                onClick={() => onSelect(item.id)}
-              >
-                {item.icon}
-                <span className="min-w-0 flex-1 max-[960px]:hidden">
-                  {item.label}
-                </span>
-                {item.badge == null ? null : (
-                  <span
-                    className="min-w-[28px] text-center text-[11px] font-g-mono bg-g-surface-2 text-g-ink-3 px-1.5 py-0.5 rounded-g-sm font-[510] tracking-[-0.015em] tabular-nums data-[tone=red]:bg-g-red-soft data-[tone=red]:text-g-red data-[tone=amber]:bg-g-amber-soft data-[tone=amber]:text-g-amber data-[tone=blue]:bg-g-blue-soft data-[tone=blue]:text-g-blue data-[tone=green]:bg-g-green-soft data-[tone=green]:text-g-green data-[tone=purple]:bg-g-purple-soft data-[tone=purple]:text-g-purple group-hover:not-group-data-[active=true]:bg-g-surface group-hover:not-group-data-[active=true]:text-g-ink-2 group-data-[active=true]:bg-g-surface group-data-[active=true]:text-g-ink-3 [[data-theme=dark]_&]:group-data-[active=true]:bg-[rgba(8,9,10,0.18)] [[data-theme=dark]_&]:group-data-[active=true]:text-g-accent-ink max-[960px]:hidden"
-                    data-tone={item.tone ?? "default"}
-                  >
-                    {badges[item.badge]}
+            <div className="flex flex-col gap-1">
+              {group.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="group flex min-h-[36px] w-full items-center gap-2 rounded-g-md px-2 py-1.5 text-left text-[13px] font-medium tracking-[-0.012em] text-g-ink-3 transition-[background,color] duration-[120ms] ease-g [&_svg]:size-4 [&_svg]:shrink-0 hover:not-data-[active=true]:bg-[color-mix(in_srgb,var(--g-surface-2)_84%,transparent)] hover:not-data-[active=true]:text-g-ink-2 [[data-theme=dark]_&]:hover:not-data-[active=true]:bg-g-surface-3 [[data-theme=dark]_&]:hover:not-data-[active=true]:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)] max-[960px]:justify-center"
+                  data-active={mode === item.id}
+                  aria-label={item.label}
+                  onClick={() => onSelect(item.id)}
+                >
+                  {item.icon}
+                  <span className="min-w-0 flex-1 max-[960px]:hidden">
+                    {item.label}
                   </span>
-                )}
-              </button>
-            ))}
+                  {item.badge == null ? null : (
+                    <span
+                      className="min-w-[28px] text-center text-[11px] font-g-mono bg-g-surface-2 text-g-ink-3 px-1.5 py-0.5 rounded-g-sm font-[510] tracking-[-0.015em] tabular-nums data-[tone=red]:bg-g-red-soft data-[tone=red]:text-g-red data-[tone=amber]:bg-g-amber-soft data-[tone=amber]:text-g-amber data-[tone=blue]:bg-g-blue-soft data-[tone=blue]:text-g-blue data-[tone=green]:bg-g-green-soft data-[tone=green]:text-g-green data-[tone=purple]:bg-g-purple-soft data-[tone=purple]:text-g-purple group-hover:not-group-data-[active=true]:bg-g-surface group-hover:not-group-data-[active=true]:text-g-ink-2 group-data-[active=true]:bg-g-surface group-data-[active=true]:text-g-ink-3 [[data-theme=dark]_&]:group-data-[active=true]:bg-[rgba(8,9,10,0.18)] [[data-theme=dark]_&]:group-data-[active=true]:text-g-accent-ink max-[960px]:hidden"
+                      data-tone={item.tone ?? "default"}
+                    >
+                      {badges[item.badge]}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
       </nav>

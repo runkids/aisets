@@ -78,7 +78,7 @@ export function AppTopbar({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute top-1/2 left-1/2 z-0 w-[min(520px,42vw)] -translate-x-1/2 -translate-y-1/2 max-[1180px]:static max-[1180px]:z-10 max-[1180px]:w-[min(360px,36vw)] max-[1180px]:translate-x-0 max-[1180px]:translate-y-0 max-[680px]:w-auto">
+      <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 w-[min(520px,42vw)] -translate-x-1/2 -translate-y-1/2 max-[1180px]:static max-[1180px]:z-10 max-[1180px]:w-[min(360px,36vw)] max-[1180px]:translate-x-0 max-[1180px]:translate-y-0 max-[680px]:w-auto">
         <TextInputButton
           className="pointer-events-auto w-full shadow-g-sm max-[480px]:h-g-btn-md max-[480px]:w-g-btn-md max-[480px]:justify-center max-[480px]:px-0"
           icon={<Search size={14} aria-hidden="true" />}

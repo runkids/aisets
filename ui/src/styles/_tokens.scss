@@ -43,6 +43,13 @@
   --g-accent-deep: #c8341a;
   --g-accent-ink: #ffffff;
 
+  /* Input outlines — neutral hover, productive focus; avoids peach/coral halos on light surfaces. */
+  --g-input-border: var(--g-line-strong);
+  --g-input-border-hover: var(--g-ink-4);
+  --g-input-border-focus: var(--g-info);
+  --g-input-shadow-focus: 0 0 0 2px
+    color-mix(in srgb, var(--g-input-border-focus) 24%, transparent);
+
   /* Theme-swapped CTA pair — primary button uses these */
   --g-cta: #15152e;
   --g-cta-ink: #fafaf7;
@@ -110,6 +117,13 @@
   --g-accent-soft: #285d49; /* Neon Muted */
   --g-accent-deep: #39a57d; /* Scanline Fade */
   --g-accent-ink: #000000;
+
+  /* Input outlines — dark mode keeps the same focused scanline family with a tighter ring. */
+  --g-input-border: var(--g-line-strong);
+  --g-input-border-hover: var(--g-ink-4);
+  --g-input-border-focus: var(--g-info);
+  --g-input-shadow-focus: 0 0 0 2px
+    color-mix(in srgb, var(--g-input-border-focus) 42%, transparent);
 
   /* CTA — Neon Glow on Blackout */
   --g-cta: #34d59a;

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   IconButton,
   SegmentedControl,
+  Tabs,
   Tooltip,
   type SegmentedControlItem,
 } from "./ui";
@@ -109,12 +110,12 @@ export function BrowseStatusBar<T extends string>({
   ariaLabel,
 }: BrowseStatusBarProps<T>) {
   return (
-    <SegmentedControl
-      variant="status"
+    <Tabs
       value={value}
       items={items}
       onChange={onChange}
       ariaLabel={ariaLabel}
+      className="max-w-full overflow-x-auto"
     />
   );
 }

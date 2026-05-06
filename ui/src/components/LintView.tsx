@@ -75,7 +75,7 @@ export function LintView({ findings, onOpenAsset }: Props) {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex max-w-[280px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-[7px] transition-[border-color,box-shadow] duration-[120ms] ease-g focus-within:border-g-ink focus-within:shadow-[0_0_0_3px_var(--g-accent-soft)]">
+        <div className="flex max-w-[280px] items-center gap-2 rounded-g-md border border-g-input-border bg-g-surface px-3 py-[7px] transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:border-g-input-hover hover:bg-g-surface-2 focus-within:border-g-input-focus focus-within:bg-g-surface focus-within:shadow-g-input-focus">
           <input
             className="flex-1 border-0 bg-transparent text-[13px] text-g-ink outline-0 placeholder:text-g-ink-4"
             placeholder={t("lint.searchPlaceholder")}

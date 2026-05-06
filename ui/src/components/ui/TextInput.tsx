@@ -19,17 +19,17 @@ const textInputShellVariants = cva(
   [
     "inline-flex w-full min-w-0 items-center gap-2 rounded-g-md border border-solid px-2.5 text-g-ink",
     "transition-[background,border-color,box-shadow,transform] duration-[120ms] ease-g",
-    "focus-within:border-g-accent focus-within:bg-g-surface focus-within:shadow-g-focus focus-within:outline-none",
+    "focus-within:border-g-input-focus focus-within:bg-g-surface focus-within:shadow-g-input-focus focus-within:outline-none",
   ],
   {
     variants: {
       variant: {
         default:
-          "border-g-line-strong bg-g-surface hover:border-g-line-strong hover:bg-g-surface-2",
-        outline: "border-g-line bg-transparent hover:border-g-line-strong",
-        subtle: "border-transparent bg-g-surface-3 hover:border-g-line-strong",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+        outline: "border-g-line bg-transparent hover:border-g-input-hover",
+        subtle: "border-transparent bg-g-surface-3 hover:border-g-input-hover",
         search:
-          "border-g-line-strong bg-g-surface hover:border-g-line-strong hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
         command:
           "border-transparent bg-transparent px-0 hover:border-transparent focus-within:border-transparent focus-within:bg-transparent focus-within:shadow-none",
       },
@@ -57,7 +57,7 @@ const textInputButtonVariants = cva(
   [
     "inline-flex min-w-0 cursor-pointer items-center gap-2 rounded-g-md border border-solid px-2.5 text-left text-g-ink",
     "transition-[background,border-color,box-shadow,transform] duration-[120ms] ease-g",
-    "focus-visible:border-g-accent focus-visible:bg-g-surface focus-visible:shadow-g-focus focus-visible:outline-none",
+    "focus-visible:border-g-input-focus focus-visible:bg-g-surface focus-visible:shadow-g-input-focus focus-visible:outline-none",
     "disabled:cursor-not-allowed disabled:opacity-[0.38]",
     "[&:active:not(:disabled)]:scale-[0.99] motion-reduce:[&:active:not(:disabled)]:scale-100",
   ],
@@ -65,11 +65,11 @@ const textInputButtonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-g-line-strong bg-g-surface hover:border-g-line-strong hover:bg-g-surface-2",
-        outline: "border-g-line bg-transparent hover:border-g-line-strong",
-        subtle: "border-transparent bg-g-surface-3 hover:border-g-line-strong",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+        outline: "border-g-line bg-transparent hover:border-g-input-hover",
+        subtle: "border-transparent bg-g-surface-3 hover:border-g-input-hover",
         search:
-          "border-g-line-strong bg-g-surface hover:border-g-line-strong hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
         command:
           "border-transparent bg-transparent px-0 hover:border-transparent focus-visible:border-transparent focus-visible:bg-transparent focus-visible:shadow-none",
       },

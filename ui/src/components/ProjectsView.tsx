@@ -28,8 +28,8 @@ import {
   EmptyState,
   IconWell,
   PromptDialog,
-  SegmentedControl,
   StackedBar,
+  Tabs,
   TextInput,
   type DropdownMenuItem,
   type StackedBarSegment,
@@ -496,31 +496,32 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
       </Card>
 
       {/* Toolbar: search + sort */}
-      <Card padding="md">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <TextInput
-            variant="search"
-            icon={<Search size={16} />}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("projects.searchProjectsPlaceholder")}
-            className="w-full max-w-[420px]"
-            inputClassName="font-g text-g-ui tracking-g-ui"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-g-caption text-g-ink-3">
-              {t("projects.sortLabel")}
-            </span>
-            <SegmentedControl
-              variant="text"
-              value={sort}
-              items={localizedSortItems}
-              onChange={setSort}
-              ariaLabel={t("projects.sortAria")}
+      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3 pb-3 pt-0">
+        <Card padding="md">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <TextInput
+              variant="search"
+              icon={<Search size={16} />}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("projects.searchProjectsPlaceholder")}
+              className="w-full max-w-[420px]"
+              inputClassName="font-g text-g-ui tracking-g-ui"
             />
+            <div className="flex items-center gap-2">
+              <span className="text-g-caption text-g-ink-3">
+                {t("projects.sortLabel")}
+              </span>
+              <Tabs
+                value={sort}
+                items={localizedSortItems}
+                onChange={setSort}
+                ariaLabel={t("projects.sortAria")}
+              />
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Project cards */}
       {visibleProjects.length === 0 ? (

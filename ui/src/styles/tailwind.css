@@ -9,6 +9,9 @@
   --color-g-surface-3: var(--g-surface-3);
   --color-g-line: var(--g-line);
   --color-g-line-strong: var(--g-line-strong);
+  --color-g-input-border: var(--g-input-border);
+  --color-g-input-hover: var(--g-input-border-hover);
+  --color-g-input-focus: var(--g-input-border-focus);
   --color-g-ink: var(--g-ink);
   --color-g-ink-2: var(--g-ink-2);
   --color-g-ink-3: var(--g-ink-3);
@@ -45,6 +48,7 @@
   --shadow-g-pop: var(--g-shadow-pop);
   --shadow-g-inset: var(--g-shadow-inset);
   --shadow-g-focus: var(--g-shadow-focus);
+  --shadow-g-input-focus: var(--g-input-shadow-focus);
 
   --font-g: var(--g-font);
   --font-g-mono: var(--g-mono);

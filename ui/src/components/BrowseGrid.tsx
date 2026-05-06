@@ -37,6 +37,11 @@ const SIZE_CONFIG: Record<
   l: { min: 300, gap: 16, meta: 96, thumbRatio: 2 / 3 },
 };
 const CARD_HOVER_BLEED = 12;
+const CARD_FLAG_CLASS_NAME =
+  "inline-flex items-center gap-[3px] rounded-g-sm border px-1.5 py-[3px] text-[10px] font-[590] leading-none tracking-[0.02em] shadow-g-sm";
+const CARD_FLAG_DUPLICATE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-amber)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-amber)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-amber)_78%,var(--g-ink)_22%)]`;
+const CARD_FLAG_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-red)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-red)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-red)_78%,var(--g-ink)_22%)]`;
+const CARD_FLAG_OPTIMIZE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-blue)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-blue)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-blue)_78%,var(--g-ink)_22%)]`;
 
 function formatExt(ext: string) {
   return ext.replace(/^\./, "").toUpperCase();
@@ -197,19 +202,19 @@ export function BrowseGrid({
                 aria-hidden="true"
               >
                 {duplicate && (
-                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
+                  <span className={CARD_FLAG_DUPLICATE_CLASS_NAME}>
                     <Copy size={10} />
                     {t("browse.flagDuplicate")}
                   </span>
                 )}
                 {isUnused && (
-                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-red)_35%,transparent)] bg-g-red-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-red">
+                  <span className={CARD_FLAG_UNUSED_CLASS_NAME}>
                     <CircleOff size={10} />
                     {t("browse.flagUnused")}
                   </span>
                 )}
                 {optimizable && (
-                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-blue)_35%,transparent)] bg-g-blue-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-blue">
+                  <span className={CARD_FLAG_OPTIMIZE_CLASS_NAME}>
                     <Sparkles size={10} />
                     {t("browse.flagOptimizable")}
                   </span>

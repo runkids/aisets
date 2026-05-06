@@ -164,7 +164,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
 
       <div className="sticky top-0 z-[4] mb-1 flex items-center gap-2 bg-[color-mix(in_srgb,var(--g-canvas)_94%,transparent)] py-3 backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <div className="flex max-w-[360px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-[7px] transition-[border-color,box-shadow] duration-[120ms] ease-g focus-within:border-g-ink focus-within:shadow-[0_0_0_3px_var(--g-accent-soft)]">
+          <div className="flex max-w-[360px] items-center gap-2 rounded-g-md border border-g-input-border bg-g-surface px-3 py-[7px] transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:border-g-input-hover hover:bg-g-surface-2 focus-within:border-g-input-focus focus-within:bg-g-surface focus-within:shadow-g-input-focus">
             <Search size={14} className="size-3.5 shrink-0 text-g-ink-4" />
             <input
               className="flex-1 border-0 bg-transparent text-[13px] text-g-ink outline-0 placeholder:text-g-ink-4"

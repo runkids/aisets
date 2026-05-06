@@ -48,7 +48,11 @@ The palette is dark-first. SCSS variable names (`--g-*`) are preserved for backw
 | `--g-surface-2`         | `#161718`               | `#f4f5f7`                  | Deep Slate ↔ Cool Wash  | Hover wash, elevated card, segmented active                                               |
 | `--g-surface-3`         | `#23252a`               | `#eceef2`                  | Charcoal ↔ Cooler Wash  | Inset wells, group headers, scrim accent                                                  |
 | `--g-line`              | `#23252a`               | `#e5e7eb`                  | —                       | Default 1px borders, dividers                                                             |
-| `--g-line-strong`       | `#383b3f`               | `#d1d5db`                  | —                       | Hover borders, scrollbar thumb, input outline                                             |
+| `--g-line-strong`       | `#383b3f`               | `#d1d5db`                  | —                       | Hover borders, scrollbar thumb, default input outline                                     |
+| `--g-input-border`      | `var(--g-line-strong)`  | `var(--g-line-strong)`     | —                       | Text input default outline                                                                |
+| `--g-input-border-hover` | `var(--g-ink-4)`        | `var(--g-ink-4)`           | —                       | Text input neutral hover outline; never accent                                            |
+| `--g-input-border-focus` | `var(--g-info)`         | `var(--g-info)`            | —                       | Text input focus outline                                                                  |
+| `--g-input-shadow-focus` | token shadow            | token shadow               | —                       | Text input focus halo using `--g-input-border-focus`                                      |
 | `--g-ink`               | `#f7f8f8`               | `#0c0d0e`                  | Porcelain ↔ Near-Black  | Primary text & icons (AAA on canvas)                                                      |
 | `--g-ink-2`             | `#d0d6e0`               | `#3f4045`                  | Light Steel ↔ Slate     | Secondary text, ghost button default                                                      |
 | `--g-ink-3`             | `#8a8f98`               | `#62666d`                  | Storm Cloud (symmetric) | Tertiary text, descriptions, nav labels                                                   |
@@ -218,7 +222,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 - The sidebar sits under the global topbar and is part of the dotted canvas, not a line-separated slab: `background: transparent`, no right border, 12px horizontal/bottom padding.
 - Product brand is not rendered inside the sidebar. It lives in the global topbar (§4.2) so the brand and page chrome read as one header.
-- Sidebar content is cardized: project switcher, each nav group, and footer use `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. There are no full-height divider lines.
+- Sidebar content is cardized: project switcher, each nav group, and footer use `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. Nav groups use 4px inner padding and stack rows with a 4px gap so active fills never visually merge. There are no full-height divider lines.
 - **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 8px bottom padding
 - **`.sb-link`**: 6px 8px padding, **6px radius** (matches `RailItem` active shape), Inter 13px / 400, Storm Cloud default
   - Non-active hover: light uses a medium `--g-surface-2` wash so it remains readable without becoming selected, and flips the count badge to `--g-surface` so the chip stays distinct; dark steps to `--g-surface-3` + `--g-ink` so it remains visible on the dark sidebar
@@ -235,7 +239,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - Layout: left brand block (40×40 official raster app icon, 6px radius, `--g-surface` + `--g-shadow-sm`, name + uppercase tag) → centered command search trigger → right action cluster with **`<Tooltip><IconButton>FolderPlus</IconButton></Tooltip>`** (Add Project, always visible) → **`<IconButton>RefreshCw</IconButton>` scan trigger** (Rescan). The topbar intentionally does not render breadcrumbs; page identity lives in the active sidebar item and page/card titles so the header stays balanced. At wide widths the search trigger is absolutely centered in the topbar (GitHub-style balanced header); below 1180px it participates in the flex row between brand and actions; at ≤480px it collapses to an icon-only command trigger. Clicking the scan trigger starts a scan and opens a compact hover/focus status dropdown anchored to the icon; hovering or keyboard focus keeps the dropdown visible. The dropdown uses `--g-surface-2`, `--g-line`, 12px overlay radius, `--g-shadow-pop`, a Loader/Check/X icon, localized phase label, optional mono `current/total`, and a 6px determinate bar (`--g-accent` while running, `--g-green` on completion, `--g-red` on failure). It does **not** place inline progress text in the topbar and does **not** show a global blue "Scanning" notice during the pending state; completion/error still uses toast/notice.
 - **Breadcrumbs:** topbar breadcrumbs are removed. No slash separators, no brand crumb, no page crumb, and no inline totals. Counts belong inside page cards or side/filter cards.
 - **Search input / trigger** `.search`:
-  - Wide topbar width: `min(520px, 42vw)`, centered in the header. Below 1180px: `min(360px, 36vw)` in-flow between crumbs and actions. At ≤480px: icon-only 32×32 trigger with `aria-label` preserved.
+  - Wide topbar width: `min(520px, 42vw)`, centered in the header. The centered wrapper sits at z 20 inside the topbar stacking context so transparent left/right flex spacers cannot intercept clicks; the actual button keeps `pointer-events: auto`. Below 1180px: `min(360px, 36vw)` in-flow between crumbs and actions. At ≤480px: icon-only 32×32 trigger with `aria-label` preserved.
   - Background `--g-surface` (white in light mode, Graphite in dark mode) with a strong token border so the field stays visible on the frosted topbar
   - Border `1px solid var(--g-line-strong)` plus `--g-shadow-sm` so the centered trigger reads as a discrete header control without diffuse elevation
   - 6px radius, 10px 12px padding, Inter 13px / 400 / Light Steel
@@ -362,7 +366,7 @@ Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`;
 
 ### 6.3 Tabs / Segmented Toggle
 
-Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background, Projects sort). Legacy `.seg-toggle` remains supported for unmigrated markup.
+Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background). Legacy `.seg-toggle` remains supported for unmigrated markup.
 
 React API:
 
@@ -381,7 +385,8 @@ React API:
 - `variant="pills"`: no wrapper chrome; children use line borders and active `--g-active-bg` / `--g-active-text`.
 - Sizes: `sm` = 26px height, `md` = 32px height.
 - Children: Inter 12–13px / 510 / token text. Icons 13px.
-- `SegmentedControl`: wrapper uses the same 32px control height, 6px radius, token border, inset shadow, and 2px inner padding for `text`, `icon`, and `fixed` variants. Active children use `--g-active-bg`, `--g-active-text`, `--g-active-weight`, and `--g-shadow-sm` so Projects sort and Browse size toggles share one selected-control recipe across themes.
+- `Tabs variant="segment"` is the unified page-tab recipe for content tabs and tab-like sort/status rows. Duplicates Exact/Similar + sort, Browse status filters, Projects sort, and Settings theme selection all use the same wrapper (`--g-surface-2`, `--g-line`, 6px radius, inset shadow) with active children on `--g-surface` + `--g-ink` + `--g-shadow-sm`.
+- `SegmentedControl`: reserved for compact toolbar toggles (`text`, `icon`, `fixed`) such as Browse view / size / background. Its wrapper uses the same 32px control height, 6px radius, `--g-surface-2` background, token border, inset shadow, and 2px inner padding. Active children use the same selected recipe as segment tabs: `--g-surface` background, `--g-ink` text, and `--g-shadow-sm`; do not use `--g-active-*` fills for these tab-like toolbar toggles.
 - Focus: every tab/toggle gets `--g-shadow-focus`.
 
 ### 6.4 Card
@@ -437,13 +442,14 @@ React API:
 ```
 
 - Base: 32px height (`md`) or 26px (`sm`), 6px radius, 10px inline padding, Inter/mono text per context, 120ms token transitions
-- `default`: `--g-surface` bg + `1px solid --g-line-strong` border so light-mode inputs render white by default; hover may lift to `--g-surface-2`
+- `default`: `--g-surface` bg + `1px solid --g-input-border` border so light-mode inputs render white by default
 - `outline`: transparent bg + `1px solid --g-line` border
 - `subtle`: `--g-surface-3` bg + transparent border
-- `search`: `--g-surface` bg + `--g-line-strong` border for toolbar/search contexts; this keeps light-mode search fields white instead of grey
+- `search`: `--g-surface` bg + `--g-input-border` border for toolbar/search contexts; this keeps light-mode search fields white instead of grey
 - `command`: transparent bg + transparent border + no shell focus ring for Command Palette header input
+- Hover: border `--g-input-border-hover` + bg `--g-surface-2`; input hover outlines stay neutral and never use accent/coral halos
 - Placeholder: `--g-ink-3`
-- Focus: border `--g-accent`, `--g-shadow-focus`, bg `--g-surface` (`command` stays borderless and shadowless). Dialog prompt inputs follow the same default white/Graphite input surface.
+- Focus: border `--g-input-border-focus`, `--g-input-shadow-focus`, bg `--g-surface` (`command` stays borderless and shadowless). Dialog prompt inputs and legacy inline search fields follow the same default white/Graphite input surface.
 - Invalid: border `--g-red`, `aria-invalid=true`
 
 ### 6.9 Asset Card `.acard`
@@ -456,7 +462,7 @@ React API:
   .acard
     .acard-thumb     1:1, --g-surface-2 bg, border-bottom --g-line
       img            max 82% w/h, object-fit contain
-      .acard-flags   absolute top-left, chip overlays
+      .acard-flags   absolute top-left, opaque token-mixed status flags (surface + 18% tone) with 52% tone border, 590 text, Lucide icon, and `--g-shadow-sm`; must stay readable on both white thumbnails and dark card surfaces
       .acard-check   absolute top-right, 0→1 opacity on hover/selected
     .acard-meta      8px 10px padding
       .acard-name    mono 12px / 510, truncate
@@ -742,8 +748,9 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - In All projects scope, the Browse project filter rail is driven by the registered project list, not just assets in the current result set, so zero-asset projects remain visible with a `0` count.
 - Project-scoped entry points open Browse with the matching project facet active in the `Rail` filter variant, so the visible active item matches the source project card / sidebar project scope. While a Project Switcher scope is active, the Browse project rail hides the redundant `All projects` row and keeps the scoped project as the only active project facet.
 - Custom Filters appear as their own Browse rail section when enabled filters exist in Settings. They are applied after status, search, project, and extension filters; counts are computed from that composed pre-custom result so the section answers "what would this saved filter do inside my current Browse scope?"
-- Sticky Browse toolbar keeps view / size / background toggles, compact sort select (`w-36` / 144px), bulk toggle, search, count, and status bar inline where space allows; first-row controls share the 32px `md` control height, while the status bar keeps its 44px row height. The sort select must not span the full row or push results downward.
-- Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with status chips (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
+- Sticky Browse toolbar keeps view / size / background toggles, compact sort select (`w-36` / 144px), bulk toggle, search, count, and status tabs inline where space allows; first-row controls share the 32px `md` control height, while status filters use the same compact `Tabs variant="segment"` page-tab recipe as Duplicates. The sort select must not span the full row or push results downward.
+- Browse uses `.content-scroll--compact` so its scrollport keeps only 8px of bottom padding, avoiding a large artificial gap under dense asset grids while preserving the default 48px bottom gutter for non-Browse pages.
+- Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with compact status tabs (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
 - Active list row: `--g-accent-soft` bg + 4px left **Neon Lime** stripe
 
 ### 7.2 Duplicates
@@ -801,10 +808,10 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 - Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
 - Projects is a workspace-level view: project cards, workspace KPIs, and the Projects nav badge always use the full catalog, independent of the Project Switcher selection. Topbar breadcrumbs stay title-only; counts live in cards.
-- Page content starts close to the global header (`pt: 12px`) so the first card aligns with the cardized sidebar rhythm rather than floating far below the transparent topbar. Route-level content scroll containers remount on mode changes so stale scroll offsets do not reveal clipped content under the transparent header.
+- Page scroll containers start close to the global header by moving the scrollport itself down 12px (`margin-top: 12px`) rather than using internal top padding. This keeps the scroll clipping edge aligned with the cardized sidebar rhythm, so scrolled content cannot appear above the first visible row.
 - Projects page fills the available content column (`width: 100%; max-width: none`) and is start-aligned (`mx: 0`), matching Duplicates and other dense pages so both left and right gutters stay consistent through the shared content-scroll padding. Because legacy `.content-grid` SCSS sets `max-width: 1200px; margin: 0 auto`, Projects must explicitly override that legacy rule when using the shared class.
-- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The toolbar itself is a card (`--g-surface`, `--g-line`, 6px radius, `--g-shadow-sm`) containing search + sort controls; do not leave it as bare controls on the canvas.
-- Projects toolbar sort uses `SegmentedControl` labels for name, count, size, health, and imported date. Count / size / health / imported sort descending (imported = newest first) with project name as the stable tiebreaker; name sort is ascending.
+- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The toolbar sits inside a sticky top mask (`top: 0`, z 20, 12px inline/bottom padding, no top padding, solid `--g-canvas` background) so its card top aligns with the sidebar project switcher and the scrollport clips content above that edge. The card inside the mask uses `--g-surface`, `--g-line`, 6px radius, and `--g-shadow-sm`; do not leave bare controls on the canvas.
+- Projects toolbar sort uses `Tabs variant="segment"` labels for name, count, size, health, and imported date so its tab-like sort control matches Duplicates and Browse status tabs. Count / size / health / imported sort descending (imported = newest first) with project name as the stable tiebreaker; name sort is ascending.
 - Clickable workspace KPI cells use an 8px padded hover/focus target with a matching negative offset so the text remains aligned while the hover wash never hugs the label or value.
 - Project cards use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
 - The `Browse Project` action on a project card sets the project scope to that card's project and navigates to Browse; Browse initializes its project facet to the same project rather than defaulting to `All Projects`.
@@ -875,7 +882,7 @@ Webkit:
 ## 11. Accessibility (canonical, must verify each release)
 
 - **Contrast**: Porcelain on Pitch Black = 17.4:1 (AAA). Storm Cloud on Pitch Black = 6.4:1 (AA). Storm Cloud on Graphite = 6.0:1 (AA). Verify any new pair.
-- **Focus**: 2px Neon Lime ring on every interactive element — never `outline: none` without a `--g-shadow-focus` replacement.
+- **Focus**: visible token focus ring on every interactive element — controls use `--g-shadow-focus`; text inputs use `--g-input-shadow-focus` plus `--g-input-border-focus` so the focused outline stays distinct from hover. Never `outline: none` without a token-backed replacement.
 - **Touch targets**: ≥44×44pt; small icons get `hitSlop` / extended `::before` hit area.
 - **Color never alone**: severity always has icon + text; preferred tile has badge + border + text label.
 - **Keyboard**: tab order matches visual order, ESC dismisses overlays, ⌘P opens command palette, ⌘/ focuses search.

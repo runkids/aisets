@@ -104,7 +104,7 @@ export function BrowseToolbar({
   ];
 
   return (
-    <div className="sticky top-0 z-[4] grid gap-2.5 mb-1 py-2 pb-1 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
+    <div className="sticky top-0 z-[4] grid gap-2.5 mb-1 pb-1 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
       <div className="flex flex-wrap items-center gap-3">
         <BrowseIconToggleGroup
           value={view}

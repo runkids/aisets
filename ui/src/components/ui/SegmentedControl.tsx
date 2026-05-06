@@ -11,7 +11,7 @@ export type SegmentedControlItem<T extends string> = {
 };
 
 const controlVariants = cva(
-  "inline-flex items-center border border-g-line rounded-g-md bg-g-surface shadow-g-inset",
+  "inline-flex items-center border border-g-line rounded-g-md bg-g-surface-2 shadow-g-inset",
   {
     variants: {
       variant: {
@@ -33,7 +33,7 @@ const itemVariants = cva(
     "transition-[background,color,box-shadow] duration-[120ms] ease-g",
     "focus-visible:shadow-g-focus",
     "hover:not-data-[active=true]:bg-g-surface-2 hover:not-data-[active=true]:text-g-ink",
-    "data-[active=true]:bg-g-active-bg data-[active=true]:font-[var(--g-active-weight)] data-[active=true]:text-g-active-text data-[active=true]:shadow-g-sm data-[active=true]:hover:bg-g-active-bg data-[active=true]:hover:text-g-active-text",
+    "data-[active=true]:bg-g-surface data-[active=true]:text-g-ink data-[active=true]:shadow-g-sm data-[active=true]:hover:bg-g-surface data-[active=true]:hover:text-g-ink",
   ],
   {
     variants: {

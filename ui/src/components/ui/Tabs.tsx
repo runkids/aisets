@@ -36,7 +36,7 @@ const listVariants = cva("inline-flex items-center gap-1", {
 
 const triggerVariants = cva(
   [
-    "inline-flex items-center justify-center gap-1.5 rounded-g-md border border-transparent font-g font-[510] tracking-g-ui text-g-ink-2 cursor-pointer",
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-g-md border border-transparent font-g font-[510] tracking-g-ui text-g-ink-2 cursor-pointer",
     "transition-[background,border-color,color,box-shadow] duration-[120ms] ease-g",
     "hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
     "[&_svg]:size-[13px] [&_svg]:shrink-0",
