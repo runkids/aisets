@@ -175,8 +175,8 @@ func TestCommandHelpers(t *testing.T) {
 		t.Fatalf("stripJSONFlag() = %#v, %v", args, found)
 	}
 
-	projects := toScannerProjects([]config.Project{{ID: "p", Name: "Project", Path: "/repo"}})
-	if len(projects) != 1 || projects[0].ID != "p" || projects[0].Path != "/repo" {
+	projects := toScannerProjects([]config.Project{{ID: "p", WorkspaceID: "default", Name: "Project", Path: "/repo", CreatedAt: "2026-05-07T00:00:00Z"}})
+	if len(projects) != 1 || projects[0].ID != "p" || projects[0].WorkspaceID != "default" || projects[0].Path != "/repo" || projects[0].CreatedAt == "" {
 		t.Fatalf("toScannerProjects() = %#v", projects)
 	}
 }

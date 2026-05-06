@@ -440,7 +440,8 @@
       "name": "名前",
       "count": "数",
       "size": "サイズ",
-      "health": "健全性"
+      "health": "健全性",
+      "imported": "追加日"
     },
     "noProjects": "一致するプロジェクトがありません",
     "noProjectsDesc": "プロジェクトフォルダーを追加するか、検索条件を調整してください。",

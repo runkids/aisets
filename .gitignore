@@ -11,3 +11,5 @@
 .DS_Store
 /docs/
 /.feature-radar/
+/demo/
+/.playwright-mcp/

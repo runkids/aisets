@@ -9,6 +9,7 @@ export type Project = {
   workspaceId: string;
   name: string;
   path: string;
+  createdAt?: string;
 };
 
 export type AppSettings = {

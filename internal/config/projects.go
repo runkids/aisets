@@ -15,7 +15,7 @@ func (s *Store) Projects() []Project {
 
 func (s *Store) AllProjects() []Project {
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, name, path
+		SELECT id, workspace_id, name, path, created_at
 		FROM projects
 		WHERE deleted_at IS NULL
 		ORDER BY lower(path)
@@ -27,7 +27,7 @@ func (s *Store) AllProjects() []Project {
 	out := []Project{}
 	for rows.Next() {
 		var project Project
-		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path); err == nil {
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.CreatedAt); err == nil {
 			out = append(out, project)
 		}
 	}
@@ -42,7 +42,7 @@ func (s *Store) AllProjects() []Project {
 
 func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, name, path
+		SELECT id, workspace_id, name, path, created_at
 		FROM projects
 		WHERE workspace_id = ? AND deleted_at IS NULL
 		ORDER BY lower(path)
@@ -54,7 +54,7 @@ func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	out := []Project{}
 	for rows.Next() {
 		var project Project
-		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path); err == nil {
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.CreatedAt); err == nil {
 			out = append(out, project)
 		}
 	}

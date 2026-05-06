@@ -6,9 +6,11 @@ import (
 )
 
 type Project struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Path string `json:"path"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspaceId,omitempty"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	CreatedAt   string `json:"createdAt,omitempty"`
 }
 
 type Catalog struct {

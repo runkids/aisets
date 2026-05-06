@@ -440,7 +440,8 @@
       "name": "이름",
       "count": "개수",
       "size": "크기",
-      "health": "상태"
+      "health": "상태",
+      "imported": "가져옴"
     },
     "noProjects": "일치하는 프로젝트가 없습니다",
     "noProjectsDesc": "프로젝트 폴더를 추가하거나 검색 조건을 조정하세요.",

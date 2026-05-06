@@ -440,7 +440,8 @@
       "name": "Name",
       "count": "Count",
       "size": "Size",
-      "health": "Health"
+      "health": "Health",
+      "imported": "Imported"
     },
     "noProjects": "No projects found",
     "noProjectsDesc": "Add a project folder or adjust your search.",

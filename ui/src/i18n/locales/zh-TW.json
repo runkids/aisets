@@ -440,7 +440,8 @@
       "name": "名稱",
       "count": "數量",
       "size": "大小",
-      "health": "健康度"
+      "health": "健康度",
+      "imported": "匯入"
     },
     "noProjects": "沒有符合的專案",
     "noProjectsDesc": "新增專案資料夾，或調整搜尋條件。",

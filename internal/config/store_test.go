@@ -42,7 +42,7 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 	}
 	defer reopened.Close()
 	projects := reopened.Projects()
-	if len(projects) != 1 || projects[0].Path != project {
+	if len(projects) != 1 || projects[0].Path != project || projects[0].CreatedAt == "" {
 		t.Fatalf("projects = %#v", projects)
 	}
 }

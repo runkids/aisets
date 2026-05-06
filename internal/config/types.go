@@ -11,6 +11,7 @@ type Project struct {
 	WorkspaceID string `json:"workspaceId"`
 	Name        string `json:"name"`
 	Path        string `json:"path"`
+	CreatedAt   string `json:"createdAt,omitempty"`
 }
 
 type AppSettings struct {

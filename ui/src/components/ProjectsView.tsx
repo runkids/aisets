@@ -42,7 +42,7 @@ type Props = {
   onAddProject?: () => void;
 };
 
-type ProjectStat = {
+export type ProjectStat = {
   project: Project;
   items: AssetItem[];
   bytes: number;
@@ -55,13 +55,14 @@ type ProjectStat = {
   lastScanLabel: string;
 };
 
-type SortKey = "name" | "count" | "size" | "health";
+export type SortKey = "name" | "count" | "size" | "health" | "imported";
 
 const sortItems: Array<{ value: SortKey; label: string }> = [
   { value: "name", label: "" },
   { value: "count", label: "" },
   { value: "size", label: "" },
   { value: "health", label: "" },
+  { value: "imported", label: "" },
 ];
 
 function formatScanTime(value: string, locale: string) {
@@ -131,7 +132,13 @@ function healthTone(health: number): "green" | "amber" | "red" {
   return "red";
 }
 
-function sortProjectStats(stats: ProjectStat[], sort: SortKey) {
+function projectCreatedAtTime(project: Project) {
+  const time = project.createdAt ? new Date(project.createdAt).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function sortProjectStats(stats: ProjectStat[], sort: SortKey) {
   return [...stats].sort((a, b) => {
     if (sort === "count")
       return (
@@ -143,6 +150,11 @@ function sortProjectStats(stats: ProjectStat[], sort: SortKey) {
     if (sort === "health")
       return (
         b.health - a.health || a.project.name.localeCompare(b.project.name)
+      );
+    if (sort === "imported")
+      return (
+        projectCreatedAtTime(b.project) - projectCreatedAtTime(a.project) ||
+        a.project.name.localeCompare(b.project.name)
       );
     return a.project.name.localeCompare(b.project.name);
   });

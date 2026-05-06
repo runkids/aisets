@@ -161,7 +161,7 @@ func (s *Server) projectByID(id string) (scanner.Project, error) {
 func toScannerProjects(projects []config.Project) []scanner.Project {
 	out := make([]scanner.Project, 0, len(projects))
 	for _, project := range projects {
-		out = append(out, scanner.Project{ID: project.ID, Name: project.Name, Path: project.Path})
+		out = append(out, scanner.Project{ID: project.ID, WorkspaceID: project.WorkspaceID, Name: project.Name, Path: project.Path, CreatedAt: project.CreatedAt})
 	}
 	return out
 }

@@ -440,7 +440,8 @@
       "name": "名称",
       "count": "数量",
       "size": "大小",
-      "health": "健康度"
+      "health": "健康度",
+      "imported": "导入"
     },
     "noProjects": "没有匹配的项目",
     "noProjectsDesc": "新增项目文件夹，或调整搜索条件。",
