@@ -1,0 +1,11 @@
+/bin/
+/dist/
+/tmp/
+/ui/dist/
+/ui/node_modules/
+/.cache/
+*.log
+*.tsbuildinfo
+.pnpm-store/
+.DS_Store
+/docs/

@@ -1,0 +1,39 @@
+@use "./tokens";
+@use "./patterns";
+@use "./components";
+@use "./layout";
+
+@media (prefers-reduced-motion: reduce) {
+  .cmdk-backdrop,
+  .cmdk,
+  .modal-backdrop,
+  .modal,
+  .drawer,
+  .run-panel,
+  .bulkbar,
+  .toast-wrap,
+  .acard[data-selected="true"]::after {
+    animation: none;
+  }
+  .btn,
+  .iconbtn,
+  .card,
+  .cmdk-item,
+  .acard,
+  .opt-row,
+  .dgroup-tile {
+    transition:
+      opacity 120ms var(--g-ease),
+      background 120ms var(--g-ease),
+      border-color 120ms var(--g-ease),
+      color 120ms var(--g-ease);
+  }
+  .btn:active:not(:disabled),
+  .iconbtn:active:not(:disabled),
+  .cmdk-item:active,
+  .acard:hover,
+  .opt-row:hover,
+  .scroll-top-btn:hover {
+    transform: none;
+  }
+}

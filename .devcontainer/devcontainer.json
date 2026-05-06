@@ -1,0 +1,27 @@
+{
+  "name": "Asset Studio Dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "asset-studio-devcontainer",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [5174, 19520],
+  "portsAttributes": {
+    "5174": { "label": "Asset Studio UI" },
+    "19520": { "label": "Asset Studio API" }
+  },
+  "remoteEnv": {
+    "PATH": "/workspace/.devcontainer/bin:/usr/local/bin:${containerEnv:PATH}",
+    "ASSET_STUDIO_UI_HOST": "0.0.0.0"
+  },
+  "postCreateCommand": ".devcontainer/setup.sh",
+  "postStartCommand": ".devcontainer/start-dev.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

@@ -1,0 +1,30 @@
+name: asset_studio_devcontainer
+
+services:
+  asset-studio-devcontainer:
+    build:
+      context: ..
+      dockerfile: docker/sandbox/Dockerfile
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      HOME: /home/developer
+      GOCACHE: /go/build-cache
+      ASSET_STUDIO_UI_HOST: 0.0.0.0
+    ports:
+      - "5174:5174"
+      - "19520:19520"
+    volumes:
+      - ..:/workspace
+      - ui-node-modules:/workspace/ui/node_modules
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/go/build-cache
+      - dev-home:/home/developer
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
+  dev-home:
+  ui-node-modules:

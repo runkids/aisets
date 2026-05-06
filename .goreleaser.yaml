@@ -1,0 +1,53 @@
+version: 2
+project_name: asset-studio
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: asset-studio
+    main: ./cmd/asset-studio
+    binary: asset-studio
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+  extra_files:
+    - glob: ./asset-studio-ui-dist.tar.gz
+
+release:
+  github:
+    owner: runkids
+    name: asset-studio
+  extra_files:
+    - glob: ./asset-studio-ui-dist.tar.gz
+
+brews:
+  - name: asset-studio
+    repository:
+      owner: runkids
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/runkids/asset-studio
+    description: Local-first asset management studio
+    license: MIT
+    test: |
+      system "#{bin}/asset-studio", "version"

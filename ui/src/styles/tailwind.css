@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-g-canvas: var(--g-canvas);
+  --color-g-surface: var(--g-surface);
+  --color-g-surface-2: var(--g-surface-2);
+  --color-g-surface-3: var(--g-surface-3);
+  --color-g-line: var(--g-line);
+  --color-g-line-strong: var(--g-line-strong);
+  --color-g-ink: var(--g-ink);
+  --color-g-ink-2: var(--g-ink-2);
+  --color-g-ink-3: var(--g-ink-3);
+  --color-g-ink-4: var(--g-ink-4);
+  --color-g-cta: var(--g-cta);
+  --color-g-cta-ink: var(--g-cta-ink);
+  --color-g-cta-hover: var(--g-cta-hover);
+  --color-g-active-bg: var(--g-active-bg);
+  --color-g-active-text: var(--g-active-text);
+  --color-g-accent: var(--g-accent);
+  --color-g-accent-soft: var(--g-accent-soft);
+  --color-g-accent-ink: var(--g-accent-ink);
+  --color-g-red: var(--g-red);
+  --color-g-red-soft: var(--g-red-soft);
+  --color-g-amber: var(--g-amber);
+  --color-g-amber-soft: var(--g-amber-soft);
+  --color-g-green: var(--g-green);
+  --color-g-green-soft: var(--g-green-soft);
+  --color-g-blue: var(--g-blue);
+  --color-g-blue-soft: var(--g-blue-soft);
+  --color-g-purple: var(--g-purple);
+  --color-g-purple-soft: var(--g-purple-soft);
+  --color-g-info: var(--g-info);
+  --color-g-info-soft: var(--g-info-soft);
+
+  --radius-g-sm: var(--g-r-sm);
+  --radius-g-md: var(--g-r-md);
+  --radius-g-lg: var(--g-r-lg);
+  --radius-g-pill: 9999px;
+
+  --shadow-g-sm: var(--g-shadow-sm);
+  --shadow-g-md: var(--g-shadow-md);
+  --shadow-g-lg: var(--g-shadow-lg);
+  --shadow-g-pop: var(--g-shadow-pop);
+  --shadow-g-inset: var(--g-shadow-inset);
+  --shadow-g-focus: var(--g-shadow-focus);
+
+  --font-g: var(--g-font);
+  --font-g-mono: var(--g-mono);
+  --font-g-display: var(--g-display);
+
+  /* Existing type scale (backward-compat) */
+  --text-g-chip: 11px;
+  --text-g-chip--line-height: 1.33;
+  --text-g-caption: 12px;
+  --text-g-caption--line-height: 1.33;
+  --text-g-ui: 13px;
+  --text-g-ui--line-height: 1.4;
+  --text-g-body: 14px;
+  --text-g-body--line-height: 1.4;
+  --tracking-g-ui: -0.012em;
+  --tracking-g-mono: -0.015em;
+
+  /* Extended type scale */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.38;
+  --text-heading-sm: 24px;
+  --text-heading-sm--line-height: 1.25;
+  --text-heading: 32px;
+  --text-heading--line-height: 1.25;
+  --text-heading-lg: 48px;
+  --text-heading-lg--line-height: 1.13;
+  --text-display: 80px;
+  --text-display--line-height: 1;
+  --tracking-caption: -0.7px;
+  --tracking-body-sm: -0.7px;
+  --tracking-body: -0.43px;
+  --tracking-subheading: -0.36px;
+  --tracking-heading-sm: -0.24px;
+  --tracking-heading: -0.64px;
+  --tracking-heading-lg: -1.2px;
+  --tracking-display: -3.2px;
+
+  --ease-g: var(--g-ease);
+  --ease-g-out: var(--g-ease-out);
+  --ease-g-spring: var(--g-ease-spring);
+
+  /* Button heights (existing) */
+  --spacing-g-btn-sm: 26px;
+  --spacing-g-btn-md: 32px;
+  --spacing-g-btn-lg: 36px;
+
+  /* Extended spacing */
+  --spacing-56: 56px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-128: 128px;
+  --spacing-160: 160px;
+  --spacing-240: 240px;
+}

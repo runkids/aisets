@@ -1,0 +1,112 @@
+package references
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestResolveReferenceKinds(t *testing.T) {
+	root := t.TempDir()
+	tests := []struct {
+		importer string
+		spec     string
+		want     string
+	}{
+		{"src/components/App.tsx", "../assets/logo.png", "src/assets/logo.png"},
+		{"src/components/App.tsx", "@/assets/logo.png", "src/assets/logo.png"},
+		{"src/components/App.tsx", "/src/assets/logo.png", "src/assets/logo.png"},
+		{"src/components/App.tsx", "src/assets/logo.png?raw", "src/assets/logo.png"},
+	}
+	for _, tt := range tests {
+		if got := Resolve(root, tt.importer, tt.spec); got != tt.want {
+			t.Fatalf("Resolve(%q, %q) = %q, want %q", tt.importer, tt.spec, got, tt.want)
+		}
+	}
+	if got := Resolve(root, "src/App.tsx", `./${name}.png`); got != "" {
+		t.Fatalf("dynamic template resolved to %q", got)
+	}
+}
+
+func TestExtractCSSStringAndPatternReferences(t *testing.T) {
+	content := `
+const a = "./assets/a.png"
+const b = ` + "`./assets/${name}.png`" + `
+.hero { background-image: url("../assets/bg.webp"); }
+`
+	refs := Extract(content)
+	if len(refs) != 3 {
+		t.Fatalf("refs = %#v", refs)
+	}
+	if refs[0].Kind != "string" || refs[1].Kind != "pattern" || refs[2].Kind != "css-url" {
+		t.Fatalf("unexpected kinds = %#v", refs)
+	}
+}
+
+func TestBuildMapResolvesProjectReferences(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "src", "assets", "logo.png"), "image")
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "@/assets/logo.png"`)
+	mustWrite(t, filepath.Join(root, "src", "style.css"), `.logo{background:url("./assets/logo.png")}`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{{ProjectID: "p", RepoPath: "src/assets/logo.png"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := refs["p\x00src/assets/logo.png"]
+	if len(got) != 2 {
+		t.Fatalf("refs = %#v", got)
+	}
+	if got[0].File != "src/App.tsx" || got[1].File != "src/style.css" {
+		t.Fatalf("refs sorted/resolved = %#v", got)
+	}
+}
+
+func TestReferenceHelperFunctions(t *testing.T) {
+	exts := CodeExtensions()
+	if !exts[".tsx"] || !exts[".css"] {
+		t.Fatalf("CodeExtensions = %#v", exts)
+	}
+	exts[".tsx"] = false
+	if !CodeExtensions()[".tsx"] {
+		t.Fatal("CodeExtensions returned shared map")
+	}
+	if !referenceMayPointTo("src/assets/logo.png", "./assets/logo.png?raw") {
+		t.Fatal("expected suffix reference to point to asset")
+	}
+	if referenceMayPointTo("src/assets/logo.png", "./other.png") {
+		t.Fatal("unexpected reference match")
+	}
+	if cleanRepoPath("../escape.png") != "" || cleanRepoPath("./src/a.png") != "src/a.png" {
+		t.Fatal("cleanRepoPath did not normalize safely")
+	}
+	if stripQuery(" icon.png?raw ") != "icon.png" {
+		t.Fatalf("stripQuery = %q", stripQuery(" icon.png?raw "))
+	}
+}
+
+func TestBuildMapHonorsContextCancellation(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./logo.png"`)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := BuildMap(ctx, []Project{{ID: "p", Path: root}}, []Asset{{ProjectID: "p", RepoPath: "src/logo.png"}})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("BuildMap canceled err = %v", err)
+	}
+}
+
+func mustWrite(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

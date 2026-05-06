@@ -1,0 +1,75 @@
+import i18n from 'i18next'
+import type { AssetItem, Catalog } from './types'
+
+export type Mode =
+  | 'projects'
+  | 'browse'
+  | 'duplicates'
+  | 'unused'
+  | 'optimize'
+  | 'lint'
+  | 'precheck'
+  | 'settings'
+
+export const modes: Mode[] = [
+  'projects',
+  'browse',
+  'duplicates',
+  'unused',
+  'optimize',
+  'lint',
+  'precheck',
+  'settings',
+]
+
+export function pathForMode(mode: Mode) {
+  return mode === 'projects' ? '/' : `/${mode}`
+}
+
+export function modeForPath(pathname: string): Mode {
+  const segment = pathname.replace(/^\/+|\/+$/g, '').split('/')[0]
+  return modes.includes(segment as Mode) ? (segment as Mode) : 'projects'
+}
+
+export function titleForMode(mode: Mode) {
+  return i18n.t(`mode.${mode}`)
+}
+
+export function descriptionForMode(mode: Mode) {
+  return i18n.t(`mode.${mode}Desc`)
+}
+
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+export function fileName(path: string) {
+  return path.split('/').pop() ?? path
+}
+
+export function primarySeverity(item: AssetItem) {
+  const rank = { critical: 0, warning: 1, info: 2 } as const
+  return item.optimizationRecommendations.reduce<
+    AssetItem['optimizationRecommendations'][number]['severity'] | null
+  >((current, recommendation) => {
+    if (current == null) return recommendation.severity
+    return rank[recommendation.severity] < rank[current]
+      ? recommendation.severity
+      : current
+  }, null)
+}
+
+export function duplicateSavings(catalog: Catalog) {
+  const items = catalog.items ?? []
+  return (catalog.duplicateGroups ?? []).reduce((sum, group) => {
+    const members = items.filter((item) => item.duplicateGroupId === group.id)
+    return (
+      sum +
+      members
+        .filter((item) => item.repoPath !== group.preferredPath)
+        .reduce((size, item) => size + item.bytes, 0)
+    )
+  }, 0)
+}

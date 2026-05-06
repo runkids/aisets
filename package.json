@@ -1,0 +1,23 @@
+{
+  "name": "asset-studio",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "ui/src/**/*.{ts,tsx}": [
+      "npx --prefix ui prettier --write",
+      "npx --prefix ui eslint --fix --config ui/eslint.config.js"
+    ],
+    "ui/src/**/*.{scss,css}": [
+      "npx --prefix ui prettier --write"
+    ],
+    "ui/src/**/*.{json,md}": [
+      "npx --prefix ui prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.0"
+  }
+}

@@ -1,0 +1,467 @@
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ChevronDown, ChevronRight, Copy, Folder, FolderOpen, Terminal, Trash2 } from 'lucide-react'
+import type { AssetItem } from '../types'
+import { fileName, formatBytes } from '../ui'
+import { BrowseGrid } from './BrowseGrid'
+import { BrowseList } from './BrowseList'
+import { BrowseToolbar, type SortMode, type ViewMode } from './BrowseToolbar'
+import { FilterRail } from './FilterRail'
+import { EmptyState } from './ui'
+
+type StatusFilter = '' | 'unused' | 'duplicate' | 'optimize' | 'referenced'
+
+type Props = {
+  items: AssetItem[]
+  activeAssetId: string
+  autoScrollAssetId: string
+  projectFilterName: string
+  imagePreviewEnabled: boolean
+  onAutoScrollDone: () => void
+  onOpenAsset: (id: string) => void
+}
+
+function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
+  switch (status) {
+    case 'unused':
+      return item.usedBy.length === 0
+    case 'duplicate':
+      return item.duplicates.length > 0 || item.similar.length > 0
+    case 'optimize':
+      return item.optimizationRecommendations.length > 0
+    case 'referenced':
+      return item.usedBy.length > 0
+    default:
+      return true
+  }
+}
+
+type FolderNode = {
+  name: string
+  path: string
+  count: number
+  children: FolderNode[]
+}
+
+function buildFolderTree(items: AssetItem[]): FolderNode {
+  const root: FolderNode = { name: '', path: '', count: items.length, children: [] }
+  const map = new Map<string, FolderNode>()
+  map.set('', root)
+
+  for (const item of items) {
+    const parts = item.repoPath.split('/')
+    let current = ''
+    for (let i = 0; i < parts.length - 1; i++) {
+      const parent = current
+      current = current ? `${current}/${parts[i]}` : parts[i]
+      if (!map.has(current)) {
+        const node: FolderNode = { name: parts[i], path: current, count: 0, children: [] }
+        map.set(current, node)
+        map.get(parent)!.children.push(node)
+      }
+    }
+  }
+
+  for (const item of items) {
+    const parts = item.repoPath.split('/')
+    let current = ''
+    for (let i = 0; i < parts.length - 1; i++) {
+      current = current ? `${current}/${parts[i]}` : parts[i]
+      const node = map.get(current)
+      if (node) node.count++
+    }
+  }
+
+  function sortChildren(node: FolderNode) {
+    node.children.sort((a, b) => a.name.localeCompare(b.name))
+    for (const child of node.children) sortChildren(child)
+  }
+  sortChildren(root)
+
+  return root
+}
+
+type TreePanelProps = {
+  root: FolderNode
+  selectedFolder: string
+  expanded: Set<string>
+  onSelectFolder: (path: string) => void
+  onToggleExpand: (path: string) => void
+  allLabel: string
+  totalCount: number
+}
+
+function TreePanel({ root, selectedFolder, expanded, onSelectFolder, onToggleExpand, allLabel, totalCount }: TreePanelProps) {
+  return (
+    <div className="browse-tree-rail scroll-thin">
+      <div className="browse-tree-inner">
+        <button
+          type="button"
+          className="browse-tree-node"
+          data-active={selectedFolder === '' || undefined}
+          onClick={() => onSelectFolder('')}
+        >
+          <FolderOpen size={13} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate">{allLabel}</span>
+          <span className="f-count tnum">{totalCount}</span>
+        </button>
+
+        {root.children.map((child) => (
+          <TreeNode
+            key={child.path}
+            node={child}
+            depth={1}
+            selectedFolder={selectedFolder}
+            expanded={expanded}
+            onSelectFolder={onSelectFolder}
+            onToggleExpand={onToggleExpand}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TreeNode({
+  node,
+  depth,
+  selectedFolder,
+  expanded,
+  onSelectFolder,
+  onToggleExpand,
+}: {
+  node: FolderNode
+  depth: number
+  selectedFolder: string
+  expanded: Set<string>
+  onSelectFolder: (path: string) => void
+  onToggleExpand: (path: string) => void
+}) {
+  const isExpanded = expanded.has(node.path)
+  const isSelected = selectedFolder === node.path
+  const hasChildren = node.children.length > 0
+
+  return (
+    <>
+      <button
+        type="button"
+        className="browse-tree-node"
+        data-active={isSelected || undefined}
+        style={{ '--tree-depth': depth } as CSSProperties}
+        onClick={() => {
+          onSelectFolder(node.path)
+          if (hasChildren && !isExpanded) onToggleExpand(node.path)
+        }}
+      >
+        {hasChildren ? (
+          <span
+            className="browse-tree-toggle"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpand(node.path)
+            }}
+          >
+            {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          </span>
+        ) : (
+          <span className="browse-tree-toggle" />
+        )}
+        {isExpanded ? <FolderOpen size={13} className="shrink-0" /> : <Folder size={13} className="shrink-0" />}
+        <span className="min-w-0 flex-1 truncate">{node.name}</span>
+        <span className="shrink-0 text-[10px] opacity-60">{node.count}</span>
+      </button>
+      {isExpanded &&
+        node.children.map((child) => (
+          <TreeNode
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            selectedFolder={selectedFolder}
+            expanded={expanded}
+            onSelectFolder={onSelectFolder}
+            onToggleExpand={onToggleExpand}
+          />
+        ))}
+    </>
+  )
+}
+
+function sortItems(items: AssetItem[], mode: SortMode): AssetItem[] {
+  const sorted = [...items]
+  switch (mode) {
+    case 'name':
+      sorted.sort((a, b) => fileName(a.repoPath).localeCompare(fileName(b.repoPath)))
+      break
+    case 'size':
+      sorted.sort((a, b) => b.bytes - a.bytes)
+      break
+    case 'recent':
+      break
+  }
+  return sorted
+}
+
+function facetOptions(allIds: string[], scopedItems: AssetItem[], key: 'projectName' | 'ext') {
+  const counts = new Map<string, number>()
+  for (const item of scopedItems) {
+    const id = item[key]
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return {
+    total: scopedItems.length,
+    options: allIds
+      .map((id) => ({ id, count: counts.get(id) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
+  }
+}
+
+function treeHasPath(node: FolderNode, path: string): boolean {
+  if (node.path === path) return true
+  return node.children.some((child) => treeHasPath(child, path))
+}
+
+export function BrowseView({
+  items,
+  activeAssetId,
+  autoScrollAssetId,
+  projectFilterName,
+  imagePreviewEnabled,
+  onAutoScrollDone,
+  onOpenAsset,
+}: Props) {
+  const { t } = useTranslation()
+  const [filters, setFilters] = useState(() => ({ project: projectFilterName, ext: '' }))
+  const [view, setView] = useState<ViewMode>('grid')
+  const [gridSize, setGridSize] = useState<'s' | 'm' | 'l'>('m')
+  const [bgMode, setBgMode] = useState<'checker' | 'light' | 'dark'>('checker')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
+  const [sortMode, setSortMode] = useState<SortMode>('name')
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!autoScrollAssetId) return undefined
+    const resetId = window.setTimeout(() => {
+      setFilters({ project: projectFilterName, ext: '' })
+      setSearchQuery('')
+      setStatusFilter('')
+      setSelectedFolder('')
+    }, 0)
+    return () => window.clearTimeout(resetId)
+  }, [autoScrollAssetId, projectFilterName])
+
+  const allProjects = useMemo(() => {
+    const projectNames = new Set(items.map((i) => i.projectName))
+    if (projectFilterName) projectNames.add(projectFilterName)
+    return Array.from(projectNames).sort()
+  }, [items, projectFilterName])
+  const allExtensions = useMemo(() => Array.from(new Set(items.map((i) => i.ext))).sort(), [items])
+
+  const facetBaseItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return items.filter((i) => {
+      if (!matchesStatus(i, statusFilter)) return false
+      if (q && !fileName(i.repoPath).toLowerCase().includes(q) && !i.repoPath.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [items, statusFilter, searchQuery])
+
+  const projectFacet = useMemo(
+    () => facetOptions(allProjects, facetBaseItems.filter((i) => !filters.ext || i.ext === filters.ext), 'projectName'),
+    [allProjects, facetBaseItems, filters.ext],
+  )
+  const extensionFacet = useMemo(
+    () => facetOptions(allExtensions, facetBaseItems.filter((i) => !filters.project || i.projectName === filters.project), 'ext'),
+    [allExtensions, facetBaseItems, filters.project],
+  )
+
+  const filtered = useMemo(() => {
+    return facetBaseItems.filter((i) => {
+      if (filters.project && i.projectName !== filters.project) return false
+      if (filters.ext && i.ext !== filters.ext) return false
+      return true
+    })
+  }, [facetBaseItems, filters])
+
+  const folderTree = useMemo(() => buildFolderTree(filtered), [filtered])
+  const activeSelectedFolder = useMemo(() => {
+    return selectedFolder && treeHasPath(folderTree, selectedFolder) ? selectedFolder : ''
+  }, [folderTree, selectedFolder])
+
+  const folderFiltered = useMemo(() => {
+    if (view !== 'tree' || !activeSelectedFolder) return filtered
+    return filtered.filter((i) => {
+      const dir = i.repoPath.substring(0, i.repoPath.lastIndexOf('/'))
+      return dir === activeSelectedFolder || dir.startsWith(activeSelectedFolder + '/')
+    })
+  }, [activeSelectedFolder, filtered, view])
+
+  const sorted = useMemo(() => sortItems(folderFiltered, sortMode), [folderFiltered, sortMode])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleBulkMode = useCallback(() => {
+    setBulkMode((prev) => {
+      if (prev) setSelected(new Set())
+      return !prev
+    })
+  }, [])
+
+  const selectedBytes = useMemo(
+    () => items.filter((i) => selected.has(i.id)).reduce((sum, i) => sum + i.bytes, 0),
+    [items, selected],
+  )
+
+  function copyPaths() {
+    const paths = items.filter((i) => selected.has(i.id)).map((i) => i.repoPath)
+    navigator.clipboard?.writeText(paths.join('\n'))
+  }
+
+  function copyAsRm() {
+    const cmds = items.filter((i) => selected.has(i.id)).map((i) => `git rm "${i.repoPath}"`)
+    navigator.clipboard?.writeText(cmds.join('\n'))
+  }
+
+  function handleToggleExpand(path: string) {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  return (
+    <>
+      <FilterRail
+        items={items}
+        filters={filters}
+        projectOptions={projectFacet.options}
+        projectTotal={projectFacet.total}
+        extensionOptions={extensionFacet.options}
+        extensionTotal={extensionFacet.total}
+        onFiltersChange={setFilters}
+      />
+      <div className="content-scroll browse-content-scroll">
+        <div className="page browse-page flex h-full flex-col">
+          <BrowseToolbar
+            view={view}
+            gridSize={gridSize}
+            bgMode={bgMode}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            itemCount={sorted.length}
+            sortMode={sortMode}
+            bulkMode={bulkMode}
+            onViewChange={setView}
+            onGridSizeChange={setGridSize}
+            onBgModeChange={setBgMode}
+            onSearchChange={setSearchQuery}
+            onStatusFilterChange={setStatusFilter}
+            onSortChange={setSortMode}
+            onBulkToggle={toggleBulkMode}
+          />
+
+          {bulkMode && selected.size > 0 && (
+            <div className="bulkbar">
+              <span className="font-g-mono text-[13px] font-[510]">
+                {t('selection.summary', { count: selected.size, size: formatBytes(selectedBytes) })}
+              </span>
+              <span className="flex-1" />
+              <button type="button" className="bulkbar-btn" onClick={copyPaths}>
+                <Copy size={12} />
+                {t('action.copyPaths')}
+              </button>
+              <button type="button" className="bulkbar-btn" onClick={copyAsRm}>
+                <Terminal size={12} />
+                {t('action.copyGitRm')}
+              </button>
+              <button
+                type="button"
+                className="bulkbar-btn bulkbar-btn-danger"
+                onClick={() => {
+                  /* delete action placeholder */
+                }}
+              >
+                <Trash2 size={12} />
+                {t('action.deleteSelected')}
+              </button>
+            </div>
+          )}
+
+          {sorted.length === 0 ? (
+            <EmptyState title={t('browse.empty')} />
+          ) : view === 'tree' ? (
+            <div className="browse-tree-shell">
+              <TreePanel
+                root={folderTree}
+                selectedFolder={activeSelectedFolder}
+                expanded={expandedFolders}
+                onSelectFolder={setSelectedFolder}
+                onToggleExpand={handleToggleExpand}
+                allLabel={t('browse.allFolders')}
+                totalCount={filtered.length}
+              />
+              <div className="browse-tree-main">
+                <BrowseGrid
+                  items={sorted}
+                  gridSize={gridSize}
+                  bgMode={bgMode}
+                  bulkMode={bulkMode}
+                  selected={selected}
+                  activeAssetId={activeAssetId}
+                  autoScrollAssetId={autoScrollAssetId}
+                  imagePreviewEnabled={imagePreviewEnabled}
+                  onAutoScrollDone={onAutoScrollDone}
+                  onSelect={(item) => onOpenAsset(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="browse-results">
+              {view === 'list' ? (
+                <BrowseList
+                  items={sorted}
+                  bgMode={bgMode}
+                  bulkMode={bulkMode}
+                  selected={selected}
+                  activeAssetId={activeAssetId}
+                  autoScrollAssetId={autoScrollAssetId}
+                  imagePreviewEnabled={imagePreviewEnabled}
+                  onAutoScrollDone={onAutoScrollDone}
+                  onSelect={(item) => onOpenAsset(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              ) : (
+                <BrowseGrid
+                  items={sorted}
+                  gridSize={gridSize}
+                  bgMode={bgMode}
+                  bulkMode={bulkMode}
+                  selected={selected}
+                  activeAssetId={activeAssetId}
+                  autoScrollAssetId={autoScrollAssetId}
+                  imagePreviewEnabled={imagePreviewEnabled}
+                  onAutoScrollDone={onAutoScrollDone}
+                  onSelect={(item) => onOpenAsset(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}

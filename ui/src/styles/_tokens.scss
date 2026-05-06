@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;510;590;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap");
+@import "@fontsource-variable/geist-mono";
+
+/* ---------- LIGHT (Daylight Console — companion to dark Midnight Command Center) ----------
+ * Strategy:
+ *   - Surface stack mirrors dark hierarchy but warmer: warm-white canvas → pure white card →
+ *     neutral wash → deeper wash. Avoids harsh pure-white screen fatigue.
+ *   - Primary CTA flips from "Neon Lime + black ink" (dark) to "near-black + white ink" (light) —
+ *     Vercel/GitHub strategy. Brand-recognizable, WCAG AAA contrast in both modes.
+ *   - Neon Lime is preserved for focus rings, selection rings, and hover wash in both modes.
+ *   - Active nav uses neutral wash + bold ink in light mode (lime on white feels like a
+ *     construction sign; the Charcoal wash + 590 weight reads as "selected" without screaming).
+ */
+:root {
+  color-scheme: light;
+
+  --g-mono:
+    "GeistMono Variable", "GeistMono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, monospace;
+  --g-display: "Inter", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --g-font:
+    "Inter", "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+
+  /* Surface stack — copied from asset-duplicate-check/src/styles/studio/_tokens.scss */
+  --g-canvas: #fafaf7;
+  --g-surface: #ffffff;
+  --g-surface-2: #f4f4ee;
+  --g-surface-3: #ececec;
+  --g-line: #e4e4da;
+  --g-line-strong: #c9c9bd;
+
+  /* Ink — copied from asset-duplicate-check */
+  --g-ink: #15152e;
+  --g-ink-2: #3a3a55;
+  --g-ink-3: #6e6e84;
+  --g-ink-4: #9a9aa8;
+  --g-ink-5: #c7c7cd;
+
+  /* Accent — copied from asset-duplicate-check */
+  --g-accent: #ff5436;
+  --g-accent-soft: #ffe9e2;
+  --g-accent-deep: #c8341a;
+  --g-accent-ink: #ffffff;
+
+  /* Theme-swapped CTA pair — primary button uses these */
+  --g-cta: #15152e;
+  --g-cta-ink: #fafaf7;
+  --g-cta-hover: #3a3a55;
+
+  /* Theme-swapped active state — copied from asset-duplicate-check active controls */
+  --g-active-bg: #15152e;
+  --g-active-text: #fafaf7;
+  --g-active-weight: 500;
+
+  --g-info: #2b7fff;
+  --g-info-soft: #e5efff;
+  --g-blue: #2b7fff;
+  --g-blue-soft: #e5efff;
+  --g-green: #00a86b;
+  --g-green-soft: #dcfce7;
+  --g-amber: #f59e0b;
+  --g-amber-soft: #fef3c7;
+  --g-red: #dc2626;
+  --g-red-soft: #fee2e2;
+  --g-purple: #7c3aed;
+  --g-purple-soft: #ede9fe;
+
+  --g-r-xs: 2px;
+  --g-r-sm: 4px;
+  --g-r-md: 6px;
+  --g-r-lg: 12px;
+  --g-r-xl: 16px;
+
+  --g-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --g-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --g-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Shadows — light mode is much subtler. Linear-clones often over-shadow on white. */
+  --g-shadow-sm: 0 1px 2px rgba(20, 20, 46, 0.05);
+  --g-shadow-md:
+    0 4px 12px rgba(20, 20, 46, 0.08), 0 1px 3px rgba(20, 20, 46, 0.04);
+  --g-shadow-lg:
+    0 24px 48px -12px rgba(20, 20, 46, 0.18),
+    0 8px 16px -8px rgba(20, 20, 46, 0.08);
+  --g-shadow-pop:
+    0 0 0 1px rgba(20, 20, 46, 0.1), 0 32px 64px -16px rgba(20, 20, 46, 0.22),
+    0 12px 24px -8px rgba(20, 20, 46, 0.1);
+  --g-shadow-inset: inset 0 0 0 1px var(--g-line);
+  --g-shadow-focus: 0 0 0 3px var(--g-accent-soft);
+}
+
+/* ---------- DARK (canonical — Neon Terminal) ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --g-canvas: #000000; /* Blackout */
+  --g-surface: #0a0a0b; /* Depth */
+  --g-surface-2: #151617; /* Graphite Deep */
+  --g-surface-3: #242628; /* Graphite */
+  --g-line: #242628;
+  --g-line-strong: #303236; /* Graphite Light */
+  --g-ink: #ffffff; /* Whiteout */
+  --g-ink-2: #c9cbcf; /* Cloud */
+  --g-ink-3: #94979e; /* Pewter */
+  --g-ink-4: #797d86; /* Ash */
+  --g-ink-5: #4a4d54;
+
+  --g-accent: #34d59a; /* Neon Glow */
+  --g-accent-soft: #285d49; /* Neon Muted */
+  --g-accent-deep: #39a57d; /* Scanline Fade */
+  --g-accent-ink: #000000;
+
+  /* CTA — Neon Glow on Blackout */
+  --g-cta: #34d59a;
+  --g-cta-ink: #000000;
+  --g-cta-hover: #39a57d;
+
+  /* Active state — Neon Glow fill */
+  --g-active-bg: #34d59a;
+  --g-active-text: #000000;
+  --g-active-weight: 510;
+
+  --g-info: #34d59a; /* Neon Glow as info */
+  --g-info-soft: rgba(52, 213, 154, 0.12);
+  --g-blue: #02b8cc; /* Cyan Spark */
+  --g-blue-soft: rgba(2, 184, 204, 0.14);
+  --g-green: #34d59a; /* Neon Glow */
+  --g-green-soft: rgba(52, 213, 154, 0.16);
+  --g-amber: #f0b429;
+  --g-amber-soft: rgba(240, 180, 41, 0.16);
+  --g-red: #ff3621; /* System Warning */
+  --g-red-soft: rgba(255, 54, 33, 0.16);
+  --g-purple: #8b5cf6; /* Amethyst */
+  --g-purple-soft: rgba(139, 92, 246, 0.16);
+
+  --g-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --g-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --g-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.4);
+  --g-shadow-pop:
+    0 4px 32px rgba(0, 0, 0, 0.6), 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+  --g-shadow-inset: inset 0 0 0 1px #242628;
+  --g-shadow-focus: 0 0 0 2px rgba(52, 213, 154, 0.45);
+}

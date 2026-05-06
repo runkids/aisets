@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { displayCatalogForMode, displayTotalsForMode, navigationBadges } from './appScope'
+import { AppTopbar } from './components/AppTopbar'
+import { AssetDrawer } from './components/AssetDrawer'
+import { BrowseView } from './components/BrowseView'
+import { CommandPalette } from './components/CommandPalette'
+import { ProjectsView } from './components/ProjectsView'
+import { DirectoryPickerModal } from './components/DirectoryPickerModal'
+import { DuplicatesView } from './components/DuplicatesView'
+import { LintView } from './components/LintView'
+import { NavSidebar } from './components/NavSidebar'
+import { OptimizeView } from './components/OptimizeView'
+import { PreCheckView } from './components/PreCheckView'
+import { PreviewModal } from './components/PreviewModal'
+import { ScrollToTop } from './components/ScrollToTop'
+import { SettingsView } from './components/SettingsView'
+import { useToast } from './components/ToastProvider'
+import { UnusedView } from './components/UnusedView'
+import { NoticeStack } from './components/ui'
+import {
+  useAddProjectMutation,
+  useApplyPreviewMutation,
+  useCatalogQuery,
+  useDeleteUnusedPreviewMutation,
+  useRenamePreviewMutation,
+  useScanCatalogMutation,
+  useSettingsQuery,
+} from './queries'
+import { errorMessage } from './i18n/index'
+import type { ActionPreview, AssetItem } from './types'
+import { modeForPath, pathForMode, type Mode } from './ui'
+
+type PreviewState = { endpoint: string; token: string; value: ActionPreview }
+
+export function App() {
+  const { t } = useTranslation()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const mode = modeForPath(location.pathname)
+
+  const [preview, setPreview] = useState<PreviewState | null>(null)
+  const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false)
+  const [cmdkOpen, setCmdkOpen] = useState(false)
+  const [autoScrollAssetId, setAutoScrollAssetId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return window.localStorage.getItem('asset-studio-theme') === 'light' ? 'light' : 'dark'
+  })
+  const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
+    return window.localStorage.getItem('asset-studio-image-preview') !== 'off'
+  })
+
+  const drawerId = searchParams.get('asset') ?? ''
+
+  function changeMode(nextMode: Mode, projectId?: string) {
+    if (projectId != null) setSelectedProjectId(projectId)
+    navigate(pathForMode(nextMode))
+  }
+
+  const setDrawerId = useCallback((id: string) => {
+    setAutoScrollAssetId('')
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (id) next.set('asset', id)
+      else next.delete('asset')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const toast = useToast()
+  const catalogQuery = useCatalogQuery()
+  const scanMutation = useScanCatalogMutation()
+  const settingsQuery = useSettingsQuery()
+  const addProjectMutation = useAddProjectMutation()
+  const renamePreviewMutation = useRenamePreviewMutation()
+  const deletePreviewMutation = useDeleteUnusedPreviewMutation()
+  const applyPreviewMutation = useApplyPreviewMutation()
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem('asset-studio-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    window.localStorage.setItem('asset-studio-image-preview', imagePreviewEnabled ? 'on' : 'off')
+  }, [imagePreviewEnabled])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); setCmdkOpen(v => !v) }
+      else if (e.key === 'Escape') setCmdkOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const catalog = catalogQuery.data ?? null
+  const items = useMemo(() => catalog?.items ?? [], [catalog])
+  const working = catalogQuery.isFetching || scanMutation.isPending || addProjectMutation.isPending
+  const workspaceName = settingsQuery.data?.settings.workspaceName ?? t('projects.workspaceName')
+
+  const effectiveSelectedProjectId = selectedProjectId && catalog?.projects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : ''
+
+  const selectedProject = useMemo(() => {
+    return catalog?.projects.find((project) => project.id === effectiveSelectedProjectId) ?? null
+  }, [catalog, effectiveSelectedProjectId])
+
+  const projectAssetCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of items) counts.set(item.projectId, (counts.get(item.projectId) ?? 0) + 1)
+    return counts
+  }, [items])
+
+  const projectSwitchProjects = useMemo(() => {
+    return (catalog?.projects ?? []).map((project) => ({
+      ...project,
+      assetCount: projectAssetCounts.get(project.id) ?? 0,
+    }))
+  }, [catalog, projectAssetCounts])
+
+  const scopedItems = useMemo(() => {
+    return effectiveSelectedProjectId ? items.filter((item) => item.projectId === effectiveSelectedProjectId) : items
+  }, [effectiveSelectedProjectId, items])
+
+  const scopedItemIds = useMemo(() => new Set(scopedItems.map((item) => item.id)), [scopedItems])
+
+  const scopedDuplicateGroups = useMemo(() => {
+    if (!catalog) return []
+    return catalog.duplicateGroups.filter((group) => scopedItems.filter((item) => item.duplicateGroupId === group.id).length > 1)
+  }, [catalog, scopedItems])
+
+  const scopedNearDuplicates = useMemo(() => {
+    if (!catalog) return []
+    return catalog.nearDuplicates.filter((pair) => scopedItemIds.has(pair.leftId) && scopedItemIds.has(pair.rightId))
+  }, [catalog, scopedItemIds])
+
+  const scopedLintFindings = useMemo(() => {
+    if (!catalog) return []
+    if (!selectedProject) return catalog.lintFindings
+    return catalog.lintFindings.filter((finding) => {
+      if (finding.assetId) return scopedItemIds.has(finding.assetId)
+      return finding.file.startsWith(selectedProject.name)
+    })
+  }, [catalog, scopedItemIds, selectedProject])
+
+  const unusedItems = useMemo(() => scopedItems.filter(i => i.usedBy.length === 0), [scopedItems])
+  const optimizeItems = useMemo(() => scopedItems.filter(i => i.optimizationRecommendations.length > 0), [scopedItems])
+  const browseItems = useMemo(() => scopedItems, [scopedItems])
+  const lintFindings = scopedLintFindings
+
+  const optimizeCount = optimizeItems.length
+  const scopedStats = useMemo(() => ({
+    totalFiles: scopedItems.length,
+    duplicateGroups: scopedDuplicateGroups.length,
+    duplicateFiles: scopedItems.filter((item) => item.duplicateGroupId && scopedDuplicateGroups.some((group) => group.id === item.duplicateGroupId)).length,
+    unusedFiles: unusedItems.length,
+    nearDuplicates: scopedNearDuplicates.length,
+    lintFindings: scopedLintFindings.length,
+    cacheHits: catalog?.stats.cacheHits ?? 0,
+  }), [catalog, scopedDuplicateGroups, scopedItems, scopedLintFindings, scopedNearDuplicates, unusedItems.length])
+
+  const scopedCatalog = useMemo(() => {
+    if (!catalog) return null
+    const projects = selectedProject ? [selectedProject] : catalog.projects
+    return {
+      ...catalog,
+      projects,
+      items: scopedItems,
+      duplicateGroups: scopedDuplicateGroups,
+      nearDuplicates: scopedNearDuplicates,
+      lintFindings: scopedLintFindings,
+      stats: scopedStats,
+    }
+  }, [catalog, scopedDuplicateGroups, scopedItems, scopedLintFindings, scopedNearDuplicates, scopedStats, selectedProject])
+
+  const badges = navigationBadges(catalog, scopedStats, optimizeCount)
+  const displayCatalog = displayCatalogForMode(mode, catalog, scopedCatalog)
+
+  const drawerAsset = drawerId ? items.find(i => i.id === drawerId) : undefined
+  const directoryPickerInitialPath = settingsQuery.data?.settings.defaultProjectRoot ?? ''
+
+  const notices: ComponentProps<typeof NoticeStack>['items'] = []
+  if (catalogQuery.error) notices.push({ id: 'catalog-error', tone: 'danger', title: t('error.catalogLoad'), children: errorMessage(catalogQuery.error) })
+  if (scanMutation.error) notices.push({ id: 'scan-error', tone: 'danger', title: t('error.scan'), children: errorMessage(scanMutation.error) })
+  if (addProjectMutation.error) notices.push({ id: 'add-error', tone: 'danger', title: t('error.addProject'), children: errorMessage(addProjectMutation.error) })
+
+  function onAddProject(path: string) {
+    addProjectMutation.mutate(path, {
+      onSuccess: () => {
+        setDirectoryPickerOpen(false)
+        toast.success(t('toast.projectAdded', { path }))
+      },
+      onError: (e) => toast.error(errorMessage(e)),
+    })
+  }
+
+  function onRescan() {
+    scanMutation.mutate(undefined, {
+      onSuccess: () => toast.success(t('toast.scanComplete')),
+      onError: (e) => toast.error(errorMessage(e)),
+    })
+  }
+
+  async function onRename(item: AssetItem) {
+    const targetPath = window.prompt(t('prompt.renamePath'), item.repoPath)
+    if (!targetPath || targetPath === item.repoPath) return
+    const result = await renamePreviewMutation.mutateAsync({ assetId: item.id, targetPath })
+    setPreview({ endpoint: '/api/actions/rename/apply', token: result.token, value: result.preview })
+  }
+
+  async function onDelete(item: AssetItem) {
+    const result = await deletePreviewMutation.mutateAsync(item.id)
+    setPreview({ endpoint: '/api/actions/delete-unused/apply', token: result.token, value: result.preview })
+  }
+
+  async function onApplyPreview() {
+    if (!preview) return
+    try {
+      await applyPreviewMutation.mutateAsync({ endpoint: preview.endpoint, token: preview.token })
+      setPreview(null)
+      toast.success(t('toast.applyComplete'))
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
+  function onCopyPath(path: string) {
+    navigator.clipboard?.writeText(path)
+    toast.info(t('toast.copied'), { durationMs: 1800 })
+  }
+
+  function openAssetFromPalette(id: string) {
+    if (!scopedItemIds.has(id)) return
+    const params = new URLSearchParams({ asset: id })
+    setAutoScrollAssetId(id)
+    navigate({ pathname: pathForMode('browse'), search: `?${params.toString()}` })
+  }
+
+  const clearAutoScrollAssetId = useCallback(() => setAutoScrollAssetId(''), [])
+
+  const displayTotals = displayTotalsForMode(mode, catalog, scopedCatalog)
+  const totalLabel = displayTotals
+    ? t('topbar.totalLabel', displayTotals)
+    : t('topbar.noCatalog')
+
+  return (
+    <main className="app">
+      <NavSidebar
+        mode={mode}
+        badges={badges}
+        workspaceName={workspaceName}
+        projects={projectSwitchProjects}
+        selectedProjectId={effectiveSelectedProjectId}
+        totalAssets={items.length}
+        onSelectProject={setSelectedProjectId}
+        onSelect={changeMode}
+      />
+      <section className="main">
+        <AppTopbar
+          mode={mode}
+          totalLabel={totalLabel}
+          working={working}
+          onAddProject={() => setDirectoryPickerOpen(true)}
+          onRefresh={onRescan}
+          onOpenCmdK={() => setCmdkOpen(true)}
+        />
+
+        <NoticeStack items={notices} />
+
+        <div className="content">
+          {mode === 'browse' ? (
+            <BrowseView
+              key={selectedProject ? `${selectedProject.id}:${selectedProject.name}` : 'all-projects'}
+              items={browseItems}
+              activeAssetId={drawerId}
+              autoScrollAssetId={autoScrollAssetId}
+              projectFilterName={selectedProject?.name ?? ''}
+              imagePreviewEnabled={imagePreviewEnabled}
+              onAutoScrollDone={clearAutoScrollAssetId}
+              onOpenAsset={setDrawerId}
+            />
+          ) : mode === 'settings' ? (
+            <SettingsView
+              theme={theme}
+              imagePreviewEnabled={imagePreviewEnabled}
+              onThemeChange={setTheme}
+              onImagePreviewEnabledChange={setImagePreviewEnabled}
+            />
+          ) : (
+            <div className="content-scroll">
+              {mode === 'precheck' ? (
+                <PreCheckView onOpenAsset={openAssetFromPalette} />
+              ) : displayCatalog == null && !catalogQuery.isLoading ? null : mode === 'projects' && displayCatalog ? (
+                <ProjectsView catalog={displayCatalog} onJump={changeMode} onAddProject={() => setDirectoryPickerOpen(true)} />
+              ) : mode === 'duplicates' && scopedCatalog ? (
+                <DuplicatesView items={scopedItems} groups={scopedCatalog.duplicateGroups} nearDuplicates={scopedCatalog.nearDuplicates} onOpenAsset={setDrawerId} />
+              ) : mode === 'unused' ? (
+                <UnusedView items={unusedItems} onOpenAsset={setDrawerId} />
+              ) : mode === 'optimize' ? (
+                <OptimizeView items={optimizeItems} onOpenAsset={setDrawerId} />
+              ) : mode === 'lint' ? (
+                <LintView findings={lintFindings} onOpenAsset={setDrawerId} />
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <ScrollToTop />
+
+      {drawerAsset && (
+        <AssetDrawer
+          asset={drawerAsset}
+          onClose={() => setDrawerId('')}
+          onRename={onRename}
+          onDelete={onDelete}
+          onCopyPath={onCopyPath}
+        />
+      )}
+
+      <CommandPalette
+        open={cmdkOpen}
+        assets={scopedItems}
+        onClose={() => setCmdkOpen(false)}
+        onNavigate={changeMode}
+        onOpenAsset={openAssetFromPalette}
+      />
+
+      {directoryPickerOpen && (
+        <DirectoryPickerModal
+          open={directoryPickerOpen}
+          working={addProjectMutation.isPending}
+          initialPath={directoryPickerInitialPath}
+          onClose={() => setDirectoryPickerOpen(false)}
+          onSelect={onAddProject}
+        />
+      )}
+
+      {preview && (
+        <PreviewModal
+          preview={preview.value}
+          working={applyPreviewMutation.isPending}
+          onCancel={() => setPreview(null)}
+          onApply={onApplyPreview}
+        />
+      )}
+    </main>
+  )
+}
