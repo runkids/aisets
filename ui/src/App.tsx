@@ -158,6 +158,12 @@ export function App() {
     }));
   }, [catalog, projectAssetCounts]);
 
+  const browseProjectNames = useMemo(() => {
+    if (!catalog) return [];
+    if (selectedProject) return [selectedProject.name];
+    return catalog.projects.map((project) => project.name);
+  }, [catalog, selectedProject]);
+
   const scopedItems = useMemo(() => {
     return effectiveSelectedProjectId
       ? items.filter((item) => item.projectId === effectiveSelectedProjectId)
@@ -402,6 +408,7 @@ export function App() {
                 items={browseItems}
                 activeAssetId={drawerId}
                 autoScrollAssetId={autoScrollAssetId}
+                projectNames={browseProjectNames}
                 projectFilterName={selectedProject?.name ?? ""}
                 imagePreviewEnabled={imagePreviewEnabled}
                 onAutoScrollDone={clearAutoScrollAssetId}

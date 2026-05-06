@@ -665,6 +665,7 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 ### 7.1 Browse
 - Grid mode `.browse-grid` size variants: `s` (120px min) / default (180px) / `l` (240px)
 - List mode: `.list` 6-column grid, sticky header `--g-surface-2` bg
+- In All projects scope, the Browse project filter rail is driven by the registered project list, not just assets in the current result set, so zero-asset projects remain visible with a `0` count.
 - Project-scoped entry points open Browse with the matching project facet active in `.filter-rail`, so the visible active pill matches the source project card / sidebar project scope.
 - Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with status chips (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
 - Active list row: `--g-accent-soft` bg + 4px left **Neon Lime** stripe
