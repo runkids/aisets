@@ -114,7 +114,7 @@ export function AppTopbar({
       <div className="flex-1" />
 
       <TextInputButton
-        className="w-80 max-w-[40vw] shrink-0 grow-0"
+        className="w-[320px] max-w-[40vw] shrink-0"
         icon={<Search size={14} aria-hidden="true" />}
         suffix={<Keycap>⌘ P</Keycap>}
         value={t("search.placeholderShort")}

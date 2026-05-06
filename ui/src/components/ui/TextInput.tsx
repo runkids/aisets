@@ -55,7 +55,7 @@ const textInputShellVariants = cva(
 
 const textInputButtonVariants = cva(
   [
-    "inline-flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-g-md border border-solid px-2.5 text-left text-g-ink",
+    "inline-flex min-w-0 cursor-pointer items-center gap-2 rounded-g-md border border-solid px-2.5 text-left text-g-ink",
     "transition-[background,border-color,box-shadow,transform] duration-[120ms] ease-g",
     "focus-visible:border-g-accent focus-visible:bg-g-surface focus-visible:shadow-g-focus focus-visible:outline-none",
     "disabled:cursor-not-allowed disabled:opacity-[0.38]",
