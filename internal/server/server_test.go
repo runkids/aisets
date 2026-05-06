@@ -13,11 +13,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
+	"asset-studio/internal/imageproc"
+	"asset-studio/internal/scanner"
 )
 
 func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
@@ -97,6 +100,111 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"canApply":false`) {
 		t.Fatalf("optimization preview = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestScanHistoryRoutes(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	baseID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "fixture", Path: root}},
+		Items: []scanner.AssetItem{
+			serverScanAsset(root, "src/changed.png", 100, "before", 1),
+			serverScanAsset(root, "src/removed.png", 50, "removed", 0),
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:01:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "fixture", Path: root}},
+		Items: []scanner.AssetItem{
+			serverScanAsset(root, "src/changed.png", 120, "after", 1),
+			serverScanAsset(root, "src/added.png", 40, "added", 0),
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/scans", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("scans = %d %s", rec.Code, rec.Body.String())
+	}
+	var listBody struct {
+		Scans []config.ScanSummary `json:"scans"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listBody); err != nil {
+		t.Fatal(err)
+	}
+	if len(listBody.Scans) != 2 || listBody.Scans[0].ID != targetID {
+		t.Fatalf("scans body = %#v", listBody)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/scans/"+strconv.FormatInt(baseID, 10), nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"id":`+strconv.FormatInt(baseID, 10)) {
+		t.Fatalf("scan summary = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/scans/diff?base=&target="+strconv.FormatInt(targetID, 10), nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"code":"scan_id_required"`) {
+		t.Fatalf("invalid diff = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/scans/diff?base="+strconv.FormatInt(baseID, 10)+"&target="+strconv.FormatInt(targetID, 10), nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("diff = %d %s", rec.Code, rec.Body.String())
+	}
+	var diff config.ScanDiff
+	if err := json.Unmarshal(rec.Body.Bytes(), &diff); err != nil {
+		t.Fatal(err)
+	}
+	if diff.Summary.Added != 1 || diff.Summary.Removed != 1 || diff.Summary.Modified != 1 {
+		t.Fatalf("diff body = %#v", diff)
+	}
+}
+
+func serverScanAsset(root, repoPath string, bytes int64, hash string, usedCount int) scanner.AssetItem {
+	usedBy := make([]string, 0, usedCount)
+	refs := make([]scanner.AssetReference, 0, usedCount)
+	for i := 0; i < usedCount; i++ {
+		usedBy = append(usedBy, "src/App.tsx")
+		refs = append(refs, scanner.AssetReference{File: "src/App.tsx", Line: i + 1, Specifier: repoPath, Kind: "string"})
+	}
+	return scanner.AssetItem{
+		ID:            "p:" + repoPath,
+		ProjectID:     "p",
+		ProjectName:   "fixture",
+		RepoPath:      repoPath,
+		LocalPath:     filepath.Join(root, repoPath),
+		Ext:           filepath.Ext(repoPath),
+		Bytes:         bytes,
+		ContentHash:   hash,
+		HashAlgorithm: "blake3",
+		Image:         imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
+		UsedBy:        usedBy,
+		References:    refs,
 	}
 }
 

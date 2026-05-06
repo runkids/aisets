@@ -176,8 +176,12 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 		}},
 		Stats: scanner.CatalogStats{TotalFiles: 1, DuplicateGroups: 1, DuplicateFiles: 2, UnusedFiles: 0, NearDuplicates: 1, CacheHits: 4},
 	}
-	if err := store.RecordScan(catalog); err != nil {
+	scanID, err := store.RecordScan(catalog)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if scanID == 0 {
+		t.Fatal("scan id was not returned")
 	}
 	assertRowCount(t, store, "scans", 1)
 	assertRowCount(t, store, "asset_snapshots", 1)
@@ -186,6 +190,84 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 	assertRowCount(t, store, "duplicate_group_snapshots", 1)
 	assertRowCount(t, store, "duplicate_group_assets", 2)
 	assertRowCount(t, store, "near_duplicate_snapshots", 1)
+}
+
+func TestScanHistoryAndDiff(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	baseID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "fixture", Path: root}},
+		Items: []scanner.AssetItem{
+			scanAsset(root, "p", "fixture", "src/removed.png", 100, "removed", 1, 10),
+			scanAsset(root, "p", "fixture", "src/modified.png", 200, "before", 2, 20),
+			scanAsset(root, "p", "fixture", "src/ref.png", 300, "same-ref", 1, 30),
+			scanAsset(root, "p", "fixture", "src/unused.png", 400, "same-unused", 1, 40),
+			scanAsset(root, "p", "fixture", "src/reused.png", 500, "same-reused", 0, 50),
+		},
+		DuplicateGroups: []scanner.DuplicateGroup{{ID: "dup-1", ContentHash: "before", HashAlgorithm: "blake3", Paths: []string{"src/modified.png", "src/removed.png"}, PreferredPath: "src/modified.png"}},
+		Stats:           scanner.CatalogStats{TotalFiles: 5, DuplicateGroups: 1, UnusedFiles: 1, NearDuplicates: 1},
+		NearDuplicates:  []scanner.NearDuplicate{{ID: "near-1", LeftPath: "src/a.png", RightPath: "src/b.png"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:01:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "fixture", Path: root}},
+		Items: []scanner.AssetItem{
+			scanAsset(root, "p", "fixture", "src/added.png", 50, "added", 0, 5),
+			scanAsset(root, "p", "fixture", "src/modified.png", 250, "after", 2, 25),
+			scanAsset(root, "p", "fixture", "src/ref.png", 300, "same-ref", 3, 35),
+			scanAsset(root, "p", "fixture", "src/unused.png", 400, "same-unused", 0, 45),
+			scanAsset(root, "p", "fixture", "src/reused.png", 500, "same-reused", 2, 55),
+		},
+		DuplicateGroups: []scanner.DuplicateGroup{
+			{ID: "dup-1", ContentHash: "after", HashAlgorithm: "blake3", Paths: []string{"src/modified.png", "src/added.png"}, PreferredPath: "src/modified.png"},
+			{ID: "dup-2", ContentHash: "same-ref", HashAlgorithm: "blake3", Paths: []string{"src/ref.png", "src/unused.png"}, PreferredPath: "src/ref.png"},
+		},
+		Stats:          scanner.CatalogStats{TotalFiles: 5, DuplicateGroups: 2, UnusedFiles: 2, NearDuplicates: 3},
+		NearDuplicates: []scanner.NearDuplicate{{ID: "near-1", LeftPath: "src/a.png", RightPath: "src/b.png"}, {ID: "near-2", LeftPath: "src/c.png", RightPath: "src/d.png"}, {ID: "near-3", LeftPath: "src/e.png", RightPath: "src/f.png"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scans, err := store.ListScans()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scans) != 2 || scans[0].ID != targetID || scans[1].ID != baseID {
+		t.Fatalf("scans = %#v", scans)
+	}
+	if _, err := store.Scan(999); !isAPIErrorCode(err, "scan_not_found") {
+		t.Fatalf("missing scan err = %#v", err)
+	}
+	diff, err := store.DiffScans(baseID, targetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff.Summary.Added != 1 || diff.Summary.Removed != 1 || diff.Summary.Modified != 1 || diff.Summary.ReferenceChanged != 3 {
+		t.Fatalf("diff summary = %#v", diff.Summary)
+	}
+	if diff.Summary.BecameUnused != 1 || diff.Summary.NoLongerUnused != 1 {
+		t.Fatalf("unused summary = %#v transitions=%#v", diff.Summary, diff.UnusedTransitions)
+	}
+	if diff.Summary.TotalByteDelta != 0 || diff.Summary.OptimizationSavingsDelta != 15 {
+		t.Fatalf("delta summary = %#v", diff.Summary)
+	}
+	if diff.Summary.DuplicateGroupsDelta != 1 || diff.Summary.NearDuplicatesDelta != 2 {
+		t.Fatalf("group deltas = %#v", diff.Summary)
+	}
+	if diff.Added[0].RepoPath != "src/added.png" || diff.Removed[0].RepoPath != "src/removed.png" || diff.Modified[0].RepoPath != "src/modified.png" {
+		t.Fatalf("diff arrays = %#v %#v %#v", diff.Added, diff.Removed, diff.Modified)
+	}
 }
 
 func TestDataAndCacheDirsHonorXDG(t *testing.T) {
@@ -344,6 +426,42 @@ func TestExportImportAndResetData(t *testing.T) {
 	if err := store.ImportData(ExportData{Version: 99}); err == nil || err.(apierr.Error).Code != "settings_import_version_unsupported" {
 		t.Fatalf("unsupported import err = %T %[1]v", err)
 	}
+}
+
+func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash string, usedCount int, savings int64) scanner.AssetItem {
+	usedBy := make([]string, 0, usedCount)
+	refs := make([]scanner.AssetReference, 0, usedCount)
+	for i := 0; i < usedCount; i++ {
+		file := "src/ref.tsx"
+		usedBy = append(usedBy, file)
+		refs = append(refs, scanner.AssetReference{File: file, Line: i + 1, Specifier: repoPath, Kind: "string"})
+	}
+	return scanner.AssetItem{
+		ID:            projectID + ":" + repoPath,
+		ProjectID:     projectID,
+		ProjectName:   projectName,
+		RepoPath:      repoPath,
+		LocalPath:     filepath.Join(root, repoPath),
+		Ext:           filepath.Ext(repoPath),
+		Bytes:         bytes,
+		ContentHash:   hash,
+		HashAlgorithm: "blake3",
+		Image:         imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
+		UsedBy:        usedBy,
+		References:    refs,
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "size",
+			Severity:       "warning",
+			ReasonCode:     "large_asset",
+			SuggestionCode: "optimize",
+			SavingsBytes:   savings,
+		}},
+	}
+}
+
+func isAPIErrorCode(err error, code string) bool {
+	coded, ok := err.(apierr.Error)
+	return ok && coded.Code == code
 }
 
 func assertRowCount(t *testing.T, store *Store, table string, want int) {

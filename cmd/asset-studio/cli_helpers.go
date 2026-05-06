@@ -28,14 +28,20 @@ func parseFlagSet(fs *flag.FlagSet, args []string) error {
 }
 
 func scanCatalog(ctx context.Context, store *config.Store) (scanner.Catalog, error) {
+	catalog, _, err := scanCatalogWithID(ctx, store)
+	return catalog, err
+}
+
+func scanCatalogWithID(ctx context.Context, store *config.Store) (scanner.Catalog, int64, error) {
 	catalog, err := scanner.New().Scan(ctx, toScannerProjects(store.Projects()))
 	if err != nil {
-		return scanner.Catalog{}, err
+		return scanner.Catalog{}, 0, err
 	}
-	if err := store.RecordScan(catalog); err != nil {
-		return scanner.Catalog{}, err
+	scanID, err := store.RecordScan(catalog)
+	if err != nil {
+		return scanner.Catalog{}, 0, err
 	}
-	return catalog, nil
+	return catalog, scanID, nil
 }
 
 func projectAndItem(ctx context.Context, store *config.Store, assetID string) (scanner.Project, scanner.AssetItem, error) {

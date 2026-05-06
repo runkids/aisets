@@ -40,6 +40,8 @@ func run(rawArgs []string) int {
 		err = cmdSettings(args[1:], jsonOut)
 	case "scan":
 		err = cmdScan(args[1:], jsonOut)
+	case "scans":
+		err = cmdScans(args[1:], jsonOut)
 	case "optimize":
 		err = cmdOptimize(args[1:], jsonOut)
 	case "pre-check":
@@ -82,6 +84,8 @@ func usageText() string {
   asset-studio settings import file.json [--json]
   asset-studio settings reset-database --confirm RESET [--json]
   asset-studio scan [projectPaths...] [--json]
+  asset-studio scans list [--json]
+  asset-studio scans diff --base ID --target ID [--json]
   asset-studio optimize estimate [assetIds...] [--json]
   asset-studio optimize script [assetIds...] [--json]
   asset-studio pre-check [filePaths...] [--json]
@@ -96,6 +100,7 @@ Commands:
   projects   List, add, rename, or remove imported projects
   settings   Inspect, export, import, or reset local state
   scan       Scan projects and print catalog summary or JSON
+  scans      List scan history or compare completed scans
   optimize   Estimate recommendations or generate a review script
   pre-check  Analyze files before adding them to a project
   actions    Preview or apply safe file mutations

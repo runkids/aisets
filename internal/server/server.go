@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -109,6 +110,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/reset-database", s.handleSettingsResetDatabase)
 	s.mux.HandleFunc("GET /api/catalog", s.handleCatalog)
 	s.mux.HandleFunc("POST /api/scan", s.handleScan)
+	s.mux.HandleFunc("GET /api/scans", s.handleScans)
+	s.mux.HandleFunc("GET /api/scans/{id}", s.handleScanSummary)
+	s.mux.HandleFunc("GET /api/scans/diff", s.handleScanDiff)
 	s.mux.HandleFunc("GET /api/assets/{id}", s.handleAsset)
 	s.mux.HandleFunc("GET /api/thumbs/{id}", s.handleThumb)
 	s.mux.HandleFunc("POST /api/actions/optimization/preview", s.handleOptimizationPreview)
@@ -225,6 +229,29 @@ func settingsErrorStatus(err error) int {
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
+}
+
+func scanErrorStatus(err error) int {
+	if coded, ok := err.(apierr.Error); ok {
+		switch coded.Code {
+		case "scan_not_found":
+			return http.StatusNotFound
+		case "scan_id_required", "scan_id_invalid", "scan_diff_same_scan":
+			return http.StatusBadRequest
+		}
+	}
+	return http.StatusInternalServerError
+}
+
+func parseScanIDParam(raw, name string) (int64, error) {
+	if raw == "" {
+		return 0, apierr.WithParams("scan_id_required", "scan id is required", map[string]any{"param": name})
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, apierr.WithParams("scan_id_invalid", "scan id is invalid", map[string]any{"param": name, "value": raw})
+	}
+	return id, nil
 }
 
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
@@ -379,12 +406,54 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("cache-control", "no-store")
 	sendNDJSON(w, map[string]any{"type": "start"})
 	sendNDJSON(w, map[string]any{"type": "progress", "phase": "scan"})
-	catalog, err := s.scan(r.Context())
+	catalog, scanID, err := s.scan(r.Context())
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_failed")})
 		return
 	}
-	sendNDJSON(w, map[string]any{"type": "done", "stats": catalog.Stats})
+	sendNDJSON(w, map[string]any{"type": "done", "scanId": scanID, "stats": catalog.Stats})
+}
+
+func (s *Server) handleScans(w http.ResponseWriter, _ *http.Request) {
+	scans, err := s.store.ListScans()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"scans": scans})
+}
+
+func (s *Server) handleScanSummary(w http.ResponseWriter, r *http.Request) {
+	id, err := parseScanIDParam(r.PathValue("id"), "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	scan, err := s.store.Scan(id)
+	if err != nil {
+		writeError(w, scanErrorStatus(err), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"scan": scan})
+}
+
+func (s *Server) handleScanDiff(w http.ResponseWriter, r *http.Request) {
+	baseID, err := parseScanIDParam(r.URL.Query().Get("base"), "base")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	targetID, err := parseScanIDParam(r.URL.Query().Get("target"), "target")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	diff, err := s.store.DiffScans(baseID, targetID)
+	if err != nil {
+		writeError(w, scanErrorStatus(err), apierr.From(err, "scan_diff_failed"))
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
 }
 
 func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
@@ -659,7 +728,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go func() {
-		_, _ = s.scan(context.Background())
+		_, _, _ = s.scan(context.Background())
 	}()
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
@@ -672,22 +741,24 @@ func (s *Server) ensureCatalog(ctx context.Context) (scanner.Catalog, error) {
 	if hasCatalog {
 		return catalog, nil
 	}
-	return s.scan(ctx)
+	catalog, _, err := s.scan(ctx)
+	return catalog, err
 }
 
-func (s *Server) scan(ctx context.Context) (scanner.Catalog, error) {
+func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
 	projects := toScannerProjects(s.store.Projects())
 	catalog, err := s.scanner.Scan(ctx, projects)
 	if err != nil {
-		return scanner.Catalog{}, err
+		return scanner.Catalog{}, 0, err
 	}
-	if err := s.store.RecordScan(catalog); err != nil {
-		return scanner.Catalog{}, err
+	scanID, err := s.store.RecordScan(catalog)
+	if err != nil {
+		return scanner.Catalog{}, 0, err
 	}
 	s.mu.Lock()
 	s.catalog = catalog
 	s.mu.Unlock()
-	return catalog, nil
+	return catalog, scanID, nil
 }
 
 func (s *Server) projectAndItem(ctx context.Context, assetID string) (scanner.Project, scanner.AssetItem, error) {

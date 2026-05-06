@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -91,8 +92,77 @@ func TestCmdProjectsAddListAndScanJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if !strings.Contains(scanned, `"ok": true`) || !strings.Contains(scanned, `"totalFiles": 1`) {
+	if !strings.Contains(scanned, `"ok": true`) || !strings.Contains(scanned, `"scanId":`) || !strings.Contains(scanned, `"totalFiles": 1`) {
 		t.Fatalf("scan json = %s", scanned)
+	}
+}
+
+func TestCmdScansListAndDiffJSON(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	if err := os.MkdirAll(filepath.Join(project, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	icon := filepath.Join(project, "src", "icon.svg")
+	if err := os.WriteFile(icon, []byte(`<svg width="1" height="1"></svg>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	baseID := scanProjectJSON(t, project)
+	if err := os.WriteFile(icon, []byte(`<svg width="2" height="2"><rect width="2" height="2"/></svg>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "src", "added.svg"), []byte(`<svg width="1" height="1"></svg>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	targetID := scanProjectJSON(t, project)
+
+	listed := captureStdout(t, func() {
+		if err := cmdScans([]string{"list", "--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var listBody struct {
+		OK    bool                 `json:"ok"`
+		Scans []config.ScanSummary `json:"scans"`
+	}
+	decodeJSON(t, listed, &listBody)
+	if !listBody.OK || len(listBody.Scans) != 2 || listBody.Scans[0].ID != targetID {
+		t.Fatalf("scans list = %#v", listBody)
+	}
+
+	diffed := captureStdout(t, func() {
+		if err := cmdScans([]string{"diff", "--base", strconv.FormatInt(baseID, 10), "--target", strconv.FormatInt(targetID, 10), "--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var diffBody struct {
+		OK   bool            `json:"ok"`
+		Diff config.ScanDiff `json:"diff"`
+	}
+	decodeJSON(t, diffed, &diffBody)
+	if !diffBody.OK || diffBody.Diff.Summary.Added != 1 || diffBody.Diff.Summary.Modified != 1 {
+		t.Fatalf("scans diff = %#v", diffBody)
+	}
+
+	var code int
+	stdout, stderr := captureOutput(t, func() {
+		code = run([]string{"scans", "diff", "--target", strconv.FormatInt(targetID, 10), "--json"})
+	})
+	if code != 1 || stderr != "" {
+		t.Fatalf("missing base code/stderr = %d/%q", code, stderr)
+	}
+	var errorBody struct {
+		OK    bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decodeJSON(t, stdout, &errorBody)
+	if errorBody.OK || errorBody.Error.Code != "scan_id_required" {
+		t.Fatalf("missing base error = %#v", errorBody)
 	}
 }
 
@@ -109,6 +179,24 @@ func TestCommandHelpers(t *testing.T) {
 	if len(projects) != 1 || projects[0].ID != "p" || projects[0].Path != "/repo" {
 		t.Fatalf("toScannerProjects() = %#v", projects)
 	}
+}
+
+func scanProjectJSON(t *testing.T, project string) int64 {
+	t.Helper()
+	out := captureStdout(t, func() {
+		if err := cmdScan([]string{project, "--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var body struct {
+		OK     bool  `json:"ok"`
+		ScanID int64 `json:"scanId"`
+	}
+	decodeJSON(t, out, &body)
+	if !body.OK || body.ScanID == 0 {
+		t.Fatalf("scan body = %#v", body)
+	}
+	return body.ScanID
 }
 
 func TestRunGlobalJSONStrictErrorsAndUnknownCommand(t *testing.T) {
