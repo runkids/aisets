@@ -10,3 +10,4 @@
 .pnpm-store/
 .DS_Store
 /docs/
+/.feature-radar/

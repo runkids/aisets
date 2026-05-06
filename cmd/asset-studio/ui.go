@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -14,8 +15,12 @@ import (
 	"asset-studio/internal/uidist"
 )
 
-func cmdUI(args []string) error {
+func cmdUI(args []string, jsonModes ...bool) error {
+	jsonOut := len(jsonModes) > 0 && jsonModes[0]
 	fs := flag.NewFlagSet("ui", flag.ContinueOnError)
+	if jsonOut {
+		fs.SetOutput(io.Discard)
+	}
 	host := fs.String("host", "127.0.0.1", "host to bind")
 	port := fs.Int("port", 19520, "port to bind")
 	basePath := fs.String("base-path", envOrDefault("ASSET_STUDIO_UI_BASE_PATH", ""), "base path for reverse proxy hosting")

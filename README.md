@@ -41,10 +41,29 @@ ui /workspace
 
 ```bash
 asset-studio ui [projectPaths...]
-asset-studio version
+asset-studio version [--json]
+asset-studio projects [--json]
+asset-studio projects add [projectPaths...] [--json]
+asset-studio projects rename --id ID --name NAME [--json]
+asset-studio projects remove --id ID [--json]
+asset-studio settings get [--json]
+asset-studio settings export [--output file.json] [--json]
+asset-studio settings import file.json [--json]
+asset-studio settings reset-database --confirm RESET [--json]
+asset-studio scan [projectPaths...] [--json]
+asset-studio optimize estimate [assetIds...] [--json]
+asset-studio optimize script [assetIds...] [--json]
+asset-studio pre-check [filePaths...] [--json]
+asset-studio actions rename preview --asset-id ID --target-path PATH [--json]
+asset-studio actions merge-duplicates preview --asset-id ID --preferred-path PATH [--json]
+asset-studio actions delete-unused preview --asset-id ID [--json]
+asset-studio actions apply --preview preview.json [--json]
 ```
+
+`--json` can be used before the command or after command arguments for AI/native automation.
 
 ## Safety
 
 File-changing operations use preview/apply APIs. Apply revalidates the source
-files before writing and rejects stale previews.
+files before writing and rejects stale previews. CLI apply accepts preview JSON
+from a file or stdin via `--preview -`.

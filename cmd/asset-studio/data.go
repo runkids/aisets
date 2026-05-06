@@ -2,26 +2,35 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 
+	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
 	"asset-studio/internal/scanner"
 )
 
-func cmdProjects(args []string) error {
-	if len(args) > 0 && args[0] == "add" {
-		return cmdProjectsAdd(args[1:])
+func cmdProjects(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	if len(args) > 0 {
+		switch args[0] {
+		case "add":
+			return cmdProjectsAdd(args[1:], jsonOut)
+		case "rename":
+			return cmdProjectsRename(args[1:], jsonOut)
+		case "remove":
+			return cmdProjectsRemove(args[1:], jsonOut)
+		}
 	}
 
-	args, forcedJSON := stripJSONFlag(args)
-	fs := flag.NewFlagSet("projects", flag.ContinueOnError)
-	jsonOut := fs.Bool("json", false, "print JSON")
-	if err := fs.Parse(args); err != nil {
+	fs := newFlagSet("projects", jsonOut)
+	if err := parseFlagSet(fs, args); err != nil {
 		return err
 	}
-	*jsonOut = *jsonOut || forcedJSON
+	if fs.NArg() != 0 {
+		return apierr.WithParams("projects_unexpected_args", "projects does not accept positional arguments", map[string]any{"args": fs.Args()})
+	}
 	store, err := config.OpenStore()
 	if err != nil {
 		return err
@@ -29,7 +38,7 @@ func cmdProjects(args []string) error {
 	defer store.Close()
 
 	projects := store.Projects()
-	if *jsonOut {
+	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "projects": projects})
 	}
 	for _, project := range projects {
@@ -38,14 +47,11 @@ func cmdProjects(args []string) error {
 	return nil
 }
 
-func cmdProjectsAdd(args []string) error {
-	args, forcedJSON := stripJSONFlag(args)
-	fs := flag.NewFlagSet("projects add", flag.ContinueOnError)
-	jsonOut := fs.Bool("json", false, "print JSON")
-	if err := fs.Parse(args); err != nil {
+func cmdProjectsAdd(args []string, jsonOut bool) error {
+	fs := newFlagSet("projects add", jsonOut)
+	if err := parseFlagSet(fs, args); err != nil {
 		return err
 	}
-	*jsonOut = *jsonOut || forcedJSON
 	store, err := config.OpenStore()
 	if err != nil {
 		return err
@@ -56,21 +62,77 @@ func cmdProjectsAdd(args []string) error {
 		return err
 	}
 	projects := store.Projects()
-	if *jsonOut {
+	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "projects": projects})
 	}
 	fmt.Printf("Imported projects: %d\n", len(projects))
 	return nil
 }
 
-func cmdScan(args []string) error {
-	args, forcedJSON := stripJSONFlag(args)
-	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
-	jsonOut := fs.Bool("json", false, "print full catalog JSON")
-	if err := fs.Parse(args); err != nil {
+func cmdProjectsRename(args []string, jsonOut bool) error {
+	fs := newFlagSet("projects rename", jsonOut)
+	id := fs.String("id", "", "project id")
+	name := fs.String("name", "", "project name")
+	if err := parseFlagSet(fs, args); err != nil {
 		return err
 	}
-	*jsonOut = *jsonOut || forcedJSON
+	if fs.NArg() != 0 {
+		return apierr.WithParams("projects_rename_unexpected_args", "projects rename does not accept positional arguments", map[string]any{"args": fs.Args()})
+	}
+	if *id == "" {
+		return apierr.New("project_id_required", "project id is required")
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.RenameProject(*id, *name); err != nil {
+		return err
+	}
+	projects := store.Projects()
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "projects": projects})
+	}
+	fmt.Printf("Renamed project: %s\n", *id)
+	return nil
+}
+
+func cmdProjectsRemove(args []string, jsonOut bool) error {
+	fs := newFlagSet("projects remove", jsonOut)
+	id := fs.String("id", "", "project id")
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return apierr.WithParams("projects_remove_unexpected_args", "projects remove does not accept positional arguments", map[string]any{"args": fs.Args()})
+	}
+	if *id == "" {
+		return apierr.New("project_id_required", "project id is required")
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.RemoveProject(*id); err != nil {
+		return err
+	}
+	projects := store.Projects()
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "projects": projects})
+	}
+	fmt.Printf("Removed project: %s\n", *id)
+	return nil
+}
+
+func cmdScan(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	fs := newFlagSet("scan", jsonOut)
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
 
 	store, err := config.OpenStore()
 	if err != nil {
@@ -81,16 +143,12 @@ func cmdScan(args []string) error {
 		return err
 	}
 
-	projects := toScannerProjects(store.Projects())
-	catalog, err := scanner.New().Scan(context.Background(), projects)
+	catalog, err := scanCatalog(context.Background(), store)
 	if err != nil {
 		return err
 	}
-	if err := store.RecordScan(catalog); err != nil {
-		return err
-	}
 
-	if *jsonOut {
+	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "catalog": catalog})
 	}
 	fmt.Printf("Projects: %d\n", len(catalog.Projects))
