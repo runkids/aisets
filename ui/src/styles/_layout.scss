@@ -396,60 +396,7 @@ a {
   gap: 8px;
 }
 
-.page {
-  padding: 32px 32px 24px;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-@media (max-width: 768px) {
-  .page {
-    padding: 20px 16px;
-  }
-}
-.page-h {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
-}
-.page-h-title {
-  font-family: var(--g-display);
-  font-size: 44px;
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  color: var(--g-ink);
-  font-weight: 700;
-  margin: 0;
-}
-.page-h-title em {
-  font-style: normal;
-  font-family: var(--g-font);
-  font-size: 0.32em;
-  vertical-align: 0.6em;
-  color: var(--g-ink-3);
-  margin-left: 10px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.page-h-sub {
-  margin-top: 10px;
-  color: var(--g-ink-3);
-  font-size: 14px;
-  max-width: 540px;
-}
-.page-h-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-@media (max-width: 768px) {
-  .page-h-title {
-    font-size: 30px;
-  }
-}
+/* Page header — migrated to Tailwind (OptimizeView, DuplicatesView, UnusedView) */
 
 /* Browse toolbar — responsive segmented control */
 @media (max-width: 768px) {

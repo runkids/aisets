@@ -56,14 +56,18 @@ export function DuplicatesView({
   );
 
   return (
-    <div className="page pt-6">
-      <div className="page-h">
+    <div className="mx-auto max-w-[1600px] px-8 pb-6 pt-6 max-[768px]:px-4 max-[768px]:py-5">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="page-h-title">
+          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
             {t("duplicates.title")}{" "}
-            <em>{t("duplicates.groupsCount", { count: groups.length })}</em>
+            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
+              {t("duplicates.groupsCount", { count: groups.length })}
+            </em>
           </h1>
-          <p className="page-h-sub">{t("duplicates.description")}</p>
+          <p className="mt-2.5 max-w-[540px] text-sm text-g-ink-3">
+            {t("duplicates.description")}
+          </p>
         </div>
       </div>
 

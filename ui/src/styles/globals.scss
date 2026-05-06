@@ -14,9 +14,7 @@
   .btn,
   .iconbtn,
   .card,
-  .acard,
-  .opt-row,
-  .dgroup-tile {
+  .acard {
     transition:
       opacity 120ms var(--g-ease),
       background 120ms var(--g-ease),
@@ -25,8 +23,7 @@
   }
   .btn:active:not(:disabled),
   .iconbtn:active:not(:disabled),
-  .acard:hover,
-  .opt-row:hover {
+  .acard:hover {
     transform: none;
   }
 }

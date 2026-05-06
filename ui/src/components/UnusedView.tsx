@@ -63,14 +63,18 @@ export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
   }
 
   return (
-    <div className="page flex h-full flex-col pt-6">
-      <div className="page-h">
+    <div className="mx-auto flex h-full max-w-[1600px] flex-col px-8 pb-6 pt-6 max-[768px]:px-4 max-[768px]:py-5">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="page-h-title">
+          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
             {t("unused.title")}{" "}
-            <em>{t("asset.assets", { count: items.length })}</em>
+            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
+              {t("asset.assets", { count: items.length })}
+            </em>
           </h1>
-          <p className="page-h-sub">{t("unused.description")}</p>
+          <p className="mt-2.5 max-w-[540px] text-sm text-g-ink-3">
+            {t("unused.description")}
+          </p>
         </div>
       </div>
 

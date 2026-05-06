@@ -147,23 +147,27 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
   }
 
   return (
-    <div className="page pt-6">
-      <div className="page-h">
+    <div className="mx-auto max-w-[1600px] px-8 pb-6 pt-6 max-[768px]:px-4 max-[768px]:py-5">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="page-h-title">
+          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
             {t("optimize.title")}{" "}
-            <em>{t("asset.assets", { count: items.length })}</em>
+            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
+              {t("asset.assets", { count: items.length })}
+            </em>
           </h1>
-          <p className="page-h-sub">{t("optimize.description")}</p>
+          <p className="mt-2.5 max-w-[540px] text-sm text-g-ink-3">
+            {t("optimize.description")}
+          </p>
         </div>
       </div>
 
-      <div className="opt-filters-wrap">
-        <div className="opt-filters-bar">
-          <div className="opt-search">
-            <Search size={14} />
+      <div className="sticky top-0 z-[4] mb-1 flex items-center gap-2 bg-[color-mix(in_srgb,var(--g-canvas)_94%,transparent)] py-3 backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <div className="flex max-w-[360px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-[7px] transition-[border-color,box-shadow] duration-[120ms] ease-g focus-within:border-g-ink focus-within:shadow-[0_0_0_3px_var(--g-accent-soft)]">
+            <Search size={14} className="size-3.5 shrink-0 text-g-ink-4" />
             <input
-              className="opt-search-input"
+              className="flex-1 border-0 bg-transparent text-[13px] text-g-ink outline-0 placeholder:text-g-ink-4"
               placeholder={t("optimize.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -171,14 +175,14 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
             {search && (
               <button
                 type="button"
-                className="opt-search-clear"
+                className="grid size-5 place-items-center rounded-full text-g-ink-4 hover:bg-g-surface-2 hover:text-g-ink"
                 onClick={() => setSearch("")}
               >
                 <X size={14} />
               </button>
             )}
           </div>
-          <div className="opt-filter-row">
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5 [scrollbar-color:var(--g-line-strong)_transparent]">
             {(
               [
                 [
@@ -228,7 +232,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
               <button
                 key={key || "all"}
                 type="button"
-                className={`opt-chip ${category === key ? "opt-chip-active" : ""}`}
+                className={`inline-flex h-7 items-center gap-1 rounded-g-md border px-2.5 text-xs font-medium transition-all duration-[120ms] ease-g ${category === key ? "border-g-ink bg-g-ink text-g-canvas" : "border-g-line bg-g-surface text-g-ink-3 hover:border-g-line-strong hover:text-g-ink"}`}
                 onClick={() =>
                   setCategory(category === key ? "" : (key as Category))
                 }
@@ -265,7 +269,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
               <button
                 key={key}
                 type="button"
-                className={`opt-chip ${severity === key ? "opt-chip-active" : ""}`}
+                className={`inline-flex h-7 items-center gap-1 rounded-g-md border px-2.5 text-xs font-medium transition-all duration-[120ms] ease-g ${severity === key ? "border-g-ink bg-g-ink text-g-canvas" : "border-g-line bg-g-surface text-g-ink-3 hover:border-g-line-strong hover:text-g-ink"}`}
                 onClick={() =>
                   setSeverity(severity === key ? "" : (key as Severity))
                 }
@@ -277,7 +281,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
         </div>
       </div>
 
-      <div className="bulkbar flex flex-wrap items-center gap-2 py-2.5">
+      <div className="sticky top-0 z-[5] mb-4 flex min-h-[44px] animate-[slideUp2_200ms_var(--g-ease-out)] flex-wrap items-center gap-2 rounded-g-md border border-g-line-strong bg-g-surface-3 px-3 py-2 text-[13px] text-g-ink shadow-g-md">
         <Button
           size="sm"
           variant="secondary"
@@ -344,11 +348,11 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
           return (
             <div
               key={item.id}
-              className="opt-row"
+              className="relative mb-2.5 grid cursor-pointer items-center gap-4 rounded-g-lg border border-g-line bg-g-surface px-[18px] py-3.5 transition-all duration-[120ms] ease-g hover:translate-x-0.5 hover:border-g-line-strong grid-cols-[28px_64px_1fr_220px_140px] max-[768px]:grid-cols-[28px_48px_1fr] max-[768px]:gap-2.5 max-[768px]:[&>:nth-child(4)]:col-start-3 max-[768px]:[&>:nth-child(5)]:col-start-3"
               onClick={() => onOpenAsset?.(item.id)}
             >
               <div
-                className="opt-row-check"
+                className="flex items-center justify-center"
                 onClick={(e) => e.stopPropagation()}
               >
                 <IconButton
@@ -366,17 +370,26 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
                   )}
                 </IconButton>
               </div>
-              <div className="opt-row-thumb">
+              <div className="grid size-16 place-items-center overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
                 <img
                   src={item.thumbnailUrl || item.url}
                   alt=""
                   loading="lazy"
+                  className="max-h-14 max-w-14 object-contain"
                 />
               </div>
-              <div className="opt-row-text">
-                <div className="opt-row-name">{fileName(item.repoPath)}</div>
-                <div className="opt-row-path">{item.repoPath}</div>
-                {rec && <div className="opt-row-reason">{rec.suggestion}</div>}
+              <div className="min-w-0 text-left">
+                <div className="truncate font-g-mono text-[13px] font-medium">
+                  {fileName(item.repoPath)}
+                </div>
+                <div className="mt-0.5 truncate font-g-mono text-g-chip text-g-ink-4">
+                  {item.repoPath}
+                </div>
+                {rec && (
+                  <div className="mt-1.5 text-xs text-g-ink-2">
+                    {rec.suggestion}
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 {sev && (
@@ -400,7 +413,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
                   </Badge>
                 ))}
               </div>
-              <div className="opt-row-savings">
+              <div className="text-right">
                 <div className="font-g-mono text-g-ui font-[510] text-g-ink">
                   {formatBytes(item.bytes)}
                 </div>
