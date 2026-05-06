@@ -50,6 +50,31 @@ func TestAnalyzeReportsExactMatchNamingIssuesAndDuplicateVerdict(t *testing.T) {
 	}
 }
 
+func TestAnalyzeHashesUncachedCatalogItemsForExactMatches(t *testing.T) {
+	root := t.TempDir()
+	asset := filepath.Join(root, "asset.png")
+	writePNG(t, asset, color.NRGBA{R: 20, G: 80, B: 160, A: 255})
+	info, err := os.Stat(asset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := scanner.Catalog{Items: []scanner.AssetItem{{
+		ID:          "asset-1",
+		RepoPath:    "assets/asset.png",
+		LocalPath:   asset,
+		ProjectName: "web",
+		Bytes:       info.Size(),
+	}}}
+
+	got, err := Analyze(context.Background(), "asset.png", asset, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Verdict != VerdictDuplicate || len(got.ExactMatches) != 1 || got.ExactMatches[0].AssetID != "asset-1" {
+		t.Fatalf("exact fallback result = %#v", got)
+	}
+}
+
 func TestAnalyzeReportsNearMatchesIncludingFlippedHashes(t *testing.T) {
 	root := t.TempDir()
 	upload := filepath.Join(root, "upload.png")

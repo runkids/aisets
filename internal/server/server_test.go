@@ -433,7 +433,7 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = newMultipartPrecheckRequest(t, "Logo Bad.png", filepath.Join(project, "src", "renamed.png"))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"verdict":"warning"`) || !strings.Contains(rec.Body.String(), `"nearMatches"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"verdict":"duplicate"`) || !strings.Contains(rec.Body.String(), `"exactMatches"`) {
 		t.Fatalf("pre-check = %d %s", rec.Code, rec.Body.String())
 	}
 }

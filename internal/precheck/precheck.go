@@ -95,7 +95,7 @@ func Analyze(ctx context.Context, name, localPath string, catalog scanner.Catalo
 		Optimization:  []scanner.OptimizationSuggestion{},
 	}
 
-	res.ExactMatches = findExactMatches(contentHash, catalog)
+	res.ExactMatches = findExactMatchesWithFallback(ctx, contentHash, info.Size(), catalog)
 	res.NearMatches = findNearMatches(hashes.DHash, hashes.DHashFlipped, contentHash, catalog)
 	res.NamingIssues = checkNaming(name)
 
@@ -148,14 +148,47 @@ func findExactMatches(contentHash string, catalog scanner.Catalog) []ExactMatch 
 	}
 	for _, item := range catalog.Items {
 		if item.ContentHash == contentHash {
-			out = append(out, ExactMatch{
-				AssetID:     item.ID,
-				RepoPath:    item.RepoPath,
-				ProjectName: item.ProjectName,
-			})
+			out = append(out, exactMatch(item))
 		}
 	}
 	return out
+}
+
+func findExactMatchesWithFallback(ctx context.Context, contentHash string, size int64, catalog scanner.Catalog) []ExactMatch {
+	out := findExactMatches(contentHash, catalog)
+	if contentHash == "" {
+		return out
+	}
+	seen := make(map[string]struct{}, len(out))
+	for _, match := range out {
+		seen[match.AssetID] = struct{}{}
+	}
+	for _, item := range catalog.Items {
+		if item.ContentHash != "" || item.LocalPath == "" || item.Bytes != size {
+			continue
+		}
+		if _, ok := seen[item.ID]; ok {
+			continue
+		}
+		if ctx.Err() != nil {
+			return out
+		}
+		hash, err := hashFile(ctx, item.LocalPath)
+		if err != nil || hash != contentHash {
+			continue
+		}
+		out = append(out, exactMatch(item))
+		seen[item.ID] = struct{}{}
+	}
+	return out
+}
+
+func exactMatch(item scanner.AssetItem) ExactMatch {
+	return ExactMatch{
+		AssetID:     item.ID,
+		RepoPath:    item.RepoPath,
+		ProjectName: item.ProjectName,
+	}
 }
 
 func findNearMatches(dHash, dHashFlipped, contentHash string, catalog scanner.Catalog) []NearMatch {
