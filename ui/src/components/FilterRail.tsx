@@ -7,15 +7,27 @@ type FilterOption = {
   count: number;
 };
 
+type CustomFilterOption = FilterOption & {
+  label: string;
+};
+
+type FilterState = {
+  project: string;
+  ext: string;
+  customFilter: string;
+};
+
 type FilterRailProps = {
   items: AssetItem[];
-  filters: { project: string; ext: string };
+  filters: FilterState;
   projectOptions?: FilterOption[];
   projectTotal?: number;
   projectScopeName?: string;
   extensionOptions?: FilterOption[];
   extensionTotal?: number;
-  onFiltersChange: (filters: { project: string; ext: string }) => void;
+  customFilterOptions?: CustomFilterOption[];
+  customFilterTotal?: number;
+  onFiltersChange: (filters: FilterState) => void;
 };
 
 function countBy(items: AssetItem[], key: "projectName" | "ext") {
@@ -37,16 +49,20 @@ export function FilterRail({
   projectScopeName,
   extensionOptions,
   extensionTotal,
+  customFilterOptions,
+  customFilterTotal,
   onFiltersChange,
 }: FilterRailProps) {
   const { t } = useTranslation();
   const projects = projectOptions ?? countBy(items, "projectName");
   const extensions = extensionOptions ?? countBy(items, "ext");
+  const customFilters = customFilterOptions ?? [];
   const allProjectsCount = projectTotal ?? items.length;
   const allExtensionsCount = extensionTotal ?? items.length;
+  const allCustomFiltersCount = customFilterTotal ?? items.length;
   const projectScopeLocked = Boolean(projectScopeName);
 
-  function toggle(key: "project" | "ext", value: string) {
+  function toggle(key: keyof FilterState, value: string) {
     onFiltersChange({
       ...filters,
       [key]:
@@ -95,6 +111,26 @@ export function FilterRail({
           />
         ))}
       </RailSection>
+
+      {customFilters.length > 0 && (
+        <RailSection heading={t("filter.customFilters")}>
+          <RailItem
+            active={filters.customFilter === ""}
+            label={t("filter.allCustomFilters")}
+            count={allCustomFiltersCount}
+            onClick={() => onFiltersChange({ ...filters, customFilter: "" })}
+          />
+          {customFilters.map((option) => (
+            <RailItem
+              key={option.id}
+              active={filters.customFilter === option.id}
+              label={option.label}
+              count={option.count}
+              onClick={() => toggle("customFilter", option.id)}
+            />
+          ))}
+        </RailSection>
+      )}
     </Rail>
   );
 }

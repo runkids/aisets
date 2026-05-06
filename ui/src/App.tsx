@@ -83,6 +83,7 @@ export function App() {
   });
 
   const drawerId = searchParams.get("asset") ?? "";
+  const browseCustomFilterId = searchParams.get("customFilter") ?? "";
 
   function changeMode(nextMode: Mode, projectId?: string) {
     if (projectId != null) setSelectedProjectId(projectId);
@@ -435,6 +436,15 @@ export function App() {
     });
   }
 
+  function openCustomFilterFromPalette(id: string) {
+    const params = new URLSearchParams({ customFilter: id });
+    setAutoScrollAssetId("");
+    navigate({
+      pathname: pathForMode("browse"),
+      search: `?${params.toString()}`,
+    });
+  }
+
   const clearAutoScrollAssetId = useCallback(
     () => setAutoScrollAssetId(""),
     [],
@@ -478,12 +488,16 @@ export function App() {
               <BrowseView
                 key={
                   selectedProject
-                    ? `${selectedProject.id}:${selectedProject.name}`
-                    : "all-projects"
+                    ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}`
+                    : `all-projects:${browseCustomFilterId}`
                 }
                 items={browseItems}
                 activeAssetId={drawerId}
                 autoScrollAssetId={autoScrollAssetId}
+                initialCustomFilterId={browseCustomFilterId}
+                customFilters={
+                  settingsQuery.data?.settings.customAssetFilters ?? []
+                }
                 projectNames={browseProjectNames}
                 projectFilterName={selectedProject?.name ?? ""}
                 imagePreviewEnabled={imagePreviewEnabled}
@@ -546,9 +560,11 @@ export function App() {
         <CommandPalette
           open={cmdkOpen}
           assets={scopedItems}
+          customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
           onClose={() => setCmdkOpen(false)}
           onNavigate={changeMode}
           onOpenAsset={openAssetFromPalette}
+          onOpenCustomFilter={openCustomFilterFromPalette}
         />
 
         {directoryPickerOpen && (

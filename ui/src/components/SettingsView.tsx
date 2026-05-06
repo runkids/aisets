@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   Download,
+  Filter,
   FolderKanban,
   Globe2,
   Image,
@@ -39,13 +40,24 @@ import {
   useSwitchWorkspaceMutation,
   useUpdateSettingsMutation,
 } from "../queries";
-import type { ExportData, SettingsInfo, SettingsUpdate } from "../types";
+import type {
+  CustomAssetFilter,
+  CustomAssetFilterClause,
+  CustomAssetFilterField,
+  CustomAssetFilterGroup,
+  CustomAssetFilterOperator,
+  ExportData,
+  SettingsInfo,
+  SettingsUpdate,
+} from "../types";
 import {
   Badge,
   Button,
   Card,
   ConfirmDialog,
+  IconButton,
   Keycap,
+  Modal,
   Notice,
   PromptDialog,
   Rail,
@@ -72,6 +84,7 @@ type Section =
   | "projects"
   | "theme"
   | "scanning"
+  | "customFilters"
   | "optimization"
   | "hotkeys"
   | "about";
@@ -84,6 +97,7 @@ type SettingsDraft = {
   excludePatternsText: string;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
+  customAssetFilters: CustomAssetFilter[];
 };
 
 type BeforeInstallPromptEvent = Event & {
@@ -96,6 +110,7 @@ const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "theme", icon: <Paintbrush size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
+  { id: "customFilters", icon: <Filter size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },
   { id: "about", icon: <Info size={15} /> },
@@ -109,7 +124,93 @@ const defaultSettings: SettingsUpdate = {
   excludePatterns: [],
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
+  customAssetFilters: [],
 };
+
+const customFilterFields: CustomAssetFilterField[] = [
+  "path",
+  "folder",
+  "extension",
+  "project",
+  "bytes",
+  "status",
+  "duplicate",
+  "nearDuplicate",
+  "optimizable",
+];
+
+const customFilterOperatorsByField: Record<
+  CustomAssetFilterField,
+  CustomAssetFilterOperator[]
+> = {
+  path: ["contains", "prefix", "suffix", "equals", "regex"],
+  folder: ["contains", "prefix", "suffix", "equals", "regex"],
+  extension: ["equals", "oneOf"],
+  project: ["equals", "contains", "oneOf"],
+  bytes: ["gte", "lte"],
+  status: ["is"],
+  duplicate: ["is"],
+  nearDuplicate: ["is"],
+  optimizable: ["is"],
+};
+
+function defaultClauseValue(
+  field: CustomAssetFilterField,
+  operator: CustomAssetFilterOperator,
+) {
+  if (field === "path" && operator === "regex") return ".*";
+  if (field === "path" && operator === "suffix") return ".png";
+  if (field === "path") return "/";
+  if (field === "folder" && operator === "suffix") return "icons";
+  if (field === "folder" && operator === "regex") return "assets/.+";
+  if (field === "folder") return "src";
+  if (field === "extension" && operator === "oneOf") return ".png,.jpg,.webp";
+  if (field === "extension") return ".png";
+  if (field === "project" && operator === "oneOf") return "Project A,Project B";
+  if (field === "project") return "Project";
+  if (field === "bytes") return "0";
+  if (field === "status") return "unused";
+  return "true";
+}
+
+function defaultClause(
+  field: CustomAssetFilterField = "path",
+): CustomAssetFilterClause {
+  const operator = customFilterOperatorsByField[field][0];
+  return {
+    field,
+    operator,
+    value: defaultClauseValue(field, operator),
+  };
+}
+
+function defaultGroup(): CustomAssetFilterGroup {
+  return { clauses: [defaultClause()] };
+}
+
+function createCustomFilter(name: string): CustomAssetFilter {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Date.now().toString(36);
+  return {
+    id: `custom-${random}`,
+    name,
+    enabled: false,
+    groups: [defaultGroup()],
+  };
+}
+
+function clauseValueOptions(field: CustomAssetFilterField) {
+  if (field === "status") return ["unused", "referenced"];
+  if (
+    field === "duplicate" ||
+    field === "nearDuplicate" ||
+    field === "optimizable"
+  )
+    return ["true", "false"];
+  return null;
+}
 
 const workspaceRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
@@ -141,6 +242,7 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
+    customAssetFilters: settings?.customAssetFilters ?? [],
   };
 }
 
@@ -156,6 +258,7 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
       .filter(Boolean),
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
     optimizationAutoApply: draft.optimizationAutoApply,
+    customAssetFilters: draft.customAssetFilters,
   };
 }
 
@@ -264,6 +367,8 @@ export function SettingsView({
   );
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [removeProjectId, setRemoveProjectId] = useState<string | null>(null);
+  const [customFiltersHelpOpen, setCustomFiltersHelpOpen] = useState(false);
+  const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -366,6 +471,130 @@ export function SettingsView({
     );
   }
 
+  function updateCustomFilters(
+    updater: (filters: CustomAssetFilter[]) => CustomAssetFilter[],
+  ) {
+    updateDraft((prev) => ({
+      ...prev,
+      customAssetFilters: updater(prev.customAssetFilters),
+    }));
+  }
+
+  function updateCustomFilter(
+    filterId: string,
+    updater: (filter: CustomAssetFilter) => CustomAssetFilter,
+  ) {
+    updateCustomFilters((filters) =>
+      filters.map((filter) =>
+        filter.id === filterId ? updater(filter) : filter,
+      ),
+    );
+  }
+
+  function updateCustomFilterClause(
+    filterId: string,
+    groupIndex: number,
+    clauseIndex: number,
+    updater: (clause: CustomAssetFilterClause) => CustomAssetFilterClause,
+  ) {
+    updateCustomFilter(filterId, (filter) => ({
+      ...filter,
+      groups: filter.groups.map((group, currentGroupIndex) =>
+        currentGroupIndex === groupIndex
+          ? {
+              clauses: group.clauses.map((clause, currentClauseIndex) =>
+                currentClauseIndex === clauseIndex ? updater(clause) : clause,
+              ),
+            }
+          : group,
+      ),
+    }));
+  }
+
+  function onAddCustomFilter() {
+    updateCustomFilters((filters) => [
+      ...filters,
+      createCustomFilter(t("settings.customFilterNewName")),
+    ]);
+  }
+
+  function onDeleteCustomFilter(filterId: string) {
+    updateCustomFilters((filters) =>
+      filters.filter((filter) => filter.id !== filterId),
+    );
+  }
+
+  function onAddCustomFilterGroup(filterId: string) {
+    updateCustomFilter(filterId, (filter) => ({
+      ...filter,
+      groups: [...filter.groups, defaultGroup()],
+    }));
+  }
+
+  function onDeleteCustomFilterGroup(filterId: string, groupIndex: number) {
+    updateCustomFilter(filterId, (filter) => ({
+      ...filter,
+      groups: filter.groups.filter((_, index) => index !== groupIndex),
+    }));
+  }
+
+  function onAddCustomFilterClause(filterId: string, groupIndex: number) {
+    updateCustomFilter(filterId, (filter) => ({
+      ...filter,
+      groups: filter.groups.map((group, index) =>
+        index === groupIndex
+          ? { clauses: [...group.clauses, defaultClause()] }
+          : group,
+      ),
+    }));
+  }
+
+  function onDeleteCustomFilterClause(
+    filterId: string,
+    groupIndex: number,
+    clauseIndex: number,
+  ) {
+    updateCustomFilter(filterId, (filter) => ({
+      ...filter,
+      groups: filter.groups.map((group, index) =>
+        index === groupIndex
+          ? {
+              clauses: group.clauses.filter(
+                (_, currentIndex) => currentIndex !== clauseIndex,
+              ),
+            }
+          : group,
+      ),
+    }));
+  }
+
+  function onCustomFilterFieldChange(
+    filterId: string,
+    groupIndex: number,
+    clauseIndex: number,
+    field: CustomAssetFilterField,
+  ) {
+    const operator = customFilterOperatorsByField[field][0];
+    updateCustomFilterClause(filterId, groupIndex, clauseIndex, () => ({
+      field,
+      operator,
+      value: defaultClauseValue(field, operator),
+    }));
+  }
+
+  function onCustomFilterOperatorChange(
+    filterId: string,
+    groupIndex: number,
+    clauseIndex: number,
+    operator: CustomAssetFilterOperator,
+  ) {
+    updateCustomFilterClause(filterId, groupIndex, clauseIndex, (clause) => ({
+      ...clause,
+      operator,
+      value: defaultClauseValue(clause.field, operator),
+    }));
+  }
+
   async function onSaveSettings() {
     const result = await updateMutation.mutateAsync(updateFromDraft(draft));
     setDraftOverride(draftFromSettings(result.settings));
@@ -428,6 +657,11 @@ export function SettingsView({
     setDraftOverride(draftFromSettings(result.settings));
   }
 
+  async function onConfirmResetSettings() {
+    await onResetSettings();
+    setResetSettingsOpen(false);
+  }
+
   async function onExport() {
     const data = await exportSettings();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -477,7 +711,7 @@ export function SettingsView({
     <SettingsActions
       disabled={settingsActionDisabled}
       onSave={() => void onSaveSettings()}
-      onReset={() => void onResetSettings()}
+      onReset={() => setResetSettingsOpen(true)}
       saveLabel={t("settings.save")}
       resetLabel={t("settings.reset")}
     />
@@ -955,6 +1189,302 @@ export function SettingsView({
             </Card>
           )}
 
+          {activeSection === "customFilters" && (
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
+              <SectionHeading
+                title={t("settings.section.customFilters")}
+                description={t("settings.customFiltersDesc")}
+                icon={sectionIcon("customFilters")}
+              />
+              <div className="px-6 py-5 md:px-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h2 className="font-g-display text-g-h3 font-[650] leading-[1.2] tracking-g-tight text-g-ink">
+                      {t("settings.customFilters")}
+                    </h2>
+                    <p className="mt-1 max-w-[62ch] font-g text-g-ui tracking-g-ui text-g-ink-3">
+                      {t("settings.customFiltersHint")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start">
+                    <IconButton
+                      size="sm"
+                      aria-label={t("settings.customFiltersHelp")}
+                      onClick={() => setCustomFiltersHelpOpen(true)}
+                    >
+                      <Info size={15} />
+                    </IconButton>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leadingIcon={<Plus size={13} />}
+                      disabled={working}
+                      onClick={onAddCustomFilter}
+                    >
+                      {t("settings.addCustomFilter")}
+                    </Button>
+                  </div>
+                </div>
+
+                {draft.customAssetFilters.length === 0 ? (
+                  <p className="mt-5 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-3 font-g text-g-ui tracking-g-ui text-g-ink-3">
+                    {t("settings.noCustomFilters")}
+                  </p>
+                ) : (
+                  <div className="mt-5 grid gap-3">
+                    {draft.customAssetFilters.map((filter) => (
+                      <section
+                        key={filter.id}
+                        className="rounded-g-md border border-g-line bg-g-surface-2 p-3 shadow-g-sm"
+                      >
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                          <TextInput
+                            label={t("settings.customFilterName")}
+                            value={filter.name}
+                            disabled={working}
+                            onChange={(event) =>
+                              updateCustomFilter(filter.id, (current) => ({
+                                ...current,
+                                name: event.target.value,
+                              }))
+                            }
+                          />
+                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                            <div className="inline-flex h-8 items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2.5 font-g text-g-caption font-[510] tracking-g-ui text-g-ink-2">
+                              <Switch
+                                checked={filter.enabled}
+                                disabled={working}
+                                onCheckedChange={(enabled) =>
+                                  updateCustomFilter(filter.id, (current) => ({
+                                    ...current,
+                                    enabled,
+                                  }))
+                                }
+                                aria-label={t("settings.customFilterEnabled")}
+                              />
+                              {t("settings.customFilterEnabled")}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              leadingIcon={<Trash2 size={13} />}
+                              disabled={working}
+                              className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                              onClick={() => onDeleteCustomFilter(filter.id)}
+                            >
+                              {t("action.delete")}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid gap-3">
+                          {filter.groups.map((group, groupIndex) => (
+                            <div
+                              key={`${filter.id}-${groupIndex}`}
+                              className="rounded-g-md border border-g-line bg-g-surface p-3"
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <Badge tone="line">
+                                  {t("settings.customFilterGroupLabel", {
+                                    index: groupIndex + 1,
+                                  })}
+                                </Badge>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    leadingIcon={<Plus size={13} />}
+                                    disabled={working}
+                                    onClick={() =>
+                                      onAddCustomFilterClause(
+                                        filter.id,
+                                        groupIndex,
+                                      )
+                                    }
+                                  >
+                                    {t("settings.addCustomFilterClause")}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    leadingIcon={<Trash2 size={13} />}
+                                    disabled={
+                                      working || filter.groups.length <= 1
+                                    }
+                                    className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                    onClick={() =>
+                                      onDeleteCustomFilterGroup(
+                                        filter.id,
+                                        groupIndex,
+                                      )
+                                    }
+                                  >
+                                    {t("settings.deleteCustomFilterGroup")}
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="mt-3 grid gap-2">
+                                {group.clauses.map((clause, clauseIndex) => {
+                                  const valueOptions = clauseValueOptions(
+                                    clause.field,
+                                  );
+                                  return (
+                                    <div
+                                      key={`${filter.id}-${groupIndex}-${clauseIndex}`}
+                                      className="grid gap-2 rounded-g-md border border-g-line bg-g-surface-2 p-2 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(140px,1.5fr)_auto]"
+                                    >
+                                      <Select
+                                        value={clause.field}
+                                        size="sm"
+                                        className="min-w-0"
+                                        aria-label={t(
+                                          "settings.customFilterFieldLabel",
+                                        )}
+                                        options={customFilterFields.map(
+                                          (field) => ({
+                                            value: field,
+                                            label: t(
+                                              `settings.customFilterField.${field}`,
+                                            ),
+                                          }),
+                                        )}
+                                        onChange={(field) =>
+                                          onCustomFilterFieldChange(
+                                            filter.id,
+                                            groupIndex,
+                                            clauseIndex,
+                                            field as CustomAssetFilterField,
+                                          )
+                                        }
+                                      />
+                                      <Select
+                                        value={clause.operator}
+                                        size="sm"
+                                        className="min-w-0"
+                                        aria-label={t(
+                                          "settings.customFilterOperatorLabel",
+                                        )}
+                                        options={customFilterOperatorsByField[
+                                          clause.field
+                                        ].map((operator) => ({
+                                          value: operator,
+                                          label: t(
+                                            `settings.customFilterOperator.${operator}`,
+                                          ),
+                                        }))}
+                                        onChange={(operator) =>
+                                          onCustomFilterOperatorChange(
+                                            filter.id,
+                                            groupIndex,
+                                            clauseIndex,
+                                            operator as CustomAssetFilterOperator,
+                                          )
+                                        }
+                                      />
+                                      {valueOptions ? (
+                                        <Select
+                                          value={clause.value}
+                                          size="sm"
+                                          className="min-w-0"
+                                          aria-label={t(
+                                            "settings.customFilterValueLabel",
+                                          )}
+                                          options={valueOptions.map(
+                                            (value) => ({
+                                              value,
+                                              label: t(
+                                                `settings.customFilterValue.${value}`,
+                                              ),
+                                            }),
+                                          )}
+                                          onChange={(value) =>
+                                            updateCustomFilterClause(
+                                              filter.id,
+                                              groupIndex,
+                                              clauseIndex,
+                                              (current) => ({
+                                                ...current,
+                                                value,
+                                              }),
+                                            )
+                                          }
+                                        />
+                                      ) : (
+                                        <TextInput
+                                          value={clause.value}
+                                          disabled={working}
+                                          inputClassName="font-g-mono text-g-caption tracking-g-mono"
+                                          aria-label={t(
+                                            "settings.customFilterValueLabel",
+                                          )}
+                                          placeholder={t(
+                                            `settings.customFilterValuePlaceholder.${clause.field}`,
+                                          )}
+                                          onChange={(event) =>
+                                            updateCustomFilterClause(
+                                              filter.id,
+                                              groupIndex,
+                                              clauseIndex,
+                                              (current) => ({
+                                                ...current,
+                                                value: event.target.value,
+                                              }),
+                                            )
+                                          }
+                                        />
+                                      )}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        leadingIcon={<Trash2 size={13} />}
+                                        disabled={
+                                          working || group.clauses.length <= 1
+                                        }
+                                        className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                        onClick={() =>
+                                          onDeleteCustomFilterClause(
+                                            filter.id,
+                                            groupIndex,
+                                            clauseIndex,
+                                          )
+                                        }
+                                      >
+                                        {t("action.delete")}
+                                      </Button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            leadingIcon={<Plus size={13} />}
+                            disabled={working}
+                            className="self-start"
+                            onClick={() => onAddCustomFilterGroup(filter.id)}
+                          >
+                            {t("settings.addCustomFilterGroup")}
+                          </Button>
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+                {updateMutation.error && (
+                  <Notice tone="danger" className="mt-4">
+                    {errorMessage(updateMutation.error)}
+                  </Notice>
+                )}
+                {settingActions}
+              </div>
+            </Card>
+          )}
+
           {activeSection === "optimization" && (
             <Card
               className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
@@ -1149,6 +1679,117 @@ export function SettingsView({
           )}
         </div>
       </div>
+      {customFiltersHelpOpen && (
+        <Modal
+          title={t("settings.customFiltersHelpTitle")}
+          description={t("settings.customFiltersHelpDesc")}
+          size="md"
+          onClose={() => setCustomFiltersHelpOpen(false)}
+          bodyClassName="space-y-5"
+        >
+          <section className="space-y-2">
+            <h3 className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+              {t("settings.customFiltersHelpLogicTitle")}
+            </h3>
+            <p className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+              {t("settings.customFiltersHelpLogic")}
+            </p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+              {t("settings.customFiltersHelpStepsTitle")}
+            </h3>
+            <ol className="list-decimal space-y-1 pl-5 font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+              <li>{t("settings.customFiltersHelpStep1")}</li>
+              <li>{t("settings.customFiltersHelpStep2")}</li>
+              <li>{t("settings.customFiltersHelpStep3")}</li>
+            </ol>
+          </section>
+          <section className="space-y-3">
+            <h3 className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+              {t("settings.customFiltersHelpExamplesTitle")}
+            </h3>
+            {[
+              {
+                title: t("settings.customFiltersHelpChineseTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.path"),
+                    t("settings.customFilterOperator.regex"),
+                    "\\p{Han}",
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpFolderSuffixTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.folder"),
+                    t("settings.customFilterOperator.suffix"),
+                    "icons",
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpLargeUnusedTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.extension"),
+                    t("settings.customFilterOperator.oneOf"),
+                    ".png,.jpg,.webp",
+                  ],
+                  [
+                    t("settings.customFilterField.bytes"),
+                    t("settings.customFilterOperator.gte"),
+                    "102400",
+                  ],
+                  [
+                    t("settings.customFilterField.status"),
+                    t("settings.customFilterOperator.is"),
+                    t("settings.customFilterValue.unused"),
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpCleanupTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.nearDuplicate"),
+                    t("settings.customFilterOperator.is"),
+                    t("settings.customFilterValue.true"),
+                  ],
+                  [
+                    t("settings.customFilterField.optimizable"),
+                    t("settings.customFilterOperator.is"),
+                    t("settings.customFilterValue.true"),
+                  ],
+                ],
+              },
+            ].map((example) => (
+              <div
+                key={example.title}
+                className="rounded-g-md border border-g-line bg-g-surface p-3"
+              >
+                <h4 className="font-g text-g-ui font-[590] tracking-g-ui text-g-ink">
+                  {example.title}
+                </h4>
+                <div className="mt-2 grid gap-1">
+                  {example.rows.map(([field, operator, value]) => (
+                    <div
+                      key={`${field}-${operator}-${value}`}
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)] gap-2 rounded-g-md bg-g-surface-2 px-2 py-1.5 font-g-mono text-g-chip tracking-g-mono text-g-ink-2"
+                    >
+                      <span className="truncate">{field}</span>
+                      <span className="truncate">{operator}</span>
+                      <span className="truncate">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        </Modal>
+      )}
       <PromptDialog
         open={addWorkspaceOpen}
         title={t("settings.addWorkspace")}
@@ -1208,6 +1849,16 @@ export function SettingsView({
         loading={removeProjectMutation.isPending}
         onConfirm={onRemoveProject}
         onCancel={() => setRemoveProjectId(null)}
+      />
+      <ConfirmDialog
+        open={resetSettingsOpen}
+        title={t("settings.resetSettings")}
+        message={t("settings.resetSettingsConfirm")}
+        confirmText={t("settings.reset")}
+        cancelText={t("common.cancel")}
+        loading={updateMutation.isPending}
+        onConfirm={() => void onConfirmResetSettings()}
+        onCancel={() => setResetSettingsOpen(false)}
       />
       <ConfirmDialog
         open={resetDatabaseOpen}

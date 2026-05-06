@@ -19,6 +19,7 @@ func DefaultAppSettings() AppSettings {
 		ExcludePatterns:            []string{},
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
+		CustomAssetFilters:         []CustomAssetFilter{},
 	}
 }
 
@@ -40,6 +41,9 @@ func (s *Store) Settings() (AppSettings, error) {
 	}
 	if settings.ExcludePatterns == nil {
 		settings.ExcludePatterns = []string{}
+	}
+	if settings.CustomAssetFilters == nil {
+		settings.CustomAssetFilters = []CustomAssetFilter{}
 	}
 	return settings, nil
 }
@@ -80,6 +84,13 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.OptimizationAutoApply != nil {
 		settings.OptimizationAutoApply = *update.OptimizationAutoApply
+	}
+	if update.CustomAssetFilters != nil {
+		filters, err := normalizeCustomAssetFilters(update.CustomAssetFilters)
+		if err != nil {
+			return AppSettings{}, err
+		}
+		settings.CustomAssetFilters = filters
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
@@ -169,6 +180,7 @@ func (s *Store) ImportData(data ExportData) error {
 			ExcludePatterns:            data.Settings.ExcludePatterns,
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
+			CustomAssetFilters:         data.Settings.CustomAssetFilters,
 		}
 		if data.Settings.ActiveWorkspaceID != "" {
 			update.ActiveWorkspaceID = &data.Settings.ActiveWorkspaceID

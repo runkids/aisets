@@ -21,6 +21,46 @@ export type AppSettings = {
   excludePatterns: string[];
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
+  customAssetFilters: CustomAssetFilter[];
+};
+
+export type CustomAssetFilterField =
+  | "path"
+  | "folder"
+  | "extension"
+  | "project"
+  | "bytes"
+  | "status"
+  | "duplicate"
+  | "nearDuplicate"
+  | "optimizable";
+
+export type CustomAssetFilterOperator =
+  | "contains"
+  | "regex"
+  | "prefix"
+  | "suffix"
+  | "equals"
+  | "oneOf"
+  | "gte"
+  | "lte"
+  | "is";
+
+export type CustomAssetFilterClause = {
+  field: CustomAssetFilterField;
+  operator: CustomAssetFilterOperator;
+  value: string;
+};
+
+export type CustomAssetFilterGroup = {
+  clauses: CustomAssetFilterClause[];
+};
+
+export type CustomAssetFilter = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  groups: CustomAssetFilterGroup[];
 };
 
 export type SettingsInfo = AppSettings & {

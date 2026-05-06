@@ -1,5 +1,6 @@
 import {
   FileWarning,
+  Filter,
   FolderKanban,
   FolderOpen,
   Recycle,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { AssetItem } from "../types";
+import type { AssetItem, CustomAssetFilter } from "../types";
 import { cn } from "@/lib/cn";
 import { fileName, type Mode } from "../ui";
 import { Keycap, TextInput } from "./ui";
@@ -19,9 +20,11 @@ import { Keycap, TextInput } from "./ui";
 type Props = {
   open: boolean;
   assets: AssetItem[];
+  customFilters: CustomAssetFilter[];
   onClose: () => void;
   onNavigate: (mode: Mode) => void;
   onOpenAsset: (id: string) => void;
+  onOpenCustomFilter: (id: string) => void;
 };
 
 type ModeItem = { id: Mode; labelKey: string; icon: ReactNode };
@@ -44,9 +47,11 @@ const MODE_ITEMS: ModeItem[] = [
 export function CommandPalette({
   open,
   assets,
+  customFilters,
   onClose,
   onNavigate,
   onOpenAsset,
+  onOpenCustomFilter,
 }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -69,11 +74,20 @@ export function CommandPalette({
       ...mode,
       label: t(mode.labelKey),
     }));
-    if (!q) return { modes: modesWithLabels.slice(0, 5), assets: [] };
+    if (!q)
+      return { modes: modesWithLabels.slice(0, 5), filters: [], assets: [] };
 
     const modes = modesWithLabels.filter((mode) =>
       mode.label.toLowerCase().includes(q),
     );
+    const filters = customFilters
+      .filter(
+        (filter) =>
+          filter.enabled &&
+          (filter.name.toLowerCase().includes(q) ||
+            filter.id.toLowerCase().includes(q)),
+      )
+      .slice(0, 6);
     const matched = assets
       .filter(
         (asset) =>
@@ -81,10 +95,11 @@ export function CommandPalette({
           asset.repoPath.toLowerCase().includes(q),
       )
       .slice(0, 8);
-    return { modes, assets: matched };
-  }, [query, assets, t]);
+    return { modes, filters, assets: matched };
+  }, [query, assets, customFilters, t]);
 
-  const totalItems = results.modes.length + results.assets.length;
+  const totalItems =
+    results.modes.length + results.filters.length + results.assets.length;
   const activeItemIndex =
     totalItems === 0 ? 0 : Math.min(activeIndex, totalItems - 1);
 
@@ -109,8 +124,12 @@ export function CommandPalette({
 
     if (index < results.modes.length) {
       onNavigate(results.modes[index].id);
+    } else if (index < results.modes.length + results.filters.length) {
+      const filter = results.filters[index - results.modes.length];
+      if (filter) onOpenCustomFilter(filter.id);
     } else {
-      const asset = results.assets[index - results.modes.length];
+      const asset =
+        results.assets[index - results.modes.length - results.filters.length];
       if (asset) onOpenAsset(asset.id);
     }
     onClose();
@@ -186,13 +205,45 @@ export function CommandPalette({
             </button>
           ))}
 
+          {results.filters.length > 0 && (
+            <>
+              <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
+                {t("commandPalette.customFilters")}
+              </div>
+              {results.filters.map((filter, index) => {
+                const resultIndex = results.modes.length + index;
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    className={itemCls}
+                    data-active={activeItemIndex === resultIndex || undefined}
+                    onMouseEnter={() => setActiveIndex(resultIndex)}
+                    onClick={() => selectItem(resultIndex)}
+                  >
+                    <span
+                      className="inline-flex text-current opacity-[0.82] shrink-0"
+                      aria-hidden="true"
+                    >
+                      <Filter size={14} />
+                    </span>
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                      {filter.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
           {results.assets.length > 0 && (
             <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
               {t("commandPalette.assets")}
             </div>
           )}
           {results.assets.map((asset, index) => {
-            const resultIndex = results.modes.length + index;
+            const resultIndex =
+              results.modes.length + results.filters.length + index;
             return (
               <button
                 key={asset.id}

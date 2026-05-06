@@ -499,6 +499,121 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	}
 }
 
+func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	defaults, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaults.CustomAssetFilters == nil || len(defaults.CustomAssetFilters) != 0 {
+		t.Fatalf("default custom filters = %#v", defaults.CustomAssetFilters)
+	}
+
+	filters := []CustomAssetFilter{{
+		ID:      "zh-assets",
+		Name:    " Chinese assets ",
+		Enabled: true,
+		Groups: []CustomAssetFilterGroup{{
+			Clauses: []CustomAssetFilterClause{{
+				Field:    "path",
+				Operator: "regex",
+				Value:    `\p{Han}`,
+			}, {
+				Field:    "bytes",
+				Operator: "gte",
+				Value:    "1024",
+			}},
+		}, {
+			Clauses: []CustomAssetFilterClause{{
+				Field:    "extension",
+				Operator: "oneOf",
+				Value:    ".svg,.png",
+			}, {
+				Field:    "folder",
+				Operator: "suffix",
+				Value:    "icons",
+			}, {
+				Field:    "project",
+				Operator: "contains",
+				Value:    "web",
+			}},
+		}},
+	}}
+	settings, err := store.UpdateSettings(SettingsUpdate{CustomAssetFilters: filters})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(settings.CustomAssetFilters) != 1 || settings.CustomAssetFilters[0].Name != "Chinese assets" {
+		t.Fatalf("custom filters = %#v", settings.CustomAssetFilters)
+	}
+	if settings.CustomAssetFilters[0].Groups[0].Clauses[0].Value != `\p{Han}` {
+		t.Fatalf("custom filter regex = %#v", settings.CustomAssetFilters[0])
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	persisted, err := reopened.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(persisted.CustomAssetFilters) != 1 || persisted.CustomAssetFilters[0].ID != "zh-assets" {
+		t.Fatalf("persisted custom filters = %#v", persisted.CustomAssetFilters)
+	}
+
+	cases := []struct {
+		name    string
+		filters []CustomAssetFilter
+		code    string
+	}{
+		{
+			name:    "empty name",
+			filters: []CustomAssetFilter{{ID: "bad", Name: " ", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "path", Operator: "contains", Value: "assets"}}}}}},
+			code:    "custom_filter_name_required",
+		},
+		{
+			name:    "empty group",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: nil}},
+			code:    "custom_filter_group_required",
+		},
+		{
+			name:    "invalid regex",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "path", Operator: "regex", Value: "["}}}}}},
+			code:    "custom_filter_regex_invalid",
+		},
+		{
+			name:    "invalid field",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "ocr", Operator: "is", Value: "zh"}}}}}},
+			code:    "custom_filter_field_invalid",
+		},
+		{
+			name:    "invalid bytes",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "bytes", Operator: "gte", Value: "-1"}}}}}},
+			code:    "custom_filter_bytes_invalid",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := reopened.UpdateSettings(SettingsUpdate{CustomAssetFilters: tt.filters})
+			if err == nil || err.(apierr.Error).Code != tt.code {
+				t.Fatalf("err = %T %[1]v, want %s", err, tt.code)
+			}
+		})
+	}
+}
+
 func TestExportImportAndResetData(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -515,12 +630,20 @@ func TestExportImportAndResetData(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace := "Exported"
-	if _, err := store.UpdateSettings(SettingsUpdate{WorkspaceName: &workspace}); err != nil {
+	filters := []CustomAssetFilter{{
+		ID:      "legacy-icons",
+		Name:    "Legacy icons",
+		Enabled: true,
+		Groups: []CustomAssetFilterGroup{{
+			Clauses: []CustomAssetFilterClause{{Field: "folder", Operator: "prefix", Value: "src/icons/legacy"}},
+		}},
+	}}
+	if _, err := store.UpdateSettings(SettingsUpdate{WorkspaceName: &workspace, CustomAssetFilters: filters}); err != nil {
 		t.Fatal(err)
 	}
 
 	exported := store.ExportData()
-	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" {
+	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" || len(exported.Settings.CustomAssetFilters) != 1 {
 		t.Fatalf("exported = %#v", exported)
 	}
 	if err := store.ResetData(); err != nil {
@@ -539,7 +662,7 @@ func TestExportImportAndResetData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.WorkspaceName != "Exported" {
+	if settings.WorkspaceName != "Exported" || len(settings.CustomAssetFilters) != 1 || settings.CustomAssetFilters[0].ID != "legacy-icons" {
 		t.Fatalf("settings after import = %#v", settings)
 	}
 	if err := store.ImportData(ExportData{Version: 99}); err == nil || err.(apierr.Error).Code != "settings_import_version_unsupported" {

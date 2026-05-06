@@ -15,25 +15,44 @@ type Project struct {
 }
 
 type AppSettings struct {
-	WorkspaceName              string   `json:"workspaceName"`
-	ActiveWorkspaceID          string   `json:"activeWorkspaceId"`
-	DefaultProjectRoot         string   `json:"defaultProjectRoot"`
-	AutoScanOnOpen             bool     `json:"autoScanOnOpen"`
-	ScanOnOpen                 bool     `json:"scanOnOpen"`
-	ExcludePatterns            []string `json:"excludePatterns"`
-	OptimizationDefaultQuality int      `json:"optimizationDefaultQuality"`
-	OptimizationAutoApply      bool     `json:"optimizationAutoApply"`
+	WorkspaceName              string              `json:"workspaceName"`
+	ActiveWorkspaceID          string              `json:"activeWorkspaceId"`
+	DefaultProjectRoot         string              `json:"defaultProjectRoot"`
+	AutoScanOnOpen             bool                `json:"autoScanOnOpen"`
+	ScanOnOpen                 bool                `json:"scanOnOpen"`
+	ExcludePatterns            []string            `json:"excludePatterns"`
+	OptimizationDefaultQuality int                 `json:"optimizationDefaultQuality"`
+	OptimizationAutoApply      bool                `json:"optimizationAutoApply"`
+	CustomAssetFilters         []CustomAssetFilter `json:"customAssetFilters"`
 }
 
 type SettingsUpdate struct {
-	WorkspaceName              *string  `json:"workspaceName"`
-	ActiveWorkspaceID          *string  `json:"activeWorkspaceId"`
-	DefaultProjectRoot         *string  `json:"defaultProjectRoot"`
-	AutoScanOnOpen             *bool    `json:"autoScanOnOpen"`
-	ScanOnOpen                 *bool    `json:"scanOnOpen"`
-	ExcludePatterns            []string `json:"excludePatterns"`
-	OptimizationDefaultQuality *int     `json:"optimizationDefaultQuality"`
-	OptimizationAutoApply      *bool    `json:"optimizationAutoApply"`
+	WorkspaceName              *string             `json:"workspaceName"`
+	ActiveWorkspaceID          *string             `json:"activeWorkspaceId"`
+	DefaultProjectRoot         *string             `json:"defaultProjectRoot"`
+	AutoScanOnOpen             *bool               `json:"autoScanOnOpen"`
+	ScanOnOpen                 *bool               `json:"scanOnOpen"`
+	ExcludePatterns            []string            `json:"excludePatterns"`
+	OptimizationDefaultQuality *int                `json:"optimizationDefaultQuality"`
+	OptimizationAutoApply      *bool               `json:"optimizationAutoApply"`
+	CustomAssetFilters         []CustomAssetFilter `json:"customAssetFilters"`
+}
+
+type CustomAssetFilter struct {
+	ID      string                   `json:"id"`
+	Name    string                   `json:"name"`
+	Enabled bool                     `json:"enabled"`
+	Groups  []CustomAssetFilterGroup `json:"groups"`
+}
+
+type CustomAssetFilterGroup struct {
+	Clauses []CustomAssetFilterClause `json:"clauses"`
+}
+
+type CustomAssetFilterClause struct {
+	Field    string `json:"field"`
+	Operator string `json:"operator"`
+	Value    string `json:"value"`
 }
 
 type ExportData struct {
