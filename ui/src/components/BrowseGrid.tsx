@@ -241,10 +241,10 @@ export function BrowseGrid({
   }
 
   return (
-    <div ref={scrollRef} className="browse-grid-scroll scroll-thin">
+    <div ref={scrollRef} className="h-full overflow-auto scroll-thin">
       <section
         ref={gridRef}
-        className="browse-grid browse-grid--virtual"
+        className="browse-grid block"
         data-size={gridSize}
         style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
         aria-label={t("browse.gridAriaLabel")}
@@ -253,7 +253,7 @@ export function BrowseGrid({
           <div
             key={virtualRow.key}
             data-index={virtualRow.index}
-            className="vgrid-row"
+            className="absolute left-0 top-0 z-0 w-full grid gap-[var(--row-gap,16px)] grid-cols-[repeat(var(--row-cols,3),minmax(0,1fr))] translate-y-[var(--row-y,0)] hover:z-[3] focus-within:z-[3]"
             style={
               {
                 "--row-y": `${virtualRow.start}px`,

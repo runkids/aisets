@@ -104,8 +104,8 @@ export function BrowseToolbar({
   ];
 
   return (
-    <div className="browse-toolbar">
-      <div className="browse-toolbar-row">
+    <div className="sticky top-0 z-[4] grid gap-2.5 mb-1 py-2 pb-1 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
+      <div className="flex flex-wrap items-center gap-3">
         <BrowseIconToggleGroup
           value={view}
           items={viewItems}
@@ -152,11 +152,13 @@ export function BrowseToolbar({
           suffix={<ArrowDownAZ size={14} aria-hidden="true" />}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
-          className="browse-toolbar-search"
+          className="ml-auto flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:ml-0 max-md:flex-[1_1_100%] max-md:max-w-none"
           inputClassName="font-g text-g-ui tracking-g-ui"
         />
 
-        <span className="browse-toolbar-count tnum">{itemCount}</span>
+        <span className="font-g-mono text-[13px] font-[510] text-g-ink-3 tabular-nums">
+          {itemCount}
+        </span>
       </div>
 
       <BrowseStatusBar

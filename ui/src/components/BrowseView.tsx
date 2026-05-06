@@ -15,7 +15,11 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
-import type { AssetItem } from "../types";
+import {
+  customFilterOptions,
+  matchesCustomAssetFilter,
+} from "../customAssetFilters";
+import type { AssetItem, CustomAssetFilter } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { BrowseGrid } from "./BrowseGrid";
 import { BrowseList } from "./BrowseList";
@@ -25,11 +29,14 @@ import { facetOptions, projectFacetIds } from "./browseFacets";
 import { EmptyState } from "./ui";
 
 type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
+type BrowseFilters = { project: string; ext: string; customFilter: string };
 
 type Props = {
   items: AssetItem[];
   activeAssetId: string;
   autoScrollAssetId: string;
+  initialCustomFilterId: string;
+  customFilters: CustomAssetFilter[];
   projectNames: string[];
   projectFilterName: string;
   imagePreviewEnabled: boolean;
@@ -50,6 +57,48 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
     default:
       return true;
   }
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function applyBrowseFilters({
+  items,
+  filters,
+  searchQuery,
+  statusFilter,
+  customFilters,
+}: {
+  items: AssetItem[];
+  filters: BrowseFilters;
+  searchQuery: string;
+  statusFilter: StatusFilter;
+  customFilters: CustomAssetFilter[];
+}) {
+  const q = searchQuery.trim().toLowerCase();
+  const facetBaseItems = items.filter((item) => {
+    if (!matchesStatus(item, statusFilter)) return false;
+    if (
+      q &&
+      !fileName(item.repoPath).toLowerCase().includes(q) &&
+      !item.repoPath.toLowerCase().includes(q)
+    )
+      return false;
+    return true;
+  });
+  const filteredWithoutCustom = facetBaseItems.filter((item) => {
+    if (filters.project && item.projectName !== filters.project) return false;
+    if (filters.ext && item.ext !== filters.ext) return false;
+    return true;
+  });
+  const selectedCustomFilter =
+    customFilters.find(
+      (filter) => filter.enabled && filter.id === filters.customFilter,
+    ) ?? null;
+  const filtered = selectedCustomFilter
+    ? filteredWithoutCustom.filter((item) =>
+        matchesCustomAssetFilter(item, selectedCustomFilter),
+      )
+    : filteredWithoutCustom;
+  return { facetBaseItems, filteredWithoutCustom, filtered };
 }
 
 type FolderNode = {
@@ -127,11 +176,11 @@ function TreePanel({
   totalCount,
 }: TreePanelProps) {
   return (
-    <div className="browse-tree-rail scroll-thin">
-      <div className="browse-tree-inner">
+    <div className="w-[220px] shrink-0 overflow-auto border border-g-line rounded-g-md bg-g-surface scroll-thin">
+      <div className="p-2">
         <button
           type="button"
-          className="browse-tree-node"
+          className="flex w-full items-center gap-1 min-h-7 rounded-g-md font-g-mono text-[12px] leading-[1.4] text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
           data-active={selectedFolder === "" || undefined}
           onClick={() => onSelectFolder("")}
         >
@@ -181,7 +230,7 @@ function TreeNode({
     <>
       <button
         type="button"
-        className="browse-tree-node"
+        className="flex w-full items-center gap-1 min-h-7 rounded-g-md font-g-mono text-[12px] leading-[1.4] text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
         data-active={isSelected || undefined}
         style={{ "--tree-depth": depth } as CSSProperties}
         onClick={() => {
@@ -191,7 +240,7 @@ function TreeNode({
       >
         {hasChildren ? (
           <span
-            className="browse-tree-toggle"
+            className="grid size-4 shrink-0 place-items-center"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand(node.path);
@@ -204,7 +253,7 @@ function TreeNode({
             )}
           </span>
         ) : (
-          <span className="browse-tree-toggle" />
+          <span className="grid size-4 shrink-0 place-items-center" />
         )}
         {isExpanded ? (
           <FolderOpen size={13} className="shrink-0" />
@@ -256,6 +305,8 @@ export function BrowseView({
   items,
   activeAssetId,
   autoScrollAssetId,
+  initialCustomFilterId,
+  customFilters,
   projectNames,
   projectFilterName,
   imagePreviewEnabled,
@@ -266,6 +317,7 @@ export function BrowseView({
   const [filters, setFilters] = useState(() => ({
     project: projectFilterName,
     ext: "",
+    customFilter: initialCustomFilterId,
   }));
   const [view, setView] = useState<ViewMode>("grid");
   const [gridSize, setGridSize] = useState<"s" | "m" | "l">("m");
@@ -283,7 +335,7 @@ export function BrowseView({
   useEffect(() => {
     if (!autoScrollAssetId) return undefined;
     const resetId = window.setTimeout(() => {
-      setFilters({ project: projectFilterName, ext: "" });
+      setFilters({ project: projectFilterName, ext: "", customFilter: "" });
       setSearchQuery("");
       setStatusFilter("");
       setSelectedFolder("");
@@ -300,19 +352,17 @@ export function BrowseView({
     [items],
   );
 
-  const facetBaseItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return items.filter((i) => {
-      if (!matchesStatus(i, statusFilter)) return false;
-      if (
-        q &&
-        !fileName(i.repoPath).toLowerCase().includes(q) &&
-        !i.repoPath.toLowerCase().includes(q)
-      )
-        return false;
-      return true;
-    });
-  }, [items, statusFilter, searchQuery]);
+  const { facetBaseItems, filteredWithoutCustom, filtered } = useMemo(
+    () =>
+      applyBrowseFilters({
+        items,
+        filters,
+        searchQuery,
+        statusFilter,
+        customFilters,
+      }),
+    [customFilters, filters, items, searchQuery, statusFilter],
+  );
 
   const projectFacet = useMemo(
     () =>
@@ -335,13 +385,10 @@ export function BrowseView({
     [allExtensions, facetBaseItems, filters.project],
   );
 
-  const filtered = useMemo(() => {
-    return facetBaseItems.filter((i) => {
-      if (filters.project && i.projectName !== filters.project) return false;
-      if (filters.ext && i.ext !== filters.ext) return false;
-      return true;
-    });
-  }, [facetBaseItems, filters]);
+  const customFilterFacet = useMemo(
+    () => customFilterOptions(customFilters, filteredWithoutCustom),
+    [customFilters, filteredWithoutCustom],
+  );
 
   const folderTree = useMemo(() => buildFolderTree(filtered), [filtered]);
   const activeSelectedFolder = useMemo(() => {
@@ -423,10 +470,12 @@ export function BrowseView({
         projectScopeName={projectFilterName}
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
+        customFilterOptions={customFilterFacet}
+        customFilterTotal={filteredWithoutCustom.length}
         onFiltersChange={setFilters}
       />
-      <div className="content-scroll browse-content-scroll">
-        <div className="page browse-page flex h-full flex-col">
+      <div className="content-scroll p-1 px-4 pb-4">
+        <div className="page max-w-none p-0 flex h-full flex-col">
           <BrowseToolbar
             view={view}
             gridSize={gridSize}
@@ -478,7 +527,7 @@ export function BrowseView({
           {sorted.length === 0 ? (
             <EmptyState title={t("browse.empty")} />
           ) : view === "tree" ? (
-            <div className="browse-tree-shell">
+            <div className="mt-1 flex min-h-0 flex-1 gap-4">
               <TreePanel
                 root={folderTree}
                 selectedFolder={activeSelectedFolder}
@@ -488,7 +537,7 @@ export function BrowseView({
                 allLabel={t("browse.allFolders")}
                 totalCount={filtered.length}
               />
-              <div className="browse-tree-main">
+              <div className="min-h-0 min-w-0 flex-1">
                 <BrowseGrid
                   items={sorted}
                   gridSize={gridSize}
@@ -505,7 +554,7 @@ export function BrowseView({
               </div>
             </div>
           ) : (
-            <div className="browse-results">
+            <div className="mt-1 min-h-0 flex-1">
               {view === "list" ? (
                 <BrowseList
                   items={sorted}
