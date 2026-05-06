@@ -1,6 +1,11 @@
 ---
 name: design-system
-description: Design system rules for Asset Studio UI. Auto-triggers when editing files under ui/src/ — enforces token usage, CVA patterns, component inventory, and pre-delivery checklist.
+description: >
+  Asset Studio UI design system — token usage, CVA component patterns, Tailwind co-location rules,
+  and pre-delivery checklist. Use this skill whenever editing ANY file under ui/src/, including .tsx,
+  .ts, and style files. Also use when creating new UI components, modifying existing ones, changing
+  colors/spacing/typography, adding animations, or touching anything visual. Even simple one-line
+  UI tweaks should consult this skill — the token and cascade rules catch subtle bugs.
 globs:
   - "ui/src/**/*.tsx"
   - "ui/src/**/*.ts"
@@ -9,107 +14,139 @@ globs:
 
 # Asset Studio Design System
 
-Applies to ALL edits under `ui/src/`. Read this before writing any UI code.
+## Why this skill exists
 
-## Architecture
+This project uses a strict token-based design system with CVA (class-variance-authority) for
+component variants and Tailwind for co-located styles. The system prevents visual inconsistencies,
+dark/light theme breakage, and cascade conflicts that are hard to debug. Every rule below exists
+because someone hit the problem it prevents.
+
+---
+
+## 1. How styling works
 
 ```
-_tokens.scss     → CSS custom properties (--g-*), light + dark
-tailwind.css     → @theme mapping (bg-g-surface, text-g-ink, etc.)
-_patterns.scss   → @keyframes, .sr-only, .bg-checker
-ui/components/ui → CVA primitives (Button, Badge, Modal, Select, etc.)
-ui/components/   → Page components (Tailwind co-located in JSX)
+┌─ _tokens.scss ──── CSS custom properties (--g-canvas, --g-ink, --g-accent, etc.)
+│                    `:root` = light, `[data-theme="dark"]` = canonical dark
+│
+├─ tailwind.css ──── @theme block maps --g-* → Tailwind classes
+│                    e.g. --color-g-surface: var(--g-surface) → `bg-g-surface`
+│                    The `g-` prefix in class names means "uses a design token"
+│
+├─ _patterns.scss ── @keyframes, .sr-only, .bg-checker (shared utilities)
+│
+├─ components/ui/ ── CVA primitives (Button, Modal, Select, Badge, etc.)
+│                    Each exports a `*Variants` function + component
+│
+└─ components/ ───── Page components use Tailwind classes directly in JSX
 ```
 
-No component styles in external SCSS. Everything co-located in `.tsx`.
+**The only SCSS files are `_tokens.scss`, `_patterns.scss`, and `globals.scss`.
+No component styles live in SCSS. Everything visual is co-located in `.tsx`.**
 
-## Token Rules
+### Token naming convention
 
-- **All visual values → `--g-*` tokens** via Tailwind aliases. No raw hex, no arbitrary px radii, no ad-hoc shadows.
-- Token source of truth: `ui/src/styles/_tokens.scss`
-- Tailwind mapping: `ui/src/styles/tailwind.css` `@theme` block
-- Full token reference: `DESIGN.md §2`
+Tailwind classes use the `g-` prefix to reference design tokens:
+- Colors: `bg-g-surface`, `text-g-ink`, `border-g-line`, `text-g-red`
+- Radius: `rounded-g-sm` (4px), `rounded-g-md` (6px), `rounded-g-lg` (12px)
+- Shadows: `shadow-g-sm`, `shadow-g-md`, `shadow-g-pop`, `shadow-g-focus`
+- Fonts: `font-g` (body), `font-g-mono`, `font-g-display`
+- Text: `text-g-chip` (11px), `text-g-caption` (12px), `text-g-ui` (13px), `text-g-body` (14px)
+- Easing: `ease-g`, `ease-g-out`, `ease-g-spring`
+- Button heights: `h-g-btn-sm` (26px), `h-g-btn-md` (32px), `h-g-btn-lg` (36px)
 
-## Component Pattern (CVA)
+Full token values are in `_tokens.scss`. Full @theme mapping is in `tailwind.css`.
 
-Every UI primitive uses this pattern:
+### Cascade gotcha (important)
+
+SCSS files (`_tokens.scss`, `_patterns.scss`) are NOT inside a CSS `@layer`. Tailwind v4
+utilities ARE in a layer. This means **SCSS properties always beat Tailwind utilities** in
+the cascade.
+
+Practical consequence: if an element has both a SCSS class and a Tailwind class for the same
+property (e.g., `.content-scroll` sets `padding: 32px` and you add `p-4`), the SCSS wins
+silently. The fix: **remove the SCSS class entirely** and replace with full Tailwind.
+
+Also: `twMerge` in Tailwind v4 can't always resolve spacing-scale utilities (`w-80`) against
+keyword utilities (`w-full`). Use arbitrary values (`w-[320px]`) when combining with CVA bases.
+
+---
+
+## 2. Component pattern
+
+### New UI primitive → CVA
 
 ```tsx
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-const componentVariants = cva("base-classes", {
-  variants: { variant: { ... }, size: { ... } },
+const widgetVariants = cva("base tailwind classes here", {
+  variants: {
+    variant: { primary: "...", secondary: "..." },
+    size: { sm: "...", md: "..." },
+  },
   defaultVariants: { variant: "primary", size: "md" },
 });
 
-type Props = React.HTMLAttributes<HTMLElement> & VariantProps<typeof componentVariants>;
+type WidgetProps = React.HTMLAttributes<HTMLElement> &
+  VariantProps<typeof widgetVariants>;
 
-function Component({ variant, size, className, ...props }: Props) {
-  return <div className={cn(componentVariants({ variant, size }), className)} {...props} />;
+function Widget({ variant, size, className, ...props }: WidgetProps) {
+  return <div className={cn(widgetVariants({ variant, size }), className)} {...props} />;
 }
 
-export { Component, componentVariants };
+export { Widget, widgetVariants };
 ```
 
-**Anti-patterns:**
-- `Record<Variant, string>` maps → use CVA
-- Manual className concatenation → use `cn()`
-- `@apply` in CSS → use utility classes in JSX
-- `w-80` with CVA `w-full` → use `w-[320px]` (twMerge + TW4 conflict)
+### Page component → direct Tailwind
 
-## UI Primitive Inventory
+Page-level components don't need CVA — just use Tailwind classes in `className` with `cn()`
+for conditionals. Use the existing UI primitives for buttons, inputs, modals, etc.
 
-Before creating a new component, check if one exists:
+### Before creating a new component
 
-| Component | Variants | File |
-|-----------|----------|------|
-| Button | primary/secondary/ghost/danger × sm/md/lg | Button.tsx |
-| IconButton | sm/md/lg + active | Button.tsx |
-| Badge | 11 tones | Badge.tsx |
-| Card | default/elevated/nested × padding | Card.tsx |
-| StatCard | 6 tones | StatCard.tsx |
-| TextInput | default/outline/subtle/search × sm/md | TextInput.tsx |
-| TextInputButton | same variants as TextInput | TextInput.tsx |
-| Select | sm/md (Radix) | Select.tsx |
-| Tabs | segment/pills × sm/md (Radix) | Tabs.tsx |
-| Modal | sm/md/lg (Radix Dialog) | Modal.tsx |
-| ConfirmDialog | default/danger (Radix AlertDialog) | ConfirmDialog.tsx |
-| PromptDialog | (Radix Dialog) | PromptDialog.tsx |
-| Tooltip | top/bottom/left/right (Radix) | Tooltip.tsx |
-| DropdownMenu | align left/right (Radix) | DropdownMenu.tsx |
-| SegmentedControl | icon/text/fixed/status | SegmentedControl.tsx |
-| Notice | info/success/warning/danger | Notice.tsx |
-| Toast | wraps Notice | Toast.tsx |
-| EmptyState | sm/md/lg × center/left × neutral/info/warning | EmptyState.tsx |
-| IconWell | sm/md/lg × 7 tones | IconWell.tsx |
-| AssetThumbnail | sm/md/lg/fill × surface/checker/light/dark | AssetThumbnail.tsx |
-| StackedBar | segments with tone | StackedBar.tsx |
-| ImagePreview | hover preview | ImagePreview.tsx |
+Read the barrel export at `ui/src/components/ui/index.ts` to see what already exists. The
+project has 21+ primitives including Button, Badge, Card, Modal, Select, Tabs, Tooltip,
+DropdownMenu, Notice, Toast, EmptyState, and more. Check before building from scratch.
 
-## Design Principles (Quick)
+---
 
-1. **Single CTA per screen** — only one `--g-cta` filled button visible
-2. **Color never alone** — status always pairs color + icon + text
-3. **Compact, not cramped** — 4px base, 8px gap, 12px card padding
-4. **6px default radius** — `--g-r-md` for most controls
-5. **Tooltips on icon-only buttons** — Radix Tooltip, never native `title`
-6. **Icons from Lucide only** — no emoji as structural icons
+## 3. Design principles
 
-## Cascade Warning
+These aren't taste preferences — each prevents a specific class of bugs:
 
-SCSS in `_tokens.scss` / `_patterns.scss` is NOT in `@layer` — it has HIGHER priority than Tailwind utilities. If you need to override a token-level style, use inline `style` or Tailwind `!important` (rare).
+| Rule | Why |
+|------|-----|
+| **All values from `--g-*` tokens** | Raw hex breaks when themes switch. A hardcoded `#ffffff` is invisible on light canvas. |
+| **Single CTA per screen** | Multiple `--g-cta` buttons create visual competition. Users don't know where to click. |
+| **Color + icon + text for status** | ~8% of males are colorblind. Color alone is invisible to them. |
+| **6px default radius (`--g-r-md`)** | Consistency across the product. Only overlays get 12px. |
+| **Tooltips via Radix, not `title`** | Native tooltips can't be styled, have inconsistent delay, and no keyboard trigger. |
+| **Lucide icons only** | Mixing icon sets (or using emoji) creates visual noise. |
+| **`cn()` for all class merging** | It wraps `clsx` + `twMerge` — handles conditional classes and deduplicates conflicts. |
 
-## Pre-Delivery Checklist
+---
 
-Before reporting UI work as done:
+## 4. Pre-delivery checklist
 
-- [ ] All values from `--g-*` tokens (no raw hex/px)
-- [ ] New component uses CVA with exported `*Variants`
-- [ ] Single primary CTA per visible screen
-- [ ] Color + icon + text for status/severity
-- [ ] `aria-label` on icon-only buttons
-- [ ] Overlays: ESC dismiss + focus trap (Radix handles this)
-- [ ] Dark mode verified (canonical theme)
-- [ ] Responsive: 1440 / 1024 / 768 / 375
-- [ ] `DESIGN.md` updated if new token/component/variant added
+Run through before reporting any UI task as done:
+
+- [ ] All visual values from `--g-*` tokens — no raw hex, no arbitrary px for radius/shadow
+- [ ] New component uses CVA with exported `*Variants` function
+- [ ] Only one `--g-cta` filled button per visible screen
+- [ ] Status/severity combines color + icon + text
+- [ ] `aria-label` on every icon-only button
+- [ ] Overlays: ESC dismiss + focus trap (Radix Dialog/AlertDialog handles this)
+- [ ] Verified in dark mode (canonical theme)
+- [ ] Responsive check: 1440 / 1024 / 768 / 375
+- [ ] `DESIGN.md` updated if you added a new token, component, or variant
+
+---
+
+## 5. Reference
+
+For full token tables (all colors, spacing, radius, shadow values), type scale, surface
+hierarchy, component specs, accessibility rules, and view-by-view patterns:
+
+→ Read `DESIGN.md` (the comprehensive spec). This skill covers the rules you need for every
+edit; DESIGN.md has the detailed reference data you need when designing something new.
