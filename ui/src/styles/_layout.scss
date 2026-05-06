@@ -161,7 +161,7 @@ a {
   gap: 8px;
   min-height: 38px;
   padding: 8px 12px;
-  border-radius: var(--g-r-sm);
+  border-radius: var(--g-r-md);
   color: var(--g-ink-3);
   font-size: 13px;
   font-weight: 500;
@@ -173,9 +173,17 @@ a {
     background 120ms var(--g-ease),
     color 120ms var(--g-ease);
 }
-.sb-link:hover {
-  background: var(--g-surface-2);
+.sb-link:hover:not([data-active="true"]) {
+  background: color-mix(in srgb, var(--g-surface-2) 84%, transparent);
   color: var(--g-ink-2);
+}
+.sb-link:hover:not([data-active="true"]) .sb-badge {
+  background: var(--g-surface);
+  color: var(--g-ink-2);
+}
+[data-theme="dark"] .sb-link:hover:not([data-active="true"]) {
+  background: var(--g-surface-3);
+  color: var(--g-ink);
 }
 .sb-link:focus-visible {
   outline: none;
@@ -188,11 +196,7 @@ a {
 }
 .sb-link[data-active="true"]:hover {
   background: var(--g-active-bg);
-  filter: brightness(0.96);
-}
-[data-theme="dark"] .sb-link[data-active="true"]:hover {
-  background: var(--g-accent-deep);
-  filter: none;
+  color: var(--g-active-text);
 }
 .sb-link[data-active="true"] .sb-badge {
   background: var(--g-surface);
@@ -382,11 +386,12 @@ a {
   width: 100%;
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid var(--g-line-strong);
+  border: 1px solid var(--g-line);
   border-radius: var(--g-r-md);
-  background: var(--g-surface-2);
+  background: var(--g-surface);
   color: var(--g-ink);
   text-align: left;
+  box-shadow: var(--g-shadow-sm);
   transition:
     background 120ms var(--g-ease),
     border-color 120ms var(--g-ease),
@@ -398,8 +403,9 @@ a {
   position: absolute;
   inset: -4px;
 }
-.project-switcher-trigger:hover {
-  background: var(--g-surface-3);
+.project-switcher-trigger:hover,
+.project-switcher-trigger[aria-expanded="true"] {
+  background: var(--g-surface-2);
   border-color: var(--g-line-strong);
 }
 .project-switcher-trigger:focus-visible {
@@ -416,7 +422,7 @@ a {
   width: 24px;
   height: 24px;
   border-radius: var(--g-r-md);
-  background: var(--g-surface-2);
+  background: var(--g-surface-3);
   color: var(--g-ink-2);
   flex-shrink: 0;
 }
@@ -464,13 +470,13 @@ a {
 }
 .project-switcher-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
   z-index: 60;
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(520px, calc(100vh - 88px));
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(480px, calc(100vh - 88px));
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid var(--g-line-strong);
   border-radius: var(--g-r-lg);
   background: var(--g-surface);
@@ -482,6 +488,7 @@ a {
   gap: 2px;
   padding: 10px 10px 12px;
   border-bottom: 1px solid var(--g-line);
+  background: var(--g-surface);
 }
 .project-switcher-menu-head strong {
   color: var(--g-ink);
@@ -506,6 +513,7 @@ a {
 }
 .project-switcher-workspace-row,
 .project-switcher-option {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -514,6 +522,10 @@ a {
   padding: 8px 10px;
   border-radius: var(--g-r-md);
   color: var(--g-ink-2);
+  text-align: left;
+}
+.project-switcher-workspace-row {
+  background: var(--g-surface);
 }
 .project-switcher-option {
   transition:
@@ -521,11 +533,32 @@ a {
     color 120ms var(--g-ease),
     box-shadow 120ms var(--g-ease);
 }
-.project-switcher-option:hover,
-.project-switcher-option:focus-visible,
-.project-switcher-option[data-active="true"] {
-  background: var(--g-surface-2);
+.project-switcher-option:hover:not([data-active="true"]),
+.project-switcher-option:focus-visible:not([data-active="true"]) {
+  background: color-mix(in srgb, var(--g-surface-2) 84%, transparent);
+  color: var(--g-ink-2);
+}
+.project-switcher-option:hover:not([data-active="true"])
+  .project-switcher-count,
+.project-switcher-option:focus-visible:not([data-active="true"])
+  .project-switcher-count {
+  background: var(--g-surface);
+  color: var(--g-ink-2);
+}
+[data-theme="dark"] .project-switcher-option:hover:not([data-active="true"]),
+[data-theme="dark"]
+  .project-switcher-option:focus-visible:not([data-active="true"]) {
+  background: var(--g-surface-3);
   color: var(--g-ink);
+}
+.project-switcher-option[data-active="true"] {
+  background: var(--g-active-bg);
+  color: var(--g-active-text);
+  font-weight: var(--g-active-weight);
+}
+.project-switcher-option[data-active="true"]:hover {
+  background: var(--g-active-bg);
+  color: var(--g-active-text);
 }
 .project-switcher-option:focus-visible {
   outline: none;
@@ -554,6 +587,7 @@ a {
   flex: 1;
   flex-direction: column;
   gap: 2px;
+  text-align: left;
 }
 .project-switcher-option-copy strong {
   overflow: hidden;
@@ -588,9 +622,27 @@ a {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+.project-switcher-option[data-active="true"] .project-switcher-count {
+  background: var(--g-surface);
+  color: var(--g-ink-3);
+}
+[data-theme="dark"]
+  .project-switcher-option[data-active="true"]
+  .project-switcher-count {
+  background: rgba(8, 9, 10, 0.18);
+  color: var(--g-accent-ink);
+}
+.project-switcher-option[data-active="true"]
+  .project-switcher-option-copy
+  strong,
+.project-switcher-option[data-active="true"]
+  .project-switcher-option-copy
+  span {
+  color: currentColor;
+}
 .project-switcher-check {
   opacity: 0;
-  color: var(--g-green);
+  color: currentColor;
 }
 .project-switcher-workspace-row .project-switcher-check,
 .project-switcher-option[data-active="true"] .project-switcher-check {
@@ -622,6 +674,11 @@ a {
   .project-switcher-menu {
     left: auto;
     right: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-switcher-trigger:active {
+    transform: none;
   }
 }
 .tb-spacer {

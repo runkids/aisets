@@ -22,16 +22,16 @@ Asset Studio now supports a progressive migration from SCSS class inventory to R
 
 ## 1. Design Principles
 
-| # | Principle | What it means here |
-|---|-----------|--------------------|
-| 1 | **Single CTA + single accent** | `--g-cta` is reserved for *one* primary CTA per screen. `--g-accent` (Neon Lime `#e4f222`) is reserved for dark CTA fill, active nav in dark mode, focus rings, and selection. Never decorative. |
-| 2 | **Layered surfaces, not shadows** | Hierarchy comes from `canvas → graphite → deep-slate → charcoal-overlay`. Shadows are tight and contained, never diffuse. |
-| 3 | **Compact, not cramped** | 4px base unit, 8px element gap, 12px card padding, 24px section gap. Information density is the feature. |
-| 4 | **Inter + Berkeley Mono** | Inter Variable for UI, Berkeley Mono (or IBM Plex Mono / JetBrains Mono fallback) for paths, hashes, sizes, counts. |
-| 5 | **6px is the default radius** | Buttons, inputs, cards, badges all gravitate to 6px. Tags 2–4px. Pills 9999px. |
-| 6 | **Motion is meaning** | 150–300ms, ease-out for entry, spring/scale for press, never decorative parallax. |
-| 7 | **Color never alone** | Severity, success, error always pair color with icon + text + position. |
-| 8 | **Tooltips are non-native** | Every icon-only control gets a `<Tooltip>` from `ui/Tooltip.tsx`. **Never** rely on the browser's native `title` attribute. See §6.23 for the full spec. |
+| #   | Principle                         | What it means here                                                                                                                                                                               |
+| --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **Single CTA + single accent**    | `--g-cta` is reserved for _one_ primary CTA per screen. `--g-accent` (Neon Lime `#e4f222`) is reserved for dark CTA fill, active nav in dark mode, focus rings, and selection. Never decorative. |
+| 2   | **Layered surfaces, not shadows** | Hierarchy comes from `canvas → graphite → deep-slate → charcoal-overlay`. Shadows are tight and contained, never diffuse.                                                                        |
+| 3   | **Compact, not cramped**          | 4px base unit, 8px element gap, 12px card padding, 24px section gap. Information density is the feature.                                                                                         |
+| 4   | **Inter + Berkeley Mono**         | Inter Variable for UI, Berkeley Mono (or IBM Plex Mono / JetBrains Mono fallback) for paths, hashes, sizes, counts.                                                                              |
+| 5   | **6px is the default radius**     | Buttons, inputs, cards, badges all gravitate to 6px. Tags 2–4px. Pills 9999px.                                                                                                                   |
+| 6   | **Motion is meaning**             | 150–300ms, ease-out for entry, spring/scale for press, never decorative parallax.                                                                                                                |
+| 7   | **Color never alone**             | Severity, success, error always pair color with icon + text + position.                                                                                                                          |
+| 8   | **Tooltips are non-native**       | Every icon-only control gets a `<Tooltip>` from `ui/Tooltip.tsx`. **Never** rely on the browser's native `title` attribute. See §6.23 for the full spec.                                         |
 
 ---
 
@@ -41,51 +41,51 @@ Asset Studio now supports a progressive migration from SCSS class inventory to R
 
 The palette is dark-first. SCSS variable names (`--g-*`) are preserved for backwards compatibility and map onto the Linear surface scale.
 
-| Token | Dark (canonical) | Light (Daylight Console) | Linear name | Role |
-|-------|------------------|--------------------------|-------------|------|
-| `--g-canvas` | `#08090a` | `#fafbfc` | Pitch Black ↔ Off-white | Page background, dotted grid base |
-| `--g-surface` | `#0f1011` | `#ffffff` | Graphite ↔ Pure White | Default card / sidebar / topbar fill |
-| `--g-surface-2` | `#161718` | `#f4f5f7` | Deep Slate ↔ Cool Wash | Hover wash, elevated card, segmented active |
-| `--g-surface-3` | `#23252a` | `#eceef2` | Charcoal ↔ Cooler Wash | Inset wells, group headers, scrim accent |
-| `--g-line` | `#23252a` | `#e5e7eb` | — | Default 1px borders, dividers |
-| `--g-line-strong` | `#383b3f` | `#d1d5db` | — | Hover borders, scrollbar thumb, input outline |
-| `--g-ink` | `#f7f8f8` | `#0c0d0e` | Porcelain ↔ Near-Black | Primary text & icons (AAA on canvas) |
-| `--g-ink-2` | `#d0d6e0` | `#3f4045` | Light Steel ↔ Slate | Secondary text, ghost button default |
-| `--g-ink-3` | `#8a8f98` | `#62666d` | Storm Cloud (symmetric) | Tertiary text, descriptions, nav labels |
-| `--g-ink-4` | `#62666d` | `#8a8f98` | Fog Grey (symmetric) | Metadata, placeholders |
-| `--g-ink-5` | `#43474d` | `#c7c8cc` | — | Crumbs separator, very dim chrome |
-| `--g-accent` | `#e4f222` | `#e4f222` | **Neon Lime** | Focus ring, selection ring, accent wash (NOT primary CTA in light) |
-| `--g-accent-soft` | `rgba(228,242,34,0.14)` | `rgba(228,242,34,0.22)` | — | Selected card meta, focus glow, hover wash |
-| `--g-accent-deep` | `#c9d61c` | `#c9d61c` | — | Reserved (legacy `.btn-accent` hover) |
-| `--g-accent-ink` | `#08090a` | `#0c0d0e` | Pitch Black | Text on Neon Lime when used as fill |
-| **`--g-cta`** | `#e4f222` (Neon Lime) | **`#0c0d0e` (Near-Black)** | — | **Theme-swapped primary CTA fill** — `.btn-primary` reads this |
-| **`--g-cta-ink`** | `#08090a` | `#ffffff` | — | Text on `--g-cta` |
-| **`--g-cta-hover`** | `#c9d61c` | `#25272a` | — | `.btn-primary:hover` |
-| **`--g-active-bg`** | `#e4f222` | `#eceef2` | — | Theme-swapped active nav / iconbtn bg |
-| **`--g-active-text`** | `#08090a` | `#0c0d0e` | — | Active text |
-| **`--g-active-weight`** | `510` | `590` | — | Active font-weight (light needs heavier weight to read as "selected" without color punch) |
-| `--g-info` | `#5e6ad2` | `#5e6ad2` | Aether Blue | Informational highlights, links |
-| `--g-info-soft` | `rgba(94,106,210,0.16)` | `rgba(94,106,210,0.12)` | — | Info chip background |
-| `--g-blue` | `#02b8cc` | `#02b8cc` | Cyan Spark | Diff / preview accent |
-| `--g-blue-soft` | `rgba(2,184,204,0.14)` | `rgba(2,184,204,0.10)` | — | Cyan chip / icon bg |
-| `--g-green` | `#27a644` | `#008d2c` | Emerald / Forest Green | Success, preferred duplicate, savings |
-| `--g-green-soft` | `rgba(39,166,68,0.16)` | `#dcfce7` | — | Success chip, run-panel result row |
-| `--g-amber` | `#f0b429` | `#f59e0b` | — | Warning |
-| `--g-amber-soft` | `rgba(240,180,41,0.16)` | `#fef3c7` | — | Warning chip |
-| `--g-red` | `#eb5757` | `#dc2626` | Warning Red | Danger, critical lint, delete |
-| `--g-red-soft` | `rgba(235,87,87,0.16)` | `#fee2e2` | — | Danger chip |
-| `--g-purple` | `#8b5cf6` | `#7c3aed` | Amethyst / Deep Violet | Lint badge, secondary category |
-| `--g-purple-soft` | `rgba(139,92,246,0.16)` | `#ede9fe` | — | Lint chip bg |
+| Token                   | Dark (canonical)        | Light (Daylight Console)   | Linear name             | Role                                                                                      |
+| ----------------------- | ----------------------- | -------------------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `--g-canvas`            | `#08090a`               | `#fafbfc`                  | Pitch Black ↔ Off-white | Page background, dotted grid base                                                         |
+| `--g-surface`           | `#0f1011`               | `#ffffff`                  | Graphite ↔ Pure White   | Default card / sidebar / topbar fill                                                      |
+| `--g-surface-2`         | `#161718`               | `#f4f5f7`                  | Deep Slate ↔ Cool Wash  | Hover wash, elevated card, segmented active                                               |
+| `--g-surface-3`         | `#23252a`               | `#eceef2`                  | Charcoal ↔ Cooler Wash  | Inset wells, group headers, scrim accent                                                  |
+| `--g-line`              | `#23252a`               | `#e5e7eb`                  | —                       | Default 1px borders, dividers                                                             |
+| `--g-line-strong`       | `#383b3f`               | `#d1d5db`                  | —                       | Hover borders, scrollbar thumb, input outline                                             |
+| `--g-ink`               | `#f7f8f8`               | `#0c0d0e`                  | Porcelain ↔ Near-Black  | Primary text & icons (AAA on canvas)                                                      |
+| `--g-ink-2`             | `#d0d6e0`               | `#3f4045`                  | Light Steel ↔ Slate     | Secondary text, ghost button default                                                      |
+| `--g-ink-3`             | `#8a8f98`               | `#62666d`                  | Storm Cloud (symmetric) | Tertiary text, descriptions, nav labels                                                   |
+| `--g-ink-4`             | `#62666d`               | `#8a8f98`                  | Fog Grey (symmetric)    | Metadata, placeholders                                                                    |
+| `--g-ink-5`             | `#43474d`               | `#c7c8cc`                  | —                       | Crumbs separator, very dim chrome                                                         |
+| `--g-accent`            | `#e4f222`               | `#e4f222`                  | **Neon Lime**           | Focus ring, selection ring, accent wash (NOT primary CTA in light)                        |
+| `--g-accent-soft`       | `rgba(228,242,34,0.14)` | `rgba(228,242,34,0.22)`    | —                       | Selected card meta, focus glow, hover wash                                                |
+| `--g-accent-deep`       | `#c9d61c`               | `#c9d61c`                  | —                       | Reserved (legacy `.btn-accent` hover)                                                     |
+| `--g-accent-ink`        | `#08090a`               | `#0c0d0e`                  | Pitch Black             | Text on Neon Lime when used as fill                                                       |
+| **`--g-cta`**           | `#e4f222` (Neon Lime)   | **`#0c0d0e` (Near-Black)** | —                       | **Theme-swapped primary CTA fill** — `.btn-primary` reads this                            |
+| **`--g-cta-ink`**       | `#08090a`               | `#ffffff`                  | —                       | Text on `--g-cta`                                                                         |
+| **`--g-cta-hover`**     | `#c9d61c`               | `#25272a`                  | —                       | `.btn-primary:hover`                                                                      |
+| **`--g-active-bg`**     | `#e4f222`               | `#eceef2`                  | —                       | Theme-swapped active nav / iconbtn bg                                                     |
+| **`--g-active-text`**   | `#08090a`               | `#0c0d0e`                  | —                       | Active text                                                                               |
+| **`--g-active-weight`** | `510`                   | `590`                      | —                       | Active font-weight (light needs heavier weight to read as "selected" without color punch) |
+| `--g-info`              | `#5e6ad2`               | `#5e6ad2`                  | Aether Blue             | Informational highlights, links                                                           |
+| `--g-info-soft`         | `rgba(94,106,210,0.16)` | `rgba(94,106,210,0.12)`    | —                       | Info chip background                                                                      |
+| `--g-blue`              | `#02b8cc`               | `#02b8cc`                  | Cyan Spark              | Diff / preview accent                                                                     |
+| `--g-blue-soft`         | `rgba(2,184,204,0.14)`  | `rgba(2,184,204,0.10)`     | —                       | Cyan chip / icon bg                                                                       |
+| `--g-green`             | `#27a644`               | `#008d2c`                  | Emerald / Forest Green  | Success, preferred duplicate, savings                                                     |
+| `--g-green-soft`        | `rgba(39,166,68,0.16)`  | `#dcfce7`                  | —                       | Success chip, run-panel result row                                                        |
+| `--g-amber`             | `#f0b429`               | `#f59e0b`                  | —                       | Warning                                                                                   |
+| `--g-amber-soft`        | `rgba(240,180,41,0.16)` | `#fef3c7`                  | —                       | Warning chip                                                                              |
+| `--g-red`               | `#eb5757`               | `#dc2626`                  | Warning Red             | Danger, critical lint, delete                                                             |
+| `--g-red-soft`          | `rgba(235,87,87,0.16)`  | `#fee2e2`                  | —                       | Danger chip                                                                               |
+| `--g-purple`            | `#8b5cf6`               | `#7c3aed`                  | Amethyst / Deep Violet  | Lint badge, secondary category                                                            |
+| `--g-purple-soft`       | `rgba(139,92,246,0.16)` | `#ede9fe`                  | —                       | Lint chip bg                                                                              |
 
-> **Rule:** Never introduce a new bright/saturated color outside this list for interactive purposes. `--g-accent` (Neon Lime) is the only accent that gets a *filled* background on a control.
+> **Rule:** Never introduce a new bright/saturated color outside this list for interactive purposes. `--g-accent` (Neon Lime) is the only accent that gets a _filled_ background on a control.
 
 ### 2.2 Typography
 
-| Token | Stack |
-|-------|-------|
-| `--g-font` (body / CJK) | `'Inter Variable', 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', sans-serif` |
-| `--g-display` | `'Inter Variable', 'Inter Tight', system-ui, sans-serif` |
-| `--g-mono` | `'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace` |
+| Token                   | Stack                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `--g-font` (body / CJK) | `'Inter Variable', 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', sans-serif`           |
+| `--g-display`           | `'Inter Variable', 'Inter Tight', system-ui, sans-serif`                                       |
+| `--g-mono`              | `'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace` |
 
 > **Why Inter Variable?** Linear's signature typeface. Variable axis lets us use 510/590 instead of 500/600 for tighter optical weight. Noto Sans TC kept inline for CJK glyph coverage; the cascade picks it up only when Inter has no glyph.
 
@@ -93,23 +93,23 @@ OpenType features for Inter: `font-feature-settings: "cv01", "ss03";` applied gl
 
 #### Type scale
 
-| Role | Font | Size | Weight | Line-height | Letter-spacing |
-|------|------|------|--------|-------------|----------------|
-| Display (hero counts) | display | 72px | 590 | 1.0 | -0.022em |
-| Heading L (section title) | display | 48px | 590 | 1.2 | -0.022em |
-| Heading M (page title) | display | 32px | 590 | 1.2 | -0.022em |
-| Heading S (card title) | display | 24px | 510 | 1.33 | -0.022em |
-| KPI value | display | 32px | 590 | 1.0 | -0.022em |
-| Subheading | body | 17px | 510 | 1.47 | -0.013em |
-| Body | body | 14px | 400 | 1.4 | -0.013em |
-| UI label / button | body | 13px | 510 | 1.4 | -0.012em |
-| Nav link | body | 13px | 400 | 1.4 | -0.012em |
-| Caption / chip | body | 12px | 510 | 1.33 | -0.011em |
-| Section label (uppercase) | body | 10px | 510 | 1.4 | 0.06em (positive) |
-| Mono — code / path / hash | mono | 12–13px | 400 | 1.5 | -0.015em |
-| Mono — value (KPI delta) | mono | 11px | 510 | 1.4 | -0.015em |
+| Role                      | Font    | Size    | Weight | Line-height | Letter-spacing    |
+| ------------------------- | ------- | ------- | ------ | ----------- | ----------------- |
+| Display (hero counts)     | display | 72px    | 590    | 1.0         | -0.022em          |
+| Heading L (section title) | display | 48px    | 590    | 1.2         | -0.022em          |
+| Heading M (page title)    | display | 32px    | 590    | 1.2         | -0.022em          |
+| Heading S (card title)    | display | 24px    | 510    | 1.33        | -0.022em          |
+| KPI value                 | display | 32px    | 590    | 1.0         | -0.022em          |
+| Subheading                | body    | 17px    | 510    | 1.47        | -0.013em          |
+| Body                      | body    | 14px    | 400    | 1.4         | -0.013em          |
+| UI label / button         | body    | 13px    | 510    | 1.4         | -0.012em          |
+| Nav link                  | body    | 13px    | 400    | 1.4         | -0.012em          |
+| Caption / chip            | body    | 12px    | 510    | 1.33        | -0.011em          |
+| Section label (uppercase) | body    | 10px    | 510    | 1.4         | 0.06em (positive) |
+| Mono — code / path / hash | mono    | 12–13px | 400    | 1.5         | -0.015em          |
+| Mono — value (KPI delta)  | mono    | 11px    | 510    | 1.4         | -0.015em          |
 
-> Section labels are the *only* uppercased text and the *only* positive tracking values. Everywhere else, tracking is negative or zero — Linear's signature.
+> Section labels are the _only_ uppercased text and the _only_ positive tracking values. Everywhere else, tracking is negative or zero — Linear's signature.
 
 ### 2.3 Spacing
 
@@ -123,24 +123,24 @@ Base unit **4px**. Density: **compact**.
                   --space-40: 40px   --space-96: 96px
 ```
 
-| Layout constant | Value |
-|-----------------|-------|
-| Section gap | 24px |
-| Card padding (default) | 12px |
+| Layout constant         | Value                           |
+| ----------------------- | ------------------------------- |
+| Section gap             | 24px                            |
+| Card padding (default)  | 12px                            |
 | Card padding (elevated) | 24px vertical / 16px horizontal |
-| Element gap (inline) | 8px |
-| Form row gap | 8px |
+| Element gap (inline)    | 8px                             |
+| Form row gap            | 8px                             |
 
 ### 2.4 Radius
 
-| Token | Value | Used by |
-|-------|-------|---------|
-| `--g-r-xs` | 2px | Tags, sidebar nav item, severity dot |
-| `--g-r-sm` | 4px | Badges, count chips |
-| `--g-r-md` | 6px | **Buttons, inputs, search, seg-toggle, icon buttons, default cards** |
-| `--g-r-lg` | 12px | Drawer, modal, run panel, settings, command palette, nested card |
-| `--g-r-xl` | 16px | Dropzone (precheck) |
-| `pill` | 9999px | Toast, scrollbar thumb, scroll-top-btn, status chips |
+| Token      | Value  | Used by                                                              |
+| ---------- | ------ | -------------------------------------------------------------------- |
+| `--g-r-xs` | 2px    | Tags, severity dot                                                   |
+| `--g-r-sm` | 4px    | Badges, count chips                                                  |
+| `--g-r-md` | 6px    | **Buttons, inputs, search, seg-toggle, icon buttons, default cards** |
+| `--g-r-lg` | 12px   | Drawer, modal, run panel, settings, command palette, nested card     |
+| `--g-r-xl` | 16px   | Dropzone (precheck)                                                  |
+| `pill`     | 9999px | Toast, scrollbar thumb, scroll-top-btn, status chips                 |
 
 > The big shift: most cards/rows that used to be 14px (`--g-r-lg` legacy) are now **6px (`--g-r-md`)** to match Linear's tight aesthetic. Only floating overlays keep 12px.
 
@@ -148,42 +148,42 @@ Base unit **4px**. Density: **compact**.
 
 Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**, not from soft diffuse blurs.
 
-| Token | Value | Used by |
-|-------|-------|---------|
-| `--g-shadow-sm` | `0 2px 4px rgba(0,0,0,0.4)` | Default card, active seg-toggle |
-| `--g-shadow-md` | `0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)` | Card hover, bulk bar, selected glow |
-| `--g-shadow-lg` | `0 24px 48px -12px rgba(0,0,0,0.6), 0 8px 16px -8px rgba(0,0,0,0.4)` | Toast, scroll-top-btn |
-| `--g-shadow-pop` | `0 4px 32px rgba(8,9,10,0.6), 0 12px 24px -8px rgba(0,0,0,0.5)` | Drawer, modal, run panel, settings, command palette |
-| `--g-shadow-inset` | `inset 0 0 0 1px #23252a` | Elevated card border (replaces solid border on Deep Slate surfaces) |
-| `--g-shadow-focus` | `0 0 0 2px rgba(228,242,34,0.4)` | Focus ring (Neon Lime, 2px) |
+| Token              | Value                                                                | Used by                                                             |
+| ------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `--g-shadow-sm`    | `0 2px 4px rgba(0,0,0,0.4)`                                          | Default card, active seg-toggle                                     |
+| `--g-shadow-md`    | `0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)`              | Card hover, bulk bar, selected glow                                 |
+| `--g-shadow-lg`    | `0 24px 48px -12px rgba(0,0,0,0.6), 0 8px 16px -8px rgba(0,0,0,0.4)` | Toast, scroll-top-btn                                               |
+| `--g-shadow-pop`   | `0 4px 32px rgba(8,9,10,0.6), 0 12px 24px -8px rgba(0,0,0,0.5)`      | Drawer, modal, run panel, settings, command palette                 |
+| `--g-shadow-inset` | `inset 0 0 0 1px #23252a`                                            | Elevated card border (replaces solid border on Deep Slate surfaces) |
+| `--g-shadow-focus` | `0 0 0 2px rgba(228,242,34,0.4)`                                     | Focus ring (Neon Lime, 2px)                                         |
 
 ### 2.6 Easing & Duration
 
-| Token | Value | Used for |
-|-------|-------|---------|
-| `--g-ease` | `cubic-bezier(0.4, 0, 0.2, 1)` | Standard transitions (120–180ms) |
-| `--g-ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Slide-in / slide-up panels (200–300ms) |
+| Token             | Value                               | Used for                                  |
+| ----------------- | ----------------------------------- | ----------------------------------------- |
+| `--g-ease`        | `cubic-bezier(0.4, 0, 0.2, 1)`      | Standard transitions (120–180ms)          |
+| `--g-ease-out`    | `cubic-bezier(0.16, 1, 0.3, 1)`     | Slide-in / slide-up panels (200–300ms)    |
 | `--g-ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Press / scale feedback on cards & buttons |
 
-| Speed | Duration | Where |
-|-------|----------|-------|
-| Hover / focus | 120ms | Buttons, links, chips |
-| Press / scale | 100ms | Pressable cards |
-| Modal / drawer enter | 240ms | Drawer slide, modal fade-scale |
-| Modal / drawer exit | 160ms | (60–70% of enter — Material rule) |
-| Toast in | 240ms | slideUp + fade |
-| Skeleton shimmer | 1.5s linear ∞ | Loading rows |
+| Speed                | Duration      | Where                             |
+| -------------------- | ------------- | --------------------------------- |
+| Hover / focus        | 120ms         | Buttons, links, chips             |
+| Press / scale        | 100ms         | Pressable cards                   |
+| Modal / drawer enter | 240ms         | Drawer slide, modal fade-scale    |
+| Modal / drawer exit  | 160ms         | (60–70% of enter — Material rule) |
+| Toast in             | 240ms         | slideUp + fade                    |
+| Skeleton shimmer     | 1.5s linear ∞ | Loading rows                      |
 
 ---
 
 ## 3. Surfaces & Layers
 
-| Level | Token | Hex (dark) | Where it lives |
-|-------|-------|------------|----------------|
-| **0** Canvas | `--g-canvas` | `#08090a` | Page background, dotted grid base, scrim base |
-| **1** Graphite | `--g-surface` | `#0f1011` | Sidebar, topbar, default cards, list rows |
-| **2** Deep Slate | `--g-surface-2` | `#161718` | Elevated cards, hover wash, drawer body, modal body |
-| **3** Charcoal | `--g-surface-3` | `#23252a` | Inset wells, code blocks, group headers, scrollbar track |
+| Level            | Token           | Hex (dark) | Where it lives                                           |
+| ---------------- | --------------- | ---------- | -------------------------------------------------------- |
+| **0** Canvas     | `--g-canvas`    | `#08090a`  | Page background, dotted grid base, scrim base            |
+| **1** Graphite   | `--g-surface`   | `#0f1011`  | Sidebar, topbar, default cards, list rows                |
+| **2** Deep Slate | `--g-surface-2` | `#161718`  | Elevated cards, hover wash, drawer body, modal body      |
+| **3** Charcoal   | `--g-surface-3` | `#23252a`  | Inset wells, code blocks, group headers, scrollbar track |
 
 > **Dotted main canvas:** keep the existing `radial-gradient(circle at 1px 1px, var(--g-line) 1px, transparent 0)` at `24px 24px`. In dark mode this becomes faint Charcoal dots on Pitch Black — preserves the "control panel grid" feel without adding light.
 
@@ -215,30 +215,35 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 ```
 
 ### 4.1 Sidebar `.sb`
+
 - `background: var(--g-surface)` (Graphite `#0f1011`)
 - `border-right: 1px solid var(--g-line)` (Charcoal `#23252a`)
 - **Brand block** `.sb-brand`: **height locked to 60px** (matches topbar — see §4.2). Layout: 40×40 logo mark using the official raster app icon (`/brand/asset-studio-app-icon.png`) on `--g-canvas`, 6px radius + name (Inter 15px / 590, Porcelain) + tag (10px uppercase / +0.06em / Storm Cloud). The image is presentation-zoomed (`scale(1.22)`) inside the clipped mark so the logo subject remains legible at sidebar chrome size. Keep the official logo asset intact; improve legibility through sizing/presentation, not by replacing the mark.
 - **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 12px bottom padding
-- **`.sb-link`**: 6px 8px padding, **2px radius** (Linear nav item style), Inter 13px / 400, Storm Cloud default
-  - Hover: bg `--g-surface-2` (Deep Slate), text `--g-ink-2`
-  - **Active**: bg `--g-accent` (Neon Lime), text `--g-accent-ink` (Pitch Black), font-weight 510. *No* shadow.
+- **`.sb-link`**: 6px 8px padding, **6px radius** (matches filter-rail `.f-pill` active shape), Inter 13px / 400, Storm Cloud default
+  - Non-active hover: light uses a medium `--g-surface-2` wash so it remains readable without becoming selected, and flips the count badge to `--g-surface` so the chip stays distinct; dark steps to `--g-surface-3` + `--g-ink` so it remains visible on the dark sidebar
+  - **Active**: bg `--g-accent` (Neon Lime), text `--g-accent-ink` (Pitch Black), font-weight 510. Active hover keeps the exact active bg/text colors in both themes. _No_ shadow.
   - Focus: 2px Neon Lime ring (`--g-shadow-focus`)
 - **Badge** in nav row: mono 11px on `--g-surface-3` background, 4px radius, Storm Cloud text. Tonal variants use `*-soft` bg + matching base color text
 - **Footer**: 1px top border, 32×32 user mark + name + team label (Storm Cloud)
 - **Responsive ≤960px**: collapse to 64px icon-only rail
 
 ### 4.2 Topbar `.topbar`
+
 - **Frosted Pitch Black**: `background: color-mix(in srgb, var(--g-canvas) 85%, transparent)`, `backdrop-filter: blur(12px) saturate(160%)`
 - `padding: 0 20px`, `border-bottom: 1px solid var(--g-line)`, `z-index: 10`, `height: 60px` (locked — must match `.sb-brand` height so the sidebar/topbar bottom borders form one continuous line)
 - Layout: `.crumbs` → `.tb-spacer` (flex: 1) → `.search` → **`<Tooltip><IconButton>FolderPlus</IconButton></Tooltip>`** (Add Project, always visible) → **`<Tooltip><IconButton>RefreshCw</IconButton></Tooltip>`** (Rescan). Rescan communicates in-progress state only through the Refresh icon loading/spin state and completion/error toast/notice; it does **not** show a global blue "Scanning" notice during the pending state.
 - **Crumbs `.crumbs`** are NOT a file-path-style breadcrumb. They are a **page header inline trio**:
+
   ```
   [.crumbs-icon 26×26 mode glyph]  .crumbs-title  ·  .crumbs-meta
   ```
-  - `.crumbs-icon`: 26×26 square, 6px radius, `--g-surface-2` bg, `--g-ink-2` icon (16×16). The icon must match the sidebar nav icon for the same mode (Gauge/FolderOpen/Recycle/Trash2/Sparkles/FileWarning/ShieldCheck/Settings) — visually ties topbar to active sidebar item.
+
+  - `.crumbs-icon`: 26×26 square, 6px radius, `--g-surface-2` bg, `--g-ink-2` icon (16×16). The icon must match the sidebar nav icon for the same mode (FolderKanban/FolderOpen/Recycle/Trash2/Sparkles/FileWarning/ShieldCheck/Settings) — visually ties topbar to active sidebar item.
   - `.crumbs-title`: Inter display 14px / 590 / `--g-ink`, `-0.013em` tracking. The mode title (e.g. "Dashboard").
   - `.crumbs-dot`: middle dot `·`, `--g-ink-5`, separates title from meta.
   - `.crumbs-meta`: mono 12px / `--g-ink-3` / tabular nums (e.g. `1 project · 5 assets`). Hidden ≤600px.
+
 - The redundant `asset.studio` brand crumb and `/` separator are removed — sidebar already shows brand; crumbs reflect navigation, not file path.
 - **Crumbs**: 13px / 400 / Storm Cloud. Current page: 510 / Porcelain. Slash separator: mono / `--g-ink-5`. Optional count chip uses `--g-info-soft` background
 - **Search input / trigger** `.search`:
@@ -253,53 +258,71 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - **Keyboard hint** `.search-kbd`: mono 10px / Storm Cloud, `--g-surface-3` bg, 1px line border, 4px radius
 
 ### 4.3 Filter Rail `.filter-rail`
+
+Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`. The primitive owns rail body, section, active item, icon, label, and count rendering through CVA variants. Legacy `.filter-rail` / `.f-pill` classes remain supported only for unmigrated markup.
+
 - 220px wide, `background: var(--g-surface)`, `border-right: 1px solid var(--g-line)`
 - Section label: 10px uppercase Storm Cloud
-- **`.f-pill`**: full-width button, 6px 10px padding, 6px radius, Inter 13px / 400 / Light Steel
-  - Hover: `--g-surface-2` bg, Porcelain text
-  - **Active**: `--g-accent` bg, `--g-accent-ink` text, 510 weight
+- **`RailItem` / `.f-pill`**: full-width button, 6px 10px padding, 6px radius, Inter 13px / 400 / Light Steel
+  - Inactive: transparent background, `--g-ink-2` text
+  - Hover: `color-mix(in srgb, var(--g-surface-2) 54%, transparent)` bg, `--g-ink` text, 1px inset `--g-line`
+  - **Active**: `--g-active-bg` bg, `--g-active-text` text, `--g-active-weight` weight
 - Count badge: mono 11px / Storm Cloud (Pitch Black on accent when active)
-- Visible on browse / duplicates / unused / optimize. Hidden ≤1024px.
+- Filter variant is used by Browse and hidden ≤1024px. Settings uses the settings variant and collapses to an icon-only 64px rail ≤768px.
 
 ### 4.4 Main canvas `.main`
+
 - Background: `var(--g-canvas)` (Pitch Black)
 - Dotted grid: `radial-gradient(circle at 1px 1px, var(--g-line) 1px, transparent 0) 24px 24px`. Dots are Charcoal in dark mode — almost invisible but present, gives the "control panel" texture.
+
+### 4.5 Project Switcher `.project-switcher`
+
+- Lives in `.sb-project-switcher` under the brand and uses the same compact chrome as sidebar controls: `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`.
+- Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
+- Menu: anchored popover, 320px max width, `--g-surface` white/Graphite layer, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
+- Header stays compact: 15px display title + 12px workspace meta, bottom divider `--g-line`.
+- Workspace row uses a non-interactive `--g-surface` card so it reads as context, not a competing selected option.
+- Project options are 40px minimum rows with 10px gaps, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Hover/focus uses `--g-surface-3`.
+- Hover logic matches sidebar rows: inactive hover uses a subtle surface wash (`--g-surface-3` in dark), inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
+- Press scale is disabled under `prefers-reduced-motion`.
 
 ---
 
 ## 5. Sticky Elements & Z-Index
 
-| Element | Position | Top | Z | Style |
-|---------|----------|-----|---|-------|
-| `.topbar` | static (flex column) | — | 10 | Frosted Pitch Black + blur(12px) |
-| `.opt-filters-wrap` | sticky | 0 | 4 | Frosted (`canvas 92% + blur 12px`) |
-| `.bulkbar` (top) | sticky | 0 | 5 | Pitch Black bg / Porcelain text / 6px radius |
-| `.bulkbar.opt-bulkbar` | sticky | bottom 16px | 10 | Same, bottom-anchored |
-| `.lint-controls` | sticky | 0 | 10 | Solid `--g-canvas` (no blur) |
-| `.lint-group-h` | sticky | `var(--lint-controls-h)` | 5 | `--g-surface-3` Charcoal header |
-| `.list-row[data-header]` | sticky | 0 | 2 | `--g-surface-2` |
-| `.dv2-tabs` | sticky | 0 | 2 | Drawer tab strip |
+| Element                  | Position             | Top                      | Z   | Style                                        |
+| ------------------------ | -------------------- | ------------------------ | --- | -------------------------------------------- |
+| `.topbar`                | static (flex column) | —                        | 10  | Frosted Pitch Black + blur(12px)             |
+| `.opt-filters-wrap`      | sticky               | 0                        | 4   | Frosted (`canvas 92% + blur 12px`)           |
+| `.bulkbar` (top)         | sticky               | 0                        | 5   | Pitch Black bg / Porcelain text / 6px radius |
+| `.bulkbar.opt-bulkbar`   | sticky               | bottom 16px              | 10  | Same, bottom-anchored                        |
+| `.lint-controls`         | sticky               | 0                        | 10  | Solid `--g-canvas` (no blur)                 |
+| `.lint-group-h`          | sticky               | `var(--lint-controls-h)` | 5   | `--g-surface-3` Charcoal header              |
+| `.list-row[data-header]` | sticky               | 0                        | 2   | `--g-surface-2`                              |
+| `.dv2-tabs`              | sticky               | 0                        | 2   | Drawer tab strip                             |
 
 ### Frosted glass recipe
+
 ```css
 background: color-mix(in srgb, var(--g-canvas) 85%, transparent);
 backdrop-filter: blur(12px);
 -webkit-backdrop-filter: blur(12px);
 ```
 
-> **Rule:** Frosted overlays must be visible on top of *both* the dotted canvas and the Graphite cards behind them — verify after each change that text remains ≥4.5:1 contrast against whatever sits beneath.
+> **Rule:** Frosted overlays must be visible on top of _both_ the dotted canvas and the Graphite cards behind them — verify after each change that text remains ≥4.5:1 contrast against whatever sits beneath.
 
 ### Z-index scale (canonical)
-| Range | Elements |
-|-------|----------|
-| 2 | List headers, drawer tabs |
-| 4–5 | Filter wraps, bulk bars, lint groups |
-| 10 | Topbar, lint controls, opt bulkbar |
-| 50–51 | Drawer backdrop / drawer |
-| 60 | Settings panel |
-| 100 | Command palette |
-| 180 | Run panel |
-| 200 | Toast, chart tooltip |
+
+| Range | Elements                             |
+| ----- | ------------------------------------ |
+| 2     | List headers, drawer tabs            |
+| 4–5   | Filter wraps, bulk bars, lint groups |
+| 10    | Topbar, lint controls, opt bulkbar   |
+| 50–51 | Drawer backdrop / drawer             |
+| 60    | Settings panel                       |
+| 100   | Command palette                      |
+| 180   | Run panel                            |
+| 200   | Toast, chart tooltip                 |
 
 ---
 
@@ -312,22 +335,25 @@ backdrop-filter: blur(12px);
 Canonical shared primitive: `ui/src/components/ui/Button.tsx`.
 
 React API:
+
 ```tsx
-<Button variant="primary" size="sm" leadingIcon={<Download size={14} />}>Export</Button>
+<Button variant="primary" size="sm" leadingIcon={<Download size={14} />}>
+  Export
+</Button>
 ```
 
 Variants are expressed in TypeScript with `clsx` and token-backed Tailwind utilities. Legacy `.btn*` classes remain supported for screens not yet migrated.
 
 Base: `height: 32px; padding: 0 12px; border-radius: 6px; font: 510 13px/1.4 Inter; transition: 120ms var(--g-ease); letter-spacing: -0.012em;`
 
-| Variant / legacy class | Background | Text | Border | Hover | Notes |
-|-------|------------|------|--------|-------|-------|
-| `primary` / `.btn-primary` | **`--g-cta`** (dark Neon Lime, light Near-Black) | `--g-cta-ink` | transparent / none | bg `--g-cta-hover` | **Singular per screen.** |
-| `secondary` / `.btn-secondary` | `--g-surface` | `--g-ink` | `1px solid --g-line-strong` | bg `--g-surface-2`, border `--g-line-strong` | Default action |
-| `ghost` / `.btn-ghost` | transparent | `--g-ink-2` | transparent / none | bg `--g-surface-2`, text `--g-ink` | Tertiary |
-| `.btn-link` | transparent | `--g-ink-2` | none | text `--g-ink` | Legacy 0/6px padding only |
-| `danger` / `.btn-danger` | `--g-red` | `--g-canvas` | transparent / none | brightness 1.08 | Destructive |
-| `size="sm"` / `.btn-sm` | inherit | inherit | inherit | — | 26px height, 10px padding, 12px font |
+| Variant / legacy class         | Background                                       | Text          | Border                      | Hover                                        | Notes                                |
+| ------------------------------ | ------------------------------------------------ | ------------- | --------------------------- | -------------------------------------------- | ------------------------------------ |
+| `primary` / `.btn-primary`     | **`--g-cta`** (dark Neon Lime, light Near-Black) | `--g-cta-ink` | transparent / none          | bg `--g-cta-hover`                           | **Singular per screen.**             |
+| `secondary` / `.btn-secondary` | `--g-surface`                                    | `--g-ink`     | `1px solid --g-line-strong` | bg `--g-surface-2`, border `--g-line-strong` | Default action                       |
+| `ghost` / `.btn-ghost`         | transparent                                      | `--g-ink-2`   | transparent / none          | bg `--g-surface-2`, text `--g-ink`           | Tertiary                             |
+| `.btn-link`                    | transparent                                      | `--g-ink-2`   | none                        | text `--g-ink`                               | Legacy 0/6px padding only            |
+| `danger` / `.btn-danger`       | `--g-red`                                        | `--g-canvas`  | transparent / none          | brightness 1.08                              | Destructive                          |
+| `size="sm"` / `.btn-sm`        | inherit                                          | inherit       | inherit                     | —                                            | 26px height, 10px padding, 12px font |
 
 **Press state (all variants):** `transform: scale(0.97)` for 100ms with `--g-ease-spring`; disabled under `prefers-reduced-motion`.
 **Disabled:** opacity 0.38, cursor not-allowed.
@@ -349,8 +375,16 @@ Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`;
 Canonical shared primitive: `Tabs` from `ui/src/components/ui/Tabs.tsx`; legacy `.seg-toggle` remains supported for unmigrated markup.
 
 React API:
+
 ```tsx
-<Tabs variant="segment" size="md" value={tab} items={items} onChange={setTab} ariaLabel="View" />
+<Tabs
+  variant="segment"
+  size="md"
+  value={tab}
+  items={items}
+  onChange={setTab}
+  ariaLabel="View"
+/>
 ```
 
 - `variant="segment"`: wrapper `--g-surface-2` bg, `1px solid --g-line` border, 6px radius, 3px inner padding, `--g-shadow-inset`; active child uses `--g-surface`, `--g-ink`, `--g-shadow-sm`.
@@ -364,17 +398,18 @@ React API:
 Canonical shared primitive: `Card` / `CardBody` from `ui/src/components/ui/Card.tsx`; legacy `.card` remains supported for unmigrated markup.
 
 React API:
+
 ```tsx
 <Card variant="default" padding="md" clickable>
   ...
 </Card>
 ```
 
-| Variant | Background | Border / shadow | Radius | Notes |
-|---------|------------|-----------------|--------|-------|
-| `default` / `.card` | `--g-surface` | 1px `--g-line`, `--g-shadow-sm`; hover `--g-line-strong` + `--g-shadow-md` | `--g-r-md` | Default card / list container |
-| `elevated` | `--g-surface-2` | `--g-shadow-inset` | `--g-r-lg` | Drawer hero, modal head, floating panels |
-| `nested` | `--g-canvas` | none | `--g-r-lg` | Inset card inside elevated surfaces |
+| Variant             | Background      | Border / shadow                                                            | Radius     | Notes                                    |
+| ------------------- | --------------- | -------------------------------------------------------------------------- | ---------- | ---------------------------------------- |
+| `default` / `.card` | `--g-surface`   | 1px `--g-line`, `--g-shadow-sm`; hover `--g-line-strong` + `--g-shadow-md` | `--g-r-md` | Default card / list container            |
+| `elevated`          | `--g-surface-2` | `--g-shadow-inset`                                                         | `--g-r-lg` | Drawer hero, modal head, floating panels |
+| `nested`            | `--g-canvas`    | none                                                                       | `--g-r-lg` | Inset card inside elevated surfaces      |
 
 Padding is explicit through `padding="none | sm | md | lg"`. Default is `none` for backwards-compatible composition.
 
@@ -383,6 +418,7 @@ Padding is explicit through `padding="none | sm | md | lg"`. Default is `none` f
 Canonical shared primitive: `Badge` from `ui/src/components/ui/Badge.tsx`; legacy `.chip` remains supported for unmigrated markup.
 
 React API:
+
 ```tsx
 <Badge tone="amber">Warning</Badge>
 ```
@@ -399,8 +435,14 @@ React API:
 Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`; legacy `.field` / `.input-shell` remains supported for unmigrated markup.
 
 React API:
+
 ```tsx
-<TextInput variant="search" size="md" icon={<Search size={16} />} invalid={hasError} />
+<TextInput
+  variant="search"
+  size="md"
+  icon={<Search size={16} />}
+  invalid={hasError}
+/>
 ```
 
 - Base: 32px height (`md`) or 26px (`sm`), 6px radius, 10px inline padding, Inter/mono text per context, 120ms token transitions
@@ -413,6 +455,7 @@ React API:
 - Invalid: border `--g-red`, `aria-invalid=true`
 
 ### 6.9 Asset Card `.acard`
+
 - `--g-surface` bg, `1px solid --g-line` border, **6px radius**, flex column
 - Hover: `transform: translateY(-2px)` + `--g-line-strong` border + `--g-shadow-md`
 - **Selected**: `--g-accent` border, 2px Neon Lime ring outset, `--g-shadow-md`, meta region tinted `--g-accent-soft`. A 1000ms `selectedPulse` plays once.
@@ -431,6 +474,7 @@ React API:
 - Thumb backgrounds via `data-bg`: `checker` (14px Charcoal/Pitch Black checker), `light` (`#fff`), `dark` (`--g-canvas`)
 
 ### 6.10 Optimize Row `.opt-row`
+
 - Grid: `28px 64px 1fr 220px 140px` (checkbox / 64px thumb / text / chips / savings)
 - 6px radius, `--g-surface` bg, 1px `--g-line` border, 12px padding
 - Hover: `transform: translateX(2px)` + border `--g-line-strong`
@@ -441,6 +485,7 @@ React API:
   - Percent: mono 11px / `--g-green`
 
 ### 6.11 Duplicate Group `.dgroup`
+
 - Container: `--g-surface` bg, 1px `--g-line`, **6px radius**
 - Header `.dgroup-h`: `--g-surface-3` (Charcoal) bg, border-bottom `--g-line`, padding 8px 12px. SHA in mono 11px / Storm Cloud. Spacer + action buttons right.
 - Body `.dgroup-body`: auto-fill grid (min 160px), 12px gap, 16px padding
@@ -448,6 +493,7 @@ React API:
 - **Preferred tile**: `--g-green` border + 2px Emerald ring + green badge top-right
 
 ### 6.12 Drawer `.drawer`
+
 - 480px wide (95vw max), fixed right, slide-in 240ms `--g-ease-out`
 - Background `--g-surface-2` (Deep Slate, elevated)
 - Backdrop: `rgba(8,9,10,0.6)` + `backdrop-filter: blur(4px)`
@@ -478,6 +524,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Auto-dismiss defaults: 3.5s; danger 6s.
 
 ### 6.15 Command Palette `.cmdk`
+
 - 580px wide, top offset 12vh
 - Background `--g-surface-2` Deep Slate, 12px radius, `--g-shadow-pop`
 - Border `1px solid --g-line` only; do **not** add an outer focus ring to the palette frame
@@ -491,6 +538,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Empty state: centered Storm Cloud text + Inter 13px helper
 
 ### 6.16 Run Panel `.opt-run-panel`
+
 - Fixed bottom-right, min(680px, 100vw - 48px)
 - `--g-surface-2` bg, 12px radius, `--g-shadow-pop`, slideUp 240ms
 - **Progress bar**: 6px height, track `--g-surface-3`, fill `--g-accent` (or `--g-green` for completion). 180ms transition.
@@ -498,14 +546,16 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Result rows: success bg `--g-green-soft` + green icon; skipped bg `--g-red-soft` + red icon; pending: skeleton shimmer
 
 ### 6.17 Bulk Action Bar `.bulkbar`
+
 - Sticky top-0 (default) or sticky bottom-16px (`.opt-bulkbar`)
-- Background `--g-surface-3` (Charcoal) — *not* Pitch Black, to lift visually off the dotted canvas
+- Background `--g-surface-3` (Charcoal) — _not_ Pitch Black, to lift visually off the dotted canvas
 - 1px inset `--g-line-strong`, **6px radius**, `--g-shadow-md`
 - Padding 8px 12px, height 44px
 - Buttons `.bulkbar-btn`: ghost-style, 6px radius, hover `--g-surface-2` overlay
 - Danger variant: `--g-red` bg + `--g-canvas` text
 
 ### 6.18 Dropzone `.precheck-dropzone`
+
 - Min-height 160px, **1.5px dashed `--g-line-strong`**, **16px radius** (only place we use xl)
 - Background `--g-surface` (Graphite)
 - States:
@@ -518,8 +568,15 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 Canonical shared primitive: `EmptyState` from `ui/src/components/ui/EmptyState.tsx`; legacy `.empty` remains supported for unmigrated markup.
 
 React API:
+
 ```tsx
-<EmptyState size="md" align="center" tone="neutral" title="No assets" description="Try another filter." />
+<EmptyState
+  size="md"
+  align="center"
+  tone="neutral"
+  title="No assets"
+  description="Try another filter."
+/>
 ```
 
 - Sizes: `sm` compact panel, `md` default 64px vertical padding, `lg` broad empty page.
@@ -531,6 +588,7 @@ React API:
 - Optional CTA below via `action` prop.
 
 ### 6.20 Scroll-to-top `.scroll-top-btn`
+
 - Fixed bottom-right 24px, 36px circle
 - `--g-surface-2` bg, 1px `--g-line-strong` border, `--g-shadow-md`
 - Hover: bg `--g-surface-3`, `translateY(-2px)`, icon `--g-ink`
@@ -541,6 +599,7 @@ React API:
 Used by `DirectoryPickerModal.tsx`. Sits inside a standard `.modal` (§6.13).
 
 Structure:
+
 ```
 .modal
   .modal-head      title + description + close
@@ -569,6 +628,7 @@ Structure:
 > **NEVER use the browser's native `title` attribute for tooltips.** Always wrap the trigger in `<Tooltip>` from `ui/Tooltip.tsx`. Native tooltips have no styling control, no shortcut hint, no animation, and inconsistent timing across OSes.
 
 **API**
+
 ```tsx
 <Tooltip label="Add Project" shortcut="⌘N" placement="bottom" delay={200}>
   <IconButton aria-label="Add Project" onClick={...}><FolderPlus size={16} /></IconButton>
@@ -649,7 +709,18 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - Container: `--g-r-sm`, 1px `--g-line`, grid centered, image object-fit contain.
 - Empty `alt` marks the thumbnail as decorative with `aria-hidden`.
 
+### 6.28 Rail
+
+Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`.
+
+- `Rail` renders the 220px rail body with token-backed CVA variants: `filter` for Browse-style facets and `settings` for section navigation.
+- `RailSection` owns the vertical group stack and optional uppercase section heading.
+- `RailItem` owns the button item shape, active state, optional Lucide icon, label truncation, and optional mono count. It exposes state as `data-state="active|inactive"`; active state uses `--g-active-bg`, `--g-active-text`, and `--g-active-weight` so dark and light modes stay theme-correct.
+- Settings section items use the `settings` item variant, preserving icon + label on desktop and hiding labels at ≤768px.
+- Browse facets must pass counts through `RailItem count` instead of composing custom count spans.
+
 ### 6.21 Severity Indicator
+
 - 6px circle dot + 11px mono label, 6px gap
 - Critical: `--g-red` dot + `chip-red`
 - Warning: `--g-amber` dot + `chip-amber`
@@ -663,25 +734,29 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 ## 7. View Patterns
 
 ### 7.1 Browse
+
 - Grid mode `.browse-grid` size variants: `s` (120px min) / default (180px) / `l` (240px)
 - List mode: `.list` 6-column grid, sticky header `--g-surface-2` bg
 - In All projects scope, the Browse project filter rail is driven by the registered project list, not just assets in the current result set, so zero-asset projects remain visible with a `0` count.
-- Project-scoped entry points open Browse with the matching project facet active in `.filter-rail`, so the visible active pill matches the source project card / sidebar project scope.
+- Project-scoped entry points open Browse with the matching project facet active in the `Rail` filter variant, so the visible active item matches the source project card / sidebar project scope. While a Project Switcher scope is active, the Browse project rail hides the redundant `All projects` row and keeps the scoped project as the only active project facet.
 - Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with status chips (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
 - Active list row: `--g-accent-soft` bg + 4px left **Neon Lime** stripe
 
 ### 7.2 Duplicates
+
 - `Tabs` primitive in page header: Exact / Similar and sort controls
 - `.dgroup` SHA-headed groups remain supported for denser duplicate layouts
 - Preferred tile: green Emerald border + corner badge
 - Similar tab: side-by-side compare with overlay slider — slider track `--g-surface-3`, thumb `--g-accent`
 
 ### 7.3 Unused
+
 - `.acard-check` (top-right) toggles selection
 - `.bulkbar` sticky top-0 with: select all, copy paths, copy `git rm`, delete selected
 - Delete CTA uses `.btn-danger`, never `.btn-primary`
 
 ### 7.4 Optimize
+
 - Sticky frosted `.opt-filters-wrap` (z 4, blur 12px)
 - Category chips `.opt-filter-row` (大小 / 格式 / SVG / 尺寸 / 動畫), horizontally scrollable
 - Severity chips (嚴重 / 警告 / 建議), separated by 1px Charcoal vertical divider
@@ -692,6 +767,7 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - `.opt-bulkbar` is **bottom-sticky** (16px from bottom)
 
 ### 7.5 Lint
+
 - `.lint-kpi`: 4-column KPI grid (critical / warning / info / total)
 - `.lint-controls`: sticky top-0, solid `--g-canvas`, z 10
 - Grouped findings (3 levels):
@@ -701,12 +777,14 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - Severity dot + chip per §6.21
 
 ### 7.6 Pre-Check
+
 - Top dropzone (§6.18) accepting drag/drop/paste/click
 - `.precheck-result-card`: flex row (56px thumb + body), `--g-surface` bg, 6px radius
 - Verdict badge: pass=`chip-green`, warning=`chip-amber`, fail=`chip-red`
 - `.precheck-finding` rows: mini chip + mono path
 
 ### 7.7 Dashboard
+
 - KPI grid uses `StatCard`: auto-fit min 220px, `--g-surface` cards, 6px radius
 - Clickable KPI: button semantics, focus ring, hover `translateY(-2px)` + `--g-shadow-md`
 - KPI value: Inter display 32px / 590, delta badge mono 11px (green up / red down)
@@ -716,30 +794,38 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - Overview: 1.4fr / 1fr two-column at ≥980px, single-column below
 
 ### 7.8 Projects
+
+- Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
 - Projects is a workspace-level view: project cards, workspace KPIs, the Projects nav badge, and the topbar count always use the full catalog, independent of the Project Switcher selection.
 - Project cards use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
 - The `Browse Project` action on a project card sets the project scope to that card's project and navigates to Browse; Browse initializes its project facet to the same project rather than defaulting to `All Projects`.
 
 ### 7.9 Settings
+
+- Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas.
+- `.settings-panel-head` uses a 32px tokenized icon well, `--g-surface-2` header strip, 24px display title, and 14px helper text to match the card/header hierarchy used elsewhere.
+- `.settings-field` rows are compact 3-column grids (`32px icon | copy | control`) with `--g-surface-2` fill, `--g-shadow-inset`, 6px radius, and hover `--g-line-strong`; controls stay right-aligned on wide desktop and stack under copy once the settings pane gets narrow (≤1100px viewport).
+- Every settings row pairs its label with a Lucide icon well so the large right pane has the same command-center affordance as nav, topbar crumbs, and project rows.
 - Storage rows show the persisted database path, data directory, and cache directory only. There is no separate config directory row; app state lives in the SQLite data directory, and release UI assets live in cache.
 
 ---
 
 ## 8. Animations
 
-| Name | Duration | Easing | Effect |
-|------|----------|--------|--------|
-| `slideInR` | 240ms | ease-out | Drawer translateX(100%) → 0 |
-| `fadeIn` | 160ms | ease | Backdrop opacity 0 → 1 |
-| `slideUp` | 200ms | ease-out | Panels & toast translateY(8px) + opacity |
-| `selectedPulse` | 1000ms | ease-out | One-shot Neon Lime box-shadow pulse 0 → 14px → 0 spread on selection |
-| `pressScale` | 100ms | spring | `transform: scale(0.97)` on press, restore on release |
-| `icon-spin` | 900ms | linear ∞ | Loading spinner |
-| `spin-slow` | 2.4s | linear ∞ | Progress wedge |
-| `shimmer` | 1.5s | linear ∞ | Skeleton gradient sweep |
-| `slide-right` | 1.4s | ease ∞ | Indeterminate progress bar |
+| Name            | Duration | Easing   | Effect                                                               |
+| --------------- | -------- | -------- | -------------------------------------------------------------------- |
+| `slideInR`      | 240ms    | ease-out | Drawer translateX(100%) → 0                                          |
+| `fadeIn`        | 160ms    | ease     | Backdrop opacity 0 → 1                                               |
+| `slideUp`       | 200ms    | ease-out | Panels & toast translateY(8px) + opacity                             |
+| `selectedPulse` | 1000ms   | ease-out | One-shot Neon Lime box-shadow pulse 0 → 14px → 0 spread on selection |
+| `pressScale`    | 100ms    | spring   | `transform: scale(0.97)` on press, restore on release                |
+| `icon-spin`     | 900ms    | linear ∞ | Loading spinner                                                      |
+| `spin-slow`     | 2.4s     | linear ∞ | Progress wedge                                                       |
+| `shimmer`       | 1.5s     | linear ∞ | Skeleton gradient sweep                                              |
+| `slide-right`   | 1.4s     | ease ∞   | Indeterminate progress bar                                           |
 
 **Global rules**
+
 - Standard hover transition: 120ms `--g-ease`
 - Hover / focus colors are token-driven and theme-aware: use `--g-surface-2`, `--g-surface-3`, `--g-line-strong`, `--g-shadow-focus`, and `--g-active-*` instead of hard-coded dark/light overrides
 - Theme transition: 200ms (color-only properties)
@@ -752,6 +838,7 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 ## 9. Scrollbar
 
 Webkit:
+
 - Width 10px (thin variant 8px, inline 6px)
 - Track transparent
 - Thumb: `--g-line-strong` background, 9999px radius, **2px Pitch Black border** (creates the "floating pill" look)
@@ -761,13 +848,13 @@ Webkit:
 
 ## 10. Responsive Breakpoints
 
-| Width | Changes |
-|-------|---------|
-| ≤960px | Sidebar collapses to 64px icon-only rail |
-| ≤1024px | FilterRail hidden |
-| ≤768px | Page padding 20px 16px. Page title 24px. `.opt-row` collapses to 3 cols. `.opt-summary` 2 cols. |
-| ≤600px | Drawer & modal full-width |
-| ≤480px | Crumbs truncate (hide first + separator). Search input shrinks to icon-only. |
+| Width   | Changes                                                                                         |
+| ------- | ----------------------------------------------------------------------------------------------- |
+| ≤960px  | Sidebar collapses to 64px icon-only rail                                                        |
+| ≤1024px | FilterRail hidden                                                                               |
+| ≤768px  | Page padding 20px 16px. Page title 24px. `.opt-row` collapses to 3 cols. `.opt-summary` 2 cols. |
+| ≤600px  | Drawer & modal full-width                                                                       |
+| ≤480px  | Crumbs truncate (hide first + separator). Search input shrinks to icon-only.                    |
 
 ---
 
@@ -788,6 +875,7 @@ Webkit:
 ## 12. Do / Don't
 
 ### Do
+
 - Reserve **`--g-cta`** for one primary CTA per screen; reserve Neon Lime `--g-accent` for dark CTA fill, dark active nav, focus ring, and selection.
 - Build hierarchy via the **4-tier surface stack** (canvas → graphite → deep-slate → charcoal).
 - Use **Inter Variable** at 510/590 weights and **negative tracking** (-0.011 to -0.022em) on all UI text.
@@ -797,6 +885,7 @@ Webkit:
 - Wrap every icon-only control in `<Tooltip>` (§6.23) — non-native, keyboard-reachable, with optional shortcut hint.
 
 ### Don't
+
 - Don't introduce another saturated brand color for interactive purposes.
 - Don't apply broad gradients to large sections.
 - Don't use heavy diffuse drop shadows (`0 24px 48px` blur is for overlays only).
@@ -820,14 +909,14 @@ Webkit:
 
 ## 14. Token Migration (legacy `--g-*` → Linear surface intent)
 
-| Old assumption | New canonical role |
-|----------------|--------------------|
-| `--g-surface` = `#ffffff` paper | `--g-surface` = `#0f1011` Graphite card layer |
-| `--g-accent` = warm coral `#ff5436` | `--g-accent` = Neon Lime `#e4f222` |
-| Card radius = 14px (`--g-r-lg`) | Card radius = 6px (`--g-r-md`); `--g-r-lg` reserved for overlays |
-| Shadows: soft 24/48px diffuse | Shadows: tight 2/4/12px; `inset 0 0 0 1px` borders |
-| Display = Inter Tight | Display = Inter Variable (510/590) |
-| Mono = JetBrains | Mono = Berkeley Mono (JetBrains as fallback) |
+| Old assumption                      | New canonical role                                               |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `--g-surface` = `#ffffff` paper     | `--g-surface` = `#0f1011` Graphite card layer                    |
+| `--g-accent` = warm coral `#ff5436` | `--g-accent` = Neon Lime `#e4f222`                               |
+| Card radius = 14px (`--g-r-lg`)     | Card radius = 6px (`--g-r-md`); `--g-r-lg` reserved for overlays |
+| Shadows: soft 24/48px diffuse       | Shadows: tight 2/4/12px; `inset 0 0 0 1px` borders               |
+| Display = Inter Tight               | Display = Inter Variable (510/590)                               |
+| Mono = JetBrains                    | Mono = Berkeley Mono (JetBrains as fallback)                     |
 
 Update `_tokens.scss`, `_layout.scss`, `_components.scss`, `_patterns.scss` to honor this table whenever you touch them.
 
@@ -847,12 +936,12 @@ A naive inversion fails because Neon Lime `#e4f222` has only **1.4:1 contrast** 
 
 ### 15.2 Surface strategy
 
-| Layer | Light value | Why |
-|-------|-------------|-----|
-| Canvas | `#fafbfc` (warm off-white) | Pure white causes screen fatigue; off-white preserves "page" feeling |
-| Surface | `#ffffff` (pure white) | Cards must visually lift above the canvas |
-| Surface-2 | `#f4f5f7` (cool wash) | Hover state on cards, segmented inactive |
-| Surface-3 | `#eceef2` (cooler wash) | Inset wells, group headers, active nav bg |
+| Layer     | Light value                | Why                                                                  |
+| --------- | -------------------------- | -------------------------------------------------------------------- |
+| Canvas    | `#fafbfc` (warm off-white) | Pure white causes screen fatigue; off-white preserves "page" feeling |
+| Surface   | `#ffffff` (pure white)     | Cards must visually lift above the canvas                            |
+| Surface-2 | `#f4f5f7` (cool wash)      | Hover state on cards, segmented inactive                             |
+| Surface-3 | `#eceef2` (cooler wash)    | Inset wells, group headers, active nav bg                            |
 
 Borders: `#e5e7eb` default, `#d1d5db` strong. Both light enough to whisper, dark enough to define edges.
 
@@ -866,6 +955,7 @@ Light mode: Primary CTA = Near-Black fill + White text       (16.5:1 contrast)
 This mirrors Vercel and GitHub: the primary action **flips with the theme** so it always punches through. Both modes are recognizable as "the button" without sharing the same color.
 
 Implemented via theme-swapped tokens:
+
 - `--g-cta`, `--g-cta-ink`, `--g-cta-hover` — the `.btn-primary` rule reads these and swaps automatically.
 - `--g-active-bg`, `--g-active-text`, `--g-active-weight` — sidebar active item, iconbtn active toggle.
 
@@ -880,6 +970,7 @@ Implemented via theme-swapped tokens:
 ### 15.5 Active state — neutral wash, not lime
 
 Light-mode active nav uses:
+
 - Background: `--g-surface-3` (#eceef2 cooler wash)
 - Text color: `--g-ink` (near-black)
 - Font weight: **590** (one notch heavier than non-active 400)
@@ -888,22 +979,22 @@ The combination of subtle bg + bold weight reads as "selected" without screaming
 
 ### 15.6 Semantic colors — adjusted for white background
 
-| Token | Dark | Light | Why light value differs |
-|-------|------|-------|-------------------------|
-| `--g-green` | `#27a644` Emerald | `#007a26` Forest Green | Emerald loses contrast on white; Forest Green is AA-compliant |
-| `--g-amber` | `#f0b429` | `#b45309` Burnt Amber | Yellow on white is unreadable (1.7:1); burnt amber passes AA |
-| `--g-red` | `#eb5757` | `#dc2626` | Slightly deeper red so error chips read on white |
-| `--g-purple` | `#8b5cf6` Amethyst | `#7c3aed` | Deeper violet for AA on white |
+| Token        | Dark               | Light                  | Why light value differs                                       |
+| ------------ | ------------------ | ---------------------- | ------------------------------------------------------------- |
+| `--g-green`  | `#27a644` Emerald  | `#007a26` Forest Green | Emerald loses contrast on white; Forest Green is AA-compliant |
+| `--g-amber`  | `#f0b429`          | `#b45309` Burnt Amber  | Yellow on white is unreadable (1.7:1); burnt amber passes AA  |
+| `--g-red`    | `#eb5757`          | `#dc2626`              | Slightly deeper red so error chips read on white              |
+| `--g-purple` | `#8b5cf6` Amethyst | `#7c3aed`              | Deeper violet for AA on white                                 |
 
 ### 15.7 Shadow recalibration
 
 Light-mode shadows are **3–4× lower alpha** than dark:
 
-| Token | Dark | Light |
-|-------|------|-------|
-| `--g-shadow-sm` | `0 2px 4px rgba(0,0,0,0.4)` | `0 1px 2px rgba(15,17,21,0.04)` |
-| `--g-shadow-md` | `0 4px 12px rgba(0,0,0,0.4) + 0 1px 3px 0.3` | `0 4px 12px rgba(15,17,21,0.06) + 0 1px 3px 0.04` |
-| `--g-shadow-pop` | `0 4px 32px rgba(8,9,10,0.6) ...` | `0 24px 48px -12px rgba(15,17,21,0.18) ...` |
+| Token            | Dark                                         | Light                                             |
+| ---------------- | -------------------------------------------- | ------------------------------------------------- |
+| `--g-shadow-sm`  | `0 2px 4px rgba(0,0,0,0.4)`                  | `0 1px 2px rgba(15,17,21,0.04)`                   |
+| `--g-shadow-md`  | `0 4px 12px rgba(0,0,0,0.4) + 0 1px 3px 0.3` | `0 4px 12px rgba(15,17,21,0.06) + 0 1px 3px 0.04` |
+| `--g-shadow-pop` | `0 4px 32px rgba(8,9,10,0.6) ...`            | `0 24px 48px -12px rgba(15,17,21,0.18) ...`       |
 
 Dark shadows can be opaque because the canvas is already black. Light shadows must be subtle — over-shadowing on white is the #1 tell of an amateur Linear-clone.
 
