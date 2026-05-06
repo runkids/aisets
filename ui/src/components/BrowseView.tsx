@@ -474,8 +474,8 @@ export function BrowseView({
         customFilterTotal={filteredWithoutCustom.length}
         onFiltersChange={setFilters}
       />
-      <div className="content-scroll p-1 px-4 pb-4">
-        <div className="page max-w-none p-0 flex h-full flex-col">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-2 pt-1">
+        <div className="max-w-none p-0 flex h-full flex-col">
           <BrowseToolbar
             view={view}
             gridSize={gridSize}
