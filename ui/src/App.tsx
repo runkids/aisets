@@ -47,6 +47,8 @@ type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
+const SCAN_COMPLETE_DISMISS_MS = 1200;
+const SCAN_ERROR_DISMISS_MS = 3500;
 
 function storedThemePreference(): ThemePreference {
   const stored = window.localStorage.getItem("asset-studio-theme");
@@ -147,9 +149,14 @@ export function App() {
   useEffect(() => {
     if (scanMutation.isPending) return undefined;
     if (!scanProgressVisible) return undefined;
+
+    const dismissDelay =
+      scanProgress?.type === "error"
+        ? SCAN_ERROR_DISMISS_MS
+        : SCAN_COMPLETE_DISMISS_MS;
     const timeout = window.setTimeout(
       () => setScanProgressVisible(false),
-      3500,
+      dismissDelay,
     );
     return () => window.clearTimeout(timeout);
   }, [scanMutation.isPending, scanProgressVisible, scanProgress]);

@@ -25,11 +25,11 @@ const textInputShellVariants = cva(
     variants: {
       variant: {
         default:
-          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-input-hover-bg",
         outline: "border-g-line bg-transparent hover:border-g-input-hover",
         subtle: "border-transparent bg-g-surface-3 hover:border-g-input-hover",
         search:
-          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-input-hover-bg",
         command:
           "border-transparent bg-transparent px-0 hover:border-transparent focus-within:border-transparent focus-within:bg-transparent focus-within:shadow-none",
       },
@@ -65,11 +65,11 @@ const textInputButtonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-input-hover-bg",
         outline: "border-g-line bg-transparent hover:border-g-input-hover",
         subtle: "border-transparent bg-g-surface-3 hover:border-g-input-hover",
         search:
-          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-surface-2",
+          "border-g-input-border bg-g-surface hover:border-g-input-hover hover:bg-g-input-hover-bg",
         command:
           "border-transparent bg-transparent px-0 hover:border-transparent focus-visible:border-transparent focus-visible:bg-transparent focus-visible:shadow-none",
       },

@@ -12,6 +12,7 @@
   --color-g-input-border: var(--g-input-border);
   --color-g-input-hover: var(--g-input-border-hover);
   --color-g-input-focus: var(--g-input-border-focus);
+  --color-g-input-hover-bg: var(--g-input-bg-hover);
   --color-g-ink: var(--g-ink);
   --color-g-ink-2: var(--g-ink-2);
   --color-g-ink-3: var(--g-ink-3);
