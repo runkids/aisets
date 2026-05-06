@@ -22,7 +22,6 @@ import (
 
 func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
 	writePNG(t, filepath.Join(root, "src", "logo.png"))
@@ -107,7 +106,6 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := config.OpenStore()
 	if err != nil {
@@ -156,7 +154,6 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 }
 
 func TestAssetInvalidIDReturns404(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
 	store, err := config.OpenStore()
 	if err != nil {
@@ -179,7 +176,6 @@ func TestAssetInvalidIDReturns404(t *testing.T) {
 
 func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := config.OpenStore()
 	if err != nil {
@@ -235,7 +231,6 @@ func TestSettingsExportImportResetDatabase(t *testing.T) {
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := config.OpenStore()
 	if err != nil {
@@ -299,7 +294,6 @@ func TestProjectsAddAndDirectoryRoutes(t *testing.T) {
 	if err := os.WriteFile(file, []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := config.OpenStore()
 	if err != nil {
@@ -351,7 +345,6 @@ func TestProjectsAddAndDirectoryRoutes(t *testing.T) {
 
 func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	project := filepath.Join(root, "project")
@@ -440,14 +433,13 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = newMultipartPrecheckRequest(t, "Logo Bad.png", filepath.Join(project, "src", "renamed.png"))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"verdict":"warning"`) || !strings.Contains(rec.Body.String(), `"nearMatches"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"verdict":"duplicate"`) || !strings.Contains(rec.Body.String(), `"exactMatches"`) {
 		t.Fatalf("pre-check = %d %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestMergePreviewRouteForDuplicateAssets(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	project := filepath.Join(root, "project")

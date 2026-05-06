@@ -188,7 +188,6 @@
     "storageDesc": "Current local storage paths used by the API server.",
     "databasePath": "Database",
     "dataDir": "Data directory",
-    "configDir": "Config directory",
     "cacheDir": "Cache directory"
   },
   "error": {

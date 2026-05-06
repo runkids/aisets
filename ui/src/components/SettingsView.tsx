@@ -12,80 +12,81 @@ import {
   Sliders,
   Sun,
   Upload,
-} from 'lucide-react'
-import type { ReactNode } from 'react'
-import { useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { exportSettings } from '../api'
-import { errorMessage, supportedLanguages } from '../i18n/index'
-import { cn } from '../lib/cn'
+} from "lucide-react";
+import type { ReactNode } from "react";
+import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { exportSettings } from "../api";
+import { errorMessage, supportedLanguages } from "../i18n/index";
+import { cn } from "../lib/cn";
 import {
   useCatalogQuery,
   useImportSettingsMutation,
   useResetDatabaseMutation,
   useSettingsQuery,
   useUpdateSettingsMutation,
-} from '../queries'
-import type { ExportData, SettingsInfo, SettingsUpdate } from '../types'
-import { Badge, Button, Card, Notice, Select, Tabs, TextInput } from './ui'
+} from "../queries";
+import type { ExportData, SettingsInfo, SettingsUpdate } from "../types";
+import { Badge, Button, Card, Notice, Select, Tabs, TextInput } from "./ui";
 
 type Props = {
-  theme: 'light' | 'dark'
-  imagePreviewEnabled: boolean
-  onThemeChange: (theme: 'light' | 'dark') => void
-  onImagePreviewEnabledChange: (enabled: boolean) => void
-}
+  theme: "light" | "dark";
+  imagePreviewEnabled: boolean;
+  onThemeChange: (theme: "light" | "dark") => void;
+  onImagePreviewEnabledChange: (enabled: boolean) => void;
+};
 
 type Section =
-  | 'workspace'
-  | 'projects'
-  | 'theme'
-  | 'scanning'
-  | 'optimization'
-  | 'hotkeys'
-  | 'about'
+  | "workspace"
+  | "projects"
+  | "theme"
+  | "scanning"
+  | "optimization"
+  | "hotkeys"
+  | "about";
 
 type SettingsDraft = {
-  workspaceName: string
-  defaultProjectRoot: string
-  autoScanOnOpen: boolean
-  scanOnOpen: boolean
-  excludePatternsText: string
-  optimizationDefaultQuality: number
-  optimizationAutoApply: boolean
-}
+  workspaceName: string;
+  defaultProjectRoot: string;
+  autoScanOnOpen: boolean;
+  scanOnOpen: boolean;
+  excludePatternsText: string;
+  optimizationDefaultQuality: number;
+  optimizationAutoApply: boolean;
+};
 
 const sectionMeta: { id: Section; icon: ReactNode }[] = [
-  { id: 'workspace', icon: <Settings2 size={15} /> },
-  { id: 'projects', icon: <FolderPlus size={15} /> },
-  { id: 'theme', icon: <Paintbrush size={15} /> },
-  { id: 'scanning', icon: <Scan size={15} /> },
-  { id: 'optimization', icon: <Sliders size={15} /> },
-  { id: 'hotkeys', icon: <Keyboard size={15} /> },
-  { id: 'about', icon: <Info size={15} /> },
-]
+  { id: "workspace", icon: <Settings2 size={15} /> },
+  { id: "projects", icon: <FolderPlus size={15} /> },
+  { id: "theme", icon: <Paintbrush size={15} /> },
+  { id: "scanning", icon: <Scan size={15} /> },
+  { id: "optimization", icon: <Sliders size={15} /> },
+  { id: "hotkeys", icon: <Keyboard size={15} /> },
+  { id: "about", icon: <Info size={15} /> },
+];
 
 const defaultSettings: SettingsUpdate = {
-  workspaceName: 'Asset Studio',
-  defaultProjectRoot: '/workspace',
+  workspaceName: "Asset Studio",
+  defaultProjectRoot: "/workspace",
   autoScanOnOpen: false,
   scanOnOpen: false,
   excludePatterns: [],
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
-}
+};
 
 function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
   return {
-    workspaceName: settings?.workspaceName ?? defaultSettings.workspaceName ?? '',
+    workspaceName:
+      settings?.workspaceName ?? defaultSettings.workspaceName ?? "",
     defaultProjectRoot:
-      settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? '',
+      settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? "",
     autoScanOnOpen: settings?.autoScanOnOpen ?? false,
     scanOnOpen: settings?.scanOnOpen ?? false,
-    excludePatternsText: (settings?.excludePatterns ?? []).join(', '),
+    excludePatternsText: (settings?.excludePatterns ?? []).join(", "),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
-  }
+  };
 }
 
 function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
@@ -95,24 +96,24 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     autoScanOnOpen: draft.autoScanOnOpen,
     scanOnOpen: draft.scanOnOpen,
     excludePatterns: draft.excludePatternsText
-      .split(',')
+      .split(",")
       .map((part) => part.trim())
       .filter(Boolean),
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
     optimizationAutoApply: draft.optimizationAutoApply,
-  }
+  };
 }
 
 function Toggle({
   checked,
   onChange,
   disabled = false,
-  'aria-label': ariaLabel,
+  "aria-label": ariaLabel,
 }: {
-  checked: boolean
-  onChange: (next: boolean) => void
-  disabled?: boolean
-  'aria-label': string
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  "aria-label": string;
 }) {
   return (
     <button
@@ -123,21 +124,21 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-g-pill border border-transparent transition-colors duration-[120ms] ease-g',
-        'focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]',
-        checked ? 'bg-g-accent' : 'bg-g-surface-3',
+        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-g-pill border border-transparent transition-colors duration-[120ms] ease-g",
+        "focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]",
+        checked ? "bg-g-accent" : "bg-g-surface-3",
       )}
     >
       <span
         className={cn(
-          'pointer-events-none block size-3.5 rounded-full transition-transform duration-[120ms] ease-g',
+          "pointer-events-none block size-3.5 rounded-full transition-transform duration-[120ms] ease-g",
           checked
-            ? 'translate-x-[18px] bg-g-accent-ink'
-            : 'translate-x-[3px] bg-g-ink-3',
+            ? "translate-x-[18px] bg-g-accent-ink"
+            : "translate-x-[3px] bg-g-ink-3",
         )}
       />
     </button>
-  )
+  );
 }
 
 function FieldRow({
@@ -145,9 +146,9 @@ function FieldRow({
   description,
   children,
 }: {
-  label: string
-  description?: string
-  children: ReactNode
+  label: string;
+  description?: string;
+  children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2.5 shadow-g-inset sm:flex-row sm:items-center sm:justify-between">
@@ -165,15 +166,15 @@ function FieldRow({
         {children}
       </div>
     </div>
-  )
+  );
 }
 
 function SectionHeading({
   title,
   description,
 }: {
-  title: string
-  description?: string
+  title: string;
+  description?: string;
 }) {
   return (
     <div className="mb-5">
@@ -186,7 +187,7 @@ function SectionHeading({
         </p>
       )}
     </div>
-  )
+  );
 }
 
 function PathRow({
@@ -194,9 +195,9 @@ function PathRow({
   label,
   value,
 }: {
-  icon?: ReactNode
-  label: string
-  value?: string
+  icon?: ReactNode;
+  label: string;
+  value?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-g-line px-3 py-2 last:border-b-0">
@@ -205,10 +206,10 @@ function PathRow({
         {label}
       </span>
       <code className="min-w-0 truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-2">
-        {value ?? '...'}
+        {value ?? "..."}
       </code>
     </div>
-  )
+  );
 }
 
 function SettingsActions({
@@ -218,26 +219,22 @@ function SettingsActions({
   saveLabel,
   resetLabel,
 }: {
-  disabled: boolean
-  onSave: () => void
-  onReset: () => void
-  saveLabel: string
-  resetLabel: string
+  disabled: boolean;
+  onSave: () => void;
+  onReset: () => void;
+  saveLabel: string;
+  resetLabel: string;
 }) {
   return (
     <div className="mt-2 flex gap-2">
-      <Button
-        variant="primary"
-        onClick={onSave}
-        disabled={disabled}
-      >
+      <Button variant="primary" onClick={onSave} disabled={disabled}>
         {saveLabel}
       </Button>
       <Button variant="ghost" onClick={onReset} disabled={disabled}>
         {resetLabel}
       </Button>
     </div>
-  )
+  );
 }
 
 export function SettingsView({
@@ -246,70 +243,74 @@ export function SettingsView({
   onThemeChange,
   onImagePreviewEnabledChange,
 }: Props) {
-  const { i18n, t } = useTranslation()
-  const [activeSection, setActiveSection] = useState<Section>('workspace')
-  const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const settingsQuery = useSettingsQuery()
-  const catalogQuery = useCatalogQuery()
-  const importMutation = useImportSettingsMutation()
-  const resetMutation = useResetDatabaseMutation()
-  const updateMutation = useUpdateSettingsMutation()
+  const { i18n, t } = useTranslation();
+  const [activeSection, setActiveSection] = useState<Section>("workspace");
+  const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
+    null,
+  );
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const settingsQuery = useSettingsQuery();
+  const catalogQuery = useCatalogQuery();
+  const importMutation = useImportSettingsMutation();
+  const resetMutation = useResetDatabaseMutation();
+  const updateMutation = useUpdateSettingsMutation();
 
-  const settings = settingsQuery.data?.settings
-  const draft = draftOverride ?? draftFromSettings(settings)
-  const projects = catalogQuery.data?.projects ?? []
-  const items = catalogQuery.data?.items ?? []
+  const settings = settingsQuery.data?.settings;
+  const draft = draftOverride ?? draftFromSettings(settings);
+  const projects = catalogQuery.data?.projects ?? [];
+  const items = catalogQuery.data?.items ?? [];
   const working =
-    importMutation.isPending || resetMutation.isPending || updateMutation.isPending
-  const settingsActionDisabled = settingsQuery.isLoading || working
+    importMutation.isPending ||
+    resetMutation.isPending ||
+    updateMutation.isPending;
+  const settingsActionDisabled = settingsQuery.isLoading || working;
 
-  const assetCountByProject: Record<string, number> = {}
+  const assetCountByProject: Record<string, number> = {};
   for (const item of items) {
     assetCountByProject[item.projectId] =
-      (assetCountByProject[item.projectId] ?? 0) + 1
+      (assetCountByProject[item.projectId] ?? 0) + 1;
   }
 
   function updateDraft(updater: (current: SettingsDraft) => SettingsDraft) {
     setDraftOverride((current) =>
       updater(current ?? draftFromSettings(settingsQuery.data?.settings)),
-    )
+    );
   }
 
   async function onSaveSettings() {
-    const result = await updateMutation.mutateAsync(updateFromDraft(draft))
-    setDraftOverride(draftFromSettings(result.settings))
+    const result = await updateMutation.mutateAsync(updateFromDraft(draft));
+    setDraftOverride(draftFromSettings(result.settings));
   }
 
   async function onResetSettings() {
-    const result = await updateMutation.mutateAsync(defaultSettings)
-    setDraftOverride(draftFromSettings(result.settings))
+    const result = await updateMutation.mutateAsync(defaultSettings);
+    setDraftOverride(draftFromSettings(result.settings));
   }
 
   async function onExport() {
-    const data = await exportSettings()
+    const data = await exportSettings();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `asset-studio-export-${new Date().toISOString().slice(0, 10)}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `asset-studio-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function onImport(file: File) {
-    const text = await file.text()
-    const data = JSON.parse(text) as ExportData
-    await importMutation.mutateAsync(data)
-    setDraftOverride(null)
+    const text = await file.text();
+    const data = JSON.parse(text) as ExportData;
+    await importMutation.mutateAsync(data);
+    setDraftOverride(null);
   }
 
   async function onReset() {
-    const confirmed = window.confirm(t('settings.resetConfirm'))
-    if (!confirmed) return
-    await resetMutation.mutateAsync()
+    const confirmed = window.confirm(t("settings.resetConfirm"));
+    if (!confirmed) return;
+    await resetMutation.mutateAsync();
   }
 
   const settingActions = (
@@ -317,16 +318,16 @@ export function SettingsView({
       disabled={settingsActionDisabled}
       onSave={() => void onSaveSettings()}
       onReset={() => void onResetSettings()}
-      saveLabel={t('settings.save')}
-      resetLabel={t('settings.reset')}
+      saveLabel={t("settings.save")}
+      resetLabel={t("settings.reset")}
     />
-  )
+  );
 
   return (
     <>
       <nav
         className="filter-rail settings-filter-rail"
-        aria-label={t('mode.settings')}
+        aria-label={t("mode.settings")}
       >
         <section className="filter-rail-section">
           {sectionMeta.map(({ id, icon }) => (
@@ -351,17 +352,19 @@ export function SettingsView({
 
       <div className="content-scroll settings-content-scroll">
         <div className="content-grid settings-content-grid">
-          {activeSection === 'workspace' && (
+          {activeSection === "workspace" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.workspace')}
-                description={t('settings.workspaceDesc')}
+                title={t("settings.section.workspace")}
+                description={t("settings.workspaceDesc")}
               />
               <div className="flex flex-col gap-4">
-                <FieldRow label={t('settings.workspaceName')}>
+                <FieldRow label={t("settings.workspaceName")}>
                   <TextInput
                     type="text"
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
                     value={draft.workspaceName}
                     onChange={(event) =>
                       updateDraft((prev) => ({
@@ -375,12 +378,14 @@ export function SettingsView({
                   />
                 </FieldRow>
                 <FieldRow
-                  label={t('settings.defaultRoot')}
-                  description={t('settings.defaultRootHint')}
+                  label={t("settings.defaultRoot")}
+                  description={t("settings.defaultRootHint")}
                 >
                   <TextInput
                     type="text"
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
                     value={draft.defaultProjectRoot}
                     onChange={(event) =>
                       updateDraft((prev) => ({
@@ -393,16 +398,18 @@ export function SettingsView({
                   />
                 </FieldRow>
                 <FieldRow
-                  label={t('settings.autoScan')}
-                  description={t('settings.autoScanHint')}
+                  label={t("settings.autoScan")}
+                  description={t("settings.autoScanHint")}
                 >
                   <Toggle
                     checked={draft.autoScanOnOpen}
                     onChange={(next) =>
                       updateDraft((prev) => ({ ...prev, autoScanOnOpen: next }))
                     }
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
-                    aria-label={t('settings.autoScan')}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
+                    aria-label={t("settings.autoScan")}
                   />
                 </FieldRow>
                 {updateMutation.error && (
@@ -415,16 +422,16 @@ export function SettingsView({
             </Card>
           )}
 
-          {activeSection === 'projects' && (
+          {activeSection === "projects" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.projects')}
-                description={t('settings.projectsDesc')}
+                title={t("settings.section.projects")}
+                description={t("settings.projectsDesc")}
               />
               <div className="flex flex-col gap-3">
                 {projects.length === 0 ? (
                   <p className="py-6 text-center font-g text-g-ui text-g-ink-3">
-                    {t('settings.noProjects')}
+                    {t("settings.noProjects")}
                   </p>
                 ) : (
                   <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
@@ -442,7 +449,7 @@ export function SettingsView({
                           </div>
                         </div>
                         <Badge tone="line">
-                          {t('settings.projectAssets', {
+                          {t("settings.projectAssets", {
                             count: assetCountByProject[project.id] ?? 0,
                           })}
                         </Badge>
@@ -454,14 +461,14 @@ export function SettingsView({
             </Card>
           )}
 
-          {activeSection === 'theme' && (
+          {activeSection === "theme" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.theme')}
-                description={t('settings.appearanceDesc')}
+                title={t("settings.section.theme")}
+                description={t("settings.appearanceDesc")}
               />
               <div className="flex flex-col gap-4">
-                <FieldRow label={t('settings.language')}>
+                <FieldRow label={t("settings.language")}>
                   <Select
                     value={i18n.language}
                     options={supportedLanguages.map((lang) => ({
@@ -469,66 +476,70 @@ export function SettingsView({
                       label: lang.label,
                     }))}
                     onChange={(value) => i18n.changeLanguage(value)}
-                    aria-label={t('settings.language')}
+                    aria-label={t("settings.language")}
                   />
                 </FieldRow>
-                <FieldRow label={t('settings.theme')}>
+                <FieldRow label={t("settings.theme")}>
                   <Tabs
                     value={theme}
                     items={[
                       {
-                        value: 'light',
-                        label: t('settings.light'),
+                        value: "light",
+                        label: t("settings.light"),
                         icon: <Sun size={15} />,
                       },
                       {
-                        value: 'dark',
-                        label: t('settings.dark'),
+                        value: "dark",
+                        label: t("settings.dark"),
                         icon: <Moon size={15} />,
                       },
                     ]}
                     onChange={onThemeChange}
-                    ariaLabel={t('settings.theme')}
+                    ariaLabel={t("settings.theme")}
                   />
                 </FieldRow>
                 <FieldRow
-                  label={t('settings.imagePreview')}
-                  description={t('settings.imagePreviewHint')}
+                  label={t("settings.imagePreview")}
+                  description={t("settings.imagePreviewHint")}
                 >
                   <Toggle
                     checked={imagePreviewEnabled}
                     onChange={onImagePreviewEnabledChange}
-                    aria-label={t('settings.imagePreview')}
+                    aria-label={t("settings.imagePreview")}
                   />
                 </FieldRow>
               </div>
             </Card>
           )}
 
-          {activeSection === 'scanning' && (
+          {activeSection === "scanning" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.scanning')}
-                description={t('settings.scanningDesc')}
+                title={t("settings.section.scanning")}
+                description={t("settings.scanningDesc")}
               />
               <div className="flex flex-col gap-4">
-                <FieldRow label={t('settings.scanOnOpen')}>
+                <FieldRow label={t("settings.scanOnOpen")}>
                   <Toggle
                     checked={draft.scanOnOpen}
                     onChange={(next) =>
                       updateDraft((prev) => ({ ...prev, scanOnOpen: next }))
                     }
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
-                    aria-label={t('settings.scanOnOpen')}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
+                    aria-label={t("settings.scanOnOpen")}
                   />
                 </FieldRow>
                 <FieldRow
-                  label={t('settings.excludePatterns')}
-                  description={t('settings.excludePatternsHint')}
+                  label={t("settings.excludePatterns")}
+                  description={t("settings.excludePatternsHint")}
                 >
                   <TextInput
                     type="text"
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
                     value={draft.excludePatternsText}
                     onChange={(event) =>
                       updateDraft((prev) => ({
@@ -550,16 +561,16 @@ export function SettingsView({
             </Card>
           )}
 
-          {activeSection === 'optimization' && (
+          {activeSection === "optimization" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.optimization')}
-                description={t('settings.optimizationDesc')}
+                title={t("settings.section.optimization")}
+                description={t("settings.optimizationDesc")}
               />
               <div className="flex flex-col gap-4">
                 <FieldRow
-                  label={t('settings.defaultQuality')}
-                  description={t('settings.defaultQualityHint')}
+                  label={t("settings.defaultQuality")}
+                  description={t("settings.defaultQualityHint")}
                 >
                   <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
                     <input
@@ -567,22 +578,28 @@ export function SettingsView({
                       min={0}
                       max={100}
                       value={draft.optimizationDefaultQuality}
-                      disabled={settingsQuery.isLoading || updateMutation.isPending}
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
                       onChange={(event) =>
                         updateDraft((prev) => ({
                           ...prev,
-                          optimizationDefaultQuality: Number(event.target.value),
+                          optimizationDefaultQuality: Number(
+                            event.target.value,
+                          ),
                         }))
                       }
                       className="w-32 rounded-g-sm accent-g-accent focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
-                      aria-label={t('settings.defaultQuality')}
+                      aria-label={t("settings.defaultQuality")}
                     />
-                    <Badge tone="line">{draft.optimizationDefaultQuality}</Badge>
+                    <Badge tone="line">
+                      {draft.optimizationDefaultQuality}
+                    </Badge>
                   </div>
                 </FieldRow>
                 <FieldRow
-                  label={t('settings.autoApply')}
-                  description={t('settings.autoApplyHint')}
+                  label={t("settings.autoApply")}
+                  description={t("settings.autoApplyHint")}
                 >
                   <Toggle
                     checked={draft.optimizationAutoApply}
@@ -592,8 +609,10 @@ export function SettingsView({
                         optimizationAutoApply: next,
                       }))
                     }
-                    disabled={settingsQuery.isLoading || updateMutation.isPending}
-                    aria-label={t('settings.autoApply')}
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
+                    aria-label={t("settings.autoApply")}
                   />
                 </FieldRow>
                 {updateMutation.error && (
@@ -606,16 +625,16 @@ export function SettingsView({
             </Card>
           )}
 
-          {activeSection === 'hotkeys' && (
+          {activeSection === "hotkeys" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.hotkeys')}
-                description={t('settings.hotkeysDesc')}
+                title={t("settings.section.hotkeys")}
+                description={t("settings.hotkeysDesc")}
               />
               <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
                 {[
-                  { keys: '⌘ K', action: t('settings.hotkeyPalette') },
-                  { keys: 'Esc', action: t('settings.hotkeyClose') },
+                  { keys: "⌘ K", action: t("settings.hotkeyPalette") },
+                  { keys: "Esc", action: t("settings.hotkeyClose") },
                 ].map(({ keys, action }) => (
                   <div
                     key={keys}
@@ -633,22 +652,22 @@ export function SettingsView({
             </Card>
           )}
 
-          {activeSection === 'about' && (
+          {activeSection === "about" && (
             <Card padding="lg">
               <SectionHeading
-                title={t('settings.section.about')}
-                description={t('settings.aboutDesc')}
+                title={t("settings.section.about")}
+                description={t("settings.aboutDesc")}
               />
               <div className="flex flex-col gap-4">
-                <FieldRow label={t('settings.version')}>
+                <FieldRow label={t("settings.version")}>
                   <Badge tone="default">0.1.0</Badge>
                 </FieldRow>
-                <FieldRow label={t('settings.license')}>
+                <FieldRow label={t("settings.license")}>
                   <span className="font-g text-g-ui text-g-ink-2">MIT</span>
                 </FieldRow>
                 <div className="mt-4 border-t border-g-line pt-4">
                   <h3 className="mb-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
-                    {t('settings.data')}
+                    {t("settings.data")}
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -656,7 +675,7 @@ export function SettingsView({
                       leadingIcon={<Download size={15} />}
                       onClick={onExport}
                     >
-                      {t('settings.export')}
+                      {t("settings.export")}
                     </Button>
                     <Button
                       variant="secondary"
@@ -664,7 +683,7 @@ export function SettingsView({
                       onClick={() => fileInputRef.current?.click()}
                       disabled={working}
                     >
-                      {t('settings.import')}
+                      {t("settings.import")}
                     </Button>
                     <Button
                       variant="danger"
@@ -672,7 +691,7 @@ export function SettingsView({
                       onClick={() => void onReset()}
                       disabled={working}
                     >
-                      {t('settings.resetDatabase')}
+                      {t("settings.resetDatabase")}
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -680,33 +699,29 @@ export function SettingsView({
                       accept="application/json,.json"
                       className="sr-only"
                       onChange={(event) => {
-                        const file = event.currentTarget.files?.[0]
-                        event.currentTarget.value = ''
-                        if (file) void onImport(file)
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        if (file) void onImport(file);
                       }}
                     />
                   </div>
                 </div>
                 <div className="mt-2 border-t border-g-line pt-4">
                   <h3 className="mb-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
-                    {t('settings.storage')}
+                    {t("settings.storage")}
                   </h3>
                   <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
                     <PathRow
                       icon={<Database size={15} />}
-                      label={t('settings.databasePath')}
+                      label={t("settings.databasePath")}
                       value={settings?.databasePath}
                     />
                     <PathRow
-                      label={t('settings.dataDir')}
+                      label={t("settings.dataDir")}
                       value={settings?.dataDir}
                     />
                     <PathRow
-                      label={t('settings.configDir')}
-                      value={settings?.configDir}
-                    />
-                    <PathRow
-                      label={t('settings.cacheDir')}
+                      label={t("settings.cacheDir")}
                       value={settings?.cacheDir}
                     />
                   </div>
@@ -717,5 +732,5 @@ export function SettingsView({
         </div>
       </div>
     </>
-  )
+  );
 }

@@ -1,50 +1,49 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { updateSettings } from './api'
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { updateSettings } from "./api";
 
-describe('updateSettings', () => {
+describe("updateSettings", () => {
   afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+    vi.unstubAllGlobals();
+  });
 
-  it('sends a PATCH request with the backend settings shape', async () => {
+  it("sends a PATCH request with the backend settings shape", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         settings: {
-          workspaceName: 'Team',
-          defaultProjectRoot: '/workspace',
+          workspaceName: "Team",
+          defaultProjectRoot: "/workspace",
           autoScanOnOpen: false,
           scanOnOpen: true,
-          excludePatterns: ['dist'],
+          excludePatterns: ["dist"],
           optimizationDefaultQuality: 72,
           optimizationAutoApply: false,
-          databasePath: '/tmp/asset-studio.db',
-          configDir: '/tmp/config',
-          dataDir: '/tmp/data',
-          cacheDir: '/tmp/cache',
+          databasePath: "/tmp/asset-studio.db",
+          dataDir: "/tmp/data",
+          cacheDir: "/tmp/cache",
         },
       }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     await updateSettings({
-      workspaceName: 'Team',
+      workspaceName: "Team",
       scanOnOpen: true,
-      excludePatterns: ['dist'],
+      excludePatterns: ["dist"],
       optimizationDefaultQuality: 72,
-    })
+    });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/settings', {
-      method: 'PATCH',
+    expect(fetchMock).toHaveBeenCalledWith("/api/settings", {
+      method: "PATCH",
       body: JSON.stringify({
-        workspaceName: 'Team',
+        workspaceName: "Team",
         scanOnOpen: true,
-        excludePatterns: ['dist'],
+        excludePatterns: ["dist"],
         optimizationDefaultQuality: 72,
       }),
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
       },
-    })
-  })
-})
+    });
+  });
+});

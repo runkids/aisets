@@ -386,7 +386,6 @@
     "storageDesc": "API 서버가 사용하는 현재 로컬 저장 경로입니다.",
     "databasePath": "데이터베이스",
     "dataDir": "데이터 디렉토리",
-    "configDir": "설정 디렉토리",
     "cacheDir": "캐시 디렉토리"
   },
   "unused": {

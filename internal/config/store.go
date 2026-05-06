@@ -53,21 +53,6 @@ type ExportData struct {
 	Settings   *AppSettings `json:"settings,omitempty"`
 }
 
-type legacyData struct {
-	Projects []Project `json:"projects"`
-}
-
-func ConfigDir() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "asset-studio")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ".asset-studio"
-	}
-	return filepath.Join(home, ".config", "asset-studio")
-}
-
 func DataDir() string {
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
 		return filepath.Join(xdg, "asset-studio")
@@ -478,7 +463,7 @@ func (s *Store) init() error {
 	if err := s.migrate(); err != nil {
 		return err
 	}
-	return s.importLegacyConfig()
+	return nil
 }
 
 func (s *Store) migrate() error {
@@ -635,29 +620,6 @@ func (s *Store) migrate() error {
 	}
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 1, nowUTC())
 	return err
-}
-
-func (s *Store) importLegacyConfig() error {
-	path := filepath.Join(ConfigDir(), "config.json")
-	bytes, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var data legacyData
-	if len(bytes) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(bytes, &data); err != nil {
-		return err
-	}
-	paths := make([]string, 0, len(data.Projects))
-	for _, project := range data.Projects {
-		paths = append(paths, project.Path)
-	}
-	return s.AddProjects(paths)
 }
 
 func nowUTC() string {

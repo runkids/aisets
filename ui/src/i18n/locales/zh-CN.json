@@ -386,7 +386,6 @@
     "storageDesc": "API server 当前使用的本地存储路径。",
     "databasePath": "数据庫",
     "dataDir": "数据目录",
-    "configDir": "设置目录",
     "cacheDir": "缓存目录"
   },
   "unused": {

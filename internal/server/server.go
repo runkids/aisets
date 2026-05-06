@@ -278,7 +278,6 @@ func (s *Server) handleRenameProject(w http.ResponseWriter, r *http.Request) {
 type settingsInfo struct {
 	config.AppSettings
 	DatabasePath string `json:"databasePath"`
-	ConfigDir    string `json:"configDir"`
 	DataDir      string `json:"dataDir"`
 	CacheDir     string `json:"cacheDir"`
 }
@@ -291,7 +290,6 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 	return settingsInfo{
 		AppSettings:  settings,
 		DatabasePath: s.store.Path(),
-		ConfigDir:    config.ConfigDir(),
 		DataDir:      config.DataDir(),
 		CacheDir:     config.CacheDir(),
 	}, nil

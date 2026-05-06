@@ -16,7 +16,6 @@ export type AppSettings = {
 
 export type SettingsInfo = AppSettings & {
   databasePath: string;
-  configDir: string;
   dataDir: string;
   cacheDir: string;
 };

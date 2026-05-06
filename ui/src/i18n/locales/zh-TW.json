@@ -386,7 +386,6 @@
     "storageDesc": "API server 目前使用的本機儲存路徑。",
     "databasePath": "資料庫",
     "dataDir": "資料目錄",
-    "configDir": "設定目錄",
     "cacheDir": "快取目錄"
   },
   "unused": {

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -20,7 +19,6 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 
 	store, err := OpenStore()
 	if err != nil {
@@ -55,7 +53,6 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 
 	store, err := OpenStore()
 	if err != nil {
@@ -83,7 +80,6 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 func TestStoreUpdatesSettings(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	store, err := OpenStore()
 	if err != nil {
 		t.Fatal(err)
@@ -125,38 +121,9 @@ func TestStoreUpdatesSettings(t *testing.T) {
 	}
 }
 
-func TestStoreImportsLegacyConfigJSON(t *testing.T) {
-	root := t.TempDir()
-	project := filepath.Join(root, "legacy")
-	if err := os.Mkdir(project, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	configDir := filepath.Join(root, "config")
-	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", configDir)
-	if err := os.MkdirAll(filepath.Join(configDir, "asset-studio"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	bytes, _ := json.Marshal(legacyData{Projects: []Project{{ID: project, Name: "legacy", Path: project}}})
-	if err := os.WriteFile(filepath.Join(configDir, "asset-studio", "config.json"), bytes, 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	store, err := OpenStore()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	projects := store.Projects()
-	if len(projects) != 1 || projects[0].Path != project {
-		t.Fatalf("projects = %#v", projects)
-	}
-}
-
 func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	store, err := OpenStore()
 	if err != nil {
 		t.Fatal(err)
@@ -221,15 +188,11 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 	assertRowCount(t, store, "near_duplicate_snapshots", 1)
 }
 
-func TestConfigDataAndCacheDirsHonorXDG(t *testing.T) {
+func TestDataAndCacheDirsHonorXDG(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 
-	if got := ConfigDir(); got != filepath.Join(root, "config", "asset-studio") {
-		t.Fatalf("ConfigDir() = %q", got)
-	}
 	if got := DataDir(); got != filepath.Join(root, "data", "asset-studio") {
 		t.Fatalf("DataDir() = %q", got)
 	}
@@ -241,7 +204,6 @@ func TestConfigDataAndCacheDirsHonorXDG(t *testing.T) {
 func TestAddProjectsSkipsEmptyRejectsFilesAndRestoresDeleted(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	project := filepath.Join(root, "project")
 	file := filepath.Join(root, "asset.png")
 	if err := os.Mkdir(project, 0o755); err != nil {
@@ -282,7 +244,6 @@ func TestAddProjectsSkipsEmptyRejectsFilesAndRestoresDeleted(t *testing.T) {
 func TestProjectMutationValidationErrors(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	store, err := OpenStore()
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +261,6 @@ func TestProjectMutationValidationErrors(t *testing.T) {
 func TestSettingsValidationAndAllFields(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	store, err := OpenStore()
 	if err != nil {
 		t.Fatal(err)
@@ -341,7 +301,6 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 func TestExportImportAndResetData(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
