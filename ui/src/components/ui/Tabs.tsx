@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { cn } from "../../lib/cn";
+import { Tabs as TabsPrimitive } from "radix-ui";
+import { cva } from "class-variance-authority";
+import { cn } from "@/lib/cn";
 
 export type TabItem<T extends string> = {
   value: T;
@@ -21,31 +23,40 @@ type TabsProps<T extends string> = {
   className?: string;
 };
 
-const tabsBaseClassName = "inline-flex items-center gap-1";
+const listVariants = cva("inline-flex items-center gap-1", {
+  variants: {
+    variant: {
+      segment:
+        "rounded-g-md border border-g-line bg-g-surface-2 p-[3px] shadow-g-inset",
+      pills: "flex-wrap",
+    },
+  },
+  defaultVariants: { variant: "segment" },
+});
 
-const tabsVariantClassNames: Record<TabsVariant, string> = {
-  segment:
-    "rounded-g-md border border-g-line bg-g-surface-2 p-[3px] shadow-g-inset",
-  pills: "flex-wrap",
-};
-
-const tabBaseClassName = cn(
-  "inline-flex items-center justify-center gap-1.5 rounded-g-md border border-transparent font-g font-[510] tracking-g-ui text-g-ink-2 transition-[background,border-color,color,box-shadow] duration-[120ms] ease-g",
-  "hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
-  "[&_svg]:size-[13px] [&_svg]:shrink-0",
+const triggerVariants = cva(
+  [
+    "inline-flex items-center justify-center gap-1.5 rounded-g-md border border-transparent font-g font-[510] tracking-g-ui text-g-ink-2 cursor-pointer",
+    "transition-[background,border-color,color,box-shadow] duration-[120ms] ease-g",
+    "hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+    "[&_svg]:size-[13px] [&_svg]:shrink-0",
+  ],
+  {
+    variants: {
+      variant: {
+        segment:
+          "data-[state=active]:bg-g-surface data-[state=active]:text-g-ink data-[state=active]:shadow-g-sm",
+        pills:
+          "border-g-line-strong bg-transparent data-[state=active]:bg-g-active-bg data-[state=active]:text-g-active-text data-[state=active]:font-[590]",
+      },
+      size: {
+        sm: "h-g-btn-sm px-2 text-g-caption",
+        md: "h-g-btn-md px-3 text-g-ui",
+      },
+    },
+    defaultVariants: { variant: "segment", size: "md" },
+  },
 );
-
-const tabSizeClassNames: Record<TabsSize, string> = {
-  sm: "h-g-btn-sm px-2 text-g-caption",
-  md: "h-g-btn-md px-3 text-g-ui",
-};
-
-const tabVariantClassNames: Record<TabsVariant, string> = {
-  segment:
-    "data-[active=true]:bg-g-surface data-[active=true]:text-g-ink data-[active=true]:shadow-g-sm",
-  pills:
-    "border-g-line-strong bg-transparent data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[590]",
-};
 
 export function Tabs<T extends string>({
   value,
@@ -57,37 +68,27 @@ export function Tabs<T extends string>({
   className,
 }: TabsProps<T>) {
   return (
-    <div
-      className={cn(
-        tabsBaseClassName,
-        tabsVariantClassNames[variant],
-        className,
-      )}
-      role="tablist"
-      aria-label={ariaLabel}
+    <TabsPrimitive.Root
+      value={value}
+      onValueChange={(v) => onChange(v as T)}
+      activationMode="manual"
     >
-      {items.map((item) => {
-        const active = value === item.value;
-        return (
-          <button
+      <TabsPrimitive.List
+        className={cn(listVariants({ variant }), className)}
+        aria-label={ariaLabel}
+      >
+        {items.map((item) => (
+          <TabsPrimitive.Trigger
             key={item.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            data-active={active || undefined}
-            className={cn(
-              tabBaseClassName,
-              tabSizeClassNames[size],
-              tabVariantClassNames[variant],
-            )}
-            onClick={() => onChange(item.value)}
+            value={item.value}
+            className={triggerVariants({ variant, size })}
           >
             {item.icon}
             <span>{item.label}</span>
             {item.badge}
-          </button>
-        );
-      })}
-    </div>
+          </TabsPrimitive.Trigger>
+        ))}
+      </TabsPrimitive.List>
+    </TabsPrimitive.Root>
   );
 }
