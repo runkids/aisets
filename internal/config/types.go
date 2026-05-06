@@ -3,6 +3,7 @@ package config
 type Workspace struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
+	IconImage    string `json:"iconImage,omitempty"`
 	ProjectCount int    `json:"projectCount"`
 }
 

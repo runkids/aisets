@@ -193,6 +193,7 @@
     "project_name_empty": "專案名稱不可為空。",
     "invalid_body": "請求內容格式不正確。",
     "workspace_name_empty": "工作區名稱不可為空。",
+    "workspace_icon_invalid": "工作區圖片必須是 512 KB 以內的 PNG、JPEG、GIF 或 WebP data URL。",
     "workspace_not_found": "找不到工作區。",
     "workspace_last_required": "至少需要保留一個工作區。"
   },
@@ -214,7 +215,13 @@
     "scanComplete": "掃描完成",
     "applyComplete": "變更已套用",
     "copied": "路徑已複製",
-    "workspaceSwitched": "已切換工作區：{{name}}"
+    "workspaceSwitched": "已切換工作區：{{name}}",
+    "settingsSaved": "設定已儲存",
+    "settingsSaveFailed": "設定儲存失敗",
+    "settingsReset": "設定已重設",
+    "settingsResetFailed": "設定重設失敗",
+    "databaseReset": "資料庫已重設",
+    "databaseResetFailed": "資料庫重設失敗"
   },
   "prompt": {
     "renamePath": "新的專案相對路徑"
@@ -511,8 +518,17 @@
     "addWorkspacePrompt": "工作區名稱",
     "renameWorkspace": "重新命名工作區",
     "renameWorkspacePrompt": "新的工作區名稱",
+    "renameWorkspaceSuccess": "已重新命名工作區為 {{name}}",
+    "workspaceIcon": "工作區圖片",
+    "workspaceIconHint": "支援 PNG、JPEG、GIF 或 WebP，最大 512 KB；用於工作區列表與工作區標題。",
+    "uploadWorkspaceIcon": "上傳圖片",
+    "removeWorkspaceIcon": "移除圖片",
+    "workspaceIconTypeError": "請選擇 PNG、JPEG、GIF 或 WebP 圖片。",
+    "workspaceIconSizeError": "工作區圖片必須小於或等於 512 KB。",
+    "workspaceIconReadError": "無法讀取這張圖片。",
     "removeWorkspace": "刪除工作區",
-    "removeWorkspaceConfirm": "要刪除 {{name}} 嗎？專案檔案會保留在磁碟上，但此工作區與追蹤專案清單會被移除。"
+    "removeWorkspaceConfirm": "要刪除 {{name}} 嗎？專案檔案會保留在磁碟上，但此工作區與追蹤專案清單會被移除。",
+    "removeWorkspaceSuccess": "已刪除工作區 {{name}}"
   },
   "unused": {
     "title": "未使用",

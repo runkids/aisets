@@ -147,14 +147,19 @@ func (s *Store) ImportData(data ExportData) error {
 		if workspace.ID == "" || workspace.Name == "" {
 			continue
 		}
+		iconImage, err := normalizeWorkspaceIconImage(workspace.IconImage)
+		if err != nil {
+			return err
+		}
 		if _, err := s.db.Exec(`
-			INSERT INTO workspaces (id, name, created_at, updated_at)
-			VALUES (?, ?, ?, ?)
+			INSERT INTO workspaces (id, name, icon_image, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				name = excluded.name,
+				icon_image = excluded.icon_image,
 				deleted_at = NULL,
 				updated_at = excluded.updated_at
-		`, workspace.ID, workspace.Name, nowUTC(), nowUTC()); err != nil {
+		`, workspace.ID, workspace.Name, iconImage, nowUTC(), nowUTC()); err != nil {
 			return err
 		}
 	}

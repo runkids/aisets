@@ -2,6 +2,7 @@ import { Check, ChevronDown, FolderKanban, Layers3 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
+import { WorkspaceAvatar } from "./WorkspaceAvatar";
 import { cn } from "@/lib/cn";
 
 export type ProjectSwitcherProject = Project & {
@@ -18,10 +19,6 @@ type Props = {
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
 };
-
-function projectInitial(name: string) {
-  return name.trim().slice(0, 1).toUpperCase() || "A";
-}
 
 /* ── Tailwind class blocks ─────────────────────────────────────────── */
 
@@ -237,9 +234,11 @@ export function ProjectSwitcher({
                 data-active={isActive || undefined}
                 onClick={() => selectWorkspace(workspace.id)}
               >
-                <span className={avatarClass} aria-hidden="true">
-                  {projectInitial(workspace.name)}
-                </span>
+                <WorkspaceAvatar
+                  name={workspace.name}
+                  iconImage={workspace.iconImage}
+                  className={avatarClass}
+                />
                 <span className={cn(optionCopyClass, optionCopyActiveOverride)}>
                   <strong className={optionCopyStrongClass}>
                     {workspace.name}

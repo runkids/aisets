@@ -229,7 +229,8 @@ func TestWorkspaceRoutesScopeCatalogProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payload, _ := json.Marshal(map[string]string{"name": "Client A"})
+	iconImage := "data:image/png;base64,aWNvbg=="
+	payload, _ := json.Marshal(map[string]string{"name": "Client A", "iconImage": iconImage})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/add", bytes.NewReader(payload))
 	s.handler.ServeHTTP(rec, req)
@@ -248,13 +249,17 @@ func TestWorkspaceRoutesScopeCatalogProjects(t *testing.T) {
 	if added.Settings.ActiveWorkspaceID == "" || len(added.Settings.Workspaces) != 2 {
 		t.Fatalf("added settings = %#v", added.Settings)
 	}
+	if added.Settings.Workspaces[0].IconImage != iconImage && added.Settings.Workspaces[1].IconImage != iconImage {
+		t.Fatalf("added workspace icon missing = %#v", added.Settings.Workspaces)
+	}
 	workspaceID := added.Settings.ActiveWorkspaceID
 
-	payload, _ = json.Marshal(map[string]string{"id": workspaceID, "name": "Client Renamed"})
+	iconImage = "data:image/webp;base64,bmV3LWljb24="
+	payload, _ = json.Marshal(map[string]string{"id": workspaceID, "name": "Client Renamed", "iconImage": iconImage})
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", bytes.NewReader(payload))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"workspaceName":"Client Renamed"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"workspaceName":"Client Renamed"`) || !strings.Contains(rec.Body.String(), iconImage) {
 		t.Fatalf("rename workspace = %d %s", rec.Code, rec.Body.String())
 	}
 

@@ -32,6 +32,7 @@ func (s *Store) migrate() error {
 		`CREATE TABLE IF NOT EXISTS workspaces (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
+			icon_image TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT
@@ -187,6 +188,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateProjectsWorkspaceSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateWorkspacesIconSchema(); err != nil {
+		return err
+	}
 	if err := s.migrateAppSettingsSchema(); err != nil {
 		return err
 	}
@@ -256,6 +260,35 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Store) migrateWorkspacesIconSchema() error {
+	rows, err := s.db.Query(`PRAGMA table_info(workspaces)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if columns["icon_image"] {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE workspaces ADD COLUMN icon_image TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 func (s *Store) ensureDefaultWorkspace() error {

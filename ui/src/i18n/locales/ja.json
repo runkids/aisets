@@ -180,6 +180,7 @@
     "project_name_empty": "プロジェクト名は空にできません。",
     "invalid_body": "リクエスト本文が不正です。",
     "workspace_name_empty": "ワークスペース名は空にできません。",
+    "workspace_icon_invalid": "ワークスペース画像は 512 KB 以下の PNG、JPEG、GIF、WebP data URL にしてください。",
     "workspace_not_found": "ワークスペースが見つかりません。",
     "workspace_last_required": "少なくとも 1 つのワークスペースが必要です。"
   },
@@ -201,7 +202,13 @@
     "scanComplete": "スキャン完了",
     "applyComplete": "変更を適用しました",
     "copied": "パスをコピーしました",
-    "workspaceSwitched": "ワークスペースを切り替えました: {{name}}"
+    "workspaceSwitched": "ワークスペースを切り替えました: {{name}}",
+    "settingsSaved": "設定を保存しました",
+    "settingsSaveFailed": "設定の保存に失敗しました",
+    "settingsReset": "設定をリセットしました",
+    "settingsResetFailed": "設定のリセットに失敗しました",
+    "databaseReset": "データベースをリセットしました",
+    "databaseResetFailed": "データベースのリセットに失敗しました"
   },
   "prompt": {
     "renamePath": "新しいプロジェクト相対パス"
@@ -498,8 +505,17 @@
     "addWorkspacePrompt": "ワークスペース名",
     "renameWorkspace": "ワークスペース名を変更",
     "renameWorkspacePrompt": "新しいワークスペース名",
+    "renameWorkspaceSuccess": "ワークスペース名を {{name}} に変更しました",
+    "workspaceIcon": "ワークスペース画像",
+    "workspaceIconHint": "PNG、JPEG、GIF、WebP（512 KB まで）。ワークスペース一覧と見出しで使われます。",
+    "uploadWorkspaceIcon": "画像をアップロード",
+    "removeWorkspaceIcon": "画像を削除",
+    "workspaceIconTypeError": "PNG、JPEG、GIF、WebP 画像を選択してください。",
+    "workspaceIconSizeError": "ワークスペース画像は 512 KB 以下にしてください。",
+    "workspaceIconReadError": "この画像を読み取れませんでした。",
     "removeWorkspace": "ワークスペースを削除",
-    "removeWorkspaceConfirm": "{{name}} を削除しますか？プロジェクトファイルはディスクに残りますが、このワークスペースと追跡中のプロジェクト一覧は削除されます。"
+    "removeWorkspaceConfirm": "{{name}} を削除しますか？プロジェクトファイルはディスクに残りますが、このワークスペースと追跡中のプロジェクト一覧は削除されます。",
+    "removeWorkspaceSuccess": "ワークスペース {{name}} を削除しました"
   },
   "unused": {
     "title": "未使用",

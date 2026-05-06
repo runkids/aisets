@@ -1,6 +1,7 @@
 export type Workspace = {
   id: string;
   name: string;
+  iconImage?: string;
   projectCount: number;
 };
 

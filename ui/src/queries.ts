@@ -122,7 +122,8 @@ function invalidateWorkspaceScope(client: ReturnType<typeof useQueryClient>) {
 export function useAddWorkspaceMutation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => addWorkspace(name),
+    mutationFn: ({ name, iconImage }: { name: string; iconImage?: string }) =>
+      addWorkspace(name, iconImage),
     onSuccess: async () => {
       await invalidateWorkspaceScope(client);
     },
@@ -142,8 +143,15 @@ export function useSwitchWorkspaceMutation() {
 export function useRenameWorkspaceMutation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      renameWorkspace(id, name),
+    mutationFn: ({
+      id,
+      name,
+      iconImage,
+    }: {
+      id: string;
+      name: string;
+      iconImage?: string;
+    }) => renameWorkspace(id, name, iconImage),
     onSuccess: async () => {
       await invalidateWorkspaceScope(client);
     },

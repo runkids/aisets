@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/sha1"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"sort"
@@ -15,13 +16,15 @@ import (
 
 const defaultWorkspaceID = "default"
 
+const maxWorkspaceIconBytes = 512 * 1024
+
 func (s *Store) Workspaces() []Workspace {
 	rows, err := s.db.Query(`
-		SELECT w.id, w.name, COUNT(p.id) AS project_count
+		SELECT w.id, w.name, w.icon_image, COUNT(p.id) AS project_count
 		FROM workspaces w
 		LEFT JOIN projects p ON p.workspace_id = w.id AND p.deleted_at IS NULL
 		WHERE w.deleted_at IS NULL
-		GROUP BY w.id, w.name, w.created_at
+		GROUP BY w.id, w.name, w.icon_image, w.created_at
 		ORDER BY lower(w.name), w.created_at
 	`)
 	if err != nil {
@@ -31,7 +34,7 @@ func (s *Store) Workspaces() []Workspace {
 	out := []Workspace{}
 	for rows.Next() {
 		var workspace Workspace
-		if err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.ProjectCount); err == nil {
+		if err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.IconImage, &workspace.ProjectCount); err == nil {
 			out = append(out, workspace)
 		}
 	}
@@ -39,35 +42,43 @@ func (s *Store) Workspaces() []Workspace {
 	return out
 }
 
-func (s *Store) AddWorkspace(name string) (Workspace, error) {
+func (s *Store) AddWorkspace(name, iconImage string) (Workspace, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Workspace{}, apierr.New("workspace_name_empty", "workspace name must not be empty")
 	}
+	iconImage, err := normalizeWorkspaceIconImage(iconImage)
+	if err != nil {
+		return Workspace{}, err
+	}
 	now := nowUTC()
 	id := workspaceID(name, strconv.FormatInt(time.Now().UnixNano(), 10))
 	if _, err := s.db.Exec(`
-		INSERT INTO workspaces (id, name, created_at, updated_at)
-		VALUES (?, ?, ?, ?)
-	`, id, name, now, now); err != nil {
+		INSERT INTO workspaces (id, name, icon_image, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, id, name, iconImage, now, now); err != nil {
 		return Workspace{}, err
 	}
 	if _, err := s.UpdateSettings(SettingsUpdate{ActiveWorkspaceID: &id}); err != nil {
 		return Workspace{}, err
 	}
-	return Workspace{ID: id, Name: name, ProjectCount: 0}, nil
+	return Workspace{ID: id, Name: name, IconImage: iconImage, ProjectCount: 0}, nil
 }
 
-func (s *Store) RenameWorkspace(id, name string) error {
+func (s *Store) RenameWorkspace(id, name, iconImage string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return apierr.New("workspace_name_empty", "workspace name must not be empty")
 	}
+	iconImage, err := normalizeWorkspaceIconImage(iconImage)
+	if err != nil {
+		return err
+	}
 	result, err := s.db.Exec(`
 		UPDATE workspaces
-		SET name = ?, updated_at = ?
+		SET name = ?, icon_image = ?, updated_at = ?
 		WHERE id = ? AND deleted_at IS NULL
-	`, name, nowUTC(), id)
+	`, name, iconImage, nowUTC(), id)
 	if err != nil {
 		return err
 	}
@@ -150,12 +161,12 @@ func (s *Store) activeWorkspaceID() string {
 func (s *Store) workspace(id string) (Workspace, error) {
 	var workspace Workspace
 	err := s.db.QueryRow(`
-		SELECT w.id, w.name, COUNT(p.id) AS project_count
+		SELECT w.id, w.name, w.icon_image, COUNT(p.id) AS project_count
 		FROM workspaces w
 		LEFT JOIN projects p ON p.workspace_id = w.id AND p.deleted_at IS NULL
 		WHERE w.id = ? AND w.deleted_at IS NULL
-		GROUP BY w.id, w.name
-	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.ProjectCount)
+		GROUP BY w.id, w.name, w.icon_image
+	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.IconImage, &workspace.ProjectCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Workspace{}, apierr.New("workspace_not_found", "workspace not found")
 	}
@@ -163,6 +174,37 @@ func (s *Store) workspace(id string) (Workspace, error) {
 		return Workspace{}, err
 	}
 	return workspace, nil
+}
+
+func normalizeWorkspaceIconImage(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	prefix, encoded, ok := strings.Cut(value, ",")
+	if !ok {
+		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL")
+	}
+	allowedPrefix := false
+	for _, candidate := range []string{
+		"data:image/png;base64",
+		"data:image/jpeg;base64",
+		"data:image/gif;base64",
+		"data:image/webp;base64",
+	} {
+		if strings.EqualFold(prefix, candidate) {
+			allowedPrefix = true
+			break
+		}
+	}
+	if !allowedPrefix {
+		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(decoded) == 0 || len(decoded) > maxWorkspaceIconBytes {
+		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL under 512 KB")
+	}
+	return value, nil
 }
 
 func workspaceID(name, seed string) string {

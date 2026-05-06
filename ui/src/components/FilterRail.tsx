@@ -73,7 +73,7 @@ export function FilterRail({
   }
 
   return (
-    <Rail>
+    <Rail className="ml-3 px-0">
       <RailSection heading={t("filter.project")}>
         {!projectScopeLocked && (
           <RailItem

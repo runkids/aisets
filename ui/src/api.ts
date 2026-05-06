@@ -140,10 +140,10 @@ export function removeProject(id: string) {
   });
 }
 
-export function addWorkspace(name: string) {
+export function addWorkspace(name: string, iconImage = "") {
   return request<{ settings: SettingsInfo }>("/api/workspaces/add", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, iconImage }),
   });
 }
 
@@ -154,10 +154,10 @@ export function switchWorkspace(id: string) {
   });
 }
 
-export function renameWorkspace(id: string, name: string) {
+export function renameWorkspace(id: string, name: string, iconImage = "") {
   return request<{ settings: SettingsInfo }>("/api/workspaces/rename", {
     method: "POST",
-    body: JSON.stringify({ id, name }),
+    body: JSON.stringify({ id, name, iconImage }),
   });
 }
 

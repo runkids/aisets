@@ -28,7 +28,6 @@ type BrowseToolbarProps = {
   bgMode: "checker" | "light" | "dark";
   searchQuery: string;
   statusFilter: StatusFilter;
-  itemCount: number;
   sortMode: SortMode;
   bulkMode: boolean;
   onViewChange: (view: ViewMode) => void;
@@ -46,7 +45,6 @@ export function BrowseToolbar({
   bgMode,
   searchQuery,
   statusFilter,
-  itemCount,
   sortMode,
   bulkMode,
   onViewChange,
@@ -155,10 +153,6 @@ export function BrowseToolbar({
           className="ml-auto flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:ml-0 max-md:flex-[1_1_100%] max-md:max-w-none"
           inputClassName="font-g text-g-ui tracking-g-ui"
         />
-
-        <span className="font-g-mono text-[13px] font-[510] text-g-ink-3 tabular-nums">
-          {itemCount}
-        </span>
       </div>
 
       <BrowseStatusBar

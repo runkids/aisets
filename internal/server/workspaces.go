@@ -12,7 +12,7 @@ func workspaceErrorStatus(err error) int {
 		switch coded.Code {
 		case "workspace_not_found":
 			return http.StatusNotFound
-		case "workspace_name_empty", "workspace_last_required":
+		case "workspace_name_empty", "workspace_last_required", "workspace_icon_invalid":
 			return http.StatusBadRequest
 		}
 	}
@@ -30,13 +30,14 @@ func (s *Server) writeSettingsInfo(w http.ResponseWriter) {
 
 func (s *Server) handleAddWorkspace(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name string `json:"name"`
+		Name      string `json:"name"`
+		IconImage string `json:"iconImage"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if _, err := s.store.AddWorkspace(body.Name); err != nil {
+	if _, err := s.store.AddWorkspace(body.Name, body.IconImage); err != nil {
 		writeError(w, workspaceErrorStatus(err), err)
 		return
 	}
@@ -62,14 +63,15 @@ func (s *Server) handleSwitchWorkspace(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRenameWorkspace(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		IconImage string `json:"iconImage"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.store.RenameWorkspace(body.ID, body.Name); err != nil {
+	if err := s.store.RenameWorkspace(body.ID, body.Name, body.IconImage); err != nil {
 		writeError(w, workspaceErrorStatus(err), err)
 		return
 	}

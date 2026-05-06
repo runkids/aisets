@@ -63,9 +63,12 @@ func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := store.AddWorkspace("Client A")
+	workspace, err := store.AddWorkspace("Client A", "data:image/png;base64,aWNvbg==")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if workspace.IconImage == "" {
+		t.Fatalf("workspace icon not persisted on add: %#v", workspace)
 	}
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
@@ -87,10 +90,10 @@ func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
 	if all := store.AllProjects(); len(all) != 2 {
 		t.Fatalf("all projects = %#v", all)
 	}
-	if err := store.RenameWorkspace(workspace.ID, "Client Assets"); err != nil {
+	if err := store.RenameWorkspace(workspace.ID, "Client Assets", "data:image/webp;base64,bmV3LWljb24="); err != nil {
 		t.Fatal(err)
 	}
-	if workspaces := store.Workspaces(); len(workspaces) != 2 || workspaces[0].Name != "Asset Studio" || workspaces[1].Name != "Client Assets" {
+	if workspaces := store.Workspaces(); len(workspaces) != 2 || workspaces[0].Name != "Asset Studio" || workspaces[1].Name != "Client Assets" || workspaces[1].IconImage == workspace.IconImage {
 		t.Fatalf("renamed workspaces = %#v", workspaces)
 	}
 	if err := store.RemoveWorkspace(workspace.ID); err != nil {
@@ -456,6 +459,9 @@ func TestProjectMutationValidationErrors(t *testing.T) {
 		if !ok || coded.Code == "" {
 			t.Fatalf("expected coded project error, got %T %[1]v", err)
 		}
+	}
+	if _, err := store.AddWorkspace("Client", "data:text/plain;base64,bm8="); err == nil || err.(apierr.Error).Code != "workspace_icon_invalid" {
+		t.Fatalf("invalid workspace icon err = %T %[1]v", err)
 	}
 }
 

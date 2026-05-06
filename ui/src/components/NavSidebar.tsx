@@ -139,7 +139,7 @@ export function NavSidebar({
   ];
 
   return (
-    <aside className="relative z-30 flex flex-col overflow-visible bg-transparent px-3 pb-3">
+    <aside className="relative z-30 flex flex-col overflow-visible bg-transparent pl-3 pr-0 pb-3">
       <div className="order-1 shrink-0 pt-3 pb-1 max-[960px]:hidden">
         <ProjectSwitcher
           workspaceName={workspaceName}

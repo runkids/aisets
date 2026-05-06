@@ -441,7 +441,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <div className="flex flex-col gap-2 w-full">
       {/* Workspace hero */}
       <Card variant="default" padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -494,7 +494,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
       </Card>
 
       {/* Toolbar: search + sort */}
-      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3 pb-3 pt-0">
+      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3 pb-0 pt-0">
         <Card padding="md">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <TextInput
@@ -535,7 +535,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
           }
         />
       ) : (
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="grid grid-cols-1 gap-x-4 gap-y-2 lg:grid-cols-2">
           {visibleProjects.map((stat) => (
             <ProjectCard
               key={stat.project.id}

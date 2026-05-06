@@ -214,7 +214,13 @@
     "scanComplete": "스캔 완료",
     "applyComplete": "변경 사항 적용됨",
     "copied": "경로 복사됨",
-    "workspaceSwitched": "워크스페이스 전환됨: {{name}}"
+    "workspaceSwitched": "워크스페이스 전환됨: {{name}}",
+    "settingsSaved": "설정 저장됨",
+    "settingsSaveFailed": "설정 저장 실패",
+    "settingsReset": "설정 재설정됨",
+    "settingsResetFailed": "설정 재설정 실패",
+    "databaseReset": "데이터베이스 재설정됨",
+    "databaseResetFailed": "데이터베이스 재설정 실패"
   },
   "prompt": {
     "renamePath": "새 프로젝트 상대 경로"
@@ -511,8 +517,10 @@
     "addWorkspacePrompt": "워크스페이스 이름",
     "renameWorkspace": "워크스페이스 이름 변경",
     "renameWorkspacePrompt": "새 워크스페이스 이름",
+    "renameWorkspaceSuccess": "워크스페이스 이름을 {{name}}(으)로 변경했습니다",
     "removeWorkspace": "워크스페이스 삭제",
-    "removeWorkspaceConfirm": "{{name}}을(를) 삭제할까요? 프로젝트 파일은 디스크에 남지만 이 워크스페이스와 추적 중인 프로젝트 목록은 제거됩니다."
+    "removeWorkspaceConfirm": "{{name}}을(를) 삭제할까요? 프로젝트 파일은 디스크에 남지만 이 워크스페이스와 추적 중인 프로젝트 목록은 제거됩니다.",
+    "removeWorkspaceSuccess": "{{name}} 워크스페이스를 삭제했습니다"
   },
   "unused": {
     "title": "미사용",

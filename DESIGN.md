@@ -4,51 +4,11 @@
 
 **Theme:** dark-first (Linear-inspired). A light variant exists for parity but the canonical product surface is dark.
 
-> **🚨 ALL UI/UX CHANGES MUST UPDATE THIS FILE.** See root `CLAUDE.md` for the contract.
-
 ---
 
-## 0. Styling Architecture
+## 1. Tokens
 
-Asset Studio uses a fully co-located component styling model. There are no component or layout SCSS files.
-
-| Layer                   | Technology                                                            | Location                                                                      |
-| ----------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Design tokens           | CSS custom properties (`--g-*`)                                       | `ui/src/styles/_tokens.scss` (`:root` light, `[data-theme='dark']` canonical) |
-| Tailwind ↔ token bridge | `@theme` mapping (`bg-g-surface`, `text-g-ink`, `rounded-g-md`, etc.) | `ui/src/styles/tailwind.css`                                                  |
-| Global reset & base     | Minimal body/html reset                                               | `ui/src/styles/globals.scss`                                                  |
-| Shared utilities        | `@keyframes`, `.sr-only`, `.bg-checker`                               | `ui/src/styles/_patterns.scss`                                                |
-| UI primitives           | CVA variants + `cn()` composition                                     | `ui/src/components/ui/*.tsx`                                                  |
-| Page/view components    | Tailwind utility classes in JSX                                       | `ui/src/pages/*.tsx`, `ui/src/components/*.tsx`                               |
-
-**Rules:**
-
-- **All visual values must resolve to `--g-*` tokens** via Tailwind token aliases or direct `var()` references. No raw hex, no arbitrary px radii, no ad-hoc shadow strings.
-- **Component variants are expressed via CVA** (`cva()` from `class-variance-authority`). New components must use CVA for variant/size/state logic, not `Record<Variant, string>` maps or manual className concatenation.
-- **`cn()` from `@/lib/cn`** composes CVA output with conditional Tailwind classes. It is the sole className merge utility.
-- **No component styles in external SCSS files.** Everything is co-located in the `.tsx` that owns the component.
-- **Tailwind is NOT used via `@apply`** — only utility classes in JSX `className` props.
-
----
-
-## 1. Design Principles
-
-| #   | Principle                         | What it means here                                                                                                                                                                               |
-| --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | **Single CTA + single accent**    | `--g-cta` is reserved for _one_ primary CTA per screen. `--g-accent` (Neon Lime `#e4f222`) is reserved for dark CTA fill, active nav in dark mode, focus rings, and selection. Never decorative. |
-| 2   | **Layered surfaces, not shadows** | Hierarchy comes from `canvas → graphite → deep-slate → charcoal-overlay`. Shadows are tight and contained, never diffuse.                                                                        |
-| 3   | **Compact, not cramped**          | 4px base unit, 8px element gap, 12px card padding, 24px section gap. Information density is the feature.                                                                                         |
-| 4   | **Inter + Berkeley Mono**         | Inter Variable for UI, Berkeley Mono (or IBM Plex Mono / JetBrains Mono fallback) for paths, hashes, sizes, counts.                                                                              |
-| 5   | **6px is the default radius**     | Buttons, inputs, cards, badges all gravitate to 6px. Tags 2–4px. Pills 9999px.                                                                                                                   |
-| 6   | **Motion is meaning**             | 150–300ms, ease-out for entry, spring/scale for press, never decorative parallax.                                                                                                                |
-| 7   | **Color never alone**             | Severity, success, error always pair color with icon + text + position.                                                                                                                          |
-| 8   | **Tooltips are non-native**       | Every icon-only control gets a `<Tooltip>` from `ui/Tooltip.tsx`. **Never** rely on the browser's native `title` attribute. See §6.23 for the full spec.                                         |
-
----
-
-## 2. Tokens
-
-### 2.1 Colors
+### 1.1 Colors
 
 The palette is dark-first. CSS custom property names (`--g-*`) map onto the Linear surface scale. Tailwind token aliases (e.g. `bg-g-surface`, `text-g-ink`) are defined in `tailwind.css`.
 
@@ -93,9 +53,7 @@ The palette is dark-first. CSS custom property names (`--g-*`) map onto the Line
 | `--g-purple`             | `#8b5cf6`               | `#7c3aed`                  | Amethyst / Deep Violet  | Lint badge, secondary category                                                            |
 | `--g-purple-soft`        | `rgba(139,92,246,0.16)` | `#ede9fe`                  | —                       | Lint chip bg                                                                              |
 
-> **Rule:** Never introduce a new bright/saturated color outside this list for interactive purposes. `--g-accent` (Neon Lime) is the only accent that gets a _filled_ background on a control.
-
-### 2.2 Typography
+### 1.2 Typography
 
 | Token                   | Stack                                                                                          |
 | ----------------------- | ---------------------------------------------------------------------------------------------- |
@@ -127,7 +85,7 @@ OpenType features for Inter: `font-feature-settings: "cv01", "ss03";` applied gl
 
 > Section labels are the _only_ uppercased text and the _only_ positive tracking values. Everywhere else, tracking is negative or zero — Linear's signature.
 
-### 2.3 Spacing
+### 1.3 Spacing
 
 Base unit **4px**. Density: **compact**.
 
@@ -147,7 +105,7 @@ Base unit **4px**. Density: **compact**.
 | Element gap (inline)    | 8px                             |
 | Form row gap            | 8px                             |
 
-### 2.4 Radius
+### 1.4 Radius
 
 | Token      | Value  | Used by                                                              |
 | ---------- | ------ | -------------------------------------------------------------------- |
@@ -160,7 +118,7 @@ Base unit **4px**. Density: **compact**.
 
 > The big shift: most cards/rows that used to be 14px (`--g-r-lg` legacy) are now **6px (`--g-r-md`)** to match Linear's tight aesthetic. Only floating overlays keep 12px.
 
-### 2.5 Shadows & Elevation
+### 1.5 Shadows & Elevation
 
 Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**, not from soft diffuse blurs.
 
@@ -173,7 +131,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 | `--g-shadow-inset` | `inset 0 0 0 1px #23252a`                                            | Elevated card border (replaces solid border on Deep Slate surfaces) |
 | `--g-shadow-focus` | `0 0 0 2px rgba(228,242,34,0.4)`                                     | Focus ring (Neon Lime, 2px)                                         |
 
-### 2.6 Easing & Duration
+### 1.6 Easing & Duration
 
 | Token             | Value                               | Used for                                  |
 | ----------------- | ----------------------------------- | ----------------------------------------- |
@@ -192,7 +150,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 ---
 
-## 3. Surfaces & Layers
+## 2. Surfaces & Layers
 
 | Level            | Token           | Hex (dark) | Where it lives                                           |
 | ---------------- | --------------- | ---------- | -------------------------------------------------------- |
@@ -205,7 +163,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 ---
 
-## 4. Shell Layout
+## 3. Shell Layout
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -230,10 +188,10 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 └──────────────────────────────────────────────────┘
 ```
 
-### 4.1 Sidebar `.sb`
+### 3.1 Sidebar `.sb`
 
-- The sidebar sits under the global topbar and is part of the dotted canvas, not a line-separated slab: `background: transparent`, no right border, 12px horizontal/bottom padding.
-- Product brand is not rendered inside the sidebar. It lives in the global topbar (§4.2) so the brand and page chrome read as one header.
+- The sidebar sits under the global topbar and is part of the dotted canvas, not a line-separated slab: `background: transparent`, no right border, 12px left/bottom padding, and no right padding so sidebar cards align flush to the content boundary.
+- Product brand is not rendered inside the sidebar. It lives in the global topbar (§3.2) so the brand and page chrome read as one header.
 - Sidebar content is cardized: project switcher, each nav group, and footer use `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. Nav groups use 4px inner padding and stack rows with a 4px gap so active fills never visually merge. There are no full-height divider lines.
 - **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 8px bottom padding
 - **`.sb-link`**: 6px 8px padding, **6px radius** (matches `RailItem` active shape), Inter 13px / 400, Storm Cloud default
@@ -244,7 +202,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - **Footer**: cardized surface row with 32×32 user mark + name + team label (Storm Cloud); no top divider line
 - **Responsive ≤960px**: collapse to 64px icon-only rail
 
-### 4.2 Topbar `.topbar`
+### 3.2 Topbar `.topbar`
 
 - Global header spans the full app width (`grid-column: 1 / -1`) and is transparent over the dotted canvas: `background: transparent`, no bottom border, no backdrop blur.
 - `padding: 0 20px`, `z-index: 10`, `height: 60px`.
@@ -262,11 +220,11 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - Command palette search includes pages, assets, paths, and enabled Custom Filters. Selecting a Custom Filter navigates to Browse and applies that saved filter immediately.
 - **Keyboard hint** `Keycap`: shared `ui/src/components/ui/Keycap.tsx` component using token-backed Tailwind classes. Default size is mono 12px / Storm Cloud, `--g-surface-2` bg, 1px strong line border, 4px radius, 2px 8px padding. Used by topbar search, command palette, Settings hotkey rows, and compact tooltip shortcut pills. Topbar command-palette trigger shows `⌘ P`, matching the implemented shortcut.
 
-### 4.3 Rail
+### 3.3 Rail
 
 Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`. The primitive owns rail body, section, active item, icon, label, count rendering, responsive variants, and active / inactive / hover states through CVA variants.
 
-- Filter rail is compact but readable: 200px wide with 6px horizontal rail padding, transparent rail body, and no right divider line. The dotted canvas remains visible between rail cards and content cards.
+- Filter rail is compact but readable: 200px wide with 6px horizontal rail padding, transparent rail body, and no right divider line. Browse and Settings add an 8px left inset to the first rail so the rail does not touch the shell sidebar after the sidebar's right padding is removed. The dotted canvas remains visible between rail cards and content cards.
 - Each `RailSection` is a compact card: `--g-surface` fill, `--g-line` border, 6px radius, `--g-shadow-sm`, 4px inner padding.
 - Section label: 10px uppercase Storm Cloud
 - **`RailItem`**: full-width button, 6px 8px padding, 6px radius, Inter 12px / 400 / Light Steel
@@ -276,12 +234,12 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Count badge: mono 11px / Storm Cloud (Pitch Black on accent when active)
 - Filter variant is used by Browse and hidden ≤1024px. Settings uses the settings variant and collapses to an icon-only 64px rail ≤768px.
 
-### 4.4 Main canvas `.main`
+### 3.4 Main canvas `.main`
 
 - Background: `var(--g-canvas)` (Pitch Black)
 - Dotted grid: `radial-gradient(circle at 1px 1px, var(--g-line) 1px, transparent 0) 24px 24px`. Dots are Charcoal in dark mode — almost invisible but present, gives the "control panel" texture.
 
-### 4.5 Project Switcher `.project-switcher`
+### 3.5 Project Switcher `.project-switcher`
 
 - Lives in `.sb-project-switcher` under the brand and uses the same compact chrome as sidebar controls: `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. The wrapper does not draw a lower divider; spacing separates the switcher from navigation.
 - Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
@@ -294,7 +252,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ---
 
-## 5. Sticky Elements & Z-Index
+## 4. Sticky Elements & Z-Index
 
 | Element                  | Position             | Top                      | Z   | Style                                        |
 | ------------------------ | -------------------- | ------------------------ | --- | -------------------------------------------- |
@@ -315,7 +273,7 @@ backdrop-filter: blur(12px);
 -webkit-backdrop-filter: blur(12px);
 ```
 
-> **Rule:** Frosted overlays must be visible on top of _both_ the dotted canvas and the Graphite cards behind them — verify after each change that text remains ≥4.5:1 contrast against whatever sits beneath.
+> Frosted overlays must be visible on top of _both_ the dotted canvas and the Graphite cards behind them — text must remain ≥4.5:1 contrast against whatever sits beneath.
 
 ### Z-index scale (canonical)
 
@@ -332,11 +290,11 @@ backdrop-filter: blur(12px);
 
 ---
 
-## 6. Components
+## 5. Components
 
-> All shared UI primitives live in `ui/src/components/ui/` and use CVA + `cn()` for variant/state styling. Page components compose these primitives with Tailwind utility classes. See §0 for the full architecture.
+> All shared UI primitives live in `ui/src/components/ui/` and use CVA + `cn()` for variant/state styling. Page components compose these primitives with Tailwind utility classes.
 
-### 6.1 Buttons
+### 5.1 Buttons
 
 Canonical shared primitive: `ui/src/components/ui/Button.tsx`.
 
@@ -365,7 +323,7 @@ Base: `height: 32px; padding: 0 12px; border-radius: 6px; font: 510 13px/1.4 Int
 **Disabled:** opacity 0.38, cursor not-allowed.
 **Loading:** show 14px spinner (icon-spin), text stays.
 
-### 6.2 Icon Button
+### 5.2 Icon Button
 
 Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`.
 
@@ -376,7 +334,7 @@ Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`.
 - Loading: SVG spins 900ms linear ∞
 - Hit area extended to 44×44 via `::before` pseudo for mobile compliance
 
-### 6.3 Tabs / Segmented Toggle
+### 5.3 Tabs / Segmented Toggle
 
 Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background).
 
@@ -401,7 +359,7 @@ React API:
 - `SegmentedControl`: reserved for compact toolbar toggles (`text`, `icon`, `fixed`) such as Browse view / size / background. Its wrapper uses the same 32px control height, 6px radius, `--g-surface-2` background, token border, inset shadow, and 2px inner padding. Active children use the same selected recipe as segment tabs: `--g-surface` background, `--g-ink` text, and `--g-shadow-sm`; do not use `--g-active-*` fills for these tab-like toolbar toggles.
 - Focus: every tab/toggle gets `--g-shadow-focus`.
 
-### 6.4 Card
+### 5.4 Card
 
 Canonical shared primitive: `Card` / `CardBody` from `ui/src/components/ui/Card.tsx`.
 
@@ -421,7 +379,7 @@ React API:
 
 Padding is explicit through `padding="none | sm | md | lg"`. Default is `none` for backwards-compatible composition.
 
-### 6.7 Badge / Chip
+### 5.7 Badge / Chip
 
 Canonical shared primitive: `Badge` from `ui/src/components/ui/Badge.tsx`.
 
@@ -438,7 +396,7 @@ React API:
 - Alias tones: `danger → red`, `warning → amber`
 - `accent`: `--g-accent` bg + `--g-accent-ink` text (use sparingly — counts as accent budget)
 
-### 6.8 Text Input
+### 5.8 Text Input
 
 Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`. Shell, button trigger, control, icon, affix, size, and state styles are co-located via CVA variants and token-backed Tailwind classes.
 
@@ -464,7 +422,7 @@ React API:
 - Focus: border `--g-input-border-focus`, `--g-input-shadow-focus`, bg `--g-surface` (`command` stays borderless and shadowless). Focus uses a quiet neutral outline in both themes, not blue, coral, or lime. Dialog prompt inputs and legacy inline search fields follow the same default white/Graphite input surface.
 - Invalid: border `--g-red`, `aria-invalid=true`
 
-### 6.9 Asset Card `.acard`
+### 5.9 Asset Card `.acard`
 
 - `--g-surface` bg, `1px solid --g-line` border, **6px radius**, flex column
 - Hover: `transform: translateY(-2px)` + `--g-line-strong` border + `--g-shadow-md`
@@ -483,7 +441,7 @@ React API:
   ```
 - Thumb backgrounds via `data-bg`: `checker` (14px Charcoal/Pitch Black checker), `light` (`#fff`), `dark` (`--g-canvas`)
 
-### 6.10 Optimize Row `.opt-row`
+### 5.10 Optimize Row `.opt-row`
 
 - Grid: `28px 64px 1fr 220px 140px` (checkbox / 64px thumb / text / chips / savings)
 - 6px radius, `--g-surface` bg, 1px `--g-line` border, 12px padding
@@ -494,7 +452,7 @@ React API:
   - Target: mono 16px / 590 / `--g-green`
   - Percent: mono 11px / `--g-green`
 
-### 6.11 Duplicate Group `.dgroup`
+### 5.11 Duplicate Group `.dgroup`
 
 - Container: `--g-surface` bg, 1px `--g-line`, **6px radius**
 - Header `.dgroup-h`: `--g-surface-3` (Charcoal) bg, border-bottom `--g-line`, padding 8px 12px. SHA in mono 11px / Storm Cloud. Spacer + action buttons right.
@@ -502,7 +460,7 @@ React API:
 - Tile `.dgroup-tile`: 1px `--g-line`, 6px radius, `--g-surface` bg
 - **Preferred tile**: `--g-green` border + 2px Emerald ring + green badge top-right
 
-### 6.12 Drawer `.drawer`
+### 5.12 Drawer `.drawer`
 
 - 480px wide (95vw max), fixed right, slide-in 240ms `--g-ease-out`
 - Background `--g-surface-2` (Deep Slate, elevated)
@@ -513,7 +471,7 @@ React API:
   - Sticky tab strip: `--g-surface-2` bg, active tab gets a 2px **Neon Lime** underline + Porcelain text
 - Close button: top-right `.iconbtn`, ESC also dismisses
 
-### 6.13 Modal
+### 5.13 Modal
 
 Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`.
 
@@ -524,7 +482,7 @@ Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`.
 - Body padding: `md` (16px) or `none` for code/script previews.
 - Enter: fade backdrop + `slideUp2` 200ms `--g-ease-out`; reduced motion must disable transforms.
 
-### 6.14 Toast
+### 5.14 Toast
 
 Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `ToastProvider` owns queue/timers only.
 
@@ -533,7 +491,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Content uses `Notice` tone variants, so status always includes icon + text, not color alone.
 - Auto-dismiss defaults: 3.5s; danger 6s.
 
-### 6.15 Command Palette `.cmdk`
+### 5.15 Command Palette `.cmdk`
 
 - 580px wide, top offset 12vh
 - Background `--g-surface-2` Deep Slate, 12px radius, `--g-shadow-pop`
@@ -547,7 +505,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Group label: 10px uppercase Storm Cloud
 - Empty state: centered Storm Cloud text + Inter 13px helper
 
-### 6.16 Run Panel `.opt-run-panel`
+### 5.16 Run Panel `.opt-run-panel`
 
 - Fixed bottom-right, min(680px, 100vw - 48px)
 - `--g-surface-2` bg, 12px radius, `--g-shadow-pop`, slideUp 240ms
@@ -555,7 +513,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Max-height: min(78vh, 760px)
 - Result rows: success bg `--g-green-soft` + green icon; skipped bg `--g-red-soft` + red icon; pending: skeleton shimmer
 
-### 6.17 Bulk Action Bar `.bulkbar`
+### 5.17 Bulk Action Bar `.bulkbar`
 
 - Sticky top-0 (default) or sticky bottom-16px (`.opt-bulkbar`)
 - Background `--g-surface-3` (Charcoal) — _not_ Pitch Black, to lift visually off the dotted canvas
@@ -564,7 +522,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Buttons `.bulkbar-btn`: ghost-style, 6px radius, hover `--g-surface-2` overlay
 - Danger variant: `--g-red` bg + `--g-canvas` text
 
-### 6.18 Dropzone `.precheck-dropzone`
+### 5.18 Dropzone `.precheck-dropzone`
 
 - Min-height 160px, **1.5px dashed `--g-line-strong`**, **16px radius** (only place we use xl)
 - Background `--g-surface` (Graphite)
@@ -573,7 +531,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
   - **Drag-over**: solid 2px `--g-accent` border, bg `--g-accent-soft`, 2px outer Neon Lime ring
   - Disabled: opacity 0.38
 
-### 6.19 Empty State
+### 5.19 Empty State
 
 Canonical shared primitive: `EmptyState` from `ui/src/components/ui/EmptyState.tsx`.
 
@@ -597,16 +555,16 @@ React API:
 - Helper: Inter 13px / 400 / `--g-ink-3`.
 - Optional CTA below via `action` prop.
 
-### 6.20 Scroll-to-top `.scroll-top-btn`
+### 5.20 Scroll-to-top `.scroll-top-btn`
 
 - Fixed bottom-right 24px, 36px circle
 - `--g-surface-2` bg, 1px `--g-line-strong` border, `--g-shadow-md`
 - Hover: bg `--g-surface-3`, `translateY(-2px)`, icon `--g-ink`
 - Show after 480px scroll
 
-### 6.22 Directory Picker (`Select Project Directory` modal)
+### 5.22 Directory Picker (`Select Project Directory` modal)
 
-Used by `DirectoryPickerModal.tsx`. Sits inside a standard `.modal` (§6.13). Header copy stays localized and runtime-neutral: it describes directories readable by the environment running Asset Studio, never devcontainer-only mounts or repo-specific example paths. If the Add-project start path setting is empty, the picker starts from the API server's current working directory.
+Used by `DirectoryPickerModal.tsx`. Sits inside a standard `.modal` (§5.13). Header copy stays localized and runtime-neutral: it describes directories readable by the environment running Asset Studio, never devcontainer-only mounts or repo-specific example paths. If the Add-project start path setting is empty, the picker starts from the API server's current working directory.
 
 Structure:
 
@@ -633,7 +591,7 @@ Structure:
 - **Error state**: inaccessible / missing / invalid paths render an `EmptyState` inside `.directory-panel` using an AlertTriangle icon, localized title, and the API error text (including the attempted path). Directory-listing queries do not retry these 4xx responses, so the panel must settle quickly instead of showing an indefinite loading state.
 - **Footer**: `justify-content: space-between` so the current path label sits left and `[Cancel] [Add This Directory]` action group sits right. The Add CTA uses the primary button variant (`--g-cta`) and counts as the screen's primary action. Disable it unless the current listing resolved successfully.
 
-### 6.23 Tooltip `<Tooltip>` (custom, non-native)
+### 5.23 Tooltip `<Tooltip>` (custom, non-native)
 
 > **NEVER use the browser's native `title` attribute for tooltips.** Always wrap the trigger in `<Tooltip>` from `ui/Tooltip.tsx`. Native tooltips have no styling control, no shortcut hint, no animation, and inconsistent timing across OSes.
 
@@ -679,9 +637,9 @@ The component clones the single child element and adds `onMouseEnter` / `onMouse
 
 - Every icon-only `IconButton` in chrome (topbar, drawer header, list row actions, run-panel close, etc.)
 - Disabled state explainers (pair with `disabled` prop on tooltip = `false` to keep showing)
-- Truncated labels — pair with `truncation-strategy` rule from §11
+- Truncated labels — pair with `truncation-strategy` rule from §10
 
-### 6.24 Notice
+### 5.24 Notice
 
 Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/Notice.tsx`.
 
@@ -691,7 +649,7 @@ Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/
 - Role: `danger` uses `alert`; all other tones use `status`.
 - Loading uses `Loader2` with token motion.
 
-### 6.25 Select
+### 5.25 Select
 
 Canonical shared primitive: `Select` from `ui/src/components/ui/Select.tsx`.
 
@@ -700,7 +658,7 @@ Canonical shared primitive: `Select` from `ui/src/components/ui/Select.tsx`.
 - Options are stacked with a 4px gap so rounded hover / checked states do not visually merge. Highlighted option uses `--g-surface-2` / `--g-ink`. Checked option uses the same active treatment as Project Switcher and sidebar active rows: `--g-active-bg`, `--g-active-text`, and `--g-active-weight`; the check icon inherits the active text color.
 - ESC and outside click close the menu. Full roving keyboard navigation is a separate accessibility pass.
 
-### 6.26 Switch
+### 5.26 Switch
 
 Canonical shared primitive: `Switch` from `ui/src/components/ui/Switch.tsx`, backed by Radix `Switch.Root` / `Switch.Thumb` for checked state, keyboard interaction, and ARIA semantics.
 
@@ -710,7 +668,7 @@ Canonical shared primitive: `Switch` from `ui/src/components/ui/Switch.tsx`, bac
 - Touch target extends beyond the visual 36×20 track via pseudo-element hit slop.
 - Settings toggles must use this primitive rather than hand-rolled `role="switch"` buttons.
 
-### 6.27 Stat Card
+### 5.27 Stat Card
 
 Canonical shared primitive: `StatCard` from `ui/src/components/ui/StatCard.tsx`.
 
@@ -720,7 +678,7 @@ Canonical shared primitive: `StatCard` from `ui/src/components/ui/StatCard.tsx`.
 - Clickable cards are real buttons with focus ring and hover lift (`translateY(-2px)` disabled under reduced motion).
 - Tones: `neutral | accent | green | red | amber | blue`.
 
-### 6.28 Asset Thumbnail
+### 5.28 Asset Thumbnail
 
 Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThumbnail.tsx`.
 
@@ -729,7 +687,7 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - Container: `--g-r-sm`, 1px `--g-line`, grid centered, image object-fit contain.
 - Empty `alt` marks the thumbnail as decorative with `aria-hidden`.
 
-### 6.29 Rail
+### 5.29 Rail
 
 Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`.
 
@@ -739,7 +697,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Settings section items use the `settings` item variant, preserving icon + label on desktop and hiding labels at ≤768px.
 - Browse facets must pass counts through `RailItem count` instead of composing custom count spans.
 
-### 6.21 Severity Indicator
+### 5.21 Severity Indicator
 
 - 6px circle dot + 11px mono label, 6px gap
 - Critical: `--g-red` dot + `chip-red`
@@ -751,45 +709,45 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ---
 
-## 7. View Patterns
+## 6. View Patterns
 
-### 7.1 Browse
+### 6.1 Browse
 
 - Grid mode `.browse-grid` size variants: `s` (120px min) / default (180px) / `l` (240px)
 - List mode: `.list` 6-column grid, sticky header `--g-surface-2` bg
 - In All projects scope, the Browse project filter rail is driven by the registered project list, not just assets in the current result set, so zero-asset projects remain visible with a `0` count.
 - Project-scoped entry points open Browse with the matching project facet active in the `Rail` filter variant, so the visible active item matches the source project card / sidebar project scope. While a Project Switcher scope is active, the Browse project rail hides the redundant `All projects` row and keeps the scoped project as the only active project facet.
 - Custom Filters appear as their own Browse rail section when enabled filters exist in Settings. They are applied after status, search, project, and extension filters; counts are computed from that composed pre-custom result so the section answers "what would this saved filter do inside my current Browse scope?"
-- Sticky Browse toolbar keeps view / size / background toggles, compact sort select (`w-36` / 144px), bulk toggle, search, count, and status tabs inline where space allows; first-row controls share the 32px `md` control height, while status filters use the same compact `Tabs variant="segment"` page-tab recipe as Duplicates. The sort select must not span the full row or push results downward.
+- Sticky Browse toolbar keeps view / size / background toggles, compact sort select (`w-36` / 144px), bulk toggle, search, count, and status tabs inline where space allows; first-row controls share the 32px `md` control height, while status filters use the same compact `Tabs variant="segment"` page-tab recipe as Duplicates. The sort select must not span the full row or push results downward. Browse's filter rail keeps an 8px left inset from the shell sidebar.
 - Browse uses `.content-scroll--compact` so its scrollport keeps only 8px of bottom padding, avoiding a large artificial gap under dense asset grids while preserving the default 48px bottom gutter for non-Browse pages.
 - Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with compact status tabs (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
 - Active list row: `--g-accent-soft` bg + 4px left **Neon Lime** stripe
 
-### 7.2 Duplicates
+### 6.2 Duplicates
 
 - `Tabs` primitive in page header: Exact / Similar and sort controls
 - `.dgroup` SHA-headed groups remain supported for denser duplicate layouts
 - Preferred tile: green Emerald border + corner badge
 - Similar tab: side-by-side compare with overlay slider — slider track `--g-surface-3`, thumb `--g-accent`
 
-### 7.3 Unused
+### 6.3 Unused
 
 - `.acard-check` (top-right) toggles selection
 - `.bulkbar` sticky top-0 with: select all, copy paths, copy `git rm`, delete selected
 - Delete CTA uses `Button variant="danger"`, never `variant="primary"`
 
-### 7.4 Optimize
+### 6.4 Optimize
 
 - Sticky frosted `.opt-filters-wrap` (z 4, blur 12px)
 - Category chips `.opt-filter-row` (大小 / 格式 / SVG / 尺寸 / 動畫), horizontally scrollable
 - Severity chips (嚴重 / 警告 / 建議), separated by 1px Charcoal vertical divider
-- `.opt-row` 5-column grid as in §6.10
+- `.opt-row` 5-column grid as in §5.10
 - `.opt-summary` 4-column KPI grid at top
 - `.opt-progress`: indeterminate uses `slide-right` keyframe; determinate fills with `--g-accent`
 - Skeleton shimmer for in-flight estimates
 - `.opt-bulkbar` is **bottom-sticky** (16px from bottom)
 
-### 7.5 Lint
+### 6.5 Lint
 
 - `.lint-kpi`: 4-column KPI grid (critical / warning / info / total)
 - `.lint-controls`: sticky top-0, solid `--g-canvas`, z 10
@@ -797,16 +755,16 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
   - `.lint-group` (by rule) — sticky header at CSS var offset, `--g-surface-3` bg
   - `.lint-subgroup` (by file) — 12px indent
   - `.lint-finding` (leaf) — expandable suggestion + mono snippet in `--g-surface-3` block
-- Severity dot + chip per §6.21
+- Severity dot + chip per §5.21
 
-### 7.6 Pre-Check
+### 6.6 Pre-Check
 
-- Top dropzone (§6.18) accepting drag/drop/paste/click
+- Top dropzone (§5.18) accepting drag/drop/paste/click
 - `.precheck-result-card`: flex row (56px thumb + body), `--g-surface` bg, 6px radius
 - Verdict badge: pass=`chip-green`, warning=`chip-amber`, fail=`chip-red`
 - `.precheck-finding` rows: mini chip + mono path
 
-### 7.7 Dashboard
+### 6.7 Dashboard
 
 - KPI grid uses `StatCard`: auto-fit min 220px, `--g-surface` cards, 6px radius
 - Clickable KPI: button semantics, focus ring, hover `translateY(-2px)` + `--g-shadow-md`
@@ -816,22 +774,22 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Action card grid: auto-fit min 260px, `.card` style with chevron
 - Overview: 1.4fr / 1fr two-column at ≥980px, single-column below
 
-### 7.8 Projects
+### 6.8 Projects
 
 - Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
 - Projects is a workspace-level view: project cards, workspace KPIs, and the Projects nav badge always use the full catalog, independent of the Project Switcher selection. Topbar breadcrumbs stay title-only; counts live in cards.
 - Page scroll containers start close to the global header by moving the scrollport itself down 12px (`margin-top: 12px`) rather than using internal top padding. This keeps the scroll clipping edge aligned with the cardized sidebar rhythm, so scrolled content cannot appear above the first visible row.
 - Projects page fills the available content column (`width: 100%; max-width: none`) and is start-aligned (`mx: 0`), matching Duplicates and other dense pages so both left and right gutters stay consistent through the shared content-scroll padding. Projects uses full-width layout (`max-width: none`) rather than the centered content pattern.
-- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The Projects page stack uses 16px vertical gaps between the workspace hero, toolbar mask, and project card grid so cards sit close to their controls without feeling cramped. The toolbar sits inside a sticky top mask (`top: 0`, z 20, 12px inline padding, 8px bottom padding, no top padding, solid `--g-canvas` background) so its card top aligns with the sidebar project switcher and the scrollport clips content above that edge. The card inside the mask uses `--g-surface`, `--g-line`, 6px radius, and `--g-shadow-sm`; do not leave bare controls on the canvas.
+- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The Projects page stack uses 8px vertical gaps between the workspace hero, toolbar mask, and project card grid so cards sit close to their controls without feeling cramped. The toolbar sits inside a sticky top mask (`top: 0`, z 20, 12px inline padding, no bottom/top padding, solid `--g-canvas` background) so its card top aligns with the sidebar project switcher and the scrollport clips content above that edge. The card inside the mask uses `--g-surface`, `--g-line`, 6px radius, and `--g-shadow-sm`; do not leave bare controls on the canvas.
 - Projects toolbar sort uses `Tabs variant="segment"` labels for name, count, size, health, and imported date so its tab-like sort control matches Duplicates and Browse status tabs. Count / size / health / imported sort descending (imported = newest first) with project name as the stable tiebreaker; name sort is ascending.
 - The workspace hero avatar uses the active workspace's uploaded image when available and falls back to a tokenized initial well; the same avatar grammar is reused in Project Switcher and Settings so workspace identity stays consistent.
 - Clickable workspace KPI cells use an 8px padded hover/focus target with a matching negative offset so the text remains aligned while the hover wash never hugs the label or value.
-- Project cards sit in a responsive grid with 16px column gaps and 12px row gaps. They use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
+- Project cards sit in a responsive grid with 16px column gaps and 8px row gaps. They use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
 - The `Browse Project` action on a project card sets the project scope to that card's project and navigates to Browse; Browse initializes its project facet to the same project rather than defaulting to `All Projects`.
 
-### 7.9 Settings
+### 6.9 Settings
 
-- Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas. The language select keeps the canonical language inventory but promotes Simplified Chinese to the first option when the browser locale resolves to Mainland China, Hong Kong, or Macau.
+- Settings uses the shared `Rail` settings variant for section navigation with an 8px left inset from the shell sidebar, and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas. The language select keeps the canonical language inventory but promotes Simplified Chinese to the first option when the browser locale resolves to Mainland China, Hong Kong, or Macau.
 - Settings panel headers are plain text blocks inside the single outer panel: 28px display title plus 14px helper text. No nested header strip and no icon well.
 - The Workspace section owns multi-workspace management through the workspace list, avoiding a duplicate standalone active-workspace name field. The workspace list and default-root input share the same 560px desktop control width so the section reads as one aligned column. A compact token-backed workspace list shows each workspace as a 6px-radius row with a workspace avatar well (uploaded image when present, initial fallback otherwise), name, mono project count, an always-visible secondary Switch button with an exchange icon for inactive workspaces, hover/focus-revealed Rename/Delete actions on desktop, and a secondary `Add workspace` button below the list. On stacked mobile/touch layouts, Rename/Delete remain visible. Desktop hover/focus actions reveal as the two 12px-caption small buttons directly, without an extra pill/tag wrapper around the action group. Row hover/focus applies to the full row surface, never just the label cluster, but the label cluster itself is non-interactive; only the explicit Switch button changes workspace. The Active badge and Switch button share the same 32px height and 112px width so the workspace state column stays aligned; Active uses a check icon with the neutral active surface, while Switch keeps the same footprint with interactive hover/focus treatment. Add and Rename use a workspace dialog that collects the name plus an optional uploaded PNG/JPEG/GIF/WebP image up to 512 KB, with 64px tokenized preview, 12px-caption secondary Upload/Remove controls, and a single primary confirm CTA. Delete uses the shared danger `ConfirmDialog`, preserves files on disk, and disables deletion when only one workspace remains. `Add workspace` lives here (not in the sidebar switcher), opens the workspace dialog (never a native browser prompt), collects a name, and switches to the new empty workspace after creation.
 - All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The Add-project start path input keeps its placeholder short, while the resolved server working directory renders as a wrapping mono helper below the input so long English copy or paths do not clip inside the field. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
@@ -844,7 +802,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ---
 
-## 8. Animations
+## 7. Animations
 
 | Name            | Duration | Easing   | Effect                                                               |
 | --------------- | -------- | -------- | -------------------------------------------------------------------- |
@@ -869,7 +827,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ---
 
-## 9. Scrollbar
+## 8. Scrollbar
 
 Webkit:
 
@@ -880,7 +838,7 @@ Webkit:
 
 ---
 
-## 10. Responsive Breakpoints
+## 9. Responsive Breakpoints
 
 | Width   | Changes                                                                                         |
 | ------- | ----------------------------------------------------------------------------------------------- |
@@ -892,7 +850,7 @@ Webkit:
 
 ---
 
-## 11. Accessibility (canonical, must verify each release)
+## 10. Accessibility
 
 - **Contrast**: Porcelain on Pitch Black = 17.4:1 (AAA). Storm Cloud on Pitch Black = 6.4:1 (AA). Storm Cloud on Graphite = 6.0:1 (AA). Verify any new pair.
 - **Focus**: visible token focus ring on every interactive element — controls use `--g-shadow-focus`; text inputs use `--g-input-shadow-focus` plus `--g-input-border-focus` so the focused outline stays distinct from hover. Never `outline: none` without a token-backed replacement.
@@ -900,39 +858,13 @@ Webkit:
 - **Color never alone**: severity always has icon + text; preferred tile has badge + border + text label.
 - **Keyboard**: tab order matches visual order, ESC dismisses overlays, ⌘P opens command palette, ⌘/ focuses search.
 - **Screen reader**: every icon button has `aria-label`; toasts use `role="status"` (`aria-live="polite"`); modals trap focus and restore on close.
-- **Tooltips**: every icon-only control wrapped in `<Tooltip>` (§6.23). Keyboard-reachable (focus shows tooltip immediately), uses `role="tooltip"` + `aria-describedby`, and is supplementary — the trigger must still carry its own `aria-label`. **Never** use the browser's native `title` attribute.
+- **Tooltips**: every icon-only control wrapped in `<Tooltip>` (§5.23). Keyboard-reachable (focus shows tooltip immediately), uses `role="tooltip"` + `aria-describedby`, and is supplementary — the trigger must still carry its own `aria-label`. **Never** use the browser's native `title` attribute.
 - **Localized copy**: visible UI strings, placeholder text, dialog labels, toast text, `aria-label`s, filter chips, count summaries, and action labels live in `ui/src/i18n/locales/*.json`. Components call `t(...)`; do not hardcode user-facing copy in TSX except product names, file extensions, keyboard hints, and API/user-provided values.
 - **Reduced motion**: respect `prefers-reduced-motion` — disable transforms, keep opacity-only fades.
 
 ---
 
-## 12. Do / Don't
-
-### Do
-
-- Reserve **`--g-cta`** for one primary CTA per screen; reserve Neon Lime `--g-accent` for dark CTA fill, dark active nav, focus ring, and selection.
-- Build hierarchy via the **4-tier surface stack** (canvas → graphite → deep-slate → charcoal).
-- Use **Inter Variable** at 510/590 weights and **negative tracking** (-0.011 to -0.022em) on all UI text.
-- Default to **6px radius** for buttons/inputs/cards. Use 12px only on overlays.
-- Pair every functional color with **icon + text + position**.
-- Keep shadows **tight and contained** (`0 2px 4px` defaults).
-- Wrap every icon-only control in `<Tooltip>` (§6.23) — non-native, keyboard-reachable, with optional shortcut hint.
-
-### Don't
-
-- Don't introduce another saturated brand color for interactive purposes.
-- Don't apply broad gradients to large sections.
-- Don't use heavy diffuse drop shadows (`0 24px 48px` blur is for overlays only).
-- Don't put body/UI text below 12px or above the 1.5 line-height ceiling.
-- Don't drop the focus ring without an accessible replacement.
-- Don't use emoji for structural icons — Lucide / Heroicons SVG only.
-- Don't randomize spacing — stick to the 4px scale.
-- Don't truncate text without offering full text via `<Tooltip>` or drawer.
-- Don't use the browser's native `title` attribute for tooltips — use `<Tooltip>` from `ui/Tooltip.tsx` instead.
-
----
-
-## 13. Imagery
+## 11. Imagery
 
 - The product surface is **screenshots and chrome**, not decorative photography.
 - Icons are SVG, mono-color, filled or 1.5px stroke (one consistent set per hierarchy level — currently Lucide).
@@ -941,7 +873,7 @@ Webkit:
 
 ---
 
-## 14. Token Migration (legacy `--g-*` → Linear surface intent)
+## 12. Token Migration (legacy `--g-*` → Linear surface intent)
 
 | Old assumption                      | New canonical role                                               |
 | ----------------------------------- | ---------------------------------------------------------------- |
@@ -956,11 +888,11 @@ Update `_tokens.scss`, `_patterns.scss`, and `tailwind.css` to honor this table 
 
 ---
 
-## 15. Light Mode Companion — "Daylight Console"
+## 13. Light Mode Companion — "Daylight Console"
 
 > Asset Studio is **dark-first** (Linear Midnight Command Center). The light theme is a **deliberately designed companion**, not an inversion. It shares the same component shapes, spacing, typography, and motion — only surfaces and CTA strategy change.
 
-### 15.1 Why a separate light spec
+### 13.1 Why a separate light spec
 
 A naive inversion fails because Neon Lime `#e4f222` has only **1.4:1 contrast** on white — far below WCAG AA's 4.5:1. Filling a primary CTA with lime on a white canvas reads as "construction sign," not "professional tool." So the light variant must:
 
@@ -968,7 +900,7 @@ A naive inversion fails because Neon Lime `#e4f222` has only **1.4:1 contrast** 
 2. **Demote the accent** to focus / selection / wash usage only.
 3. **Recalibrate shadows** so the "elevation by tight shadow" intent still reads on white (where any shadow > 0.1 alpha looks heavy).
 
-### 15.2 Surface strategy
+### 13.2 Surface strategy
 
 | Layer     | Light value                | Why                                                                  |
 | --------- | -------------------------- | -------------------------------------------------------------------- |
@@ -979,7 +911,7 @@ A naive inversion fails because Neon Lime `#e4f222` has only **1.4:1 contrast** 
 
 Borders: `#e5e7eb` default, `#d1d5db` strong. Both light enough to whisper, dark enough to define edges.
 
-### 15.3 CTA strategy — the Vercel pattern
+### 13.3 CTA strategy — the Vercel pattern
 
 ```
 Dark mode:  Primary CTA = Neon Lime fill + Pitch Black text  (16.7:1 contrast)
@@ -993,7 +925,7 @@ Implemented via theme-swapped tokens:
 - `--g-cta`, `--g-cta-ink`, `--g-cta-hover` — the `Button variant="primary"` CVA definition reads these and swaps automatically.
 - `--g-active-bg`, `--g-active-text`, `--g-active-weight` — sidebar active item, iconbtn active toggle.
 
-### 15.4 Where Neon Lime still appears in light mode
+### 13.4 Where Neon Lime still appears in light mode
 
 - **Focus rings**: 2px Neon Lime @ 0.55 alpha + 1px ink @ 0.08 alpha layered (the second ring gives definition on white).
 - **Selection rings on cards**: 2px Neon Lime border, 1px Neon Lime soft wash on the meta region.
@@ -1001,7 +933,7 @@ Implemented via theme-swapped tokens:
 - **NEVER** as a primary CTA filled background on a light surface.
 - **NEVER** as a section background or large coverage area.
 
-### 15.5 Active state — neutral wash, not lime
+### 13.5 Active state — neutral wash, not lime
 
 Light-mode active nav uses:
 
@@ -1011,7 +943,7 @@ Light-mode active nav uses:
 
 The combination of subtle bg + bold weight reads as "selected" without screaming. Lime fill on a white sidebar against a near-white canvas would be visually exhausting.
 
-### 15.6 Semantic colors — adjusted for white background
+### 13.6 Semantic colors — adjusted for white background
 
 | Token        | Dark               | Light                  | Why light value differs                                       |
 | ------------ | ------------------ | ---------------------- | ------------------------------------------------------------- |
@@ -1020,7 +952,7 @@ The combination of subtle bg + bold weight reads as "selected" without screaming
 | `--g-red`    | `#eb5757`          | `#dc2626`              | Slightly deeper red so error chips read on white              |
 | `--g-purple` | `#8b5cf6` Amethyst | `#7c3aed`              | Deeper violet for AA on white                                 |
 
-### 15.7 Shadow recalibration
+### 13.7 Shadow recalibration
 
 Light-mode shadows are **3–4× lower alpha** than dark:
 
@@ -1032,16 +964,16 @@ Light-mode shadows are **3–4× lower alpha** than dark:
 
 Dark shadows can be opaque because the canvas is already black. Light shadows must be subtle — over-shadowing on white is the #1 tell of an amateur Linear-clone.
 
-### 15.8 Theme switching
+### 13.8 Theme switching
 
 - Default theme preference is **dark** (`localStorage` absence or invalid value → dark). Explicit preferences are `"light"`, `"dark"`, and `"system"`.
 - The Settings theme row uses a three-option segmented control: Light (`Sun`), Dark (`Moon`), and System (`Monitor`). It fills the same control-column width as the language select and distributes the three options evenly. System resolves through `prefers-color-scheme` and updates when the OS preference changes.
 - The resolved theme is applied via `[data-theme='dark' | 'light']` on `<html>`. `:root` defaults to light, dark overrides via attribute.
 - All token-driven components (buttons, inputs, modals, drawers, etc.) automatically theme-swap via CSS custom properties. No component needs `[data-theme]` selectors — theme-aware values flow through `_tokens.scss` and are consumed by Tailwind token aliases and CVA variants.
 
-### 15.9 Light-mode delivery checklist
+### 13.9 Light-mode delivery checklist
 
-In addition to §15, when delivering UI work that lands light-side:
+In addition to §13, when delivering UI work that lands light-side:
 
 - [ ] No Neon Lime as a filled CTA on white surfaces.
 - [ ] All shadows lifted to `--g-shadow-*` tokens (don't hand-roll on white — you will over-shadow).
@@ -1049,27 +981,3 @@ In addition to §15, when delivering UI work that lands light-side:
 - [ ] Functional colors verified at 4.5:1 against the surface they sit on (use `--g-green / --g-amber / --g-red / --g-purple` light values, not dark values).
 - [ ] Active nav/icon states use `--g-active-*` tokens, not `--g-accent`.
 - [ ] Tested side-by-side with dark — both modes should feel like the same product, just different lighting.
-
----
-
-## 16. Pre-Delivery Checklist (UI changes)
-
-Run through this list **before declaring any UI task complete**:
-
-- [ ] No new color introduced outside §2.1.
-- [ ] Single primary CTA per screen — `--g-cta` fill is unique.
-- [ ] All radii from §2.4 (no arbitrary values).
-- [ ] All spacing from the 4px scale.
-- [ ] All visual values come from CVA variants or Tailwind classes using `--g-*` tokens — no raw hex or arbitrary values in JSX.
-- [ ] New components use CVA pattern with exported variants function — no `Record<Variant, string>` or manual className concatenation.
-- [ ] No component styles in external SCSS files — everything co-located in `.tsx`.
-- [ ] Body text ≥14px, line-height ≥1.4.
-- [ ] All interactive elements have visible focus ring (2px Neon Lime).
-- [ ] All icon-only buttons have `aria-label`.
-- [ ] Touch targets ≥44pt (real or via hit-slop).
-- [ ] Severity / status pairs color with icon + text.
-- [ ] `prefers-reduced-motion` respected for any new animation.
-- [ ] Tested at 375px / 768px / 1024px / 1440px widths.
-- [ ] Frosted overlays still legible above whatever scrolls beneath.
-- [ ] **Both themes verified side-by-side** — toggle dark ↔ light in Settings; layout, contrast, and intent must match. See §15.9 for light-specific checks.
-- [ ] **DESIGN.md updated** to reflect any token / component / pattern change.

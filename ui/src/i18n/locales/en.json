@@ -291,8 +291,17 @@
     "addWorkspacePrompt": "Workspace name",
     "renameWorkspace": "Rename workspace",
     "renameWorkspacePrompt": "New workspace name",
+    "renameWorkspaceSuccess": "Renamed workspace to {{name}}",
+    "workspaceIcon": "Workspace image",
+    "workspaceIconHint": "PNG, JPEG, GIF, or WebP up to 512 KB. Used in workspace lists and the workspace header.",
+    "uploadWorkspaceIcon": "Upload image",
+    "removeWorkspaceIcon": "Remove image",
+    "workspaceIconTypeError": "Choose a PNG, JPEG, GIF, or WebP image.",
+    "workspaceIconSizeError": "Workspace image must be 512 KB or smaller.",
+    "workspaceIconReadError": "Could not read this image.",
     "removeWorkspace": "Delete workspace",
-    "removeWorkspaceConfirm": "Delete {{name}}? Projects stay on disk, but this workspace and its tracked project list will be removed."
+    "removeWorkspaceConfirm": "Delete {{name}}? Projects stay on disk, but this workspace and its tracked project list will be removed.",
+    "removeWorkspaceSuccess": "Deleted workspace {{name}}"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",
@@ -341,6 +350,7 @@
     "project_name_empty": "Project name must not be empty.",
     "invalid_body": "Invalid request body.",
     "workspace_name_empty": "Workspace name must not be empty.",
+    "workspace_icon_invalid": "Workspace image must be a PNG, JPEG, GIF, or WebP data URL under 512 KB.",
     "workspace_not_found": "Workspace not found.",
     "workspace_last_required": "At least one workspace is required."
   },
@@ -362,7 +372,13 @@
     "scanComplete": "Scan complete",
     "applyComplete": "Changes applied",
     "copied": "Path copied",
-    "workspaceSwitched": "Workspace switched: {{name}}"
+    "workspaceSwitched": "Workspace switched: {{name}}",
+    "settingsSaved": "Settings saved",
+    "settingsSaveFailed": "Settings save failed",
+    "settingsReset": "Settings reset",
+    "settingsResetFailed": "Settings reset failed",
+    "databaseReset": "Database reset",
+    "databaseResetFailed": "Database reset failed"
   },
   "prompt": {
     "renamePath": "New project-relative path"

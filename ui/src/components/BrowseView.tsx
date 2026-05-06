@@ -482,7 +482,6 @@ export function BrowseView({
             bgMode={bgMode}
             searchQuery={searchQuery}
             statusFilter={statusFilter}
-            itemCount={sorted.length}
             sortMode={sortMode}
             bulkMode={bulkMode}
             onViewChange={setView}

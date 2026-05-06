@@ -180,6 +180,7 @@
     "project_name_empty": "项目名称不能为空。",
     "invalid_body": "请求内容格式不正确。",
     "workspace_name_empty": "工作区名称不能为空。",
+    "workspace_icon_invalid": "工作区图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL。",
     "workspace_not_found": "找不到工作区。",
     "workspace_last_required": "至少需要保留一个工作区。"
   },
@@ -201,7 +202,13 @@
     "scanComplete": "扫描完成",
     "applyComplete": "變更已套用",
     "copied": "路径已复制",
-    "workspaceSwitched": "已切换工作区：{{name}}"
+    "workspaceSwitched": "已切换工作区：{{name}}",
+    "settingsSaved": "设置已保存",
+    "settingsSaveFailed": "设置保存失败",
+    "settingsReset": "设置已重置",
+    "settingsResetFailed": "设置重置失败",
+    "databaseReset": "数据库已重置",
+    "databaseResetFailed": "数据库重置失败"
   },
   "prompt": {
     "renamePath": "新的项目相對路径"
@@ -498,8 +505,17 @@
     "addWorkspacePrompt": "工作区名称",
     "renameWorkspace": "重命名工作区",
     "renameWorkspacePrompt": "新的工作区名称",
+    "renameWorkspaceSuccess": "已重命名工作区为 {{name}}",
+    "workspaceIcon": "工作区图片",
+    "workspaceIconHint": "支持 PNG、JPEG、GIF 或 WebP，最大 512 KB；用于工作区列表与工作区标题。",
+    "uploadWorkspaceIcon": "上传图片",
+    "removeWorkspaceIcon": "移除图片",
+    "workspaceIconTypeError": "请选择 PNG、JPEG、GIF 或 WebP 图片。",
+    "workspaceIconSizeError": "工作区图片必须小于或等于 512 KB。",
+    "workspaceIconReadError": "无法读取这张图片。",
     "removeWorkspace": "删除工作区",
-    "removeWorkspaceConfirm": "要删除 {{name}} 吗？项目文件会保留在磁盘上，但此工作区与追踪项目列表会被移除。"
+    "removeWorkspaceConfirm": "要删除 {{name}} 吗？项目文件会保留在磁盘上，但此工作区与追踪项目列表会被移除。",
+    "removeWorkspaceSuccess": "已删除工作区 {{name}}"
   },
   "unused": {
     "title": "未使用",
