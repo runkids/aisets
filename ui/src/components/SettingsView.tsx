@@ -219,12 +219,13 @@ const workspaceRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:opacity-0 sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const projectRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
-const rowActionButtonClass =
+const ghostDangerClass = "text-g-red hover:bg-g-red-soft hover:text-g-red";
+const smButtonOverrideClass =
   "!h-g-btn-sm !px-2.5 !font-g !text-[12px] !leading-none !tracking-g-ui";
-const rowActionDangerButtonClass = `${rowActionButtonClass} text-g-red hover:bg-g-red-soft hover:text-g-red`;
-const workspaceDialogButtonClass =
-  "!h-g-btn-sm !px-2.5 !font-g !text-[12px] !leading-none !tracking-g-ui [&_svg]:!size-3";
-const workspaceDialogDangerButtonClass = `${workspaceDialogButtonClass} text-g-red hover:bg-g-red-soft hover:text-g-red`;
+const rowActionButtonClass = smButtonOverrideClass;
+const rowActionDangerButtonClass = `${rowActionButtonClass} ${ghostDangerClass}`;
+const workspaceDialogButtonClass = `${smButtonOverrideClass} [&_svg]:!size-3`;
+const workspaceDialogDangerButtonClass = `${workspaceDialogButtonClass} ${ghostDangerClass}`;
 const activeWorkspaceBadgeClass =
   "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink-2 shadow-g-sm font-g text-[12px] font-[590] leading-none tracking-[-0.012em] [&_svg]:size-3.5 [&_svg]:text-g-green";
 const switchWorkspaceButtonClass =
@@ -1507,7 +1508,7 @@ export function SettingsView({
                               size="sm"
                               leadingIcon={<Trash2 size={13} />}
                               disabled={working}
-                              className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                              className={ghostDangerClass}
                               onClick={() => onDeleteCustomFilter(filter.id)}
                             >
                               {t("action.delete")}
@@ -1549,7 +1550,7 @@ export function SettingsView({
                                     disabled={
                                       working || filter.groups.length <= 1
                                     }
-                                    className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                    className={ghostDangerClass}
                                     onClick={() =>
                                       onDeleteCustomFilterGroup(
                                         filter.id,
@@ -1678,7 +1679,7 @@ export function SettingsView({
                                         disabled={
                                           working || group.clauses.length <= 1
                                         }
-                                        className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                        className={ghostDangerClass}
                                         onClick={() =>
                                           onDeleteCustomFilterClause(
                                             filter.id,
