@@ -1,4 +1,5 @@
-import { cn } from "../../lib/cn";
+import { cva } from "class-variance-authority";
+import { cn } from "@/lib/cn";
 
 type StackedBarTone =
   | "green"
@@ -23,15 +24,22 @@ type StackedBarProps = {
   trackTone?: StackedBarTone;
 };
 
-const toneClassNames: Record<StackedBarTone, string> = {
-  green: "bg-g-green",
-  amber: "bg-g-amber",
-  red: "bg-g-red",
-  purple: "bg-g-purple",
-  blue: "bg-g-blue",
-  accent: "bg-g-accent",
-  neutral: "bg-g-ink-4",
-};
+const segmentVariants = cva(
+  "transition-[width] duration-300 ease-g first:rounded-l-full last:rounded-r-full",
+  {
+    variants: {
+      tone: {
+        green: "bg-g-green",
+        amber: "bg-g-amber",
+        red: "bg-g-red",
+        purple: "bg-g-purple",
+        blue: "bg-g-blue",
+        accent: "bg-g-accent",
+        neutral: "bg-g-ink-4",
+      },
+    },
+  },
+);
 
 export function StackedBar({
   segments,
@@ -59,10 +67,7 @@ export function StackedBar({
         return (
           <span
             key={i}
-            className={cn(
-              "transition-[width] duration-300 ease-g first:rounded-l-full last:rounded-r-full",
-              toneClassNames[seg.tone],
-            )}
+            className={cn(segmentVariants({ tone: seg.tone }))}
             style={{ width: `${pct}%` }}
             aria-label={seg.label}
           />
@@ -71,3 +76,6 @@ export function StackedBar({
     </div>
   );
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export { segmentVariants };

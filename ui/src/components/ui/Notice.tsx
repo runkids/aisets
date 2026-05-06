@@ -6,31 +6,43 @@ import {
   XCircle,
 } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "../../lib/cn";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/cn";
+
+const noticeVariants = cva(
+  "flex items-start gap-2.5 rounded-g-md border p-3 font-g text-g-ui",
+  {
+    variants: {
+      tone: {
+        info: "border-g-blue-soft bg-g-blue-soft/30 [--notice-icon:var(--g-blue)]",
+        success:
+          "border-g-green-soft bg-g-green-soft/30 [--notice-icon:var(--g-green)]",
+        warning:
+          "border-g-amber-soft bg-g-amber-soft/30 [--notice-icon:var(--g-amber)]",
+        danger:
+          "border-g-red-soft bg-g-red-soft/30 [--notice-icon:var(--g-red)]",
+      },
+    },
+    defaultVariants: {
+      tone: "info",
+    },
+  },
+);
 
 type NoticeTone = "info" | "success" | "warning" | "danger";
 
-type NoticeProps = HTMLAttributes<HTMLDivElement> & {
-  tone?: NoticeTone;
-  title?: string;
-  children: ReactNode;
-  loading?: boolean;
-};
+type NoticeProps = HTMLAttributes<HTMLDivElement> &
+  VariantProps<typeof noticeVariants> & {
+    title?: string;
+    children: ReactNode;
+    loading?: boolean;
+  };
 
 const iconForTone: Record<NoticeTone, ReactNode> = {
   info: <Info size={18} />,
   success: <CheckCircle2 size={18} />,
   warning: <AlertTriangle size={18} />,
   danger: <XCircle size={18} />,
-};
-
-const noticeToneClassNames: Record<NoticeTone, string> = {
-  info: "border-g-blue-soft bg-g-blue-soft/30 [--notice-icon:var(--g-blue)]",
-  success:
-    "border-g-green-soft bg-g-green-soft/30 [--notice-icon:var(--g-green)]",
-  warning:
-    "border-g-amber-soft bg-g-amber-soft/30 [--notice-icon:var(--g-amber)]",
-  danger: "border-g-red-soft bg-g-red-soft/30 [--notice-icon:var(--g-red)]",
 };
 
 export function Notice({
@@ -43,11 +55,7 @@ export function Notice({
 }: NoticeProps) {
   return (
     <div
-      className={cn(
-        "flex items-start gap-2.5 rounded-g-md border p-3 font-g text-g-ui",
-        noticeToneClassNames[tone],
-        className,
-      )}
+      className={cn(noticeVariants({ tone }), className)}
       role={tone === "danger" ? "alert" : "status"}
       {...props}
     >
@@ -55,7 +63,7 @@ export function Notice({
         {loading ? (
           <Loader2 size={18} className="animate-spin" />
         ) : (
-          iconForTone[tone]
+          iconForTone[tone!]
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -93,3 +101,6 @@ export function NoticeStack({
     </div>
   );
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export { noticeVariants };
