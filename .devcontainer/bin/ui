@@ -2,11 +2,14 @@
 # Devcontainer: launch Asset Studio API + Vite frontend.
 # Usage:
 #   ui /workspace/project-a /workspace/project-b
+#   ui --app /workspace/project-a
+#   ui --no-open /workspace/project-a
 #   ui stop
 set -euo pipefail
 
 PORT=19520
 VITE_PORT=5174
+OPEN_MODE=browser
 PIDDIR=/tmp/asset-studio-dev-servers
 LOGDIR=/tmp
 mkdir -p "$PIDDIR"
@@ -20,6 +23,51 @@ fi
 
 is_port_open() {
   timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$1" 2>/dev/null
+}
+
+open_browser() {
+  local url="$1"
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1 &
+    return 0
+  fi
+  return 1
+}
+
+open_app_window() {
+  local url="$1"
+  local browser
+  for browser in google-chrome google-chrome-stable chromium chromium-browser microsoft-edge brave-browser; do
+    if command -v "$browser" >/dev/null 2>&1; then
+      "$browser" "--app=$url" >/dev/null 2>&1 &
+      return 0
+    fi
+  done
+  return 1
+}
+
+open_ui() {
+  local url="$1"
+  case "$OPEN_MODE" in
+    none)
+      return 0
+      ;;
+    app)
+      if open_app_window "$url"; then
+        return 0
+      fi
+      if open_browser "$url"; then
+        echo "  opener       app launcher unavailable; opened browser instead"
+        return 0
+      fi
+      echo "  opener       unavailable in this devcontainer; open the URL on the host"
+      ;;
+    browser)
+      if ! open_browser "$url"; then
+        echo "  opener       unavailable in this devcontainer; open the URL on the host"
+      fi
+      ;;
+  esac
 }
 
 pids_on_port() {
@@ -80,12 +128,32 @@ if [ "${1:-}" = "stop" ]; then
   exit 0
 fi
 
+api_args=()
+for arg in "$@"; do
+  case "$arg" in
+    --app)
+      OPEN_MODE=app
+      ;;
+    --no-open)
+      OPEN_MODE=none
+      ;;
+    *)
+      api_args+=("$arg")
+      ;;
+  esac
+done
+
 kill_pid_file "$PIDDIR/api.pid"
 pkill -f 'asset-studio.* ui' 2>/dev/null || true
 kill_port "$PORT"
 
 export ASSET_STUDIO_UI_HOST=0.0.0.0
-export ASSET_STUDIO_UI_FLAGS="--port ${PORT} $*"
+ASSET_STUDIO_UI_FLAGS="--port ${PORT}"
+for arg in "${api_args[@]}"; do
+  printf -v quoted_arg '%q' "$arg"
+  ASSET_STUDIO_UI_FLAGS+=" $quoted_arg"
+done
+export ASSET_STUDIO_UI_FLAGS
 
 AIR_BIN=""
 for p in "$(go env GOPATH)/bin/air" /go/bin/air /usr/local/go/bin/air; do
@@ -135,4 +203,6 @@ else
   fi
 fi
 
-echo "✓ Asset Studio: http://127.0.0.1:$VITE_PORT"
+URL="http://127.0.0.1:$VITE_PORT"
+open_ui "$URL"
+echo "✓ Asset Studio: $URL"

@@ -13,6 +13,14 @@ const root = document.getElementById("root");
 
 if (!root) throw new Error("Missing #root element");
 
+if ("serviceWorker" in navigator) {
+  const basePath = window.__BASE_PATH__ ?? "";
+  const swPath = `${basePath.replace(/\/$/, "")}/sw.js`;
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(swPath);
+  });
+}
+
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

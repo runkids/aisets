@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"asset-studio/internal/config"
 )
@@ -577,6 +581,181 @@ func TestCmdUIRejectsInvalidFlags(t *testing.T) {
 	}
 }
 
+func TestParseUIOptionsAcceptsFlagsAfterProjects(t *testing.T) {
+	t.Setenv("ASSET_STUDIO_UI_BASE_PATH", "/env-studio")
+	opts, err := parseUIOptions([]string{
+		"/workspace/a",
+		"--port", "20555",
+		"/workspace/b",
+		"--host=0.0.0.0",
+		"--base-path", "/studio/",
+		"--app",
+		"--no-open",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.host != "0.0.0.0" || opts.port != 20555 || opts.basePath != "/studio/" || !opts.noOpen || !opts.appWindow {
+		t.Fatalf("opts = %#v", opts)
+	}
+	if strings.Join(opts.projects, ",") != "/workspace/a,/workspace/b" {
+		t.Fatalf("projects = %#v", opts.projects)
+	}
+	if _, err := parseUIOptions([]string{"--port", "bad"}); err == nil {
+		t.Fatal("expected invalid port error")
+	}
+	if _, err := parseUIOptions([]string{"--host"}); err == nil {
+		t.Fatal("expected missing host value error")
+	}
+}
+
+func TestUIModeURLAndBackgroundChildArgs(t *testing.T) {
+	mode, rest := splitUIMode([]string{"once", "--port", "20555"})
+	if mode != uiOnceMode || strings.Join(rest, " ") != "--port 20555" {
+		t.Fatalf("mode=%q rest=%#v", mode, rest)
+	}
+	mode, rest = splitUIMode([]string{"stop", "--port", "20555"})
+	if mode != uiStopMode || strings.Join(rest, " ") != "--port 20555" {
+		t.Fatalf("stop mode=%q rest=%#v", mode, rest)
+	}
+
+	opts := uiOptions{
+		host:       "0.0.0.0",
+		port:       20555,
+		basePath:   "/studio/",
+		noOpen:     true,
+		clearCache: true,
+		projects:   []string{"/workspace/a", "/workspace/b"},
+	}
+	if got := uiURL(opts); got != "http://0.0.0.0:20555/studio" {
+		t.Fatalf("uiURL() = %q", got)
+	}
+	if got := uiHealthURL(opts); got != "http://0.0.0.0:20555/studio/api/health" {
+		t.Fatalf("uiHealthURL() = %q", got)
+	}
+	got := strings.Join(uiChildArgs(opts), "\n")
+	want := strings.Join([]string{
+		"ui",
+		"once",
+		"--no-open",
+		"--host", "0.0.0.0",
+		"--port", "20555",
+		"--base-path", "/studio/",
+		"--clear-cache",
+		"/workspace/a",
+		"/workspace/b",
+	}, "\n")
+	if got != want {
+		t.Fatalf("child args = %#v", uiChildArgs(opts))
+	}
+}
+
+func TestCmdUIReusesRunningServerWithJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/health" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(server.Close)
+
+	host, port, err := net.SplitHostPort(strings.TrimPrefix(server.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := captureStdout(t, func() {
+		if err := cmdUI([]string{"--host", host, "--port", port, "--no-open"}, true); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var body struct {
+		OK     bool   `json:"ok"`
+		URL    string `json:"url"`
+		Status string `json:"status"`
+	}
+	decodeJSON(t, out, &body)
+	if !body.OK || body.URL != server.URL || body.Status != "running" {
+		t.Fatalf("ui reuse body = %#v", body)
+	}
+}
+
+func TestCmdUIStopReportsNotRunningJSON(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := listener.Addr().String()
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := captureStdout(t, func() {
+		if err := cmdUI([]string{"stop", "--host", host, "--port", port}, true); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var body struct {
+		OK     bool   `json:"ok"`
+		Status string `json:"status"`
+	}
+	decodeJSON(t, out, &body)
+	if !body.OK || body.Status != "not_running" {
+		t.Fatalf("stop body = %#v", body)
+	}
+	if err := cmdUI([]string{"stop", "/workspace/project"}); err == nil {
+		t.Fatal("expected ui stop to reject project paths")
+	}
+}
+
+func TestUIPortAndLogHelpers(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureUIPortAvailable(uiOptions{host: host, port: port}); err == nil {
+		t.Fatal("expected occupied port to be rejected")
+	}
+
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	logFile, err := openUILog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := logFile.Name()
+	if err := logFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "cache", "asset-studio", "ui.log")
+	if name != want {
+		t.Fatalf("log path = %q, want %q", name, want)
+	}
+	opts := uiOptions{host: "127.0.0.1", port: 20555}
+	if err := writeUIPidFile(opts, 12345); err != nil {
+		t.Fatal(err)
+	}
+	pid, err := readUIPidFile(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pid != 12345 {
+		t.Fatalf("pid file = %d", pid)
+	}
+}
+
 func TestExitWithErrorWritesJSONAndExits(t *testing.T) {
 	if os.Getenv("ASSET_STUDIO_EXIT_WITH_ERROR_SUBPROCESS") == "1" {
 		exitWithError("scan", errors.New("boom"), true)
@@ -604,12 +783,78 @@ func TestOpenBrowserStartsPlatformCommand(t *testing.T) {
 	}
 	dir := t.TempDir()
 	shim := filepath.Join(dir, name)
-	if err := os.WriteFile(shim, []byte("#!/usr/bin/env sh\nexit 0\n"), 0o755); err != nil {
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", dir)
 	if err := openBrowser("http://127.0.0.1:19520"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOpenUIWindowStartsAppWindowWhenRequested(t *testing.T) {
+	commands := map[string]string{
+		"darwin": "open",
+		"linux":  "google-chrome",
+	}
+	name, ok := commands[runtime.GOOS]
+	if !ok {
+		t.Skipf("desktop app command shim is not defined for %s", runtime.GOOS)
+	}
+	dir := t.TempDir()
+	out := filepath.Join(dir, "args.txt")
+	shim := filepath.Join(dir, name)
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+strconv.Quote(out)+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	if err := openUIWindow("http://127.0.0.1:19520", true); err != nil {
+		t.Fatal(err)
+	}
+	var content string
+	for i := 0; i < 100; i++ {
+		bytes, err := os.ReadFile(out)
+		if err == nil {
+			content = string(bytes)
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !strings.Contains(content, "--app=http://127.0.0.1:19520") {
+		t.Fatalf("desktop app args = %q", content)
+	}
+}
+
+func TestOpenUIWindowDefaultsToBrowser(t *testing.T) {
+	commands := map[string]string{
+		"darwin": "open",
+		"linux":  "xdg-open",
+	}
+	name, ok := commands[runtime.GOOS]
+	if !ok {
+		t.Skipf("browser command shim is not defined for %s", runtime.GOOS)
+	}
+	dir := t.TempDir()
+	out := filepath.Join(dir, "args.txt")
+	shim := filepath.Join(dir, name)
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+strconv.Quote(out)+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	if err := openUIWindow("http://127.0.0.1:19520", false); err != nil {
+		t.Fatal(err)
+	}
+	var content string
+	for i := 0; i < 100; i++ {
+		bytes, err := os.ReadFile(out)
+		if err == nil {
+			content = string(bytes)
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if strings.Contains(content, "--app=") || !strings.Contains(content, "http://127.0.0.1:19520") {
+		t.Fatalf("browser args = %q", content)
 	}
 }
 

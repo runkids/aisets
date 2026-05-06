@@ -185,7 +185,7 @@ function KpiCell({
   return (
     <Tag
       type={onClick ? "button" : undefined}
-      className={`text-left ${onClick ? "cursor-pointer rounded-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus" : ""}`}
+      className={`text-left ${onClick ? "-m-2 cursor-pointer rounded-g-md p-2 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus" : ""}`}
       onClick={onClick}
     >
       <div className="text-g-chip font-[510] text-g-ink-3">{label}</div>

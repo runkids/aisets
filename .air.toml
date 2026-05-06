@@ -6,7 +6,7 @@ tmp_dir = "tmp"
 [build]
   entrypoint = "./cmd/asset-studio"
   cmd = "go build -o ./tmp/asset-studio ./cmd/asset-studio"
-  full_bin = "${ASSET_STUDIO_UI_EXEC_PREFIX}./tmp/asset-studio ui --no-open --host ${ASSET_STUDIO_UI_HOST:-localhost} ${ASSET_STUDIO_UI_FLAGS}"
+  full_bin = "${ASSET_STUDIO_UI_EXEC_PREFIX}./tmp/asset-studio ui once --no-open --host ${ASSET_STUDIO_UI_HOST:-localhost} ${ASSET_STUDIO_UI_FLAGS}"
   delay = 1000
   kill_delay = 500
   send_interrupt = true

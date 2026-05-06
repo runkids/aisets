@@ -1,10 +1,13 @@
 import {
+  ArrowLeftRight,
+  CheckCircle2,
   Download,
   FolderKanban,
   Globe2,
   Image,
   Info,
   Keyboard,
+  Monitor,
   Moon,
   Paintbrush,
   Pencil,
@@ -18,7 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
 import { errorMessage, supportedLanguages } from "../i18n/index";
@@ -54,10 +57,12 @@ import {
   TextInput,
 } from "./ui";
 
+type ThemePreference = "light" | "dark" | "system";
+
 type Props = {
-  theme: "light" | "dark";
+  theme: ThemePreference;
   imagePreviewEnabled: boolean;
-  onThemeChange: (theme: "light" | "dark") => void;
+  onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
 };
 
@@ -80,6 +85,11 @@ type SettingsDraft = {
   optimizationAutoApply: boolean;
 };
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "workspace", icon: <Settings2 size={15} /> },
   { id: "projects", icon: <FolderKanban size={15} /> },
@@ -99,6 +109,25 @@ const defaultSettings: SettingsUpdate = {
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
 };
+
+const workspaceRowActionRevealClass =
+  "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
+const projectRowActionRevealClass =
+  "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
+const activeWorkspaceBadgeClass =
+  "workspace-state-control workspace-state-control-active";
+const switchWorkspaceButtonClass =
+  "workspace-state-control workspace-state-control-switch";
+const projectAssetsBadgeClass =
+  "shrink-0 border-g-line bg-g-surface-2 text-g-ink-3";
+
+function isStandaloneApp() {
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    ("standalone" in navigator &&
+      (navigator as Navigator & { standalone?: boolean }).standalone === true)
+  );
+}
 
 function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
   return {
@@ -235,6 +264,10 @@ export function SettingsView({
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [removeProjectId, setRemoveProjectId] = useState<string | null>(null);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [installMessage, setInstallMessage] = useState("");
+  const [installedApp, setInstalledApp] = useState(() => isStandaloneApp());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const settingsQuery = useSettingsQuery();
   const defaultDirectoryQuery = useDirectoryListingQuery(
@@ -254,11 +287,12 @@ export function SettingsView({
 
   const settings = settingsQuery.data?.settings;
   const draft = draftOverride ?? draftFromSettings(settings);
-  const defaultRootPlaceholder = defaultDirectoryQuery.data?.path
-    ? t("settings.defaultRootPlaceholderWithPath", {
+  const defaultRootPlaceholder = t("settings.defaultRootPlaceholder");
+  const defaultRootCurrentPath = defaultDirectoryQuery.data?.path
+    ? t("settings.defaultRootCurrentPath", {
         path: defaultDirectoryQuery.data.path,
       })
-    : t("settings.defaultRootPlaceholder");
+    : "";
   const workspaces = settings?.workspaces ?? [];
   const activeWorkspaceId = settings?.activeWorkspaceId ?? "default";
   const projects = catalogQuery.data?.projects ?? [];
@@ -299,6 +333,25 @@ export function SettingsView({
     switchWorkspaceMutation.isPending ||
     updateMutation.isPending;
   const settingsActionDisabled = settingsQuery.isLoading || working;
+
+  useEffect(() => {
+    function onBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setInstallMessage("");
+    }
+    function onAppInstalled() {
+      setInstalledApp(true);
+      setInstallPrompt(null);
+      setInstallMessage(t("settings.installInstalled"));
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, [t]);
 
   const assetCountByProject: Record<string, number> = {};
   for (const item of items) {
@@ -394,6 +447,25 @@ export function SettingsView({
     setDraftOverride(null);
   }
 
+  async function onInstallApp() {
+    if (installedApp) {
+      setInstallMessage(t("settings.installInstalled"));
+      return;
+    }
+    if (!installPrompt) {
+      setInstallMessage(t("settings.installManualHint"));
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    setInstallPrompt(null);
+    setInstallMessage(
+      choice.outcome === "accepted"
+        ? t("settings.installAccepted")
+        : t("settings.installDismissed"),
+    );
+  }
+
   function onReset() {
     resetMutation.mutate(undefined, {
       onSuccess: () => setResetDatabaseOpen(false),
@@ -438,27 +510,6 @@ export function SettingsView({
               />
               <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 <FieldRow
-                  label={t("settings.workspaceName")}
-                  icon={<Settings2 size={15} />}
-                >
-                  <TextInput
-                    type="text"
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    value={draft.workspaceName}
-                    onChange={(event) =>
-                      updateDraft((prev) => ({
-                        ...prev,
-                        workspaceName: event.target.value,
-                      }))
-                    }
-                    placeholder="Asset Studio"
-                    className="w-full md:w-[560px]"
-                    inputClassName="font-g tracking-g-ui"
-                  />
-                </FieldRow>
-                <FieldRow
                   label={t("settings.workspaces")}
                   description={t("settings.workspacesHint")}
                   align="start"
@@ -476,7 +527,7 @@ export function SettingsView({
                             key={workspace.id}
                             role="listitem"
                             data-active={isActive || undefined}
-                            className="group flex flex-col gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 data-[active=true]:border-g-line-strong data-[active=true]:bg-g-surface-2 sm:flex-row sm:items-center"
+                            className="group relative flex flex-col gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 data-[active=true]:border-g-line-strong data-[active=true]:bg-g-surface-2 sm:flex-row sm:items-center"
                           >
                             {isActive ? (
                               <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
@@ -507,17 +558,48 @@ export function SettingsView({
                                 </span>
                               </div>
                             )}
-                            <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                            <div className="relative flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                              <div className={workspaceRowActionRevealClass}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  leadingIcon={<Pencil size={13} />}
+                                  disabled={working}
+                                  onClick={() =>
+                                    setRenameWorkspaceId(workspace.id)
+                                  }
+                                >
+                                  {t("action.rename")}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  leadingIcon={<Trash2 size={13} />}
+                                  disabled={working || workspaces.length <= 1}
+                                  className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                  onClick={() =>
+                                    setRemoveWorkspaceId(workspace.id)
+                                  }
+                                >
+                                  {t("action.delete")}
+                                </Button>
+                              </div>
                               {isActive && (
-                                <Badge tone="line" className="text-g-ink-3">
+                                <Badge
+                                  tone="line"
+                                  className={activeWorkspaceBadgeClass}
+                                >
+                                  <CheckCircle2 aria-hidden="true" />
                                   {t("settings.activeWorkspace")}
                                 </Badge>
                               )}
                               {!isActive && (
                                 <Button
-                                  variant="ghost"
+                                  variant="secondary"
                                   size="sm"
+                                  leadingIcon={<ArrowLeftRight size={13} />}
                                   disabled={working}
+                                  className={switchWorkspaceButtonClass}
                                   onClick={() =>
                                     void onSwitchWorkspace(workspace.id)
                                   }
@@ -525,29 +607,6 @@ export function SettingsView({
                                   {t("settings.switchWorkspaceAction")}
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                leadingIcon={<Pencil size={13} />}
-                                disabled={working}
-                                onClick={() =>
-                                  setRenameWorkspaceId(workspace.id)
-                                }
-                              >
-                                {t("action.rename")}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                leadingIcon={<Trash2 size={13} />}
-                                disabled={working || workspaces.length <= 1}
-                                className="text-g-red hover:bg-g-red-soft hover:text-g-red"
-                                onClick={() =>
-                                  setRemoveWorkspaceId(workspace.id)
-                                }
-                              >
-                                {t("action.delete")}
-                              </Button>
                             </div>
                           </div>
                         );
@@ -569,22 +628,30 @@ export function SettingsView({
                   label={t("settings.defaultRoot")}
                   description={t("settings.defaultRootHint")}
                   icon={<FolderKanban size={15} />}
+                  align="start"
                 >
-                  <TextInput
-                    type="text"
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    value={draft.defaultProjectRoot}
-                    onChange={(event) =>
-                      updateDraft((prev) => ({
-                        ...prev,
-                        defaultProjectRoot: event.target.value,
-                      }))
-                    }
-                    placeholder={defaultRootPlaceholder}
-                    className="w-full md:w-[560px]"
-                  />
+                  <div className="flex w-full flex-col gap-1.5 md:w-[560px]">
+                    <TextInput
+                      type="text"
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                      value={draft.defaultProjectRoot}
+                      onChange={(event) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          defaultProjectRoot: event.target.value,
+                        }))
+                      }
+                      placeholder={defaultRootPlaceholder}
+                      className="w-full"
+                    />
+                    {defaultRootCurrentPath && (
+                      <p className="break-all text-left font-g-mono text-g-caption tracking-g-mono text-g-ink-3 md:text-right">
+                        {defaultRootCurrentPath}
+                      </p>
+                    )}
+                  </div>
                 </FieldRow>
                 {(updateMutation.error ||
                   addWorkspaceMutation.error ||
@@ -645,14 +712,20 @@ export function SettingsView({
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                               {isActive ? (
-                                <Badge tone="line" className="text-g-ink-3">
+                                <Badge
+                                  tone="line"
+                                  className={activeWorkspaceBadgeClass}
+                                >
+                                  <CheckCircle2 aria-hidden="true" />
                                   {t("settings.activeWorkspace")}
                                 </Badge>
                               ) : (
                                 <Button
-                                  variant="ghost"
+                                  variant="secondary"
                                   size="sm"
+                                  leadingIcon={<ArrowLeftRight size={13} />}
                                   disabled={working}
+                                  className={switchWorkspaceButtonClass}
                                   onClick={() =>
                                     void onSwitchWorkspace(workspace.id)
                                   }
@@ -671,30 +744,36 @@ export function SettingsView({
                               groupedProjects.map((project) => (
                                 <div
                                   key={project.id}
-                                  className="flex flex-col gap-2 rounded-g-md px-2 py-2 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
+                                  className="group relative flex flex-col gap-2 rounded-g-md px-2 py-2 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
                                 >
                                   <div className="flex min-w-0 items-start gap-2">
                                     <span className="mt-2 size-1.5 shrink-0 rounded-g-pill bg-g-line-strong" />
                                     <div className="min-w-0">
-                                      <div className="truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
-                                        {project.name}
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <div className="min-w-0 truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                                          {project.name}
+                                        </div>
+                                        {project.workspaceId ===
+                                          activeWorkspaceId && (
+                                          <Badge
+                                            tone="line"
+                                            className={projectAssetsBadgeClass}
+                                          >
+                                            {t("settings.projectAssets", {
+                                              count:
+                                                assetCountByProject[
+                                                  project.id
+                                                ] ?? 0,
+                                            })}
+                                          </Badge>
+                                        )}
                                       </div>
                                       <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
                                         {project.path}
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-3 sm:justify-end sm:pl-0">
-                                    {project.workspaceId ===
-                                      activeWorkspaceId && (
-                                      <Badge tone="line">
-                                        {t("settings.projectAssets", {
-                                          count:
-                                            assetCountByProject[project.id] ??
-                                            0,
-                                        })}
-                                      </Badge>
-                                    )}
+                                  <div className={projectRowActionRevealClass}>
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -780,9 +859,15 @@ export function SettingsView({
                         label: t("settings.dark"),
                         icon: <Moon size={15} />,
                       },
+                      {
+                        value: "system",
+                        label: t("settings.system"),
+                        icon: <Monitor size={15} />,
+                      },
                     ]}
                     onChange={onThemeChange}
                     ariaLabel={t("settings.theme")}
+                    className="w-full min-w-[280px] max-w-full [&_[role=tab]]:min-w-0 [&_[role=tab]]:flex-1"
                   />
                 </FieldRow>
                 <FieldRow
@@ -965,6 +1050,29 @@ export function SettingsView({
                   icon={<Info size={15} />}
                 >
                   <span className="font-g text-g-ui text-g-ink-2">MIT</span>
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.installApp")}
+                  description={t("settings.installAppHint")}
+                  align="start"
+                >
+                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                    <Button
+                      variant="secondary"
+                      leadingIcon={<Download size={15} />}
+                      onClick={() => void onInstallApp()}
+                      disabled={installedApp}
+                    >
+                      {installedApp
+                        ? t("settings.installInstalledAction")
+                        : t("settings.installAppAction")}
+                    </Button>
+                    {installMessage && (
+                      <Notice tone={installedApp ? "success" : "info"}>
+                        {installMessage}
+                      </Notice>
+                    )}
+                  </div>
                 </FieldRow>
                 <FieldRow label={t("settings.data")}>
                   <div className="flex flex-wrap justify-start gap-2 md:justify-end">

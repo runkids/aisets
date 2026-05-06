@@ -23,5 +23,5 @@ COPY --from=ui-builder /src/ui/dist /home/assetstudio/.cache/asset-studio/ui/doc
 USER assetstudio
 EXPOSE 19520
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["asset-studio", "ui", "--host", "0.0.0.0", "--port", "19520", "--no-open"]
+CMD ["asset-studio", "ui", "once", "--host", "0.0.0.0", "--port", "19520", "--no-open"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD curl -sf http://localhost:19520/api/health || exit 1

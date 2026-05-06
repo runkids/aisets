@@ -1,12 +1,15 @@
 {
   "name": "Asset Studio",
   "short_name": "Asset Studio",
+  "description": "Local asset hygiene workspace for multi-project image cleanup.",
+  "start_url": ".",
+  "scope": ".",
   "icons": [
     {
       "src": "/brand/asset-studio-app-icon.png",
       "sizes": "1254x1254",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
   "theme_color": "#101746",

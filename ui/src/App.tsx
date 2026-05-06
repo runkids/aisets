@@ -47,6 +47,22 @@ import type { ActionPreview, AssetItem } from "./types";
 import { modeForPath, pathForMode, type Mode } from "./ui";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
+type ThemePreference = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
+
+const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
+
+function storedThemePreference(): ThemePreference {
+  const stored = window.localStorage.getItem("asset-studio-theme");
+  return stored === "light" || stored === "dark" || stored === "system"
+    ? stored
+    : "dark";
+}
+
+function resolveThemePreference(theme: ThemePreference): ResolvedTheme {
+  if (theme !== "system") return theme;
+  return window.matchMedia(SYSTEM_THEME_QUERY).matches ? "dark" : "light";
+}
 
 export function App() {
   const { t } = useTranslation();
@@ -61,11 +77,7 @@ export function App() {
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [autoScrollAssetId, setAutoScrollAssetId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    return window.localStorage.getItem("asset-studio-theme") === "light"
-      ? "light"
-      : "dark";
-  });
+  const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
   });
@@ -105,8 +117,18 @@ export function App() {
   const applyPreviewMutation = useApplyPreviewMutation();
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    const applyTheme = () => {
+      document.documentElement.dataset.theme = resolveThemePreference(theme);
+    };
+
+    applyTheme();
     window.localStorage.setItem("asset-studio-theme", theme);
+
+    if (theme !== "system") return undefined;
+
+    const media = window.matchMedia(SYSTEM_THEME_QUERY);
+    media.addEventListener("change", applyTheme);
+    return () => media.removeEventListener("change", applyTheme);
   }, [theme]);
 
   useEffect(() => {

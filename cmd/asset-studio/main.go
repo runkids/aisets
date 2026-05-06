@@ -74,7 +74,9 @@ func run(rawArgs []string) int {
 
 func usageText() string {
 	return `Usage:
-  asset-studio ui [projectPaths...] [flags]
+  asset-studio ui [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--app] [--no-open]
+  asset-studio ui once [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--no-open]
+  asset-studio ui stop [--host HOST] [--port PORT]
   asset-studio projects [--json]
   asset-studio projects add [projectPaths...] [--json]
   asset-studio projects rename --id ID --name NAME [--json]
@@ -96,7 +98,7 @@ func usageText() string {
   asset-studio version [--json]
 
 Commands:
-  ui         Start the localhost UI
+  ui         Start or reuse the localhost UI in the background
   projects   List, add, rename, or remove imported projects
   settings   Inspect, export, import, or reset local state
   scan       Scan projects and print catalog summary or JSON
@@ -104,7 +106,14 @@ Commands:
   optimize   Estimate recommendations or generate a review script
   pre-check  Analyze files before adding them to a project
   actions    Preview or apply safe file mutations
-  version    Print version`
+  version    Print version
+
+UI:
+  asset-studio ui starts a background server and opens a browser.
+  asset-studio ui once runs the same server in the foreground.
+  asset-studio ui stop stops a background UI server for the selected port.
+  --app opens a desktop-style app window when the browser supports it.
+  --port defaults to 19520. --base-path supports reverse proxy hosting.`
 }
 
 func printUsage() {
