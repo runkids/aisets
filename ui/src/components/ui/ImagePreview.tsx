@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/cn";
 
 type ImagePreviewProps = {
   src: string;
@@ -77,7 +78,7 @@ export function ImagePreview({
 
   return (
     <div
-      className="img-preview-anchor"
+      className="contents"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onMouseMove={handleMove}
@@ -87,8 +88,14 @@ export function ImagePreview({
         enabled &&
         src &&
         createPortal(
-          <div className="img-preview" style={previewStyle}>
-            <img src={src} alt={alt} className="img-preview-img" />
+          <div
+            className={cn(
+              "h-[400px] w-[480px] overflow-hidden rounded-g-lg border border-g-line-strong",
+              "bg-g-surface shadow-g-pop pointer-events-none animate-[fadeIn_160ms_var(--g-ease)]",
+            )}
+            style={previewStyle}
+          >
+            <img src={src} alt={alt} className="size-full object-contain" />
           </div>,
           document.body,
         )}

@@ -1,6 +1,7 @@
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/cn";
 
 type Props = {
   scrollerSelector?: string;
@@ -44,7 +45,12 @@ export function ScrollToTop({
   return (
     <button
       type="button"
-      className="scroll-top-btn"
+      className={cn(
+        "fixed bottom-7 right-7 z-50 flex size-10 items-center justify-center rounded-full",
+        "border border-g-line-strong bg-g-surface text-g-ink shadow-[0_2px_8px_rgba(0,0,0,0.12)]",
+        "transition-all duration-150 ease-g",
+        "hover:bg-g-ink hover:text-g-canvas hover:border-g-ink hover:-translate-y-0.5",
+      )}
       onClick={jumpToTop}
       aria-label={t("action.scrollToTop")}
     >

@@ -1409,33 +1409,6 @@ button.list-row:focus-visible {
   }
 }
 
-/* Scroll to top */
-.scroll-top-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 50;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid var(--g-line-strong);
-  background: var(--g-surface);
-  color: var(--g-ink);
-  font-size: 18px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: all 150ms var(--g-ease);
-}
-.scroll-top-btn:hover {
-  background: var(--g-ink);
-  color: var(--g-canvas);
-  border-color: var(--g-ink);
-  transform: translateY(-2px);
-}
-
 /* Toast */
 .toast-wrap {
   position: fixed;
