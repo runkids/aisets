@@ -1,53 +1,41 @@
 import type { HTMLAttributes } from "react";
-import { cn } from "../../lib/cn";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/cn";
 
-type BadgeTone =
-  | "default"
-  | "line"
-  | "green"
-  | "red"
-  | "amber"
-  | "blue"
-  | "purple"
-  | "info"
-  | "accent"
-  | "warning"
-  | "danger";
-
-type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
-  tone?: BadgeTone;
-};
-
-const badgeBaseClassName = cn(
+const badgeVariants = cva(
   "inline-flex h-[22px] items-center gap-1 rounded-g-pill border border-transparent px-2 font-g-mono text-g-chip font-[510] tracking-g-mono tabular-nums",
+  {
+    variants: {
+      tone: {
+        default: "bg-g-surface-3 text-g-ink-3",
+        line: "border-g-line-strong bg-transparent text-g-ink-2",
+        green: "bg-g-green-soft text-g-green",
+        red: "bg-g-red-soft text-g-red",
+        amber: "bg-g-amber-soft text-g-amber",
+        blue: "bg-g-blue-soft text-g-blue",
+        purple: "bg-g-purple-soft text-g-purple",
+        info: "bg-g-info-soft text-g-info",
+        accent: "bg-g-accent text-g-accent-ink",
+        warning: "bg-g-amber-soft text-g-amber",
+        danger: "bg-g-red-soft text-g-red",
+      },
+    },
+    defaultVariants: {
+      tone: "default",
+    },
+  },
 );
 
-const badgeToneClassNames: Record<BadgeTone, string> = {
-  default: "bg-g-surface-3 text-g-ink-3",
-  line: "border-g-line-strong bg-transparent text-g-ink-2",
-  green: "bg-g-green-soft text-g-green",
-  red: "bg-g-red-soft text-g-red",
-  amber: "bg-g-amber-soft text-g-amber",
-  blue: "bg-g-blue-soft text-g-blue",
-  purple: "bg-g-purple-soft text-g-purple",
-  info: "bg-g-info-soft text-g-info",
-  accent: "bg-g-accent text-g-accent-ink",
-  warning: "bg-g-amber-soft text-g-amber",
-  danger: "bg-g-red-soft text-g-red",
-};
+type BadgeProps = HTMLAttributes<HTMLSpanElement> &
+  VariantProps<typeof badgeVariants>;
 
-export function Badge({
-  tone = "default",
-  children,
-  className,
-  ...props
-}: BadgeProps) {
+function Badge({ tone, children, className, ...props }: BadgeProps) {
   return (
-    <span
-      className={cn(badgeBaseClassName, badgeToneClassNames[tone], className)}
-      {...props}
-    >
+    <span className={cn(badgeVariants({ tone }), className)} {...props}>
       {children}
     </span>
   );
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export { Badge, badgeVariants, type BadgeProps };
