@@ -149,11 +149,15 @@ export function PreCheckView({ onOpenAsset }: Props) {
   );
 
   return (
-    <div className="page pt-6">
-      <div className="page-h">
+    <div className="mx-auto max-w-[1600px] px-8 pb-6 pt-6 max-[768px]:px-4 max-[768px]:py-5">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="page-h-title">{t("precheck.title")}</h1>
-          <p className="page-h-sub">{t("precheck.sub")}</p>
+          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
+            {t("precheck.title")}
+          </h1>
+          <p className="mt-2.5 max-w-[540px] text-[14px] text-g-ink-3">
+            {t("precheck.sub")}
+          </p>
         </div>
         {results.length > 0 && (
           <div className="flex items-center gap-2">
@@ -179,7 +183,7 @@ export function PreCheckView({ onOpenAsset }: Props) {
       </div>
 
       <div
-        className="dropzone mb-4"
+        className="mb-4 cursor-pointer rounded-g-lg border-2 border-dashed border-g-line-strong bg-g-surface px-8 py-[60px] text-center transition-all duration-200 ease-g hover:border-g-accent hover:bg-[color-mix(in_srgb,var(--g-accent-soft)_50%,var(--g-surface))]"
         data-active={dragOver || undefined}
         onDragOver={(e) => {
           e.preventDefault();
@@ -189,7 +193,7 @@ export function PreCheckView({ onOpenAsset }: Props) {
         onDrop={onDrop}
         onClick={onPick}
       >
-        <div className="dropzone-icon">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-g-surface-2 text-g-ink-3">
           <Upload size={24} />
         </div>
         <div className="text-g-body font-[510] text-g-ink">

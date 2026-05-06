@@ -59,21 +59,25 @@ export function LintView({ findings, onOpenAsset }: Props) {
   });
 
   return (
-    <div className="page flex h-full flex-col pt-6">
-      <div className="page-h">
+    <div className="mx-auto flex h-full max-w-[1600px] flex-col px-8 pb-6 pt-6 max-[768px]:px-4 max-[768px]:py-5">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="page-h-title">
+          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
             {t("lint.title")}{" "}
-            <em>{t("lint.findingsCount", { count: findings.length })}</em>
+            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
+              {t("lint.findingsCount", { count: findings.length })}
+            </em>
           </h1>
-          <p className="page-h-sub">{t("lint.description")}</p>
+          <p className="mt-2.5 max-w-[540px] text-[14px] text-g-ink-3">
+            {t("lint.description")}
+          </p>
         </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="opt-search max-w-[280px]">
+        <div className="flex max-w-[280px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-[7px] transition-[border-color,box-shadow] duration-[120ms] ease-g focus-within:border-g-ink focus-within:shadow-[0_0_0_3px_var(--g-accent-soft)]">
           <input
-            className="opt-search-input"
+            className="flex-1 border-0 bg-transparent text-[13px] text-g-ink outline-0 placeholder:text-g-ink-4"
             placeholder={t("lint.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -83,7 +87,7 @@ export function LintView({ findings, onOpenAsset }: Props) {
           <button
             key={s || "all"}
             type="button"
-            className={`opt-chip ${severityFilter === s ? "opt-chip-active" : ""}`}
+            className={`inline-flex h-7 items-center gap-1 rounded-g-md border px-2.5 text-[12px] font-medium transition-all duration-[120ms] ease-g ${severityFilter === s ? "border-g-ink bg-g-ink text-g-canvas" : "border-g-line bg-g-surface text-g-ink-3 hover:border-g-line-strong hover:text-g-ink"}`}
             onClick={() => setSeverityFilter(severityFilter === s ? "" : s)}
           >
             {t("filter.countLabel", {
