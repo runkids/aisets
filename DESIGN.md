@@ -10,13 +10,24 @@
 
 ## 0. Styling Architecture
 
-Asset Studio now supports a progressive migration from SCSS class inventory to React-owned component variants.
+Asset Studio uses a fully co-located component styling model. There are no component or layout SCSS files.
 
-- **Design tokens remain the source of truth.** Tailwind utilities used by components must resolve to `--g-*` tokens or the 4px spacing/type scales in this document.
-- **React components may own variants.** Shared primitives can use `clsx` + variant maps to express `variant`, `size`, and state in TypeScript instead of hand-concatenating SCSS classes.
-- **Tailwind is allowed for shared primitives and new component-local styling** when it uses token aliases from `ui/src/styles/tailwind.css` (`bg-g-surface`, `text-g-ink`, `rounded-g-md`, `shadow-g-focus`, etc.). Global resets must not set unlayered `background`, `border`, `padding`, `color`, or `outline` on form controls, because those declarations override Tailwind/CVA utilities.
-- **SCSS remains valid for tokens, reset/layout, legacy screens, and complex view patterns** (`.acard`, `.opt-row`, `.dgroup`, sticky groups, drawers, modals).
-- **Migration is incremental.** Existing semantic classes are preserved until their owning component is migrated; avoid broad rewrites that mix behavior changes with styling migration.
+| Layer                   | Technology                                                            | Location                                                                      |
+| ----------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Design tokens           | CSS custom properties (`--g-*`)                                       | `ui/src/styles/_tokens.scss` (`:root` light, `[data-theme='dark']` canonical) |
+| Tailwind ↔ token bridge | `@theme` mapping (`bg-g-surface`, `text-g-ink`, `rounded-g-md`, etc.) | `ui/src/styles/tailwind.css`                                                  |
+| Global reset & base     | Minimal body/html reset                                               | `ui/src/styles/globals.scss`                                                  |
+| Shared utilities        | `@keyframes`, `.sr-only`, `.bg-checker`                               | `ui/src/styles/_patterns.scss`                                                |
+| UI primitives           | CVA variants + `cn()` composition                                     | `ui/src/components/ui/*.tsx`                                                  |
+| Page/view components    | Tailwind utility classes in JSX                                       | `ui/src/pages/*.tsx`, `ui/src/components/*.tsx`                               |
+
+**Rules:**
+
+- **All visual values must resolve to `--g-*` tokens** via Tailwind token aliases or direct `var()` references. No raw hex, no arbitrary px radii, no ad-hoc shadow strings.
+- **Component variants are expressed via CVA** (`cva()` from `class-variance-authority`). New components must use CVA for variant/size/state logic, not `Record<Variant, string>` maps or manual className concatenation.
+- **`cn()` from `@/lib/cn`** composes CVA output with conditional Tailwind classes. It is the sole className merge utility.
+- **No component styles in external SCSS files.** Everything is co-located in the `.tsx` that owns the component.
+- **Tailwind is NOT used via `@apply`** — only utility classes in JSX `className` props.
 
 ---
 
@@ -39,48 +50,48 @@ Asset Studio now supports a progressive migration from SCSS class inventory to R
 
 ### 2.1 Colors
 
-The palette is dark-first. SCSS variable names (`--g-*`) are preserved for backwards compatibility and map onto the Linear surface scale.
+The palette is dark-first. CSS custom property names (`--g-*`) map onto the Linear surface scale. Tailwind token aliases (e.g. `bg-g-surface`, `text-g-ink`) are defined in `tailwind.css`.
 
-| Token                   | Dark (canonical)        | Light (Daylight Console)   | Linear name             | Role                                                                                      |
-| ----------------------- | ----------------------- | -------------------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
-| `--g-canvas`            | `#08090a`               | `#fafbfc`                  | Pitch Black ↔ Off-white | Page background, dotted grid base                                                         |
-| `--g-surface`           | `#0f1011`               | `#ffffff`                  | Graphite ↔ Pure White   | Default card / sidebar / topbar fill                                                      |
-| `--g-surface-2`         | `#161718`               | `#f4f5f7`                  | Deep Slate ↔ Cool Wash  | Hover wash, elevated card, segmented active                                               |
-| `--g-surface-3`         | `#23252a`               | `#eceef2`                  | Charcoal ↔ Cooler Wash  | Inset wells, group headers, scrim accent                                                  |
-| `--g-line`              | `#23252a`               | `#e5e7eb`                  | —                       | Default 1px borders, dividers                                                             |
-| `--g-line-strong`       | `#383b3f`               | `#d1d5db`                  | —                       | Hover borders, scrollbar thumb, default input outline                                     |
-| `--g-input-border`      | `var(--g-line-strong)`  | `var(--g-line-strong)`     | —                       | Text input default outline                                                                |
+| Token                    | Dark (canonical)        | Light (Daylight Console)   | Linear name             | Role                                                                                      |
+| ------------------------ | ----------------------- | -------------------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `--g-canvas`             | `#08090a`               | `#fafbfc`                  | Pitch Black ↔ Off-white | Page background, dotted grid base                                                         |
+| `--g-surface`            | `#0f1011`               | `#ffffff`                  | Graphite ↔ Pure White   | Default card / sidebar / topbar fill                                                      |
+| `--g-surface-2`          | `#161718`               | `#f4f5f7`                  | Deep Slate ↔ Cool Wash  | Hover wash, elevated card, segmented active                                               |
+| `--g-surface-3`          | `#23252a`               | `#eceef2`                  | Charcoal ↔ Cooler Wash  | Inset wells, group headers, scrim accent                                                  |
+| `--g-line`               | `#23252a`               | `#e5e7eb`                  | —                       | Default 1px borders, dividers                                                             |
+| `--g-line-strong`        | `#383b3f`               | `#d1d5db`                  | —                       | Hover borders, scrollbar thumb, default input outline                                     |
+| `--g-input-border`       | `var(--g-line-strong)`  | `var(--g-line-strong)`     | —                       | Text input default outline                                                                |
 | `--g-input-border-hover` | `var(--g-ink-4)`        | `var(--g-line-strong)`     | —                       | Text input hover outline; neutral, never semantic/accent                                  |
 | `--g-input-border-focus` | `var(--g-ink-4)`        | `var(--g-line-strong)`     | —                       | Text input focus outline; neutral graphite/line treatment, not blue/coral/lime            |
-| `--g-input-bg-hover`    | `var(--g-surface-2)`    | `var(--g-surface)`         | —                       | Text input hover fill; light mode avoids dirty grey washes                                |
+| `--g-input-bg-hover`     | `var(--g-surface-2)`    | `var(--g-surface)`         | —                       | Text input hover fill; light mode avoids dirty grey washes                                |
 | `--g-input-shadow-focus` | token shadow            | token shadow               | —                       | Text input focus halo using `--g-input-border-focus`                                      |
-| `--g-ink`               | `#f7f8f8`               | `#0c0d0e`                  | Porcelain ↔ Near-Black  | Primary text & icons (AAA on canvas)                                                      |
-| `--g-ink-2`             | `#d0d6e0`               | `#3f4045`                  | Light Steel ↔ Slate     | Secondary text, ghost button default                                                      |
-| `--g-ink-3`             | `#8a8f98`               | `#62666d`                  | Storm Cloud (symmetric) | Tertiary text, descriptions, nav labels                                                   |
-| `--g-ink-4`             | `#62666d`               | `#8a8f98`                  | Fog Grey (symmetric)    | Metadata, placeholders                                                                    |
-| `--g-ink-5`             | `#43474d`               | `#c7c8cc`                  | —                       | Crumbs separator, very dim chrome                                                         |
-| `--g-accent`            | `#e4f222`               | `#e4f222`                  | **Neon Lime**           | Focus ring, selection ring, accent wash (NOT primary CTA in light)                        |
-| `--g-accent-soft`       | `rgba(228,242,34,0.14)` | `rgba(228,242,34,0.22)`    | —                       | Selected card meta, focus glow, hover wash                                                |
-| `--g-accent-deep`       | `#c9d61c`               | `#c9d61c`                  | —                       | Reserved (legacy `.btn-accent` hover)                                                     |
-| `--g-accent-ink`        | `#08090a`               | `#0c0d0e`                  | Pitch Black             | Text on Neon Lime when used as fill                                                       |
-| **`--g-cta`**           | `#e4f222` (Neon Lime)   | **`#0c0d0e` (Near-Black)** | —                       | **Theme-swapped primary CTA fill** — `.btn-primary` reads this                            |
-| **`--g-cta-ink`**       | `#08090a`               | `#ffffff`                  | —                       | Text on `--g-cta`                                                                         |
-| **`--g-cta-hover`**     | `#c9d61c`               | `#25272a`                  | —                       | `.btn-primary:hover`                                                                      |
-| **`--g-active-bg`**     | `#e4f222`               | `#eceef2`                  | —                       | Theme-swapped active nav / iconbtn bg                                                     |
-| **`--g-active-text`**   | `#08090a`               | `#0c0d0e`                  | —                       | Active text                                                                               |
-| **`--g-active-weight`** | `510`                   | `590`                      | —                       | Active font-weight (light needs heavier weight to read as "selected" without color punch) |
-| `--g-info`              | `#5e6ad2`               | `#5e6ad2`                  | Aether Blue             | Informational highlights, links                                                           |
-| `--g-info-soft`         | `rgba(94,106,210,0.16)` | `rgba(94,106,210,0.12)`    | —                       | Info chip background                                                                      |
-| `--g-blue`              | `#02b8cc`               | `#02b8cc`                  | Cyan Spark              | Diff / preview accent                                                                     |
-| `--g-blue-soft`         | `rgba(2,184,204,0.14)`  | `rgba(2,184,204,0.10)`     | —                       | Cyan chip / icon bg                                                                       |
-| `--g-green`             | `#27a644`               | `#008d2c`                  | Emerald / Forest Green  | Success, preferred duplicate, savings                                                     |
-| `--g-green-soft`        | `rgba(39,166,68,0.16)`  | `#dcfce7`                  | —                       | Success chip, run-panel result row                                                        |
-| `--g-amber`             | `#f0b429`               | `#f59e0b`                  | —                       | Warning                                                                                   |
-| `--g-amber-soft`        | `rgba(240,180,41,0.16)` | `#fef3c7`                  | —                       | Warning chip                                                                              |
-| `--g-red`               | `#eb5757`               | `#dc2626`                  | Warning Red             | Danger, critical lint, delete                                                             |
-| `--g-red-soft`          | `rgba(235,87,87,0.16)`  | `#fee2e2`                  | —                       | Danger chip                                                                               |
-| `--g-purple`            | `#8b5cf6`               | `#7c3aed`                  | Amethyst / Deep Violet  | Lint badge, secondary category                                                            |
-| `--g-purple-soft`       | `rgba(139,92,246,0.16)` | `#ede9fe`                  | —                       | Lint chip bg                                                                              |
+| `--g-ink`                | `#f7f8f8`               | `#0c0d0e`                  | Porcelain ↔ Near-Black  | Primary text & icons (AAA on canvas)                                                      |
+| `--g-ink-2`              | `#d0d6e0`               | `#3f4045`                  | Light Steel ↔ Slate     | Secondary text, ghost button default                                                      |
+| `--g-ink-3`              | `#8a8f98`               | `#62666d`                  | Storm Cloud (symmetric) | Tertiary text, descriptions, nav labels                                                   |
+| `--g-ink-4`              | `#62666d`               | `#8a8f98`                  | Fog Grey (symmetric)    | Metadata, placeholders                                                                    |
+| `--g-ink-5`              | `#43474d`               | `#c7c8cc`                  | —                       | Crumbs separator, very dim chrome                                                         |
+| `--g-accent`             | `#e4f222`               | `#e4f222`                  | **Neon Lime**           | Focus ring, selection ring, accent wash (NOT primary CTA in light)                        |
+| `--g-accent-soft`        | `rgba(228,242,34,0.14)` | `rgba(228,242,34,0.22)`    | —                       | Selected card meta, focus glow, hover wash                                                |
+| `--g-accent-deep`        | `#c9d61c`               | `#c9d61c`                  | —                       | Reserved (accent button hover)                                                            |
+| `--g-accent-ink`         | `#08090a`               | `#0c0d0e`                  | Pitch Black             | Text on Neon Lime when used as fill                                                       |
+| **`--g-cta`**            | `#e4f222` (Neon Lime)   | **`#0c0d0e` (Near-Black)** | —                       | **Theme-swapped primary CTA fill** — `Button variant="primary"` reads this                |
+| **`--g-cta-ink`**        | `#08090a`               | `#ffffff`                  | —                       | Text on `--g-cta`                                                                         |
+| **`--g-cta-hover`**      | `#c9d61c`               | `#25272a`                  | —                       | `Button variant="primary"` hover                                                          |
+| **`--g-active-bg`**      | `#e4f222`               | `#eceef2`                  | —                       | Theme-swapped active nav / iconbtn bg                                                     |
+| **`--g-active-text`**    | `#08090a`               | `#0c0d0e`                  | —                       | Active text                                                                               |
+| **`--g-active-weight`**  | `510`                   | `590`                      | —                       | Active font-weight (light needs heavier weight to read as "selected" without color punch) |
+| `--g-info`               | `#5e6ad2`               | `#5e6ad2`                  | Aether Blue             | Informational highlights, links                                                           |
+| `--g-info-soft`          | `rgba(94,106,210,0.16)` | `rgba(94,106,210,0.12)`    | —                       | Info chip background                                                                      |
+| `--g-blue`               | `#02b8cc`               | `#02b8cc`                  | Cyan Spark              | Diff / preview accent                                                                     |
+| `--g-blue-soft`          | `rgba(2,184,204,0.14)`  | `rgba(2,184,204,0.10)`     | —                       | Cyan chip / icon bg                                                                       |
+| `--g-green`              | `#27a644`               | `#008d2c`                  | Emerald / Forest Green  | Success, preferred duplicate, savings                                                     |
+| `--g-green-soft`         | `rgba(39,166,68,0.16)`  | `#dcfce7`                  | —                       | Success chip, run-panel result row                                                        |
+| `--g-amber`              | `#f0b429`               | `#f59e0b`                  | —                       | Warning                                                                                   |
+| `--g-amber-soft`         | `rgba(240,180,41,0.16)` | `#fef3c7`                  | —                       | Warning chip                                                                              |
+| `--g-red`                | `#eb5757`               | `#dc2626`                  | Warning Red             | Danger, critical lint, delete                                                             |
+| `--g-red-soft`           | `rgba(235,87,87,0.16)`  | `#fee2e2`                  | —                       | Danger chip                                                                               |
+| `--g-purple`             | `#8b5cf6`               | `#7c3aed`                  | Amethyst / Deep Violet  | Lint badge, secondary category                                                            |
+| `--g-purple-soft`        | `rgba(139,92,246,0.16)` | `#ede9fe`                  | —                       | Lint chip bg                                                                              |
 
 > **Rule:** Never introduce a new bright/saturated color outside this list for interactive purposes. `--g-accent` (Neon Lime) is the only accent that gets a _filled_ background on a control.
 
@@ -276,7 +287,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
 - Menu: anchored popover, 320px max width, `--g-surface` white/Graphite layer, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
 - Header stays compact: 15px display title + 12px workspace meta, bottom divider `--g-line`.
-- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. Rows keep 4px vertical separation so hover fills do not visually merge. The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
+- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. Rows keep 4px vertical separation so hover fills do not visually merge. Workspace rows use the shared workspace avatar well (uploaded image or initial fallback). The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
 - Project options are 40px minimum rows with 10px gaps, 4px vertical separation, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Project options are scoped to the active workspace only. The selected project scope keeps the full active treatment; hover/focus uses `--g-surface-3`.
 - Hover logic matches sidebar rows: inactive hover uses the full `--g-surface-3` wash in both themes (not a transparent `--g-surface-2` mix) so it separates from the menu background and active workspace row; inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
 - Press scale is disabled under `prefers-reduced-motion`.
@@ -323,7 +334,7 @@ backdrop-filter: blur(12px);
 
 ## 6. Components
 
-> Class names from the existing codebase are preserved for legacy and view-pattern CSS. Shared React primitives may migrate to token-backed Tailwind variants as described in §0.
+> All shared UI primitives live in `ui/src/components/ui/` and use CVA + `cn()` for variant/state styling. Page components compose these primitives with Tailwind utility classes. See §0 for the full architecture.
 
 ### 6.1 Buttons
 
@@ -337,18 +348,18 @@ React API:
 </Button>
 ```
 
-Variants are expressed in TypeScript with `clsx` and token-backed Tailwind utilities. Legacy `.btn*` classes remain supported for screens not yet migrated.
+Variants are expressed via CVA (`cva()`) with token-backed Tailwind utilities, composed with `cn()`.
 
 Base: `height: 32px; padding: 0 12px; border-radius: 6px; font: 510 13px/1.4 Inter; transition: 120ms var(--g-ease); letter-spacing: -0.012em;`
 
-| Variant / legacy class         | Background                                       | Text          | Border                      | Hover                                        | Notes                                |
-| ------------------------------ | ------------------------------------------------ | ------------- | --------------------------- | -------------------------------------------- | ------------------------------------ |
-| `primary` / `.btn-primary`     | **`--g-cta`** (dark Neon Lime, light Near-Black) | `--g-cta-ink` | transparent / none          | bg `--g-cta-hover`                           | **Singular per screen.**             |
-| `secondary` / `.btn-secondary` | `--g-surface`                                    | `--g-ink`     | `1px solid --g-line-strong` | bg `--g-surface-2`, border `--g-line-strong` | Default action                       |
-| `ghost` / `.btn-ghost`         | transparent                                      | `--g-ink-2`   | transparent / none          | bg `--g-surface-2`, text `--g-ink`           | Tertiary                             |
-| `.btn-link`                    | transparent                                      | `--g-ink-2`   | none                        | text `--g-ink`                               | Legacy 0/6px padding only            |
-| `danger` / `.btn-danger`       | `--g-red`                                        | `--g-canvas`  | transparent / none          | brightness 1.08                              | Destructive                          |
-| `size="sm"` / `.btn-sm`        | inherit                                          | inherit       | inherit                     | —                                            | 26px height, 10px padding, 12px font |
+| Variant     | Background                                       | Text          | Border                      | Hover                                        | Notes                                |
+| ----------- | ------------------------------------------------ | ------------- | --------------------------- | -------------------------------------------- | ------------------------------------ |
+| `primary`   | **`--g-cta`** (dark Neon Lime, light Near-Black) | `--g-cta-ink` | transparent / none          | bg `--g-cta-hover`                           | **Singular per screen.**             |
+| `secondary` | `--g-surface`                                    | `--g-ink`     | `1px solid --g-line-strong` | bg `--g-surface-2`, border `--g-line-strong` | Default action                       |
+| `ghost`     | transparent                                      | `--g-ink-2`   | transparent / none          | bg `--g-surface-2`, text `--g-ink`           | Tertiary                             |
+| `link`      | transparent                                      | `--g-ink-2`   | none                        | text `--g-ink`                               | 0/6px padding only                   |
+| `danger`    | `--g-red`                                        | `--g-canvas`  | transparent / none          | brightness 1.08                              | Destructive                          |
+| `size="sm"` | inherit                                          | inherit       | inherit                     | —                                            | 26px height, 10px padding, 12px font |
 
 **Press state (all variants):** `transform: scale(0.97)` for 100ms with `--g-ease-spring`; disabled under `prefers-reduced-motion`.
 **Disabled:** opacity 0.38, cursor not-allowed.
@@ -356,7 +367,7 @@ Base: `height: 32px; padding: 0 12px; border-radius: 6px; font: 510 13px/1.4 Int
 
 ### 6.2 Icon Button
 
-Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`; legacy `.iconbtn` remains supported.
+Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`.
 
 - 32×32, 6px radius, transparent bg, `--g-ink-2` icon
 - Sizes: `sm` 26×26, `md` 32×32, `lg` 36×36
@@ -367,7 +378,7 @@ Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`;
 
 ### 6.3 Tabs / Segmented Toggle
 
-Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background). Legacy `.seg-toggle` remains supported for unmigrated markup.
+Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background).
 
 React API:
 
@@ -392,7 +403,7 @@ React API:
 
 ### 6.4 Card
 
-Canonical shared primitive: `Card` / `CardBody` from `ui/src/components/ui/Card.tsx`; legacy `.card` remains supported for unmigrated markup.
+Canonical shared primitive: `Card` / `CardBody` from `ui/src/components/ui/Card.tsx`.
 
 React API:
 
@@ -402,17 +413,17 @@ React API:
 </Card>
 ```
 
-| Variant             | Background      | Border / shadow                                                            | Radius     | Notes                                    |
-| ------------------- | --------------- | -------------------------------------------------------------------------- | ---------- | ---------------------------------------- |
-| `default` / `.card` | `--g-surface`   | 1px `--g-line`, `--g-shadow-sm`; hover `--g-line-strong` + `--g-shadow-md` | `--g-r-md` | Default card / list container            |
-| `elevated`          | `--g-surface-2` | `--g-shadow-inset`                                                         | `--g-r-lg` | Drawer hero, modal head, floating panels |
-| `nested`            | `--g-canvas`    | none                                                                       | `--g-r-lg` | Inset card inside elevated surfaces      |
+| Variant    | Background      | Border / shadow                                                            | Radius     | Notes                                    |
+| ---------- | --------------- | -------------------------------------------------------------------------- | ---------- | ---------------------------------------- |
+| `default`  | `--g-surface`   | 1px `--g-line`, `--g-shadow-sm`; hover `--g-line-strong` + `--g-shadow-md` | `--g-r-md` | Default card / list container            |
+| `elevated` | `--g-surface-2` | `--g-shadow-inset`                                                         | `--g-r-lg` | Drawer hero, modal head, floating panels |
+| `nested`   | `--g-canvas`    | none                                                                       | `--g-r-lg` | Inset card inside elevated surfaces      |
 
 Padding is explicit through `padding="none | sm | md | lg"`. Default is `none` for backwards-compatible composition.
 
 ### 6.7 Badge / Chip
 
-Canonical shared primitive: `Badge` from `ui/src/components/ui/Badge.tsx`; legacy `.chip` remains supported for unmigrated markup.
+Canonical shared primitive: `Badge` from `ui/src/components/ui/Badge.tsx`.
 
 React API:
 
@@ -429,7 +440,7 @@ React API:
 
 ### 6.8 Text Input
 
-Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`; its shell, button trigger, control, icon, affix, size, and state styles are owned by token-backed Tailwind/CVA classes rather than `.text-input-*` / `.field` SCSS classes.
+Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`. Shell, button trigger, control, icon, affix, size, and state styles are co-located via CVA variants and token-backed Tailwind classes.
 
 React API:
 
@@ -504,7 +515,7 @@ React API:
 
 ### 6.13 Modal
 
-Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`; legacy `.modal` remains supported for unmigrated markup.
+Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`.
 
 - Centered on `rgba(8,9,10,0.6)` backdrop + blur(4px), z 50.
 - Sizes: `sm` 520px, `md` 760px, `lg` 960px.
@@ -564,7 +575,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 
 ### 6.19 Empty State
 
-Canonical shared primitive: `EmptyState` from `ui/src/components/ui/EmptyState.tsx`; legacy `.empty` remains supported for unmigrated markup.
+Canonical shared primitive: `EmptyState` from `ui/src/components/ui/EmptyState.tsx`.
 
 React API:
 
@@ -614,12 +625,12 @@ Structure:
 ```
 
 - **`.directory-picker`**: vertical stack, 12px gap, min-height 320px
-- **`.directory-path-row`**: input + Go button inline; input uses `.field` / `.input-shell` Charcoal Grey fill with HardDrive icon prefix
+- **`.directory-path-row`**: input + Go button inline; input uses `TextInput` with HardDrive icon prefix
 - **`.directory-panel`**: `--g-canvas` Pitch Black inset well with 1px Charcoal inset border (`--g-shadow-inset`), 6px radius — visually a recessed dark panel inside the Deep Slate modal body
 - **`.directory-item`**: `display: grid; grid-template-columns: 18px minmax(0, 200px) 1fr; gap: 10px;` — folder icon + name + truncated full path. Hover bg `--g-surface-2`, focus 2px Neon Lime ring. Each row 32px tall.
   - Name: Inter 13px / 510 / Porcelain
   - Code path: mono 11px / Fog Grey, right-aligned, truncates with ellipsis
-- **Error state**: inaccessible / missing / invalid paths render an `.empty` state inside `.directory-panel` using an AlertTriangle icon, localized title, and the API error text (including the attempted path). Directory-listing queries do not retry these 4xx responses, so the panel must settle quickly instead of showing an indefinite loading state.
+- **Error state**: inaccessible / missing / invalid paths render an `EmptyState` inside `.directory-panel` using an AlertTriangle icon, localized title, and the API error text (including the attempted path). Directory-listing queries do not retry these 4xx responses, so the panel must settle quickly instead of showing an indefinite loading state.
 - **Footer**: `justify-content: space-between` so the current path label sits left and `[Cancel] [Add This Directory]` action group sits right. The Add CTA uses the primary button variant (`--g-cta`) and counts as the screen's primary action. Disable it unless the current listing resolved successfully.
 
 ### 6.23 Tooltip `<Tooltip>` (custom, non-native)
@@ -672,7 +683,7 @@ The component clones the single child element and adds `onMouseEnter` / `onMouse
 
 ### 6.24 Notice
 
-Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/Notice.tsx`; legacy `.notice` remains supported for unmigrated markup.
+Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/Notice.tsx`.
 
 - Tones: `info | success | warning | danger`.
 - Base: flex row, 10px icon gap, 12px padding, 6px radius, 1px token border, 13px Inter.
@@ -765,7 +776,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 - `.acard-check` (top-right) toggles selection
 - `.bulkbar` sticky top-0 with: select all, copy paths, copy `git rm`, delete selected
-- Delete CTA uses `.btn-danger`, never `.btn-primary`
+- Delete CTA uses `Button variant="danger"`, never `variant="primary"`
 
 ### 7.4 Optimize
 
@@ -810,23 +821,24 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
 - Projects is a workspace-level view: project cards, workspace KPIs, and the Projects nav badge always use the full catalog, independent of the Project Switcher selection. Topbar breadcrumbs stay title-only; counts live in cards.
 - Page scroll containers start close to the global header by moving the scrollport itself down 12px (`margin-top: 12px`) rather than using internal top padding. This keeps the scroll clipping edge aligned with the cardized sidebar rhythm, so scrolled content cannot appear above the first visible row.
-- Projects page fills the available content column (`width: 100%; max-width: none`) and is start-aligned (`mx: 0`), matching Duplicates and other dense pages so both left and right gutters stay consistent through the shared content-scroll padding. Because legacy `.content-grid` SCSS sets `max-width: 1200px; margin: 0 auto`, Projects must explicitly override that legacy rule when using the shared class.
-- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The toolbar sits inside a sticky top mask (`top: 0`, z 20, 12px inline/bottom padding, no top padding, solid `--g-canvas` background) so its card top aligns with the sidebar project switcher and the scrollport clips content above that edge. The card inside the mask uses `--g-surface`, `--g-line`, 6px radius, and `--g-shadow-sm`; do not leave bare controls on the canvas.
+- Projects page fills the available content column (`width: 100%; max-width: none`) and is start-aligned (`mx: 0`), matching Duplicates and other dense pages so both left and right gutters stay consistent through the shared content-scroll padding. Projects uses full-width layout (`max-width: none`) rather than the centered content pattern.
+- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The Projects page stack uses 16px vertical gaps between the workspace hero, toolbar mask, and project card grid so cards sit close to their controls without feeling cramped. The toolbar sits inside a sticky top mask (`top: 0`, z 20, 12px inline padding, 8px bottom padding, no top padding, solid `--g-canvas` background) so its card top aligns with the sidebar project switcher and the scrollport clips content above that edge. The card inside the mask uses `--g-surface`, `--g-line`, 6px radius, and `--g-shadow-sm`; do not leave bare controls on the canvas.
 - Projects toolbar sort uses `Tabs variant="segment"` labels for name, count, size, health, and imported date so its tab-like sort control matches Duplicates and Browse status tabs. Count / size / health / imported sort descending (imported = newest first) with project name as the stable tiebreaker; name sort is ascending.
+- The workspace hero avatar uses the active workspace's uploaded image when available and falls back to a tokenized initial well; the same avatar grammar is reused in Project Switcher and Settings so workspace identity stays consistent.
 - Clickable workspace KPI cells use an 8px padded hover/focus target with a matching negative offset so the text remains aligned while the hover wash never hugs the label or value.
-- Project cards use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
+- Project cards sit in a responsive grid with 16px column gaps and 12px row gaps. They use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
 - The `Browse Project` action on a project card sets the project scope to that card's project and navigates to Browse; Browse initializes its project facet to the same project rather than defaulting to `All Projects`.
 
 ### 7.9 Settings
 
 - Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas. The language select keeps the canonical language inventory but promotes Simplified Chinese to the first option when the browser locale resolves to Mainland China, Hong Kong, or Macau.
 - Settings panel headers are plain text blocks inside the single outer panel: 28px display title plus 14px helper text. No nested header strip and no icon well.
-- The Workspace section owns multi-workspace management through the workspace list, avoiding a duplicate standalone active-workspace name field. The workspace list and default-root input share the same 560px desktop control width so the section reads as one aligned column. A compact token-backed workspace list shows each workspace as a 6px-radius row with `FolderKanban` icon well, name, mono project count, an always-visible secondary Switch button with an exchange icon for inactive workspaces, hover/focus-revealed Rename/Delete actions on desktop, and a secondary `Add workspace` button below the list. On stacked mobile/touch layouts, Rename/Delete remain visible. Row hover/focus applies to the full row surface, never just the label cluster, but the label cluster itself is non-interactive; only the explicit Switch button changes workspace. The Active badge and Switch button share the same 32px height and 112px width so the workspace state column stays aligned; Active uses a check icon with the neutral active surface, while Switch keeps the same footprint with interactive hover/focus treatment. Rename uses the shared `PromptDialog`; delete uses the shared danger `ConfirmDialog`, preserves files on disk, and disables deletion when only one workspace remains. `Add workspace` lives here (not in the sidebar switcher), opens the shared `PromptDialog` (never a native browser prompt), collects a name, and switches to the new empty workspace after creation.
+- The Workspace section owns multi-workspace management through the workspace list, avoiding a duplicate standalone active-workspace name field. The workspace list and default-root input share the same 560px desktop control width so the section reads as one aligned column. A compact token-backed workspace list shows each workspace as a 6px-radius row with a workspace avatar well (uploaded image when present, initial fallback otherwise), name, mono project count, an always-visible secondary Switch button with an exchange icon for inactive workspaces, hover/focus-revealed Rename/Delete actions on desktop, and a secondary `Add workspace` button below the list. On stacked mobile/touch layouts, Rename/Delete remain visible. Desktop hover/focus actions reveal as the two 12px-caption small buttons directly, without an extra pill/tag wrapper around the action group. Row hover/focus applies to the full row surface, never just the label cluster, but the label cluster itself is non-interactive; only the explicit Switch button changes workspace. The Active badge and Switch button share the same 32px height and 112px width so the workspace state column stays aligned; Active uses a check icon with the neutral active surface, while Switch keeps the same footprint with interactive hover/focus treatment. Add and Rename use a workspace dialog that collects the name plus an optional uploaded PNG/JPEG/GIF/WebP image up to 512 KB, with 64px tokenized preview, 12px-caption secondary Upload/Remove controls, and a single primary confirm CTA. Delete uses the shared danger `ConfirmDialog`, preserves files on disk, and disables deletion when only one workspace remains. `Add workspace` lives here (not in the sidebar switcher), opens the workspace dialog (never a native browser prompt), collects a name, and switches to the new empty workspace after creation.
 - All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The Add-project start path input keeps its placeholder short, while the resolved server working directory renders as a wrapping mono helper below the input so long English copy or paths do not clip inside the field. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
-- Projects groups all registered project roots by workspace inside the single settings panel: each workspace gets a compact header with `FolderKanban` icon well, workspace name, mono project count, and Active/secondary Switch affordance; project rows sit under a subtle left rule with a small neutral dot, mono path, an active-workspace asset count chip placed beside the project name, and Rename/Delete actions that reveal on row hover/focus on desktop while staying visible in stacked mobile/touch layout. Do not flatten projects across workspaces. Hotkeys, About, Data, and Storage follow the same row pattern as form settings; no section may introduce nested cards or boxed subgroups. Scanning → exclude patterns uses a wider 420px textarea with vertical resize enabled so patterns can be entered one per line; save parsing accepts both newlines and commas.
+- Projects groups all registered project roots by workspace inside the single settings panel: each workspace gets a compact header with the same workspace avatar well, workspace name, mono project count, and Active/secondary Switch affordance; project rows sit under a subtle left rule with a small neutral dot, mono path, an active-workspace asset count chip placed beside the project name, and Rename/Delete actions that reveal on row hover/focus on desktop while staying visible in stacked mobile/touch layout. Do not flatten projects across workspaces. Hotkeys, About, Data, and Storage follow the same row pattern as form settings; no section may introduce nested cards or boxed subgroups. Scanning → exclude patterns uses a wider 420px textarea with vertical resize enabled so patterns can be entered one per line; save parsing accepts both newlines and commas.
 - Custom Filters is the only Settings section with repeated rule-builder records. Each saved filter is an individual editable record with name, enable switch, delete action, OR groups, and AND clauses; use token-backed compact borders to separate the repeated rule rows without introducing a second card component. Path/folder-like operators should include contains, starts with, ends with, equals, and regex; extension/project support one-of lists where useful. v1 rules are deterministic path/metadata predicates only; OCR/content-derived classifiers are explicitly out of scope.
 - Custom Filters must include a right-aligned help icon in the section header. The help modal explains OR groups, AND clauses, setup steps, and concrete examples for non-engineers.
-- The Settings `Reset` action must open a confirmation dialog before applying defaults. It resets app preferences and custom filters, not projects, scans, or files; database reset remains a separate danger confirmation in About/Data.
+- Settings workspace/project rename and delete success paths must show success toasts with the affected workspace/project name. The Settings `Save` action must show a success toast after persistence and a danger toast with the API error message when persistence fails. The Settings `Reset` action must open a confirmation dialog before applying defaults, then show success/error toasts with error details on failure. It resets app preferences and custom filters, not projects, scans, or files; database reset remains a separate danger confirmation in About/Data and also reports success/error via toast.
 - The Settings right pane intentionally avoids nested cards and heavy dividers; hierarchy comes from typography, spacing, and one outer panel only.
 - Storage rows show the persisted database path, data directory, and cache directory only. There is no separate config directory row; app state lives in the SQLite data directory, and release UI assets live in cache.
 
@@ -940,7 +952,7 @@ Webkit:
 | Display = Inter Tight               | Display = Inter Variable (510/590)                               |
 | Mono = JetBrains                    | Mono = Berkeley Mono (JetBrains as fallback)                     |
 
-Update `_tokens.scss`, `_layout.scss`, `_components.scss`, `_patterns.scss` to honor this table whenever you touch them.
+Update `_tokens.scss`, `_patterns.scss`, and `tailwind.css` to honor this table whenever you touch them.
 
 ---
 
@@ -978,7 +990,7 @@ This mirrors Vercel and GitHub: the primary action **flips with the theme** so i
 
 Implemented via theme-swapped tokens:
 
-- `--g-cta`, `--g-cta-ink`, `--g-cta-hover` — the `.btn-primary` rule reads these and swaps automatically.
+- `--g-cta`, `--g-cta-ink`, `--g-cta-hover` — the `Button variant="primary"` CVA definition reads these and swaps automatically.
 - `--g-active-bg`, `--g-active-text`, `--g-active-weight` — sidebar active item, iconbtn active toggle.
 
 ### 15.4 Where Neon Lime still appears in light mode
@@ -1025,7 +1037,7 @@ Dark shadows can be opaque because the canvas is already black. Light shadows mu
 - Default theme preference is **dark** (`localStorage` absence or invalid value → dark). Explicit preferences are `"light"`, `"dark"`, and `"system"`.
 - The Settings theme row uses a three-option segmented control: Light (`Sun`), Dark (`Moon`), and System (`Monitor`). It fills the same control-column width as the language select and distributes the three options evenly. System resolves through `prefers-color-scheme` and updates when the OS preference changes.
 - The resolved theme is applied via `[data-theme='dark' | 'light']` on `<html>`. `:root` defaults to light, dark overrides via attribute.
-- All token-driven components (buttons, inputs, modals, drawers, etc.) automatically theme-swap. No component needs `[data-theme]` selectors except the few exceptions noted in `_layout.scss` (e.g. dotted canvas in dark, sb-link active hover).
+- All token-driven components (buttons, inputs, modals, drawers, etc.) automatically theme-swap via CSS custom properties. No component needs `[data-theme]` selectors — theme-aware values flow through `_tokens.scss` and are consumed by Tailwind token aliases and CVA variants.
 
 ### 15.9 Light-mode delivery checklist
 
@@ -1048,6 +1060,9 @@ Run through this list **before declaring any UI task complete**:
 - [ ] Single primary CTA per screen — `--g-cta` fill is unique.
 - [ ] All radii from §2.4 (no arbitrary values).
 - [ ] All spacing from the 4px scale.
+- [ ] All visual values come from CVA variants or Tailwind classes using `--g-*` tokens — no raw hex or arbitrary values in JSX.
+- [ ] New components use CVA pattern with exported variants function — no `Record<Variant, string>` or manual className concatenation.
+- [ ] No component styles in external SCSS files — everything co-located in `.tsx`.
 - [ ] Body text ≥14px, line-height ≥1.4.
 - [ ] All interactive elements have visible focus ring (2px Neon Lime).
 - [ ] All icon-only buttons have `aria-label`.

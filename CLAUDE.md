@@ -6,13 +6,13 @@
 
 ## 1. What this project is
 
-Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in a codebase: scan, detect duplicates, find unused, optimize, lint. The UI is a Vite + React + TypeScript + SCSS application under `ui/` consumed by the Go binary under `cmd/` + `internal/`.
+Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in a codebase: scan, detect duplicates, find unused, optimize, lint. The UI is a Vite + React + TypeScript + Tailwind/CVA application under `ui/` consumed by the Go binary under `cmd/` + `internal/`.
 
 | Layer | Tech | Path |
 |-------|------|------|
 | CLI / server | Go | `cmd/`, `internal/` |
-| Web UI | React + TypeScript + SCSS | `ui/src/` |
-| Design tokens & component styles | SCSS partials | `ui/src/styles/_tokens.scss`, `_layout.scss`, `_components.scss`, `_patterns.scss` |
+| Web UI | React + TypeScript + Tailwind + CVA | `ui/src/` |
+| Design tokens & styling | CSS custom properties + Tailwind `@theme` | `ui/src/styles/_tokens.scss`, `tailwind.css`, `_patterns.scss` |
 | Single source of truth for UI/UX | **Markdown spec** | `DESIGN.md` |
 
 ---
@@ -30,7 +30,7 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 ### 2.2 While implementing
 
 4. **All visual values must come from `_tokens.scss` CSS custom properties** (`--g-canvas`, `--g-surface`, `--g-ink`, `--g-accent`, `--g-r-md`, `--g-shadow-*`, etc.). No raw hex, no arbitrary px radii, no ad-hoc shadow strings.
-5. **Class names from the existing inventory are preserved.** Restyle in place; do not rename `.acard`, `.opt-row`, `.dgroup`, `.bulkbar`, etc. New components must use names that match the file they live in and follow the existing kebab-case convention.
+5. **Component styles are co-located in `.tsx` via CVA + Tailwind.** New components must use the CVA pattern (`cva()` for variants, `cn()` for composition). Do not create external SCSS files for component styling.
 6. **Single primary CTA per screen.** Only one element gets the Neon Lime (`--g-accent`) filled background per visible page. Audit before committing.
 7. **Color is never alone.** Status / severity / success / error must always combine color with icon + text + position.
 8. **Pre-delivery checklist** in `DESIGN.md §15` — run through every box before reporting the task as done.
@@ -51,7 +51,7 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 
 Triggers the contract:
 - Editing any file under `ui/src/`
-- Editing any `*.scss` partial
+- Editing `_tokens.scss`, `tailwind.css`, `_patterns.scss`, or `globals.scss`
 - Adding / removing a component, view, route, or visual element
 - Changing copy that lives in the UI (button labels, empty states, tooltips, error text)
 - Changing icons, illustrations, or imagery
@@ -68,17 +68,17 @@ Does **not** trigger:
 
 ## 3. Stack-specific notes
 
-### 3.1 SCSS / styling
-- All tokens live in `ui/src/styles/_tokens.scss` under `:root` (light parity) and `[data-theme='dark']` (canonical).
-- Layout primitives in `_layout.scss`. Components in `_components.scss`. View-specific patterns in `_patterns.scss`.
-- Tailwind is **not** used for components (only `tailwind.css` placeholder). Author components in SCSS using tokens.
+### 3.1 Styling
+- Design tokens: `ui/src/styles/_tokens.scss` (CSS custom properties for light/dark) + `tailwind.css` (`@theme` mapping).
+- Component styles: Co-located in `.tsx` files via Tailwind utility classes + CVA variants.
+- Shared utilities: `ui/src/styles/_patterns.scss` (`@keyframes`, `.sr-only`, `.bg-checker`).
+- All UI primitives in `ui/src/components/ui/` use CVA pattern: `cva()` for variants, `cn()` for composition.
+- No component styles in external SCSS files — everything lives in the `.tsx`.
+- Tailwind is NOT used via `@apply` — only utility classes in JSX `className`.
 - No `!important`. No inline styles for visual properties (only for dynamic computed values like translateX offsets).
-
-> Temporary migration note, delete after the UI primitive migration is complete: `ui/src/main.tsx` currently imports `tailwind.css` before `globals.scss`. Tailwind utilities are emitted inside CSS layers, while the later SCSS reset is unlayered, so reset rules such as `button { padding: 0; background: transparent; color: inherit; }` can override component utilities. When migrating SCSS component rules to Tailwind/CVA, verify computed styles in the browser for active, inactive, hover, padding, and text color. If a primitive still lives under the current import order, either move the cascade intentionally or use a targeted utility strategy that actually wins the reset; do not assume the class appearing in DOM means the visual state applied.
 
 ### 3.2 React / TypeScript
 - Functional components, hooks, no class components.
-- Class names follow kebab-case matching SCSS partials.
 - Icons from Lucide React only — never emoji as structural icons.
 - Every `<button>` without visible text needs `aria-label`.
 - Every overlay needs ESC dismissal + focus trap + focus restoration.
@@ -100,7 +100,7 @@ Does **not** trigger:
 - If not already inside the devcontainer, enter it first with `make devc` (or `./scripts/devc.sh shell` when the container is already running). Use `/workspace` as the repo root inside the container.
 - For UI review, first ask the user whether they are already inside the devcontainer. Once confirmed, run `ui` inside the devcontainer. The UI is served at `http://127.0.0.1:5174` and the API at `19520`.
 - A UI commit must:
-  - Touch the relevant SCSS / TSX
+  - Touch the relevant TSX / SCSS tokens
   - Touch `DESIGN.md` if any design-surface delta exists
   - Inside the devcontainer, pass `go test ./...` and `go vet ./...` (UI changes can break Go-side embed tests)
   - Inside the devcontainer, pass the relevant UI checks such as `pnpm --dir ui lint`, `pnpm --dir ui test`, and/or `pnpm --dir ui build`
@@ -125,6 +125,9 @@ Does **not** trigger:
 - Mixing icon styles (e.g. Lucide outline + filled emoji) within the same screen.
 - Changing a component's visual contract without updating `DESIGN.md`.
 - "While I'm here" cleanup of unrelated UI — keep the diff scoped.
+- Writing component styles in external SCSS files instead of co-locating in `.tsx`.
+- Bypassing CVA to manually concatenate className strings for components that have variants.
+- Using `Record<Variant, string>` instead of CVA for new components.
 
 ---
 
@@ -132,10 +135,10 @@ Does **not** trigger:
 
 - Design system spec: [`DESIGN.md`](./DESIGN.md)
 - Tokens: [`ui/src/styles/_tokens.scss`](./ui/src/styles/_tokens.scss)
-- Components: [`ui/src/styles/_components.scss`](./ui/src/styles/_components.scss)
-- Layout: [`ui/src/styles/_layout.scss`](./ui/src/styles/_layout.scss)
-- Patterns: [`ui/src/styles/_patterns.scss`](./ui/src/styles/_patterns.scss)
-- Pre-delivery checklist: [`DESIGN.md §15`](./DESIGN.md#15-pre-delivery-checklist-ui-changes)
+- Tailwind token bridge: [`ui/src/styles/tailwind.css`](./ui/src/styles/tailwind.css)
+- Shared utilities: [`ui/src/styles/_patterns.scss`](./ui/src/styles/_patterns.scss)
+- UI primitives: [`ui/src/components/ui/`](./ui/src/components/ui/)
+- Pre-delivery checklist: [`DESIGN.md §16`](./DESIGN.md#16-pre-delivery-checklist-ui-changes)
 
 ---
 
