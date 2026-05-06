@@ -275,7 +275,7 @@ function ProjectCard({
         <StackedBar
           segments={buildHealthSegments(stat)}
           total={100}
-          className="project-card-health-bar mt-4"
+          className="mt-4 bg-g-surface-2 data-[track-tone=green]:bg-[color-mix(in_srgb,var(--g-green)_16%,var(--g-surface-2))] data-[track-tone=amber]:bg-[color-mix(in_srgb,var(--g-amber)_16%,var(--g-surface-2))] data-[track-tone=red]:bg-[color-mix(in_srgb,var(--g-red)_16%,var(--g-surface-2))] [&>span]:opacity-90"
           ariaLabel={t("projects.healthBadge", { health: stat.health })}
           trackTone={healthTone(stat.health)}
         />
@@ -332,7 +332,7 @@ function AddProjectCard({ onAddProject }: { onAddProject?: () => void }) {
   return (
     <button
       type="button"
-      className="project-add-card grid place-items-center rounded-g-md text-g-ink-3 hover:text-g-ink-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+      className="grid min-h-[176px] place-items-center rounded-g-md border-2 border-dashed border-g-line-strong bg-g-surface p-4 text-g-ink-3 transition-[border-color,background,color,box-shadow] duration-200 ease-g hover:not-disabled:border-g-accent hover:not-disabled:bg-[color-mix(in_srgb,var(--g-accent-soft)_50%,var(--g-surface))] hover:text-g-ink-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
       onClick={onAddProject}
       disabled={!onAddProject}
     >

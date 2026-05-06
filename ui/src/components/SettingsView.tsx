@@ -116,9 +116,9 @@ const workspaceRowActionRevealClass =
 const projectRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const activeWorkspaceBadgeClass =
-  "workspace-state-control workspace-state-control-active";
+  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink-2 shadow-g-sm font-g text-[12px] font-[590] leading-none tracking-[-0.012em] [&_svg]:size-3.5 [&_svg]:text-g-green";
 const switchWorkspaceButtonClass =
-  "workspace-state-control workspace-state-control-switch";
+  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink shadow-g-sm font-g text-[12px] font-[590] leading-none tracking-[-0.012em] [&_svg]:size-3.5 hover:bg-g-surface-3";
 const projectAssetsBadgeClass =
   "shrink-0 border-g-line bg-g-surface-2 text-g-ink-3";
 
@@ -500,10 +500,13 @@ export function SettingsView({
         </RailSection>
       </Rail>
 
-      <div className="content-scroll settings-content-scroll">
-        <div className="content-grid settings-content-grid">
+      <div className="content-scroll">
+        <div className="content-grid ml-0 mr-auto max-w-[1040px]">
           {activeSection === "workspace" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.workspace")}
                 description={t("settings.workspaceDesc")}
@@ -675,7 +678,10 @@ export function SettingsView({
           )}
 
           {activeSection === "projects" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.projects")}
                 description={t("settings.projectsDesc")}
@@ -822,7 +828,10 @@ export function SettingsView({
           )}
 
           {activeSection === "theme" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.theme")}
                 description={t("settings.appearanceDesc")}
@@ -887,7 +896,10 @@ export function SettingsView({
           )}
 
           {activeSection === "scanning" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.scanning")}
                 description={t("settings.scanningDesc")}
@@ -944,7 +956,10 @@ export function SettingsView({
           )}
 
           {activeSection === "optimization" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.optimization")}
                 description={t("settings.optimizationDesc")}
@@ -1011,7 +1026,10 @@ export function SettingsView({
           )}
 
           {activeSection === "hotkeys" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.hotkeys")}
                 description={t("settings.hotkeysDesc")}
@@ -1031,7 +1049,10 @@ export function SettingsView({
           )}
 
           {activeSection === "about" && (
-            <Card className="settings-panel" padding="none">
+            <Card
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              padding="none"
+            >
               <SectionHeading
                 title={t("settings.section.about")}
                 description={t("settings.aboutDesc")}
