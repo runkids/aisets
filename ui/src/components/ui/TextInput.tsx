@@ -1,57 +1,120 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { cn } from "../../lib/cn";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+} from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/cn";
 
-type TextInputVariant = "default" | "outline" | "subtle" | "search";
-type TextInputSize = "sm" | "md";
+/* ─── Shell (shared wrapper) ─────────────────────────────── */
 
-type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
-  label?: string;
-  icon?: ReactNode;
-  suffix?: ReactNode;
-  variant?: TextInputVariant;
-  size?: TextInputSize;
-  invalid?: boolean;
-  inputClassName?: string;
-};
-
-type TextInputButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "value"> & {
-  icon?: ReactNode;
-  suffix?: ReactNode;
-  value: ReactNode;
-  variant?: TextInputVariant;
-  size?: TextInputSize;
-  contentClassName?: string;
-};
-
-const fieldClassName = "flex min-w-0 flex-1 flex-col gap-1.5";
-const labelClassName =
-  "font-g text-g-caption font-[510] tracking-[-0.011em] text-g-ink-3";
-const shellBaseClassName = cn(
-  "inline-flex w-full min-w-0 items-center gap-2 rounded-g-md border px-2.5 text-g-ink transition-[background,border-color,box-shadow] duration-[120ms] ease-g",
-  "focus-within:border-g-accent focus-within:bg-g-surface focus-within:shadow-g-focus",
+const textInputShellVariants = cva(
+  [
+    "inline-flex w-full min-w-0 items-center gap-2 rounded-g-md border px-2.5 text-g-ink transition-[background,border-color,box-shadow] duration-[120ms] ease-g",
+    "focus-within:border-g-accent focus-within:bg-g-surface focus-within:shadow-g-focus",
+  ],
+  {
+    variants: {
+      variant: {
+        default:
+          "border-g-line-strong bg-g-surface-3 hover:border-g-line-strong",
+        outline: "border-g-line bg-transparent hover:border-g-line-strong",
+        subtle: "border-transparent bg-g-surface-3 hover:border-g-line-strong",
+        search:
+          "border-g-line-strong bg-g-surface-3 hover:border-g-line-strong",
+      },
+      size: {
+        sm: "h-g-btn-sm",
+        md: "h-g-btn-md",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "md",
+    },
+  },
 );
 
-const shellVariantClassNames: Record<TextInputVariant, string> = {
-  default: "border-g-line-strong bg-g-surface-3 hover:border-g-line-strong",
-  outline: "border-g-line bg-transparent hover:border-g-line-strong",
-  subtle: "border-transparent bg-g-surface-3 hover:border-g-line-strong",
-  search: "border-g-line-strong bg-g-surface-3 hover:border-g-line-strong",
-};
+type ShellVariants = VariantProps<typeof textInputShellVariants>;
 
-const shellSizeClassNames: Record<TextInputSize, string> = {
-  sm: "h-g-btn-sm",
-  md: "h-g-btn-md",
-};
+/* ─── TextInput ──────────────────────────────────────────── */
 
 const inputBaseClassName =
   "min-w-0 flex-1 border-0 bg-transparent font-g-mono text-g-ui tracking-g-mono text-g-ink outline-none placeholder:text-g-ink-3";
 
-export function TextInputButton({
+type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> &
+  ShellVariants & {
+    label?: string;
+    icon?: ReactNode;
+    suffix?: ReactNode;
+    invalid?: boolean;
+    inputClassName?: string;
+  };
+
+function TextInput({
+  label,
+  icon,
+  suffix,
+  id,
+  variant,
+  size,
+  invalid = false,
+  className,
+  inputClassName,
+  ...props
+}: TextInputProps) {
+  return (
+    <label
+      className={cn("flex min-w-0 flex-1 flex-col gap-1.5", className)}
+      htmlFor={id}
+    >
+      {label && (
+        <span className="font-g text-g-caption font-[510] tracking-[-0.011em] text-g-ink-3">
+          {label}
+        </span>
+      )}
+      <span
+        className={cn(
+          textInputShellVariants({ variant, size }),
+          invalid && "border-g-red",
+        )}
+      >
+        {icon && (
+          <span className="inline-flex shrink-0 text-g-ink-3">{icon}</span>
+        )}
+        <input
+          id={id}
+          className={cn(inputBaseClassName, inputClassName)}
+          aria-invalid={invalid || undefined}
+          {...props}
+        />
+        {suffix && (
+          <span className="shrink-0 text-g-caption text-g-ink-3">{suffix}</span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+/* ─── TextInputButton ────────────────────────────────────── */
+
+type TextInputButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "value"
+> &
+  ShellVariants & {
+    icon?: ReactNode;
+    suffix?: ReactNode;
+    value: ReactNode;
+    contentClassName?: string;
+  };
+
+function TextInputButton({
   icon,
   suffix,
   value,
   variant = "search",
-  size = "md",
+  size,
   className,
   contentClassName,
   disabled,
@@ -61,12 +124,7 @@ export function TextInputButton({
     <button
       type="button"
       className={cn(
-        shellBaseClassName,
-        shellVariantClassNames[variant],
-        shellSizeClassNames[size],
-        "text-input-button",
-        `text-input-button--${variant}`,
-        `text-input-button--${size}`,
+        textInputShellVariants({ variant, size }),
         "cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-[0.38]",
         className,
       )}
@@ -91,42 +149,12 @@ export function TextInputButton({
   );
 }
 
-export function TextInput({
-  label,
-  icon,
-  suffix,
-  id,
-  variant = "default",
-  size = "md",
-  invalid = false,
-  className,
-  inputClassName,
-  ...props
-}: TextInputProps) {
-  return (
-    <label className={cn(fieldClassName, className)} htmlFor={id}>
-      {label && <span className={labelClassName}>{label}</span>}
-      <span
-        className={cn(
-          shellBaseClassName,
-          shellVariantClassNames[variant],
-          shellSizeClassNames[size],
-          invalid && "border-g-red",
-        )}
-      >
-        {icon && (
-          <span className="inline-flex shrink-0 text-g-ink-3">{icon}</span>
-        )}
-        <input
-          id={id}
-          className={cn(inputBaseClassName, inputClassName)}
-          aria-invalid={invalid || undefined}
-          {...props}
-        />
-        {suffix && (
-          <span className="shrink-0 text-g-caption text-g-ink-3">{suffix}</span>
-        )}
-      </span>
-    </label>
-  );
-}
+/* eslint-disable react-refresh/only-export-components */
+export {
+  TextInput,
+  TextInputButton,
+  textInputShellVariants,
+  type TextInputProps,
+  type TextInputButtonProps,
+};
+/* eslint-enable react-refresh/only-export-components */
