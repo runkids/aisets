@@ -18,9 +18,9 @@ import { directoryListingQueryOptions } from "./queries";
 
 describe("directoryListingQueryOptions", () => {
   it("does not retry missing or invalid directory requests", () => {
-    const options = directoryListingQueryOptions("/workspace/missing", true);
+    const options = directoryListingQueryOptions("/missing-project", true);
 
-    expect(options.queryKey).toEqual(["directories", "/workspace/missing"]);
+    expect(options.queryKey).toEqual(["directories", "/missing-project"]);
     expect(options.enabled).toBe(true);
     expect(options.retry).toBe(false);
   });

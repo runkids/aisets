@@ -1,13 +1,21 @@
 package config
 
+type Workspace struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ProjectCount int    `json:"projectCount"`
+}
+
 type Project struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Path string `json:"path"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspaceId"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
 }
 
 type AppSettings struct {
 	WorkspaceName              string   `json:"workspaceName"`
+	ActiveWorkspaceID          string   `json:"activeWorkspaceId"`
 	DefaultProjectRoot         string   `json:"defaultProjectRoot"`
 	AutoScanOnOpen             bool     `json:"autoScanOnOpen"`
 	ScanOnOpen                 bool     `json:"scanOnOpen"`
@@ -18,6 +26,7 @@ type AppSettings struct {
 
 type SettingsUpdate struct {
 	WorkspaceName              *string  `json:"workspaceName"`
+	ActiveWorkspaceID          *string  `json:"activeWorkspaceId"`
 	DefaultProjectRoot         *string  `json:"defaultProjectRoot"`
 	AutoScanOnOpen             *bool    `json:"autoScanOnOpen"`
 	ScanOnOpen                 *bool    `json:"scanOnOpen"`
@@ -29,6 +38,7 @@ type SettingsUpdate struct {
 type ExportData struct {
 	Version    int          `json:"version"`
 	ExportedAt string       `json:"exportedAt"`
+	Workspaces []Workspace  `json:"workspaces,omitempty"`
 	Projects   []Project    `json:"projects"`
 	Settings   *AppSettings `json:"settings,omitempty"`
 }

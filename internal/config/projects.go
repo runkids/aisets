@@ -10,8 +10,12 @@ import (
 )
 
 func (s *Store) Projects() []Project {
+	return s.ProjectsInWorkspace(s.activeWorkspaceID())
+}
+
+func (s *Store) AllProjects() []Project {
 	rows, err := s.db.Query(`
-		SELECT id, name, path
+		SELECT id, workspace_id, name, path
 		FROM projects
 		WHERE deleted_at IS NULL
 		ORDER BY lower(path)
@@ -23,7 +27,34 @@ func (s *Store) Projects() []Project {
 	out := []Project{}
 	for rows.Next() {
 		var project Project
-		if err := rows.Scan(&project.ID, &project.Name, &project.Path); err == nil {
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path); err == nil {
+			out = append(out, project)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].WorkspaceID != out[j].WorkspaceID {
+			return out[i].WorkspaceID < out[j].WorkspaceID
+		}
+		return strings.ToLower(out[i].Path) < strings.ToLower(out[j].Path)
+	})
+	return out
+}
+
+func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
+	rows, err := s.db.Query(`
+		SELECT id, workspace_id, name, path
+		FROM projects
+		WHERE workspace_id = ? AND deleted_at IS NULL
+		ORDER BY lower(path)
+	`, workspaceID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := []Project{}
+	for rows.Next() {
+		var project Project
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path); err == nil {
 			out = append(out, project)
 		}
 	}
@@ -32,6 +63,13 @@ func (s *Store) Projects() []Project {
 }
 
 func (s *Store) AddProjects(paths []string) error {
+	return s.AddProjectsToWorkspace(s.activeWorkspaceID(), paths)
+}
+
+func (s *Store) AddProjectsToWorkspace(workspaceID string, paths []string) error {
+	if _, err := s.workspace(workspaceID); err != nil {
+		return err
+	}
 	now := nowUTC()
 	for _, raw := range paths {
 		if raw == "" {
@@ -49,13 +87,13 @@ func (s *Store) AddProjects(paths []string) error {
 			return &PathError{Path: abs, Message: "project path must be a directory"}
 		}
 		if _, err := s.db.Exec(`
-			INSERT INTO projects (id, name, path, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(path) DO UPDATE SET
+			INSERT INTO projects (id, workspace_id, name, path, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(workspace_id, path) DO UPDATE SET
 				name = excluded.name,
 				deleted_at = NULL,
 				updated_at = excluded.updated_at
-		`, abs, filepath.Base(abs), abs, now, now); err != nil {
+		`, projectID(workspaceID, abs), workspaceID, filepath.Base(abs), abs, now, now); err != nil {
 			return err
 		}
 	}

@@ -1,11 +1,19 @@
+export type Workspace = {
+  id: string;
+  name: string;
+  projectCount: number;
+};
+
 export type Project = {
   id: string;
+  workspaceId: string;
   name: string;
   path: string;
 };
 
 export type AppSettings = {
   workspaceName: string;
+  activeWorkspaceId: string;
   defaultProjectRoot: string;
   autoScanOnOpen: boolean;
   scanOnOpen: boolean;
@@ -15,6 +23,8 @@ export type AppSettings = {
 };
 
 export type SettingsInfo = AppSettings & {
+  workspaces: Workspace[];
+  projects: Project[];
   databasePath: string;
   dataDir: string;
   cacheDir: string;
@@ -25,6 +35,7 @@ export type SettingsUpdate = Partial<AppSettings>;
 export type ExportData = {
   version: number;
   exportedAt: string;
+  workspaces?: Workspace[];
   projects: Project[];
   settings?: AppSettings;
 };

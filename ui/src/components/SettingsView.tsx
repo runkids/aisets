@@ -7,11 +7,14 @@ import {
   Keyboard,
   Moon,
   Paintbrush,
+  Pencil,
+  Plus,
   RotateCcw,
   Scan,
   Settings2,
   Sliders,
   Sun,
+  Trash2,
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -20,10 +23,17 @@ import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
 import { errorMessage, supportedLanguages } from "../i18n/index";
 import {
+  useAddWorkspaceMutation,
   useCatalogQuery,
+  useDirectoryListingQuery,
   useImportSettingsMutation,
+  useRemoveProjectMutation,
+  useRemoveWorkspaceMutation,
+  useRenameProjectMutation,
+  useRenameWorkspaceMutation,
   useResetDatabaseMutation,
   useSettingsQuery,
+  useSwitchWorkspaceMutation,
   useUpdateSettingsMutation,
 } from "../queries";
 import type { ExportData, SettingsInfo, SettingsUpdate } from "../types";
@@ -31,7 +41,9 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Notice,
+  PromptDialog,
   Rail,
   RailItem,
   RailSection,
@@ -80,7 +92,7 @@ const sectionMeta: { id: Section; icon: ReactNode }[] = [
 
 const defaultSettings: SettingsUpdate = {
   workspaceName: "Asset Studio",
-  defaultProjectRoot: "/workspace",
+  defaultProjectRoot: "",
   autoScanOnOpen: false,
   scanOnOpen: false,
   excludePatterns: [],
@@ -120,15 +132,23 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
 function FieldRow({
   label,
   description,
+  align = "center",
   children,
 }: {
   label: string;
   description?: string;
   icon?: ReactNode;
+  align?: "center" | "start";
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-1 items-center gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8">
+    <div
+      className={
+        align === "start"
+          ? "grid grid-cols-1 items-start gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8"
+          : "grid grid-cols-1 items-center gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8"
+      }
+    >
       <div className="min-w-0">
         <span className="block font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
           {label}
@@ -205,20 +225,78 @@ export function SettingsView({
   const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
     null,
   );
+  const [addWorkspaceOpen, setAddWorkspaceOpen] = useState(false);
+  const [renameWorkspaceId, setRenameWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [removeWorkspaceId, setRemoveWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
+  const [removeProjectId, setRemoveProjectId] = useState<string | null>(null);
+  const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const settingsQuery = useSettingsQuery();
+  const defaultDirectoryQuery = useDirectoryListingQuery(
+    "",
+    activeSection === "workspace",
+  );
   const catalogQuery = useCatalogQuery();
+  const addWorkspaceMutation = useAddWorkspaceMutation();
   const importMutation = useImportSettingsMutation();
+  const removeProjectMutation = useRemoveProjectMutation();
+  const removeWorkspaceMutation = useRemoveWorkspaceMutation();
+  const renameProjectMutation = useRenameProjectMutation();
+  const renameWorkspaceMutation = useRenameWorkspaceMutation();
   const resetMutation = useResetDatabaseMutation();
+  const switchWorkspaceMutation = useSwitchWorkspaceMutation();
   const updateMutation = useUpdateSettingsMutation();
 
   const settings = settingsQuery.data?.settings;
   const draft = draftOverride ?? draftFromSettings(settings);
+  const defaultRootPlaceholder = defaultDirectoryQuery.data?.path
+    ? t("settings.defaultRootPlaceholderWithPath", {
+        path: defaultDirectoryQuery.data.path,
+      })
+    : t("settings.defaultRootPlaceholder");
+  const workspaces = settings?.workspaces ?? [];
+  const activeWorkspaceId = settings?.activeWorkspaceId ?? "default";
   const projects = catalogQuery.data?.projects ?? [];
+  const settingsProjects = settings?.projects ?? projects;
   const items = catalogQuery.data?.items ?? [];
+  const workspaceProjects = new Map(
+    workspaces.map((workspace) => [
+      workspace.id,
+      [] as typeof settingsProjects,
+    ]),
+  );
+  for (const project of settingsProjects) {
+    const group = workspaceProjects.get(project.workspaceId);
+    if (group) {
+      group.push(project);
+    }
+  }
+  const workspaceBeingRenamed = workspaces.find(
+    (workspace) => workspace.id === renameWorkspaceId,
+  );
+  const workspaceBeingRemoved = workspaces.find(
+    (workspace) => workspace.id === removeWorkspaceId,
+  );
+  const projectBeingRenamed = settingsProjects.find(
+    (project) => project.id === renameProjectId,
+  );
+  const projectBeingRemoved = settingsProjects.find(
+    (project) => project.id === removeProjectId,
+  );
   const working =
+    addWorkspaceMutation.isPending ||
     importMutation.isPending ||
+    removeProjectMutation.isPending ||
+    removeWorkspaceMutation.isPending ||
+    renameProjectMutation.isPending ||
+    renameWorkspaceMutation.isPending ||
     resetMutation.isPending ||
+    switchWorkspaceMutation.isPending ||
     updateMutation.isPending;
   const settingsActionDisabled = settingsQuery.isLoading || working;
 
@@ -237,6 +315,58 @@ export function SettingsView({
   async function onSaveSettings() {
     const result = await updateMutation.mutateAsync(updateFromDraft(draft));
     setDraftOverride(draftFromSettings(result.settings));
+  }
+
+  function onAddWorkspace(name: string) {
+    addWorkspaceMutation.mutate(name, {
+      onSuccess: (result) => {
+        setAddWorkspaceOpen(false);
+        setDraftOverride(draftFromSettings(result.settings));
+      },
+    });
+  }
+
+  async function onSwitchWorkspace(workspaceId: string) {
+    const result = await switchWorkspaceMutation.mutateAsync(workspaceId);
+    setDraftOverride(draftFromSettings(result.settings));
+  }
+
+  function onRenameWorkspace(name: string) {
+    if (!workspaceBeingRenamed) return;
+    renameWorkspaceMutation.mutate(
+      { id: workspaceBeingRenamed.id, name },
+      {
+        onSuccess: (result) => {
+          setRenameWorkspaceId(null);
+          setDraftOverride(draftFromSettings(result.settings));
+        },
+      },
+    );
+  }
+
+  function onRemoveWorkspace() {
+    if (!workspaceBeingRemoved) return;
+    removeWorkspaceMutation.mutate(workspaceBeingRemoved.id, {
+      onSuccess: (result) => {
+        setRemoveWorkspaceId(null);
+        setDraftOverride(draftFromSettings(result.settings));
+      },
+    });
+  }
+
+  function onRenameProject(name: string) {
+    if (!projectBeingRenamed) return;
+    renameProjectMutation.mutate(
+      { id: projectBeingRenamed.id, name },
+      { onSuccess: () => setRenameProjectId(null) },
+    );
+  }
+
+  function onRemoveProject() {
+    if (!projectBeingRemoved) return;
+    removeProjectMutation.mutate(projectBeingRemoved.id, {
+      onSuccess: () => setRemoveProjectId(null),
+    });
   }
 
   async function onResetSettings() {
@@ -264,10 +394,10 @@ export function SettingsView({
     setDraftOverride(null);
   }
 
-  async function onReset() {
-    const confirmed = window.confirm(t("settings.resetConfirm"));
-    if (!confirmed) return;
-    await resetMutation.mutateAsync();
+  function onReset() {
+    resetMutation.mutate(undefined, {
+      onSuccess: () => setResetDatabaseOpen(false),
+    });
   }
 
   const settingActions = (
@@ -324,9 +454,116 @@ export function SettingsView({
                       }))
                     }
                     placeholder="Asset Studio"
-                    className="w-full md:w-80"
+                    className="w-full md:w-[560px]"
                     inputClassName="font-g tracking-g-ui"
                   />
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.workspaces")}
+                  description={t("settings.workspacesHint")}
+                  align="start"
+                >
+                  <div className="flex w-full flex-col gap-2 md:w-[560px] md:items-stretch">
+                    <div className="grid gap-2" role="list">
+                      {workspaces.map((workspace) => {
+                        const isActive = workspace.id === activeWorkspaceId;
+                        const summary = t("settings.workspaceProjects", {
+                          count: workspace.projectCount,
+                        });
+
+                        return (
+                          <div
+                            key={workspace.id}
+                            role="listitem"
+                            data-active={isActive || undefined}
+                            className="group flex flex-col gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 data-[active=true]:border-g-line-strong data-[active=true]:bg-g-surface-2 sm:flex-row sm:items-center"
+                          >
+                            {isActive ? (
+                              <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                                <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
+                                  <FolderKanban size={15} />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
+                                    {workspace.name}
+                                  </span>
+                                  <span className="block font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                    {summary}
+                                  </span>
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                                <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
+                                  <FolderKanban size={15} />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate font-g-display text-g-body font-[510] leading-[1.3] tracking-[-0.013em] text-g-ink">
+                                    {workspace.name}
+                                  </span>
+                                  <span className="block font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                    {summary}
+                                  </span>
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                              {isActive && (
+                                <Badge tone="line" className="text-g-ink-3">
+                                  {t("settings.activeWorkspace")}
+                                </Badge>
+                              )}
+                              {!isActive && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={working}
+                                  onClick={() =>
+                                    void onSwitchWorkspace(workspace.id)
+                                  }
+                                >
+                                  {t("settings.switchWorkspaceAction")}
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leadingIcon={<Pencil size={13} />}
+                                disabled={working}
+                                onClick={() =>
+                                  setRenameWorkspaceId(workspace.id)
+                                }
+                              >
+                                {t("action.rename")}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leadingIcon={<Trash2 size={13} />}
+                                disabled={working || workspaces.length <= 1}
+                                className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                onClick={() =>
+                                  setRemoveWorkspaceId(workspace.id)
+                                }
+                              >
+                                {t("action.delete")}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leadingIcon={<Plus size={13} />}
+                      disabled={working}
+                      className="self-start"
+                      onClick={() => setAddWorkspaceOpen(true)}
+                    >
+                      {t("settings.addWorkspace")}
+                    </Button>
+                  </div>
                 </FieldRow>
                 <FieldRow
                   label={t("settings.defaultRoot")}
@@ -345,13 +582,23 @@ export function SettingsView({
                         defaultProjectRoot: event.target.value,
                       }))
                     }
-                    placeholder="/workspace"
-                    className="w-full md:w-80"
+                    placeholder={defaultRootPlaceholder}
+                    className="w-full md:w-[560px]"
                   />
                 </FieldRow>
-                {updateMutation.error && (
+                {(updateMutation.error ||
+                  addWorkspaceMutation.error ||
+                  renameWorkspaceMutation.error ||
+                  removeWorkspaceMutation.error ||
+                  switchWorkspaceMutation.error) && (
                   <Notice tone="danger">
-                    {errorMessage(updateMutation.error)}
+                    {errorMessage(
+                      updateMutation.error ??
+                        addWorkspaceMutation.error ??
+                        renameWorkspaceMutation.error ??
+                        removeWorkspaceMutation.error ??
+                        switchWorkspaceMutation.error,
+                    )}
                   </Notice>
                 )}
                 {settingActions}
@@ -366,25 +613,129 @@ export function SettingsView({
                 description={t("settings.projectsDesc")}
                 icon={sectionIcon("projects")}
               />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                {projects.length === 0 ? (
-                  <p className="py-4 font-g text-g-ui text-g-ink-3">
+              <div className="px-6 py-5 md:px-8">
+                {settingsProjects.length === 0 ? (
+                  <p className="font-g text-g-ui text-g-ink-3">
                     {t("settings.noProjects")}
                   </p>
                 ) : (
-                  projects.map((project) => (
-                    <FieldRow
-                      key={project.id}
-                      label={project.name}
-                      description={project.path}
-                    >
-                      <Badge tone="line">
-                        {t("settings.projectAssets", {
-                          count: assetCountByProject[project.id] ?? 0,
-                        })}
-                      </Badge>
-                    </FieldRow>
-                  ))
+                  <div className="space-y-5">
+                    {workspaces.map((workspace) => {
+                      const groupedProjects =
+                        workspaceProjects.get(workspace.id) ?? [];
+                      const isActive = workspace.id === activeWorkspaceId;
+
+                      return (
+                        <section key={workspace.id} className="space-y-2">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
+                                <FolderKanban size={15} />
+                              </span>
+                              <div className="min-w-0">
+                                <h3 className="truncate font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
+                                  {workspace.name}
+                                </h3>
+                                <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                  {t("settings.workspaceProjects", {
+                                    count: groupedProjects.length,
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                              {isActive ? (
+                                <Badge tone="line" className="text-g-ink-3">
+                                  {t("settings.activeWorkspace")}
+                                </Badge>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={working}
+                                  onClick={() =>
+                                    void onSwitchWorkspace(workspace.id)
+                                  }
+                                >
+                                  {t("settings.switchWorkspaceAction")}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-4 grid gap-1.5 border-l border-g-line pl-4 sm:ml-10">
+                            {groupedProjects.length === 0 ? (
+                              <p className="py-2 font-g text-g-ui text-g-ink-3">
+                                {t("settings.noProjectsInWorkspace")}
+                              </p>
+                            ) : (
+                              groupedProjects.map((project) => (
+                                <div
+                                  key={project.id}
+                                  className="flex flex-col gap-2 rounded-g-md px-2 py-2 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                  <div className="flex min-w-0 items-start gap-2">
+                                    <span className="mt-2 size-1.5 shrink-0 rounded-g-pill bg-g-line-strong" />
+                                    <div className="min-w-0">
+                                      <div className="truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                                        {project.name}
+                                      </div>
+                                      <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                        {project.path}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-3 sm:justify-end sm:pl-0">
+                                    {project.workspaceId ===
+                                      activeWorkspaceId && (
+                                      <Badge tone="line">
+                                        {t("settings.projectAssets", {
+                                          count:
+                                            assetCountByProject[project.id] ??
+                                            0,
+                                        })}
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      leadingIcon={<Pencil size={13} />}
+                                      disabled={working}
+                                      onClick={() =>
+                                        setRenameProjectId(project.id)
+                                      }
+                                    >
+                                      {t("action.rename")}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      leadingIcon={<Trash2 size={13} />}
+                                      disabled={working}
+                                      className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                                      onClick={() =>
+                                        setRemoveProjectId(project.id)
+                                      }
+                                    >
+                                      {t("action.delete")}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
+                {(renameProjectMutation.error ||
+                  removeProjectMutation.error) && (
+                  <Notice tone="danger" className="mt-4">
+                    {errorMessage(
+                      renameProjectMutation.error ??
+                        removeProjectMutation.error,
+                    )}
+                  </Notice>
                 )}
               </div>
             </Card>
@@ -477,6 +828,7 @@ export function SettingsView({
                   label={t("settings.excludePatterns")}
                   description={t("settings.excludePatternsHint")}
                   icon={<Sliders size={15} />}
+                  align="start"
                 >
                   <Textarea
                     disabled={
@@ -490,7 +842,9 @@ export function SettingsView({
                       }))
                     }
                     placeholder={"node_modules\n.git\ndist/**"}
-                    className="w-full md:w-80"
+                    rows={6}
+                    className="w-full md:w-[420px]"
+                    textareaClassName="min-h-36 resize-y"
                   />
                 </FieldRow>
                 {updateMutation.error && (
@@ -632,7 +986,7 @@ export function SettingsView({
                     <Button
                       variant="danger"
                       leadingIcon={<RotateCcw size={15} />}
-                      onClick={() => void onReset()}
+                      onClick={() => setResetDatabaseOpen(true)}
                       disabled={working}
                     >
                       {t("settings.resetDatabase")}
@@ -667,6 +1021,77 @@ export function SettingsView({
           )}
         </div>
       </div>
+      <PromptDialog
+        open={addWorkspaceOpen}
+        title={t("settings.addWorkspace")}
+        label={t("settings.workspaceName")}
+        placeholder={t("settings.addWorkspacePrompt")}
+        confirmText={t("settings.addWorkspace")}
+        cancelText={t("common.cancel")}
+        loading={addWorkspaceMutation.isPending}
+        onConfirm={onAddWorkspace}
+        onCancel={() => setAddWorkspaceOpen(false)}
+      />
+      <PromptDialog
+        open={Boolean(workspaceBeingRenamed)}
+        title={t("settings.renameWorkspace")}
+        label={t("settings.workspaceName")}
+        placeholder={t("settings.renameWorkspacePrompt")}
+        defaultValue={workspaceBeingRenamed?.name ?? ""}
+        confirmText={t("action.rename")}
+        cancelText={t("common.cancel")}
+        loading={renameWorkspaceMutation.isPending}
+        onConfirm={onRenameWorkspace}
+        onCancel={() => setRenameWorkspaceId(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(workspaceBeingRemoved)}
+        variant="danger"
+        title={t("settings.removeWorkspace")}
+        message={t("settings.removeWorkspaceConfirm", {
+          name: workspaceBeingRemoved?.name ?? "",
+        })}
+        confirmText={t("action.delete")}
+        cancelText={t("common.cancel")}
+        loading={removeWorkspaceMutation.isPending}
+        onConfirm={onRemoveWorkspace}
+        onCancel={() => setRemoveWorkspaceId(null)}
+      />
+      <PromptDialog
+        open={Boolean(projectBeingRenamed)}
+        title={t("projects.renameDialogTitle")}
+        label={t("projects.renameLabel")}
+        defaultValue={projectBeingRenamed?.name ?? ""}
+        confirmText={t("projects.renameDialogConfirm")}
+        cancelText={t("common.cancel")}
+        loading={renameProjectMutation.isPending}
+        onConfirm={onRenameProject}
+        onCancel={() => setRenameProjectId(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(projectBeingRemoved)}
+        variant="danger"
+        title={t("projects.removeDialogTitle")}
+        message={t("projects.removeConfirm", {
+          name: projectBeingRemoved?.name ?? "",
+        })}
+        confirmText={t("projects.removeDialogConfirm")}
+        cancelText={t("common.cancel")}
+        loading={removeProjectMutation.isPending}
+        onConfirm={onRemoveProject}
+        onCancel={() => setRemoveProjectId(null)}
+      />
+      <ConfirmDialog
+        open={resetDatabaseOpen}
+        variant="danger"
+        title={t("settings.resetDatabase")}
+        message={t("settings.resetConfirm")}
+        confirmText={t("settings.resetDatabase")}
+        cancelText={t("common.cancel")}
+        loading={resetMutation.isPending}
+        onConfirm={onReset}
+        onCancel={() => setResetDatabaseOpen(false)}
+      />
     </>
   );
 }

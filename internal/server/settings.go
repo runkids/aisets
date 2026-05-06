@@ -16,9 +16,11 @@ func settingsErrorStatus(err error) int {
 
 type settingsInfo struct {
 	config.AppSettings
-	DatabasePath string `json:"databasePath"`
-	DataDir      string `json:"dataDir"`
-	CacheDir     string `json:"cacheDir"`
+	Workspaces   []config.Workspace `json:"workspaces"`
+	Projects     []config.Project   `json:"projects"`
+	DatabasePath string             `json:"databasePath"`
+	DataDir      string             `json:"dataDir"`
+	CacheDir     string             `json:"cacheDir"`
 }
 
 func (s *Server) currentSettingsInfo() (settingsInfo, error) {
@@ -28,6 +30,8 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 	}
 	return settingsInfo{
 		AppSettings:  settings,
+		Workspaces:   s.store.Workspaces(),
+		Projects:     s.store.AllProjects(),
 		DatabasePath: s.store.Path(),
 		DataDir:      config.DataDir(),
 		CacheDir:     config.CacheDir(),
@@ -48,6 +52,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
+	}
+	if body.ActiveWorkspaceID != nil {
+		s.clearCatalog()
 	}
 	if _, err := s.store.UpdateSettings(body); err != nil {
 		writeError(w, settingsErrorStatus(err), err)

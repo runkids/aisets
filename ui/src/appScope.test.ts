@@ -7,7 +7,7 @@ import {
 import type { Catalog, Project } from "./types";
 
 function makeProject(id: string): Project {
-  return { id, name: id, path: `/${id}` };
+  return { id, workspaceId: "default", name: id, path: `/${id}` };
 }
 
 function makeCatalog(projectIds: string[], totalFiles: number): Catalog {

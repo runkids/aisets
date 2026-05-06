@@ -14,7 +14,7 @@ Asset Studio now supports a progressive migration from SCSS class inventory to R
 
 - **Design tokens remain the source of truth.** Tailwind utilities used by components must resolve to `--g-*` tokens or the 4px spacing/type scales in this document.
 - **React components may own variants.** Shared primitives can use `clsx` + variant maps to express `variant`, `size`, and state in TypeScript instead of hand-concatenating SCSS classes.
-- **Tailwind is allowed for shared primitives and new component-local styling** when it uses token aliases from `ui/src/styles/tailwind.css` (`bg-g-surface`, `text-g-ink`, `rounded-g-md`, `shadow-g-focus`, etc.).
+- **Tailwind is allowed for shared primitives and new component-local styling** when it uses token aliases from `ui/src/styles/tailwind.css` (`bg-g-surface`, `text-g-ink`, `rounded-g-md`, `shadow-g-focus`, etc.). Global resets must not set unlayered `background`, `border`, `padding`, `color`, or `outline` on form controls, because those declarations override Tailwind/CVA utilities.
 - **SCSS remains valid for tokens, reset/layout, legacy screens, and complex view patterns** (`.acard`, `.opt-row`, `.dgroup`, sticky groups, drawers, modals).
 - **Migration is incremental.** Existing semantic classes are preserved until their owning component is migrated; avoid broad rewrites that mix behavior changes with styling migration.
 
@@ -248,7 +248,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - **Crumbs**: 13px / 400 / Storm Cloud. Current page: 510 / Porcelain. Slash separator: mono / `--g-ink-5`. Optional count chip uses `--g-info-soft` background
 - **Search input / trigger** `.search`:
   - Width 320px (max 40vw)
-  - Background `--g-surface-3` (Charcoal subtle input fill)
+  - Background `--g-surface` (white in light mode, Graphite in dark mode) with a strong token border so the field stays visible on the frosted topbar
   - Border `1px solid var(--g-line-strong)`
   - 6px radius, 10px 12px padding, Inter 13px / 400 / Light Steel
   - Placeholder: Storm Cloud
@@ -277,12 +277,12 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ### 4.5 Project Switcher `.project-switcher`
 
-- Lives in `.sb-project-switcher` under the brand and uses the same compact chrome as sidebar controls: `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`.
+- Lives in `.sb-project-switcher` under the brand and uses the same compact chrome as sidebar controls: `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. The wrapper does not draw a lower divider; spacing separates the switcher from navigation.
 - Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
 - Menu: anchored popover, 320px max width, `--g-surface` white/Graphite layer, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
 - Header stays compact: 15px display title + 12px workspace meta, bottom divider `--g-line`.
-- Workspace row uses a non-interactive `--g-surface` card so it reads as context, not a competing selected option.
-- Project options are 40px minimum rows with 10px gaps, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Hover/focus uses `--g-surface-3`.
+- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
+- Project options are 40px minimum rows with 10px gaps, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Project options are scoped to the active workspace only. The selected project scope keeps the full active treatment; hover/focus uses `--g-surface-3`.
 - Hover logic matches sidebar rows: inactive hover uses a subtle surface wash (`--g-surface-3` in dark), inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
 - Press scale is disabled under `prefers-reduced-motion`.
 
@@ -372,7 +372,7 @@ Canonical shared primitive: `IconButton` from `ui/src/components/ui/Button.tsx`;
 
 ### 6.3 Tabs / Segmented Toggle
 
-Canonical shared primitive: `Tabs` from `ui/src/components/ui/Tabs.tsx`; legacy `.seg-toggle` remains supported for unmigrated markup.
+Canonical shared primitives: `Tabs` from `ui/src/components/ui/Tabs.tsx` for content tabs, and `SegmentedControl` from `ui/src/components/ui/SegmentedControl.tsx` for compact toolbar toggles (Browse view / size / background, Projects sort). Legacy `.seg-toggle` remains supported for unmigrated markup.
 
 React API:
 
@@ -391,7 +391,8 @@ React API:
 - `variant="pills"`: no wrapper chrome; children use line borders and active `--g-active-bg` / `--g-active-text`.
 - Sizes: `sm` = 26px height, `md` = 32px height.
 - Children: Inter 12–13px / 510 / token text. Icons 13px.
-- Focus: every tab gets `--g-shadow-focus`.
+- `SegmentedControl`: wrapper uses the same 32px control height, 6px radius, token border, inset shadow, and 2px inner padding for `text`, `icon`, and `fixed` variants. Active children use `--g-active-bg`, `--g-active-text`, `--g-active-weight`, and `--g-shadow-sm` so Projects sort and Browse size toggles share one selected-control recipe across themes.
+- Focus: every tab/toggle gets `--g-shadow-focus`.
 
 ### 6.4 Card
 
@@ -423,7 +424,7 @@ React API:
 <Badge tone="amber">Warning</Badge>
 ```
 
-- Height 22px, 9999px radius (pill), mono **11px / 510**, tabular nums
+- Height 20px, 9999px radius (pill), mono **10px / 510**, tabular nums
 - Default tone: bg `--g-surface-3`, text `--g-ink-3`
 - `line`: transparent bg, 1px `--g-line-strong` border, `--g-ink-2` text
 - Tonal variants `red | amber | green | blue | purple | info`: `*-soft` bg + base color text
@@ -432,7 +433,7 @@ React API:
 
 ### 6.8 Text Input
 
-Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`; legacy `.field` / `.input-shell` remains supported for unmigrated markup.
+Canonical shared primitive: `TextInput` from `ui/src/components/ui/TextInput.tsx`; its shell, button trigger, control, icon, affix, size, and state styles are owned by token-backed Tailwind/CVA classes rather than `.text-input-*` / `.field` SCSS classes.
 
 React API:
 
@@ -446,12 +447,13 @@ React API:
 ```
 
 - Base: 32px height (`md`) or 26px (`sm`), 6px radius, 10px inline padding, Inter/mono text per context, 120ms token transitions
-- `default`: `--g-surface-3` bg + `1px solid --g-line-strong` border (current primitive default)
+- `default`: `--g-surface` bg + `1px solid --g-line-strong` border so light-mode inputs render white by default; hover may lift to `--g-surface-2`
 - `outline`: transparent bg + `1px solid --g-line` border
 - `subtle`: `--g-surface-3` bg + transparent border
-- `search`: `--g-surface-3` bg + `--g-line-strong` border for toolbar/search contexts
+- `search`: `--g-surface` bg + `--g-line-strong` border for toolbar/search contexts; this keeps light-mode search fields white instead of grey
+- `command`: transparent bg + transparent border + no shell focus ring for Command Palette header input
 - Placeholder: `--g-ink-3`
-- Focus: border `--g-accent`, `--g-shadow-focus`, bg `--g-surface`
+- Focus: border `--g-accent`, `--g-shadow-focus`, bg `--g-surface` (`command` stays borderless and shadowless). Dialog prompt inputs follow the same default white/Graphite input surface.
 - Invalid: border `--g-red`, `aria-invalid=true`
 
 ### 6.9 Asset Card `.acard`
@@ -469,7 +471,7 @@ React API:
     .acard-meta      8px 10px padding
       .acard-name    mono 12px / 510, truncate
       .acard-path    mono 10px / Storm Cloud, truncate
-      .acard-row     chip stack, 4px gap
+      .acard-row     chip stack, 4px gap; compact reference count badge (`N↗`) wrapped in custom `<Tooltip>` with localized full reference count
   ```
 - Thumb backgrounds via `data-bg`: `checker` (14px Charcoal/Pitch Black checker), `light` (`#fff`), `dark` (`--g-canvas`)
 
@@ -529,7 +531,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Background `--g-surface-2` Deep Slate, 12px radius, `--g-shadow-pop`
 - Border `1px solid --g-line` only; do **not** add an outer focus ring to the palette frame
 - Backdrop blur(8px) on `rgba(8,9,10,0.5)`
-- **Input**: `--g-surface` header strip, 15px / 400 / Porcelain, no border, padding 14px 16px, bottom 1px `--g-line`
+- **Input**: rendered through `TextInput variant="command"` inside a `--g-surface` header strip, 15px / 400 / Porcelain, no input border or focus outline, padding 14px 16px on the strip, bottom 1px `--g-line`
 - List items: 8px 10px padding, 6px radius, hover bg `--g-surface-3`
 - Active / keyboard-highlighted item uses theme-swapped `--g-active-bg`, `--g-active-text`, `--g-active-weight` (dark = Neon Lime; light = neutral wash) so hover/active colors stay correct in both schemes
 - Page commands show only icon + label; do not show `G O` / `G B` style hints unless those key chords are actually implemented
@@ -596,7 +598,7 @@ React API:
 
 ### 6.22 Directory Picker (`Select Project Directory` modal)
 
-Used by `DirectoryPickerModal.tsx`. Sits inside a standard `.modal` (§6.13).
+Used by `DirectoryPickerModal.tsx`. Sits inside a standard `.modal` (§6.13). Header copy stays localized and runtime-neutral: it describes directories readable by the environment running Asset Studio, never devcontainer-only mounts or repo-specific example paths. If the Add-project start path setting is empty, the picker starts from the API server's current working directory.
 
 Structure:
 
@@ -686,8 +688,8 @@ Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/
 Canonical shared primitive: `Select` from `ui/src/components/ui/Select.tsx`.
 
 - Trigger: 26px (`sm`) or 32px (`md`), `--g-surface-3` bg, `--g-line-strong` border, 6px radius.
-- Menu: absolutely positioned with viewport-aware top/bottom placement, `--g-surface-2`, `--g-line`, 6px radius, `--g-shadow-pop`, z 60.
-- Option active state uses `--g-active-bg` / `--g-active-text`.
+- Menu: absolutely positioned with viewport-aware top/bottom placement, `--g-surface`, `--g-line-strong`, 6px radius, `--g-shadow-pop`, z 60. Max-height is `min(320px, var(--radix-select-content-available-height))`; do not use spacing-scale `max-h-64` because this project maps `64` to 64px.
+- Options are stacked with a 4px gap so rounded hover / checked states do not visually merge. Highlighted option uses `--g-surface-2` / `--g-ink`. Checked option uses the same active treatment as Project Switcher and sidebar active rows: `--g-active-bg`, `--g-active-text`, and `--g-active-weight`; the check icon inherits the active text color.
 - ESC and outside click close the menu. Full roving keyboard navigation is a separate accessibility pass.
 
 ### 6.26 Switch
@@ -749,6 +751,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - List mode: `.list` 6-column grid, sticky header `--g-surface-2` bg
 - In All projects scope, the Browse project filter rail is driven by the registered project list, not just assets in the current result set, so zero-asset projects remain visible with a `0` count.
 - Project-scoped entry points open Browse with the matching project facet active in the `Rail` filter variant, so the visible active item matches the source project card / sidebar project scope. While a Project Switcher scope is active, the Browse project rail hides the redundant `All projects` row and keeps the scoped project as the only active project facet.
+- Sticky Browse toolbar keeps view / size / background toggles, compact sort select (`w-36` / 144px), bulk toggle, search, count, and status bar inline where space allows; first-row controls share the 32px `md` control height, while the status bar keeps its 44px row height. The sort select must not span the full row or push results downward.
 - Sticky filter bar `.opt-filters-wrap`: frosted (`--g-canvas` 92%) with status chips (全部 / 未使用 / 重複 / 可最佳化 / 已引用)
 - Active list row: `--g-accent-soft` bg + 4px left **Neon Lime** stripe
 
@@ -807,6 +810,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 - Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
 - Projects is a workspace-level view: project cards, workspace KPIs, the Projects nav badge, and the topbar count always use the full catalog, independent of the Project Switcher selection.
+- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search.
 - Project cards use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.
 - The `Browse Project` action on a project card sets the project scope to that card's project and navigates to Browse; Browse initializes its project facet to the same project rather than defaulting to `All Projects`.
 
@@ -814,8 +818,9 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 - Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas.
 - Settings panel headers are plain text blocks inside the single outer panel: 28px display title plus 14px helper text. No nested header strip and no icon well.
-- All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
-- Projects, Hotkeys, About, Data, and Storage follow the same row pattern as form settings; no section may introduce nested list cards or boxed subgroups. Scanning → exclude patterns uses a textarea so patterns can be entered one per line; save parsing accepts both newlines and commas.
+- The Workspace section owns multi-workspace management: the current workspace name field renames the active workspace; workspace text inputs and the workspace list share the same 560px desktop control width so the section reads as one aligned column. A compact token-backed workspace list shows each workspace as a 6px-radius row with `FolderKanban` icon well, name, mono project count, visible Switch/Rename/Delete actions, and a secondary `Add workspace` button below the list. Row hover applies to the full row surface, never just the label cluster, but the label cluster itself is non-interactive; only the explicit Switch button changes workspace. The active workspace badge uses the shared compact `Badge` primitive and stays metadata-sized so it does not compete with row actions. Rename uses the shared `PromptDialog`; delete uses the shared danger `ConfirmDialog`, preserves files on disk, and disables deletion when only one workspace remains. `Add workspace` lives here (not in the sidebar switcher), opens the shared `PromptDialog` (never a native browser prompt), collects a name, and switches to the new empty workspace after creation.
+- All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The Add-project start path placeholder names the empty-state behavior and, when the API resolves it, includes the server's current working directory path. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
+- Projects groups all registered project roots by workspace inside the single settings panel: each workspace gets a compact header with `FolderKanban` icon well, workspace name, mono project count, and Active/Switch affordance; project rows sit under a subtle left rule with a small neutral dot, mono path, active-workspace asset count when available, and visible Rename/Delete actions. Do not flatten projects across workspaces. Hotkeys, About, Data, and Storage follow the same row pattern as form settings; no section may introduce nested cards or boxed subgroups. Scanning → exclude patterns uses a wider 420px textarea with vertical resize enabled so patterns can be entered one per line; save parsing accepts both newlines and commas.
 - The Settings right pane intentionally avoids nested cards and heavy dividers; hierarchy comes from typography, spacing, and one outer panel only.
 - Storage rows show the persisted database path, data directory, and cache directory only. There is no separate config directory row; app state lives in the SQLite data directory, and release UI assets live in cache.
 

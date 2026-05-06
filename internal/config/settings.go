@@ -12,7 +12,8 @@ import (
 func DefaultAppSettings() AppSettings {
 	return AppSettings{
 		WorkspaceName:              "Asset Studio",
-		DefaultProjectRoot:         "/workspace",
+		ActiveWorkspaceID:          defaultWorkspaceID,
+		DefaultProjectRoot:         "",
 		AutoScanOnOpen:             false,
 		ScanOnOpen:                 false,
 		ExcludePatterns:            []string{},
@@ -34,6 +35,9 @@ func (s *Store) Settings() (AppSettings, error) {
 	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
 		return AppSettings{}, err
 	}
+	if settings.ActiveWorkspaceID == "" {
+		settings.ActiveWorkspaceID = defaultWorkspaceID
+	}
 	if settings.ExcludePatterns == nil {
 		settings.ExcludePatterns = []string{}
 	}
@@ -45,7 +49,18 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if err != nil {
 		return AppSettings{}, err
 	}
-	if update.WorkspaceName != nil {
+	activeWorkspaceChanged := false
+	if update.ActiveWorkspaceID != nil {
+		workspaceID := strings.TrimSpace(*update.ActiveWorkspaceID)
+		workspace, err := s.workspace(workspaceID)
+		if err != nil {
+			return AppSettings{}, err
+		}
+		settings.ActiveWorkspaceID = workspace.ID
+		settings.WorkspaceName = workspace.Name
+		activeWorkspaceChanged = true
+	}
+	if update.WorkspaceName != nil && !activeWorkspaceChanged {
 		settings.WorkspaceName = strings.TrimSpace(*update.WorkspaceName)
 	}
 	if update.DefaultProjectRoot != nil {
@@ -66,8 +81,23 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.OptimizationAutoApply != nil {
 		settings.OptimizationAutoApply = *update.OptimizationAutoApply
 	}
+	if settings.ActiveWorkspaceID == "" {
+		settings.ActiveWorkspaceID = defaultWorkspaceID
+	}
 	if settings.WorkspaceName == "" {
 		return AppSettings{}, apierr.New("settings_workspace_name_required", "workspace name is required")
+	}
+	if _, err := s.workspace(settings.ActiveWorkspaceID); err != nil {
+		return AppSettings{}, err
+	}
+	if update.WorkspaceName != nil && !activeWorkspaceChanged {
+		if _, err := s.db.Exec(`
+			UPDATE workspaces
+			SET name = ?, updated_at = ?
+			WHERE id = ? AND deleted_at IS NULL
+		`, settings.WorkspaceName, nowUTC(), settings.ActiveWorkspaceID); err != nil {
+			return AppSettings{}, err
+		}
 	}
 	if settings.OptimizationDefaultQuality < 0 || settings.OptimizationDefaultQuality > 100 {
 		return AppSettings{}, apierr.New("settings_quality_invalid", "optimization quality must be between 0 and 100")
@@ -92,21 +122,43 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 func (s *Store) ExportData() ExportData {
 	settings, err := s.Settings()
 	if err != nil {
-		return ExportData{Version: 1, ExportedAt: nowUTC(), Projects: s.Projects()}
+		return ExportData{Version: 1, ExportedAt: nowUTC(), Workspaces: s.Workspaces(), Projects: s.AllProjects()}
 	}
-	return ExportData{Version: 1, ExportedAt: nowUTC(), Projects: s.Projects(), Settings: &settings}
+	return ExportData{Version: 1, ExportedAt: nowUTC(), Workspaces: s.Workspaces(), Projects: s.AllProjects(), Settings: &settings}
 }
 
 func (s *Store) ImportData(data ExportData) error {
 	if data.Version != 1 {
 		return apierr.New("settings_import_version_unsupported", "settings import version is unsupported")
 	}
-	paths := make([]string, 0, len(data.Projects))
-	for _, project := range data.Projects {
-		paths = append(paths, project.Path)
+	for _, workspace := range data.Workspaces {
+		workspace.Name = strings.TrimSpace(workspace.Name)
+		if workspace.ID == "" || workspace.Name == "" {
+			continue
+		}
+		if _, err := s.db.Exec(`
+			INSERT INTO workspaces (id, name, created_at, updated_at)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(id) DO UPDATE SET
+				name = excluded.name,
+				deleted_at = NULL,
+				updated_at = excluded.updated_at
+		`, workspace.ID, workspace.Name, nowUTC(), nowUTC()); err != nil {
+			return err
+		}
 	}
-	if err := s.AddProjects(paths); err != nil {
-		return err
+	projectsByWorkspace := map[string][]string{}
+	for _, project := range data.Projects {
+		workspaceID := project.WorkspaceID
+		if workspaceID == "" {
+			workspaceID = s.activeWorkspaceID()
+		}
+		projectsByWorkspace[workspaceID] = append(projectsByWorkspace[workspaceID], project.Path)
+	}
+	for workspaceID, paths := range projectsByWorkspace {
+		if err := s.AddProjectsToWorkspace(workspaceID, paths); err != nil {
+			return err
+		}
 	}
 	if data.Settings != nil {
 		update := SettingsUpdate{
@@ -117,6 +169,9 @@ func (s *Store) ImportData(data ExportData) error {
 			ExcludePatterns:            data.Settings.ExcludePatterns,
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
+		}
+		if data.Settings.ActiveWorkspaceID != "" {
+			update.ActiveWorkspaceID = &data.Settings.ActiveWorkspaceID
 		}
 		_, err := s.UpdateSettings(update)
 		return err

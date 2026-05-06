@@ -25,24 +25,6 @@ body {
 * {
   box-sizing: border-box;
 }
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  outline: 0;
-}
-button {
-  cursor: pointer;
-  padding: 0;
-}
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
 code {
   font-family: var(--g-mono);
 }
@@ -138,7 +120,6 @@ a {
 .sb-project-switcher {
   order: 1;
   padding: 12px 14px 8px;
-  border-bottom: 1px solid var(--g-line);
   flex-shrink: 0;
 }
 .sb-nav {
@@ -556,9 +537,18 @@ a {
   color: var(--g-active-text);
   font-weight: var(--g-active-weight);
 }
+.project-switcher-option[data-kind="workspace"][data-active="true"] {
+  background: var(--g-surface-2);
+  color: var(--g-ink);
+  box-shadow: inset 0 0 0 1px var(--g-line-strong);
+}
 .project-switcher-option[data-active="true"]:hover {
   background: var(--g-active-bg);
   color: var(--g-active-text);
+}
+.project-switcher-option[data-kind="workspace"][data-active="true"]:hover {
+  background: var(--g-surface-2);
+  color: var(--g-ink);
 }
 .project-switcher-option:focus-visible {
   outline: none;

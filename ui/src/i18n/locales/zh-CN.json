@@ -13,7 +13,7 @@
     "precheck": "预检",
     "system": "系统",
     "settings": "设置",
-    "brandTag": "本地素材維運",
+    "brandTag": "Local asset ops",
     "navigationAria": "Asset Studio 导航",
     "projects": "项目"
   },
@@ -91,10 +91,10 @@
   },
   "directoryPicker": {
     "title": "选择项目目录",
-    "description": "这里显示的是 Asset Studio API server 能读取的目录；devcontainer 需要先 mount host 目录。",
+    "description": "这里显示的是运行 Asset Studio 的环境可读取的目录。",
     "defaultDir": "默认目录",
     "addDir": "添加此目录",
-    "pathPlaceholder": "输入路径，例如 /workspace 或 /host/gibbon",
+    "pathPlaceholder": "输入 Asset Studio server 可访问的绝对路径",
     "pathLabel": "目录路径",
     "go": "前往",
     "loading": "读取目录中",
@@ -165,7 +165,10 @@
     "settings_workspace_name_required": "工作区名称必填。",
     "settings_quality_invalid": "优化质量必须介于 0 到 100。",
     "project_name_empty": "项目名称不能为空。",
-    "invalid_body": "请求内容格式不正确。"
+    "invalid_body": "请求内容格式不正确。",
+    "workspace_name_empty": "工作区名称不能为空。",
+    "workspace_not_found": "找不到工作区。",
+    "workspace_last_required": "至少需要保留一个工作区。"
   },
   "topbar": {
     "totalLabel": "{{projects}} 个项目 · {{assets}} 个素材",
@@ -176,13 +179,16 @@
     "projectSection": "项目",
     "allProjects": "所有项目",
     "assetCount": "{{count}} 个素材",
-    "currentWorkspace": "当前工作区"
+    "currentWorkspace": "当前工作区",
+    "switchWorkspace": "切换工作区",
+    "projectCount": "{{count}} 个项目"
   },
   "toast": {
     "projectAdded": "已新增项目：{{path}}",
     "scanComplete": "扫描完成",
     "applyComplete": "變更已套用",
-    "copied": "路径已复制"
+    "copied": "路径已复制",
+    "workspaceSwitched": "已切换工作区：{{name}}"
   },
   "prompt": {
     "renamePath": "新的项目相對路径"
@@ -344,11 +350,14 @@
     "workspaceDesc": "设置这个本地工作区名称，以及新增项目时的起始文件夹。",
     "workspaceName": "工作区名称",
     "defaultRoot": "新增项目起始路径",
-    "defaultRootHint": "只作为“新增项目”文件夹选择器的初始位置。",
+    "defaultRootHint": "只作为“新增项目”文件夹选择器的初始位置。留空时会从 server 当前工作目录开始。",
+    "defaultRootPlaceholder": "留空以使用 server 当前工作目录作为起始路径",
+    "defaultRootPlaceholderWithPath": "留空以使用 server 当前工作目录（当前路径：{{path}}）",
     "autoScan": "打开后自动扫描",
     "autoScanHint": "保存偏好，供之后启动流程使用。",
-    "projectsDesc": "当前这个工作区追踪的项目根目录。",
+    "projectsDesc": "按工作区分类显示已追踪的项目根目录。",
     "noProjects": "尚未加入项目。",
+    "noProjectsInWorkspace": "这个工作区尚未加入项目。",
     "projectAssets": "{{count}} 个素材",
     "appearance": "外观",
     "appearanceDesc": "选择 Asset Studio 在这台机器上的显示方式。",
@@ -387,7 +396,18 @@
     "storageDesc": "API server 当前使用的本地存储路径。",
     "databasePath": "数据庫",
     "dataDir": "数据目录",
-    "cacheDir": "缓存目录"
+    "cacheDir": "缓存目录",
+    "workspaces": "工作区",
+    "workspacesHint": "切换追踪项目分组，或创建新的工作区；当前工作区决定可见项目列表。",
+    "workspaceProjects": "{{count}} 个项目",
+    "activeWorkspace": "使用中",
+    "switchWorkspaceAction": "切换",
+    "addWorkspace": "新增工作区",
+    "addWorkspacePrompt": "工作区名称",
+    "renameWorkspace": "重命名工作区",
+    "renameWorkspacePrompt": "新的工作区名称",
+    "removeWorkspace": "删除工作区",
+    "removeWorkspaceConfirm": "要删除 {{name}} 吗？项目文件会保留在磁盘上，但此工作区与追踪项目列表会被移除。"
   },
   "unused": {
     "title": "未使用",
@@ -413,7 +433,7 @@
     "lastScan": "上次扫描 {{time}}",
     "browseProject": "浏览项目",
     "addProject": "新增项目",
-    "searchProjectsPlaceholder": "搜索项目、路径或素材...",
+    "searchProjectsPlaceholder": "搜索项目...",
     "sortLabel": "排序",
     "sortAria": "项目排序",
     "sort": {

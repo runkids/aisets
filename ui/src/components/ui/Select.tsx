@@ -71,11 +71,13 @@ export function Select({
 
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
-          className="z-[60] max-h-64 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
+          className={cn(
+            "z-[60] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
+          )}
           position="popper"
           sideOffset={6}
         >
-          <SelectPrimitive.Viewport>
+          <SelectPrimitive.Viewport className="flex flex-col gap-1">
             {options.map((option) => (
               <SelectPrimitive.Item
                 key={option.value}
@@ -83,7 +85,7 @@ export function Select({
                 className={cn(
                   "flex w-full cursor-pointer items-center gap-2 rounded-g-md px-2.5 py-2 text-left font-g text-g-ui text-g-ink-2 outline-none",
                   "transition-[background,color] duration-[120ms] ease-g",
-                  "data-[highlighted]:bg-g-surface-3 data-[highlighted]:text-g-ink",
+                  "data-[highlighted]:bg-g-surface-2 data-[highlighted]:text-g-ink",
                   "data-[state=checked]:bg-g-active-bg data-[state=checked]:font-[590] data-[state=checked]:text-g-active-text",
                 )}
               >

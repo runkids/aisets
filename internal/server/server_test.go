@@ -208,6 +208,105 @@ func serverScanAsset(root, repoPath string, bytes int64, hash string, usedCount 
 	}
 }
 
+func TestWorkspaceRoutesScopeCatalogProjects(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "first")
+	second := filepath.Join(root, "second")
+	writePNG(t, filepath.Join(first, "a.png"))
+	writePNG(t, filepath.Join(second, "b.png"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{first}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload, _ := json.Marshal(map[string]string{"name": "Client A"})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/add", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add workspace = %d %s", rec.Code, rec.Body.String())
+	}
+	var added struct {
+		Settings struct {
+			ActiveWorkspaceID string             `json:"activeWorkspaceId"`
+			Workspaces        []config.Workspace `json:"workspaces"`
+		} `json:"settings"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &added); err != nil {
+		t.Fatal(err)
+	}
+	if added.Settings.ActiveWorkspaceID == "" || len(added.Settings.Workspaces) != 2 {
+		t.Fatalf("added settings = %#v", added.Settings)
+	}
+	workspaceID := added.Settings.ActiveWorkspaceID
+
+	payload, _ = json.Marshal(map[string]string{"id": workspaceID, "name": "Client Renamed"})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"workspaceName":"Client Renamed"`) {
+		t.Fatalf("rename workspace = %d %s", rec.Code, rec.Body.String())
+	}
+
+	if err := store.AddProjects([]string{second}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), filepath.Base(second)) || strings.Contains(rec.Body.String(), filepath.Base(first)) {
+		t.Fatalf("active catalog = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"projects"`) || !strings.Contains(rec.Body.String(), filepath.Base(first)) || !strings.Contains(rec.Body.String(), filepath.Base(second)) {
+		t.Fatalf("settings projects = %d %s", rec.Code, rec.Body.String())
+	}
+
+	payload, _ = json.Marshal(map[string]string{"id": "default"})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces/switch", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("switch workspace = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), filepath.Base(first)) || strings.Contains(rec.Body.String(), filepath.Base(second)) {
+		t.Fatalf("switched catalog = %d %s", rec.Code, rec.Body.String())
+	}
+
+	payload, _ = json.Marshal(map[string]string{"id": workspaceID})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces/remove", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), workspaceID) {
+		t.Fatalf("remove workspace = %d %s", rec.Code, rec.Body.String())
+	}
+
+	payload, _ = json.Marshal(map[string]string{"id": "default"})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces/remove", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"code":"workspace_last_required"`) {
+		t.Fatalf("remove last workspace = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")

@@ -13,7 +13,7 @@
     "precheck": "Pre-Check",
     "system": "시스템",
     "settings": "설정",
-    "brandTag": "로컬 에셋 운영",
+    "brandTag": "Local asset ops",
     "navigationAria": "Asset Studio 내비게이션",
     "projects": "프로젝트"
   },
@@ -91,10 +91,10 @@
   },
   "directoryPicker": {
     "title": "프로젝트 디렉토리 선택",
-    "description": "Asset Studio API 서버가 읽을 수 있는 디렉토리를 표시합니다. devcontainer에서는 호스트 디렉토리를 먼저 마운트해야 합니다.",
+    "description": "Asset Studio를 실행 중인 환경에서 읽을 수 있는 디렉토리를 표시합니다.",
     "defaultDir": "기본 디렉토리",
     "addDir": "이 디렉토리 추가",
-    "pathPlaceholder": "경로 입력, 예: /workspace 또는 /host/gibbon",
+    "pathPlaceholder": "Asset Studio 서버가 접근할 수 있는 절대 경로 입력",
     "pathLabel": "디렉토리 경로",
     "go": "이동",
     "loading": "디렉토리 로딩 중",
@@ -165,7 +165,10 @@
     "settings_workspace_name_required": "워크스페이스 이름은 필수입니다.",
     "settings_quality_invalid": "최적화 품질은 0에서 100 사이여야 합니다.",
     "project_name_empty": "프로젝트 이름은 비워둘 수 없습니다.",
-    "invalid_body": "요청 본문이 올바르지 않습니다."
+    "invalid_body": "요청 본문이 올바르지 않습니다.",
+    "workspace_name_empty": "워크스페이스 이름은 비워 둘 수 없습니다.",
+    "workspace_not_found": "워크스페이스를 찾을 수 없습니다.",
+    "workspace_last_required": "워크스페이스가 하나 이상 필요합니다."
   },
   "topbar": {
     "totalLabel": "{{projects}}개 프로젝트 · {{assets}}개 에셋",
@@ -176,13 +179,16 @@
     "projectSection": "프로젝트",
     "allProjects": "모든 프로젝트",
     "assetCount": "{{count}}개 에셋",
-    "currentWorkspace": "현재 워크스페이스"
+    "currentWorkspace": "현재 워크스페이스",
+    "switchWorkspace": "워크스페이스 전환",
+    "projectCount": "{{count}}개 프로젝트"
   },
   "toast": {
     "projectAdded": "프로젝트 추가됨: {{path}}",
     "scanComplete": "스캔 완료",
     "applyComplete": "변경 사항 적용됨",
-    "copied": "경로 복사됨"
+    "copied": "경로 복사됨",
+    "workspaceSwitched": "워크스페이스 전환됨: {{name}}"
   },
   "prompt": {
     "renamePath": "새 프로젝트 상대 경로"
@@ -344,11 +350,14 @@
     "workspaceDesc": "로컬 워크스페이스 이름과 프로젝트 추가 시작 폴더를 설정합니다.",
     "workspaceName": "워크스페이스 이름",
     "defaultRoot": "프로젝트 추가 시작 경로",
-    "defaultRootHint": "Add Project 폴더 선택기의 초기 위치로만 사용됩니다.",
+    "defaultRootHint": "Add Project 폴더 선택기의 초기 위치로만 사용됩니다. 비워 두면 서버의 현재 작업 디렉토리에서 시작합니다.",
+    "defaultRootPlaceholder": "비워 두면 서버의 현재 작업 디렉토리를 시작 경로로 사용",
+    "defaultRootPlaceholderWithPath": "비워 두면 서버의 현재 작업 디렉토리를 사용합니다(현재 경로: {{path}})",
     "autoScan": "열면 자동 스캔",
     "autoScanHint": "향후 시작 흐름에 사용할 선호 설정을 저장합니다.",
-    "projectsDesc": "이 워크스페이스에서 추적 중인 프로젝트 루트입니다.",
+    "projectsDesc": "추적 중인 프로젝트 루트를 워크스페이스별로 표시합니다.",
     "noProjects": "등록된 프로젝트가 없습니다.",
+    "noProjectsInWorkspace": "이 워크스페이스에는 프로젝트가 없습니다.",
     "projectAssets": "{{count}}개 에셋",
     "appearance": "외관",
     "appearanceDesc": "이 기기에서 Asset Studio가 표시되는 방식을 선택하세요.",
@@ -387,7 +396,18 @@
     "storageDesc": "API 서버가 사용하는 현재 로컬 저장 경로입니다.",
     "databasePath": "데이터베이스",
     "dataDir": "데이터 디렉토리",
-    "cacheDir": "캐시 디렉토리"
+    "cacheDir": "캐시 디렉토리",
+    "workspaces": "워크스페이스",
+    "workspacesHint": "추적할 프로젝트 그룹을 전환하거나 새 워크스페이스를 만듭니다. 활성 워크스페이스가 보이는 프로젝트 목록을 결정합니다.",
+    "workspaceProjects": "프로젝트 {{count}}개",
+    "activeWorkspace": "활성",
+    "switchWorkspaceAction": "전환",
+    "addWorkspace": "워크스페이스 추가",
+    "addWorkspacePrompt": "워크스페이스 이름",
+    "renameWorkspace": "워크스페이스 이름 변경",
+    "renameWorkspacePrompt": "새 워크스페이스 이름",
+    "removeWorkspace": "워크스페이스 삭제",
+    "removeWorkspaceConfirm": "{{name}}을(를) 삭제할까요? 프로젝트 파일은 디스크에 남지만 이 워크스페이스와 추적 중인 프로젝트 목록은 제거됩니다."
   },
   "unused": {
     "title": "미사용",
@@ -413,7 +433,7 @@
     "lastScan": "마지막 스캔 {{time}}",
     "browseProject": "프로젝트 보기",
     "addProject": "프로젝트 추가",
-    "searchProjectsPlaceholder": "프로젝트, 경로 또는 에셋 검색...",
+    "searchProjectsPlaceholder": "프로젝트 검색...",
     "sortLabel": "정렬",
     "sortAria": "프로젝트 정렬",
     "sort": {

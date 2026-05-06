@@ -91,10 +91,10 @@
   },
   "directoryPicker": {
     "title": "Select Project Directory",
-    "description": "Showing directories readable by the Asset Studio API server; devcontainers need to mount the host directory first.",
+    "description": "Showing directories available to the environment running Asset Studio.",
     "defaultDir": "Default directory",
     "addDir": "Add This Directory",
-    "pathPlaceholder": "Enter path, e.g. /workspace or /host/gibbon",
+    "pathPlaceholder": "Enter an absolute path the Asset Studio server can access",
     "pathLabel": "Directory path",
     "go": "Go",
     "loading": "Loading directory",
@@ -146,11 +146,14 @@
     "workspaceDesc": "Name this local workspace and choose where Add Project starts.",
     "workspaceName": "Workspace name",
     "defaultRoot": "Add-project start path",
-    "defaultRootHint": "Used only as the initial folder for the Add Project picker.",
+    "defaultRootHint": "Used only as the initial folder for the Add Project picker. Leave blank to start from the server's current working directory.",
+    "defaultRootPlaceholder": "Leave blank to use the server's current working directory",
+    "defaultRootPlaceholderWithPath": "Leave blank to use the server's current working directory: {{path}}",
     "autoScan": "Auto-scan after opening",
     "autoScanHint": "Remember the preference for future startup behavior.",
-    "projectsDesc": "Registered project roots currently tracked by this workspace.",
+    "projectsDesc": "Registered project roots grouped by workspace.",
     "noProjects": "No projects registered.",
+    "noProjectsInWorkspace": "No projects in this workspace.",
     "projectAssets": "{{count}} assets",
     "appearance": "Appearance",
     "appearanceDesc": "Choose how Asset Studio looks on this machine.",
@@ -189,7 +192,18 @@
     "storageDesc": "Current local storage paths used by the API server.",
     "databasePath": "Database",
     "dataDir": "Data directory",
-    "cacheDir": "Cache directory"
+    "cacheDir": "Cache directory",
+    "workspaces": "Workspaces",
+    "workspacesHint": "Switch tracked project groups or create a new one. The active workspace owns the visible project list.",
+    "workspaceProjects": "{{count}} projects",
+    "activeWorkspace": "Active",
+    "switchWorkspaceAction": "Switch",
+    "addWorkspace": "Add workspace",
+    "addWorkspacePrompt": "Workspace name",
+    "renameWorkspace": "Rename workspace",
+    "renameWorkspacePrompt": "New workspace name",
+    "removeWorkspace": "Delete workspace",
+    "removeWorkspaceConfirm": "Delete {{name}}? Projects stay on disk, but this workspace and its tracked project list will be removed."
   },
   "error": {
     "catalogLoad": "Failed to load catalog",
@@ -223,7 +237,10 @@
     "uploadWithStatus": "Upload failed ({{status}})",
     "requestFailed": "Failed ({{status}})",
     "project_name_empty": "Project name must not be empty.",
-    "invalid_body": "Invalid request body."
+    "invalid_body": "Invalid request body.",
+    "workspace_name_empty": "Workspace name must not be empty.",
+    "workspace_not_found": "Workspace not found.",
+    "workspace_last_required": "At least one workspace is required."
   },
   "topbar": {
     "totalLabel": "{{projects}} projects · {{assets}} assets",
@@ -234,13 +251,16 @@
     "projectSection": "Project",
     "allProjects": "All projects",
     "assetCount": "{{count}} assets",
-    "currentWorkspace": "Current workspace"
+    "currentWorkspace": "Current workspace",
+    "switchWorkspace": "Switch workspace",
+    "projectCount": "{{count}} projects"
   },
   "toast": {
     "projectAdded": "Project added: {{path}}",
     "scanComplete": "Scan complete",
     "applyComplete": "Changes applied",
-    "copied": "Path copied"
+    "copied": "Path copied",
+    "workspaceSwitched": "Workspace switched: {{name}}"
   },
   "prompt": {
     "renamePath": "New project-relative path"
@@ -413,7 +433,7 @@
     "lastScan": "Last scan {{time}}",
     "browseProject": "Browse project",
     "addProject": "Add project",
-    "searchProjectsPlaceholder": "Search projects, paths, or assets...",
+    "searchProjectsPlaceholder": "Search projects...",
     "sortLabel": "Sort",
     "sortAria": "Project sort",
     "sort": {

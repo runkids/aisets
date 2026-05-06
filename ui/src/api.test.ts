@@ -12,7 +12,7 @@ describe("updateSettings", () => {
       json: async () => ({
         settings: {
           workspaceName: "Team",
-          defaultProjectRoot: "/workspace",
+          defaultProjectRoot: "",
           autoScanOnOpen: false,
           scanOnOpen: true,
           excludePatterns: ["dist"],

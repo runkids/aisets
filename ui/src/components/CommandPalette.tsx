@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, type Mode } from "../ui";
+import { TextInput } from "./ui";
 
 type Props = {
   open: boolean;
@@ -131,10 +132,12 @@ export function CommandPalette({
         aria-label={t("commandPalette.ariaLabel")}
       >
         <div className="cmdk-input">
-          <Search size={16} className="cmdk-input-icon" aria-hidden="true" />
-          <input
+          <TextInput
             ref={inputRef}
+            variant="command"
             type="text"
+            icon={<Search size={16} aria-hidden="true" />}
+            suffix={<span className="search-kbd">esc</span>}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -143,8 +146,8 @@ export function CommandPalette({
             onKeyDown={handleKey}
             placeholder={t("commandPalette.placeholder")}
             aria-label={t("commandPalette.searchAriaLabel")}
+            inputClassName="font-g text-[15px] tracking-g-ui text-g-ink placeholder:text-g-ink-4"
           />
-          <span className="search-kbd">esc</span>
         </div>
 
         <div className="cmdk-list">

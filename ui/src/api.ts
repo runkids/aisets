@@ -15,7 +15,8 @@ declare global {
   }
 }
 
-const basePath = typeof window === "undefined" ? "" : (window.__BASE_PATH__ ?? "");
+const basePath =
+  typeof window === "undefined" ? "" : (window.__BASE_PATH__ ?? "");
 
 export class APIError extends Error {
   code: string;
@@ -98,6 +99,34 @@ export function addProject(path: string) {
 
 export function removeProject(id: string) {
   return request<{ projects: Project[] }>("/api/projects/remove", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+}
+
+export function addWorkspace(name: string) {
+  return request<{ settings: SettingsInfo }>("/api/workspaces/add", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function switchWorkspace(id: string) {
+  return request<{ settings: SettingsInfo }>("/api/workspaces/switch", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+}
+
+export function renameWorkspace(id: string, name: string) {
+  return request<{ settings: SettingsInfo }>("/api/workspaces/rename", {
+    method: "POST",
+    body: JSON.stringify({ id, name }),
+  });
+}
+
+export function removeWorkspace(id: string) {
+  return request<{ settings: SettingsInfo }>("/api/workspaces/remove", {
     method: "POST",
     body: JSON.stringify({ id }),
   });

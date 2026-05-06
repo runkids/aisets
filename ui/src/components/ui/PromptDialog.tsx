@@ -74,7 +74,7 @@ function PromptDialogContent({
                 )}
                 <input
                   ref={inputRef}
-                  className="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-g-md border border-g-line-strong bg-g-surface-3 px-2.5 text-g-ink transition-[border-color,box-shadow,background] duration-[120ms] ease-g hover:border-g-line-strong focus-within:border-g-accent focus-within:bg-g-surface focus-within:shadow-g-focus focus-within:outline-none"
+                  className="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-g-md border border-g-line-strong bg-g-surface px-2.5 text-g-ink transition-[border-color,box-shadow,background] duration-[120ms] ease-g hover:border-g-line-strong hover:bg-g-surface-2 focus-within:border-g-accent focus-within:bg-g-surface focus-within:shadow-g-focus focus-within:outline-none"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={placeholder}

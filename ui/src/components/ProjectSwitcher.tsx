@@ -1,7 +1,7 @@
 import { Check, ChevronDown, FolderKanban, Layers3 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Project } from "../types";
+import type { Project, Workspace } from "../types";
 
 export type ProjectSwitcherProject = Project & {
   assetCount: number;
@@ -9,9 +9,12 @@ export type ProjectSwitcherProject = Project & {
 
 type Props = {
   workspaceName: string;
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
   projects: ProjectSwitcherProject[];
   selectedProjectId: string;
   totalAssets: number;
+  onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
 };
 
@@ -21,9 +24,12 @@ function projectInitial(name: string) {
 
 export function ProjectSwitcher({
   workspaceName,
+  workspaces,
+  activeWorkspaceId,
   projects,
   selectedProjectId,
   totalAssets,
+  onSelectWorkspace,
   onSelectProject,
 }: Props) {
   const { t } = useTranslation();
@@ -60,6 +66,10 @@ export function ProjectSwitcher({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  function selectWorkspace(workspaceId: string) {
+    onSelectWorkspace(workspaceId);
+  }
 
   function selectProject(projectId: string) {
     onSelectProject(projectId);
@@ -115,20 +125,37 @@ export function ProjectSwitcher({
           <div className="project-switcher-section-label">
             {t("topbar.workspaceSection")}
           </div>
-          <div className="project-switcher-workspace-row">
-            <span className="project-switcher-avatar" aria-hidden="true">
-              {projectInitial(workspaceName)}
-            </span>
-            <span className="project-switcher-option-copy">
-              <strong>{workspaceName}</strong>
-              <span>{t("topbar.currentWorkspace")}</span>
-            </span>
-            <Check
-              size={15}
-              className="project-switcher-check"
-              aria-hidden="true"
-            />
-          </div>
+          {workspaces.map((workspace) => (
+            <button
+              key={workspace.id}
+              type="button"
+              className="project-switcher-option"
+              data-kind="workspace"
+              role="menuitemradio"
+              aria-checked={activeWorkspaceId === workspace.id}
+              data-active={activeWorkspaceId === workspace.id || undefined}
+              onClick={() => selectWorkspace(workspace.id)}
+            >
+              <span className="project-switcher-avatar" aria-hidden="true">
+                {projectInitial(workspace.name)}
+              </span>
+              <span className="project-switcher-option-copy">
+                <strong>{workspace.name}</strong>
+                <span>
+                  {activeWorkspaceId === workspace.id
+                    ? t("topbar.currentWorkspace")
+                    : t("topbar.projectCount", {
+                        count: workspace.projectCount,
+                      })}
+                </span>
+              </span>
+              <Check
+                size={15}
+                className="project-switcher-check"
+                aria-hidden="true"
+              />
+            </button>
+          ))}
 
           <div className="project-switcher-section-label">
             {t("topbar.projectSection")}

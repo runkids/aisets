@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addProject,
+  addWorkspace,
   applyPreview,
   deleteUnusedPreview,
   getCatalog,
@@ -8,10 +9,13 @@ import {
   importSettings,
   listDirectories,
   removeProject,
+  removeWorkspace,
   renamePreview,
   renameProject,
+  renameWorkspace,
   resetDatabase,
   scanCatalog,
+  switchWorkspace,
   updateSettings,
 } from "./api";
 import type { ExportData, SettingsUpdate } from "./types";
@@ -106,6 +110,54 @@ export function useApplyPreviewMutation() {
   });
 }
 
+function invalidateWorkspaceScope(client: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: catalogQueryKey }),
+    client.invalidateQueries({ queryKey: settingsQueryKey }),
+  ]);
+}
+
+export function useAddWorkspaceMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => addWorkspace(name),
+    onSuccess: async () => {
+      await invalidateWorkspaceScope(client);
+    },
+  });
+}
+
+export function useSwitchWorkspaceMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => switchWorkspace(id),
+    onSuccess: async () => {
+      await invalidateWorkspaceScope(client);
+    },
+  });
+}
+
+export function useRenameWorkspaceMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      renameWorkspace(id, name),
+    onSuccess: async () => {
+      await invalidateWorkspaceScope(client);
+    },
+  });
+}
+
+export function useRemoveWorkspaceMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => removeWorkspace(id),
+    onSuccess: async () => {
+      await invalidateWorkspaceScope(client);
+    },
+  });
+}
+
 export function useImportSettingsMutation() {
   const client = useQueryClient();
   return useMutation({
@@ -144,7 +196,10 @@ export function useRemoveProjectMutation() {
   return useMutation({
     mutationFn: (id: string) => removeProject(id),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: settingsQueryKey }),
+      ]);
     },
   });
 }
@@ -155,7 +210,10 @@ export function useRenameProjectMutation() {
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       renameProject(id, name),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: settingsQueryKey }),
+      ]);
     },
   });
 }

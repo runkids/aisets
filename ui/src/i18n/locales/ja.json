@@ -13,7 +13,7 @@
     "precheck": "プリチェック",
     "system": "システム",
     "settings": "設定",
-    "brandTag": "ローカルアセット運用",
+    "brandTag": "Local asset ops",
     "navigationAria": "Asset Studio ナビゲーション",
     "projects": "プロジェクト"
   },
@@ -91,10 +91,10 @@
   },
   "directoryPicker": {
     "title": "プロジェクトディレクトリを選択",
-    "description": "Asset Studio API サーバーが読み取れるディレクトリを表示しています。devcontainer ではホストディレクトリを先にマウントしてください。",
+    "description": "Asset Studio を実行している環境が読み取れるディレクトリを表示しています。",
     "defaultDir": "デフォルトディレクトリ",
     "addDir": "このディレクトリを追加",
-    "pathPlaceholder": "パスを入力（例：/workspace または /host/gibbon）",
+    "pathPlaceholder": "Asset Studio サーバーがアクセスできる絶対パスを入力",
     "pathLabel": "ディレクトリパス",
     "go": "移動",
     "loading": "ディレクトリ読み込み中",
@@ -165,7 +165,10 @@
     "settings_workspace_name_required": "ワークスペース名は必須です。",
     "settings_quality_invalid": "最適化品質は 0 から 100 の間で指定してください。",
     "project_name_empty": "プロジェクト名は空にできません。",
-    "invalid_body": "リクエスト本文が不正です。"
+    "invalid_body": "リクエスト本文が不正です。",
+    "workspace_name_empty": "ワークスペース名は空にできません。",
+    "workspace_not_found": "ワークスペースが見つかりません。",
+    "workspace_last_required": "少なくとも 1 つのワークスペースが必要です。"
   },
   "topbar": {
     "totalLabel": "{{projects}} プロジェクト · {{assets}} アセット",
@@ -176,13 +179,16 @@
     "projectSection": "プロジェクト",
     "allProjects": "すべてのプロジェクト",
     "assetCount": "{{count}} アセット",
-    "currentWorkspace": "現在のワークスペース"
+    "currentWorkspace": "現在のワークスペース",
+    "switchWorkspace": "ワークスペースを切り替え",
+    "projectCount": "{{count}} プロジェクト"
   },
   "toast": {
     "projectAdded": "プロジェクトを追加しました：{{path}}",
     "scanComplete": "スキャン完了",
     "applyComplete": "変更を適用しました",
-    "copied": "パスをコピーしました"
+    "copied": "パスをコピーしました",
+    "workspaceSwitched": "ワークスペースを切り替えました: {{name}}"
   },
   "prompt": {
     "renamePath": "新しいプロジェクト相対パス"
@@ -344,11 +350,14 @@
     "workspaceDesc": "ローカルワークスペース名と、プロジェクト追加時の開始フォルダを設定します。",
     "workspaceName": "ワークスペース名",
     "defaultRoot": "プロジェクト追加の開始パス",
-    "defaultRootHint": "Add Project のフォルダピッカーの初期位置としてのみ使われます。",
+    "defaultRootHint": "Add Project のフォルダピッカーの初期位置としてのみ使われます。空欄の場合はサーバーの現在の作業ディレクトリから開始します。",
+    "defaultRootPlaceholder": "空欄の場合はサーバーの現在の作業ディレクトリを開始パスとして使用",
+    "defaultRootPlaceholderWithPath": "空欄の場合はサーバーの現在の作業ディレクトリを使用（現在のパス：{{path}}）",
     "autoScan": "起動後に自動スキャン",
     "autoScanHint": "今後の起動フロー用に設定を保存します。",
-    "projectsDesc": "このワークスペースで追跡しているプロジェクトルート。",
+    "projectsDesc": "追跡中のプロジェクトルートをワークスペース別に表示します。",
     "noProjects": "プロジェクトはまだありません。",
+    "noProjectsInWorkspace": "このワークスペースにはプロジェクトがありません。",
     "projectAssets": "{{count}} アセット",
     "appearance": "外観",
     "appearanceDesc": "このマシンでの Asset Studio の表示方法を選択します。",
@@ -387,7 +396,18 @@
     "storageDesc": "API サーバーが現在使用しているローカル保存先。",
     "databasePath": "データベース",
     "dataDir": "データディレクトリ",
-    "cacheDir": "キャッシュディレクトリ"
+    "cacheDir": "キャッシュディレクトリ",
+    "workspaces": "ワークスペース",
+    "workspacesHint": "追跡するプロジェクトグループを切り替えるか、新しいワークスペースを作成します。アクティブなワークスペースが表示されるプロジェクト一覧を決めます。",
+    "workspaceProjects": "{{count}} 件のプロジェクト",
+    "activeWorkspace": "使用中",
+    "switchWorkspaceAction": "切り替え",
+    "addWorkspace": "ワークスペースを追加",
+    "addWorkspacePrompt": "ワークスペース名",
+    "renameWorkspace": "ワークスペース名を変更",
+    "renameWorkspacePrompt": "新しいワークスペース名",
+    "removeWorkspace": "ワークスペースを削除",
+    "removeWorkspaceConfirm": "{{name}} を削除しますか？プロジェクトファイルはディスクに残りますが、このワークスペースと追跡中のプロジェクト一覧は削除されます。"
   },
   "unused": {
     "title": "未使用",
@@ -413,7 +433,7 @@
     "lastScan": "前回スキャン {{time}}",
     "browseProject": "プロジェクトを表示",
     "addProject": "プロジェクト追加",
-    "searchProjectsPlaceholder": "プロジェクト、パス、アセットを検索...",
+    "searchProjectsPlaceholder": "プロジェクトを検索...",
     "sortLabel": "並べ替え",
     "sortAria": "プロジェクト並べ替え",
     "sort": {

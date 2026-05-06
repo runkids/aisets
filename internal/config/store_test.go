@@ -47,6 +47,66 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 	}
 }
 
+func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := store.AddWorkspace("Client A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	if projects := store.Projects(); len(projects) != 1 || projects[0].WorkspaceID != workspace.ID || projects[0].Path != project {
+		t.Fatalf("active workspace projects = %#v", projects)
+	}
+
+	settings, err := store.UpdateSettings(SettingsUpdate{ActiveWorkspaceID: testStringPtr(defaultWorkspaceID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.ActiveWorkspaceID != defaultWorkspaceID || settings.WorkspaceName != "Asset Studio" {
+		t.Fatalf("settings after switch = %#v", settings)
+	}
+	if projects := store.Projects(); len(projects) != 1 || projects[0].WorkspaceID != defaultWorkspaceID || projects[0].ID != project {
+		t.Fatalf("default workspace projects = %#v", projects)
+	}
+	if all := store.AllProjects(); len(all) != 2 {
+		t.Fatalf("all projects = %#v", all)
+	}
+	if err := store.RenameWorkspace(workspace.ID, "Client Assets"); err != nil {
+		t.Fatal(err)
+	}
+	if workspaces := store.Workspaces(); len(workspaces) != 2 || workspaces[0].Name != "Asset Studio" || workspaces[1].Name != "Client Assets" {
+		t.Fatalf("renamed workspaces = %#v", workspaces)
+	}
+	if err := store.RemoveWorkspace(workspace.ID); err != nil {
+		t.Fatal(err)
+	}
+	if workspaces := store.Workspaces(); len(workspaces) != 1 || workspaces[0].ID != defaultWorkspaceID {
+		t.Fatalf("workspaces after remove = %#v", workspaces)
+	}
+	if all := store.AllProjects(); len(all) != 1 || all[0].WorkspaceID != defaultWorkspaceID {
+		t.Fatalf("all projects after workspace remove = %#v", all)
+	}
+	if err := store.RemoveWorkspace(defaultWorkspaceID); err == nil || !isAPIErrorCode(err, "workspace_last_required") {
+		t.Fatalf("remove last workspace err = %T %[1]v", err)
+	}
+}
+
 func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
@@ -115,6 +175,24 @@ func TestStoreMigratesLegacySettingsValueJSON(t *testing.T) {
 	}
 	if _, err := store.UpdateSettings(SettingsUpdate{}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.DefaultProjectRoot != "" {
+		t.Fatalf("default project root = %q", settings.DefaultProjectRoot)
 	}
 }
 
@@ -498,6 +576,10 @@ func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash 
 			SavingsBytes:   savings,
 		}},
 	}
+}
+
+func testStringPtr(value string) *string {
+	return &value
 }
 
 func isAPIErrorCode(err error, code string) bool {

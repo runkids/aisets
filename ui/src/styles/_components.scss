@@ -383,22 +383,6 @@
   background: var(--g-surface);
   border-bottom: 1px solid var(--g-line);
 }
-.cmdk-input-icon {
-  color: var(--g-ink-4);
-  flex-shrink: 0;
-}
-.cmdk-input input {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-  color: var(--g-ink);
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: -0.012em;
-}
-.cmdk-input input::placeholder {
-  color: var(--g-ink-4);
-}
 .cmdk-list {
   max-height: 400px;
   overflow-y: auto;
@@ -616,150 +600,6 @@
   }
 }
 
-/* Form field (TextInput) */
-.text-input-shell {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  color: var(--g-ink);
-  background: var(--g-surface-3);
-  border: 1px solid var(--g-line-strong);
-  border-radius: var(--g-r-md);
-  transition:
-    background 120ms var(--g-ease),
-    border-color 120ms var(--g-ease),
-    box-shadow 120ms var(--g-ease),
-    transform 100ms var(--g-ease-spring);
-}
-.text-input-shell--sm {
-  height: 26px;
-}
-.text-input-shell--md {
-  height: 32px;
-}
-.text-input-shell--default {
-  background: var(--g-surface-3);
-  border-color: var(--g-line-strong);
-}
-.text-input-shell--outline {
-  background: transparent;
-  border-color: var(--g-line);
-}
-.text-input-shell--subtle {
-  background: var(--g-surface-3);
-  border-color: transparent;
-}
-.text-input-shell--search {
-  background: var(--g-surface);
-  border-color: var(--g-line);
-}
-.text-input-shell:hover {
-  border-color: var(--g-line-strong);
-}
-.text-input-shell--search:hover {
-  background: var(--g-surface-2);
-  border-color: var(--g-line-strong);
-}
-.text-input-shell:focus-within {
-  outline: none;
-  border-color: var(--g-accent);
-  box-shadow: var(--g-shadow-focus);
-  background: var(--g-surface);
-}
-.text-input-shell--invalid {
-  border-color: var(--g-red);
-}
-.text-input-shell--disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-.field-label {
-  font-size: 12px;
-  font-weight: 510;
-  letter-spacing: -0.011em;
-  color: var(--g-ink-3);
-}
-.input-icon {
-  display: inline-flex;
-  color: var(--g-ink-3);
-  flex-shrink: 0;
-}
-.input-control {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: 0;
-  outline: none;
-  font-family: var(--g-mono);
-  font-size: 13px;
-  letter-spacing: -0.015em;
-  color: var(--g-ink);
-}
-.input-control::placeholder {
-  color: var(--g-ink-3);
-}
-.input-affix {
-  color: var(--g-ink-3);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.text-input-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  color: var(--g-ink);
-  background: var(--g-surface-3);
-  border: 1px solid var(--g-line-strong);
-  border-radius: var(--g-r-md);
-  text-align: left;
-  transition:
-    background 120ms var(--g-ease),
-    border-color 120ms var(--g-ease),
-    box-shadow 120ms var(--g-ease);
-}
-.text-input-button--sm {
-  height: 26px;
-}
-.text-input-button--md {
-  height: 32px;
-}
-.text-input-button--outline {
-  background: transparent;
-  border-color: var(--g-line);
-}
-.text-input-button--subtle {
-  background: var(--g-surface-3);
-  border-color: transparent;
-}
-.text-input-button:hover:not(:disabled) {
-  border-color: var(--g-line-strong);
-}
-.text-input-button--search:hover:not(:disabled) {
-  background: var(--g-surface-2);
-}
-.text-input-button:focus-visible {
-  outline: none;
-  border-color: var(--g-accent);
-  box-shadow: var(--g-shadow-focus);
-  background: var(--g-surface);
-}
-
 /* Directory picker (Select Project Directory modal) */
 .directory-picker {
   display: flex;
@@ -771,9 +611,6 @@
   display: flex;
   gap: 8px;
   align-items: center;
-}
-.directory-path-row .field {
-  flex: 1;
 }
 .directory-panel {
   flex: 1;

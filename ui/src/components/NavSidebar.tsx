@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { Project } from "../types";
+import type { Project, Workspace } from "../types";
 import type { Mode } from "../ui";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 
@@ -31,9 +31,12 @@ type Props = {
   mode: Mode;
   badges: Badges;
   workspaceName: string;
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
   projects: ProjectSwitcherProject[];
   selectedProjectId: string;
   totalAssets: number;
+  onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelect: (mode: Mode) => void;
 };
@@ -42,9 +45,12 @@ export function NavSidebar({
   mode,
   badges,
   workspaceName,
+  workspaces,
+  activeWorkspaceId,
   projects,
   selectedProjectId,
   totalAssets,
+  onSelectWorkspace,
   onSelectProject,
   onSelect,
 }: Props) {
@@ -151,9 +157,12 @@ export function NavSidebar({
       <div className="sb-project-switcher">
         <ProjectSwitcher
           workspaceName={workspaceName}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
           projects={projects}
           selectedProjectId={selectedProjectId}
           totalAssets={totalAssets}
+          onSelectWorkspace={onSelectWorkspace}
           onSelectProject={onSelectProject}
         />
       </div>

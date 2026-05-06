@@ -2,7 +2,9 @@ package config
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"strings"
 )
 
 func (s *Store) init() error {
@@ -27,13 +29,22 @@ func (s *Store) migrate() error {
 			version INTEGER PRIMARY KEY,
 			applied_at TEXT NOT NULL
 		)`,
-		`CREATE TABLE IF NOT EXISTS projects (
+		`CREATE TABLE IF NOT EXISTS workspaces (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
-			path TEXT NOT NULL UNIQUE,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			id TEXT PRIMARY KEY,
+			workspace_id TEXT NOT NULL DEFAULT 'default',
+			name TEXT NOT NULL,
+			path TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			deleted_at TEXT,
+			UNIQUE(workspace_id, path)
 		)`,
 		`CREATE TABLE IF NOT EXISTS app_settings (
 			key TEXT PRIMARY KEY,
@@ -173,10 +184,99 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+	if err := s.migrateProjectsWorkspaceSchema(); err != nil {
+		return err
+	}
 	if err := s.migrateAppSettingsSchema(); err != nil {
 		return err
 	}
+	if err := s.ensureDefaultWorkspace(); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 1, nowUTC())
+	return err
+}
+
+func (s *Store) migrateProjectsWorkspaceSchema() error {
+	rows, err := s.db.Query(`PRAGMA table_info(projects)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if columns["workspace_id"] {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`ALTER TABLE projects RENAME TO projects_legacy`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE projects (
+			id TEXT PRIMARY KEY,
+			workspace_id TEXT NOT NULL DEFAULT 'default',
+			name TEXT NOT NULL,
+			path TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			deleted_at TEXT,
+			UNIQUE(workspace_id, path)
+		)
+	`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO projects (id, workspace_id, name, path, created_at, updated_at, deleted_at)
+		SELECT id, 'default', name, path, created_at, updated_at, deleted_at
+		FROM projects_legacy
+	`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DROP TABLE projects_legacy`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ensureDefaultWorkspace() error {
+	name := "Asset Studio"
+	var raw string
+	if err := s.db.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw); err == nil && raw != "" {
+		var settings AppSettings
+		if err := json.Unmarshal([]byte(raw), &settings); err == nil && strings.TrimSpace(settings.WorkspaceName) != "" {
+			name = strings.TrimSpace(settings.WorkspaceName)
+		}
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	now := nowUTC()
+	_, err := s.db.Exec(`
+		INSERT INTO workspaces (id, name, created_at, updated_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name = CASE WHEN workspaces.name = '' THEN excluded.name ELSE workspaces.name END,
+			updated_at = workspaces.updated_at
+	`, defaultWorkspaceID, name, now, now)
 	return err
 }
 

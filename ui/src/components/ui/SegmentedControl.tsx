@@ -15,9 +15,9 @@ const controlVariants = cva(
   {
     variants: {
       variant: {
-        text: "gap-px min-h-[34px] p-[3px]",
-        icon: "gap-px min-h-[34px] p-[3px]",
-        fixed: "gap-px min-h-[34px] p-[3px]",
+        text: "h-g-btn-md gap-px p-[2px]",
+        icon: "h-g-btn-md gap-px p-[2px]",
+        fixed: "h-g-btn-md gap-px p-[2px]",
         status: "flex w-full min-h-[44px] gap-0.5 p-1",
       },
     },
@@ -33,17 +33,17 @@ const itemVariants = cva(
     "transition-[background,color,box-shadow] duration-[120ms] ease-g",
     "focus-visible:shadow-g-focus",
     "hover:not-data-[active=true]:bg-g-surface-2 hover:not-data-[active=true]:text-g-ink",
-    "data-[active=true]:bg-g-ink data-[active=true]:text-g-canvas data-[active=true]:shadow-g-sm",
+    "data-[active=true]:bg-g-active-bg data-[active=true]:font-[var(--g-active-weight)] data-[active=true]:text-g-active-text data-[active=true]:shadow-g-sm data-[active=true]:hover:bg-g-active-bg data-[active=true]:hover:text-g-active-text",
   ],
   {
     variants: {
       variant: {
-        text: "h-6 min-w-8 px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
-        icon: "size-7 min-w-0 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
+        text: "h-[26px] min-w-8 px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
+        icon: "size-[26px] min-w-0 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
         fixed:
-          "h-6 w-8 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
+          "h-[26px] w-8 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
         status:
-          "min-h-[34px] h-[34px] px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-sm text-g-ink-2 data-[active=true]:text-g-canvas",
+          "min-h-[34px] h-[34px] px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-sm text-g-ink-2",
       },
     },
     defaultVariants: {

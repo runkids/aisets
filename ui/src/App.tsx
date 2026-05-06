@@ -27,6 +27,7 @@ import { OptimizeView } from "./components/OptimizeView";
 import { PreCheckView } from "./components/PreCheckView";
 import { PreviewModal } from "./components/PreviewModal";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { PromptDialog } from "./components/ui";
 import { SettingsView } from "./components/SettingsView";
 import { useToast } from "./components/ToastProvider";
 import { UnusedView } from "./components/UnusedView";
@@ -34,6 +35,7 @@ import { NoticeStack } from "./components/ui";
 import {
   useAddProjectMutation,
   useApplyPreviewMutation,
+  useSwitchWorkspaceMutation,
   useCatalogQuery,
   useDeleteUnusedPreviewMutation,
   useRenamePreviewMutation,
@@ -54,6 +56,7 @@ export function App() {
   const mode = modeForPath(location.pathname);
 
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [renameTarget, setRenameTarget] = useState<AssetItem | null>(null);
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [autoScrollAssetId, setAutoScrollAssetId] = useState("");
@@ -96,6 +99,7 @@ export function App() {
   const scanMutation = useScanCatalogMutation();
   const settingsQuery = useSettingsQuery();
   const addProjectMutation = useAddProjectMutation();
+  const switchWorkspaceMutation = useSwitchWorkspaceMutation();
   const renamePreviewMutation = useRenamePreviewMutation();
   const deletePreviewMutation = useDeleteUnusedPreviewMutation();
   const applyPreviewMutation = useApplyPreviewMutation();
@@ -141,9 +145,15 @@ export function App() {
   const working =
     catalogQuery.isFetching ||
     scanMutation.isPending ||
-    addProjectMutation.isPending;
+    addProjectMutation.isPending ||
+    switchWorkspaceMutation.isPending;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
+  const activeWorkspaceId =
+    settingsQuery.data?.settings.activeWorkspaceId ?? "default";
+  const workspaces = settingsQuery.data?.settings.workspaces ?? [
+    { id: activeWorkspaceId, name: workspaceName, projectCount: 0 },
+  ];
 
   const effectiveSelectedProjectId =
     selectedProjectId &&
@@ -318,6 +328,21 @@ export function App() {
     });
   }
 
+  function onSwitchWorkspace(workspaceId: string) {
+    if (workspaceId === activeWorkspaceId) return;
+    switchWorkspaceMutation.mutate(workspaceId, {
+      onSuccess: (result) => {
+        setSelectedProjectId("");
+        toast.success(
+          t("toast.workspaceSwitched", {
+            name: result.settings.workspaceName,
+          }),
+        );
+      },
+      onError: (e) => toast.error(errorMessage(e)),
+    });
+  }
+
   function onRescan() {
     scanMutation.mutate(undefined, {
       onSuccess: () => toast.success(t("toast.scanComplete")),
@@ -325,18 +350,29 @@ export function App() {
     });
   }
 
-  async function onRename(item: AssetItem) {
-    const targetPath = window.prompt(t("prompt.renamePath"), item.repoPath);
-    if (!targetPath || targetPath === item.repoPath) return;
-    const result = await renamePreviewMutation.mutateAsync({
-      assetId: item.id,
-      targetPath,
-    });
-    setPreview({
-      endpoint: "/api/actions/rename/apply",
-      token: result.token,
-      value: result.preview,
-    });
+  function onRename(item: AssetItem) {
+    setRenameTarget(item);
+  }
+
+  function onRenameConfirm(targetPath: string) {
+    if (!renameTarget || targetPath === renameTarget.repoPath) return;
+    renamePreviewMutation.mutate(
+      {
+        assetId: renameTarget.id,
+        targetPath,
+      },
+      {
+        onSuccess: (result) => {
+          setRenameTarget(null);
+          setPreview({
+            endpoint: "/api/actions/rename/apply",
+            token: result.token,
+            value: result.preview,
+          });
+        },
+        onError: (e) => toast.error(errorMessage(e)),
+      },
+    );
   }
 
   async function onDelete(item: AssetItem) {
@@ -394,9 +430,12 @@ export function App() {
           mode={mode}
           badges={badges}
           workspaceName={workspaceName}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
           projects={projectSwitchProjects}
           selectedProjectId={effectiveSelectedProjectId}
           totalAssets={items.length}
+          onSelectWorkspace={onSwitchWorkspace}
           onSelectProject={setSelectedProjectId}
           onSelect={changeMode}
         />
@@ -499,6 +538,18 @@ export function App() {
             onSelect={onAddProject}
           />
         )}
+
+        <PromptDialog
+          open={renameTarget != null}
+          title={t("action.rename")}
+          label={t("prompt.renamePath")}
+          defaultValue={renameTarget?.repoPath ?? ""}
+          confirmText={t("action.rename")}
+          cancelText={t("common.cancel")}
+          loading={renamePreviewMutation.isPending}
+          onConfirm={onRenameConfirm}
+          onCancel={() => setRenameTarget(null)}
+        />
 
         {preview && (
           <PreviewModal
