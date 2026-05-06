@@ -1,29 +1,12 @@
 @use "./tokens";
 @use "./patterns";
-@use "./components";
-@use "./layout";
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer,
-  .run-panel,
-  .bulkbar,
-  .toast-wrap,
-  .acard[data-selected="true"]::after {
-    animation: none;
-  }
-  .btn,
-  .iconbtn,
-  .card,
-  .acard {
-    transition:
-      opacity 120ms var(--g-ease),
-      background 120ms var(--g-ease),
-      border-color 120ms var(--g-ease),
-      color 120ms var(--g-ease);
-  }
-  .btn:active:not(:disabled),
-  .iconbtn:active:not(:disabled),
-  .acard:hover {
-    transform: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

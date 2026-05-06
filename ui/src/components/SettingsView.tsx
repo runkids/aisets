@@ -21,7 +21,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
@@ -49,6 +49,7 @@ import type {
   ExportData,
   SettingsInfo,
   SettingsUpdate,
+  Workspace,
 } from "../types";
 import {
   Badge,
@@ -69,6 +70,8 @@ import {
   Textarea,
   TextInput,
 } from "./ui";
+import { useToast } from "./ToastProvider";
+import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
 type ThemePreference = "light" | "dark" | "system";
 
@@ -213,7 +216,7 @@ function clauseValueOptions(field: CustomAssetFilterField) {
 }
 
 const workspaceRowActionRevealClass =
-  "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
+  "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:opacity-0 sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const projectRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const activeWorkspaceBadgeClass =
@@ -322,6 +325,179 @@ function PathRow({ label, value }: { label: string; value?: string }) {
   );
 }
 
+const workspaceIconMaxBytes = 512 * 1024;
+const workspaceIconAccept = "image/png,image/jpeg,image/gif,image/webp";
+
+function readWorkspaceIcon(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+type WorkspaceDialogProps = {
+  open: boolean;
+  workspace?: Workspace;
+  loading: boolean;
+  onConfirm: (value: { name: string; iconImage: string }) => void;
+  onCancel: () => void;
+};
+
+type WorkspaceDialogContentProps = Omit<WorkspaceDialogProps, "open">;
+
+function WorkspaceDialogContent({
+  workspace,
+  loading,
+  onConfirm,
+  onCancel,
+}: WorkspaceDialogContentProps) {
+  const { t } = useTranslation();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const defaultName = workspace?.name ?? "";
+  const defaultIconImage = workspace?.iconImage ?? "";
+  const [name, setName] = useState(defaultName);
+  const [iconImage, setIconImage] = useState(defaultIconImage);
+  const [error, setError] = useState("");
+
+  const trimmedName = name.trim();
+  const changed = trimmedName !== defaultName || iconImage !== defaultIconImage;
+  const canSubmit = trimmedName.length > 0 && (!workspace || changed);
+
+  async function onFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!workspaceIconAccept.split(",").includes(file.type)) {
+      setError(t("settings.workspaceIconTypeError"));
+      return;
+    }
+    if (file.size > workspaceIconMaxBytes) {
+      setError(t("settings.workspaceIconSizeError"));
+      return;
+    }
+    try {
+      setIconImage(await readWorkspaceIcon(file));
+      setError("");
+    } catch {
+      setError(t("settings.workspaceIconReadError"));
+    }
+  }
+
+  function submit() {
+    if (!canSubmit) return;
+    onConfirm({ name: trimmedName, iconImage });
+  }
+
+  return (
+    <Modal
+      title={
+        workspace ? t("settings.renameWorkspace") : t("settings.addWorkspace")
+      }
+      onClose={onCancel}
+      size="sm"
+      footer={
+        <div className="ml-auto flex gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={loading}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submit}
+            disabled={loading || !canSubmit}
+          >
+            {workspace ? t("action.rename") : t("settings.addWorkspace")}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+          <WorkspaceAvatar
+            name={trimmedName || defaultName || t("settings.addWorkspace")}
+            iconImage={iconImage}
+            className="size-16 bg-g-surface-3 text-2xl shadow-g-inset"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <input
+              ref={inputRef}
+              type="file"
+              accept={workspaceIconAccept}
+              className="sr-only"
+              tabIndex={-1}
+              onChange={(event) => void onFileChange(event)}
+              disabled={loading}
+            />
+            <div>
+              <p className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                {t("settings.workspaceIcon")}
+              </p>
+              <p className="mt-0.5 font-g text-g-caption tracking-g-ui text-g-ink-3">
+                {t("settings.workspaceIconHint")}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Upload size={13} />}
+                onClick={() => inputRef.current?.click()}
+                disabled={loading}
+              >
+                {t("settings.uploadWorkspaceIcon")}
+              </Button>
+              {iconImage && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leadingIcon={<Trash2 size={13} />}
+                  onClick={() => {
+                    setIconImage("");
+                    setError("");
+                  }}
+                  disabled={loading}
+                  className="text-g-red hover:bg-g-red-soft hover:text-g-red"
+                >
+                  {t("settings.removeWorkspaceIcon")}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-g-caption font-[510] text-g-ink-3">
+            {t("settings.workspaceName")}
+          </label>
+          <TextInput
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={
+              workspace
+                ? t("settings.renameWorkspacePrompt")
+                : t("settings.addWorkspacePrompt")
+            }
+            disabled={loading}
+            className="w-full"
+          />
+        </div>
+        {error && <Notice tone="danger">{error}</Notice>}
+      </div>
+    </Modal>
+  );
+}
+
+function WorkspaceDialog({ open, workspace, ...props }: WorkspaceDialogProps) {
+  if (!open) return null;
+  return (
+    <WorkspaceDialogContent
+      key={workspace?.id ?? "new"}
+      workspace={workspace}
+      {...props}
+    />
+  );
+}
+
 function SettingsActions({
   disabled,
   onSave,
@@ -354,6 +530,7 @@ export function SettingsView({
   onImagePreviewEnabledChange,
 }: Props) {
   const { i18n, t } = useTranslation();
+  const toast = useToast();
   const [activeSection, setActiveSection] = useState<Section>("workspace");
   const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
     null,
@@ -596,12 +773,19 @@ export function SettingsView({
   }
 
   async function onSaveSettings() {
-    const result = await updateMutation.mutateAsync(updateFromDraft(draft));
-    setDraftOverride(draftFromSettings(result.settings));
+    try {
+      const result = await updateMutation.mutateAsync(updateFromDraft(draft));
+      setDraftOverride(draftFromSettings(result.settings));
+      toast.success(t("toast.settingsSaved"));
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("toast.settingsSaveFailed"),
+      });
+    }
   }
 
-  function onAddWorkspace(name: string) {
-    addWorkspaceMutation.mutate(name, {
+  function onAddWorkspace(value: { name: string; iconImage: string }) {
+    addWorkspaceMutation.mutate(value, {
       onSuccess: (result) => {
         setAddWorkspaceOpen(false);
         setDraftOverride(draftFromSettings(result.settings));
@@ -614,10 +798,10 @@ export function SettingsView({
     setDraftOverride(draftFromSettings(result.settings));
   }
 
-  function onRenameWorkspace(name: string) {
+  function onRenameWorkspace(value: { name: string; iconImage: string }) {
     if (!workspaceBeingRenamed) return;
     renameWorkspaceMutation.mutate(
-      { id: workspaceBeingRenamed.id, name },
+      { id: workspaceBeingRenamed.id, ...value },
       {
         onSuccess: (result) => {
           setRenameWorkspaceId(null);
@@ -655,11 +839,18 @@ export function SettingsView({
   async function onResetSettings() {
     const result = await updateMutation.mutateAsync(defaultSettings);
     setDraftOverride(draftFromSettings(result.settings));
+    toast.success(t("toast.settingsReset"));
   }
 
   async function onConfirmResetSettings() {
-    await onResetSettings();
-    setResetSettingsOpen(false);
+    try {
+      await onResetSettings();
+      setResetSettingsOpen(false);
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("toast.settingsResetFailed"),
+      });
+    }
   }
 
   async function onExport() {
@@ -703,7 +894,15 @@ export function SettingsView({
 
   function onReset() {
     resetMutation.mutate(undefined, {
-      onSuccess: () => setResetDatabaseOpen(false),
+      onSuccess: () => {
+        setResetDatabaseOpen(false);
+        toast.success(t("toast.databaseReset"));
+      },
+      onError: (error) => {
+        toast.error(errorMessage(error), {
+          title: t("toast.databaseResetFailed"),
+        });
+      },
     });
   }
 
@@ -734,8 +933,8 @@ export function SettingsView({
         </RailSection>
       </Rail>
 
-      <div className="content-scroll">
-        <div className="content-grid ml-0 mr-auto max-w-[1040px]">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pb-8">
+        <div className="flex flex-col gap-6 ml-0 mr-auto max-w-[1040px] w-full">
           {activeSection === "workspace" && (
             <Card
               className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
@@ -769,9 +968,11 @@ export function SettingsView({
                           >
                             {isActive ? (
                               <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
-                                  <FolderKanban size={15} />
-                                </span>
+                                <WorkspaceAvatar
+                                  name={workspace.name}
+                                  iconImage={workspace.iconImage}
+                                  className="text-g-ink-2"
+                                />
                                 <span className="min-w-0">
                                   <span className="block truncate font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
                                     {workspace.name}
@@ -783,9 +984,11 @@ export function SettingsView({
                               </div>
                             ) : (
                               <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
-                                  <FolderKanban size={15} />
-                                </span>
+                                <WorkspaceAvatar
+                                  name={workspace.name}
+                                  iconImage={workspace.iconImage}
+                                  className="text-g-ink-2"
+                                />
                                 <span className="min-w-0">
                                   <span className="block truncate font-g-display text-g-body font-[510] leading-[1.3] tracking-[-0.013em] text-g-ink">
                                     {workspace.name}
@@ -937,9 +1140,11 @@ export function SettingsView({
                         <section key={workspace.id} className="space-y-2">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex min-w-0 items-center gap-3">
-                              <span className="grid size-8 shrink-0 place-items-center rounded-g-md bg-g-surface-3 text-g-ink-2">
-                                <FolderKanban size={15} />
-                              </span>
+                              <WorkspaceAvatar
+                                name={workspace.name}
+                                iconImage={workspace.iconImage}
+                                className="text-g-ink-2"
+                              />
                               <div className="min-w-0">
                                 <h3 className="truncate font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
                                   {workspace.name}
@@ -1790,25 +1995,15 @@ export function SettingsView({
           </section>
         </Modal>
       )}
-      <PromptDialog
+      <WorkspaceDialog
         open={addWorkspaceOpen}
-        title={t("settings.addWorkspace")}
-        label={t("settings.workspaceName")}
-        placeholder={t("settings.addWorkspacePrompt")}
-        confirmText={t("settings.addWorkspace")}
-        cancelText={t("common.cancel")}
         loading={addWorkspaceMutation.isPending}
         onConfirm={onAddWorkspace}
         onCancel={() => setAddWorkspaceOpen(false)}
       />
-      <PromptDialog
+      <WorkspaceDialog
         open={Boolean(workspaceBeingRenamed)}
-        title={t("settings.renameWorkspace")}
-        label={t("settings.workspaceName")}
-        placeholder={t("settings.renameWorkspacePrompt")}
-        defaultValue={workspaceBeingRenamed?.name ?? ""}
-        confirmText={t("action.rename")}
-        cancelText={t("common.cancel")}
+        workspace={workspaceBeingRenamed}
         loading={renameWorkspaceMutation.isPending}
         onConfirm={onRenameWorkspace}
         onCancel={() => setRenameWorkspaceId(null)}

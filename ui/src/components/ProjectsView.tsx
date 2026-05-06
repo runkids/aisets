@@ -35,6 +35,7 @@ import {
   type StackedBarSegment,
 } from "./ui";
 import { useToast } from "./ToastProvider";
+import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
 type Props = {
   catalog: Catalog;
@@ -75,10 +76,6 @@ function formatScanTime(value: string, locale: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function projectInitial(name: string) {
-  return (name.trim()[0] ?? "A").toUpperCase();
 }
 
 function buildProjectStats(catalog: Catalog, locale: string): ProjectStat[] {
@@ -261,7 +258,7 @@ function ProjectCard({
             trigger={
               <button
                 type="button"
-                className="iconbtn"
+                className="relative size-8 grid place-items-center rounded-g-md text-g-ink-2 bg-transparent cursor-pointer transition-[background,color,transform] duration-[120ms] ease-[var(--g-ease)] before:absolute before:inset-[-6px] before:content-[''] hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus active:not-disabled:scale-[0.94] disabled:opacity-[0.38] disabled:cursor-not-allowed [&>svg]:size-4"
                 aria-label={t("projects.projectActionsAria", {
                   name: stat.project.name,
                 })}
@@ -437,22 +434,23 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
   const unused = catalog.stats.unusedFiles;
   const duplicateFiles = catalog.stats.duplicateFiles;
   const lastScan = formatScanTime(catalog.generatedAt, i18n.language);
-  const workspaceName =
-    settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
+  const settings = settingsQuery.data?.settings;
+  const workspaceName = settings?.workspaceName ?? t("projects.workspaceName");
+  const activeWorkspace = settings?.workspaces.find(
+    (workspace) => workspace.id === settings.activeWorkspaceId,
+  );
 
   return (
-    <div className="content-grid !mx-0 !w-full !max-w-none">
+    <div className="flex flex-col gap-6 w-full">
       {/* Workspace hero */}
       <Card variant="default" padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <IconWell
-              size="lg"
-              tone="neutral"
-              className="font-g-display text-lg font-[590]"
-            >
-              {projectInitial(workspaceName)}
-            </IconWell>
+            <WorkspaceAvatar
+              name={workspaceName}
+              iconImage={activeWorkspace?.iconImage}
+              className="size-12 bg-g-surface-2 text-lg shadow-g-inset"
+            />
             <div>
               <div className="text-g-chip font-[510] uppercase tracking-[0.06em] text-g-ink-3">
                 {t("projects.workspace")}
