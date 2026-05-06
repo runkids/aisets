@@ -10,6 +10,7 @@ export { ImagePreview } from "./ImagePreview";
 export { Modal } from "./Modal";
 export { Notice, NoticeStack } from "./Notice";
 export { PromptDialog } from "./PromptDialog";
+export { Rail, RailItem, RailSection } from "./Rail";
 export {
   SegmentedControl,
   type SegmentedControlItem,
@@ -17,7 +18,8 @@ export {
 export { Select } from "./Select";
 export { StackedBar, type StackedBarSegment } from "./StackedBar";
 export { StatCard } from "./StatCard";
+export { Switch } from "./Switch";
 export { Tabs, type TabItem } from "./Tabs";
-export { TextInput, TextInputButton } from "./TextInput";
+export { TextInput, TextInputButton, Textarea } from "./TextInput";
 export { Toast } from "./Toast";
 export { Tooltip } from "./Tooltip";

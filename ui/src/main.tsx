@@ -5,8 +5,8 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { ToastProvider } from "./components/ToastProvider";
 import "./i18n/index";
-import "./styles/tailwind.css";
 import "./styles/globals.scss";
+import "./styles/tailwind.css";
 
 const queryClient = new QueryClient();
 const root = document.getElementById("root");

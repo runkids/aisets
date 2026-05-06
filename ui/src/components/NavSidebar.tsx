@@ -1,127 +1,136 @@
 import {
   BarChart3,
-  Building2,
   FileWarning,
+  FolderKanban,
   FolderOpen,
   Recycle,
   Settings,
   ShieldCheck,
   Sparkles,
   Trash2,
-} from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import type { Project } from '../types'
-import type { Mode } from '../ui'
-import { ProjectSwitcher } from './ProjectSwitcher'
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { Project } from "../types";
+import type { Mode } from "../ui";
+import { ProjectSwitcher } from "./ProjectSwitcher";
 
 type Badges = {
-  projects: number
-  total: number
-  duplicate: number
-  unused: number
-  optimize: number
-  lint: number
-}
+  projects: number;
+  total: number;
+  duplicate: number;
+  unused: number;
+  optimize: number;
+  lint: number;
+};
 
 type ProjectSwitcherProject = Project & {
-  assetCount: number
-}
+  assetCount: number;
+};
 
 type Props = {
-  mode: Mode
-  badges: Badges
-  workspaceName: string
-  projects: ProjectSwitcherProject[]
-  selectedProjectId: string
-  totalAssets: number
-  onSelectProject: (projectId: string) => void
-  onSelect: (mode: Mode) => void
-}
+  mode: Mode;
+  badges: Badges;
+  workspaceName: string;
+  projects: ProjectSwitcherProject[];
+  selectedProjectId: string;
+  totalAssets: number;
+  onSelectProject: (projectId: string) => void;
+  onSelect: (mode: Mode) => void;
+};
 
-export function NavSidebar({ mode, badges, workspaceName, projects, selectedProjectId, totalAssets, onSelectProject, onSelect }: Props) {
-  const { t } = useTranslation()
+export function NavSidebar({
+  mode,
+  badges,
+  workspaceName,
+  projects,
+  selectedProjectId,
+  totalAssets,
+  onSelectProject,
+  onSelect,
+}: Props) {
+  const { t } = useTranslation();
 
   const groups: Array<{
-    title: string
+    title: string;
     items: Array<{
-      id: Mode
-      label: string
-      icon: React.ReactNode
-      badge?: keyof Badges
-      tone?: string
-    }>
+      id: Mode;
+      label: string;
+      icon: React.ReactNode;
+      badge?: keyof Badges;
+      tone?: string;
+    }>;
   }> = [
     {
-      title: t('nav.workspace'),
+      title: t("nav.workspace"),
       items: [
         {
-          id: 'projects',
-          label: t('nav.projects'),
-          icon: <Building2 size={18} />,
-          badge: 'projects',
+          id: "projects",
+          label: t("nav.projects"),
+          icon: <FolderKanban size={18} />,
+          badge: "projects",
         },
         {
-          id: 'browse',
-          label: t('nav.browse'),
+          id: "browse",
+          label: t("nav.browse"),
           icon: <FolderOpen size={18} />,
-          badge: 'total',
+          badge: "total",
         },
       ],
     },
     {
-      title: t('nav.cleanup'),
+      title: t("nav.cleanup"),
       items: [
         {
-          id: 'duplicates',
-          label: t('nav.duplicates'),
+          id: "duplicates",
+          label: t("nav.duplicates"),
           icon: <Recycle size={18} />,
-          badge: 'duplicate',
-          tone: 'amber',
+          badge: "duplicate",
+          tone: "amber",
         },
         {
-          id: 'unused',
-          label: t('nav.unused'),
+          id: "unused",
+          label: t("nav.unused"),
           icon: <Trash2 size={18} />,
-          badge: 'unused',
-          tone: 'red',
+          badge: "unused",
+          tone: "red",
         },
         {
-          id: 'optimize',
-          label: t('nav.optimize'),
+          id: "optimize",
+          label: t("nav.optimize"),
           icon: <Sparkles size={18} />,
-          badge: 'optimize',
-          tone: 'blue',
+          badge: "optimize",
+          tone: "blue",
         },
         {
-          id: 'lint',
-          label: t('nav.lint'),
+          id: "lint",
+          label: t("nav.lint"),
           icon: <FileWarning size={18} />,
-          badge: 'lint',
-          tone: 'purple',
+          badge: "lint",
+          tone: "purple",
         },
       ],
     },
     {
-      title: t('nav.tools'),
+      title: t("nav.tools"),
       items: [
         {
-          id: 'precheck',
-          label: t('nav.precheck'),
+          id: "precheck",
+          label: t("nav.precheck"),
           icon: <ShieldCheck size={18} />,
         },
       ],
     },
     {
-      title: t('nav.system'),
+      title: t("nav.system"),
       items: [
         {
-          id: 'settings',
-          label: t('nav.settings'),
+          id: "settings",
+          label: t("nav.settings"),
           icon: <Settings size={18} />,
         },
       ],
     },
-  ]
+  ];
 
   return (
     <aside className="sb">
@@ -135,7 +144,7 @@ export function NavSidebar({ mode, badges, workspaceName, projects, selectedProj
         </div>
         <div>
           <div className="sb-brand-name">Asset Studio</div>
-          <div className="sb-brand-tag">{t('nav.brandTag')}</div>
+          <div className="sb-brand-tag">{t("nav.brandTag")}</div>
         </div>
       </div>
 
@@ -149,7 +158,7 @@ export function NavSidebar({ mode, badges, workspaceName, projects, selectedProj
         />
       </div>
 
-      <nav className="sb-nav" aria-label={t('nav.navigationAria')}>
+      <nav className="sb-nav" aria-label={t("nav.navigationAria")}>
         {groups.map((group) => (
           <div key={group.title} className="sb-group">
             <div className="sb-section">{group.title}</div>
@@ -164,7 +173,7 @@ export function NavSidebar({ mode, badges, workspaceName, projects, selectedProj
                 {item.icon}
                 <span className="sb-link-label">{item.label}</span>
                 {item.badge == null ? null : (
-                  <span className="sb-badge" data-tone={item.tone ?? 'default'}>
+                  <span className="sb-badge" data-tone={item.tone ?? "default"}>
                     {badges[item.badge]}
                   </span>
                 )}
@@ -176,8 +185,8 @@ export function NavSidebar({ mode, badges, workspaceName, projects, selectedProj
 
       <div className="sb-footer">
         <BarChart3 size={16} />
-        <span>{t('nav.footer')}</span>
+        <span>{t("nav.footer")}</span>
       </div>
     </aside>
-  )
+  );
 }

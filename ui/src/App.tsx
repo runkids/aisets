@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
 } from "react";
@@ -90,6 +91,7 @@ export function App() {
   );
 
   const toast = useToast();
+  const autoScanStartedRef = useRef(false);
   const catalogQuery = useCatalogQuery();
   const scanMutation = useScanCatalogMutation();
   const settingsQuery = useSettingsQuery();
@@ -122,6 +124,19 @@ export function App() {
   }, []);
 
   const catalog = catalogQuery.data ?? null;
+
+  useEffect(() => {
+    const settings = settingsQuery.data?.settings;
+    if (autoScanStartedRef.current || !settings || !catalog) return;
+    if (!settings.scanOnOpen && !settings.autoScanOnOpen) return;
+    if (catalog.projects.length === 0) return;
+
+    autoScanStartedRef.current = true;
+    scanMutation.mutate(undefined, {
+      onError: (error) => toast.error(errorMessage(error)),
+    });
+  }, [catalog, scanMutation, settingsQuery.data?.settings, toast]);
+
   const items = useMemo(() => catalog?.items ?? [], [catalog]);
   const working =
     catalogQuery.isFetching ||

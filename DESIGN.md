@@ -220,7 +220,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 - `border-right: 1px solid var(--g-line)` (Charcoal `#23252a`)
 - **Brand block** `.sb-brand`: **height locked to 60px** (matches topbar — see §4.2). Layout: 40×40 logo mark using the official raster app icon (`/brand/asset-studio-app-icon.png`) on `--g-canvas`, 6px radius + name (Inter 15px / 590, Porcelain) + tag (10px uppercase / +0.06em / Storm Cloud). The image is presentation-zoomed (`scale(1.22)`) inside the clipped mark so the logo subject remains legible at sidebar chrome size. Keep the official logo asset intact; improve legibility through sizing/presentation, not by replacing the mark.
 - **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 12px bottom padding
-- **`.sb-link`**: 6px 8px padding, **6px radius** (matches filter-rail `.f-pill` active shape), Inter 13px / 400, Storm Cloud default
+- **`.sb-link`**: 6px 8px padding, **6px radius** (matches `RailItem` active shape), Inter 13px / 400, Storm Cloud default
   - Non-active hover: light uses a medium `--g-surface-2` wash so it remains readable without becoming selected, and flips the count badge to `--g-surface` so the chip stays distinct; dark steps to `--g-surface-3` + `--g-ink` so it remains visible on the dark sidebar
   - **Active**: bg `--g-accent` (Neon Lime), text `--g-accent-ink` (Pitch Black), font-weight 510. Active hover keeps the exact active bg/text colors in both themes. _No_ shadow.
   - Focus: 2px Neon Lime ring (`--g-shadow-focus`)
@@ -257,13 +257,13 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
   - Press: subtle `scale(0.99)` only; disabled by reduced motion
 - **Keyboard hint** `.search-kbd`: mono 10px / Storm Cloud, `--g-surface-3` bg, 1px line border, 4px radius
 
-### 4.3 Filter Rail `.filter-rail`
+### 4.3 Rail
 
-Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`. The primitive owns rail body, section, active item, icon, label, and count rendering through CVA variants. Legacy `.filter-rail` / `.f-pill` classes remain supported only for unmigrated markup.
+Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`. The primitive owns rail body, section, active item, icon, label, count rendering, responsive variants, and active / inactive / hover states through CVA variants.
 
 - 220px wide, `background: var(--g-surface)`, `border-right: 1px solid var(--g-line)`
 - Section label: 10px uppercase Storm Cloud
-- **`RailItem` / `.f-pill`**: full-width button, 6px 10px padding, 6px radius, Inter 13px / 400 / Light Steel
+- **`RailItem`**: full-width button, 6px 10px padding, 6px radius, Inter 13px / 400 / Light Steel
   - Inactive: transparent background, `--g-ink-2` text
   - Hover: `color-mix(in srgb, var(--g-surface-2) 54%, transparent)` bg, `--g-ink` text, 1px inset `--g-line`
   - **Active**: `--g-active-bg` bg, `--g-active-text` text, `--g-active-weight` weight
@@ -690,7 +690,17 @@ Canonical shared primitive: `Select` from `ui/src/components/ui/Select.tsx`.
 - Option active state uses `--g-active-bg` / `--g-active-text`.
 - ESC and outside click close the menu. Full roving keyboard navigation is a separate accessibility pass.
 
-### 6.26 Stat Card
+### 6.26 Switch
+
+Canonical shared primitive: `Switch` from `ui/src/components/ui/Switch.tsx`, backed by Radix `Switch.Root` / `Switch.Thumb` for checked state, keyboard interaction, and ARIA semantics.
+
+- Track: 36×20, pill radius, unchecked `--g-surface-3`, checked `--g-active-bg`.
+- Thumb: 14×14, unchecked `--g-ink-3`, checked `--g-active-text`, 120ms token transition.
+- Focus: `--g-shadow-focus`; disabled opacity 0.38; press scale uses `--g-ease-spring` and is disabled by reduced motion.
+- Touch target extends beyond the visual 36×20 track via pseudo-element hit slop.
+- Settings toggles must use this primitive rather than hand-rolled `role="switch"` buttons.
+
+### 6.27 Stat Card
 
 Canonical shared primitive: `StatCard` from `ui/src/components/ui/StatCard.tsx`.
 
@@ -700,7 +710,7 @@ Canonical shared primitive: `StatCard` from `ui/src/components/ui/StatCard.tsx`.
 - Clickable cards are real buttons with focus ring and hover lift (`translateY(-2px)` disabled under reduced motion).
 - Tones: `neutral | accent | green | red | amber | blue`.
 
-### 6.27 Asset Thumbnail
+### 6.28 Asset Thumbnail
 
 Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThumbnail.tsx`.
 
@@ -709,13 +719,13 @@ Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThu
 - Container: `--g-r-sm`, 1px `--g-line`, grid centered, image object-fit contain.
 - Empty `alt` marks the thumbnail as decorative with `aria-hidden`.
 
-### 6.28 Rail
+### 6.29 Rail
 
 Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`.
 
 - `Rail` renders the 220px rail body with token-backed CVA variants: `filter` for Browse-style facets and `settings` for section navigation.
 - `RailSection` owns the vertical group stack and optional uppercase section heading.
-- `RailItem` owns the button item shape, active state, optional Lucide icon, label truncation, and optional mono count. It exposes state as `data-state="active|inactive"`; active state uses `--g-active-bg`, `--g-active-text`, and `--g-active-weight` so dark and light modes stay theme-correct.
+- `RailItem` owns the button item shape, active state, optional Lucide icon, label truncation, and optional mono count. Active and inactive visual states are CVA variants; `data-state="active|inactive"` is emitted for inspection and accessibility tooling. Active state uses `--g-active-bg`, `--g-active-text`, and `--g-active-weight` so dark and light modes stay theme-correct.
 - Settings section items use the `settings` item variant, preserving icon + label on desktop and hiding labels at ≤768px.
 - Browse facets must pass counts through `RailItem count` instead of composing custom count spans.
 
@@ -803,9 +813,10 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 ### 7.9 Settings
 
 - Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas.
-- `.settings-panel-head` uses a 32px tokenized icon well, `--g-surface-2` header strip, 24px display title, and 14px helper text to match the card/header hierarchy used elsewhere.
-- `.settings-field` rows are compact 3-column grids (`32px icon | copy | control`) with `--g-surface-2` fill, `--g-shadow-inset`, 6px radius, and hover `--g-line-strong`; controls stay right-aligned on wide desktop and stack under copy once the settings pane gets narrow (≤1100px viewport).
-- Every settings row pairs its label with a Lucide icon well so the large right pane has the same command-center affordance as nav, topbar crumbs, and project rows.
+- Settings panel headers are plain text blocks inside the single outer panel: 28px display title plus 14px helper text. No nested header strip and no icon well.
+- All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
+- Projects, Hotkeys, About, Data, and Storage follow the same row pattern as form settings; no section may introduce nested list cards or boxed subgroups. Scanning → exclude patterns uses a textarea so patterns can be entered one per line; save parsing accepts both newlines and commas.
+- The Settings right pane intentionally avoids nested cards and heavy dividers; hierarchy comes from typography, spacing, and one outer panel only.
 - Storage rows show the persisted database path, data directory, and cache directory only. There is no separate config directory row; app state lives in the SQLite data directory, and release UI assets live in cache.
 
 ---

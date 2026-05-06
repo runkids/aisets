@@ -137,7 +137,9 @@ function TreePanel({
         >
           <FolderOpen size={13} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{allLabel}</span>
-          <span className="f-count tnum">{totalCount}</span>
+          <span className="shrink-0 font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums">
+            {totalCount}
+          </span>
         </button>
 
         {root.children.map((child) => (
@@ -418,6 +420,7 @@ export function BrowseView({
         filters={filters}
         projectOptions={projectFacet.options}
         projectTotal={projectFacet.total}
+        projectScopeName={projectFilterName}
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
         onFiltersChange={setFilters}

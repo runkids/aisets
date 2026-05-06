@@ -74,6 +74,8 @@ Does **not** trigger:
 - Tailwind is **not** used for components (only `tailwind.css` placeholder). Author components in SCSS using tokens.
 - No `!important`. No inline styles for visual properties (only for dynamic computed values like translateX offsets).
 
+> Temporary migration note, delete after the UI primitive migration is complete: `ui/src/main.tsx` currently imports `tailwind.css` before `globals.scss`. Tailwind utilities are emitted inside CSS layers, while the later SCSS reset is unlayered, so reset rules such as `button { padding: 0; background: transparent; color: inherit; }` can override component utilities. When migrating SCSS component rules to Tailwind/CVA, verify computed styles in the browser for active, inactive, hover, padding, and text color. If a primitive still lives under the current import order, either move the cascade intentionally or use a targeted utility strategy that actually wins the reset; do not assume the class appearing in DOM means the visual state applied.
+
 ### 3.2 React / TypeScript
 - Functional components, hooks, no class components.
 - Class names follow kebab-case matching SCSS partials.
@@ -83,6 +85,7 @@ Does **not** trigger:
 
 ### 3.3 Go
 - Standard `gofmt`, `go vet`, table-driven tests. Project conventions follow `internal/` package layout.
+- Keep Go files domain-sized and navigable. When a non-test file grows beyond ~400 lines, split it by cohesive responsibility before adding more behavior (for example: `projects.go`, `settings.go`, `scans.go`, `migrations.go`, `helpers.go`). Preserve package-level interfaces and avoid behavior changes during file-only splits.
 - **Backend logic requires test coverage.** Any behavior change under `cmd/` or `internal/` must include deterministic Go tests in the same commit. Cover the successful path plus validation, error mapping, persistence, filesystem-safety, and serialization branches touched by the change.
 - New backend packages, exported functions, API handlers, scanner/lint rules, action flows, pre-check logic, optimization logic, config migrations, and cache/download behavior must not land with 0% direct coverage. If a branch cannot be exercised deterministically, document why in the PR/commit notes and cover the nearest pure helper instead.
 - Backend bug fixes start with a regression test that fails before the fix. Prefer table-driven tests for rule engines and focused integration tests for HTTP/store/scanner flows.
@@ -93,17 +96,22 @@ Does **not** trigger:
 ## 4. Commit & verification
 
 - Conventional Commits, English. Commit message answers *why*, not *what*.
+- **Run all UI and CLI verification inside the devcontainer / Docker environment.** Do not run `go test`, `go vet`, `pnpm`, Vite, or CLI smoke checks on the host unless the user explicitly asks for a host-only check.
+- If not already inside the devcontainer, enter it first with `make devc` (or `./scripts/devc.sh shell` when the container is already running). Use `/workspace` as the repo root inside the container.
+- For UI review, first ask the user whether they are already inside the devcontainer. Once confirmed, run `ui` inside the devcontainer. The UI is served at `http://127.0.0.1:5174` and the API at `19520`.
 - A UI commit must:
   - Touch the relevant SCSS / TSX
   - Touch `DESIGN.md` if any design-surface delta exists
-  - Pass `go test ./...` and `go vet ./...` (UI changes can break Go-side embed tests)
-  - Render correctly at 1440 / 1024 / 768 / 375 widths in dark mode (canonical)
+  - Inside the devcontainer, pass `go test ./...` and `go vet ./...` (UI changes can break Go-side embed tests)
+  - Inside the devcontainer, pass the relevant UI checks such as `pnpm --dir ui lint`, `pnpm --dir ui test`, and/or `pnpm --dir ui build`
+  - Render correctly at 1440 / 1024 / 768 / 375 widths in dark mode (canonical) via `http://127.0.0.1:5174`
 - A backend logic commit must:
   - Add or update Go tests for every changed behavior under `cmd/` or `internal/`
-  - Pass `go test ./...`, `go vet ./...`, and `mkdir -p tmp && go test ./... -coverprofile=tmp/backend-coverage.out`
+  - Inside the devcontainer, pass `go test ./...`, `go vet ./...`, and `mkdir -p tmp && go test ./... -coverprofile=tmp/backend-coverage.out`
   - Inspect `go tool cover -func=tmp/backend-coverage.out` for newly added or modified backend functions and avoid untested logic regressions
+- CLI / server changes must be smoke-tested inside the devcontainer with the project CLI or `go run ./cmd/asset-studio ...` command that matches the changed behavior.
 - CI must mirror local verification via `.github/workflows/test.yaml`. The release workflow must depend on that reusable test workflow before publishing artifacts.
-- Use pnpm for JavaScript tooling. Root `package.json` and `pnpm-lock.yaml` are intentional repo-level dev tooling for Husky + lint-staged; app/runtime UI dependencies stay under `ui/`.
+- Use pnpm for JavaScript tooling inside the devcontainer. Root `package.json` and `pnpm-lock.yaml` are intentional repo-level dev tooling for Husky + lint-staged; app/runtime UI dependencies stay under `ui/`.
 - Never `--no-verify`.
 
 ---
@@ -137,4 +145,6 @@ Does **not** trigger:
 2. Use tokens, not raw values.
 3. One Neon Lime CTA per screen.
 4. Update `DESIGN.md` in the same commit.
-5. Run the §15 checklist before saying "done".
+5. Run UI / CLI verification inside Docker/devcontainer only.
+6. UI review? Ask whether the user is already inside devcontainer, then run `ui`; open `http://127.0.0.1:5174`.
+7. Run the §15 checklist before saying "done".

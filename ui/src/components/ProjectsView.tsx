@@ -1,6 +1,6 @@
 import {
   ArrowRight,
-  Building2,
+  FolderKanban,
   FolderPlus,
   MoreHorizontal,
   Pencil,
@@ -229,7 +229,7 @@ function ProjectCard({
       <CardBody padding="md">
         <div className="flex items-start gap-3">
           <IconWell size="lg" tone="neutral">
-            <Building2 />
+            <FolderKanban />
           </IconWell>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

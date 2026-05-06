@@ -1,7 +1,8 @@
 import {
-  Database,
   Download,
-  FolderPlus,
+  FolderKanban,
+  Globe2,
+  Image,
   Info,
   Keyboard,
   Moon,
@@ -18,7 +19,6 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
 import { errorMessage, supportedLanguages } from "../i18n/index";
-import { cn } from "../lib/cn";
 import {
   useCatalogQuery,
   useImportSettingsMutation,
@@ -27,7 +27,20 @@ import {
   useUpdateSettingsMutation,
 } from "../queries";
 import type { ExportData, SettingsInfo, SettingsUpdate } from "../types";
-import { Badge, Button, Card, Notice, Select, Tabs, TextInput } from "./ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Notice,
+  Rail,
+  RailItem,
+  RailSection,
+  Select,
+  Switch,
+  Tabs,
+  Textarea,
+  TextInput,
+} from "./ui";
 
 type Props = {
   theme: "light" | "dark";
@@ -57,7 +70,7 @@ type SettingsDraft = {
 
 const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "workspace", icon: <Settings2 size={15} /> },
-  { id: "projects", icon: <FolderPlus size={15} /> },
+  { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "theme", icon: <Paintbrush size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
@@ -83,7 +96,7 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? "",
     autoScanOnOpen: settings?.autoScanOnOpen ?? false,
     scanOnOpen: settings?.scanOnOpen ?? false,
-    excludePatternsText: (settings?.excludePatterns ?? []).join(", "),
+    excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
   };
@@ -96,49 +109,12 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     autoScanOnOpen: draft.autoScanOnOpen,
     scanOnOpen: draft.scanOnOpen,
     excludePatterns: draft.excludePatternsText
-      .split(",")
+      .split(/[\n,]/)
       .map((part) => part.trim())
       .filter(Boolean),
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
     optimizationAutoApply: draft.optimizationAutoApply,
   };
-}
-
-function Toggle({
-  checked,
-  onChange,
-  disabled = false,
-  "aria-label": ariaLabel,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  disabled?: boolean;
-  "aria-label": string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-g-pill border border-transparent transition-colors duration-[120ms] ease-g",
-        "focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]",
-        checked ? "bg-g-accent" : "bg-g-surface-3",
-      )}
-    >
-      <span
-        className={cn(
-          "pointer-events-none block size-3.5 rounded-full transition-transform duration-[120ms] ease-g",
-          checked
-            ? "translate-x-[18px] bg-g-accent-ink"
-            : "translate-x-[3px] bg-g-ink-3",
-        )}
-      />
-    </button>
-  );
 }
 
 function FieldRow({
@@ -148,67 +124,48 @@ function FieldRow({
 }: {
   label: string;
   description?: string;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2.5 shadow-g-inset sm:flex-row sm:items-center sm:justify-between">
+    <div className="grid grid-cols-1 items-center gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8">
       <div className="min-w-0">
-        <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2">
+        <span className="block font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
           {label}
         </span>
         {description && (
-          <p className="mt-0.5 font-g text-g-caption tracking-g-ui text-g-ink-4">
+          <p className="mt-0.5 max-w-[48ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
             {description}
           </p>
         )}
       </div>
-      <div className="w-full shrink-0 sm:flex sm:w-auto sm:justify-end">
+      <div className="flex min-w-0 justify-start md:min-w-[280px] md:justify-end">
         {children}
       </div>
     </div>
   );
 }
 
-function SectionHeading({
-  title,
-  description,
-}: {
+function SectionHeading(props: {
   title: string;
   description?: string;
+  icon?: ReactNode;
 }) {
-  return (
-    <div className="mb-5">
-      <h2 className="m-0 font-g-display text-[18px] font-[590] leading-[1.33] tracking-[-0.013em] text-g-ink">
-        {title}
-      </h2>
-      {description && (
-        <p className="mt-1 font-g text-g-ui tracking-g-ui text-g-ink-3">
-          {description}
-        </p>
-      )}
-    </div>
-  );
+  void props;
+  return null;
 }
 
-function PathRow({
-  icon,
-  label,
-  value,
-}: {
-  icon?: ReactNode;
-  label: string;
-  value?: string;
-}) {
+function sectionIcon(id: Section) {
+  return sectionMeta.find((section) => section.id === id)?.icon;
+}
+
+function PathRow({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-g-line px-3 py-2 last:border-b-0">
-      <span className="flex items-center gap-1.5 whitespace-nowrap font-g text-g-caption font-[510] text-g-ink-3">
-        {icon}
-        {label}
-      </span>
-      <code className="min-w-0 truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-2">
+    <FieldRow label={label}>
+      <code className="max-w-full truncate rounded-g-pill bg-g-surface-2 px-3 py-1 font-g-mono text-g-chip tracking-g-mono text-g-ink-2">
         {value ?? "..."}
       </code>
-    </div>
+    </FieldRow>
   );
 }
 
@@ -226,7 +183,7 @@ function SettingsActions({
   resetLabel: string;
 }) {
   return (
-    <div className="mt-2 flex gap-2">
+    <div className="flex gap-2 py-4">
       <Button variant="primary" onClick={onSave} disabled={disabled}>
         {saveLabel}
       </Button>
@@ -325,41 +282,35 @@ export function SettingsView({
 
   return (
     <>
-      <nav
-        className="filter-rail settings-filter-rail"
-        aria-label={t("mode.settings")}
-      >
-        <section className="filter-rail-section">
+      <Rail as="nav" variant="settings" aria-label={t("mode.settings")}>
+        <RailSection>
           {sectionMeta.map(({ id, icon }) => (
-            <button
+            <RailItem
               key={id}
-              type="button"
-              className="f-pill"
-              data-active={activeSection === id || undefined}
-              aria-pressed={activeSection === id}
+              variant="settings"
+              active={activeSection === id}
+              icon={icon}
+              label={t(`settings.section.${id}`)}
               onClick={() => setActiveSection(id)}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="inline-flex shrink-0 text-current opacity-70">
-                  {icon}
-                </span>
-                <span className="f-label">{t(`settings.section.${id}`)}</span>
-              </span>
-            </button>
+            />
           ))}
-        </section>
-      </nav>
+        </RailSection>
+      </Rail>
 
       <div className="content-scroll settings-content-scroll">
         <div className="content-grid settings-content-grid">
           {activeSection === "workspace" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.workspace")}
                 description={t("settings.workspaceDesc")}
+                icon={sectionIcon("workspace")}
               />
-              <div className="flex flex-col gap-4">
-                <FieldRow label={t("settings.workspaceName")}>
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                <FieldRow
+                  label={t("settings.workspaceName")}
+                  icon={<Settings2 size={15} />}
+                >
                   <TextInput
                     type="text"
                     disabled={
@@ -373,13 +324,14 @@ export function SettingsView({
                       }))
                     }
                     placeholder="Asset Studio"
-                    className="sm:w-48"
+                    className="w-full md:w-80"
                     inputClassName="font-g tracking-g-ui"
                   />
                 </FieldRow>
                 <FieldRow
                   label={t("settings.defaultRoot")}
                   description={t("settings.defaultRootHint")}
+                  icon={<FolderKanban size={15} />}
                 >
                   <TextInput
                     type="text"
@@ -394,22 +346,7 @@ export function SettingsView({
                       }))
                     }
                     placeholder="/workspace"
-                    className="sm:w-56"
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.autoScan")}
-                  description={t("settings.autoScanHint")}
-                >
-                  <Toggle
-                    checked={draft.autoScanOnOpen}
-                    onChange={(next) =>
-                      updateDraft((prev) => ({ ...prev, autoScanOnOpen: next }))
-                    }
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    aria-label={t("settings.autoScan")}
+                    className="w-full md:w-80"
                   />
                 </FieldRow>
                 {updateMutation.error && (
@@ -423,52 +360,48 @@ export function SettingsView({
           )}
 
           {activeSection === "projects" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.projects")}
                 description={t("settings.projectsDesc")}
+                icon={sectionIcon("projects")}
               />
-              <div className="flex flex-col gap-3">
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 {projects.length === 0 ? (
-                  <p className="py-6 text-center font-g text-g-ui text-g-ink-3">
+                  <p className="py-4 font-g text-g-ui text-g-ink-3">
                     {t("settings.noProjects")}
                   </p>
                 ) : (
-                  <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-                    {projects.map((project) => (
-                      <div
-                        key={project.id}
-                        className="flex items-center justify-between gap-3 border-b border-g-line px-3 py-2.5 last:border-b-0"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate font-g text-g-ui font-[510] text-g-ink">
-                            {project.name}
-                          </div>
-                          <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-4">
-                            {project.path}
-                          </div>
-                        </div>
-                        <Badge tone="line">
-                          {t("settings.projectAssets", {
-                            count: assetCountByProject[project.id] ?? 0,
-                          })}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+                  projects.map((project) => (
+                    <FieldRow
+                      key={project.id}
+                      label={project.name}
+                      description={project.path}
+                    >
+                      <Badge tone="line">
+                        {t("settings.projectAssets", {
+                          count: assetCountByProject[project.id] ?? 0,
+                        })}
+                      </Badge>
+                    </FieldRow>
+                  ))
                 )}
               </div>
             </Card>
           )}
 
           {activeSection === "theme" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.theme")}
                 description={t("settings.appearanceDesc")}
+                icon={sectionIcon("theme")}
               />
-              <div className="flex flex-col gap-4">
-                <FieldRow label={t("settings.language")}>
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                <FieldRow
+                  label={t("settings.language")}
+                  icon={<Globe2 size={15} />}
+                >
                   <Select
                     value={i18n.language}
                     options={supportedLanguages.map((lang) => ({
@@ -479,7 +412,10 @@ export function SettingsView({
                     aria-label={t("settings.language")}
                   />
                 </FieldRow>
-                <FieldRow label={t("settings.theme")}>
+                <FieldRow
+                  label={t("settings.theme")}
+                  icon={<Paintbrush size={15} />}
+                >
                   <Tabs
                     value={theme}
                     items={[
@@ -501,10 +437,11 @@ export function SettingsView({
                 <FieldRow
                   label={t("settings.imagePreview")}
                   description={t("settings.imagePreviewHint")}
+                  icon={<Image size={15} />}
                 >
-                  <Toggle
+                  <Switch
                     checked={imagePreviewEnabled}
-                    onChange={onImagePreviewEnabledChange}
+                    onCheckedChange={onImagePreviewEnabledChange}
                     aria-label={t("settings.imagePreview")}
                   />
                 </FieldRow>
@@ -513,16 +450,21 @@ export function SettingsView({
           )}
 
           {activeSection === "scanning" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.scanning")}
                 description={t("settings.scanningDesc")}
+                icon={sectionIcon("scanning")}
               />
-              <div className="flex flex-col gap-4">
-                <FieldRow label={t("settings.scanOnOpen")}>
-                  <Toggle
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                <FieldRow
+                  label={t("settings.scanOnOpen")}
+                  description={t("settings.scanOnOpenHint")}
+                  icon={<Scan size={15} />}
+                >
+                  <Switch
                     checked={draft.scanOnOpen}
-                    onChange={(next) =>
+                    onCheckedChange={(next) =>
                       updateDraft((prev) => ({ ...prev, scanOnOpen: next }))
                     }
                     disabled={
@@ -534,9 +476,9 @@ export function SettingsView({
                 <FieldRow
                   label={t("settings.excludePatterns")}
                   description={t("settings.excludePatternsHint")}
+                  icon={<Sliders size={15} />}
                 >
-                  <TextInput
-                    type="text"
+                  <Textarea
                     disabled={
                       settingsQuery.isLoading || updateMutation.isPending
                     }
@@ -547,8 +489,8 @@ export function SettingsView({
                         excludePatternsText: event.target.value,
                       }))
                     }
-                    placeholder="node_modules, .git, dist"
-                    className="sm:w-56"
+                    placeholder={"node_modules\n.git\ndist/**"}
+                    className="w-full md:w-80"
                   />
                 </FieldRow>
                 {updateMutation.error && (
@@ -562,17 +504,19 @@ export function SettingsView({
           )}
 
           {activeSection === "optimization" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.optimization")}
                 description={t("settings.optimizationDesc")}
+                icon={sectionIcon("optimization")}
               />
-              <div className="flex flex-col gap-4">
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 <FieldRow
                   label={t("settings.defaultQuality")}
                   description={t("settings.defaultQualityHint")}
+                  icon={<Sliders size={15} />}
                 >
-                  <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
+                  <div className="flex w-full items-center justify-start gap-3 md:justify-end">
                     <input
                       type="range"
                       min={0}
@@ -589,7 +533,7 @@ export function SettingsView({
                           ),
                         }))
                       }
-                      className="w-32 rounded-g-sm accent-g-accent focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                      className="w-56 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                       aria-label={t("settings.defaultQuality")}
                     />
                     <Badge tone="line">
@@ -600,10 +544,11 @@ export function SettingsView({
                 <FieldRow
                   label={t("settings.autoApply")}
                   description={t("settings.autoApplyHint")}
+                  icon={<Sliders size={15} />}
                 >
-                  <Toggle
+                  <Switch
                     checked={draft.optimizationAutoApply}
-                    onChange={(next) =>
+                    onCheckedChange={(next) =>
                       updateDraft((prev) => ({
                         ...prev,
                         optimizationAutoApply: next,
@@ -626,50 +571,49 @@ export function SettingsView({
           )}
 
           {activeSection === "hotkeys" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.hotkeys")}
                 description={t("settings.hotkeysDesc")}
+                icon={sectionIcon("hotkeys")}
               />
-              <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 {[
                   { keys: "⌘ K", action: t("settings.hotkeyPalette") },
                   { keys: "Esc", action: t("settings.hotkeyClose") },
                 ].map(({ keys, action }) => (
-                  <div
-                    key={keys}
-                    className="flex items-center justify-between gap-3 border-b border-g-line px-3 py-2.5 last:border-b-0"
-                  >
-                    <span className="font-g text-g-ui text-g-ink-2">
-                      {action}
-                    </span>
-                    <kbd className="rounded-g-sm border border-g-line-strong bg-g-surface-3 px-2 py-0.5 font-g-mono text-g-caption text-g-ink-3">
+                  <FieldRow key={keys} label={action}>
+                    <kbd className="rounded-g-sm border border-g-line-strong bg-g-surface-2 px-2 py-0.5 font-g-mono text-g-caption text-g-ink-3">
                       {keys}
                     </kbd>
-                  </div>
+                  </FieldRow>
                 ))}
               </div>
             </Card>
           )}
 
           {activeSection === "about" && (
-            <Card padding="lg">
+            <Card className="settings-panel" padding="none">
               <SectionHeading
                 title={t("settings.section.about")}
                 description={t("settings.aboutDesc")}
+                icon={sectionIcon("about")}
               />
-              <div className="flex flex-col gap-4">
-                <FieldRow label={t("settings.version")}>
+              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                <FieldRow
+                  label={t("settings.version")}
+                  icon={<Info size={15} />}
+                >
                   <Badge tone="default">0.1.0</Badge>
                 </FieldRow>
-                <FieldRow label={t("settings.license")}>
+                <FieldRow
+                  label={t("settings.license")}
+                  icon={<Info size={15} />}
+                >
                   <span className="font-g text-g-ui text-g-ink-2">MIT</span>
                 </FieldRow>
-                <div className="mt-4 border-t border-g-line pt-4">
-                  <h3 className="mb-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
-                    {t("settings.data")}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
+                <FieldRow label={t("settings.data")}>
+                  <div className="flex flex-wrap justify-start gap-2 md:justify-end">
                     <Button
                       variant="secondary"
                       leadingIcon={<Download size={15} />}
@@ -705,27 +649,19 @@ export function SettingsView({
                       }}
                     />
                   </div>
-                </div>
-                <div className="mt-2 border-t border-g-line pt-4">
-                  <h3 className="mb-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
-                    {t("settings.storage")}
-                  </h3>
-                  <div className="overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-                    <PathRow
-                      icon={<Database size={15} />}
-                      label={t("settings.databasePath")}
-                      value={settings?.databasePath}
-                    />
-                    <PathRow
-                      label={t("settings.dataDir")}
-                      value={settings?.dataDir}
-                    />
-                    <PathRow
-                      label={t("settings.cacheDir")}
-                      value={settings?.cacheDir}
-                    />
-                  </div>
-                </div>
+                </FieldRow>
+                <PathRow
+                  label={t("settings.databasePath")}
+                  value={settings?.databasePath}
+                />
+                <PathRow
+                  label={t("settings.dataDir")}
+                  value={settings?.dataDir}
+                />
+                <PathRow
+                  label={t("settings.cacheDir")}
+                  value={settings?.cacheDir}
+                />
               </div>
             </Card>
           )}

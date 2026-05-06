@@ -1,0 +1,69 @@
+package scanner
+
+import (
+	"bufio"
+	"os"
+
+	"asset-studio/internal/lint"
+)
+
+func runLint(projects []Project, items []AssetItem) []lint.Finding {
+	type refWithAsset struct {
+		ref   AssetReference
+		item  AssetItem
+		pPath string
+	}
+
+	byFile := map[string][]refWithAsset{}
+	projectPath := map[string]string{}
+	for _, p := range projects {
+		projectPath[p.ID] = p.Path
+	}
+	for _, item := range items {
+		pPath := projectPath[item.ProjectID]
+		for _, ref := range item.References {
+			key := pPath + "/" + ref.File
+			byFile[key] = append(byFile[key], refWithAsset{ref: ref, item: item, pPath: pPath})
+		}
+	}
+
+	var findings []lint.Finding
+	for filePath, refs := range byFile {
+		lines := readFileLines(filePath)
+		if lines == nil {
+			continue
+		}
+		for _, r := range refs {
+			lineContent := ""
+			if r.ref.Line > 0 && r.ref.Line <= len(lines) {
+				lineContent = lines[r.ref.Line-1]
+			}
+			ctx := lint.Context{
+				File:       r.ref.File,
+				Line:       r.ref.Line,
+				Content:    lineContent,
+				Kind:       r.ref.Kind,
+				Specifier:  r.ref.Specifier,
+				AssetBytes: r.item.Bytes,
+				AssetExt:   r.item.Ext,
+				AssetID:    r.item.ID,
+			}
+			findings = append(findings, lint.Run(ctx)...)
+		}
+	}
+	return findings
+}
+
+func readFileLines(path string) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	var lines []string
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+	return lines
+}

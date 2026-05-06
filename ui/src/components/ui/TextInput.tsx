@@ -2,6 +2,7 @@ import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  TextareaHTMLAttributes,
 } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
@@ -96,6 +97,56 @@ function TextInput({
   );
 }
 
+/* ─── Textarea ───────────────────────────────────────────── */
+
+type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> &
+  Omit<ShellVariants, "size"> & {
+    label?: string;
+    invalid?: boolean;
+    textareaClassName?: string;
+  };
+
+function Textarea({
+  label,
+  id,
+  variant,
+  invalid = false,
+  className,
+  textareaClassName,
+  ...props
+}: TextareaProps) {
+  return (
+    <label
+      className={cn("flex min-w-0 flex-1 flex-col gap-1.5", className)}
+      htmlFor={id}
+    >
+      {label && (
+        <span className="font-g text-g-caption font-[510] tracking-[-0.011em] text-g-ink-3">
+          {label}
+        </span>
+      )}
+      <span
+        className={cn(
+          textInputShellVariants({ variant, size: "md" }),
+          "min-h-28 items-start py-2.5",
+          invalid && "border-g-red",
+        )}
+      >
+        <textarea
+          id={id}
+          className={cn(
+            inputBaseClassName,
+            "min-h-24 resize-y leading-[1.5]",
+            textareaClassName,
+          )}
+          aria-invalid={invalid || undefined}
+          {...props}
+        />
+      </span>
+    </label>
+  );
+}
+
 /* ─── TextInputButton ────────────────────────────────────── */
 
 type TextInputButtonProps = Omit<
@@ -153,8 +204,10 @@ function TextInputButton({
 export {
   TextInput,
   TextInputButton,
+  Textarea,
   textInputShellVariants,
   type TextInputProps,
   type TextInputButtonProps,
+  type TextareaProps,
 };
 /* eslint-enable react-refresh/only-export-components */

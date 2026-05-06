@@ -1,6 +1,7 @@
 package config
 
 import (
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
@@ -74,6 +75,46 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 	}
 	if projects := store.Projects(); len(projects) != 0 {
 		t.Fatalf("projects after remove = %#v", projects)
+	}
+}
+
+func TestStoreMigratesLegacySettingsValueJSON(t *testing.T) {
+	root := t.TempDir()
+	dataHome := filepath.Join(root, "data")
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	dataDir := filepath.Join(dataHome, "asset-studio")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyRaw := `{"workspaceName":"Legacy Assets","defaultProjectRoot":"/legacy","autoScanOnOpen":true,"scanOnOpen":true,"excludePatterns":["dist"],"optimizationDefaultQuality":64,"optimizationAutoApply":true}`
+	if _, err := db.Exec(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)`, "settings", legacyRaw, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.WorkspaceName != "Legacy Assets" || settings.DefaultProjectRoot != "/legacy" || !settings.AutoScanOnOpen || settings.OptimizationDefaultQuality != 64 {
+		t.Fatalf("settings = %#v", settings)
+	}
+	if _, err := store.UpdateSettings(SettingsUpdate{}); err != nil {
+		t.Fatal(err)
 	}
 }
 

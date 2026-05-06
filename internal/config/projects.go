@@ -1,0 +1,114 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"asset-studio/internal/apierr"
+)
+
+func (s *Store) Projects() []Project {
+	rows, err := s.db.Query(`
+		SELECT id, name, path
+		FROM projects
+		WHERE deleted_at IS NULL
+		ORDER BY lower(path)
+	`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := []Project{}
+	for rows.Next() {
+		var project Project
+		if err := rows.Scan(&project.ID, &project.Name, &project.Path); err == nil {
+			out = append(out, project)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Path) < strings.ToLower(out[j].Path) })
+	return out
+}
+
+func (s *Store) AddProjects(paths []string) error {
+	now := nowUTC()
+	for _, raw := range paths {
+		if raw == "" {
+			continue
+		}
+		abs, err := filepath.Abs(raw)
+		if err != nil {
+			return err
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			return &PathError{Path: abs, Message: "project path must be a directory"}
+		}
+		if _, err := s.db.Exec(`
+			INSERT INTO projects (id, name, path, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(path) DO UPDATE SET
+				name = excluded.name,
+				deleted_at = NULL,
+				updated_at = excluded.updated_at
+		`, abs, filepath.Base(abs), abs, now, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) RemoveProject(id string) error {
+	result, err := s.db.Exec(`
+		UPDATE projects
+		SET deleted_at = ?, updated_at = ?
+		WHERE id = ? AND deleted_at IS NULL
+	`, nowUTC(), nowUTC(), id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return apierr.New("project_not_found", "project not found")
+	}
+	return nil
+}
+
+func (s *Store) RenameProject(id, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return apierr.New("project_name_empty", "project name must not be empty")
+	}
+	result, err := s.db.Exec(`
+		UPDATE projects
+		SET name = ?, updated_at = ?
+		WHERE id = ? AND deleted_at IS NULL
+	`, name, nowUTC(), id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return apierr.New("project_not_found", "project not found")
+	}
+	return nil
+}
+
+type PathError struct {
+	Path    string
+	Message string
+}
+
+func (e *PathError) Error() string {
+	return e.Message + ": " + e.Path
+}

@@ -1331,80 +1331,130 @@
   }
 }
 
-/* Settings two-pane layout */
-.stg-layout {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 24px;
-  min-height: 0;
+/* Settings panels */
+.settings-content-grid {
+  max-width: 1040px;
+  margin-inline: 0 auto;
 }
-.stg-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-self: stretch;
-  padding: 16px 12px;
-  background: var(--g-surface);
-  border-right: 1px solid var(--g-line);
-}
-.stg-rail-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 30px;
-  padding: 6px 10px;
+.settings-panel {
+  overflow: hidden;
+  border: 1px solid var(--g-line);
   border-radius: var(--g-r-md);
-  font-size: 13px;
-  line-height: 1.4;
-  font-weight: 400;
-  letter-spacing: -0.012em;
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-sm);
+}
+.settings-panel:hover {
+  border-color: var(--g-line);
+  box-shadow: var(--g-shadow-sm);
+}
+.settings-panel-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--g-line);
+  background: var(--g-surface-2);
+}
+.settings-panel-icon,
+.settings-field-icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-r-md);
+  background: var(--g-surface-3);
   color: var(--g-ink-2);
-  text-align: left;
+}
+.settings-panel-title {
+  margin: 0;
+  font-family: var(--g-display);
+  font-size: 24px;
+  line-height: 1.33;
+  font-weight: 590;
+  letter-spacing: -0.022em;
+  color: var(--g-ink);
+}
+.settings-panel-description {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: -0.013em;
+  color: var(--g-ink-3);
+}
+.settings-panel > .settings-panel-head + div {
+  padding: 16px;
+}
+.settings-field {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+  padding: 12px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-r-md);
+  background: var(--g-surface-2);
+  box-shadow: var(--g-shadow-inset);
   transition:
+    border-color 120ms var(--g-ease),
     background 120ms var(--g-ease),
-    color 120ms var(--g-ease),
     box-shadow 120ms var(--g-ease);
 }
-.stg-rail-item:hover:not([data-active="true"]) {
-  background: color-mix(in srgb, var(--g-surface-2) 54%, transparent);
-  color: var(--g-ink);
-  box-shadow: inset 0 0 0 1px var(--g-line);
+.settings-field:hover {
+  border-color: var(--g-line-strong);
+  background: color-mix(in srgb, var(--g-surface-2) 78%, var(--g-surface-3));
 }
-.stg-rail-item:focus-visible {
-  outline: none;
-  box-shadow: var(--g-shadow-focus);
-}
-.stg-rail-item[data-active="true"] {
-  background: var(--g-active-bg);
-  color: var(--g-active-text);
-  font-weight: var(--g-active-weight);
-}
-.stg-rail-item[data-active="true"]:hover {
-  background: var(--g-active-bg);
-  filter: brightness(0.96);
-}
-[data-theme="dark"] .stg-rail-item[data-active="true"]:hover {
-  background: var(--g-accent-deep);
-  filter: none;
-}
-.stg-panel {
+.settings-field-copy {
   min-width: 0;
 }
+.settings-field-label {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 510;
+  letter-spacing: -0.012em;
+  color: var(--g-ink);
+}
+.settings-field-description {
+  margin: 2px 0 0;
+  max-width: 64ch;
+  font-size: 12px;
+  line-height: 1.33;
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  color: var(--g-ink-3);
+}
+.settings-field-control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 180px;
+}
+.settings-field-control > * {
+  width: 100%;
+}
+.settings-field-control > .seg-toggle {
+  width: auto;
+}
+@media (max-width: 1100px) {
+  .settings-field {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .settings-field-control {
+    grid-column: 2;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+}
 @media (max-width: 768px) {
-  .stg-layout {
-    grid-template-columns: 1fr;
+  .settings-content-grid {
+    max-width: none;
   }
-  .stg-rail {
-    flex-direction: row;
-    gap: 4px;
-    overflow-x: auto;
-    padding: 0 0 12px;
-    background: transparent;
-    border-right: 0;
-  }
-  .stg-rail-item {
-    white-space: nowrap;
+  .settings-panel-head,
+  .settings-panel > .settings-panel-head + div {
+    padding: 12px;
   }
 }
 
