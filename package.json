@@ -6,18 +6,22 @@
   },
   "lint-staged": {
     "ui/src/**/*.{ts,tsx}": [
-      "npx --prefix ui prettier --write",
-      "npx --prefix ui eslint --fix --config ui/eslint.config.js"
+      "pnpm --dir ui exec prettier --write",
+      "pnpm --dir ui exec eslint --fix --config eslint.config.js"
     ],
     "ui/src/**/*.{scss,css}": [
-      "npx --prefix ui prettier --write"
+      "pnpm --dir ui exec prettier --write"
     ],
     "ui/src/**/*.{json,md}": [
-      "npx --prefix ui prettier --write"
+      "pnpm --dir ui exec prettier --write"
+    ],
+    "**/*.go": [
+      "gofmt -w"
     ]
   },
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^17.0.0"
-  }
+  },
+  "packageManager": "pnpm@10.28.0"
 }

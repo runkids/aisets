@@ -3,6 +3,7 @@
 /tmp/
 /ui/dist/
 /ui/node_modules/
+/node_modules/
 /.cache/
 *.log
 *.tsbuildinfo
