@@ -4,8 +4,6 @@
 @use "./layout";
 
 @media (prefers-reduced-motion: reduce) {
-  .cmdk-backdrop,
-  .cmdk,
   .drawer,
   .run-panel,
   .bulkbar,
@@ -16,7 +14,6 @@
   .btn,
   .iconbtn,
   .card,
-  .cmdk-item,
   .acard,
   .opt-row,
   .dgroup-tile {
@@ -28,7 +25,6 @@
   }
   .btn:active:not(:disabled),
   .iconbtn:active:not(:disabled),
-  .cmdk-item:active,
   .acard:hover,
   .opt-row:hover {
     transform: none;

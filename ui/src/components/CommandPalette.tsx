@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
+import { cn } from "@/lib/cn";
 import { fileName, type Mode } from "../ui";
 import { Keycap, TextInput } from "./ui";
 
@@ -117,21 +118,29 @@ export function CommandPalette({
 
   if (!open) return null;
 
+  const itemCls = cn(
+    "flex items-center gap-2.5 w-full min-h-9 px-2.5 py-2 rounded-g-md text-g-ink-2 text-[13px] font-[510] tracking-[-0.012em] text-left",
+    "transition-[background,color] duration-[120ms] ease-g active:scale-[0.99] active:transition-transform active:duration-[100ms] active:ease-g-spring",
+    "hover:bg-g-surface-3 hover:text-g-ink",
+    "data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]",
+    "focus-visible:outline-none focus-visible:shadow-g-focus",
+  );
+
   return (
     <div
-      className="cmdk-backdrop"
+      className="fixed inset-0 z-[100] grid place-items-start justify-items-center pt-[12vh] bg-black/50 backdrop-blur-[8px] animate-[fadeIn_160ms_var(--g-ease)]"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
-        className="cmdk"
+        className="w-[580px] max-w-[90vw] overflow-hidden bg-g-surface-2 border border-g-line rounded-g-lg shadow-g-pop animate-[cmdkIn_200ms_var(--g-ease-out)]"
         role="dialog"
         aria-modal="true"
         aria-label={t("commandPalette.ariaLabel")}
       >
-        <div className="cmdk-input">
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-g-surface border-b border-g-line">
           <TextInput
             ref={inputRef}
             variant="command"
@@ -150,28 +159,37 @@ export function CommandPalette({
           />
         </div>
 
-        <div className="cmdk-list">
+        <div className="max-h-[400px] overflow-y-auto p-2">
           {results.modes.length > 0 && (
-            <div className="cmdk-section-h">{t("commandPalette.pages")}</div>
+            <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
+              {t("commandPalette.pages")}
+            </div>
           )}
           {results.modes.map((mode, index) => (
             <button
               key={mode.id}
               type="button"
-              className="cmdk-item"
+              className={itemCls}
               data-active={activeItemIndex === index || undefined}
               onMouseEnter={() => setActiveIndex(index)}
               onClick={() => selectItem(index)}
             >
-              <span className="cmdk-item-icon" aria-hidden="true">
+              <span
+                className="inline-flex text-current opacity-[0.82] shrink-0"
+                aria-hidden="true"
+              >
                 {mode.icon}
               </span>
-              <span className="cmdk-item-label">{mode.label}</span>
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {mode.label}
+              </span>
             </button>
           ))}
 
           {results.assets.length > 0 && (
-            <div className="cmdk-section-h">{t("commandPalette.assets")}</div>
+            <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
+              {t("commandPalette.assets")}
+            </div>
           )}
           {results.assets.map((asset, index) => {
             const resultIndex = results.modes.length + index;
@@ -179,31 +197,47 @@ export function CommandPalette({
               <button
                 key={asset.id}
                 type="button"
-                className="cmdk-item cmdk-item-asset"
+                className={itemCls}
                 data-active={activeItemIndex === resultIndex || undefined}
                 onMouseEnter={() => setActiveIndex(resultIndex)}
                 onClick={() => selectItem(resultIndex)}
               >
-                <span className="cmdk-mini-thumb" aria-hidden="true">
+                <span
+                  className="grid place-items-center w-[34px] h-[34px] shrink-0 overflow-hidden border border-g-line rounded-g-md bg-g-surface"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(45deg, var(--g-surface-3) 25%, transparent 25%), linear-gradient(-45deg, var(--g-surface-3) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--g-surface-3) 75%), linear-gradient(-45deg, transparent 75%, var(--g-surface-3) 75%)",
+                    backgroundPosition: "0 0, 0 6px, 6px -6px, 6px 0",
+                    backgroundSize: "12px 12px",
+                  }}
+                >
                   <img
                     src={asset.thumbnailUrl || asset.url}
                     alt=""
                     loading="lazy"
+                    className="max-w-[90%] max-h-[90%] object-contain"
                   />
                 </span>
-                <span className="cmdk-asset-text">
-                  <span className="cmdk-item-label cmdk-asset-name">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-current font-g-mono text-xs font-[510]">
                     {fileName(asset.repoPath)}
                   </span>
-                  <span className="cmdk-item-path">{asset.repoPath}</span>
+                  <span className="overflow-hidden text-current opacity-[0.62] font-g-mono text-[11px] tracking-[-0.015em] text-ellipsis whitespace-nowrap">
+                    {asset.repoPath}
+                  </span>
                 </span>
-                <span className="cmdk-item-meta">{asset.projectName}</span>
+                <span className="ml-auto text-current opacity-60 font-g-mono text-[11px] font-[510] tracking-[-0.015em] whitespace-nowrap">
+                  {asset.projectName}
+                </span>
               </button>
             );
           })}
 
           {totalItems === 0 && (
-            <div className="cmdk-empty">{t("common.noResults")}</div>
+            <div className="px-4 py-5 text-g-ink-4 text-[13px] text-center">
+              {t("common.noResults")}
+            </div>
           )}
         </div>
       </div>

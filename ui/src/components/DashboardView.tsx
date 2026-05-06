@@ -63,7 +63,7 @@ export function DashboardView({ catalog, onJump }: Props) {
 
   return (
     <div className="content-grid">
-      <section className="kpi-grid">
+      <section className="grid grid-cols-4 gap-4 max-[960px]:grid-cols-2 max-[480px]:grid-cols-1">
         <StatCard
           label={t("dashboard.totalAssets")}
           value={catalog.stats.totalFiles}
