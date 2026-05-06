@@ -62,8 +62,8 @@
   },
   "search": {
     "placeholder": "Search path, project, format, or content hash…",
-    "ariaLabel": "Search assets",
-    "placeholderShort": "Search assets..."
+    "ariaLabel": "Open command palette",
+    "placeholderShort": "Search or jump to..."
   },
   "tabs": {
     "scopeAriaLabel": "Asset scope",

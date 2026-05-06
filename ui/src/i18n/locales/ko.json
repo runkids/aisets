@@ -62,8 +62,8 @@
   },
   "search": {
     "placeholder": "경로, 프로젝트, 형식 또는 콘텐츠 해시 검색…",
-    "ariaLabel": "에셋 검색",
-    "placeholderShort": "에셋 검색..."
+    "ariaLabel": "명령 팔레트 열기",
+    "placeholderShort": "검색 또는 이동..."
   },
   "tabs": {
     "scopeAriaLabel": "에셋 범위",

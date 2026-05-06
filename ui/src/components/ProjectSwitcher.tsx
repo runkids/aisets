@@ -77,12 +77,10 @@ const sectionLabelClass =
   "px-2.5 pt-3 pb-1.5 text-g-ink-3 text-[10px] font-[510] tracking-[0.06em] leading-[1.4] uppercase";
 
 const optionClass = cn(
-  "relative flex w-full items-center gap-2.5 min-h-[40px] px-2.5 py-2 rounded-g-md text-g-ink-2 text-left",
+  "relative my-0.5 flex w-full items-center gap-2.5 min-h-[40px] px-2.5 py-2 rounded-g-md text-g-ink-2 text-left",
   "transition-[background,color,box-shadow] duration-[120ms] ease-g",
-  "hover:not-data-active:bg-[color-mix(in_srgb,var(--g-surface-2)_84%,transparent)] hover:not-data-active:text-g-ink-2",
-  "focus-visible:not-data-active:bg-[color-mix(in_srgb,var(--g-surface-2)_84%,transparent)] focus-visible:not-data-active:text-g-ink-2",
-  "dark:hover:not-data-active:bg-g-surface-3 dark:hover:not-data-active:text-g-ink",
-  "dark:focus-visible:not-data-active:bg-g-surface-3 dark:focus-visible:not-data-active:text-g-ink",
+  "hover:not-data-active:bg-g-surface-3 hover:not-data-active:text-g-ink",
+  "focus-visible:not-data-active:bg-g-surface-3 focus-visible:not-data-active:text-g-ink",
   "data-active:bg-g-active-bg data-active:text-g-active-text data-active:font-[var(--g-active-weight)]",
   "data-active:hover:bg-g-active-bg data-active:hover:text-g-active-text",
   "focus-visible:outline-none focus-visible:shadow-g-focus",

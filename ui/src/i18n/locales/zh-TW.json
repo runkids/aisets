@@ -62,8 +62,8 @@
   },
   "search": {
     "placeholder": "搜尋路徑、專案、格式或 content hash…",
-    "ariaLabel": "搜尋素材",
-    "placeholderShort": "搜尋素材..."
+    "ariaLabel": "開啟指令面板",
+    "placeholderShort": "搜尋或跳至..."
   },
   "tabs": {
     "scopeAriaLabel": "素材範圍",

@@ -56,17 +56,7 @@ function Button({
   return (
     <button
       type={type}
-      className={cn(
-        "btn",
-        variant === "primary" && "btn-primary",
-        variant === "secondary" && "btn-secondary",
-        variant === "ghost" && "btn-ghost",
-        variant === "danger" && "btn-danger",
-        size === "sm" && "btn-sm",
-        size === "lg" && "btn-lg",
-        buttonVariants({ variant, size }),
-        className,
-      )}
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     >
       {leadingIcon}
@@ -115,7 +105,7 @@ function IconButton({
   return (
     <button
       type={type}
-      className={cn("iconbtn", iconButtonVariants({ size }), className)}
+      className={cn(iconButtonVariants({ size }), className)}
       data-active={active || undefined}
       {...props}
     >

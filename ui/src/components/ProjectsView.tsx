@@ -441,7 +441,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
 
   return (
-    <div className="content-grid max-w-[1240px]">
+    <div className="content-grid !mx-0 !w-full !max-w-none">
       {/* Workspace hero */}
       <Card variant="default" padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -496,29 +496,31 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
       </Card>
 
       {/* Toolbar: search + sort */}
-      <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <TextInput
-          variant="search"
-          icon={<Search size={16} />}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("projects.searchProjectsPlaceholder")}
-          className="w-full max-w-[420px]"
-          inputClassName="font-g text-g-ui tracking-g-ui"
-        />
-        <div className="flex items-center gap-2">
-          <span className="text-g-caption text-g-ink-3">
-            {t("projects.sortLabel")}
-          </span>
-          <SegmentedControl
-            variant="text"
-            value={sort}
-            items={localizedSortItems}
-            onChange={setSort}
-            ariaLabel={t("projects.sortAria")}
+      <Card padding="md">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <TextInput
+            variant="search"
+            icon={<Search size={16} />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("projects.searchProjectsPlaceholder")}
+            className="w-full max-w-[420px]"
+            inputClassName="font-g text-g-ui tracking-g-ui"
           />
+          <div className="flex items-center gap-2">
+            <span className="text-g-caption text-g-ink-3">
+              {t("projects.sortLabel")}
+            </span>
+            <SegmentedControl
+              variant="text"
+              value={sort}
+              items={localizedSortItems}
+              onChange={setSort}
+              ariaLabel={t("projects.sortAria")}
+            />
+          </div>
         </div>
-      </section>
+      </Card>
 
       {/* Project cards */}
       {visibleProjects.length === 0 ? (

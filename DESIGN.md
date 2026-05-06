@@ -216,42 +216,30 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 ### 4.1 Sidebar `.sb`
 
-- `background: var(--g-surface)` (Graphite `#0f1011`)
-- `border-right: 1px solid var(--g-line)` (Charcoal `#23252a`)
-- **Brand block** `.sb-brand`: **height locked to 60px** (matches topbar — see §4.2). Layout: 40×40 logo mark using the official raster app icon (`/brand/asset-studio-app-icon.png`) on `--g-canvas`, 6px radius + name (Inter 15px / 590, Porcelain) + tag (10px uppercase / +0.06em / Storm Cloud). The image is presentation-zoomed (`scale(1.22)`) inside the clipped mark so the logo subject remains legible at sidebar chrome size. Keep the official logo asset intact; improve legibility through sizing/presentation, not by replacing the mark.
-- **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 12px bottom padding
+- The sidebar sits under the global topbar and is part of the dotted canvas, not a line-separated slab: `background: transparent`, no right border, 12px horizontal/bottom padding.
+- Product brand is not rendered inside the sidebar. It lives in the global topbar (§4.2) so the brand and page chrome read as one header.
+- Sidebar content is cardized: project switcher, each nav group, and footer use `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. There are no full-height divider lines.
+- **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 8px bottom padding
 - **`.sb-link`**: 6px 8px padding, **6px radius** (matches `RailItem` active shape), Inter 13px / 400, Storm Cloud default
   - Non-active hover: light uses a medium `--g-surface-2` wash so it remains readable without becoming selected, and flips the count badge to `--g-surface` so the chip stays distinct; dark steps to `--g-surface-3` + `--g-ink` so it remains visible on the dark sidebar
   - **Active**: bg `--g-accent` (Neon Lime), text `--g-accent-ink` (Pitch Black), font-weight 510. Active hover keeps the exact active bg/text colors in both themes. _No_ shadow.
   - Focus: 2px Neon Lime ring (`--g-shadow-focus`)
 - **Badge** in nav row: mono 11px on `--g-surface-3` background, 4px radius, Storm Cloud text. Tonal variants use `*-soft` bg + matching base color text
-- **Footer**: 1px top border, 32×32 user mark + name + team label (Storm Cloud)
+- **Footer**: cardized surface row with 32×32 user mark + name + team label (Storm Cloud); no top divider line
 - **Responsive ≤960px**: collapse to 64px icon-only rail
 
 ### 4.2 Topbar `.topbar`
 
-- **Frosted Pitch Black**: `background: color-mix(in srgb, var(--g-canvas) 85%, transparent)`, `backdrop-filter: blur(12px) saturate(160%)`
-- `padding: 0 20px`, `border-bottom: 1px solid var(--g-line)`, `z-index: 10`, `height: 60px` (locked — must match `.sb-brand` height so the sidebar/topbar bottom borders form one continuous line)
-- Layout: `.crumbs` → `.tb-spacer` (flex: 1) → `.search` → **`<Tooltip><IconButton>FolderPlus</IconButton></Tooltip>`** (Add Project, always visible) → **`<IconButton>RefreshCw</IconButton>` scan trigger** (Rescan). Clicking the scan trigger starts a scan and opens a compact hover/focus status dropdown anchored to the icon; hovering or keyboard focus keeps the dropdown visible. The dropdown uses `--g-surface-2`, `--g-line`, 12px overlay radius, `--g-shadow-pop`, a Loader/Check/X icon, localized phase label, optional mono `current/total`, and a 6px determinate bar (`--g-accent` while running, `--g-green` on completion, `--g-red` on failure). It does **not** place inline progress text in the topbar and does **not** show a global blue "Scanning" notice during the pending state; completion/error still uses toast/notice.
-- **Crumbs `.crumbs`** are NOT a file-path-style breadcrumb. They are a **page header inline trio**:
-
-  ```
-  [.crumbs-icon 26×26 mode glyph]  .crumbs-title  ·  .crumbs-meta
-  ```
-
-  - `.crumbs-icon`: 26×26 square, 6px radius, `--g-surface-2` bg, `--g-ink-2` icon (16×16). The icon must match the sidebar nav icon for the same mode (FolderKanban/FolderOpen/Recycle/Trash2/Sparkles/FileWarning/ShieldCheck/Settings) — visually ties topbar to active sidebar item.
-  - `.crumbs-title`: Inter display 14px / 590 / `--g-ink`, `-0.013em` tracking. The mode title (e.g. "Dashboard").
-  - `.crumbs-dot`: middle dot `·`, `--g-ink-5`, separates title from meta.
-  - `.crumbs-meta`: mono 12px / `--g-ink-3` / tabular nums (e.g. `1 project · 5 assets`). Hidden ≤600px.
-
-- The redundant `asset.studio` brand crumb and `/` separator are removed — sidebar already shows brand; crumbs reflect navigation, not file path.
-- **Crumbs**: 13px / 400 / Storm Cloud. Current page: 510 / Porcelain. Slash separator: mono / `--g-ink-5`. Optional count chip uses `--g-info-soft` background
+- Global header spans the full app width (`grid-column: 1 / -1`) and is transparent over the dotted canvas: `background: transparent`, no bottom border, no backdrop blur.
+- `padding: 0 20px`, `z-index: 10`, `height: 60px`.
+- Layout: left brand block (40×40 official raster app icon, 6px radius, `--g-surface` + `--g-shadow-sm`, name + uppercase tag) → centered command search trigger → right action cluster with **`<Tooltip><IconButton>FolderPlus</IconButton></Tooltip>`** (Add Project, always visible) → **`<IconButton>RefreshCw</IconButton>` scan trigger** (Rescan). The topbar intentionally does not render breadcrumbs; page identity lives in the active sidebar item and page/card titles so the header stays balanced. At wide widths the search trigger is absolutely centered in the topbar (GitHub-style balanced header); below 1180px it participates in the flex row between brand and actions; at ≤480px it collapses to an icon-only command trigger. Clicking the scan trigger starts a scan and opens a compact hover/focus status dropdown anchored to the icon; hovering or keyboard focus keeps the dropdown visible. The dropdown uses `--g-surface-2`, `--g-line`, 12px overlay radius, `--g-shadow-pop`, a Loader/Check/X icon, localized phase label, optional mono `current/total`, and a 6px determinate bar (`--g-accent` while running, `--g-green` on completion, `--g-red` on failure). It does **not** place inline progress text in the topbar and does **not** show a global blue "Scanning" notice during the pending state; completion/error still uses toast/notice.
+- **Breadcrumbs:** topbar breadcrumbs are removed. No slash separators, no brand crumb, no page crumb, and no inline totals. Counts belong inside page cards or side/filter cards.
 - **Search input / trigger** `.search`:
-  - Width 320px (max 40vw)
+  - Wide topbar width: `min(520px, 42vw)`, centered in the header. Below 1180px: `min(360px, 36vw)` in-flow between crumbs and actions. At ≤480px: icon-only 32×32 trigger with `aria-label` preserved.
   - Background `--g-surface` (white in light mode, Graphite in dark mode) with a strong token border so the field stays visible on the frosted topbar
-  - Border `1px solid var(--g-line-strong)`
+  - Border `1px solid var(--g-line-strong)` plus `--g-shadow-sm` so the centered trigger reads as a discrete header control without diffuse elevation
   - 6px radius, 10px 12px padding, Inter 13px / 400 / Light Steel
-  - Placeholder: Storm Cloud
+  - Placeholder/trigger copy: localized "Search or jump to..." phrasing, so the command palette reads as navigation as well as asset search.
   - Hover: bg `--g-surface-2`, border `--g-line-strong` (theme-aware; never hard-code separate light/dark colors)
   - Focus: border `--g-accent`, box-shadow `--g-shadow-focus`, bg `--g-surface`
   - Press: subtle `scale(0.99)` only; disabled by reduced motion
@@ -262,9 +250,10 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/components/ui/Rail.tsx`. The primitive owns rail body, section, active item, icon, label, count rendering, responsive variants, and active / inactive / hover states through CVA variants.
 
-- 220px wide, `background: var(--g-surface)`, `border-right: 1px solid var(--g-line)`
+- Filter rail is compact but readable: 200px wide with 6px horizontal rail padding, transparent rail body, and no right divider line. The dotted canvas remains visible between rail cards and content cards.
+- Each `RailSection` is a compact card: `--g-surface` fill, `--g-line` border, 6px radius, `--g-shadow-sm`, 4px inner padding.
 - Section label: 10px uppercase Storm Cloud
-- **`RailItem`**: full-width button, 6px 10px padding, 6px radius, Inter 13px / 400 / Light Steel
+- **`RailItem`**: full-width button, 6px 8px padding, 6px radius, Inter 12px / 400 / Light Steel
   - Inactive: transparent background, `--g-ink-2` text
   - Hover: `color-mix(in srgb, var(--g-surface-2) 54%, transparent)` bg, `--g-ink` text, 1px inset `--g-line`
   - **Active**: `--g-active-bg` bg, `--g-active-text` text, `--g-active-weight` weight
@@ -282,9 +271,9 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 - Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
 - Menu: anchored popover, 320px max width, `--g-surface` white/Graphite layer, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
 - Header stays compact: 15px display title + 12px workspace meta, bottom divider `--g-line`.
-- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
-- Project options are 40px minimum rows with 10px gaps, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Project options are scoped to the active workspace only. The selected project scope keeps the full active treatment; hover/focus uses `--g-surface-3`.
-- Hover logic matches sidebar rows: inactive hover uses a subtle surface wash (`--g-surface-3` in dark), inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
+- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. Rows keep 4px vertical separation so hover fills do not visually merge. The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
+- Project options are 40px minimum rows with 10px gaps, 4px vertical separation, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Project options are scoped to the active workspace only. The selected project scope keeps the full active treatment; hover/focus uses `--g-surface-3`.
+- Hover logic matches sidebar rows: inactive hover uses the full `--g-surface-3` wash in both themes (not a transparent `--g-surface-2` mix) so it separates from the menu background and active workspace row; inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
 - Press scale is disabled under `prefers-reduced-motion`.
 
 ---
@@ -811,8 +800,10 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 ### 7.8 Projects
 
 - Projects uses the `FolderKanban` Lucide icon across the sidebar nav, topbar crumbs, command palette, project cards, project switcher project rows, and Settings projects section so project roots read as tracked folders rather than organizations.
-- Projects is a workspace-level view: project cards, workspace KPIs, the Projects nav badge, and the topbar count always use the full catalog, independent of the Project Switcher selection.
-- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search.
+- Projects is a workspace-level view: project cards, workspace KPIs, and the Projects nav badge always use the full catalog, independent of the Project Switcher selection. Topbar breadcrumbs stay title-only; counts live in cards.
+- Page content starts close to the global header (`pt: 12px`) so the first card aligns with the cardized sidebar rhythm rather than floating far below the transparent topbar. Route-level content scroll containers remount on mode changes so stale scroll offsets do not reveal clipped content under the transparent header.
+- Projects page fills the available content column (`width: 100%; max-width: none`) and is start-aligned (`mx: 0`), matching Duplicates and other dense pages so both left and right gutters stay consistent through the shared content-scroll padding. Because legacy `.content-grid` SCSS sets `max-width: 1200px; margin: 0 auto`, Projects must explicitly override that legacy rule when using the shared class.
+- The Projects toolbar search filters project cards only. Placeholder copy must describe project search, not asset or path result search. The toolbar itself is a card (`--g-surface`, `--g-line`, 6px radius, `--g-shadow-sm`) containing search + sort controls; do not leave it as bare controls on the canvas.
 - Projects toolbar sort uses `SegmentedControl` labels for name, count, size, health, and imported date. Count / size / health / imported sort descending (imported = newest first) with project name as the stable tiebreaker; name sort is ascending.
 - Clickable workspace KPI cells use an 8px padded hover/focus target with a matching negative offset so the text remains aligned while the hover wash never hugs the label or value.
 - Project cards use `.project-card-health-bar` as a health meter: fill width equals `health / 100`, fill tone follows the health badge (`green` / `amber` / `red`), and the track is a 16% tone mix over `--g-surface-2` so `0% health` still reads as a red danger state instead of empty data. The same health, unused, duplicate, optimizable, and lint counts are repeated in text badges so the bar is never color-only.

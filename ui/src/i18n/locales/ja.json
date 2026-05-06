@@ -62,8 +62,8 @@
   },
   "search": {
     "placeholder": "パス、プロジェクト、フォーマット、コンテンツハッシュで検索…",
-    "ariaLabel": "アセットを検索",
-    "placeholderShort": "アセットを検索..."
+    "ariaLabel": "コマンドパレットを開く",
+    "placeholderShort": "検索または移動..."
   },
   "tabs": {
     "scopeAriaLabel": "アセット範囲",

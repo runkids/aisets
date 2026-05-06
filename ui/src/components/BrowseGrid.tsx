@@ -163,7 +163,7 @@ export function BrowseGrid({
       <button
         key={item.id}
         type="button"
-        className="acard"
+        className="group/card relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:z-[2] data-[selected=true]:translate-y-[-2px] data-[selected=true]:border-g-accent data-[selected=true]:shadow-[0_0_0_2px_var(--g-accent),var(--g-shadow-md)] data-[selected=true]:after:absolute data-[selected=true]:after:inset-[6px] data-[selected=true]:after:rounded-[calc(var(--g-r-md)-2px)] data-[selected=true]:after:pointer-events-none data-[selected=true]:after:animate-[selectedPulse_1000ms_var(--g-ease-out)] cursor-pointer"
         data-selected={isVisuallySelected || undefined}
         onClick={() => (bulkMode ? onToggleSelect(item.id) : onSelect(item))}
         aria-label={ariaLabel}
@@ -173,24 +173,43 @@ export function BrowseGrid({
           alt={fileName(item.repoPath)}
           enabled={imagePreviewEnabled}
         >
-          <div className="acard-thumb" data-bg={bgMode}>
-            <img src={imgSrc} alt="" loading="lazy" className="acard-img" />
+          <div
+            className="relative grid place-items-center overflow-hidden border-b border-g-line bg-g-surface-2 data-[bg=dark]:bg-g-ink [[data-theme=dark]_&]:data-[bg=dark]:bg-g-canvas data-[bg=light]:bg-g-surface [[data-theme=dark]_&]:data-[bg=light]:bg-g-ink"
+            data-bg={bgMode}
+            style={{
+              aspectRatio:
+                cfg.thumbRatio === 1
+                  ? "1"
+                  : cfg.thumbRatio === 3 / 4
+                    ? "4/3"
+                    : "3/2",
+            }}
+          >
+            <img
+              src={imgSrc}
+              alt=""
+              loading="lazy"
+              className="absolute inset-3 m-auto max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain"
+            />
             {(duplicate || isUnused || optimizable) && (
-              <div className="acard-flags" aria-hidden="true">
+              <div
+                className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-44px)]"
+                aria-hidden="true"
+              >
                 {duplicate && (
-                  <span className="flag flag-dup">
+                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
                     <Copy size={10} />
                     {t("browse.flagDuplicate")}
                   </span>
                 )}
                 {isUnused && (
-                  <span className="flag flag-unused">
+                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-red)_35%,transparent)] bg-g-red-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-red">
                     <CircleOff size={10} />
                     {t("browse.flagUnused")}
                   </span>
                 )}
                 {optimizable && (
-                  <span className="flag flag-opt">
+                  <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-blue)_35%,transparent)] bg-g-blue-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-blue">
                     <Sparkles size={10} />
                     {t("browse.flagOptimizable")}
                   </span>
@@ -198,7 +217,7 @@ export function BrowseGrid({
               </div>
             )}
             <span
-              className="acard-check"
+              className="absolute top-2 right-2 grid size-[22px] place-items-center rounded-g-md border border-g-line-strong bg-g-surface text-g-ink-3 opacity-0 transition-[opacity,background,color,border-color] duration-[120ms] ease-[var(--g-ease)] pointer-events-none group-hover/card:opacity-100 group-data-[selected=true]/card:opacity-100 group-data-[selected=true]/card:bg-g-accent group-data-[selected=true]/card:border-g-accent group-data-[selected=true]/card:text-g-accent-ink"
               role={bulkMode ? "checkbox" : undefined}
               aria-checked={bulkMode ? isSelected : undefined}
               aria-label={
@@ -217,14 +236,18 @@ export function BrowseGrid({
             </span>
           </div>
         </ImagePreview>
-        <div className="acard-meta">
+        <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)] group-data-[selected=true]/card:bg-g-accent-soft">
           <Tooltip label={item.repoPath} placement="top">
-            <div className="acard-name">{fileName(item.repoPath)}</div>
+            <div className="block w-full truncate text-left font-g-mono text-[12px] font-[510] text-g-ink">
+              {fileName(item.repoPath)}
+            </div>
           </Tooltip>
           <Tooltip label={item.repoPath} placement="top">
-            <div className="acard-path">{item.repoPath}</div>
+            <div className="block w-full truncate text-left font-g-mono text-[10px] text-g-ink-4">
+              {item.repoPath}
+            </div>
           </Tooltip>
-          <div className="acard-row">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="line">{formatExt(item.ext)}</Badge>
             <Badge>{formatBytes(item.bytes)}</Badge>
             <Tooltip label={referenceLabel} placement="top">
@@ -244,7 +267,7 @@ export function BrowseGrid({
     <div ref={scrollRef} className="h-full overflow-auto scroll-thin">
       <section
         ref={gridRef}
-        className="browse-grid block"
+        className="relative block w-full p-1 align-content-start"
         data-size={gridSize}
         style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
         aria-label={t("browse.gridAriaLabel")}

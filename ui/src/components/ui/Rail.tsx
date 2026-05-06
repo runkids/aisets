@@ -3,12 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 const railVariants = cva(
-  "flex w-[220px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-[var(--g-line)] bg-[var(--g-surface)] px-3 py-4",
+  "flex shrink-0 flex-col gap-2 overflow-y-auto bg-transparent px-1.5 py-3",
   {
     variants: {
       variant: {
-        filter: "max-lg:hidden",
-        settings: "max-md:w-16 max-md:px-2 max-md:py-3",
+        filter: "w-[200px] max-lg:hidden",
+        settings: "w-[220px] max-md:w-16 max-md:px-2 max-md:py-3",
       },
     },
     defaultVariants: {
@@ -17,15 +17,17 @@ const railVariants = cva(
   },
 );
 
-const railSectionVariants = cva("flex flex-col gap-1");
+const railSectionVariants = cva(
+  "flex flex-col gap-1 rounded-[var(--g-r-md)] border border-[var(--g-line)] bg-[var(--g-surface)] p-1 shadow-[var(--g-shadow-sm)]",
+);
 
 const railHeadingVariants = cva(
-  "m-0 px-1 pb-1 font-g text-[10px] font-[510] uppercase leading-[1.4] tracking-[0.06em] text-[var(--g-ink-3)]",
+  "m-0 px-2 pb-0.5 pt-1 font-g text-[10px] font-[510] uppercase leading-[1.4] tracking-[0.06em] text-[var(--g-ink-3)]",
 );
 
 const railItemVariants = cva(
   [
-    "flex min-h-[30px] w-full cursor-pointer items-center justify-between gap-2 rounded-[var(--g-r-md)] !px-2.5 !py-1.5 text-left font-g text-[13px] leading-[1.4] tracking-[-0.012em]",
+    "flex min-h-[28px] w-full cursor-pointer items-center justify-between gap-2 rounded-[var(--g-r-md)] !px-2 !py-1.5 text-left font-g text-[12px] leading-[1.4] tracking-[-0.012em]",
     "transition-[background,color,box-shadow] duration-[120ms] ease-[var(--g-ease)]",
     "focus-visible:outline-none focus-visible:shadow-[var(--g-shadow-focus)] disabled:cursor-not-allowed disabled:!opacity-[0.38]",
   ],

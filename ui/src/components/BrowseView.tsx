@@ -474,7 +474,7 @@ export function BrowseView({
         customFilterTotal={filteredWithoutCustom.length}
         onFiltersChange={setFilters}
       />
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-2 pt-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2 pt-3">
         <div className="max-w-none p-0 flex h-full flex-col">
           <BrowseToolbar
             view={view}
@@ -495,7 +495,7 @@ export function BrowseView({
           />
 
           {bulkMode && selected.size > 0 && (
-            <div className="bulkbar">
+            <div className="sticky top-0 z-[5] mb-4 flex min-h-[44px] items-center gap-3 rounded-g-md border border-g-line-strong bg-g-surface-3 px-3 py-2 text-[13px] text-g-ink shadow-g-md animate-[slideUp2_200ms_var(--g-ease-out)]">
               <span className="font-g-mono text-[13px] font-[510]">
                 {t("selection.summary", {
                   count: selected.size,
@@ -503,17 +503,25 @@ export function BrowseView({
                 })}
               </span>
               <span className="flex-1" />
-              <button type="button" className="bulkbar-btn" onClick={copyPaths}>
+              <button
+                type="button"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={copyPaths}
+              >
                 <Copy size={12} />
                 {t("action.copyPaths")}
               </button>
-              <button type="button" className="bulkbar-btn" onClick={copyAsRm}>
+              <button
+                type="button"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={copyAsRm}
+              >
                 <Terminal size={12} />
                 {t("action.copyGitRm")}
               </button>
               <button
                 type="button"
-                className="bulkbar-btn bulkbar-btn-danger"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-g-red px-2.5 text-[12px] font-[510] text-g-canvas hover:brightness-[1.08]"
                 onClick={() => {
                   /* delete action placeholder */
                 }}

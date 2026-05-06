@@ -9,11 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  displayCatalogForMode,
-  displayTotalsForMode,
-  navigationBadges,
-} from "./appScope";
+import { displayCatalogForMode, navigationBadges } from "./appScope";
 import { AppTopbar } from "./components/AppTopbar";
 import { AssetDrawer } from "./components/AssetDrawer";
 import { BrowseView } from "./components/BrowseView";
@@ -105,16 +101,19 @@ export function App() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [setAutoScrollAssetId, setSearchParams],
   );
 
   const toast = useToast();
   const autoScanStartedRef = useRef(false);
   const catalogQuery = useCatalogQuery();
-  const handleScanEvent = useCallback((event: ScanEvent) => {
-    setScanProgress(event);
-    setScanProgressVisible(true);
-  }, []);
+  const handleScanEvent = useCallback(
+    (event: ScanEvent) => {
+      setScanProgress(event);
+      setScanProgressVisible(true);
+    },
+    [setScanProgress, setScanProgressVisible],
+  );
   const scanMutation = useScanCatalogMutation({ onEvent: handleScanEvent });
   const settingsQuery = useSettingsQuery();
   const addProjectMutation = useAddProjectMutation();
@@ -464,17 +463,21 @@ export function App() {
 
   const clearAutoScrollAssetId = useCallback(
     () => setAutoScrollAssetId(""),
-    [],
+    [setAutoScrollAssetId],
   );
-
-  const displayTotals = displayTotalsForMode(mode, catalog, scopedCatalog);
-  const totalLabel = displayTotals
-    ? t("topbar.totalLabel", displayTotals)
-    : t("topbar.noCatalog");
 
   return (
     <TooltipPrimitive.Provider delayDuration={400}>
-      <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[1fr] max-[960px]:grid-cols-[64px_1fr]">
+      <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
+        <div className="col-span-2 row-start-1">
+          <AppTopbar
+            working={working}
+            scanProgress={scanProgressVisible ? scanProgress : null}
+            onAddProject={() => setDirectoryPickerOpen(true)}
+            onRefresh={onRescan}
+            onOpenCmdK={() => setCmdkOpen(true)}
+          />
+        </div>
         <NavSidebar
           mode={mode}
           badges={badges}
@@ -488,17 +491,7 @@ export function App() {
           onSelectProject={setSelectedProjectId}
           onSelect={changeMode}
         />
-        <section className="flex flex-col overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)]">
-          <AppTopbar
-            mode={mode}
-            totalLabel={totalLabel}
-            working={working}
-            scanProgress={scanProgressVisible ? scanProgress : null}
-            onAddProject={() => setDirectoryPickerOpen(true)}
-            onRefresh={onRescan}
-            onOpenCmdK={() => setCmdkOpen(true)}
-          />
-
+        <section className="flex flex-col overflow-hidden bg-transparent">
           <NoticeStack items={notices} />
 
           <div className="flex flex-1 overflow-hidden">
@@ -530,7 +523,10 @@ export function App() {
                 onImagePreviewEnabledChange={setImagePreviewEnabled}
               />
             ) : (
-              <div className="content-scroll flex-1 overflow-y-auto overflow-x-hidden px-8 pt-8 pb-12 max-[768px]:px-4 max-[768px]:pt-5 max-[768px]:pb-8">
+              <div
+                key={mode}
+                className="content-scroll flex-1 overflow-y-auto overflow-x-hidden px-3 pt-3 pb-12 max-[768px]:px-3 max-[768px]:pt-3 max-[768px]:pb-8"
+              >
                 {mode === "precheck" ? (
                   <PreCheckView onOpenAsset={openAssetFromPalette} />
                 ) : displayCatalog == null &&
