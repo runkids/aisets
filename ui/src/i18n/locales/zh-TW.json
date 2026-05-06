@@ -133,6 +133,19 @@
     "optimizable": "可最佳化",
     "referenced": "已引用"
   },
+  "scanProgress": {
+    "starting": "準備開始掃描",
+    "complete": "掃描完成",
+    "phase": {
+      "collecting": "收集素材中",
+      "metadata": "分析圖片中",
+      "references": "檢查引用中",
+      "duplicates": "整理重複素材中",
+      "nearDuplicates": "比對相似素材中",
+      "lint": "執行素材規則中",
+      "persisting": "儲存掃描結果中"
+    }
+  },
   "error": {
     "catalogLoad": "Catalog 載入失敗",
     "scan": "掃描失敗",

@@ -5,6 +5,27 @@ import (
 	"asset-studio/internal/lint"
 )
 
+type ScanPhase string
+
+const (
+	ScanPhaseCollecting     ScanPhase = "collecting"
+	ScanPhaseMetadata       ScanPhase = "metadata"
+	ScanPhaseReferences     ScanPhase = "references"
+	ScanPhaseDuplicates     ScanPhase = "duplicates"
+	ScanPhaseNearDuplicates ScanPhase = "nearDuplicates"
+	ScanPhaseLint           ScanPhase = "lint"
+	ScanPhasePersisting     ScanPhase = "persisting"
+)
+
+type ScanProgress struct {
+	Phase   ScanPhase `json:"phase"`
+	Current int       `json:"current,omitempty"`
+	Total   int       `json:"total,omitempty"`
+	Message string    `json:"message,omitempty"`
+}
+
+type ProgressFunc func(ScanProgress)
+
 type Project struct {
 	ID          string `json:"id"`
 	WorkspaceID string `json:"workspaceId,omitempty"`

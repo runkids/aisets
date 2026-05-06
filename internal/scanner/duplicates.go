@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"context"
 	"sort"
 
 	"asset-studio/internal/imageproc"
@@ -39,11 +40,15 @@ func markDuplicates(items []AssetItem) []DuplicateGroup {
 	return groups
 }
 
-func markNearDuplicates(items []AssetItem) []NearDuplicate {
+func markNearDuplicates(ctx context.Context, items []AssetItem, progress ProgressFunc) ([]NearDuplicate, error) {
 	const threshold = 5
 	var out []NearDuplicate
 	for i := 0; i < len(items); i++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if items[i].DHash == "" {
+			notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: i + 1, Total: len(items)})
 			continue
 		}
 		for j := i + 1; j < len(items); j++ {
@@ -74,6 +79,7 @@ func markNearDuplicates(items []AssetItem) []NearDuplicate {
 				Flipped:   flipped,
 			})
 		}
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: i + 1, Total: len(items)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].LeftPath != out[j].LeftPath {
@@ -84,5 +90,5 @@ func markNearDuplicates(items []AssetItem) []NearDuplicate {
 	for i := range items {
 		sort.Strings(items[i].Similar)
 	}
-	return out
+	return out, nil
 }

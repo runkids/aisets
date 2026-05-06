@@ -5,6 +5,7 @@ import type {
   DirectoryListing,
   ExportData,
   Project,
+  ScanEvent,
   SettingsInfo,
   SettingsUpdate,
 } from "./types";
@@ -57,10 +58,40 @@ export function getCatalog() {
   return request<Catalog>("/api/catalog");
 }
 
-export async function scanCatalog() {
+function throwAPIError(error: APIErrorBody["error"] | undefined) {
+  if (error?.code) throw new APIError(error.code, error.message, error.params);
+  throw new APIError("scan_failed", "scan failed");
+}
+
+function parseScanLine(
+  line: string,
+  onEvent?: (event: ScanEvent) => void,
+): ScanEvent | null {
+  if (!line.trim()) return null;
+  const event = JSON.parse(line) as ScanEvent;
+  onEvent?.(event);
+  if (event.type === "error") throwAPIError(event.error);
+  return event;
+}
+
+async function parseScanText(
+  text: string,
+  onEvent?: (event: ScanEvent) => void,
+) {
+  let done: Extract<ScanEvent, { type: "done" }> | null = null;
+  for (const line of text.split("\n")) {
+    const event = parseScanLine(line, onEvent);
+    if (event?.type === "done") done = event;
+  }
+  return done ?? ({ type: "done" } as const);
+}
+
+export async function scanCatalog(options?: {
+  onEvent?: (event: ScanEvent) => void;
+}) {
   const response = await fetch(`${basePath}/api/scan`, { method: "POST" });
-  const text = await response.text();
   if (!response.ok) {
+    const text = await response.text();
     const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
     const error = body.error;
     if (error?.code)
@@ -70,24 +101,29 @@ export async function scanCatalog() {
     });
   }
 
-  let done: { type: string; stats?: Catalog["stats"] } | null = null;
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
-    const event = JSON.parse(line) as {
-      type: string;
-      stats?: Catalog["stats"];
-      error?: APIErrorBody["error"];
-    };
-    if (event.type === "error") {
-      const error = event.error;
-      if (error?.code)
-        throw new APIError(error.code, error.message, error.params);
-      throw new APIError("scan_failed", "scan failed");
+  if (!response.body)
+    return parseScanText(await response.text(), options?.onEvent);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: Extract<ScanEvent, { type: "done" }> | null = null;
+
+  for (;;) {
+    const chunk = await reader.read();
+    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parseScanLine(line, options?.onEvent);
+      if (event?.type === "done") done = event;
     }
-    if (event.type === "done") done = event;
+    if (chunk.done) break;
   }
 
-  return done ?? { type: "done" };
+  const finalEvent = parseScanLine(buffer, options?.onEvent);
+  if (finalEvent?.type === "done") done = finalEvent;
+  return done ?? ({ type: "done" } as const);
 }
 
 export function addProject(path: string) {

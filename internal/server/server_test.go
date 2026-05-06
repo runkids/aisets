@@ -76,7 +76,7 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/api/scan", nil)
 	s.handler.ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if rec.Code != http.StatusOK || !strings.Contains(body, `"type":"start"`) || !strings.Contains(body, `"type":"progress"`) || !strings.Contains(body, `"type":"done"`) {
+	if rec.Code != http.StatusOK || rec.Header().Get("content-type") != "application/x-ndjson; charset=utf-8" || !strings.Contains(body, `"type":"start"`) || !strings.Contains(body, `"type":"progress"`) || !strings.Contains(body, `"phase":"metadata"`) || !strings.Contains(body, `"phase":"persisting"`) || !strings.Contains(body, `"type":"done"`) {
 		t.Fatalf("scan = %d %s", rec.Code, body)
 	}
 

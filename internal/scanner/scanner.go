@@ -50,10 +50,16 @@ func NewWithCacheDir(cacheDir string) *Scanner {
 }
 
 func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error) {
+	return s.ScanWithProgress(ctx, projects, nil)
+}
+
+func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, progress ProgressFunc) (Catalog, error) {
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
 	candidates, err := collectCandidates(ctx, projects)
 	if err != nil {
 		return Catalog{}, err
 	}
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting, Current: len(candidates), Total: len(candidates)})
 	sizeCounts := map[int64]int{}
 	for _, candidate := range candidates {
 		sizeCounts[candidate.info.Size()]++
@@ -67,6 +73,7 @@ func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error)
 	})
 	results := make(chan scanResult)
 	workers := max(1, min(runtime.NumCPU(), 8))
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseMetadata, Current: 0, Total: len(candidates)})
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
@@ -94,7 +101,10 @@ func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error)
 		wg.Wait()
 		close(results)
 	}()
+	processed := 0
 	for result := range results {
+		processed++
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseMetadata, Current: processed, Total: len(candidates)})
 		if result.err != nil {
 			return Catalog{}, result.err
 		}
@@ -113,7 +123,10 @@ func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error)
 		return items[i].RepoPath < items[j].RepoPath
 	})
 
-	refs, err := buildReferenceMap(ctx, projects, items)
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
+	refs, err := buildReferenceMap(ctx, projects, items, func(current, total int) {
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
+	})
 	if err != nil {
 		return Catalog{}, err
 	}
@@ -121,9 +134,17 @@ func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error)
 		items[i].References = refs[assetKey(items[i].ProjectID, items[i].RepoPath)]
 		items[i].UsedBy = uniqueReferenceFiles(items[i].References)
 	}
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseDuplicates})
 	dups := markDuplicates(items)
-	near := markNearDuplicates(items)
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseDuplicates, Current: len(items), Total: len(items)})
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: 0, Total: len(items)})
+	near, err := markNearDuplicates(ctx, items, progress)
+	if err != nil {
+		return Catalog{}, err
+	}
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint})
 	lintFindings := runLint(projects, items)
+	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint, Current: len(lintFindings), Total: len(lintFindings)})
 
 	unused := 0
 	dupFiles := 0

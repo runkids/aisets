@@ -133,6 +133,19 @@
     "optimizable": "Optimizable",
     "referenced": "Referenced"
   },
+  "scanProgress": {
+    "starting": "Starting scan",
+    "complete": "Scan complete",
+    "phase": {
+      "collecting": "Collecting assets",
+      "metadata": "Analyzing images",
+      "references": "Checking references",
+      "duplicates": "Grouping duplicates",
+      "nearDuplicates": "Comparing similar assets",
+      "lint": "Running asset rules",
+      "persisting": "Saving scan results"
+    }
+  },
   "settings": {
     "section": {
       "workspace": "Workspace",

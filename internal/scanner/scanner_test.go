@@ -100,6 +100,37 @@ func TestScanCatalogJSONUsesEmptyArrays(t *testing.T) {
 	}
 }
 
+func TestScanWithProgressReportsPhases(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "src", "asset.png"), solidImage(2, 2, color.White))
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import asset from "./asset.png"`)
+
+	var events []ScanProgress
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	_, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, func(event ScanProgress) {
+		events = append(events, event)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[ScanPhase]bool{}
+	metadataDone := false
+	for _, event := range events {
+		seen[event.Phase] = true
+		if event.Phase == ScanPhaseMetadata && event.Current == 1 && event.Total == 1 {
+			metadataDone = true
+		}
+	}
+	for _, phase := range []ScanPhase{ScanPhaseCollecting, ScanPhaseMetadata, ScanPhaseReferences, ScanPhaseDuplicates, ScanPhaseNearDuplicates, ScanPhaseLint} {
+		if !seen[phase] {
+			t.Fatalf("missing progress phase %s in %#v", phase, events)
+		}
+	}
+	if !metadataDone {
+		t.Fatalf("metadata progress did not complete with 1/1: %#v", events)
+	}
+}
+
 func TestScanSkipsHeavyDirectories(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "node_modules", "ignored.png"), solidImage(2, 2, color.Black))

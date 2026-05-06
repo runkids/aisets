@@ -18,7 +18,7 @@ import {
   switchWorkspace,
   updateSettings,
 } from "./api";
-import type { ExportData, SettingsUpdate } from "./types";
+import type { ExportData, ScanEvent, SettingsUpdate } from "./types";
 
 export const catalogQueryKey = ["catalog"] as const;
 export const settingsQueryKey = ["settings"] as const;
@@ -50,10 +50,12 @@ export function useSettingsQuery() {
   });
 }
 
-export function useScanCatalogMutation() {
+export function useScanCatalogMutation(options?: {
+  onEvent?: (event: ScanEvent) => void;
+}) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: scanCatalog,
+    mutationFn: () => scanCatalog({ onEvent: options?.onEvent }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

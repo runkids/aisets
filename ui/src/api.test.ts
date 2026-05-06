@@ -1,5 +1,63 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { updateSettings } from "./api";
+import { scanCatalog, updateSettings } from "./api";
+import type { ScanEvent } from "./types";
+
+function streamFromChunks(chunks: string[]) {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+  });
+}
+
+describe("scanCatalog", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("streams NDJSON scan events as chunks arrive", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: streamFromChunks([
+        '{"type":"start"}\n{"type":"prog',
+        'ress","phase":"metadata","current":1,"total":2}\n',
+        '{"type":"done","scanId":7}\n',
+      ]),
+      text: async () => "",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const events: ScanEvent[] = [];
+
+    const result = await scanCatalog({
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(result).toEqual({ type: "done", scanId: 7 });
+    expect(events).toEqual([
+      { type: "start" },
+      { type: "progress", phase: "metadata", current: 1, total: 2 },
+      { type: "done", scanId: 7 },
+    ]);
+  });
+
+  it("throws APIError when a streamed scan error arrives", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: streamFromChunks([
+        '{"type":"error","error":{"code":"scan_failed","message":"Scan failed"}}\n',
+      ]),
+      text: async () => "",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(scanCatalog()).rejects.toMatchObject({
+      code: "scan_failed",
+      name: "APIError",
+    });
+  });
+});
 
 describe("updateSettings", () => {
   afterEach(() => {

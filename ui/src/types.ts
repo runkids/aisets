@@ -175,6 +175,27 @@ export type Catalog = {
   };
 };
 
+export type ScanProgressPhase =
+  | "collecting"
+  | "metadata"
+  | "references"
+  | "duplicates"
+  | "nearDuplicates"
+  | "lint"
+  | "persisting";
+
+export type ScanEvent =
+  | { type: "start" }
+  | {
+      type: "progress";
+      phase: ScanProgressPhase;
+      current?: number;
+      total?: number;
+      message?: string;
+    }
+  | { type: "done"; scanId?: number; stats?: Catalog["stats"] }
+  | { type: "error"; error?: APIErrorBody["error"] };
+
 export type ActionPreview = {
   id: string;
   type: string;

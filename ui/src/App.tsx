@@ -78,6 +78,7 @@ export function App() {
   const [autoScrollAssetId, setAutoScrollAssetId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [scanProgress, setScanProgress] = useState<ScanEvent | null>(null);
+  const [scanProgressVisible, setScanProgressVisible] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
@@ -112,6 +113,7 @@ export function App() {
   const catalogQuery = useCatalogQuery();
   const handleScanEvent = useCallback((event: ScanEvent) => {
     setScanProgress(event);
+    setScanProgressVisible(true);
   }, []);
   const scanMutation = useScanCatalogMutation({ onEvent: handleScanEvent });
   const settingsQuery = useSettingsQuery();
@@ -142,6 +144,16 @@ export function App() {
       imagePreviewEnabled ? "on" : "off",
     );
   }, [imagePreviewEnabled]);
+
+  useEffect(() => {
+    if (scanMutation.isPending) return undefined;
+    if (!scanProgressVisible) return undefined;
+    const timeout = window.setTimeout(
+      () => setScanProgressVisible(false),
+      3500,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [scanMutation.isPending, scanProgressVisible, scanProgress]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -372,8 +384,8 @@ export function App() {
 
   function onRescan() {
     setScanProgress(null);
+    setScanProgressVisible(true);
     scanMutation.mutate(undefined, {
-      onSuccess: () => toast.success(t("toast.scanComplete")),
       onError: (e) => toast.error(errorMessage(e)),
     });
   }
@@ -481,7 +493,7 @@ export function App() {
             mode={mode}
             totalLabel={totalLabel}
             working={working}
-            scanProgress={scanMutation.isPending ? scanProgress : null}
+            scanProgress={scanProgressVisible ? scanProgress : null}
             onAddProject={() => setDirectoryPickerOpen(true)}
             onRefresh={onRescan}
             onOpenCmdK={() => setCmdkOpen(true)}

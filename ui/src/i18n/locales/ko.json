@@ -133,6 +133,19 @@
     "optimizable": "최적화 가능",
     "referenced": "참조됨"
   },
+  "scanProgress": {
+    "starting": "스캔 시작 중",
+    "complete": "스캔 완료",
+    "phase": {
+      "collecting": "에셋 수집 중",
+      "metadata": "이미지 분석 중",
+      "references": "참조 확인 중",
+      "duplicates": "중복 그룹화 중",
+      "nearDuplicates": "유사 에셋 비교 중",
+      "lint": "에셋 규칙 실행 중",
+      "persisting": "스캔 결과 저장 중"
+    }
+  },
   "error": {
     "catalogLoad": "카탈로그 로드 실패",
     "scan": "스캔 실패",

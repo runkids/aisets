@@ -28,6 +28,14 @@ type Reference struct {
 	Kind      string `json:"kind"`
 }
 
+type ProgressFunc func(current, total int)
+
+type codeCandidate struct {
+	project Project
+	path    string
+	repo    string
+}
+
 var imageExts = map[string]bool{
 	".avif": true, ".gif": true, ".jpeg": true, ".jpg": true,
 	".png": true, ".svg": true, ".webp": true,
@@ -47,6 +55,10 @@ var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\
 var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
 
 func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[string][]Reference, error) {
+	return BuildMapWithProgress(ctx, projects, assets, nil)
+}
+
+func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asset, progress ProgressFunc) (map[string][]Reference, error) {
 	assetSets := map[string]map[string]bool{}
 	for _, asset := range assets {
 		if assetSets[asset.ProjectID] == nil {
@@ -54,7 +66,72 @@ func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[stri
 		}
 		assetSets[asset.ProjectID][asset.RepoPath] = true
 	}
+	files, err := collectCodeCandidates(ctx, projects)
+	if err != nil {
+		return nil, err
+	}
+	if progress != nil && len(files) == 0 {
+		progress(0, 0)
+	}
 	out := map[string][]Reference{}
+	for i, file := range files {
+		bytes, err := os.ReadFile(file.path)
+		if err != nil {
+			if progress != nil {
+				progress(i+1, len(files))
+			}
+			continue
+		}
+		for _, ref := range Extract(string(bytes)) {
+			ref.File = file.repo
+			resolved := Resolve(file.project.Path, file.repo, ref.Specifier)
+			if ref.Kind == "pattern" {
+				for candidate := range assetSets[file.project.ID] {
+					if referenceMayPointTo(candidate, ref.Specifier) {
+						ref.ProjectID = file.project.ID
+						ref.AssetPath = candidate
+						out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
+					}
+				}
+				continue
+			}
+			if resolved != "" && assetSets[file.project.ID][resolved] {
+				ref.ProjectID = file.project.ID
+				ref.AssetPath = resolved
+				out[key(file.project.ID, resolved)] = append(out[key(file.project.ID, resolved)], ref)
+				continue
+			}
+			for candidate := range assetSets[file.project.ID] {
+				if referenceMayPointTo(candidate, ref.Specifier) {
+					ref.ProjectID = file.project.ID
+					ref.AssetPath = candidate
+					out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
+				}
+			}
+		}
+		if progress != nil {
+			progress(i+1, len(files))
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	}
+	for k := range out {
+		sort.Slice(out[k], func(i, j int) bool {
+			if out[k][i].File != out[k][j].File {
+				return out[k][i].File < out[k][j].File
+			}
+			if out[k][i].Line != out[k][j].Line {
+				return out[k][i].Line < out[k][j].Line
+			}
+			return out[k][i].Specifier < out[k][j].Specifier
+		})
+	}
+	return out, nil
+}
+
+func collectCodeCandidates(ctx context.Context, projects []Project) ([]codeCandidate, error) {
+	var files []codeCandidate
 	for _, project := range projects {
 		err := filepath.WalkDir(project.Path, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
@@ -72,60 +149,18 @@ func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[stri
 			if !codeExts[strings.ToLower(filepath.Ext(path))] {
 				return nil
 			}
-			bytes, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
 			repoFile, err := filepath.Rel(project.Path, path)
 			if err != nil {
 				return nil
 			}
-			repoFile = filepath.ToSlash(repoFile)
-			for _, ref := range Extract(string(bytes)) {
-				ref.File = repoFile
-				resolved := Resolve(project.Path, repoFile, ref.Specifier)
-				if ref.Kind == "pattern" {
-					for candidate := range assetSets[project.ID] {
-						if referenceMayPointTo(candidate, ref.Specifier) {
-							ref.ProjectID = project.ID
-							ref.AssetPath = candidate
-							out[key(project.ID, candidate)] = append(out[key(project.ID, candidate)], ref)
-						}
-					}
-					continue
-				}
-				if resolved != "" && assetSets[project.ID][resolved] {
-					ref.ProjectID = project.ID
-					ref.AssetPath = resolved
-					out[key(project.ID, resolved)] = append(out[key(project.ID, resolved)], ref)
-					continue
-				}
-				for candidate := range assetSets[project.ID] {
-					if referenceMayPointTo(candidate, ref.Specifier) {
-						ref.ProjectID = project.ID
-						ref.AssetPath = candidate
-						out[key(project.ID, candidate)] = append(out[key(project.ID, candidate)], ref)
-					}
-				}
-			}
+			files = append(files, codeCandidate{project: project, path: path, repo: filepath.ToSlash(repoFile)})
 			return nil
 		})
 		if err != nil {
 			return nil, err
 		}
 	}
-	for k := range out {
-		sort.Slice(out[k], func(i, j int) bool {
-			if out[k][i].File != out[k][j].File {
-				return out[k][i].File < out[k][j].File
-			}
-			if out[k][i].Line != out[k][j].Line {
-				return out[k][i].Line < out[k][j].Line
-			}
-			return out[k][i].Specifier < out[k][j].Specifier
-		})
-	}
-	return out, nil
+	return files, nil
 }
 
 func Extract(content string) []Reference {

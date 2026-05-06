@@ -48,8 +48,16 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("cache-control", "no-store")
 	sendNDJSON(w, map[string]any{"type": "start"})
-	sendNDJSON(w, map[string]any{"type": "progress", "phase": "scan"})
-	catalog, scanID, err := s.scan(r.Context())
+	progress := func(event scanner.ScanProgress) {
+		sendNDJSON(w, map[string]any{
+			"type":    "progress",
+			"phase":   event.Phase,
+			"current": event.Current,
+			"total":   event.Total,
+			"message": event.Message,
+		})
+	}
+	catalog, scanID, err := s.scanWithProgress(r.Context(), progress)
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_failed")})
 		return
@@ -150,10 +158,17 @@ func (s *Server) ensureCatalog(ctx context.Context) (scanner.Catalog, error) {
 }
 
 func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
+	return s.scanWithProgress(ctx, nil)
+}
+
+func (s *Server) scanWithProgress(ctx context.Context, progress scanner.ProgressFunc) (scanner.Catalog, int64, error) {
 	projects := toScannerProjects(s.store.Projects())
-	catalog, err := s.scanner.Scan(ctx, projects)
+	catalog, err := s.scanner.ScanWithProgress(ctx, projects, progress)
 	if err != nil {
 		return scanner.Catalog{}, 0, err
+	}
+	if progress != nil {
+		progress(scanner.ScanProgress{Phase: scanner.ScanPhasePersisting})
 	}
 	scanID, err := s.store.RecordScan(catalog)
 	if err != nil {
