@@ -32,10 +32,16 @@ export function AssetDrawer({
 
   return (
     <>
-      <div className="drawer-backdrop" onClick={onClose} />
-      <aside className="drawer">
-        <div className="drawer-h">
-          <span className="drawer-title" title={asset.repoPath}>
+      <div
+        className="fixed inset-0 z-50 bg-[rgba(20,20,46,0.32)] backdrop-blur-[8px] animate-[fadeIn_180ms_var(--g-ease)] [[data-theme='dark']_&]:bg-[rgba(0,0,0,0.5)]"
+        onClick={onClose}
+      />
+      <aside className="fixed inset-y-0 right-0 z-[51] flex w-[480px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)]">
+        <div className="flex items-center gap-2.5 border-b border-g-line px-5 py-[18px]">
+          <span
+            className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui font-medium"
+            title={asset.repoPath}
+          >
             {fileName(asset.repoPath)}
           </span>
           <IconButton onClick={onClose} aria-label={t("common.close")}>
@@ -43,13 +49,15 @@ export function AssetDrawer({
           </IconButton>
         </div>
 
-        <div className="drawer-body">
-          <div className="drawer-section">
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="mb-5">
             <AssetThumbnail src={asset.thumbnailUrl || asset.url} size="fill" />
           </div>
 
-          <div className="drawer-section">
-            <div className="drawer-section-h">{t("assetDrawer.metadata")}</div>
+          <div className="mb-5">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
+              {t("assetDrawer.metadata")}
+            </div>
             <table className="w-full border-collapse text-g-caption">
               <tbody>
                 <MetaRow
@@ -92,8 +100,8 @@ export function AssetDrawer({
           </div>
 
           {asset.references.length > 0 && (
-            <div className="drawer-section">
-              <div className="drawer-section-h">
+            <div className="mb-5">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
                 {t("assetDrawer.references", {
                   count: asset.references.length,
                 })}
@@ -123,8 +131,8 @@ export function AssetDrawer({
           )}
 
           {asset.optimizationRecommendations.length > 0 && (
-            <div className="drawer-section">
-              <div className="drawer-section-h">
+            <div className="mb-5">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
                 {t("assetDrawer.optimization")}
               </div>
               <div className="grid gap-1.5">
@@ -153,8 +161,8 @@ export function AssetDrawer({
           )}
 
           {asset.duplicates.length > 0 && (
-            <div className="drawer-section">
-              <div className="drawer-section-h">
+            <div className="mb-5">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
                 {t("assetDrawer.duplicates", {
                   count: asset.duplicates.length,
                 })}
@@ -172,8 +180,10 @@ export function AssetDrawer({
             </div>
           )}
 
-          <div className="drawer-section">
-            <div className="drawer-section-h">{t("assetDrawer.actions")}</div>
+          <div className="mb-5">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
+              {t("assetDrawer.actions")}
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {onCopyPath && (
                 <Button

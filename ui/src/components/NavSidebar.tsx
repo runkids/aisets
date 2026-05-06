@@ -139,22 +139,26 @@ export function NavSidebar({
   ];
 
   return (
-    <aside className="sb">
-      <div className="sb-brand">
-        <div className="sb-brand-mark">
+    <aside className="sb relative z-30 flex flex-col overflow-visible border-r border-g-line bg-g-surface">
+      <div className="sb-brand order-0 flex h-[60px] shrink-0 items-center gap-2.5 border-b border-g-line px-4 max-[960px]:justify-center max-[960px]:px-2 max-[960px]:py-4">
+        <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-g-md bg-g-canvas">
           <img
-            className="sb-brand-img"
+            className="block size-full origin-center scale-[1.22]"
             src="/brand/asset-studio-app-icon.png"
             alt=""
           />
         </div>
         <div>
-          <div className="sb-brand-name">Asset Studio</div>
-          <div className="sb-brand-tag">{t("nav.brandTag")}</div>
+          <div className="font-g-display text-[15px] font-[590] leading-[1.1] tracking-[-0.013em] text-g-ink max-[960px]:hidden">
+            Asset Studio
+          </div>
+          <div className="mt-0.5 text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 max-[960px]:hidden">
+            {t("nav.brandTag")}
+          </div>
         </div>
       </div>
 
-      <div className="sb-project-switcher">
+      <div className="order-1 shrink-0 px-3.5 pt-3 pb-2 max-[960px]:hidden">
         <ProjectSwitcher
           workspaceName={workspaceName}
           workspaces={workspaces}
@@ -167,10 +171,15 @@ export function NavSidebar({
         />
       </div>
 
-      <nav className="sb-nav" aria-label={t("nav.navigationAria")}>
+      <nav
+        className="sb-nav order-2 flex-1 overflow-y-auto py-2"
+        aria-label={t("nav.navigationAria")}
+      >
         {groups.map((group) => (
-          <div key={group.title} className="sb-group">
-            <div className="sb-section">{group.title}</div>
+          <div key={group.title}>
+            <div className="px-5 pt-3 pb-1 text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 max-[960px]:hidden">
+              {group.title}
+            </div>
             {group.items.map((item) => (
               <button
                 key={item.id}
@@ -180,7 +189,9 @@ export function NavSidebar({
                 onClick={() => onSelect(item.id)}
               >
                 {item.icon}
-                <span className="sb-link-label">{item.label}</span>
+                <span className="sb-link-label min-w-0 flex-1 max-[960px]:hidden">
+                  {item.label}
+                </span>
                 {item.badge == null ? null : (
                   <span className="sb-badge" data-tone={item.tone ?? "default"}>
                     {badges[item.badge]}
@@ -192,9 +203,9 @@ export function NavSidebar({
         ))}
       </nav>
 
-      <div className="sb-footer">
+      <div className="order-3 flex items-center gap-2.5 border-t border-g-line p-3 text-[12px] text-g-ink-3 max-[960px]:justify-center">
         <BarChart3 size={16} />
-        <span>{t("nav.footer")}</span>
+        <span className="max-[960px]:hidden">{t("nav.footer")}</span>
       </div>
     </aside>
   );

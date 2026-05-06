@@ -39,7 +39,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
         </>
       }
     >
-      <div className="preview-list">
+      <div className="flex flex-col gap-2 font-g-mono text-g-caption">
         {preview.changes.map((change) => (
           <div key={`${change.file}:${change.line}:${change.oldSpecifier}`}>
             <code>
@@ -55,7 +55,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
         ))}
         {preview.blockers.map((blocker) => (
           <div
-            className="preview-blocker"
+            className="text-g-red"
             key={`${blocker.file}:${blocker.line}:${blocker.code}`}
           >
             <code>
@@ -67,7 +67,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
         {preview.changes.length === 0 &&
           preview.deletes.length === 0 &&
           preview.blockers.length === 0 && (
-            <div className="text-(--g-ink-4)">{t("preview.noChanges")}</div>
+            <div className="text-g-ink-4">{t("preview.noChanges")}</div>
           )}
       </div>
     </Modal>

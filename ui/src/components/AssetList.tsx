@@ -43,13 +43,21 @@ export function AssetList({ items, view, onRename, onDelete }: Props) {
   }
 
   return (
-    <section className="table-list" aria-label={t("assetList.listAriaLabel")}>
+    <section
+      className="flex flex-col gap-2"
+      aria-label={t("assetList.listAriaLabel")}
+    >
       {items.map((item) => {
         const severity = primarySeverity(item);
         return (
-          <Card key={item.id} className="acard-row">
-            <div className="acard-row-thumb">
-              <img src={item.url} alt="" loading="lazy" />
+          <Card key={item.id} className="flex items-center gap-4 p-3">
+            <div className="size-10 shrink-0 overflow-hidden rounded-g-md border border-g-line">
+              <img
+                src={item.url}
+                alt=""
+                loading="lazy"
+                className="size-full object-contain"
+              />
             </div>
             <div className="min-w-0">
               <div className="truncate font-extrabold" title={item.repoPath}>

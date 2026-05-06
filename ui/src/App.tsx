@@ -43,7 +43,7 @@ import {
   useSettingsQuery,
 } from "./queries";
 import { errorMessage } from "./i18n/index";
-import type { ActionPreview, AssetItem } from "./types";
+import type { ActionPreview, AssetItem, ScanEvent } from "./types";
 import { modeForPath, pathForMode, type Mode } from "./ui";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
@@ -77,6 +77,7 @@ export function App() {
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [autoScrollAssetId, setAutoScrollAssetId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [scanProgress, setScanProgress] = useState<ScanEvent | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
@@ -109,7 +110,10 @@ export function App() {
   const toast = useToast();
   const autoScanStartedRef = useRef(false);
   const catalogQuery = useCatalogQuery();
-  const scanMutation = useScanCatalogMutation();
+  const handleScanEvent = useCallback((event: ScanEvent) => {
+    setScanProgress(event);
+  }, []);
+  const scanMutation = useScanCatalogMutation({ onEvent: handleScanEvent });
   const settingsQuery = useSettingsQuery();
   const addProjectMutation = useAddProjectMutation();
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
@@ -367,6 +371,7 @@ export function App() {
   }
 
   function onRescan() {
+    setScanProgress(null);
     scanMutation.mutate(undefined, {
       onSuccess: () => toast.success(t("toast.scanComplete")),
       onError: (e) => toast.error(errorMessage(e)),
@@ -457,7 +462,7 @@ export function App() {
 
   return (
     <TooltipPrimitive.Provider delayDuration={400}>
-      <main className="app">
+      <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[1fr] max-[960px]:grid-cols-[64px_1fr]">
         <NavSidebar
           mode={mode}
           badges={badges}
@@ -471,11 +476,12 @@ export function App() {
           onSelectProject={setSelectedProjectId}
           onSelect={changeMode}
         />
-        <section className="main">
+        <section className="flex flex-col overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)]">
           <AppTopbar
             mode={mode}
             totalLabel={totalLabel}
             working={working}
+            scanProgress={scanMutation.isPending ? scanProgress : null}
             onAddProject={() => setDirectoryPickerOpen(true)}
             onRefresh={onRescan}
             onOpenCmdK={() => setCmdkOpen(true)}
@@ -483,7 +489,7 @@ export function App() {
 
           <NoticeStack items={notices} />
 
-          <div className="content">
+          <div className="flex flex-1 overflow-hidden">
             {mode === "browse" ? (
               <BrowseView
                 key={
@@ -512,7 +518,7 @@ export function App() {
                 onImagePreviewEnabledChange={setImagePreviewEnabled}
               />
             ) : (
-              <div className="content-scroll">
+              <div className="content-scroll flex-1 overflow-y-auto overflow-x-hidden px-8 pt-8 pb-12 max-[768px]:px-4 max-[768px]:pt-5 max-[768px]:pb-8">
                 {mode === "precheck" ? (
                   <PreCheckView onOpenAsset={openAssetFromPalette} />
                 ) : displayCatalog == null &&

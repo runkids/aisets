@@ -14,20 +14,26 @@ export function AssetCard({ item, onRename, onDelete }: Props) {
   const { t } = useTranslation();
   const severity = primarySeverity(item);
   return (
-    <article className="acard">
-      <div className="acard-thumb">
+    <article className="acard relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus">
+      <div className="acard-thumb relative grid aspect-[4/3] place-items-center overflow-hidden border-b border-g-line bg-g-surface-2">
         <img src={item.thumbnailUrl || item.url} alt="" loading="lazy" />
       </div>
-      <div className="acard-meta">
+      <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)]">
         <div>
-          <div className="acard-name" title={item.repoPath}>
+          <div
+            className="block w-full truncate text-left font-g-mono text-[12px] font-[510] text-g-ink"
+            title={item.repoPath}
+          >
             {fileName(item.repoPath)}
           </div>
-          <div className="acard-path" title={item.repoPath}>
+          <div
+            className="block w-full truncate text-left font-g-mono text-[10px] text-g-ink-4"
+            title={item.repoPath}
+          >
             {item.repoPath}
           </div>
         </div>
-        <div className="acard-row">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <Badge tone="line">{item.projectName}</Badge>
           <Badge tone="line">{item.ext}</Badge>
           <Badge tone="line">{formatBytes(item.bytes)}</Badge>
@@ -51,7 +57,7 @@ export function AssetCard({ item, onRename, onDelete }: Props) {
             </Badge>
           )}
         </div>
-        <div className="acard-actions">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <Button
             size="sm"
             variant="secondary"
