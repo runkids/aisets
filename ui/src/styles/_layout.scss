@@ -679,19 +679,6 @@ a {
   width: 320px;
   max-width: 40vw;
 }
-.search-kbd {
-  font-family: var(--g-mono);
-  font-size: 10px;
-  background: var(--g-surface);
-  color: var(--g-ink-3);
-  padding: 2px 6px;
-  border-radius: var(--g-r-sm);
-  border: 1px solid var(--g-line-strong);
-  font-weight: 510;
-  letter-spacing: -0.015em;
-  flex-shrink: 0;
-}
-
 /* Content + page */
 .content {
   flex: 1;

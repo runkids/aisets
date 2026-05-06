@@ -1,6 +1,7 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Keycap } from "./Keycap";
 
 type Placement = "top" | "bottom" | "left" | "right";
 
@@ -42,14 +43,9 @@ function Tooltip({
           <span className="inline-flex items-center gap-1.5">
             <span>{label}</span>
             {shortcut && (
-              <kbd
-                className={cn(
-                  "font-g-mono text-[10px] font-[510] tracking-[-0.015em] text-g-ink-3",
-                  "rounded-g-sm border border-g-line-strong bg-g-surface-3 px-[5px] py-px",
-                )}
-              >
+              <Keycap size="sm" surface="strong">
                 {shortcut}
-              </kbd>
+              </Keycap>
             )}
           </span>
         </TooltipPrimitive.Content>

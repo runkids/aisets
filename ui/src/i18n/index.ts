@@ -7,14 +7,10 @@ import zhTW from "./locales/zh-TW.json";
 import zhCN from "./locales/zh-CN.json";
 import ja from "./locales/ja.json";
 import ko from "./locales/ko.json";
-
-export const supportedLanguages = [
-  { code: "en", label: "English" },
-  { code: "zh-TW", label: "繁體中文" },
-  { code: "zh-CN", label: "简体中文" },
-  { code: "ja", label: "日本語" },
-  { code: "ko", label: "한국어" },
-] as const;
+export {
+  languageOptionsForLocale,
+  supportedLanguages,
+} from "./languageOptions";
 
 i18n
   .use(LanguageDetector)

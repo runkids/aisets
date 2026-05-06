@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, type Mode } from "../ui";
-import { TextInput } from "./ui";
+import { Keycap, TextInput } from "./ui";
 
 type Props = {
   open: boolean;
@@ -137,7 +137,7 @@ export function CommandPalette({
             variant="command"
             type="text"
             icon={<Search size={16} aria-hidden="true" />}
-            suffix={<span className="search-kbd">esc</span>}
+            suffix={<Keycap>Esc</Keycap>}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

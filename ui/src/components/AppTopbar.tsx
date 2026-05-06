@@ -14,7 +14,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Mode } from "../ui";
 import { titleForMode } from "../ui";
-import { TextInputButton, Tooltip } from "./ui";
+import { Keycap, TextInputButton, Tooltip } from "./ui";
 import { IconButton } from "./ui/Button";
 
 const MODE_ICON: Record<Mode, typeof FolderKanban> = {
@@ -71,7 +71,7 @@ export function AppTopbar({
       <TextInputButton
         className="topbar-search"
         icon={<Search size={14} aria-hidden="true" />}
-        suffix={<span className="search-kbd">⌘P</span>}
+        suffix={<Keycap>⌘ P</Keycap>}
         value={t("search.placeholderShort")}
         onClick={onOpenCmdK}
         aria-label={t("search.ariaLabel")}

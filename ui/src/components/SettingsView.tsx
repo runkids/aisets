@@ -24,7 +24,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
-import { errorMessage, supportedLanguages } from "../i18n/index";
+import { errorMessage, languageOptionsForLocale } from "../i18n/index";
 import {
   useAddWorkspaceMutation,
   useCatalogQuery,
@@ -45,6 +45,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  Keycap,
   Notice,
   PromptDialog,
   Rail,
@@ -834,7 +835,7 @@ export function SettingsView({
                 >
                   <Select
                     value={i18n.language}
-                    options={supportedLanguages.map((lang) => ({
+                    options={languageOptionsForLocale().map((lang) => ({
                       value: lang.code,
                       label: lang.label,
                     }))}
@@ -1018,13 +1019,11 @@ export function SettingsView({
               />
               <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 {[
-                  { keys: "⌘ K", action: t("settings.hotkeyPalette") },
+                  { keys: "⌘ P", action: t("settings.hotkeyPalette") },
                   { keys: "Esc", action: t("settings.hotkeyClose") },
                 ].map(({ keys, action }) => (
                   <FieldRow key={keys} label={action}>
-                    <kbd className="rounded-g-sm border border-g-line-strong bg-g-surface-2 px-2 py-0.5 font-g-mono text-g-caption text-g-ink-3">
-                      {keys}
-                    </kbd>
+                    <Keycap>{keys}</Keycap>
                   </FieldRow>
                 ))}
               </div>

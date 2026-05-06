@@ -7,6 +7,7 @@ export { DropdownMenu, type DropdownMenuItem } from "./DropdownMenu";
 export { EmptyState } from "./EmptyState";
 export { IconWell } from "./IconWell";
 export { ImagePreview } from "./ImagePreview";
+export { Keycap } from "./Keycap";
 export { Modal } from "./Modal";
 export { Notice, NoticeStack } from "./Notice";
 export { PromptDialog } from "./PromptDialog";

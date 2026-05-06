@@ -255,7 +255,7 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
   - Hover: bg `--g-surface-2`, border `--g-line-strong` (theme-aware; never hard-code separate light/dark colors)
   - Focus: border `--g-accent`, box-shadow `--g-shadow-focus`, bg `--g-surface`
   - Press: subtle `scale(0.99)` only; disabled by reduced motion
-- **Keyboard hint** `.search-kbd`: mono 10px / Storm Cloud, `--g-surface-3` bg, 1px line border, 4px radius
+- **Keyboard hint** `Keycap`: shared `ui/src/components/ui/Keycap.tsx` component using token-backed Tailwind classes. Default size is mono 12px / Storm Cloud, `--g-surface-2` bg, 1px strong line border, 4px radius, 2px 8px padding. Used by topbar search, command palette, Settings hotkey rows, and compact tooltip shortcut pills. Topbar command-palette trigger shows `⌘ P`, matching the implemented shortcut.
 
 ### 4.3 Rail
 
@@ -656,7 +656,7 @@ The component clones the single child element and adds `onMouseEnter` / `onMouse
 - Border `1px solid --g-line-strong` (Gunmetal)
 - Radius `6px`, padding `5px 8px`, shadow `--g-shadow-md`
 - Text: Inter 12px / 510, Porcelain, `-0.011em` tracking
-- Optional `.tooltip-kbd`: mono 10px / Storm Cloud, `--g-surface-3` bg, 4px radius, 1px Gunmetal border
+- Optional shortcut pill: `Keycap size="sm" surface="strong"` (mono 10px / Storm Cloud, `--g-surface-3` bg, 4px radius, 1px Gunmetal border)
 - Animation: 100ms opacity fade + 120ms ease-out 2px slide from the placement direction
 - `pointer-events: none` so it never blocks the trigger
 
@@ -818,7 +818,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ### 7.9 Settings
 
-- Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas.
+- Settings uses the shared `Rail` settings variant for section navigation and renders the right pane as a single `.settings-panel` card per section, max-width 1040px and aligned to the content start so form controls do not sprawl across the canvas. The language select keeps the canonical language inventory but promotes Simplified Chinese to the first option when the browser locale resolves to Mainland China, Hong Kong, or Macau.
 - Settings panel headers are plain text blocks inside the single outer panel: 28px display title plus 14px helper text. No nested header strip and no icon well.
 - The Workspace section owns multi-workspace management through the workspace list, avoiding a duplicate standalone active-workspace name field. The workspace list and default-root input share the same 560px desktop control width so the section reads as one aligned column. A compact token-backed workspace list shows each workspace as a 6px-radius row with `FolderKanban` icon well, name, mono project count, an always-visible secondary Switch button with an exchange icon for inactive workspaces, hover/focus-revealed Rename/Delete actions on desktop, and a secondary `Add workspace` button below the list. On stacked mobile/touch layouts, Rename/Delete remain visible. Row hover/focus applies to the full row surface, never just the label cluster, but the label cluster itself is non-interactive; only the explicit Switch button changes workspace. The Active badge and Switch button share the same 32px height and 112px width so the workspace state column stays aligned; Active uses a check icon with the neutral active surface, while Switch keeps the same footprint with interactive hover/focus treatment. Rename uses the shared `PromptDialog`; delete uses the shared danger `ConfirmDialog`, preserves files on disk, and disables deletion when only one workspace remains. `Add workspace` lives here (not in the sidebar switcher), opens the shared `PromptDialog` (never a native browser prompt), collects a name, and switches to the new empty workspace after creation.
 - All Settings sections use the same simple content rows (`copy | control`) with generous vertical rhythm and no per-row box, inset shadow, or icon well. Controls use a consistent 280px desktop control column; text inputs and textareas use the shared longer 320px width, stay right-aligned on desktop, and stack under copy on narrow panes. Boolean controls use the shared Radix-backed `Switch` primitive. The Add-project start path input keeps its placeholder short, while the resolved server working directory renders as a wrapping mono helper below the input so long English copy or paths do not clip inside the field. The workspace section does not show a duplicate auto-scan toggle; startup scanning is owned by Scanning → `scanOnOpen`, whose helper copy explains that Asset Studio rescans the catalog once after startup and project load.
@@ -882,7 +882,7 @@ Webkit:
 - **Focus**: 2px Neon Lime ring on every interactive element — never `outline: none` without a `--g-shadow-focus` replacement.
 - **Touch targets**: ≥44×44pt; small icons get `hitSlop` / extended `::before` hit area.
 - **Color never alone**: severity always has icon + text; preferred tile has badge + border + text label.
-- **Keyboard**: tab order matches visual order, ESC dismisses overlays, ⌘K opens command palette, ⌘/ focuses search.
+- **Keyboard**: tab order matches visual order, ESC dismisses overlays, ⌘P opens command palette, ⌘/ focuses search.
 - **Screen reader**: every icon button has `aria-label`; toasts use `role="status"` (`aria-live="polite"`); modals trap focus and restore on close.
 - **Tooltips**: every icon-only control wrapped in `<Tooltip>` (§6.23). Keyboard-reachable (focus shows tooltip immediately), uses `role="tooltip"` + `aria-describedby`, and is supplementary — the trigger must still carry its own `aria-label`. **Never** use the browser's native `title` attribute.
 - **Localized copy**: visible UI strings, placeholder text, dialog labels, toast text, `aria-label`s, filter chips, count summaries, and action labels live in `ui/src/i18n/locales/*.json`. Components call `t(...)`; do not hardcode user-facing copy in TSX except product names, file extensions, keyboard hints, and API/user-provided values.
