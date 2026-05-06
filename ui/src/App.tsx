@@ -532,7 +532,7 @@ export function App() {
             ) : (
               <div
                 key={mode}
-                className="content-scroll flex-1 overflow-y-auto overflow-x-hidden px-3 pt-0 pb-12 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+                className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
               >
                 {mode === "precheck" ? (
                   <PreCheckView onOpenAsset={openAssetFromPalette} />

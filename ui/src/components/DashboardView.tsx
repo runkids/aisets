@@ -62,7 +62,7 @@ export function DashboardView({ catalog, onJump }: Props) {
   );
 
   return (
-    <div className="content-grid">
+    <div className="flex flex-col gap-6 max-w-[1200px] mx-auto w-full">
       <section className="grid grid-cols-4 gap-4 max-[960px]:grid-cols-2 max-[480px]:grid-cols-1">
         <StatCard
           label={t("dashboard.totalAssets")}
@@ -240,7 +240,7 @@ export function DashboardView({ catalog, onJump }: Props) {
               description={t("dashboard.noProjectsDesc")}
             />
           ) : (
-            <div className="table-list">
+            <div className="flex flex-col gap-2">
               {projects.map((project) => (
                 <Card key={project.id} padding="md">
                   <div className="font-extrabold">{project.name}</div>

@@ -27,7 +27,7 @@ export function AssetList({ items, view, onRename, onDelete }: Props) {
   if (view === "grid") {
     return (
       <section
-        className="browse-grid"
+        className="relative grid w-full grid-cols-[repeat(auto-fill,minmax(var(--browse-card-min,180px),1fr))] gap-[var(--browse-card-gap,16px)] content-start p-1"
         aria-label={t("assetList.gridAriaLabel")}
       >
         {items.map((item) => (

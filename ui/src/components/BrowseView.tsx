@@ -474,7 +474,7 @@ export function BrowseView({
         customFilterTotal={filteredWithoutCustom.length}
         onFiltersChange={setFilters}
       />
-      <div className="content-scroll content-scroll--compact flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2 pt-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
         <div className="max-w-none p-0 flex h-full flex-col">
           <BrowseToolbar
             view={view}

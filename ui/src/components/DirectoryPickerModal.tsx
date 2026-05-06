@@ -86,8 +86,8 @@ export function DirectoryPickerModal({
         </>
       }
     >
-      <div className="directory-picker">
-        <div className="directory-path-row">
+      <div className="flex flex-col gap-3 min-h-[320px]">
+        <div className="flex gap-2 items-center">
           <TextInput
             icon={<HardDrive size={16} />}
             value={draftPath || currentPath}
@@ -103,7 +103,7 @@ export function DirectoryPickerModal({
           </Button>
         </div>
 
-        <div className="directory-panel">
+        <div className="flex-1 bg-g-canvas border border-g-line rounded-g-md shadow-g-inset overflow-hidden min-h-[280px] flex flex-col">
           {listingQuery.isPending ? (
             <EmptyState
               icon={<Loader2 className="animate-spin" size={22} />}
@@ -117,11 +117,14 @@ export function DirectoryPickerModal({
               description={directoryError}
             />
           ) : listing ? (
-            <div className="directory-list" role="list">
+            <div
+              className="flex flex-col gap-0.5 p-1.5 overflow-y-auto flex-1"
+              role="list"
+            >
               {listing.parent && (
                 <button
                   type="button"
-                  className="directory-item"
+                  className="grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3"
                   onClick={() => go(listing.parent)}
                 >
                   <ChevronLeft size={18} />
@@ -133,7 +136,7 @@ export function DirectoryPickerModal({
                 <button
                   key={dir.path}
                   type="button"
-                  className="directory-item"
+                  className="grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3"
                   onClick={() => go(dir.path)}
                 >
                   <Folder size={18} />

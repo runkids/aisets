@@ -14,8 +14,8 @@ export function AssetCard({ item, onRename, onDelete }: Props) {
   const { t } = useTranslation();
   const severity = primarySeverity(item);
   return (
-    <article className="acard relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus">
-      <div className="acard-thumb relative grid aspect-[4/3] place-items-center overflow-hidden border-b border-g-line bg-g-surface-2">
+    <article className="relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus">
+      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden border-b border-g-line bg-g-surface-2">
         <img src={item.thumbnailUrl || item.url} alt="" loading="lazy" />
       </div>
       <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)]">
