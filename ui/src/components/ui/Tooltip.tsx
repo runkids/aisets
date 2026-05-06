@@ -1,11 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/cn";
 
 type Placement = "top" | "bottom" | "left" | "right";
 
@@ -18,7 +13,7 @@ type TooltipProps = {
   children: ReactNode;
 };
 
-export function Tooltip({
+function Tooltip({
   label,
   shortcut,
   placement = "bottom",
@@ -26,50 +21,41 @@ export function Tooltip({
   disabled,
   children,
 }: TooltipProps) {
-  const [shown, setShown] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  const id = useId();
-
-  const clear = useCallback(() => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const show = useCallback(() => {
-    if (disabled) return;
-    clear();
-    timerRef.current = window.setTimeout(() => setShown(true), delay);
-  }, [clear, delay, disabled]);
-
-  const hide = useCallback(() => {
-    clear();
-    setShown(false);
-  }, [clear]);
-
-  useEffect(() => () => clear(), [clear]);
+  if (disabled) return <>{children}</>;
 
   return (
-    <span
-      className="tooltip-anchor"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
-      {children}
-      <span
-        id={id}
-        role="tooltip"
-        className="tooltip"
-        data-placement={placement}
-        data-shown={shown || undefined}
-        aria-hidden={!shown}
-      >
-        <span className="tooltip-label">{label}</span>
-        {shortcut && <span className="tooltip-kbd">{shortcut}</span>}
-      </span>
-    </span>
+    <TooltipPrimitive.Root delayDuration={delay}>
+      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          side={placement}
+          sideOffset={6}
+          className={cn(
+            "z-[200] max-w-xs whitespace-nowrap rounded-g-md border border-g-line-strong px-2 py-[5px] shadow-g-md",
+            "bg-g-canvas text-g-ink",
+            "text-[12px] font-[510] leading-[1.2] tracking-[-0.011em]",
+            "pointer-events-none",
+            "animate-in fade-in-0 zoom-in-95",
+            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          )}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <span>{label}</span>
+            {shortcut && (
+              <kbd
+                className={cn(
+                  "font-g-mono text-[10px] font-[510] tracking-[-0.015em] text-g-ink-3",
+                  "rounded-g-sm border border-g-line-strong bg-g-surface-3 px-[5px] py-px",
+                )}
+              >
+                {shortcut}
+              </kbd>
+            )}
+          </span>
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 }
+
+export { Tooltip };

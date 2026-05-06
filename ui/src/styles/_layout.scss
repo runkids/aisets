@@ -1345,10 +1345,6 @@ button.list-row:focus-visible {
   flex-direction: column;
   justify-self: stretch;
 }
-.list-main > .tooltip-anchor {
-  display: block;
-  min-width: 0;
-}
 .list-name {
   font-family: var(--g-mono);
   font-size: 12px;
