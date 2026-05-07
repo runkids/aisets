@@ -392,7 +392,7 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 	s.mu.Unlock()
 	if !stale {
 		summary, err := s.store.CatalogSummary()
-		if err == nil {
+		if err == nil && !s.analysisIncomplete(summary) {
 			return summary, nil
 		}
 	}
@@ -401,6 +401,25 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 		return config.CatalogSummary{}, err
 	}
 	return s.store.CatalogSummary()
+}
+
+func (s *Server) analysisIncomplete(summary config.CatalogSummary) bool {
+	settings, err := s.store.Settings()
+	if err != nil {
+		return false
+	}
+	a := summary.Analysis
+	want := settings.ScanAnalyses
+	if want.References && a.References != scanner.AnalysisComputed {
+		return true
+	}
+	if want.NearDuplicates && a.NearDuplicates != scanner.AnalysisComputed {
+		return true
+	}
+	if want.Optimization && a.Optimization != scanner.AnalysisComputed {
+		return true
+	}
+	return false
 }
 
 func (s *Server) clearCatalog() {
