@@ -11,6 +11,9 @@ type Props = {
 
 export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
   const { t } = useTranslation();
+  const changes = preview.changes ?? [];
+  const deletes = preview.deletes ?? [];
+  const blockers = preview.blockers ?? [];
 
   return (
     <Modal
@@ -22,7 +25,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
       footer={
         <>
           <div className="text-g-body text-g-ink-4">
-            {preview.changes.length} changes · {preview.deletes.length} deletes
+            {changes.length} changes · {deletes.length} deletes
           </div>
           <div className="ml-auto flex gap-2">
             <Button variant="secondary" onClick={onCancel}>
@@ -40,7 +43,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
       }
     >
       <div className="flex flex-col gap-2 font-g-mono text-g-caption">
-        {preview.changes.map((change) => (
+        {changes.map((change) => (
           <div key={`${change.file}:${change.line}:${change.oldSpecifier}`}>
             <code>
               {change.file}:{change.line}
@@ -48,12 +51,12 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
             {change.oldSpecifier} → {change.newSpecifier}
           </div>
         ))}
-        {preview.deletes.map((path) => (
+        {deletes.map((path) => (
           <div key={path}>
             Delete <code>{path}</code>
           </div>
         ))}
-        {preview.blockers.map((blocker) => (
+        {blockers.map((blocker) => (
           <div
             className="text-g-red"
             key={`${blocker.file}:${blocker.line}:${blocker.code}`}
@@ -64,9 +67,9 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
             {blocker.reason}
           </div>
         ))}
-        {preview.changes.length === 0 &&
-          preview.deletes.length === 0 &&
-          preview.blockers.length === 0 && (
+        {changes.length === 0 &&
+          deletes.length === 0 &&
+          blockers.length === 0 && (
             <div className="text-g-ink-4">{t("preview.noChanges")}</div>
           )}
       </div>

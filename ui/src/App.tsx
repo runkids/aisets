@@ -565,6 +565,7 @@ export function App() {
 
         {drawerAsset && (
           <AssetDrawer
+            key={drawerAsset.id}
             asset={drawerAsset}
             onClose={() => setDrawerId("")}
             onRename={onRename}

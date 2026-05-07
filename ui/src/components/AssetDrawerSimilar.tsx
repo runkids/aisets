@@ -70,29 +70,29 @@ export function AssetDrawerSimilar({ asset, onOpenAsset }: Props) {
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
             {t("assetDrawer.exactDuplicates")}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
             {duplicateItems.map((dup) => (
               <button
                 key={dup.id}
                 type="button"
                 onClick={() => onOpenAsset?.(dup.id)}
-                className="cursor-pointer overflow-hidden rounded-g-md border border-g-line bg-g-surface-2 text-left transition-colors duration-[120ms] ease-g hover:border-g-line-strong hover:bg-g-surface-3"
+                className="cursor-pointer overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color] duration-[120ms] ease-g hover:border-g-line-strong focus-visible:outline-none focus-visible:shadow-g-focus"
               >
-                <div className="flex aspect-[4/3] items-center justify-center bg-g-canvas p-3">
+                <div className="flex aspect-square items-center justify-center bg-g-surface-2 p-2">
                   <img
                     src={dup.thumbnailUrl || dup.url}
                     alt={fileName(dup.repoPath)}
-                    className="max-h-full max-w-full object-contain"
+                    className="max-h-[85%] max-w-[85%] object-contain"
                   />
                 </div>
-                <div className="p-2">
-                  <div className="truncate font-g-mono text-g-caption font-medium text-g-ink">
+                <div className="px-2.5 py-2">
+                  <div className="truncate font-g-mono text-g-caption text-g-ink">
                     {fileName(dup.repoPath)}
                   </div>
-                  <div className="truncate text-g-chip text-g-ink-3">
+                  <div className="mt-px truncate font-g-mono text-[9px] text-g-ink-4">
                     {dup.repoPath}
                   </div>
-                  <div className="mt-1 text-g-chip text-g-ink-4">
+                  <div className="mt-px font-g-mono text-[9px] text-g-ink-4">
                     {dup.image.width > 0 &&
                       `${dup.image.width}×${dup.image.height} · `}
                     {formatBytes(dup.bytes)} ·{" "}
