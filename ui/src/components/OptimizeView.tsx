@@ -23,6 +23,7 @@ import {
 
 type Props = {
   items: AssetItem[];
+  totalCount: number;
   onOpenAsset?: (id: string) => void;
 };
 
@@ -35,7 +36,7 @@ function categoryOfItem(item: AssetItem): Set<string> {
   return cats;
 }
 
-export function OptimizeView({ items, onOpenAsset }: Props) {
+export function OptimizeView({ items, totalCount, onOpenAsset }: Props) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("");
@@ -161,7 +162,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
           <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
             {t("optimize.title")}{" "}
             <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
-              {t("asset.assets", { count: items.length })}
+              {t("asset.assets", { count: totalCount })}
             </em>
           </h1>
           <p className="mt-2.5 max-w-[540px] text-g-body text-g-ink-3">
@@ -197,7 +198,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
                   "",
                   t("filter.countLabel", {
                     label: t("status.all"),
-                    count: items.length,
+                    count: totalCount,
                   }),
                 ],
                 [

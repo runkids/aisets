@@ -9,7 +9,12 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { displayCatalogForMode, navigationBadges } from "./appScope";
+import {
+  catalogItemsTotalCount,
+  displayCatalogForMode,
+  navigationBadges,
+  optimizableBadgeCount,
+} from "./appScope";
 import { AppTopbar } from "./components/AppTopbar";
 import { AssetDrawer } from "./components/AssetDrawer";
 import { BrowseView } from "./components/BrowseView";
@@ -358,6 +363,11 @@ export function App() {
     hasNextPage: hasMoreNearDuplicates,
     isFetchingNextPage: isFetchingMoreNearDuplicates,
   } = nearDuplicatesQuery;
+  const {
+    fetchNextPage: fetchNextOptimizeItemsPage,
+    hasNextPage: hasMoreOptimizeItems,
+    isFetchingNextPage: isFetchingMoreOptimizeItems,
+  } = optimizeItemsQuery;
 
   useEffect(() => {
     if (mode !== "unused") return;
@@ -400,6 +410,17 @@ export function App() {
     fetchNextNearDuplicatesPage,
     hasMoreNearDuplicates,
     isFetchingMoreNearDuplicates,
+    mode,
+  ]);
+
+  useEffect(() => {
+    if (mode !== "optimize") return;
+    if (!hasMoreOptimizeItems || isFetchingMoreOptimizeItems) return;
+    void fetchNextOptimizeItemsPage();
+  }, [
+    fetchNextOptimizeItemsPage,
+    hasMoreOptimizeItems,
+    isFetchingMoreOptimizeItems,
     mode,
   ]);
 
@@ -548,8 +569,15 @@ export function App() {
   );
   const lintFindings = scopedLintFindings;
 
-  const optimizeCount =
-    selectedProjectStats?.optimizableFiles ?? optimizeItems.length;
+  const optimizeCount = optimizableBadgeCount(
+    catalog,
+    selectedProjectStats,
+    optimizeItems.length,
+  );
+  const optimizeTotalCount = catalogItemsTotalCount(
+    optimizeItemsQuery.data?.pages[0]?.total,
+    optimizeCount,
+  );
   const scopedStats = useMemo(
     () =>
       catalog && !effectiveSelectedProjectId
@@ -970,6 +998,7 @@ export function App() {
                 ) : (
                   <OptimizeView
                     items={optimizeItems}
+                    totalCount={optimizeTotalCount}
                     onOpenAsset={setDrawerId}
                   />
                 )

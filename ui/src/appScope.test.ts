@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogItemsTotalCount,
   displayCatalogForMode,
   displayTotalsForMode,
   navigationBadges,
+  optimizableBadgeCount,
 } from "./appScope";
 import type { Catalog, Project } from "./types";
 
@@ -10,7 +12,11 @@ function makeProject(id: string): Project {
   return { id, workspaceId: "default", name: id, path: `/${id}` };
 }
 
-function makeCatalog(projectIds: string[], totalFiles: number): Catalog {
+function makeCatalog(
+  projectIds: string[],
+  totalFiles: number,
+  optimizableFilesByProject: number[] = [],
+): Catalog {
   return {
     generatedAt: "2026-05-06T12:00:00.000Z",
     projects: projectIds.map(makeProject),
@@ -20,7 +26,7 @@ function makeCatalog(projectIds: string[], totalFiles: number): Catalog {
       totalBytes: 0,
       unusedFiles: 0,
       duplicateFiles: 0,
-      optimizableFiles: 0,
+      optimizableFiles: optimizableFilesByProject[index] ?? 0,
       lintFindings: 0,
     })),
     items: [],
@@ -68,6 +74,25 @@ describe("displayCatalogForMode", () => {
       projects: 1,
       assets: 3,
     });
+  });
+});
+
+describe("optimizableBadgeCount", () => {
+  it("uses project stats before the Optimize list query has loaded", () => {
+    const fullCatalog = makeCatalog(["001", "workspace"], 4, [2, 3]);
+
+    expect(optimizableBadgeCount(fullCatalog, null, 0)).toBe(5);
+    expect(
+      optimizableBadgeCount(fullCatalog, fullCatalog.projectStats[1], 0),
+    ).toBe(3);
+    expect(optimizableBadgeCount(null, null, 7)).toBe(7);
+  });
+});
+
+describe("catalogItemsTotalCount", () => {
+  it("uses the server total instead of the loaded page length", () => {
+    expect(catalogItemsTotalCount(219, 200)).toBe(219);
+    expect(catalogItemsTotalCount(undefined, 200)).toBe(200);
   });
 });
 

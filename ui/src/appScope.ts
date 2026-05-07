@@ -31,6 +31,28 @@ export function displayTotalsForMode(
   };
 }
 
+export function optimizableBadgeCount(
+  catalog: Catalog | null,
+  selectedProjectStats: Catalog["projectStats"][number] | null,
+  fallbackCount: number,
+) {
+  if (selectedProjectStats) return selectedProjectStats.optimizableFiles;
+  if (catalog) {
+    return catalog.projectStats.reduce(
+      (total, stat) => total + stat.optimizableFiles,
+      0,
+    );
+  }
+  return fallbackCount;
+}
+
+export function catalogItemsTotalCount(
+  firstPageTotal: number | undefined,
+  fallbackCount: number,
+) {
+  return firstPageTotal ?? fallbackCount;
+}
+
 export function navigationBadges(
   catalog: Catalog | null,
   scopedStats: Catalog["stats"],
