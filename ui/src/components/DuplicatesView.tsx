@@ -614,7 +614,7 @@ export function DuplicatesView({
               <Select
                 value={extFilter}
                 aria-label={t("duplicates.filterExtension")}
-                size="sm"
+                size="md"
                 className="w-[160px] shrink-0"
                 options={[
                   { value: "__all__", label: t("duplicates.allExtensions") },
