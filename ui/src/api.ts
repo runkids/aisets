@@ -325,3 +325,49 @@ export function batchDelete(assetIds: string[]) {
     body: JSON.stringify({ assetIds }),
   });
 }
+
+export type BatchPreviewResponse = {
+  preview: {
+    id: string;
+    type: string;
+    moves: Array<{ from: string; to: string }>;
+    changes: Array<{
+      file: string;
+      line: number;
+      oldSpecifier: string;
+      newSpecifier: string;
+    }>;
+    blockers: Array<{
+      file: string;
+      line: number;
+      code: string;
+      reason: string;
+    }>;
+    canApply: boolean;
+  };
+  token: string;
+};
+
+export function batchMovePreview(assetIds: string[], targetDir: string) {
+  return request<BatchPreviewResponse>("/api/actions/batch/move/preview", {
+    method: "POST",
+    body: JSON.stringify({ assetIds, targetDir }),
+  });
+}
+
+export function batchRenamePreview(
+  assetIds: string[],
+  rules: import("./types").RenameRules,
+) {
+  return request<BatchPreviewResponse>("/api/actions/batch/rename/preview", {
+    method: "POST",
+    body: JSON.stringify({ assetIds, rules }),
+  });
+}
+
+export function batchApply(endpoint: string, token: string) {
+  return request<{ result: unknown }>(endpoint, {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}

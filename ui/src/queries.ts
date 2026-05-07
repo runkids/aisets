@@ -3,7 +3,10 @@ import {
   addProject,
   addWorkspace,
   applyPreview,
+  batchApply,
   batchDelete,
+  batchMovePreview,
+  batchRenamePreview,
   deleteUnusedPreview,
   getCatalog,
   getSettings,
@@ -25,6 +28,7 @@ import {
 import type {
   ExportData,
   OCRRunEvent,
+  RenameRules,
   ScanEvent,
   SettingsUpdate,
 } from "./types";
@@ -275,6 +279,41 @@ export function useBatchDeleteMutation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (assetIds: string[]) => batchDelete(assetIds),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useBatchMovePreviewMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetIds,
+      targetDir,
+    }: {
+      assetIds: string[];
+      targetDir: string;
+    }) => batchMovePreview(assetIds, targetDir),
+  });
+}
+
+export function useBatchRenamePreviewMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetIds,
+      rules,
+    }: {
+      assetIds: string[];
+      rules: RenameRules;
+    }) => batchRenamePreview(assetIds, rules),
+  });
+}
+
+export function useBatchApplyMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ endpoint, token }: { endpoint: string; token: string }) =>
+      batchApply(endpoint, token),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

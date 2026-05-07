@@ -21,8 +21,18 @@ import {
   customFilterOptions,
   matchesCustomAssetFilter,
 } from "../customAssetFilters";
-import { useBatchDeleteMutation } from "../queries";
+import {
+  useBatchDeleteMutation,
+  useBatchMovePreviewMutation,
+  useBatchRenamePreviewMutation,
+  useBatchApplyMutation,
+} from "../queries";
+import type { RenameRules } from "../types";
+import type { BatchPreviewResponse } from "../api";
 import { BatchConfirmModal } from "./BatchConfirmModal";
+import { BatchPreviewModal } from "./BatchPreviewModal";
+import { RenameRuleModal } from "./RenameRuleModal";
+import { DirectoryPickerModal } from "./DirectoryPickerModal";
 import { matchesOCRSearchText } from "../ocrSearch";
 import type { AssetItem, CustomAssetFilter } from "../types";
 import { fileName, formatBytes } from "../ui";
@@ -364,7 +374,17 @@ export function BrowseView({
     new Set(),
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMoveDir, setShowMoveDir] = useState(false);
+  const [showRenameRules, setShowRenameRules] = useState(false);
+  const [batchPreview, setBatchPreview] = useState<{
+    endpoint: string;
+    data: BatchPreviewResponse;
+  } | null>(null);
+
   const batchDeleteMut = useBatchDeleteMutation();
+  const movePreviewMut = useBatchMovePreviewMutation();
+  const renamePreviewMut = useBatchRenamePreviewMutation();
+  const batchApplyMut = useBatchApplyMutation();
 
   useEffect(() => {
     if (!autoScrollAssetId) return undefined;
@@ -486,6 +506,47 @@ export function BrowseView({
     });
   }
 
+  function handleMoveSelect(targetDir: string) {
+    setShowMoveDir(false);
+    movePreviewMut.mutate(
+      { assetIds: Array.from(selected), targetDir },
+      {
+        onSuccess: (data) => {
+          setBatchPreview({ endpoint: "/api/actions/batch/move/apply", data });
+        },
+      },
+    );
+  }
+
+  function handleRenameConfirm(rules: RenameRules) {
+    setShowRenameRules(false);
+    renamePreviewMut.mutate(
+      { assetIds: Array.from(selected), rules },
+      {
+        onSuccess: (data) => {
+          setBatchPreview({
+            endpoint: "/api/actions/batch/rename/apply",
+            data,
+          });
+        },
+      },
+    );
+  }
+
+  function handleBatchApply() {
+    if (!batchPreview) return;
+    batchApplyMut.mutate(
+      { endpoint: batchPreview.endpoint, token: batchPreview.data.token },
+      {
+        onSuccess: () => {
+          setBatchPreview(null);
+          setSelected(new Set());
+          setBulkMode(false);
+        },
+      },
+    );
+  }
+
   function copyPaths() {
     const paths = items
       .filter((i) => selected.has(i.id))
@@ -554,16 +615,16 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
-                disabled
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={() => setShowMoveDir(true)}
               >
                 <FolderInput size={12} />
                 {t("action.batchMove")}
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
-                disabled
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={() => setShowRenameRules(true)}
               >
                 <PenLine size={12} />
                 {t("action.batchRename")}
@@ -671,6 +732,42 @@ export function BrowseView({
           working={batchDeleteMut.isPending}
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={handleBatchDelete}
+        />
+      )}
+
+      {showMoveDir && (
+        <DirectoryPickerModal
+          open={showMoveDir}
+          working={movePreviewMut.isPending}
+          onClose={() => setShowMoveDir(false)}
+          onSelect={handleMoveSelect}
+        />
+      )}
+
+      {showRenameRules && (
+        <RenameRuleModal
+          filePaths={items
+            .filter((i) => selected.has(i.id))
+            .map((i) => i.repoPath)}
+          onCancel={() => setShowRenameRules(false)}
+          onConfirm={handleRenameConfirm}
+        />
+      )}
+
+      {batchPreview && (
+        <BatchPreviewModal
+          title={
+            batchPreview.endpoint.includes("move")
+              ? t("action.batchMove")
+              : t("action.batchRename")
+          }
+          moves={batchPreview.data.preview.moves}
+          changes={batchPreview.data.preview.changes}
+          blockers={batchPreview.data.preview.blockers}
+          canApply={batchPreview.data.preview.canApply}
+          working={batchApplyMut.isPending}
+          onCancel={() => setBatchPreview(null)}
+          onApply={handleBatchApply}
         />
       )}
     </>
