@@ -57,13 +57,13 @@ const triggerChevronClass = cn(
 );
 
 const menuClass = cn(
-  "absolute top-[calc(100%+8px)] left-0 z-[60] w-[min(320px,calc(100vw-32px))] max-h-[min(480px,calc(100vh-88px))]",
-  "overflow-y-auto p-1.5 border border-g-line-strong rounded-g-lg bg-g-surface shadow-g-pop",
-  "max-[720px]:left-auto max-[720px]:right-0",
+  "absolute top-[calc(100%+8px)] left-0 z-[60] w-full max-h-[min(480px,calc(100vh-88px))]",
+  "overflow-y-auto p-1.5 border border-g-line-strong rounded-g-lg bg-g-surface-2 shadow-g-pop",
+  "max-[720px]:left-auto max-[720px]:right-0 max-[720px]:w-[min(320px,calc(100vw-32px))]",
 );
 
 const menuHeadClass =
-  "flex flex-col gap-0.5 px-2.5 pt-2.5 pb-3 border-b border-g-line bg-g-surface";
+  "flex flex-col gap-0.5 px-2.5 pt-2.5 pb-3 border-b border-g-line bg-g-surface-2";
 
 const menuHeadTitleClass =
   "text-g-ink font-g-display text-[15px] font-[590] tracking-[-0.013em] leading-[1.2]";
@@ -85,7 +85,7 @@ const optionClass = cn(
 );
 
 const workspaceOptionActiveOverride =
-  "data-[kind=workspace]:data-active:bg-g-surface-2 data-[kind=workspace]:data-active:text-g-ink data-[kind=workspace]:data-active:shadow-[inset_0_0_0_1px_var(--g-line-strong)] data-[kind=workspace]:data-active:hover:bg-g-surface-2 data-[kind=workspace]:data-active:hover:text-g-ink";
+  "data-[kind=workspace]:data-active:bg-g-surface data-[kind=workspace]:data-active:text-g-ink data-[kind=workspace]:data-active:shadow-[inset_0_0_0_1px_var(--g-line-strong)] data-[kind=workspace]:data-active:hover:bg-g-surface data-[kind=workspace]:data-active:hover:text-g-ink [[data-theme=dark]_&]:data-[kind=workspace]:data-active:bg-g-surface-3 [[data-theme=dark]_&]:data-[kind=workspace]:data-active:hover:bg-g-surface-3";
 
 const avatarClass =
   "inline-grid place-items-center size-7 rounded-g-md bg-g-surface-3 text-g-ink font-g-display text-[13px] font-[590] shrink-0";
@@ -107,7 +107,7 @@ const countClass = cn(
 );
 
 const countActiveClass =
-  "data-active:[&_.ps-count]:bg-g-surface data-active:[&_.ps-count]:text-g-ink-3 dark:data-active:[&_.ps-count]:bg-[rgba(8,9,10,0.18)] dark:data-active:[&_.ps-count]:text-g-accent-ink";
+  "data-active:[&_.ps-count]:bg-g-surface data-active:[&_.ps-count]:text-g-ink-3 data-active:[&_.ps-count]:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-active-text)_22%,transparent)] [[data-theme=dark]_&]:data-active:[&_.ps-count]:bg-g-active-text [[data-theme=dark]_&]:data-active:[&_.ps-count]:text-g-active-bg [[data-theme=dark]_&]:data-active:[&_.ps-count]:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-active-bg)_28%,transparent)]";
 
 const hoverCountClass =
   "hover:not-data-active:[&_.ps-count]:bg-g-surface hover:not-data-active:[&_.ps-count]:text-g-ink-2 focus-visible:not-data-active:[&_.ps-count]:bg-g-surface focus-visible:not-data-active:[&_.ps-count]:text-g-ink-2";

@@ -33,8 +33,8 @@ export function ConfirmDialog({
       onOpenChange={(o) => !o && !loading && onCancel()}
     >
       <AlertDialogPrimitive.Portal>
-        <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[50] flex items-center justify-center bg-[rgba(8,9,10,0.6)] p-4 backdrop-blur-[4px] animate-[fadeIn_160ms_var(--g-ease)]" />
-        <div className="fixed inset-0 z-[50] flex items-center justify-center p-4">
+        <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(8,9,10,0.6)] p-4 backdrop-blur-[4px] animate-[fadeIn_160ms_var(--g-ease)]" />
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <AlertDialogPrimitive.Content
             className="relative flex w-full max-w-[448px] flex-col overflow-hidden rounded-g-lg border border-g-line bg-g-surface-2 shadow-g-pop animate-[modalIn_200ms_var(--g-ease-out)]"
             onEscapeKeyDown={(e) => loading && e.preventDefault()}

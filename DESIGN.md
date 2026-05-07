@@ -67,22 +67,22 @@ OpenType features for Inter: `font-feature-settings: "cv01", "ss03";` applied gl
 
 #### Type scale
 
-| Role                      | Font    | Size    | Weight | Line-height | Letter-spacing    |
-| ------------------------- | ------- | ------- | ------ | ----------- | ----------------- |
-| Display (hero counts)     | display | 36px    | 590    | 1.1         | -0.8px            |
-| Heading L (section title) | display | 28px    | 590    | 1.2         | -0.6px            |
-| Heading M (page title)    | display | 22px    | 590    | 1.27        | -0.4px            |
-| Heading S (card title)    | display | 18px    | 510    | 1.33        | -0.3px            |
-| KPI value                 | display | 22px    | 590    | 1.0         | -0.4px            |
-| Subheading                | body    | 16px    | 510    | 1.4         | -0.2px            |
-| Body (`text-g-body`)      | body    | 13px    | 400    | 1.4         | -0.011em          |
-| UI label / button (`text-g-ui`) | body | 12px | 510    | 1.4         | -0.011em          |
-| Nav link                  | body    | 12px    | 400    | 1.4         | -0.011em          |
-| Caption (`text-g-caption`)| body    | 11px    | 510    | 1.36        | -0.011em          |
-| Chip (`text-g-chip`)      | body    | 10px    | 510    | 1.4         | -0.011em          |
-| Section label (uppercase) | body    | 10px    | 510    | 1.4         | 0.06em (positive) |
-| Mono — code / path / hash | mono    | 11–12px | 400    | 1.5         | -0.013em          |
-| Mono — value (KPI delta)  | mono    | 10px    | 510    | 1.4         | -0.013em          |
+| Role                            | Font    | Size    | Weight | Line-height | Letter-spacing    |
+| ------------------------------- | ------- | ------- | ------ | ----------- | ----------------- |
+| Display (hero counts)           | display | 36px    | 590    | 1.1         | -0.8px            |
+| Heading L (section title)       | display | 28px    | 590    | 1.2         | -0.6px            |
+| Heading M (page title)          | display | 22px    | 590    | 1.27        | -0.4px            |
+| Heading S (card title)          | display | 18px    | 510    | 1.33        | -0.3px            |
+| KPI value                       | display | 22px    | 590    | 1.0         | -0.4px            |
+| Subheading                      | body    | 16px    | 510    | 1.4         | -0.2px            |
+| Body (`text-g-body`)            | body    | 13px    | 400    | 1.4         | -0.011em          |
+| UI label / button (`text-g-ui`) | body    | 12px    | 510    | 1.4         | -0.011em          |
+| Nav link                        | body    | 12px    | 400    | 1.4         | -0.011em          |
+| Caption (`text-g-caption`)      | body    | 11px    | 510    | 1.36        | -0.011em          |
+| Chip (`text-g-chip`)            | body    | 10px    | 510    | 1.4         | -0.011em          |
+| Section label (uppercase)       | body    | 10px    | 510    | 1.4         | 0.06em (positive) |
+| Mono — code / path / hash       | mono    | 11–12px | 400    | 1.5         | -0.013em          |
+| Mono — value (KPI delta)        | mono    | 10px    | 510    | 1.4         | -0.013em          |
 
 > Section labels are the _only_ uppercased text and the _only_ positive tracking values. Everywhere else, tracking is negative or zero — Linear's signature.
 
@@ -244,11 +244,11 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 - Lives in `.sb-project-switcher` under the brand and uses the same compact chrome as sidebar controls: `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. The wrapper does not draw a lower divider; spacing separates the switcher from navigation.
 - Trigger: 44px minimum height, 8px gap, 10px inline padding, 24px icon well on `--g-surface-3`; hover/open state lifts to `--g-surface-2` with `--g-line-strong` border.
-- Menu: anchored popover, 320px max width, `--g-surface` white/Graphite layer, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
+- Menu: anchored popover, matches the trigger width on desktop and caps to `min(320px, calc(100vw - 32px))` on compact icon-only layouts, `--g-surface-2` in both themes so the dropdown lifts away from the sidebar/canvas without hard-coded colors, 12px radius, `--g-shadow-pop`, 6px inner padding, max height `min(480px, calc(100vh - 88px))`.
 - Header stays compact: 15px display title + 12px workspace meta, bottom divider `--g-line`.
-- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. Rows keep 4px vertical separation so hover fills do not visually merge. Workspace rows use the shared workspace avatar well (uploaded image or initial fallback). The active workspace uses a subtle `--g-surface-2` fill + `--g-line-strong` inset + check icon instead of the full active fill, so it does not compete with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
+- Workspace rows are interactive `menuitemradio` options in the same row grammar as projects, but they are visually treated as the **parent context** rather than another asset scope. Rows keep 4px vertical separation so hover fills do not visually merge. Workspace rows use the shared workspace avatar well (uploaded image or initial fallback). The active workspace uses a subtle row surface (`--g-surface` in light mode, `--g-surface-3` in dark mode) + `--g-line-strong` inset + check icon instead of the full active fill, so it stays distinct from the `--g-surface-2` dropdown background without competing with the selected project scope. Inactive workspace rows show project counts. Selecting a workspace keeps the menu open, clears project scope, invalidates the catalog, and reloads the active workspace's project list in-place so the user can continue choosing `All projects` or a project without reopening the switcher. Creation and deletion are intentionally excluded from this compact switcher and live in Settings only.
 - Project options are 40px minimum rows with 10px gaps, 4px vertical separation, 6px radius, Lucide icon, strong label, mono secondary path/count, and a right-side mono count chip. The `All projects` option also renders the right-side count chip so its statistics align with individual project rows. Project options are scoped to the active workspace only. The selected project scope keeps the full active treatment; hover/focus uses `--g-surface-3`.
-- Hover logic matches sidebar rows: inactive hover uses the full `--g-surface-3` wash in both themes (not a transparent `--g-surface-2` mix) so it separates from the menu background and active workspace row; inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
+- Hover logic matches sidebar rows: inactive hover uses the full `--g-surface-3` wash in both themes (not a transparent `--g-surface-2` mix) so it separates from the menu background and active workspace row; inactive count chips flip to `--g-surface`, and active hover keeps the exact `--g-active-bg` / `--g-active-text` colors. Selected project uses the same active treatment as sidebar active rows, with the check icon inheriting the active text color. Active count chips keep a distinct chip surface with an inset token-mixed contrast edge; dark mode uses the inverse active text/background pair for a solid dark chip on the neon active fill, while light mode keeps the neutral active recipe. Do not use left/right colored inset stripes or side-line accents in the switcher menu. Option copy remains left-aligned; counts stay as subdued mono chips.
 - Press scale is disabled under `prefers-reduced-motion`.
 
 ---
@@ -286,6 +286,8 @@ backdrop-filter: blur(12px);
 | 50–51 | Drawer backdrop / drawer             |
 | 60    | Settings panel                       |
 | 100   | Command palette                      |
+| 120   | Modal / prompt / confirm dialogs     |
+| 200   | Toasts and tooltips                  |
 | 180   | Run panel                            |
 | 200   | Toast, chart tooltip                 |
 
@@ -466,7 +468,7 @@ React API:
 - 480px wide (95vw max), fixed right, slide-in 240ms `--g-ease-out`
 - Background `--g-surface-2` (Deep Slate, elevated)
 - Backdrop: `rgba(8,9,10,0.6)` + `backdrop-filter: blur(4px)`
-- Structure: `.drawer-h` (header, 16px padding, border-bottom `--g-line`) → `.drawer-body` (scrollable)
+- Structure: `.drawer-h` (compact header, 12px block / 16px inline padding, border-bottom `--g-line`) → compact sticky tab strip (6px block / 16px inline padding) → `.drawer-body` (scrollable, 16px padding)
 - **Enhanced variant `.dv2`**: min(680px, 95vw)
   - Hero area: `--g-surface-3` Charcoal bg with subtle `--g-info` linear-gradient overlay
   - Sticky tab strip: `--g-surface-2` bg, active tab gets a 2px **Neon Lime** underline + Porcelain text
@@ -476,7 +478,7 @@ React API:
 
 Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`.
 
-- Centered on `rgba(8,9,10,0.6)` backdrop + blur(4px), z 50.
+- Centered on `rgba(8,9,10,0.6)` backdrop + blur(4px), z 120 so dialogs opened from the asset drawer layer above the drawer/backdrop stack.
 - Sizes: `sm` 520px, `md` 760px, `lg` 960px.
 - Frame: `--g-surface-2` bg, `1px solid --g-line`, 12px radius, `--g-shadow-pop`.
 - Header/footer: `--g-surface` bg, 16px horizontal padding, 1px `--g-line` divider.

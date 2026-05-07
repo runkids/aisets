@@ -60,8 +60,8 @@ export function Modal({
   return (
     <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[50] grid place-items-center bg-[rgba(8,9,10,0.6)] p-4 backdrop-blur-[4px] animate-[fadeIn_160ms_var(--g-ease)]" />
-        <div className="fixed inset-0 z-[50] grid place-items-center p-4">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[120] grid place-items-center bg-[rgba(8,9,10,0.6)] p-4 backdrop-blur-[4px] animate-[fadeIn_160ms_var(--g-ease)]" />
+        <div className="fixed inset-0 z-[120] grid place-items-center p-4">
           <DialogPrimitive.Content
             className={cn(modalVariants({ size }), className)}
             aria-label={title}

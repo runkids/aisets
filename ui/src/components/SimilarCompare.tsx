@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Tabs, type TabItem } from "@/components/ui";
+import { Tabs, ZoomableImage, type TabItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatBytes } from "@/ui";
 
@@ -143,10 +143,11 @@ export function SimilarCompare({
                 key={asset.repoPath}
                 className="flex flex-1 flex-col items-center gap-2"
               >
-                <img
-                  src={asset.thumbnailUrl}
+                <ZoomableImage
+                  key={asset.url}
+                  src={asset.url}
                   alt={fileName(asset.repoPath)}
-                  className="max-h-48 w-full object-contain"
+                  className="aspect-[4/3] w-full"
                 />
                 <span className="max-w-full truncate font-g-mono text-g-caption text-g-ink-2">
                   {fileName(asset.repoPath)}

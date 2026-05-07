@@ -25,3 +25,4 @@ export { Tabs, type TabItem } from "./Tabs";
 export { TextInput, TextInputButton, Textarea } from "./TextInput";
 export { Toast } from "./Toast";
 export { Tooltip } from "./Tooltip";
+export { ZoomableImage } from "./ZoomableImage";

@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes } from "../ui";
-import { AssetThumbnail, Badge, CopyButton, IconButton, Tooltip } from "./ui";
+import { Badge, CopyButton, IconButton, Tooltip, ZoomableImage } from "./ui";
 
 type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
 
@@ -32,9 +32,12 @@ export function AssetDrawerOverview({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <AssetThumbnail src={asset.thumbnailUrl || asset.url} size="fill" />
-      </div>
+      <ZoomableImage
+        key={asset.url}
+        src={asset.url}
+        alt={fileName(asset.repoPath)}
+        className="aspect-square w-full"
+      />
 
       <div className="flex items-center gap-1.5">
         <span

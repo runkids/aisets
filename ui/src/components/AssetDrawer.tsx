@@ -105,7 +105,7 @@ export function AssetDrawer({ asset, onClose, onRename, onDelete }: Props) {
         onClick={onClose}
       />
       <aside className="fixed inset-y-0 right-0 z-[51] flex w-[600px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)]">
-        <div className="flex items-center gap-2.5 border-b border-g-line px-5 py-[18px]">
+        <div className="flex items-center gap-2.5 border-b border-g-line px-4 py-3">
           <span
             className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui font-medium"
             title={asset.repoPath}
@@ -117,7 +117,7 @@ export function AssetDrawer({ asset, onClose, onRename, onDelete }: Props) {
           </IconButton>
         </div>
 
-        <div className="sticky top-0 z-10 border-b border-g-line bg-g-surface px-5 py-2">
+        <div className="sticky top-0 z-10 border-b border-g-line bg-g-surface px-4 py-1.5">
           <Tabs
             value={tab}
             items={tabs}
@@ -127,7 +127,7 @@ export function AssetDrawer({ asset, onClose, onRename, onDelete }: Props) {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4">
           {tab === "overview" && (
             <AssetDrawerOverview
               asset={asset}
