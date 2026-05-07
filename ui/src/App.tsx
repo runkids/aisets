@@ -444,11 +444,6 @@ export function App() {
     }
   }
 
-  function onCopyPath(path: string) {
-    navigator.clipboard?.writeText(path);
-    toast.info(t("toast.copied"), { durationMs: 1800 });
-  }
-
   function openAssetFromPalette(id: string) {
     if (!scopedItemIds.has(id)) return;
     const params = new URLSearchParams({ asset: id });
@@ -574,7 +569,6 @@ export function App() {
             onClose={() => setDrawerId("")}
             onRename={onRename}
             onDelete={onDelete}
-            onCopyPath={onCopyPath}
           />
         )}
 

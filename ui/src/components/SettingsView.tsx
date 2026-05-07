@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Check,
   CheckCircle2,
+  Code,
   ChevronDown,
   Download,
   Filter,
@@ -185,6 +186,22 @@ const customFilterOperatorsByField: Record<
   ocrConfidence: ["gte", "lte"],
   ocrStatus: ["is"],
 };
+
+const editorOptions = [
+  { value: "vscode", label: "VS Code" },
+  { value: "cursor", label: "Cursor" },
+  { value: "windsurf", label: "Windsurf" },
+  { value: "antigravity", label: "Antigravity" },
+  { value: "trae", label: "Trae" },
+  { value: "webstorm", label: "WebStorm" },
+  { value: "idea", label: "IntelliJ IDEA" },
+  { value: "goland", label: "GoLand" },
+  { value: "pycharm", label: "PyCharm" },
+  { value: "rubymine", label: "RubyMine" },
+  { value: "phpstorm", label: "PhpStorm" },
+  { value: "zed", label: "Zed" },
+  { value: "sublime", label: "Sublime Text" },
+];
 
 function defaultClauseValue(
   field: CustomAssetFilterField,
@@ -753,6 +770,7 @@ export function SettingsView({
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [removeProjectId, setRemoveProjectId] = useState<string | null>(null);
   const [customFiltersHelpOpen, setCustomFiltersHelpOpen] = useState(false);
+  const [ocrLimitsOpen, setOCRLimitsOpen] = useState(false);
   const [runOCRConfirmOpen, setRunOCRConfirmOpen] = useState(false);
   const [removeOCRConfirmOpen, setRemoveOCRConfirmOpen] = useState(false);
   const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
@@ -1677,6 +1695,20 @@ export function SettingsView({
                     aria-label={t("settings.imagePreview")}
                   />
                 </FieldRow>
+                <FieldRow
+                  label={t("settings.preferredEditor")}
+                  description={t("settings.preferredEditorDesc")}
+                  icon={<Code size={15} />}
+                >
+                  <Select
+                    value={settings?.preferredEditor ?? "vscode"}
+                    options={editorOptions}
+                    onChange={(value) =>
+                      updateMutation.mutate({ preferredEditor: value })
+                    }
+                    aria-label={t("settings.preferredEditor")}
+                  />
+                </FieldRow>
               </div>
             </Card>
           )}
@@ -1753,7 +1785,7 @@ export function SettingsView({
                   icon={<Globe2 size={15} />}
                   align="start"
                 >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                  <div className="w-full md:w-[420px]">
                     <OCRLanguageSelect
                       value={draft.ocrLanguages}
                       packs={ocrLanguagePacks}
@@ -1767,19 +1799,6 @@ export function SettingsView({
                         settingsQuery.isLoading || updateMutation.isPending
                       }
                     />
-                    <div className="flex flex-wrap justify-start gap-1.5 md:justify-end">
-                      {ocrLanguagePacks.map((pack) => (
-                        <Badge
-                          key={pack.language}
-                          tone={pack.installed ? "green" : "line"}
-                        >
-                          {ocrLanguageLabel(pack.language, t)}
-                          {pack.installed
-                            ? ""
-                            : ` ${t("settings.notInstalled")}`}
-                        </Badge>
-                      ))}
-                    </div>
                   </div>
                 </FieldRow>
                 <FieldRow
@@ -1788,29 +1807,19 @@ export function SettingsView({
                   icon={<Sliders size={15} />}
                   align="start"
                 >
-                  <div className="grid w-full gap-2 md:w-[420px] md:grid-cols-2">
-                    <TextInput
-                      type="number"
-                      value={String(draft.ocrMaxPixels)}
-                      onChange={(event) =>
-                        updateDraft((prev) => ({
-                          ...prev,
-                          ocrMaxPixels: Number(event.target.value),
-                        }))
+                  <div className="flex w-full items-center justify-start md:w-[420px] md:justify-end">
+                    <Button
+                      variant="secondary"
+                      className="min-w-[96px]"
+                      leadingIcon={<Sliders size={14} />}
+                      onClick={() => setOCRLimitsOpen(true)}
+                      aria-label={`${t("settings.ocrLimits")} ${t("settings.ocrLimitsEdit")}`}
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
                       }
-                      aria-label={t("settings.ocrMaxPixels")}
-                    />
-                    <TextInput
-                      type="number"
-                      value={String(draft.ocrBatchSize)}
-                      onChange={(event) =>
-                        updateDraft((prev) => ({
-                          ...prev,
-                          ocrBatchSize: Number(event.target.value),
-                        }))
-                      }
-                      aria-label={t("settings.ocrBatchSize")}
-                    />
+                    >
+                      {t("settings.ocrLimitsEdit")}
+                    </Button>
                   </div>
                 </FieldRow>
                 <FieldRow
@@ -1819,7 +1828,7 @@ export function SettingsView({
                   icon={<Download size={15} />}
                   align="start"
                 >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                  <div className="flex w-full flex-col items-start gap-2 md:w-[560px] md:items-end">
                     <div className="flex flex-wrap justify-start gap-2 md:justify-end">
                       <Button
                         variant="secondary"
@@ -1911,7 +1920,7 @@ export function SettingsView({
                         ? t("settings.ocrInstalled")
                         : t("settings.ocrNotInstalled")}
                     </p>
-                    <p className="max-w-[420px] text-left font-g text-g-caption tracking-g-ui text-g-ink-3 md:text-right">
+                    <p className="w-full rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-left font-g text-g-ui leading-[1.55] tracking-g-ui text-g-ink-3">
                       {t("settings.ocrCacheScopeHint")}
                     </p>
                     {settings?.ocrRuntime.engineAvailable === false && (
@@ -2438,6 +2447,57 @@ export function SettingsView({
           )}
         </div>
       </div>
+      {ocrLimitsOpen && (
+        <Modal
+          title={t("settings.ocrLimitsHelpTitle")}
+          description={t("settings.ocrLimitsHelpDesc")}
+          size="md"
+          onClose={() => setOCRLimitsOpen(false)}
+          bodyClassName="space-y-5"
+        >
+          <Notice tone="info">{t("settings.ocrLimitsKeepDefaults")}</Notice>
+          <div className="grid gap-4">
+            <label className="grid gap-2">
+              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+                {t("settings.ocrMaxPixels")}
+              </span>
+              <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+                {t("settings.ocrMaxPixelsHint")}
+              </span>
+              <TextInput
+                type="number"
+                value={String(draft.ocrMaxPixels)}
+                onChange={(event) =>
+                  updateDraft((prev) => ({
+                    ...prev,
+                    ocrMaxPixels: Number(event.target.value),
+                  }))
+                }
+                aria-label={t("settings.ocrMaxPixels")}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+                {t("settings.ocrBatchSize")}
+              </span>
+              <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+                {t("settings.ocrBatchSizeHint")}
+              </span>
+              <TextInput
+                type="number"
+                value={String(draft.ocrBatchSize)}
+                onChange={(event) =>
+                  updateDraft((prev) => ({
+                    ...prev,
+                    ocrBatchSize: Number(event.target.value),
+                  }))
+                }
+                aria-label={t("settings.ocrBatchSize")}
+              />
+            </label>
+          </div>
+        </Modal>
+      )}
       {customFiltersHelpOpen && (
         <Modal
           title={t("settings.customFiltersHelpTitle")}

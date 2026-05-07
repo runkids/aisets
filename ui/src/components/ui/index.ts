@@ -2,6 +2,7 @@ export { AssetThumbnail } from "./AssetThumbnail";
 export { Badge } from "./Badge";
 export { Button, IconButton } from "./Button";
 export { Card, CardBody } from "./Card";
+export { CopyButton } from "./CopyButton";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { DropdownMenu, type DropdownMenuItem } from "./DropdownMenu";
 export { EmptyState } from "./EmptyState";

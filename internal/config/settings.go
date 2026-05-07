@@ -26,6 +26,7 @@ func DefaultAppSettings() AppSettings {
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
 		CustomAssetFilters:         []CustomAssetFilter{},
+		PreferredEditor:            "vscode",
 	}
 }
 
@@ -139,6 +140,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 		}
 		settings.CustomAssetFilters = filters
 	}
+	if update.PreferredEditor != nil {
+		settings.PreferredEditor = *update.PreferredEditor
+	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
 	}
@@ -251,6 +255,7 @@ func (s *Store) ImportData(data ExportData) error {
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
 			CustomAssetFilters:         data.Settings.CustomAssetFilters,
+			PreferredEditor:            &data.Settings.PreferredEditor,
 		}
 		if data.Settings.ActiveWorkspaceID != "" {
 			update.ActiveWorkspaceID = &data.Settings.ActiveWorkspaceID

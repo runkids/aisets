@@ -30,6 +30,7 @@ type AppSettings struct {
 	OptimizationDefaultQuality int                 `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      bool                `json:"optimizationAutoApply"`
 	CustomAssetFilters         []CustomAssetFilter `json:"customAssetFilters"`
+	PreferredEditor            string              `json:"preferredEditor"`
 }
 
 type SettingsUpdate struct {
@@ -47,6 +48,7 @@ type SettingsUpdate struct {
 	OptimizationDefaultQuality *int                `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      *bool               `json:"optimizationAutoApply"`
 	CustomAssetFilters         []CustomAssetFilter `json:"customAssetFilters"`
+	PreferredEditor            *string             `json:"preferredEditor"`
 }
 
 type CustomAssetFilter struct {

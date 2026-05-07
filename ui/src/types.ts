@@ -28,6 +28,7 @@ export type AppSettings = {
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
   customAssetFilters: CustomAssetFilter[];
+  preferredEditor: string;
 };
 
 export type CustomAssetFilterField =
@@ -169,6 +170,19 @@ export type AssetItem = {
     attempts?: number;
     updatedAt?: string;
   };
+};
+
+export type SimilarFile = {
+  id: string;
+  path: string;
+  similarity: number;
+  mirrored: boolean;
+  thumbnailUrl: string;
+  bytes: number;
+  width: number;
+  height: number;
+  ext: string;
+  contentHash: string;
 };
 
 export type DuplicateGroup = {
