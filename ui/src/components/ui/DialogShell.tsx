@@ -114,7 +114,7 @@ const DialogDrawerSurface = forwardRef<
     <aside
       ref={ref}
       className={cn(
-        "fixed inset-y-0 right-0 z-[51] flex w-[680px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)] max-[600px]:w-screen max-[600px]:max-w-none",
+        "fixed inset-y-0 right-0 z-[51] flex w-[800px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)] max-[600px]:w-screen max-[600px]:max-w-none",
         className,
       )}
       {...props}

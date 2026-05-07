@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
+import { toCompareAsset } from "./compareTypes";
 import { SimilarCompare } from "./SimilarCompare";
 import { AssetThumbnail, EmptyState } from "./ui";
 
@@ -104,24 +105,8 @@ export function AssetDrawerSimilar({
           </div>
 
           <SimilarCompare
-            currentAsset={{
-              thumbnailUrl: asset.thumbnailUrl || asset.url,
-              url: asset.url,
-              repoPath: asset.repoPath,
-              bytes: asset.bytes,
-              width: asset.image.width,
-              height: asset.image.height,
-              ext: asset.ext,
-            }}
-            similarAsset={{
-              thumbnailUrl: selected.item.thumbnailUrl || selected.item.url,
-              url: selected.item.url,
-              repoPath: selected.item.repoPath,
-              bytes: selected.item.bytes,
-              width: selected.item.image.width,
-              height: selected.item.image.height,
-              ext: selected.item.ext,
-            }}
+            currentAsset={toCompareAsset(asset)}
+            similarAsset={toCompareAsset(selected.item)}
             similarity={selected.similarity}
             mirrored={selected.mirrored}
           />

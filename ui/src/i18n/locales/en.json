@@ -656,6 +656,16 @@
     "mergeConfirmTitle": "Merge {{count}} duplicates",
     "mergeConfirmBody": "Remove {{count}} duplicate copies ({{size}}) and update {{refs}} references to use the preferred paths."
   },
+  "compare": {
+    "side": "Side by side",
+    "blend": "Blend",
+    "overlay": "Overlay",
+    "diff": "Pixel diff",
+    "blendOpacity": "Blend opacity",
+    "overlayOpacity": "Overlay opacity",
+    "diffDifference": "Difference",
+    "diffIdentical": "Identical"
+  },
   "optimize": {
     "title": "Optimize",
     "description": "Assets with format, size, or compression recommendations.",

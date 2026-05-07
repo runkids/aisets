@@ -320,6 +320,16 @@
     "mergeConfirmTitle": "合併 {{count}} 個重複檔案",
     "mergeConfirmBody": "移除 {{count}} 個重複副本（{{size}}），並更新 {{refs}} 個引用指向保留路徑。"
   },
+  "compare": {
+    "side": "並排",
+    "blend": "混合",
+    "overlay": "疊加",
+    "diff": "像素差異",
+    "blendOpacity": "混合透明度",
+    "overlayOpacity": "疊加透明度",
+    "diffDifference": "差異",
+    "diffIdentical": "相同"
+  },
   "optimize": {
     "title": "最佳化",
     "description": "具有格式、尺寸或壓縮建議的素材",

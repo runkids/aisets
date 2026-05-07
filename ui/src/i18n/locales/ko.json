@@ -301,6 +301,16 @@
     "mergeConfirmTitle": "{{count}}개 중복 병합",
     "mergeConfirmBody": "{{count}}개의 중복 복사본({{size}})을 제거하고 {{refs}}개의 참조를 기본 경로로 업데이트합니다."
   },
+  "compare": {
+    "side": "나란히 비교",
+    "blend": "블렌드",
+    "overlay": "오버레이",
+    "diff": "픽셀 차이",
+    "blendOpacity": "블렌드 불투명도",
+    "overlayOpacity": "오버레이 불투명도",
+    "diffDifference": "차이",
+    "diffIdentical": "동일"
+  },
   "optimize": {
     "title": "Optimize",
     "description": "Assets with format, size, or compression recommendations.",

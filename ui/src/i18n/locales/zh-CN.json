@@ -289,6 +289,16 @@
     "mergeConfirmTitle": "合并 {{count}} 个重复文件",
     "mergeConfirmBody": "移除 {{count}} 个重复副本（{{size}}），并更新 {{refs}} 个引用指向首选路径。"
   },
+  "compare": {
+    "side": "并排",
+    "blend": "混合",
+    "overlay": "叠加",
+    "diff": "像素差异",
+    "blendOpacity": "混合透明度",
+    "overlayOpacity": "叠加透明度",
+    "diffDifference": "差异",
+    "diffIdentical": "相同"
+  },
   "optimize": {
     "title": "优化",
     "description": "具有格式、尺寸或压缩建议的素材",

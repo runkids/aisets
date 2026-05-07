@@ -34,12 +34,13 @@ import {
   CopyButton,
   EmptyState,
   Modal,
-  Range,
   Select,
   StatCard,
   Tabs,
   TextInput,
 } from "./ui";
+import { ComparePanel, useCompareTabs } from "./ComparePanel";
+import { toCompareAsset, type CompareMode } from "./compareTypes";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
 
@@ -721,13 +722,7 @@ export function DuplicatesView({
             const right = itemById.get(nd.rightId);
             if (!left || !right) return null;
             return (
-              <SimilarPairCard
-                key={nd.id}
-                nd={nd}
-                left={left}
-                right={right}
-                onOpenAsset={onOpenAsset}
-              />
+              <SimilarPairCard key={nd.id} nd={nd} left={left} right={right} />
             );
           })}
           {nearDuplicates.length === 0 && (
@@ -805,24 +800,20 @@ export function DuplicatesView({
   );
 }
 
-/* ── Similar pair card with side/overlay modes ── */
-
-type CompareMode = "side" | "overlay";
+/* ── Similar pair card ── */
 
 function SimilarPairCard({
   nd,
   left,
   right,
-  onOpenAsset,
 }: {
   nd: { id: string; distance: number; flipped: boolean };
   left: AssetItem;
   right: AssetItem;
-  onOpenAsset?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<CompareMode>("side");
-  const [overlayOpacity, setOverlayOpacity] = useState(50);
+  const tabItems = useCompareTabs();
 
   return (
     <Card padding="md">
@@ -842,103 +833,15 @@ function SimilarPairCard({
           value={mode}
           ariaLabel="Compare mode"
           onChange={setMode}
-          items={[
-            { value: "side", label: t("duplicates.sideBySideMode") },
-            { value: "overlay", label: t("duplicates.overlayMode") },
-          ]}
+          items={tabItems}
         />
       </div>
 
-      {mode === "side" ? (
-        <div className="mx-auto flex max-w-3xl items-start gap-3 sm:gap-5">
-          <ComparisonSide item={left} onOpen={() => onOpenAsset?.(left.id)} />
-          <ComparisonSide item={right} onOpen={() => onOpenAsset?.(right.id)} />
-        </div>
-      ) : (
-        <div className="mx-auto max-w-md">
-          <div className="relative aspect-square overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-            <img
-              src={left.thumbnailUrl || left.url}
-              alt=""
-              className="absolute inset-0 size-full object-contain"
-            />
-            <img
-              src={right.thumbnailUrl || right.url}
-              alt=""
-              className="absolute inset-0 size-full object-contain mix-blend-difference"
-              style={{ opacity: overlayOpacity / 100 }}
-            />
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-g-chip text-g-ink-4">
-              {fileName(left.repoPath)}
-            </span>
-            <Range
-              min={0}
-              max={100}
-              value={overlayOpacity}
-              onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-              aria-label={t("duplicates.overlayOpacity")}
-            />
-            <span className="text-g-chip text-g-ink-4">
-              {fileName(right.repoPath)}
-            </span>
-          </div>
-        </div>
-      )}
+      <ComparePanel
+        left={toCompareAsset(left)}
+        right={toCompareAsset(right)}
+        mode={mode}
+      />
     </Card>
-  );
-}
-
-/* ── Similar tab comparison side ── */
-
-function ComparisonSide({
-  item,
-  onOpen,
-}: {
-  item: AssetItem;
-  onOpen: () => void;
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <button
-        type="button"
-        className="overflow-hidden rounded-g-md border border-g-line transition-all duration-[120ms] ease-g hover:-translate-y-px hover:border-g-line-strong hover:shadow-g-md focus-visible:outline-none focus-visible:shadow-g-focus"
-        onClick={onOpen}
-      >
-        <AssetThumbnail
-          src={item.thumbnailUrl || item.url}
-          size="fill"
-          className="rounded-none border-0"
-        />
-      </button>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate font-g-mono text-g-caption font-[510] text-g-ink">
-          {fileName(item.repoPath)}
-        </span>
-        <span className="truncate text-g-chip text-g-ink-4">
-          {item.repoPath}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <Badge tone="line" className="text-[9px]">
-            {formatExt(item.ext)}
-          </Badge>
-          <span className="font-g-mono text-g-chip text-g-ink-3">
-            {formatBytes(item.bytes)}
-          </span>
-          {item.image.width > 0 && (
-            <span className="font-g-mono text-g-chip text-g-ink-4">
-              {item.image.width}&times;{item.image.height}
-            </span>
-          )}
-          {item.references.length > 0 && (
-            <span className="ml-auto inline-flex items-center gap-0.5 font-g-mono text-g-chip text-g-ink-3">
-              <Link2 size={9} />
-              {item.references.length}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

@@ -289,6 +289,16 @@
     "mergeConfirmTitle": "{{count}}件の重複をマージ",
     "mergeConfirmBody": "{{count}}件の重複コピー（{{size}}）を削除し、{{refs}}件の参照を推奨パスに更新します。"
   },
+  "compare": {
+    "side": "並べて比較",
+    "blend": "ブレンド",
+    "overlay": "オーバーレイ",
+    "diff": "ピクセル差分",
+    "blendOpacity": "ブレンド不透明度",
+    "overlayOpacity": "オーバーレイ不透明度",
+    "diffDifference": "差異",
+    "diffIdentical": "同一"
+  },
   "optimize": {
     "title": "Optimize",
     "description": "Assets with format, size, or compression recommendations.",
