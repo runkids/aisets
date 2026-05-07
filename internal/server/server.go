@@ -127,6 +127,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/actions/batch/move/apply", s.handleBatchApply)
 	s.mux.HandleFunc("POST /api/actions/batch/rename/preview", s.handleBatchRenamePreview)
 	s.mux.HandleFunc("POST /api/actions/batch/rename/apply", s.handleBatchApply)
+	s.mux.HandleFunc("POST /api/actions/batch/export", s.handleBatchExport)
 	s.mux.HandleFunc("POST /api/pre-check", s.handlePreCheck)
 	s.mux.HandleFunc("POST /api/actions/optimization/estimate", s.handleOptimizationEstimate)
 	s.mux.HandleFunc("POST /api/actions/optimization/generate-script", s.handleOptimizationGenerateScript)

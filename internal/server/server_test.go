@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -1375,6 +1376,69 @@ func TestBatchMovePreviewAndApply(t *testing.T) {
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"code":"preview_token_invalid"`) {
 		t.Fatalf("reused batch token = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBatchExport(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "img", "a.png"))
+	writePNG(t, filepath.Join(project, "img", "b.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Trigger a scan so catalog is populated.
+	scanRec := httptest.NewRecorder()
+	s.handler.ServeHTTP(scanRec, httptest.NewRequest(http.MethodPost, "/api/scan", nil))
+
+	catRec := httptest.NewRecorder()
+	s.handler.ServeHTTP(catRec, httptest.NewRequest(http.MethodGet, "/api/catalog", nil))
+	var cat struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(catRec.Body.Bytes(), &cat); err != nil {
+		t.Fatal(err)
+	}
+
+	ids := make([]string, 0)
+	for _, item := range cat.Items {
+		ids = append(ids, item.ID)
+	}
+
+	payload, _ := json.Marshal(map[string]any{"assetIds": ids})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/batch/export", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/zip" {
+		t.Fatalf("expected application/zip, got %s", ct)
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatalf("invalid ZIP: %v", err)
+	}
+	if len(zipReader.File) != 2 {
+		t.Fatalf("expected 2 files in ZIP, got %d", len(zipReader.File))
 	}
 }
 

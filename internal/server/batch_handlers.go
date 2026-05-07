@@ -1,8 +1,13 @@
 package server
 
 import (
+	"archive/zip"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"time"
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
@@ -122,6 +127,47 @@ func (s *Server) takeBatchPreview(id string) (actions.BatchPreview, bool) {
 		delete(s.batchPreviews, id)
 	}
 	return preview, ok
+}
+
+func (s *Server) handleBatchExport(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AssetIDs []string `json:"assetIds"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.AssetIDs) == 0 {
+		writeError(w, http.StatusBadRequest, apierr.New("empty_selection", "no assets selected"))
+		return
+	}
+
+	items, _, err := s.batchItems(r.Context(), body.AssetIDs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	filename := fmt.Sprintf("assets-export-%s.zip", time.Now().Format("2006-01-02"))
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	for _, item := range items {
+		f, err := os.Open(item.LocalPath)
+		if err != nil {
+			continue
+		}
+		entry, err := zw.Create(item.RepoPath)
+		if err != nil {
+			f.Close()
+			continue
+		}
+		io.Copy(entry, f)
+		f.Close()
+	}
 }
 
 func (s *Server) batchItems(ctx context.Context, ids []string) ([]scanner.AssetItem, scanner.Project, error) {
