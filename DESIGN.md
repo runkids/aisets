@@ -432,8 +432,15 @@ Canonical shared primitive: `Checkbox` from `ui/src/components/ui/Checkbox.tsx`,
 
 - Base: square control, 4px radius, `--g-surface` bg, `--g-line-strong` border, token focus ring
 - Sizes: `sm` 14px, `md` 16px, `lg` 20px
-- Checked / indeterminate: `--g-accent` fill, `--g-accent-ink` Lucide check icon
+- Checked / indeterminate: `--g-active-bg` fill, `--g-active-text` Lucide check icon, matching Settings checkbox controls
 - Browse and duplicate card selection uses the checkbox directly in the top-right corner; do not add a large outer shell around it.
+
+### 5.8.2 Range
+
+Canonical shared primitive: `Range` from `ui/src/components/ui/Range.tsx`.
+
+- Native range input, token focus ring, disabled opacity/cursor
+- Uses `accent-g-active-bg`, matching Settings range controls; do not use `g-accent` for compare/overlay sliders in light mode.
 
 ### 5.9 Asset Card `.acard`
 

@@ -5,7 +5,7 @@ import { errorMessage } from "../../i18n/index";
 import type { SettingsDraft } from "./types";
 import { FieldRow } from "./FieldRow";
 import { sectionIcon } from "./helpers";
-import { Button, Card, Notice, Switch } from "../ui";
+import { Button, Card, Notice, Range, Switch } from "../ui";
 
 type OptimizationSectionProps = {
   draft: SettingsDraft;
@@ -49,8 +49,7 @@ export function OptimizationSection({
           >
             <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
               <div className="flex items-center gap-3">
-                <input
-                  type="range"
+                <Range
                   min={0}
                   max={100}
                   value={draft.optimizationDefaultQuality}
@@ -61,7 +60,6 @@ export function OptimizationSection({
                       optimizationDefaultQuality: Number(event.target.value),
                     }))
                   }
-                  className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   aria-label={t("settings.defaultQuality")}
                 />
                 <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
@@ -141,8 +139,7 @@ export function OptimizationSection({
           >
             <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
               <div className="flex items-center gap-3">
-                <input
-                  type="range"
+                <Range
                   min={0}
                   max={50}
                   value={draft.optimizationThresholds.svgMinSavingsPercent}
@@ -155,7 +152,6 @@ export function OptimizationSection({
                       },
                     }))
                   }
-                  className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   disabled={settingsLoading || updatePending}
                 />
                 <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
@@ -197,8 +193,7 @@ export function OptimizationSection({
           >
             <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
               <div className="flex items-center gap-3">
-                <input
-                  type="range"
+                <Range
                   min={800}
                   max={5120}
                   step={64}
@@ -212,7 +207,6 @@ export function OptimizationSection({
                       },
                     }))
                   }
-                  className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   disabled={settingsLoading || updatePending}
                 />
                 <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
@@ -254,8 +248,7 @@ export function OptimizationSection({
           >
             <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
               <div className="flex items-center gap-3">
-                <input
-                  type="range"
+                <Range
                   min={50}
                   max={2000}
                   step={50}
@@ -269,7 +262,6 @@ export function OptimizationSection({
                       },
                     }))
                   }
-                  className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   disabled={settingsLoading || updatePending}
                 />
                 <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
@@ -311,8 +303,7 @@ export function OptimizationSection({
           >
             <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
               <div className="flex items-center gap-3">
-                <input
-                  type="range"
+                <Range
                   min={100}
                   max={5000}
                   step={100}
@@ -326,7 +317,6 @@ export function OptimizationSection({
                       },
                     }))
                   }
-                  className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   disabled={settingsLoading || updatePending}
                 />
                 <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">

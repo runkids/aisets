@@ -25,6 +25,7 @@ export { Modal } from "./Modal";
 export { Notice, NoticeStack } from "./Notice";
 export { PromptDialog } from "./PromptDialog";
 export { Rail, RailItem, RailSection } from "./Rail";
+export { Range, rangeVariants, type RangeProps } from "./Range";
 export {
   SegmentedControl,
   type SegmentedControlItem,

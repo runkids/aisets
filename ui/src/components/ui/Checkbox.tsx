@@ -8,8 +8,8 @@ const checkboxVariants = cva(
   [
     "grid shrink-0 place-items-center rounded-g-sm border border-g-line-strong bg-g-surface text-transparent transition-[background,border-color,color,box-shadow,transform] duration-[120ms] ease-g",
     "focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]",
-    "data-[state=checked]:border-g-accent data-[state=checked]:bg-g-accent data-[state=checked]:text-g-accent-ink",
-    "data-[state=indeterminate]:border-g-accent data-[state=indeterminate]:bg-g-accent data-[state=indeterminate]:text-g-accent-ink",
+    "data-[state=checked]:border-g-active-bg data-[state=checked]:bg-g-active-bg data-[state=checked]:text-g-active-text",
+    "data-[state=indeterminate]:border-g-active-bg data-[state=indeterminate]:bg-g-active-bg data-[state=indeterminate]:text-g-active-text",
     "[&:active:not(:disabled)]:scale-[0.94] motion-reduce:[&:active:not(:disabled)]:scale-100",
   ],
   {
