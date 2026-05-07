@@ -61,6 +61,42 @@ func TestCmdVersionWritesTextAndJSON(t *testing.T) {
 	}
 }
 
+func TestCmdUpdateDevModeWritesTextAndJSON(t *testing.T) {
+	oldVersion := version
+	version = "dev"
+	t.Cleanup(func() { version = oldVersion })
+
+	text := captureStderr(t, func() {
+		if err := cmdUpdate(nil, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(text, "DEV mode") || !strings.Contains(text, "0.1.1-dev") {
+		t.Fatalf("text update = %q", text)
+	}
+
+	jsonOut := captureStdout(t, func() {
+		if err := cmdUpdate([]string{"--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var body struct {
+		OK     bool `json:"ok"`
+		Update struct {
+			CurrentVersion string `json:"currentVersion"`
+			LatestVersion  string `json:"latestVersion"`
+			Updated        bool   `json:"updated"`
+			DevMode        bool   `json:"devMode"`
+		} `json:"update"`
+	}
+	if err := json.Unmarshal([]byte(jsonOut), &body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.OK || !body.Update.DevMode || !body.Update.Updated || body.Update.CurrentVersion != "dev" || body.Update.LatestVersion != "0.1.1-dev" {
+		t.Fatalf("json update = %#v", body)
+	}
+}
+
 func TestCmdProjectsAddListAndScanJSON(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { useSettingsQuery } from "../queries";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes } from "../ui";
@@ -24,6 +25,7 @@ import {
   Tooltip,
   type TabItem,
 } from "./ui";
+import { DialogDrawerSurface, DialogOverlay } from "./ui/DialogShell";
 
 const copyText = (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -65,6 +67,9 @@ export function AssetDrawer({
   const [rawTab, setRawTab] = useState<DrawerTab>("overview");
   const [copiedPath, setCopiedPath] = useState("");
   const settingsQuery = useSettingsQuery();
+  const ocrVisible = Boolean(
+    settingsQuery.data?.settings.ocrEnabled && asset.ocr,
+  );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
 
@@ -110,11 +115,11 @@ export function AssetDrawer({
         ),
       });
     }
-    if (asset.ocr) {
+    if (ocrVisible) {
       items.push({ value: "ocr", label: t("assetDrawer.tabOCR") });
     }
     return items;
-  }, [asset, similarCount, t]);
+  }, [asset, ocrVisible, similarCount, t]);
 
   const tabValues = useMemo(() => tabs.map((t) => t.value), [tabs]);
   const tab = tabValues.includes(rawTab) ? rawTab : "overview";
@@ -136,10 +141,6 @@ export function AssetDrawer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         const idx = tabValues.indexOf(tab);
         if (idx === -1) return;
@@ -152,211 +153,220 @@ export function AssetDrawer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, tab, tabValues]);
+  }, [tab, tabValues]);
 
   return (
-    <>
-      <button
-        type="button"
-        className="fixed inset-0 z-50 cursor-default bg-[rgba(20,20,46,0.32)] backdrop-blur-[8px] animate-[fadeIn_180ms_var(--g-ease)] [[data-theme='dark']_&]:bg-[rgba(0,0,0,0.5)]"
-        aria-label={t("common.close")}
-        onClick={onClose}
-      />
-      <aside
-        className="fixed inset-y-0 right-0 z-[51] flex w-[680px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)] max-[600px]:w-screen max-[600px]:max-w-none"
-        role="dialog"
-        aria-modal="true"
-        aria-label={fileName(asset.repoPath)}
-      >
-        <header className="relative flex flex-col gap-3.5 border-b border-g-line bg-gradient-to-b from-g-surface-2 to-g-surface px-5 pb-3.5 pt-4 max-[600px]:px-4">
-          <IconButton
-            size="sm"
-            onClick={onClose}
-            aria-label={t("common.close")}
-            className="absolute right-3 top-3 z-10"
-          >
-            <X size={15} />
-          </IconButton>
+    <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay asChild>
+          <DialogOverlay layer="drawer" />
+        </DialogPrimitive.Overlay>
+        <DialogPrimitive.Content asChild>
+          <DialogDrawerSurface>
+            <header className="relative flex flex-col gap-3.5 border-b border-g-line bg-gradient-to-b from-g-surface-2 to-g-surface px-5 pb-3.5 pt-4 max-[600px]:px-4">
+              <DialogPrimitive.Close asChild>
+                <IconButton
+                  size="sm"
+                  aria-label={t("common.close")}
+                  className="absolute right-3 top-3 z-10"
+                >
+                  <X size={15} />
+                </IconButton>
+              </DialogPrimitive.Close>
 
-          <div className="grid grid-cols-[104px_minmax(0,1fr)] items-start gap-4 pr-9 max-[600px]:grid-cols-[84px_minmax(0,1fr)] max-[600px]:gap-3">
-            <AssetThumbnail
-              src={asset.thumbnailUrl || asset.url}
-              alt={fileName(asset.repoPath)}
-              size="fill"
-              bg="checker"
-              loading="eager"
-              className="size-[104px] rounded-g-lg p-1.5 max-[600px]:size-[84px] [&_img]:max-h-full [&_img]:max-w-full"
-            />
-
-            <div className="min-w-0">
-              <h2
-                className="line-clamp-2 break-all font-g-display text-lg font-[650] leading-tight tracking-[-0.025em] text-g-ink"
-                title={fileName(asset.repoPath)}
-              >
-                {fileName(asset.repoPath)}
-              </h2>
-              <div
-                className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui text-g-ink-3"
-                title={asset.repoPath}
-              >
-                {asset.repoPath}
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-                <HeroStat
-                  label={t("assetDrawer.format")}
-                  value={asset.ext.replace(".", "").toUpperCase()}
+              <div className="grid grid-cols-[104px_minmax(0,1fr)] items-start gap-4 pr-9 max-[600px]:grid-cols-[84px_minmax(0,1fr)] max-[600px]:gap-3">
+                <AssetThumbnail
+                  src={asset.thumbnailUrl || asset.url}
+                  alt={fileName(asset.repoPath)}
+                  size="fill"
+                  bg="checker"
+                  loading="eager"
+                  className="size-[104px] rounded-g-lg p-1.5 max-[600px]:size-[84px] [&_img]:max-h-full [&_img]:max-w-full"
                 />
-                {dimensions && (
-                  <HeroStat
-                    label={t("assetDrawer.dimensions")}
-                    value={dimensions}
-                  />
-                )}
-                <HeroStat
-                  label={t("assetDrawer.size")}
-                  value={formatBytes(asset.bytes)}
-                />
-                <HeroStat
-                  label={t("assetDrawer.usedFiles")}
-                  value={asset.references.length.toString()}
-                />
-              </div>
 
-              {(isUnused ||
-                asset.duplicates.length > 0 ||
-                asset.similar.length > 0 ||
-                asset.optimizationRecommendations.length > 0 ||
-                asset.ocr) && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {isUnused && (
-                    <HeroBadgeButton onClick={() => handleTabChange("usage")}>
-                      <Badge tone="red">{t("assetDrawer.chipUnused")}</Badge>
-                    </HeroBadgeButton>
-                  )}
-                  {asset.duplicates.length > 0 && (
-                    <HeroBadgeButton onClick={() => handleTabChange("similar")}>
-                      <Badge tone="amber">
-                        {t("assetDrawer.chipDuplicate")}
-                      </Badge>
-                    </HeroBadgeButton>
-                  )}
-                  {asset.similar.length > 0 && (
-                    <HeroBadgeButton onClick={() => handleTabChange("similar")}>
-                      <Badge tone="purple">
-                        {t("assetDrawer.chipSimilar")}
-                      </Badge>
-                    </HeroBadgeButton>
-                  )}
-                  {asset.optimizationRecommendations.length > 0 && (
-                    <HeroBadgeButton
-                      onClick={() => handleTabChange("optimize")}
+                <div className="min-w-0">
+                  <DialogPrimitive.Title asChild>
+                    <h2
+                      className="line-clamp-2 break-all font-g-display text-lg font-[650] leading-tight tracking-[-0.025em] text-g-ink"
+                      title={fileName(asset.repoPath)}
                     >
-                      <Badge tone="blue">
-                        {t("assetDrawer.chipOptimizable")}
-                      </Badge>
-                    </HeroBadgeButton>
-                  )}
-                  {asset.ocr && (
-                    <HeroBadgeButton onClick={() => handleTabChange("ocr")}>
-                      <Badge
-                        tone={
-                          asset.ocr.status === "ready"
-                            ? "green"
-                            : asset.ocr.status === "failed"
-                              ? "red"
-                              : asset.ocr.status === "skipped"
-                                ? "amber"
-                                : "line"
-                        }
-                      >
-                        {t("assetDrawer.chipOCR")}
-                      </Badge>
-                    </HeroBadgeButton>
+                      {fileName(asset.repoPath)}
+                    </h2>
+                  </DialogPrimitive.Title>
+                  <div
+                    className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui text-g-ink-3"
+                    title={asset.repoPath}
+                  >
+                    {asset.repoPath}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+                    <HeroStat
+                      label={t("assetDrawer.format")}
+                      value={asset.ext.replace(".", "").toUpperCase()}
+                    />
+                    {dimensions && (
+                      <HeroStat
+                        label={t("assetDrawer.dimensions")}
+                        value={dimensions}
+                      />
+                    )}
+                    <HeroStat
+                      label={t("assetDrawer.size")}
+                      value={formatBytes(asset.bytes)}
+                    />
+                    <HeroStat
+                      label={t("assetDrawer.usedFiles")}
+                      value={asset.references.length.toString()}
+                    />
+                  </div>
+
+                  {(isUnused ||
+                    asset.duplicates.length > 0 ||
+                    asset.similar.length > 0 ||
+                    asset.optimizationRecommendations.length > 0 ||
+                    ocrVisible) && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {isUnused && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("usage")}
+                        >
+                          <Badge tone="red">
+                            {t("assetDrawer.chipUnused")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {asset.duplicates.length > 0 && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("similar")}
+                        >
+                          <Badge tone="amber">
+                            {t("assetDrawer.chipDuplicate")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {asset.similar.length > 0 && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("similar")}
+                        >
+                          <Badge tone="purple">
+                            {t("assetDrawer.chipSimilar")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {asset.optimizationRecommendations.length > 0 && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("optimize")}
+                        >
+                          <Badge tone="blue">
+                            {t("assetDrawer.chipOptimizable")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {ocrVisible && asset.ocr && (
+                        <HeroBadgeButton onClick={() => handleTabChange("ocr")}>
+                          <Badge
+                            tone={
+                              asset.ocr.status === "ready"
+                                ? "green"
+                                : asset.ocr.status === "failed"
+                                  ? "red"
+                                  : asset.ocr.status === "skipped"
+                                    ? "amber"
+                                    : "line"
+                            }
+                          >
+                            {t("assetDrawer.chipOCR")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                    </div>
                   )}
                 </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<ExternalLink size={14} />}
+                  onClick={() => window.open(asset.url, "_blank", "noopener")}
+                >
+                  {t("action.openFile")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={
+                    pathCopied ? <Check size={14} /> : <Copy size={14} />
+                  }
+                  onClick={() => {
+                    copyText(asset.repoPath);
+                    setCopiedPath(asset.repoPath);
+                  }}
+                >
+                  {pathCopied ? t("toast.copied") : t("action.copyPath")}
+                </Button>
+                {onRename && (
+                  <Tooltip label={t("action.rename")}>
+                    <IconButton
+                      size="sm"
+                      onClick={() => onRename(asset)}
+                      aria-label={t("action.rename")}
+                    >
+                      <Pencil size={14} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {onDelete && asset.usedBy.length === 0 && (
+                  <Tooltip label={t("action.delete")}>
+                    <IconButton
+                      size="sm"
+                      onClick={() => onDelete(asset)}
+                      aria-label={t("action.delete")}
+                    >
+                      <Trash2 size={14} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </div>
+            </header>
+
+            <div className="sticky top-0 z-10 bg-g-surface">
+              <Tabs
+                value={tab}
+                items={tabs}
+                onChange={handleTabChange}
+                ariaLabel="Asset detail tabs"
+                variant="underline"
+                size="sm"
+              />
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 max-[600px]:p-4">
+              {tab === "overview" && <AssetDrawerOverview asset={asset} />}
+              {tab === "usage" && (
+                <AssetDrawerUsage
+                  references={asset.references}
+                  preferredEditor={preferredEditor}
+                />
+              )}
+              {tab === "similar" && (
+                <AssetDrawerSimilar asset={asset} onOpenAsset={onOpenAsset} />
+              )}
+              {tab === "optimize" && (
+                <AssetDrawerOptimize
+                  recommendations={asset.optimizationRecommendations}
+                />
+              )}
+              {tab === "ocr" && ocrVisible && asset.ocr && (
+                <AssetDrawerOCR ocr={asset.ocr} />
               )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<ExternalLink size={14} />}
-              onClick={() => window.open(asset.url, "_blank", "noopener")}
-            >
-              {t("action.openFile")}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={
-                pathCopied ? <Check size={14} /> : <Copy size={14} />
-              }
-              onClick={() => {
-                copyText(asset.repoPath);
-                setCopiedPath(asset.repoPath);
-              }}
-            >
-              {pathCopied ? t("toast.copied") : t("action.copyPath")}
-            </Button>
-            {onRename && (
-              <Tooltip label={t("action.rename")}>
-                <IconButton
-                  size="sm"
-                  onClick={() => onRename(asset)}
-                  aria-label={t("action.rename")}
-                >
-                  <Pencil size={14} />
-                </IconButton>
-              </Tooltip>
-            )}
-            {onDelete && asset.usedBy.length === 0 && (
-              <Tooltip label={t("action.delete")}>
-                <IconButton
-                  size="sm"
-                  onClick={() => onDelete(asset)}
-                  aria-label={t("action.delete")}
-                >
-                  <Trash2 size={14} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </div>
-        </header>
-
-        <div className="sticky top-0 z-10 bg-g-surface">
-          <Tabs
-            value={tab}
-            items={tabs}
-            onChange={handleTabChange}
-            ariaLabel="Asset detail tabs"
-            variant="underline"
-            size="sm"
-          />
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 max-[600px]:p-4">
-          {tab === "overview" && <AssetDrawerOverview asset={asset} />}
-          {tab === "usage" && (
-            <AssetDrawerUsage
-              references={asset.references}
-              preferredEditor={preferredEditor}
-            />
-          )}
-          {tab === "similar" && (
-            <AssetDrawerSimilar asset={asset} onOpenAsset={onOpenAsset} />
-          )}
-          {tab === "optimize" && (
-            <AssetDrawerOptimize
-              recommendations={asset.optimizationRecommendations}
-            />
-          )}
-          {tab === "ocr" && asset.ocr && <AssetDrawerOCR ocr={asset.ocr} />}
-        </div>
-      </aside>
-    </>
+          </DialogDrawerSurface>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

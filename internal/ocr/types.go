@@ -23,6 +23,7 @@ const (
 	DefaultMaxPixels   = 2_000_000
 	DefaultBatchSize   = 25
 	DefaultConcurrency = 1
+	MaxConcurrency     = 2
 
 	MaxExtractionAttempts = 3
 )
@@ -116,7 +117,7 @@ type Engine interface {
 func DefaultSettings() Settings {
 	return Settings{
 		Enabled:     false,
-		Languages:   []string{"eng", "chi_tra", "chi_sim"},
+		Languages:   []string{"eng"},
 		MaxPixels:   DefaultMaxPixels,
 		BatchSize:   DefaultBatchSize,
 		Concurrency: DefaultConcurrency,

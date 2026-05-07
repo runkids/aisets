@@ -101,6 +101,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/projects/rename", s.handleRenameProject)
 	s.mux.HandleFunc("GET /api/fs/directories", s.handleDirectories)
 	s.mux.HandleFunc("GET /api/settings", s.handleSettings)
+	s.mux.HandleFunc("GET /api/version", s.handleVersion)
+	s.mux.HandleFunc("POST /api/update", s.handleUpdate)
 	s.mux.HandleFunc("PATCH /api/settings", s.handleUpdateSettings)
 	s.mux.HandleFunc("GET /api/settings/export", s.handleSettingsExport)
 	s.mux.HandleFunc("POST /api/settings/import", s.handleSettingsImport)

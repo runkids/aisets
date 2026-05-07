@@ -4,10 +4,16 @@ import type { AssetItem } from "../types";
 import { ocrStatusLabel } from "../ocrStatus";
 import { Badge, Tooltip } from "./ui";
 
-export function OCRStatusBadge({ item }: { item: AssetItem }) {
+export function OCRStatusBadge({
+  item,
+  enabled = true,
+}: {
+  item: AssetItem;
+  enabled?: boolean;
+}) {
   const { t } = useTranslation();
   const label = ocrStatusLabel(t, item);
-  if (!item.ocr || !label) return null;
+  if (!enabled || !item.ocr || !label) return null;
   const tone =
     item.ocr.status === "ready"
       ? item.ocr.emptyText

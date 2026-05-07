@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { customFilterOptions } from "../customAssetFilters";
 import type { AssetItem, CustomAssetFilter } from "../types";
-import { applyBrowseFilters } from "./BrowseView";
+import { applyBrowseFilters, normalizeBrowseStoredState } from "./BrowseView";
 
 function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {
   return {
@@ -47,6 +47,68 @@ function customFilter(id: string, value: string): CustomAssetFilter {
     ],
   };
 }
+
+const defaultBrowseState = {
+  filters: { project: "", ext: "", customFilter: "" },
+  view: "grid" as const,
+  gridSize: "m" as const,
+  bgMode: "checker" as const,
+  searchQuery: "",
+  statusFilter: "" as const,
+  sortMode: "name" as const,
+};
+
+describe("normalizeBrowseStoredState", () => {
+  it("restores valid stored Browse toolbar and filter values", () => {
+    const result = normalizeBrowseStoredState(
+      {
+        filters: { project: "workspace", ext: ".png", customFilter: "icons" },
+        view: "list",
+        gridSize: "l",
+        bgMode: "dark",
+        searchQuery: "logo",
+        statusFilter: "duplicate",
+        sortMode: "size",
+      },
+      defaultBrowseState,
+    );
+
+    expect(result).toEqual({
+      filters: { project: "workspace", ext: ".png", customFilter: "icons" },
+      view: "list",
+      gridSize: "l",
+      bgMode: "dark",
+      searchQuery: "logo",
+      statusFilter: "duplicate",
+      sortMode: "size",
+    });
+  });
+
+  it("falls back for invalid values and keeps pinned route filters", () => {
+    const result = normalizeBrowseStoredState(
+      {
+        filters: { project: "stored", ext: 10, customFilter: "stored-filter" },
+        view: "table",
+        gridSize: "xl",
+        bgMode: "pink",
+        searchQuery: 20,
+        statusFilter: "missing",
+        sortMode: "random",
+      },
+      defaultBrowseState,
+      { project: "Current project", customFilter: "palette-filter" },
+    );
+
+    expect(result).toEqual({
+      ...defaultBrowseState,
+      filters: {
+        project: "Current project",
+        ext: "",
+        customFilter: "palette-filter",
+      },
+    });
+  });
+});
 
 describe("applyBrowseFilters", () => {
   it("applies selected custom filters after project, extension, status, and search filters", () => {
@@ -126,8 +188,8 @@ describe("applyBrowseFilters", () => {
         result.filteredWithoutCustom,
       ),
     ).toEqual([
-      { id: "icons", label: "icons", count: 1 },
-      { id: "photos", label: "photos", count: 1 },
+      { id: "icons", label: "icons", count: 1, usesOCR: false },
+      { id: "photos", label: "photos", count: 1, usesOCR: false },
     ]);
     expect(result.filtered.map((item) => item.id)).toEqual(["icon"]);
   });
@@ -168,6 +230,32 @@ describe("applyBrowseFilters", () => {
     ]);
   });
 
+  it("does not use cached OCR text when OCR is disabled", () => {
+    const items = [
+      makeItem({
+        id: "ocr-match",
+        repoPath: "src/assets/banner.png",
+        ocr: {
+          status: "ready",
+          text: "Summer SALE",
+          normalizedText: "summer sale",
+        },
+      }),
+      makeItem({ id: "path-only", repoPath: "src/assets/sale-icon.png" }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: { project: "", ext: "", customFilter: "" },
+      searchQuery: "sale",
+      statusFilter: "",
+      customFilters: [],
+      ocrEnabled: false,
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual(["path-only"]);
+  });
+
   it("does not match empty OCR text but reports empty OCR text candidates", () => {
     const items = [
       makeItem({
@@ -201,5 +289,16 @@ describe("applyBrowseFilters", () => {
 
     expect(result.filtered.map((item) => item.id)).toEqual(["ocr-match"]);
     expect(result.emptyOCRTextCount).toBe(1);
+
+    expect(
+      applyBrowseFilters({
+        items,
+        filters: { project: "", ext: "", customFilter: "" },
+        searchQuery: "party",
+        statusFilter: "",
+        customFilters: [],
+        ocrEnabled: false,
+      }).emptyOCRTextCount,
+    ).toBe(0);
   });
 });

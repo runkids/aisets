@@ -25,6 +25,31 @@ import (
 	"asset-studio/internal/scanner"
 )
 
+func TestAPIVersionAndUpdateDevMode(t *testing.T) {
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"devMode":true`) || !strings.Contains(rec.Body.String(), `"latestVersion":"0.1.1-dev"`) {
+		t.Fatalf("version = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/update", strings.NewReader(`{}`))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"updated":true`) || !strings.Contains(rec.Body.String(), `"devMode":true`) {
+		t.Fatalf("update = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
@@ -446,7 +471,8 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 		"ocrLanguages": ["eng", "chi_tra"],
 		"ocrMaxPixels": 1000,
 		"ocrBatchSize": 2,
-		"ocrConcurrency": 1,
+		"ocrConcurrency": 2,
+		"ocrFuzzySearch": false,
 		"excludePatterns": ["dist", " tmp "],
 		"optimizationDefaultQuality": 72
 	}`)))
@@ -462,6 +488,8 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 			OCRLanguages               []string `json:"ocrLanguages"`
 			OCRMaxPixels               int      `json:"ocrMaxPixels"`
 			OCRBatchSize               int      `json:"ocrBatchSize"`
+			OCRConcurrency             int      `json:"ocrConcurrency"`
+			OCRFuzzySearch             bool     `json:"ocrFuzzySearch"`
 			ExcludePatterns            []string `json:"excludePatterns"`
 			OptimizationDefaultQuality int      `json:"optimizationDefaultQuality"`
 			DatabasePath               string   `json:"databasePath"`
@@ -472,6 +500,9 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
 		t.Fatal(err)
+	}
+	if patched.Settings.OCRConcurrency != 2 || patched.Settings.OCRFuzzySearch {
+		t.Fatalf("OCR advanced settings = %#v", patched.Settings)
 	}
 	if patched.Settings.WorkspaceName != "Team Assets" || !patched.Settings.ScanOnOpen || patched.Settings.OptimizationDefaultQuality != 72 || patched.Settings.DatabasePath == "" {
 		t.Fatalf("patched settings = %#v", patched.Settings)

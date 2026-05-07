@@ -57,7 +57,7 @@ export function AppTopbar({
   }
 
   return (
-    <header className="relative z-10 flex h-[60px] min-w-0 shrink-0 items-center justify-between gap-2.5 bg-transparent px-5">
+    <header className="relative z-10 flex h-[60px] min-w-0 shrink-0 items-center justify-between gap-2.5 bg-transparent px-5 max-[480px]:px-3">
       <div className="relative z-10 flex min-w-0 flex-1 basis-0 items-center pr-4">
         <div className="flex w-[220px] shrink-0 items-center gap-3 max-[960px]:w-[52px] max-[960px]:justify-center max-[960px]:gap-0">
           <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-g-md bg-g-surface shadow-g-sm">
@@ -78,17 +78,16 @@ export function AppTopbar({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 w-[min(520px,42vw)] -translate-x-1/2 -translate-y-1/2 max-[1180px]:static max-[1180px]:z-10 max-[1180px]:w-[min(360px,36vw)] max-[1180px]:translate-x-0 max-[1180px]:translate-y-0 max-[680px]:w-auto">
+      <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 w-[min(520px,42vw)] -translate-x-1/2 -translate-y-1/2 max-[1180px]:static max-[1180px]:z-10 max-[1180px]:w-[min(360px,36vw)] max-[1180px]:translate-x-0 max-[1180px]:translate-y-0 max-[680px]:min-w-0 max-[680px]:flex-1 max-[680px]:basis-0">
         <TextInputButton
-          className="pointer-events-auto w-full shadow-g-sm max-[480px]:h-g-btn-md max-[480px]:w-g-btn-md max-[480px]:justify-center max-[480px]:px-0"
+          className="pointer-events-auto w-full shadow-g-sm"
           icon={<Search size={14} aria-hidden="true" />}
           suffix={
-            <span className="max-[480px]:hidden">
+            <span className="max-[680px]:hidden">
               <Keycap>⌘ P</Keycap>
             </span>
           }
           value={t("search.placeholderShort")}
-          contentClassName="max-[480px]:hidden"
           onClick={onOpenCmdK}
           aria-label={t("search.ariaLabel")}
         />

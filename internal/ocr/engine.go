@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	DefaultEngineName = "tesseract-cli"
+	DefaultEngineName             = "tesseract-cli"
+	assetStudioOCRPipelineVersion = "asset-studio-ocr-v2"
 )
 
 type AvailabilityChecker interface {
@@ -42,10 +43,13 @@ func (e TesseractCLIEngine) Name() string {
 }
 
 func (e TesseractCLIEngine) Version() string {
+	version := e.version
 	if e.version != "" {
-		return e.version
+		version = e.version
+	} else {
+		version = "unknown"
 	}
-	return "unknown"
+	return version + " " + assetStudioOCRPipelineVersion
 }
 
 func (e TesseractCLIEngine) Available(ctx context.Context) error {
@@ -72,13 +76,13 @@ func (e TesseractCLIEngine) Extract(ctx context.Context, path string, languages 
 
 	attempts := []ocrAttempt{
 		{Path: path, Mode: "default"},
-		{Path: path, Mode: "psm_6", PSM: "6", Preprocess: preprocessMainText},
+		{Path: path, Mode: "psm_6_logo_light", PSM: "6", Preprocess: preprocessGameLogoText},
 		{Path: path, Mode: "psm_11", PSM: "11", Preprocess: preprocessFullImage},
 	}
 	collected := []string{}
 	modes := []string{}
 	attemptCount := 0
-	defaultWasEmpty := false
+	needsFallback := false
 	for index, attempt := range attempts {
 		select {
 		case <-ctx.Done():
@@ -108,8 +112,8 @@ func (e TesseractCLIEngine) Extract(ctx context.Context, path string, languages 
 			modes = append(modes, attempt.Mode)
 		}
 		if index == 0 {
-			defaultWasEmpty = len(collected) == 0
-			if !defaultWasEmpty {
+			needsFallback = needsOCRFallback(text)
+			if !needsFallback {
 				break
 			}
 		}
@@ -168,22 +172,45 @@ func appendUniqueOCRText(texts []string, next string) []string {
 	return append(texts, next)
 }
 
-func preprocessMainText(path string) (string, func(), error) {
-	return preprocessOCRImage(path, ocrCropMainText)
+func needsOCRFallback(text string) bool {
+	normalized := NormalizeText(text)
+	if normalized == "" {
+		return true
+	}
+	letters := 0
+	total := 0
+	for _, r := range normalized {
+		if r == ' ' {
+			continue
+		}
+		total++
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			letters++
+		}
+	}
+	return total < 8 || letters*2 < total
+}
+
+func preprocessGameLogoText(path string) (string, func(), error) {
+	return preprocessOCRImage(path, ocrCropGameLogoText, ocrThresholdBrightText)
 }
 
 func preprocessFullImage(path string) (string, func(), error) {
-	return preprocessOCRImage(path, ocrCropFull)
+	return preprocessOCRImage(path, ocrCropFull, ocrThresholdInverted)
 }
 
 type ocrCropMode string
+type ocrThresholdMode string
 
 const (
-	ocrCropFull     ocrCropMode = "full"
-	ocrCropMainText ocrCropMode = "main_text"
+	ocrCropFull         ocrCropMode = "full"
+	ocrCropGameLogoText ocrCropMode = "game_logo_text"
+
+	ocrThresholdInverted   ocrThresholdMode = "inverted"
+	ocrThresholdBrightText ocrThresholdMode = "bright_text"
 )
 
-func preprocessOCRImage(path string, cropMode ocrCropMode) (string, func(), error) {
+func preprocessOCRImage(path string, cropMode ocrCropMode, thresholdMode ocrThresholdMode) (string, func(), error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", nil, err
@@ -195,16 +222,19 @@ func preprocessOCRImage(path string, cropMode ocrCropMode) (string, func(), erro
 	}
 	bounds := img.Bounds()
 	source := img
-	if cropMode == ocrCropMainText {
-		top := bounds.Min.Y + (bounds.Dy() * 22 / 100)
+	if cropMode == ocrCropGameLogoText {
+		top := bounds.Min.Y + (bounds.Dy() * 50 / 100)
 		if top < bounds.Max.Y {
 			source = cropImage(img, image.Rect(bounds.Min.X, top, bounds.Max.X, bounds.Max.Y))
 		}
 	}
 	scale := 3
+	if cropMode == ocrCropGameLogoText {
+		scale = 5
+	}
 	dst := image.NewGray(image.Rect(0, 0, source.Bounds().Dx()*scale, source.Bounds().Dy()*scale))
-	xdraw.NearestNeighbor.Scale(dst, dst.Bounds(), source, source.Bounds(), xdraw.Over, nil)
-	binarizeForOCR(dst)
+	xdraw.CatmullRom.Scale(dst, dst.Bounds(), source, source.Bounds(), xdraw.Over, nil)
+	binarizeForOCR(dst, thresholdMode)
 	temp, err := os.CreateTemp("", "asset-studio-ocr-*.png")
 	if err != nil {
 		return "", nil, err
@@ -228,23 +258,39 @@ func cropImage(img image.Image, rect image.Rectangle) image.Image {
 	return dst
 }
 
-func binarizeForOCR(img *image.Gray) {
+func binarizeForOCR(img *image.Gray, mode ocrThresholdMode) {
 	var total int
 	for _, value := range img.Pix {
 		total += int(value)
 	}
 	mean := total / max(len(img.Pix), 1)
-	threshold := uint8(120)
-	if mean > 155 {
-		threshold = 150
-	}
+	threshold := ocrThreshold(img, mode, mean)
 	for index, value := range img.Pix {
-		if value >= threshold {
-			img.Pix[index] = color.Gray{Y: 0}.Y
-		} else {
-			img.Pix[index] = color.Gray{Y: 255}.Y
+		switch mode {
+		case ocrThresholdBrightText:
+			if value > threshold {
+				img.Pix[index] = color.Gray{Y: 255}.Y
+			} else {
+				img.Pix[index] = color.Gray{Y: 0}.Y
+			}
+		default:
+			if value >= threshold {
+				img.Pix[index] = color.Gray{Y: 0}.Y
+			} else {
+				img.Pix[index] = color.Gray{Y: 255}.Y
+			}
 		}
 	}
+}
+
+func ocrThreshold(_ *image.Gray, mode ocrThresholdMode, mean int) uint8 {
+	if mode == ocrThresholdBrightText {
+		return 145
+	}
+	if mean > 155 {
+		return 150
+	}
+	return 120
 }
 
 func (e TesseractCLIEngine) binary() string {

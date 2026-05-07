@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
-import { Rail, RailItem, RailSection } from "./ui";
+import { Badge, Rail, RailItem, RailSection } from "./ui";
 
 type FilterOption = {
   id: string;
@@ -9,6 +9,7 @@ type FilterOption = {
 
 type CustomFilterOption = FilterOption & {
   label: string;
+  usesOCR?: boolean;
 };
 
 type FilterState = {
@@ -27,6 +28,7 @@ type FilterRailProps = {
   extensionTotal?: number;
   customFilterOptions?: CustomFilterOption[];
   customFilterTotal?: number;
+  ocrEnabled?: boolean;
   onFiltersChange: (filters: FilterState) => void;
 };
 
@@ -51,6 +53,7 @@ export function FilterRail({
   extensionTotal,
   customFilterOptions,
   customFilterTotal,
+  ocrEnabled = true,
   onFiltersChange,
 }: FilterRailProps) {
   const { t } = useTranslation();
@@ -120,15 +123,32 @@ export function FilterRail({
             count={allCustomFiltersCount}
             onClick={() => onFiltersChange({ ...filters, customFilter: "" })}
           />
-          {customFilters.map((option) => (
-            <RailItem
-              key={option.id}
-              active={filters.customFilter === option.id}
-              label={option.label}
-              count={option.count}
-              onClick={() => toggle("customFilter", option.id)}
-            />
-          ))}
+          {customFilters.map((option) => {
+            const ocrUnavailable = option.usesOCR && !ocrEnabled;
+            return (
+              <RailItem
+                key={option.id}
+                active={filters.customFilter === option.id}
+                label={option.label}
+                count={
+                  ocrUnavailable ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Badge
+                        tone="amber"
+                        className="h-[18px] px-1.5 text-[9px]"
+                      >
+                        {t("filter.requiresOCR")}
+                      </Badge>
+                      <span>{option.count}</span>
+                    </span>
+                  ) : (
+                    option.count
+                  )
+                }
+                onClick={() => toggle("customFilter", option.id)}
+              />
+            );
+          })}
         </RailSection>
       )}
     </Rail>

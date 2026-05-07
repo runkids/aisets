@@ -38,6 +38,8 @@ func run(rawArgs []string) int {
 		err = cmdProjects(args[1:], jsonOut)
 	case "settings":
 		err = cmdSettings(args[1:], jsonOut)
+	case "update", "upgrade":
+		err = cmdUpdate(args[1:], jsonOut)
 	case "scan":
 		err = cmdScan(args[1:], jsonOut)
 	case "scans":
@@ -85,6 +87,7 @@ func usageText() string {
   asset-studio settings export [--output file.json] [--json]
   asset-studio settings import file.json [--json]
   asset-studio settings reset-database --confirm RESET [--json]
+  asset-studio update [--dry-run] [--force] [--json]
   asset-studio scan [projectPaths...] [--json]
   asset-studio scans list [--json]
   asset-studio scans diff --base ID --target ID [--json]
@@ -101,6 +104,7 @@ Commands:
   ui         Start or reuse the localhost UI in the background
   projects   List, add, rename, or remove imported projects
   settings   Inspect, export, import, or reset local state
+  update     Update the Asset Studio CLI binary
   scan       Scan projects and print catalog summary or JSON
   scans      List scan history or compare completed scans
   optimize   Estimate recommendations or generate a review script

@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -77,6 +78,8 @@ type Props = {
   projectNames: string[];
   projectFilterName: string;
   imagePreviewEnabled: boolean;
+  ocrEnabled: boolean;
+  ocrFuzzySearch: boolean;
   onAutoScrollDone: () => void;
   onOpenAsset: (id: string) => void;
 };
@@ -212,12 +215,16 @@ export function applyBrowseFilters({
   searchQuery,
   statusFilter,
   customFilters,
+  ocrEnabled = true,
+  ocrFuzzySearch = true,
 }: {
   items: AssetItem[];
   filters: BrowseFilters;
   searchQuery: string;
   statusFilter: StatusFilter;
   customFilters: CustomAssetFilter[];
+  ocrEnabled?: boolean;
+  ocrFuzzySearch?: boolean;
 }) {
   const q = searchQuery.trim().toLowerCase();
   const facetBaseItems = items.filter((item) => {
@@ -231,7 +238,8 @@ export function applyBrowseFilters({
       q &&
       !fileName(item.repoPath).toLowerCase().includes(q) &&
       !item.repoPath.toLowerCase().includes(q) &&
-      !matchesOCRSearchText(ocrText, q)
+      (!ocrEnabled ||
+        !matchesOCRSearchText(ocrText, q, { fuzzy: ocrFuzzySearch }))
     )
       return false;
     return true;
@@ -260,7 +268,7 @@ export function applyBrowseFilters({
     ) {
       return false;
     }
-    return hasEmptyOCRText(item);
+    return ocrEnabled && hasEmptyOCRText(item);
   }).length;
   return { facetBaseItems, filteredWithoutCustom, filtered, emptyOCRTextCount };
 }
@@ -474,6 +482,8 @@ export function BrowseView({
   projectNames,
   projectFilterName,
   imagePreviewEnabled,
+  ocrEnabled,
+  ocrFuzzySearch,
   onAutoScrollDone,
   onOpenAsset,
 }: Props) {
@@ -513,6 +523,7 @@ export function BrowseView({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMoveDir, setShowMoveDir] = useState(false);
   const [showRenameRules, setShowRenameRules] = useState(false);
+  const [pathsCopied, setPathsCopied] = useState(false);
   const [batchPreview, setBatchPreview] = useState<{
     endpoint: string;
     data: BatchPreviewResponse;
@@ -576,8 +587,18 @@ export function BrowseView({
           searchQuery,
           statusFilter,
           customFilters,
+          ocrEnabled,
+          ocrFuzzySearch,
         }),
-      [customFilters, filters, items, searchQuery, statusFilter],
+      [
+        customFilters,
+        filters,
+        items,
+        ocrEnabled,
+        ocrFuzzySearch,
+        searchQuery,
+        statusFilter,
+      ],
     );
 
   const projectFacet = useMemo(
@@ -708,11 +729,18 @@ export function BrowseView({
     );
   }
 
+  useEffect(() => {
+    if (!pathsCopied) return;
+    const timer = window.setTimeout(() => setPathsCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [pathsCopied]);
+
   function copyPaths() {
     const paths = items
       .filter((i) => selected.has(i.id))
       .map((i) => i.repoPath);
     navigator.clipboard?.writeText(paths.join("\n"));
+    setPathsCopied(true);
   }
 
   function handleToggleExpand(path: string) {
@@ -736,6 +764,7 @@ export function BrowseView({
         extensionTotal={extensionFacet.total}
         customFilterOptions={customFilterFacet}
         customFilterTotal={filteredWithoutCustom.length}
+        ocrEnabled={ocrEnabled}
         onFiltersChange={setFilters}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
@@ -758,8 +787,8 @@ export function BrowseView({
           />
 
           {bulkMode && selected.size > 0 && (
-            <div className="sticky top-0 z-[5] mb-4 flex min-h-[44px] items-center gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-[13px] text-g-ink shadow-g-md animate-[slideUp2_200ms_var(--g-ease-out)]">
-              <span className="font-g-mono text-[13px] font-[510]">
+            <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
+              <span className="inline-flex min-h-[34px] items-center px-2.5 font-g-mono text-g-body text-g-ink-2">
                 {t("selection.summary", {
                   count: selected.size,
                   size: formatBytes(selectedBytes),
@@ -768,42 +797,42 @@ export function BrowseView({
               <span className="flex-1" />
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
                 onClick={copyPaths}
               >
-                <Copy size={12} />
-                {t("action.copyPaths")}
+                {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
+                {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
                 onClick={() => setShowMoveDir(true)}
               >
-                <FolderInput size={12} />
+                <FolderInput size={14} />
                 {t("action.batchMove")}
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
                 onClick={() => setShowRenameRules(true)}
               >
-                <PenLine size={12} />
+                <PenLine size={14} />
                 {t("action.batchRename")}
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
                 onClick={() => batchExport(Array.from(selected))}
               >
-                <Download size={12} />
+                <Download size={14} />
                 {t("action.batchExport")}
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
                 onClick={() => setShowDeleteConfirm(true)}
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
                 {t("action.deleteSelected")}
               </button>
             </div>
@@ -846,6 +875,7 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -863,6 +893,7 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -877,6 +908,7 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}

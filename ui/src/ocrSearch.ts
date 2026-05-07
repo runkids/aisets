@@ -1,10 +1,15 @@
 const ocrTokenPattern = /[\p{L}\p{N}]+/gu;
 
-export function matchesOCRSearchText(text: string, query: string): boolean {
+export function matchesOCRSearchText(
+  text: string,
+  query: string,
+  options: { fuzzy?: boolean } = {},
+): boolean {
   const normalizedText = text.trim().toLowerCase();
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery || !normalizedText) return false;
   if (normalizedText.includes(normalizedQuery)) return true;
+  if (options.fuzzy === false) return false;
   if (normalizedQuery.length < 5) return false;
 
   const tokens = normalizedText.match(ocrTokenPattern) ?? [];
@@ -17,8 +22,25 @@ export function matchesOCRSearchText(text: string, query: string): boolean {
     ) {
       return true;
     }
+    if (matchesOCRWindow(token, normalizedQuery)) {
+      return true;
+    }
     return boundedEditDistance(token, normalizedQuery, 2) <= 2;
   });
+}
+
+function matchesOCRWindow(token: string, query: string): boolean {
+  if (token.length <= query.length) return false;
+  for (const size of [query.length - 1, query.length, query.length + 1]) {
+    if (size < 4 || size > token.length) continue;
+    for (let start = 0; start <= token.length - size; start++) {
+      const window = token.slice(start, start + size);
+      if (boundedEditDistance(window, query, 2) <= 2) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function boundedEditDistance(

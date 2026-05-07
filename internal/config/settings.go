@@ -28,10 +28,11 @@ func DefaultAppSettings() AppSettings {
 		AutoScanOnOpen:             false,
 		ScanOnOpen:                 false,
 		OCREnabled:                 false,
-		OCRLanguages:               []string{"eng", "chi_tra", "chi_sim"},
+		OCRLanguages:               []string{"eng"},
 		OCRMaxPixels:               ocr.DefaultMaxPixels,
 		OCRBatchSize:               ocr.DefaultBatchSize,
 		OCRConcurrency:             ocr.DefaultConcurrency,
+		OCRFuzzySearch:             true,
 		ExcludePatterns:            defaultExcludePatterns(),
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
@@ -129,10 +130,13 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 		settings.OCRBatchSize = *update.OCRBatchSize
 	}
 	if update.OCRConcurrency != nil {
-		if *update.OCRConcurrency != 1 {
-			return AppSettings{}, apierr.New("settings_ocr_concurrency_invalid", "OCR concurrency must be 1 in v1")
+		if *update.OCRConcurrency < 1 || *update.OCRConcurrency > ocr.MaxConcurrency {
+			return AppSettings{}, apierr.New("settings_ocr_concurrency_invalid", "OCR concurrency must be between 1 and 2")
 		}
 		settings.OCRConcurrency = *update.OCRConcurrency
+	}
+	if update.OCRFuzzySearch != nil {
+		settings.OCRFuzzySearch = *update.OCRFuzzySearch
 	}
 	if update.ExcludePatterns != nil {
 		settings.ExcludePatterns = normalizePatterns(update.ExcludePatterns)
@@ -184,8 +188,8 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if settings.OCRBatchSize <= 0 {
 		return AppSettings{}, apierr.New("settings_ocr_batch_size_invalid", "OCR batch size must be greater than zero")
 	}
-	if settings.OCRConcurrency != 1 {
-		return AppSettings{}, apierr.New("settings_ocr_concurrency_invalid", "OCR concurrency must be 1 in v1")
+	if settings.OCRConcurrency < 1 || settings.OCRConcurrency > ocr.MaxConcurrency {
+		return AppSettings{}, apierr.New("settings_ocr_concurrency_invalid", "OCR concurrency must be between 1 and 2")
 	}
 	raw, err := json.Marshal(settings)
 	if err != nil {
@@ -261,6 +265,7 @@ func (s *Store) ImportData(data ExportData) error {
 			OCRMaxPixels:               &data.Settings.OCRMaxPixels,
 			OCRBatchSize:               &data.Settings.OCRBatchSize,
 			OCRConcurrency:             &data.Settings.OCRConcurrency,
+			OCRFuzzySearch:             &data.Settings.OCRFuzzySearch,
 			ExcludePatterns:            data.Settings.ExcludePatterns,
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,

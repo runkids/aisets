@@ -93,6 +93,34 @@ func TestTesseractEngineFixtureSmoke(t *testing.T) {
 	}
 }
 
+func TestTesseractEngineGameLogoFixtures(t *testing.T) {
+	root := os.Getenv("ASSET_STUDIO_OCR_TEST_DATA_ROOT")
+	if root == "" {
+		t.Skip("set ASSET_STUDIO_OCR_TEST_DATA_ROOT to run game logo OCR fixture tests")
+	}
+	fixtures := []struct {
+		path string
+		want string
+	}{
+		{filepath.Join("..", "..", "demo", "英", "百人", "PTG0008_豪车漂移EN.png"), "racing"},
+		{filepath.Join("..", "..", "demo", "英", "对战", "PTG0037_德州扑克EN.png"), "texas"},
+	}
+	for _, fixture := range fixtures {
+		t.Run(filepath.Base(fixture.path), func(t *testing.T) {
+			if _, err := os.Stat(fixture.path); err != nil {
+				t.Skipf("fixture unavailable: %v", err)
+			}
+			result, err := NewDefaultEngine(root).Extract(t.Context(), fixture.path, []string{"eng"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(NormalizeText(result.Text), fixture.want) {
+				t.Fatalf("OCR text does not contain %q: %#v", fixture.want, result)
+			}
+		})
+	}
+}
+
 func TestTesseractEngineUsesBoundedFallbackWhenDefaultIsEmpty(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake tesseract script uses POSIX shell")
@@ -139,7 +167,14 @@ esac
 	if err != nil {
 		t.Fatal(err)
 	}
-	if extraction.Text != "2-8 BAR" || extraction.Mode != "psm_6" || extraction.Attempts != MaxExtractionAttempts {
+	if extraction.Text != "2-8 BAR" || extraction.Mode != "psm_6_logo_light" || extraction.Attempts != MaxExtractionAttempts {
 		t.Fatalf("extraction = %#v", extraction)
+	}
+}
+
+func TestTesseractEngineVersionIncludesPipelineVersion(t *testing.T) {
+	version := (TesseractCLIEngine{version: "tesseract 5.3.0"}).Version()
+	if !strings.Contains(version, assetStudioOCRPipelineVersion) {
+		t.Fatalf("version %q does not include pipeline version", version)
 	}
 }

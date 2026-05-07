@@ -194,6 +194,8 @@ export function App() {
     switchWorkspaceMutation.isPending;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
+  const ocrEnabled = settingsQuery.data?.settings.ocrEnabled ?? false;
+  const ocrFuzzySearch = settingsQuery.data?.settings.ocrFuzzySearch ?? true;
   const activeWorkspaceId =
     settingsQuery.data?.settings.activeWorkspaceId ?? "default";
   const workspaces = settingsQuery.data?.settings.workspaces ?? [
@@ -514,6 +516,8 @@ export function App() {
                 projectNames={browseProjectNames}
                 projectFilterName={selectedProject?.name ?? ""}
                 imagePreviewEnabled={imagePreviewEnabled}
+                ocrEnabled={ocrEnabled}
+                ocrFuzzySearch={ocrFuzzySearch}
                 onAutoScrollDone={clearAutoScrollAssetId}
                 onOpenAsset={setDrawerId}
               />
@@ -578,6 +582,8 @@ export function App() {
           open={cmdkOpen}
           assets={scopedItems}
           customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
+          ocrEnabled={ocrEnabled}
+          ocrFuzzySearch={ocrFuzzySearch}
           onClose={() => setCmdkOpen(false)}
           onNavigate={changeMode}
           onOpenAsset={openAssetFromPalette}

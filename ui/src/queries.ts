@@ -10,6 +10,7 @@ import {
   deleteUnusedPreview,
   getCatalog,
   getSettings,
+  getVersionCheck,
   importSettings,
   installOCR,
   listDirectories,
@@ -23,6 +24,7 @@ import {
   runOCR,
   scanCatalog,
   switchWorkspace,
+  updateApp,
   updateSettings,
 } from "./api";
 import type {
@@ -35,6 +37,7 @@ import type {
 
 export const catalogQueryKey = ["catalog"] as const;
 export const settingsQueryKey = ["settings"] as const;
+export const versionQueryKey = ["version"] as const;
 
 export function directoryListingQueryOptions(path: string, enabled: boolean) {
   return {
@@ -60,6 +63,23 @@ export function useSettingsQuery() {
   return useQuery({
     queryKey: settingsQueryKey,
     queryFn: getSettings,
+  });
+}
+
+export function useVersionQuery() {
+  return useQuery({
+    queryKey: versionQueryKey,
+    queryFn: getVersionCheck,
+  });
+}
+
+export function useUpdateAppMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: updateApp,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: versionQueryKey });
+    },
   });
 }
 

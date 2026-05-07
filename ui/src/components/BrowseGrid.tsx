@@ -25,6 +25,7 @@ type BrowseGridProps = {
   activeAssetId: string;
   autoScrollAssetId: string;
   imagePreviewEnabled: boolean;
+  ocrEnabled: boolean;
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
@@ -88,6 +89,7 @@ export function BrowseGrid({
   activeAssetId,
   autoScrollAssetId,
   imagePreviewEnabled,
+  ocrEnabled,
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
@@ -158,7 +160,7 @@ export function BrowseGrid({
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       optimizable ? t("browse.flagOptimizable") : "",
-      ocrStatusLabel(t, item),
+      ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
     const referenceLabel = t("asset.refs", { count: item.usedBy.length });
     const ariaLabel = [item.repoPath, referenceLabel, ...statusLabels].join(
@@ -225,7 +227,7 @@ export function BrowseGrid({
               </div>
             )}
             <span
-              className="absolute top-2 right-2 grid size-[22px] place-items-center rounded-g-md border border-g-line-strong bg-g-surface text-g-ink-3 opacity-0 transition-[opacity,background,color,border-color] duration-[120ms] ease-[var(--g-ease)] pointer-events-none group-hover/card:opacity-100 group-data-[selected=true]/card:opacity-100 group-data-[selected=true]/card:bg-g-accent group-data-[selected=true]/card:border-g-accent group-data-[selected=true]/card:text-g-accent-ink"
+              className={`absolute top-2 right-2 grid size-[22px] place-items-center rounded-g-md border border-g-line-strong bg-g-surface text-g-ink-3 transition-[opacity,background,color,border-color] duration-[120ms] ease-[var(--g-ease)] pointer-events-none group-data-[selected=true]/card:opacity-100 group-data-[selected=true]/card:bg-g-accent group-data-[selected=true]/card:border-g-accent group-data-[selected=true]/card:text-g-accent-ink ${bulkMode ? "opacity-0 group-hover/card:opacity-100" : "opacity-0"}`}
               role={bulkMode ? "checkbox" : undefined}
               aria-checked={bulkMode ? isSelected : undefined}
               aria-label={
@@ -257,7 +259,7 @@ export function BrowseGrid({
           </Tooltip>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="line">{formatExt(item.ext)}</Badge>
-            <OCRStatusBadge item={item} />
+            <OCRStatusBadge item={item} enabled={ocrEnabled} />
             <Badge>{formatBytes(item.bytes)}</Badge>
             <Tooltip label={referenceLabel} placement="top">
               <span className="ml-auto inline-flex">

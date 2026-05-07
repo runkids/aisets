@@ -4,6 +4,17 @@ export { Button, IconButton } from "./Button";
 export { Card, CardBody } from "./Card";
 export { CopyButton } from "./CopyButton";
 export { ConfirmDialog } from "./ConfirmDialog";
+export {
+  DialogBody,
+  DialogDescription,
+  DialogDrawerSurface,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogSurface,
+  DialogTitle,
+  DialogViewport,
+} from "./DialogShell";
 export { DropdownMenu, type DropdownMenuItem } from "./DropdownMenu";
 export { EmptyState } from "./EmptyState";
 export { IconWell } from "./IconWell";

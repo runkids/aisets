@@ -58,7 +58,8 @@
     "generating": "생성 중…",
     "copy": "복사",
     "downloadShell": ".sh 다운로드",
-    "scrollToTop": "맨 위로"
+    "scrollToTop": "맨 위로",
+    "more": "더 많은 작업"
   },
   "search": {
     "placeholder": "경로, 프로젝트, 형식 또는 콘텐츠 해시 검색…",
@@ -281,7 +282,8 @@
     "customFilters": "사용자 지정 필터",
     "allProjects": "모든 프로젝트",
     "allExtensions": "모든 확장자",
-    "allCustomFilters": "모든 사용자 지정 필터"
+    "allCustomFilters": "모든 사용자 지정 필터",
+    "requiresOCR": "OCR 필요"
   },
   "toolbar": {
     "gridView": "그리드 보기",
@@ -412,7 +414,8 @@
     "excludePatternsHint": "repo 상대 패턴을 한 줄에 하나씩 입력합니다. 쉼표 구분도 사용할 수 있습니다(예: dist/** 또는 tmp).",
     "customFilters": "사용자 지정 필터",
     "customFiltersDesc": "경로와 에셋 메타데이터를 기준으로 저장되는 Browse 필터입니다.",
-    "customFiltersHint": "그룹끼리는 OR, 같은 그룹 안의 규칙은 AND입니다. 콘텐츠 인식과 OCR은 포함되지 않습니다.",
+    "customFiltersHint": "그룹끼리는 OR, 같은 그룹 안의 규칙은 AND입니다. OCR 규칙은 캐시된 로컬 OCR 결과만 비교합니다.",
+    "customFilterOCRDisabled": "OCR 꺼짐",
     "customFilterName": "필터 이름",
     "customFilterEnabled": "활성화",
     "customFilterNewName": "새 필터",
@@ -470,7 +473,7 @@
     "customFiltersHelpStep2": "각 규칙에서 필드, 연산자, 값을 선택합니다.",
     "customFiltersHelpStep3": "설정을 저장하면 Browse 왼쪽 또는 명령 팔레트에서 사용할 수 있습니다.",
     "customFiltersHelpExamplesTitle": "예시",
-    "customFiltersHelpChineseTitle": "중국어 파일 이름",
+    "customFiltersHelpIconAssetsTitle": "아이콘 파일",
     "customFiltersHelpFolderSuffixTitle": "icons로 끝나는 폴더의 에셋",
     "customFiltersHelpLargeUnusedTitle": "사용하지 않는 큰 웹 이미지",
     "customFiltersHelpCleanupTitle": "정리 후보",
@@ -486,6 +489,17 @@
     "aboutDesc": "로컬 빌드 및 저장 경로 정보입니다.",
     "version": "버전",
     "license": "라이선스",
+    "updateAvailable": "{{version}} 사용 가능",
+    "updateCheckFailed": "확인 실패",
+    "upToDate": "최신 버전",
+    "updateAction": "업데이트",
+    "updating": "업데이트 중...",
+    "upToDateAction": "최신 버전",
+    "versionDevHint": "DEV mode에서는 UI 흐름을 테스트할 수 있도록 모의 업데이트를 사용합니다.",
+    "updateDevSuccess": "DEV mode 업데이트가 시뮬레이션되었습니다.",
+    "updateSuccess": "{{version}}로 업데이트했습니다. 새 버전을 사용하려면 Asset Studio를 다시 시작하세요.",
+    "updateAlreadyCurrent": "Asset Studio는 이미 최신 버전입니다.",
+    "updateFailed": "업데이트 실패",
     "installApp": "앱 설치",
     "installAppHint": "Asset Studio를 이 브라우저에서 독립 앱으로 추가합니다.",
     "installAppAction": "앱 설치",

@@ -1,5 +1,12 @@
-import { CheckSquare, Copy, Square, Terminal, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  Check,
+  CheckSquare,
+  Copy,
+  Square,
+  Terminal,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AssetItem } from "../types";
@@ -17,6 +24,7 @@ const ROW_HEIGHT = 60;
 export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pathsCopied, setPathsCopied] = useState(false);
   const totalBytes = useMemo(
     () => items.reduce((sum, i) => sum + i.bytes, 0),
     [items],
@@ -49,11 +57,18 @@ export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
       prev.size === items.length ? new Set() : new Set(items.map((i) => i.id)),
     );
   }
+  useEffect(() => {
+    if (!pathsCopied) return;
+    const timer = window.setTimeout(() => setPathsCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [pathsCopied]);
+
   function copyPaths() {
     const paths = items
       .filter((i) => selected.has(i.id))
       .map((i) => i.repoPath);
     navigator.clipboard?.writeText(paths.join("\n"));
+    setPathsCopied(true);
   }
   function copyAsRm() {
     const cmds = items
@@ -106,10 +121,12 @@ export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
             <Button
               size="sm"
               variant="secondary"
-              leadingIcon={<Copy size={12} />}
+              leadingIcon={
+                pathsCopied ? <Check size={12} /> : <Copy size={12} />
+              }
               onClick={copyPaths}
             >
-              {t("action.copyPaths")}
+              {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
             </Button>
             <Button
               size="sm"

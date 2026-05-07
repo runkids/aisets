@@ -24,6 +24,7 @@ export type AppSettings = {
   ocrMaxPixels: number;
   ocrBatchSize: number;
   ocrConcurrency: number;
+  ocrFuzzySearch: boolean;
   excludePatterns: string[];
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
@@ -100,6 +101,23 @@ export type OCRRuntime = {
 };
 
 export type SettingsUpdate = Partial<AppSettings>;
+
+export type VersionCheck = {
+  currentVersion: string;
+  latestVersion?: string;
+  updateAvailable: boolean;
+  devMode: boolean;
+  upgradeCommand: string;
+};
+
+export type UpdateAppResult = {
+  currentVersion: string;
+  latestVersion?: string;
+  updated: boolean;
+  dryRun: boolean;
+  devMode: boolean;
+  message: string;
+};
 
 export type ExportData = {
   version: number;

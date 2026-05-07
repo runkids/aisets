@@ -8,6 +8,7 @@ type Option = {
   value: string;
   label: string;
   icon?: ReactNode;
+  description?: string;
 };
 
 type SelectSize = "sm" | "md";
@@ -26,7 +27,7 @@ const triggerVariants = cva(
     "inline-flex w-full items-center gap-2 rounded-g-md bg-g-surface px-3 font-g font-[510] tracking-g-ui text-g-ink",
     "border border-g-line shadow-g-inset",
     "transition-[background,border-color,box-shadow] duration-[120ms] ease-g",
-    "hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus",
+    "hover:border-g-input-hover hover:bg-g-input-hover-bg focus-visible:outline-none focus-visible:shadow-g-focus",
     "data-[placeholder]:text-g-ink-3",
   ],
   {
@@ -95,8 +96,13 @@ export function Select({
                   </span>
                 )}
                 <SelectPrimitive.ItemText>
-                  <span className="min-w-0 flex-1 truncate">
-                    {option.label}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{option.label}</span>
+                    {option.description && (
+                      <span className="block truncate text-g-caption font-normal text-g-ink-3">
+                        {option.description}
+                      </span>
+                    )}
                   </span>
                 </SelectPrimitive.ItemText>
                 <SelectPrimitive.ItemIndicator className="ml-auto shrink-0">

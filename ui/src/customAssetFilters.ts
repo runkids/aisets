@@ -1,10 +1,23 @@
-import type { AssetItem, CustomAssetFilter } from "./types";
+import type {
+  AssetItem,
+  CustomAssetFilter,
+  CustomAssetFilterField,
+} from "./types";
 
 export type CustomFilterOption = {
   id: string;
   label: string;
   count: number;
+  usesOCR: boolean;
 };
+
+const ocrFilterFields = new Set<CustomAssetFilterField>([
+  "ocrText",
+  "ocrLanguage",
+  "ocrScript",
+  "ocrConfidence",
+  "ocrStatus",
+]);
 
 function itemFolder(item: AssetItem) {
   const index = item.repoPath.lastIndexOf("/");
@@ -180,6 +193,12 @@ export function enabledCustomAssetFilters(filters: CustomAssetFilter[] = []) {
   return filters.filter((filter) => filter.enabled);
 }
 
+export function customAssetFilterUsesOCR(filter: CustomAssetFilter) {
+  return filter.groups.some((group) =>
+    group.clauses.some((clause) => ocrFilterFields.has(clause.field)),
+  );
+}
+
 export function customFilterOptions(
   filters: CustomAssetFilter[] = [],
   items: AssetItem[],
@@ -187,6 +206,7 @@ export function customFilterOptions(
   return enabledCustomAssetFilters(filters).map((filter) => ({
     id: filter.id,
     label: filter.name,
+    usesOCR: customAssetFilterUsesOCR(filter),
     count: items.filter((item) => matchesCustomAssetFilter(item, filter))
       .length,
   }));

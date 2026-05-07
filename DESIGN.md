@@ -477,13 +477,13 @@ React API:
 
 ### 5.13 Modal
 
-Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`.
+Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`. Shared overlay, viewport, surface, header, body, footer, and drawer surfaces live in `ui/src/components/ui/DialogShell.tsx`; `Modal`, `PromptDialog`, `ConfirmDialog`, Command Palette, and Asset Drawer compose that shell instead of duplicating backdrop/panel classes.
 
 - Centered on `rgba(8,9,10,0.6)` backdrop + blur(4px), z 120 so dialogs opened from the asset drawer layer above the drawer/backdrop stack.
 - Sizes: `sm` 520px, `md` 760px, `lg` 960px.
-- Frame: `--g-surface-2` bg, `1px solid --g-line`, 12px radius, `--g-shadow-pop`.
-- Header/footer: `--g-surface` bg, 16px horizontal padding, 1px `--g-line` divider.
-- Body padding: `md` (16px) or `none` for code/script previews.
+- Frame: `--g-surface` bg, `1px solid --g-line-strong`, 12px radius, `--g-shadow-pop`.
+- Header/footer: `--g-surface` bg, 20px horizontal padding, no internal divider lines; use whitespace to separate regions. Footer actions align right by default.
+- Body padding: `md` (20px) or `none` for code/script previews.
 - Enter: fade backdrop + `slideUp2` 200ms `--g-ease-out`; reduced motion must disable transforms.
 
 ### 5.14 Toast
@@ -503,7 +503,7 @@ Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `Toas
 - Backdrop blur(8px) on `rgba(8,9,10,0.5)`
 - **Input**: rendered through `TextInput variant="command"` inside a `--g-surface` header strip, 15px / 400 / Porcelain, no input border or focus outline, padding 14px 16px on the strip, bottom 1px `--g-line`
 - List items: 8px 10px padding, 6px radius, hover bg `--g-surface-3`
-- Active / keyboard-highlighted item uses theme-swapped `--g-active-bg`, `--g-active-text`, `--g-active-weight` (dark = Neon Lime; light = neutral wash) so hover/active colors stay correct in both schemes
+- Active / keyboard-highlighted item uses a neutral popup selection wash (`--g-surface-2` in light mode, `--g-surface-3` in dark mode) with `--g-ink` text and 590 weight. Do not use brand/CTA fills such as `--g-active-bg`, Neon Lime, or dark navy for popup list highlight states.
 - Page commands show only icon + label; do not show `G O` / `G B` style hints unless those key chords are actually implemented
 - Asset results show a 34px tokenized checker thumbnail, mono filename, dim mono path, and right-aligned project name
 - Group label: 10px uppercase Storm Cloud
@@ -657,7 +657,7 @@ Canonical shared primitive: `Notice` / `NoticeStack` from `ui/src/components/ui/
 
 Canonical shared primitive: `Select` from `ui/src/components/ui/Select.tsx`.
 
-- Trigger: 26px (`sm`) or 32px (`md`), `--g-surface-3` bg, `--g-line-strong` border, 6px radius.
+- Trigger: 26px (`sm`) or 32px (`md`), `--g-surface` bg, `--g-line` border + inset token shadow, 6px radius. Hover uses `--g-input-border-hover` + `--g-input-bg-hover` so light mode stays clean white while dark mode lifts to `--g-surface-2`.
 - Menu: absolutely positioned with viewport-aware top/bottom placement, `--g-surface`, `--g-line-strong`, 6px radius, `--g-shadow-pop`, z 60. Max-height is `min(320px, var(--radix-select-content-available-height))`; do not use spacing-scale `max-h-64` because this project maps `64` to 64px.
 - Options are stacked with a 4px gap so rounded hover / checked states do not visually merge. Highlighted option uses `--g-surface-2` / `--g-ink`. Checked option uses the same active treatment as Project Switcher and sidebar active rows: `--g-active-bg`, `--g-active-text`, and `--g-active-weight`; the check icon inherits the active text color.
 - ESC and outside click close the menu. Full roving keyboard navigation is a separate accessibility pass.

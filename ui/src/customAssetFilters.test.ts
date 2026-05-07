@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  customAssetFilterUsesOCR,
   customFilterOptions,
   matchesCustomAssetFilter,
 } from "./customAssetFilters";
@@ -193,7 +194,26 @@ describe("matchesCustomAssetFilter", () => {
 
     expect(matchesCustomAssetFilter(makeItem(), filters[0])).toBe(false);
     expect(customFilterOptions(filters, [makeItem()])).toEqual([
-      { id: "missing", label: "Missing", count: 0 },
+      { id: "missing", label: "Missing", count: 0, usesOCR: false },
+    ]);
+  });
+
+  it("marks custom filters that depend on OCR clauses", () => {
+    const ocrFilter = filter([
+      {
+        clauses: [{ field: "ocrText", operator: "contains", value: "sale" }],
+      },
+    ]);
+    const pathFilter = filter([
+      {
+        clauses: [{ field: "path", operator: "contains", value: "hero" }],
+      },
+    ]);
+
+    expect(customAssetFilterUsesOCR(ocrFilter)).toBe(true);
+    expect(customAssetFilterUsesOCR(pathFilter)).toBe(false);
+    expect(customFilterOptions([ocrFilter], [makeItem()])).toEqual([
+      { id: "custom", label: "Custom", count: 0, usesOCR: true },
     ]);
   });
 });

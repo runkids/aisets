@@ -10,6 +10,8 @@ import type {
   ScanEvent,
   SettingsInfo,
   SettingsUpdate,
+  UpdateAppResult,
+  VersionCheck,
 } from "./types";
 
 declare global {
@@ -271,6 +273,17 @@ export function updateSettings(data: SettingsUpdate) {
   return request<{ settings: SettingsInfo }>("/api/settings", {
     method: "PATCH",
     body: JSON.stringify(data),
+  });
+}
+
+export function getVersionCheck() {
+  return request<VersionCheck>("/api/version");
+}
+
+export function updateApp() {
+  return request<{ ok: boolean; update: UpdateAppResult }>("/api/update", {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

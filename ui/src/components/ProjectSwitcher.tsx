@@ -63,12 +63,12 @@ const menuClass = cn(
 );
 
 const menuHeadClass =
-  "flex flex-col gap-0.5 px-2.5 pt-2.5 pb-3 border-b border-g-line bg-g-surface-2";
+  "flex flex-col gap-0.5 px-2.5 pt-1.5 pb-2 border-b border-g-line bg-g-surface-2";
 
 const menuHeadTitleClass =
-  "text-g-ink font-g-display text-[15px] font-[590] tracking-[-0.013em] leading-[1.2]";
+  "text-g-ink font-g-display text-[13px] font-[510] tracking-[-0.011em] leading-[1.3]";
 
-const menuHeadSubClass = "text-g-ink-3 text-[12px]";
+const menuHeadSubClass = "text-g-ink-4 text-[11px]";
 
 const sectionLabelClass =
   "px-2.5 pt-3 pb-1.5 text-g-ink-3 text-[10px] font-[510] tracking-[0.06em] leading-[1.4] uppercase";
@@ -78,14 +78,12 @@ const optionClass = cn(
   "transition-[background,color,box-shadow] duration-[120ms] ease-g",
   "hover:not-data-active:bg-g-surface-3 hover:not-data-active:text-g-ink",
   "focus-visible:not-data-active:bg-g-surface-3 focus-visible:not-data-active:text-g-ink",
-  "data-active:bg-g-active-bg data-active:text-g-active-text data-active:font-[var(--g-active-weight)]",
-  "data-active:hover:bg-g-active-bg data-active:hover:text-g-active-text",
+  "data-active:bg-g-surface-3 data-active:text-g-ink data-active:font-[510]",
   "focus-visible:outline-none focus-visible:shadow-g-focus",
-  "[&_svg]:shrink-0 [&_svg]:text-current",
+  "[&_svg]:shrink-0",
 );
 
-const workspaceOptionActiveOverride =
-  "data-[kind=workspace]:data-active:bg-g-surface data-[kind=workspace]:data-active:text-g-ink data-[kind=workspace]:data-active:shadow-[inset_0_0_0_1px_var(--g-line-strong)] data-[kind=workspace]:data-active:hover:bg-g-surface data-[kind=workspace]:data-active:hover:text-g-ink [[data-theme=dark]_&]:data-[kind=workspace]:data-active:bg-g-surface-3 [[data-theme=dark]_&]:data-[kind=workspace]:data-active:hover:bg-g-surface-3";
+const workspaceOptionActiveOverride = "";
 
 const avatarClass =
   "inline-grid place-items-center size-7 rounded-g-md bg-g-surface-3 text-g-ink font-g-display text-[13px] font-[590] shrink-0";
@@ -98,21 +96,20 @@ const optionCopyStrongClass =
 const optionCopySpanClass =
   "overflow-hidden text-ellipsis text-g-ink-3 font-g-mono text-[11px] tracking-g-mono leading-[1.3] whitespace-nowrap";
 
-const optionCopyActiveOverride =
-  "data-active:[&_strong]:text-current data-active:[&_span]:text-current";
+const optionCopyActiveOverride = "";
 
 const countClass = cn(
   "min-w-[34px] px-[7px] py-0.5 rounded-g-sm bg-g-surface-3 text-g-ink-3",
   "font-g-mono text-[11px] font-[510] tracking-g-mono text-center tabular-nums",
 );
 
-const countActiveClass =
-  "data-active:[&_.ps-count]:bg-g-surface data-active:[&_.ps-count]:text-g-ink-3 data-active:[&_.ps-count]:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-active-text)_22%,transparent)] [[data-theme=dark]_&]:data-active:[&_.ps-count]:bg-g-active-text [[data-theme=dark]_&]:data-active:[&_.ps-count]:text-g-active-bg [[data-theme=dark]_&]:data-active:[&_.ps-count]:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-active-bg)_28%,transparent)]";
+const countActiveClass = "data-active:[&_.ps-count]:bg-g-surface";
 
 const hoverCountClass =
   "hover:not-data-active:[&_.ps-count]:bg-g-surface hover:not-data-active:[&_.ps-count]:text-g-ink-2 focus-visible:not-data-active:[&_.ps-count]:bg-g-surface focus-visible:not-data-active:[&_.ps-count]:text-g-ink-2";
 
-const checkClass = "opacity-0 text-current";
+const checkClass =
+  "opacity-0 text-g-accent transition-opacity duration-[120ms] ease-g";
 
 const checkVisibleClass = "opacity-100";
 

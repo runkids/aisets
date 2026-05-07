@@ -26,6 +26,7 @@ type AppSettings struct {
 	OCRMaxPixels               int                 `json:"ocrMaxPixels"`
 	OCRBatchSize               int                 `json:"ocrBatchSize"`
 	OCRConcurrency             int                 `json:"ocrConcurrency"`
+	OCRFuzzySearch             bool                `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string            `json:"excludePatterns"`
 	OptimizationDefaultQuality int                 `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      bool                `json:"optimizationAutoApply"`
@@ -44,6 +45,7 @@ type SettingsUpdate struct {
 	OCRMaxPixels               *int                `json:"ocrMaxPixels"`
 	OCRBatchSize               *int                `json:"ocrBatchSize"`
 	OCRConcurrency             *int                `json:"ocrConcurrency"`
+	OCRFuzzySearch             *bool               `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string            `json:"excludePatterns"`
 	OptimizationDefaultQuality *int                `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      *bool               `json:"optimizationAutoApply"`

@@ -552,7 +552,7 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	if _, err := store.UpdateSettings(SettingsUpdate{OCRBatchSize: &badOCRBatch}); err == nil || err.(apierr.Error).Code != "settings_ocr_batch_size_invalid" {
 		t.Fatalf("bad OCR batch err = %T %[1]v", err)
 	}
-	badOCRConcurrency := 2
+	badOCRConcurrency := 3
 	if _, err := store.UpdateSettings(SettingsUpdate{OCRConcurrency: &badOCRConcurrency}); err == nil || err.(apierr.Error).Code != "settings_ocr_concurrency_invalid" {
 		t.Fatalf("bad OCR concurrency err = %T %[1]v", err)
 	}
@@ -565,7 +565,8 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	ocrLanguages := []string{"eng", "chi_tra", "eng", "unknown"}
 	ocrMaxPixels := 1000
 	ocrBatchSize := 3
-	ocrConcurrency := 1
+	ocrConcurrency := 2
+	ocrFuzzySearch := false
 	autoApply := true
 	quality := 0
 	settings, err := store.UpdateSettings(SettingsUpdate{
@@ -578,6 +579,7 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 		OCRMaxPixels:               &ocrMaxPixels,
 		OCRBatchSize:               &ocrBatchSize,
 		OCRConcurrency:             &ocrConcurrency,
+		OCRFuzzySearch:             &ocrFuzzySearch,
 		OptimizationDefaultQuality: &quality,
 		OptimizationAutoApply:      &autoApply,
 	})
@@ -587,7 +589,7 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	if settings.WorkspaceName != "Team Assets" || settings.DefaultProjectRoot != "/repo" || !settings.AutoScanOnOpen || !settings.ScanOnOpen || settings.OptimizationDefaultQuality != 0 || !settings.OptimizationAutoApply {
 		t.Fatalf("settings = %#v", settings)
 	}
-	if !settings.OCREnabled || strings.Join(settings.OCRLanguages, ",") != "eng,chi_tra" || settings.OCRMaxPixels != 1000 || settings.OCRBatchSize != 3 || settings.OCRConcurrency != 1 {
+	if !settings.OCREnabled || strings.Join(settings.OCRLanguages, ",") != "eng,chi_tra" || settings.OCRMaxPixels != 1000 || settings.OCRBatchSize != 3 || settings.OCRConcurrency != 2 || settings.OCRFuzzySearch {
 		t.Fatalf("OCR settings = %#v", settings)
 	}
 }

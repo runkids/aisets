@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
@@ -19,6 +21,11 @@ type ocrCounts struct {
 	Skipped     int            `json:"skipped"`
 	CacheHit    int            `json:"cacheHit"`
 	SkipReasons map[string]int `json:"skipReasons,omitempty"`
+}
+
+type ocrWorkResult struct {
+	item   scanner.AssetItem
+	result ocr.Result
 }
 
 func (s *Server) handleOCRInstall(w http.ResponseWriter, r *http.Request) {
@@ -156,44 +163,45 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
-	for _, item := range candidates {
-		select {
-		case <-r.Context().Done():
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(r.Context().Err(), "ocr_canceled"), "counts": counts})
-			return
-		default:
-		}
-		extraction, err := s.ocrEngine.Extract(r.Context(), item.LocalPath, installed)
-		result := ocr.Result{
-			ProjectID:      item.ProjectID,
-			RepoPath:       item.RepoPath,
-			ContentHash:    item.ContentHash,
-			HashAlgorithm:  item.HashAlgorithm,
-			EngineName:     s.ocrEngine.Name(),
-			EngineVersion:  s.ocrEngine.Version(),
-			SettingsHash:   ocr.SettingsHash(ocrSettings),
-			Status:         ocr.StatusReady,
-			Text:           extraction.Text,
-			NormalizedText: ocr.NormalizeText(extraction.Text),
-			Languages:      extraction.Languages,
-			Scripts:        extraction.Scripts,
-			DurationMs:     extraction.DurationMs,
-			Mode:           extraction.Mode,
-			Attempts:       extraction.Attempts,
-		}
-		if result.Attempts <= 0 {
-			result.Attempts = 1
-		}
-		ocr.FinalizeResult(&result)
-		if err != nil {
-			result.Status = ocr.StatusFailed
-			result.TextStatus = ""
-			result.EmptyText = false
-			result.ErrorCode = "ocr_extract_failed"
-			if errors.Is(err, ocr.ErrNotInstalled) {
-				result.ErrorCode = "ocr_not_installed"
+	concurrency := min(max(ocrSettings.Concurrency, 1), ocr.MaxConcurrency)
+	if concurrency > len(candidates) {
+		concurrency = len(candidates)
+	}
+	if concurrency == 0 {
+		concurrency = 1
+	}
+	jobs := make(chan scanner.AssetItem)
+	results := make(chan ocrWorkResult)
+	var wg sync.WaitGroup
+	for range concurrency {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range jobs {
+				results <- ocrWorkResult{
+					item:   item,
+					result: s.extractOCRResult(r.Context(), item, installed, ocrSettings),
+				}
 			}
-			result.ErrorMessage = err.Error()
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, item := range candidates {
+			select {
+			case <-r.Context().Done():
+				return
+			case jobs <- item:
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	for work := range results {
+		result := work.result
+		if result.Status == ocr.StatusFailed {
 			counts.Failed++
 		} else {
 			counts.Ready++
@@ -203,9 +211,49 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
 			return
 		}
-		sendNDJSON(w, map[string]any{"type": "progress", "assetId": item.ID, "repoPath": item.RepoPath, "status": result.Status, "counts": counts})
+		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": result.Status, "counts": counts})
+	}
+	if err := r.Context().Err(); err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_canceled"), "counts": counts})
+		return
 	}
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts, "hasMore": hasMore})
+}
+
+func (s *Server) extractOCRResult(ctx context.Context, item scanner.AssetItem, installed []string, ocrSettings ocr.Settings) ocr.Result {
+	extraction, err := s.ocrEngine.Extract(ctx, item.LocalPath, installed)
+	result := ocr.Result{
+		ProjectID:      item.ProjectID,
+		RepoPath:       item.RepoPath,
+		ContentHash:    item.ContentHash,
+		HashAlgorithm:  item.HashAlgorithm,
+		EngineName:     s.ocrEngine.Name(),
+		EngineVersion:  s.ocrEngine.Version(),
+		SettingsHash:   ocr.SettingsHash(ocrSettings),
+		Status:         ocr.StatusReady,
+		Text:           extraction.Text,
+		NormalizedText: ocr.NormalizeText(extraction.Text),
+		Languages:      extraction.Languages,
+		Scripts:        extraction.Scripts,
+		DurationMs:     extraction.DurationMs,
+		Mode:           extraction.Mode,
+		Attempts:       extraction.Attempts,
+	}
+	if result.Attempts <= 0 {
+		result.Attempts = 1
+	}
+	ocr.FinalizeResult(&result)
+	if err != nil {
+		result.Status = ocr.StatusFailed
+		result.TextStatus = ""
+		result.EmptyText = false
+		result.ErrorCode = "ocr_extract_failed"
+		if errors.Is(err, ocr.ErrNotInstalled) {
+			result.ErrorCode = "ocr_not_installed"
+		}
+		result.ErrorMessage = err.Error()
+	}
+	return result
 }
 
 func shouldRefreshOCRResult(result ocr.Result) bool {

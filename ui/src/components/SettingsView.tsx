@@ -14,9 +14,11 @@ import {
   LoaderCircle,
   Monitor,
   Moon,
+  MoreHorizontal,
   Paintbrush,
   Pencil,
   Plus,
+  RefreshCw,
   RotateCcw,
   Scan,
   Settings2,
@@ -28,8 +30,10 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, ReactNode } from "react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/cn";
+import { customAssetFilterUsesOCR } from "../customAssetFilters";
 import { exportSettings } from "../api";
 import { errorMessage, languageOptionsForLocale } from "../i18n/index";
 import {
@@ -47,7 +51,9 @@ import {
   useRunOCRMutation,
   useSettingsQuery,
   useSwitchWorkspaceMutation,
+  useUpdateAppMutation,
   useUpdateSettingsMutation,
+  useVersionQuery,
 } from "../queries";
 import type {
   CustomAssetFilter,
@@ -66,6 +72,8 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  DropdownMenu,
+  EmptyState,
   IconButton,
   Keycap,
   Modal,
@@ -112,6 +120,7 @@ type SettingsDraft = {
   ocrMaxPixels: number;
   ocrBatchSize: number;
   ocrConcurrency: number;
+  ocrFuzzySearch: boolean;
   excludePatternsText: string;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
@@ -140,10 +149,11 @@ const defaultSettings: SettingsUpdate = {
   autoScanOnOpen: false,
   scanOnOpen: false,
   ocrEnabled: false,
-  ocrLanguages: ["eng", "chi_tra", "chi_sim"],
+  ocrLanguages: ["eng"],
   ocrMaxPixels: 2_000_000,
   ocrBatchSize: 25,
   ocrConcurrency: 1,
+  ocrFuzzySearch: true,
   excludePatterns: [],
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
@@ -274,20 +284,20 @@ const workspaceRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 sm:pointer-events-none sm:absolute sm:right-[calc(100%+6px)] sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:opacity-0 sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const projectRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
-const ghostDangerClass = "text-g-red hover:bg-g-red-soft hover:text-g-red";
+const ghostDangerClass = "text-g-ink-3 hover:bg-g-red-soft hover:text-g-red";
 const smButtonOverrideClass =
-  "!h-g-btn-sm !px-2.5 !font-g !text-g-caption !leading-none !tracking-g-ui";
-const rowActionButtonClass = smButtonOverrideClass;
-const rowActionDangerButtonClass = `${rowActionButtonClass} ${ghostDangerClass}`;
+  "!h-g-btn-sm !px-2 !font-g !text-g-caption !leading-none !tracking-g-ui";
+const rowActionButtonClass = `${smButtonOverrideClass} text-g-ink-3`;
+const rowActionDangerButtonClass = `${smButtonOverrideClass} ${ghostDangerClass}`;
 const workspaceDialogButtonClass = `${smButtonOverrideClass} [&_svg]:!size-3`;
 const workspaceDialogDangerButtonClass = `${workspaceDialogButtonClass} ${ghostDangerClass}`;
 const activeWorkspaceBadgeClass =
-  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink-2 shadow-g-sm font-g text-g-ui font-[590] leading-none tracking-g-ui [&_svg]:size-3.5 [&_svg]:text-g-green";
+  "inline-flex items-center justify-center gap-1.5 h-7 px-2.5 rounded-g-pill border border-g-green/20 bg-g-green/[0.08] text-g-ink-2 font-g text-g-caption font-[510] leading-none tracking-g-ui [&_svg]:size-3 [&_svg]:text-g-green";
 const switchWorkspaceButtonClass =
-  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink shadow-g-sm font-g text-g-ui font-[590] leading-none tracking-g-ui [&_svg]:size-3.5 hover:bg-g-surface-3";
+  "inline-flex items-center justify-center gap-1.5 h-7 px-2.5 rounded-g-pill border border-g-line bg-g-surface font-g text-g-caption font-[510] leading-none tracking-g-ui text-g-ink-2 [&_svg]:size-3 hover:bg-g-surface-2 hover:border-g-line-strong";
 const projectAssetsBadgeClass =
   "shrink-0 border-g-line bg-g-surface-2 text-g-ink-3";
-const defaultOCRLanguages = ["eng", "chi_tra", "chi_sim"];
+const defaultOCRLanguages = ["eng"];
 const fallbackOCRLanguages = [
   "eng",
   "chi_tra",
@@ -331,6 +341,7 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     ocrMaxPixels: settings?.ocrMaxPixels ?? 2_000_000,
     ocrBatchSize: settings?.ocrBatchSize ?? 25,
     ocrConcurrency: settings?.ocrConcurrency ?? 1,
+    ocrFuzzySearch: settings?.ocrFuzzySearch ?? true,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
@@ -349,6 +360,7 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     ocrMaxPixels: draft.ocrMaxPixels,
     ocrBatchSize: draft.ocrBatchSize,
     ocrConcurrency: draft.ocrConcurrency,
+    ocrFuzzySearch: draft.ocrFuzzySearch,
     excludePatterns: draft.excludePatternsText
       .split(/[\n,]/)
       .map((part) => part.trim())
@@ -375,8 +387,8 @@ function FieldRow({
     <div
       className={
         align === "start"
-          ? "grid grid-cols-1 items-start gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8"
-          : "grid grid-cols-1 items-center gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8"
+          ? "grid grid-cols-1 items-start gap-3 py-4 min-[1200px]:grid-cols-[minmax(0,1fr)_auto] min-[1200px]:gap-8"
+          : "grid grid-cols-1 items-center gap-3 py-4 min-[1200px]:grid-cols-[minmax(0,1fr)_auto] min-[1200px]:gap-8"
       }
     >
       <div className="min-w-0">
@@ -389,7 +401,7 @@ function FieldRow({
           </p>
         )}
       </div>
-      <div className="flex min-w-0 justify-start md:min-w-[280px] md:justify-end">
+      <div className="flex min-w-0 justify-start min-[1200px]:min-w-[280px] min-[1200px]:justify-end">
         {children}
       </div>
     </div>
@@ -786,6 +798,7 @@ export function SettingsView({
     activeSection === "workspace",
   );
   const catalogQuery = useCatalogQuery();
+  const versionQuery = useVersionQuery();
   const addWorkspaceMutation = useAddWorkspaceMutation();
   const importMutation = useImportSettingsMutation();
   const installOCRMutation = useInstallOCRMutation();
@@ -813,6 +826,7 @@ export function SettingsView({
     },
   });
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
+  const updateAppMutation = useUpdateAppMutation();
   const updateMutation = useUpdateSettingsMutation();
 
   const settings = settingsQuery.data?.settings;
@@ -863,6 +877,7 @@ export function SettingsView({
     renameWorkspaceMutation.isPending ||
     resetMutation.isPending ||
     switchWorkspaceMutation.isPending ||
+    updateAppMutation.isPending ||
     updateMutation.isPending;
   const ocrWorking = ocrRunActive || runOCRMutation.isPending;
   const settingsActionDisabled =
@@ -877,9 +892,6 @@ export function SettingsView({
   const hasSelectedOCRLanguages = selectedOCRLanguageList.length > 0;
   const hasUninstalledSelectedOCRLanguages = selectedOCRLanguageList.some(
     (language) => !installedOCRLanguages.has(language),
-  );
-  const hasInstalledSelectedOCRLanguages = selectedOCRLanguageList.some(
-    (language) => installedOCRLanguages.has(language),
   );
   const missingSelectedOCRLanguages = selectedOCRLanguageList.filter(
     (language) => !installedOCRLanguages.has(language),
@@ -1078,7 +1090,7 @@ export function SettingsView({
   async function onRemoveOCR() {
     setRemoveOCRConfirmOpen(false);
     try {
-      await removeOCRMutation.mutateAsync(selectedOCRLanguages());
+      await removeOCRMutation.mutateAsync(undefined);
       setOCRProgress("");
       toast.success(t("settings.ocrRemoveSuccess"));
     } catch (error) {
@@ -1250,6 +1262,29 @@ export function SettingsView({
     );
   }
 
+  async function onUpdateApp() {
+    try {
+      const result = await updateAppMutation.mutateAsync();
+      if (result.update.devMode) {
+        toast.success(t("settings.updateDevSuccess"));
+        return;
+      }
+      if (result.update.updated) {
+        toast.success(
+          t("settings.updateSuccess", {
+            version: result.update.latestVersion ?? "",
+          }),
+        );
+        return;
+      }
+      toast.info(t("settings.updateAlreadyCurrent"));
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("settings.updateFailed"),
+      });
+    }
+  }
+
   function onReset() {
     resetMutation.mutate(undefined, {
       onSuccess: () => {
@@ -1308,134 +1343,128 @@ export function SettingsView({
                 description={t("settings.workspaceDesc")}
                 icon={sectionIcon("workspace")}
               />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                <FieldRow
-                  label={t("settings.workspaces")}
-                  description={t("settings.workspacesHint")}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col gap-2 md:w-[560px] md:items-stretch">
-                    <div className="grid gap-2" role="list">
-                      {workspaces.map((workspace) => {
-                        const isActive = workspace.id === activeWorkspaceId;
-                        const summary = t("settings.workspaceProjects", {
-                          count: workspace.projectCount,
-                        });
+              <div className="px-6 pt-5 pb-2 md:px-8">
+                <div className="mb-4">
+                  <span className="block font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                    {t("settings.workspaces")}
+                  </span>
+                  <p className="mt-0.5 max-w-[60ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
+                    {t("settings.workspacesHint")}
+                  </p>
+                </div>
+                <div className="flex w-full flex-col gap-2.5">
+                  <div className="grid gap-2.5" role="list">
+                    {workspaces.map((workspace) => {
+                      const isActive = workspace.id === activeWorkspaceId;
+                      const summary = t("settings.workspaceProjects", {
+                        count: workspace.projectCount,
+                      });
 
-                        return (
-                          <div
-                            key={workspace.id}
-                            role="listitem"
-                            data-active={isActive || undefined}
-                            className="group relative flex flex-col gap-2 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 data-[active=true]:border-g-line-strong data-[active=true]:bg-g-surface-2 sm:flex-row sm:items-center"
-                          >
-                            {isActive ? (
-                              <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                <WorkspaceAvatar
-                                  name={workspace.name}
-                                  iconImage={workspace.iconImage}
-                                  className="text-g-ink-2"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block truncate font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
-                                    {workspace.name}
-                                  </span>
-                                  <span className="block font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
-                                    {summary}
-                                  </span>
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                <WorkspaceAvatar
-                                  name={workspace.name}
-                                  iconImage={workspace.iconImage}
-                                  className="text-g-ink-2"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block truncate font-g-display text-g-body font-[510] leading-[1.3] tracking-[-0.013em] text-g-ink">
-                                    {workspace.name}
-                                  </span>
-                                  <span className="block font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
-                                    {summary}
-                                  </span>
-                                </span>
-                              </div>
-                            )}
-                            <div className="relative flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
-                              <div className={workspaceRowActionRevealClass}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  leadingIcon={<Pencil size={13} />}
-                                  disabled={working}
-                                  className={rowActionButtonClass}
-                                  onClick={() =>
-                                    setRenameWorkspaceId(workspace.id)
-                                  }
-                                >
-                                  {t("action.rename")}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  leadingIcon={<Trash2 size={13} />}
-                                  disabled={working || workspaces.length <= 1}
-                                  className={rowActionDangerButtonClass}
-                                  onClick={() =>
-                                    setRemoveWorkspaceId(workspace.id)
-                                  }
-                                >
-                                  {t("action.delete")}
-                                </Button>
-                              </div>
-                              {isActive && (
-                                <Badge
-                                  tone="line"
-                                  className={activeWorkspaceBadgeClass}
-                                >
-                                  <CheckCircle2 aria-hidden="true" />
-                                  {t("settings.activeWorkspace")}
-                                </Badge>
-                              )}
-                              {!isActive && (
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  leadingIcon={<ArrowLeftRight size={13} />}
-                                  disabled={working}
-                                  className={switchWorkspaceButtonClass}
-                                  onClick={() =>
-                                    void onSwitchWorkspace(workspace.id)
-                                  }
-                                >
-                                  {t("settings.switchWorkspaceAction")}
-                                </Button>
-                              )}
-                            </div>
+                      return (
+                        <div
+                          key={workspace.id}
+                          role="listitem"
+                          className={cn(
+                            "group relative flex flex-col gap-2 rounded-g-lg border px-4 py-3 shadow-g-sm transition-[background,border-color,box-shadow] duration-[120ms] ease-g sm:flex-row sm:items-center",
+                            isActive
+                              ? "border-g-line-strong bg-g-surface-2"
+                              : "border-g-line bg-g-surface hover:bg-g-surface-2 hover:border-g-line-strong focus-within:bg-g-surface-2",
+                          )}
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
+                            <WorkspaceAvatar
+                              name={workspace.name}
+                              iconImage={workspace.iconImage}
+                              className="text-g-ink-2"
+                            />
+                            <span className="min-w-0">
+                              <span
+                                className={cn(
+                                  "block truncate font-g-display text-g-body leading-[1.3] tracking-[-0.013em] text-g-ink",
+                                  isActive ? "font-[590]" : "font-[510]",
+                                )}
+                              >
+                                {workspace.name}
+                              </span>
+                              <span className="block font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                {summary}
+                              </span>
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      leadingIcon={<Plus size={13} />}
-                      disabled={working}
-                      className="self-start"
-                      onClick={() => setAddWorkspaceOpen(true)}
-                    >
-                      {t("settings.addWorkspace")}
-                    </Button>
+                          <div className="relative flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                            <div className={workspaceRowActionRevealClass}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leadingIcon={<Pencil size={13} />}
+                                disabled={working}
+                                className={rowActionButtonClass}
+                                onClick={() =>
+                                  setRenameWorkspaceId(workspace.id)
+                                }
+                              >
+                                {t("action.rename")}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leadingIcon={<Trash2 size={13} />}
+                                disabled={working || workspaces.length <= 1}
+                                className={rowActionDangerButtonClass}
+                                onClick={() =>
+                                  setRemoveWorkspaceId(workspace.id)
+                                }
+                              >
+                                {t("action.delete")}
+                              </Button>
+                            </div>
+                            {isActive && (
+                              <Badge
+                                tone="line"
+                                className={activeWorkspaceBadgeClass}
+                              >
+                                <CheckCircle2 aria-hidden="true" />
+                                {t("settings.activeWorkspace")}
+                              </Badge>
+                            )}
+                            {!isActive && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                leadingIcon={<ArrowLeftRight size={13} />}
+                                disabled={working}
+                                className={switchWorkspaceButtonClass}
+                                onClick={() =>
+                                  void onSwitchWorkspace(workspace.id)
+                                }
+                              >
+                                {t("settings.switchWorkspaceAction")}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </FieldRow>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leadingIcon={<Plus size={13} />}
+                    disabled={working}
+                    className="self-start"
+                    onClick={() => setAddWorkspaceOpen(true)}
+                  >
+                    {t("settings.addWorkspace")}
+                  </Button>
+                </div>
+                <div className="my-5 border-t border-g-line" />
                 <FieldRow
                   label={t("settings.defaultRoot")}
                   description={t("settings.defaultRootHint")}
                   icon={<FolderKanban size={15} />}
                   align="start"
                 >
-                  <div className="flex w-full flex-col gap-1.5 md:w-[560px]">
+                  <div className="flex w-full flex-col gap-1.5 min-[1200px]:w-[560px]">
                     <TextInput
                       type="text"
                       disabled={
@@ -1452,7 +1481,7 @@ export function SettingsView({
                       className="w-full"
                     />
                     {defaultRootCurrentPath && (
-                      <p className="break-all text-left font-g-mono text-g-caption tracking-g-mono text-g-ink-3 md:text-right">
+                      <p className="break-all text-left font-g-mono text-g-caption tracking-g-mono text-g-ink-3 min-[1200px]:text-right">
                         {defaultRootCurrentPath}
                       </p>
                     )}
@@ -1501,8 +1530,19 @@ export function SettingsView({
                       const isActive = workspace.id === activeWorkspaceId;
 
                       return (
-                        <section key={workspace.id} className="space-y-2">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <section
+                          key={workspace.id}
+                          className={cn(
+                            "overflow-hidden rounded-g-lg border shadow-g-sm",
+                            isActive ? "border-g-line-strong" : "border-g-line",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+                              isActive ? "bg-g-surface-2" : "bg-g-surface",
+                            )}
+                          >
                             <div className="flex min-w-0 items-center gap-3">
                               <WorkspaceAvatar
                                 name={workspace.name}
@@ -1545,42 +1585,40 @@ export function SettingsView({
                               )}
                             </div>
                           </div>
-                          <div className="ml-4 grid gap-1.5 border-l border-g-line pl-4 sm:ml-10">
-                            {groupedProjects.length === 0 ? (
-                              <p className="py-2 font-g text-g-ui text-g-ink-3">
+                          {groupedProjects.length === 0 ? (
+                            <div className="border-t border-g-line px-5 py-3">
+                              <p className="font-g text-g-ui text-g-ink-3">
                                 {t("settings.noProjectsInWorkspace")}
                               </p>
-                            ) : (
-                              groupedProjects.map((project) => (
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-g-line border-t border-g-line">
+                              {groupedProjects.map((project) => (
                                 <div
                                   key={project.id}
-                                  className="group relative flex flex-col gap-2 rounded-g-md px-2 py-2 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
+                                  className="group relative flex flex-col gap-2 px-4 py-2.5 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
                                 >
-                                  <div className="flex min-w-0 items-start gap-2">
-                                    <span className="mt-2 size-1.5 shrink-0 rounded-g-pill bg-g-line-strong" />
-                                    <div className="min-w-0">
-                                      <div className="flex min-w-0 items-center gap-2">
-                                        <div className="min-w-0 truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
-                                          {project.name}
-                                        </div>
-                                        {project.workspaceId ===
-                                          activeWorkspaceId && (
-                                          <Badge
-                                            tone="line"
-                                            className={projectAssetsBadgeClass}
-                                          >
-                                            {t("settings.projectAssets", {
-                                              count:
-                                                assetCountByProject[
-                                                  project.id
-                                                ] ?? 0,
-                                            })}
-                                          </Badge>
-                                        )}
+                                  <div className="min-w-0">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <div className="min-w-0 truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                                        {project.name}
                                       </div>
-                                      <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
-                                        {project.path}
-                                      </div>
+                                      {project.workspaceId ===
+                                        activeWorkspaceId && (
+                                        <Badge
+                                          tone="line"
+                                          className={projectAssetsBadgeClass}
+                                        >
+                                          {t("settings.projectAssets", {
+                                            count:
+                                              assetCountByProject[project.id] ??
+                                              0,
+                                          })}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                      {project.path}
                                     </div>
                                   </div>
                                   <div className={projectRowActionRevealClass}>
@@ -1610,9 +1648,9 @@ export function SettingsView({
                                     </Button>
                                   </div>
                                 </div>
-                              ))
-                            )}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </section>
                       );
                     })}
@@ -1759,7 +1797,7 @@ export function SettingsView({
                     }
                     placeholder={"node_modules\n.git\ndist/**"}
                     rows={6}
-                    className="w-full md:w-[420px]"
+                    className="w-full min-[1200px]:w-[420px]"
                     textareaClassName="min-h-36"
                   />
                 </FieldRow>
@@ -1785,7 +1823,7 @@ export function SettingsView({
                   icon={<Globe2 size={15} />}
                   align="start"
                 >
-                  <div className="w-full md:w-[420px]">
+                  <div className="w-full min-[1200px]:w-[420px]">
                     <OCRLanguageSelect
                       value={draft.ocrLanguages}
                       packs={ocrLanguagePacks}
@@ -1807,7 +1845,7 @@ export function SettingsView({
                   icon={<Sliders size={15} />}
                   align="start"
                 >
-                  <div className="flex w-full items-center justify-start md:w-[420px] md:justify-end">
+                  <div className="flex w-full items-center justify-start min-[1200px]:w-[420px] min-[1200px]:justify-end">
                     <Button
                       variant="secondary"
                       className="min-w-[96px]"
@@ -1828,8 +1866,8 @@ export function SettingsView({
                   icon={<Download size={15} />}
                   align="start"
                 >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-[560px] md:items-end">
-                    <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
+                    <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
                       <Button
                         variant="secondary"
                         leadingIcon={
@@ -1870,8 +1908,7 @@ export function SettingsView({
                         disabled={
                           working ||
                           ocrWorking ||
-                          !settings?.ocrRuntime.installed ||
-                          !hasInstalledSelectedOCRLanguages
+                          !settings?.ocrRuntime.installed
                         }
                       >
                         {removeOCRMutation.isPending
@@ -1968,16 +2005,16 @@ export function SettingsView({
                 icon={sectionIcon("customFilters")}
               />
               <div className="px-6 py-5 md:px-8">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="font-g-display text-g-h3 font-[650] leading-[1.2] tracking-g-tight text-g-ink">
                       {t("settings.customFilters")}
                     </h2>
                     <p className="mt-1 max-w-[62ch] font-g text-g-ui tracking-g-ui text-g-ink-3">
-                      {t("settings.customFiltersHint")}
+                      {t("settings.customFiltersDesc")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 self-start">
+                  <div className="flex shrink-0 items-center gap-2">
                     <IconButton
                       size="sm"
                       aria-label={t("settings.customFiltersHelp")}
@@ -1985,82 +2022,300 @@ export function SettingsView({
                     >
                       <Info size={15} />
                     </IconButton>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      leadingIcon={<Plus size={13} />}
-                      disabled={working}
-                      onClick={onAddCustomFilter}
-                    >
-                      {t("settings.addCustomFilter")}
-                    </Button>
+                    {draft.customAssetFilters.length > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leadingIcon={<Plus size={13} />}
+                        disabled={working}
+                        onClick={onAddCustomFilter}
+                      >
+                        {t("settings.addCustomFilter")}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 {draft.customAssetFilters.length === 0 ? (
-                  <p className="mt-5 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-3 font-g text-g-ui tracking-g-ui text-g-ink-3">
-                    {t("settings.noCustomFilters")}
-                  </p>
+                  <EmptyState
+                    size="sm"
+                    icon={<Filter />}
+                    title={t("settings.noCustomFilters")}
+                    description={t("settings.customFiltersDesc")}
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leadingIcon={<Plus size={13} />}
+                        disabled={working}
+                        onClick={onAddCustomFilter}
+                      >
+                        {t("settings.addCustomFilter")}
+                      </Button>
+                    }
+                    className="mt-5 rounded-g-md border border-g-line bg-g-surface-2"
+                  />
                 ) : (
                   <div className="mt-5 grid gap-3">
-                    {draft.customAssetFilters.map((filter) => (
-                      <section
-                        key={filter.id}
-                        className="rounded-g-md border border-g-line bg-g-surface-2 p-3 shadow-g-sm"
-                      >
-                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                          <TextInput
-                            label={t("settings.customFilterName")}
-                            value={filter.name}
-                            disabled={working}
-                            onChange={(event) =>
-                              updateCustomFilter(filter.id, (current) => ({
-                                ...current,
-                                name: event.target.value,
-                              }))
-                            }
-                          />
-                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                            <div className="inline-flex h-8 items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2.5 font-g text-g-caption font-[510] tracking-g-ui text-g-ink-2">
-                              <Switch
-                                checked={filter.enabled}
-                                disabled={working}
-                                onCheckedChange={(enabled) =>
-                                  updateCustomFilter(filter.id, (current) => ({
-                                    ...current,
-                                    enabled,
-                                  }))
-                                }
-                                aria-label={t("settings.customFilterEnabled")}
-                              />
-                              {t("settings.customFilterEnabled")}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              leadingIcon={<Trash2 size={13} />}
+                    {draft.customAssetFilters.map((filter) => {
+                      const ocrUnavailable =
+                        customAssetFilterUsesOCR(filter) && !draft.ocrEnabled;
+                      return (
+                        <section
+                          key={filter.id}
+                          className="rounded-g-md border border-g-line bg-g-surface-2 shadow-g-sm"
+                        >
+                          {/* Filter header */}
+                          <div className="flex items-center gap-2 border-b border-g-line px-3 py-2">
+                            <TextInput
+                              value={filter.name}
                               disabled={working}
-                              className={ghostDangerClass}
-                              onClick={() => onDeleteCustomFilter(filter.id)}
-                            >
-                              {t("action.delete")}
-                            </Button>
+                              size="sm"
+                              icon={<Pencil size={13} />}
+                              inputClassName="font-g text-g-body font-[590] tracking-g-ui"
+                              aria-label={t("settings.customFilterName")}
+                              onChange={(event) =>
+                                updateCustomFilter(filter.id, (current) => ({
+                                  ...current,
+                                  name: event.target.value,
+                                }))
+                              }
+                            />
+                            {ocrUnavailable && (
+                              <Badge tone="amber" className="shrink-0">
+                                {t("settings.customFilterOCRDisabled")}
+                              </Badge>
+                            )}
+                            <Switch
+                              checked={filter.enabled}
+                              disabled={working}
+                              onCheckedChange={(enabled) =>
+                                updateCustomFilter(filter.id, (current) => ({
+                                  ...current,
+                                  enabled,
+                                }))
+                              }
+                              aria-label={t("settings.customFilterEnabled")}
+                            />
+                            <DropdownMenu
+                              trigger={
+                                <button
+                                  type="button"
+                                  className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-g-md text-g-ink-3 transition-[background,color] duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+                                  aria-label={t("action.more")}
+                                >
+                                  <MoreHorizontal size={15} />
+                                </button>
+                              }
+                              items={[
+                                {
+                                  label: t("action.delete"),
+                                  icon: <Trash2 size={15} />,
+                                  variant: "danger" as const,
+                                  disabled: working,
+                                  onClick: () =>
+                                    onDeleteCustomFilter(filter.id),
+                                },
+                              ]}
+                            />
                           </div>
-                        </div>
 
-                        <div className="mt-3 grid gap-3">
-                          {filter.groups.map((group, groupIndex) => (
-                            <div
-                              key={`${filter.id}-${groupIndex}`}
-                              className="rounded-g-md border border-g-line bg-g-surface p-3"
-                            >
-                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <Badge tone="line">
-                                  {t("settings.customFilterGroupLabel", {
-                                    index: groupIndex + 1,
+                          {/* Groups & clauses */}
+                          <div className="px-3 py-3">
+                            {filter.groups.map((group, groupIndex) => (
+                              <Fragment key={`${filter.id}-${groupIndex}`}>
+                                {/* OR divider between groups */}
+                                {groupIndex > 0 && (
+                                  <div className="my-3 flex items-center gap-2">
+                                    <div className="flex-1 border-t border-dashed border-g-line" />
+                                    <span className="shrink-0 rounded-g-pill bg-g-surface px-2.5 py-0.5 font-g-mono text-g-chip font-[590] uppercase tracking-g-mono text-g-ink-3">
+                                      OR
+                                    </span>
+                                    <div className="flex-1 border-t border-dashed border-g-line" />
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        "grid size-6 shrink-0 cursor-pointer place-items-center rounded-g-md transition-[background,color] duration-[120ms] ease-g hover:bg-g-red-soft focus-visible:outline-none focus-visible:shadow-g-focus",
+                                        "text-g-ink-3 hover:text-g-red",
+                                      )}
+                                      disabled={
+                                        working || filter.groups.length <= 1
+                                      }
+                                      aria-label={t(
+                                        "settings.deleteCustomFilterGroup",
+                                      )}
+                                      onClick={() =>
+                                        onDeleteCustomFilterGroup(
+                                          filter.id,
+                                          groupIndex,
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Clause rows */}
+                                <div className="grid gap-1.5">
+                                  {group.clauses.map((clause, clauseIndex) => {
+                                    const valueOptions = clauseValueOptions(
+                                      clause.field,
+                                    );
+                                    const singleOperator =
+                                      customFilterOperatorsByField[clause.field]
+                                        .length === 1;
+                                    return (
+                                      <Fragment
+                                        key={`${filter.id}-${groupIndex}-${clauseIndex}`}
+                                      >
+                                        {clauseIndex > 0 && (
+                                          <div className="flex justify-center py-0.5">
+                                            <span className="font-g-mono text-g-chip font-[510] uppercase tracking-g-mono text-g-ink-3">
+                                              AND
+                                            </span>
+                                          </div>
+                                        )}
+                                        <div
+                                          className={cn(
+                                            "grid items-center gap-2",
+                                            singleOperator
+                                              ? "sm:grid-cols-[minmax(140px,1fr)_minmax(140px,1fr)_auto]"
+                                              : "sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(140px,1.5fr)_auto]",
+                                          )}
+                                        >
+                                          <Select
+                                            value={clause.field}
+                                            className="min-w-0"
+                                            aria-label={t(
+                                              "settings.customFilterFieldLabel",
+                                            )}
+                                            options={customFilterFields.map(
+                                              (field) => ({
+                                                value: field,
+                                                label: t(
+                                                  `settings.customFilterField.${field}`,
+                                                ),
+                                                description: t(
+                                                  `settings.customFilterFieldDesc.${field}`,
+                                                ),
+                                              }),
+                                            )}
+                                            onChange={(field) =>
+                                              onCustomFilterFieldChange(
+                                                filter.id,
+                                                groupIndex,
+                                                clauseIndex,
+                                                field as CustomAssetFilterField,
+                                              )
+                                            }
+                                          />
+                                          {!singleOperator && (
+                                            <Select
+                                              value={clause.operator}
+                                              className="min-w-0"
+                                              aria-label={t(
+                                                "settings.customFilterOperatorLabel",
+                                              )}
+                                              options={customFilterOperatorsByField[
+                                                clause.field
+                                              ].map((operator) => ({
+                                                value: operator,
+                                                label: t(
+                                                  `settings.customFilterOperator.${operator}`,
+                                                ),
+                                              }))}
+                                              onChange={(operator) =>
+                                                onCustomFilterOperatorChange(
+                                                  filter.id,
+                                                  groupIndex,
+                                                  clauseIndex,
+                                                  operator as CustomAssetFilterOperator,
+                                                )
+                                              }
+                                            />
+                                          )}
+                                          {valueOptions ? (
+                                            <Select
+                                              value={clause.value}
+                                              className="min-w-0"
+                                              aria-label={t(
+                                                "settings.customFilterValueLabel",
+                                              )}
+                                              options={valueOptions.map(
+                                                (value) => ({
+                                                  value,
+                                                  label: t(
+                                                    `settings.customFilterValue.${value}`,
+                                                  ),
+                                                }),
+                                              )}
+                                              onChange={(value) =>
+                                                updateCustomFilterClause(
+                                                  filter.id,
+                                                  groupIndex,
+                                                  clauseIndex,
+                                                  (current) => ({
+                                                    ...current,
+                                                    value,
+                                                  }),
+                                                )
+                                              }
+                                            />
+                                          ) : (
+                                            <TextInput
+                                              value={clause.value}
+                                              disabled={working}
+                                              inputClassName="font-g-mono text-g-caption tracking-g-mono"
+                                              aria-label={t(
+                                                "settings.customFilterValueLabel",
+                                              )}
+                                              placeholder={t(
+                                                `settings.customFilterValuePlaceholder.${clause.field}`,
+                                              )}
+                                              onChange={(event) =>
+                                                updateCustomFilterClause(
+                                                  filter.id,
+                                                  groupIndex,
+                                                  clauseIndex,
+                                                  (current) => ({
+                                                    ...current,
+                                                    value: event.target.value,
+                                                  }),
+                                                )
+                                              }
+                                            />
+                                          )}
+                                          <button
+                                            type="button"
+                                            className={cn(
+                                              "grid size-7 shrink-0 cursor-pointer place-items-center rounded-g-md transition-[background,color] duration-[120ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus",
+                                              "text-g-ink-3 hover:bg-g-red-soft hover:text-g-red",
+                                              "disabled:cursor-not-allowed disabled:opacity-[0.38]",
+                                            )}
+                                            disabled={
+                                              working ||
+                                              group.clauses.length <= 1
+                                            }
+                                            aria-label={t("action.delete")}
+                                            onClick={() =>
+                                              onDeleteCustomFilterClause(
+                                                filter.id,
+                                                groupIndex,
+                                                clauseIndex,
+                                              )
+                                            }
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        </div>
+                                      </Fragment>
+                                    );
                                   })}
-                                </Badge>
-                                <div className="flex flex-wrap items-center gap-1.5">
+                                </div>
+
+                                {/* Add rule */}
+                                <div className="mt-2 flex justify-end">
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -2075,172 +2330,29 @@ export function SettingsView({
                                   >
                                     {t("settings.addCustomFilterClause")}
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    leadingIcon={<Trash2 size={13} />}
-                                    disabled={
-                                      working || filter.groups.length <= 1
-                                    }
-                                    className={ghostDangerClass}
-                                    onClick={() =>
-                                      onDeleteCustomFilterGroup(
-                                        filter.id,
-                                        groupIndex,
-                                      )
-                                    }
-                                  >
-                                    {t("settings.deleteCustomFilterGroup")}
-                                  </Button>
                                 </div>
-                              </div>
-                              <div className="mt-3 grid gap-2">
-                                {group.clauses.map((clause, clauseIndex) => {
-                                  const valueOptions = clauseValueOptions(
-                                    clause.field,
-                                  );
-                                  return (
-                                    <div
-                                      key={`${filter.id}-${groupIndex}-${clauseIndex}`}
-                                      className="grid gap-2 rounded-g-md border border-g-line bg-g-surface-2 p-2 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(140px,1.5fr)_auto]"
-                                    >
-                                      <Select
-                                        value={clause.field}
-                                        size="sm"
-                                        className="min-w-0"
-                                        aria-label={t(
-                                          "settings.customFilterFieldLabel",
-                                        )}
-                                        options={customFilterFields.map(
-                                          (field) => ({
-                                            value: field,
-                                            label: t(
-                                              `settings.customFilterField.${field}`,
-                                            ),
-                                          }),
-                                        )}
-                                        onChange={(field) =>
-                                          onCustomFilterFieldChange(
-                                            filter.id,
-                                            groupIndex,
-                                            clauseIndex,
-                                            field as CustomAssetFilterField,
-                                          )
-                                        }
-                                      />
-                                      <Select
-                                        value={clause.operator}
-                                        size="sm"
-                                        className="min-w-0"
-                                        aria-label={t(
-                                          "settings.customFilterOperatorLabel",
-                                        )}
-                                        options={customFilterOperatorsByField[
-                                          clause.field
-                                        ].map((operator) => ({
-                                          value: operator,
-                                          label: t(
-                                            `settings.customFilterOperator.${operator}`,
-                                          ),
-                                        }))}
-                                        onChange={(operator) =>
-                                          onCustomFilterOperatorChange(
-                                            filter.id,
-                                            groupIndex,
-                                            clauseIndex,
-                                            operator as CustomAssetFilterOperator,
-                                          )
-                                        }
-                                      />
-                                      {valueOptions ? (
-                                        <Select
-                                          value={clause.value}
-                                          size="sm"
-                                          className="min-w-0"
-                                          aria-label={t(
-                                            "settings.customFilterValueLabel",
-                                          )}
-                                          options={valueOptions.map(
-                                            (value) => ({
-                                              value,
-                                              label: t(
-                                                `settings.customFilterValue.${value}`,
-                                              ),
-                                            }),
-                                          )}
-                                          onChange={(value) =>
-                                            updateCustomFilterClause(
-                                              filter.id,
-                                              groupIndex,
-                                              clauseIndex,
-                                              (current) => ({
-                                                ...current,
-                                                value,
-                                              }),
-                                            )
-                                          }
-                                        />
-                                      ) : (
-                                        <TextInput
-                                          value={clause.value}
-                                          disabled={working}
-                                          inputClassName="font-g-mono text-g-caption tracking-g-mono"
-                                          aria-label={t(
-                                            "settings.customFilterValueLabel",
-                                          )}
-                                          placeholder={t(
-                                            `settings.customFilterValuePlaceholder.${clause.field}`,
-                                          )}
-                                          onChange={(event) =>
-                                            updateCustomFilterClause(
-                                              filter.id,
-                                              groupIndex,
-                                              clauseIndex,
-                                              (current) => ({
-                                                ...current,
-                                                value: event.target.value,
-                                              }),
-                                            )
-                                          }
-                                        />
-                                      )}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        leadingIcon={<Trash2 size={13} />}
-                                        disabled={
-                                          working || group.clauses.length <= 1
-                                        }
-                                        className={ghostDangerClass}
-                                        onClick={() =>
-                                          onDeleteCustomFilterClause(
-                                            filter.id,
-                                            groupIndex,
-                                            clauseIndex,
-                                          )
-                                        }
-                                      >
-                                        {t("action.delete")}
-                                      </Button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                              </Fragment>
+                            ))}
+
+                            {/* Add OR group */}
+                            <div className="mt-3 border-t border-g-line pt-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leadingIcon={<Plus size={13} />}
+                                disabled={working}
+                                className="w-full"
+                                onClick={() =>
+                                  onAddCustomFilterGroup(filter.id)
+                                }
+                              >
+                                {t("settings.addCustomFilterGroup")}
+                              </Button>
                             </div>
-                          ))}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            leadingIcon={<Plus size={13} />}
-                            disabled={working}
-                            className="self-start"
-                            onClick={() => onAddCustomFilterGroup(filter.id)}
-                          >
-                            {t("settings.addCustomFilterGroup")}
-                          </Button>
-                        </div>
-                      </section>
-                    ))}
+                          </div>
+                        </section>
+                      );
+                    })}
                   </div>
                 )}
                 {updateMutation.error && (
@@ -2269,7 +2381,7 @@ export function SettingsView({
                   description={t("settings.defaultQualityHint")}
                   icon={<Sliders size={15} />}
                 >
-                  <div className="flex w-full items-center justify-start gap-3 md:justify-end">
+                  <div className="flex w-full items-center justify-start gap-3 min-[1200px]:justify-end">
                     <input
                       type="range"
                       min={0}
@@ -2359,9 +2471,57 @@ export function SettingsView({
               <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
                 <FieldRow
                   label={t("settings.version")}
+                  description={
+                    versionQuery.data?.devMode
+                      ? t("settings.versionDevHint")
+                      : undefined
+                  }
                   icon={<Info size={15} />}
+                  align="start"
                 >
-                  <Badge tone="default">0.1.0</Badge>
+                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[420px] min-[1200px]:items-end">
+                    <div className="flex flex-wrap items-center justify-start gap-2 min-[1200px]:justify-end">
+                      <Badge tone="default">
+                        {versionQuery.data?.currentVersion ?? "dev"}
+                      </Badge>
+                      {versionQuery.data?.updateAvailable ? (
+                        <Badge tone="amber">
+                          {t("settings.updateAvailable", {
+                            version: versionQuery.data.latestVersion,
+                          })}
+                        </Badge>
+                      ) : versionQuery.isError ? (
+                        <Badge tone="red">
+                          {t("settings.updateCheckFailed")}
+                        </Badge>
+                      ) : (
+                        <Badge tone="green">{t("settings.upToDate")}</Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      leadingIcon={
+                        updateAppMutation.isPending ? (
+                          <LoaderCircle size={15} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={15} />
+                        )
+                      }
+                      onClick={() => void onUpdateApp()}
+                      disabled={
+                        updateAppMutation.isPending ||
+                        versionQuery.isLoading ||
+                        (!versionQuery.data?.updateAvailable &&
+                          !versionQuery.data?.devMode)
+                      }
+                    >
+                      {updateAppMutation.isPending
+                        ? t("settings.updating")
+                        : versionQuery.data?.updateAvailable
+                          ? t("settings.updateAction")
+                          : t("settings.upToDateAction")}
+                    </Button>
+                  </div>
                 </FieldRow>
                 <FieldRow
                   label={t("settings.license")}
@@ -2374,7 +2534,7 @@ export function SettingsView({
                   description={t("settings.installAppHint")}
                   align="start"
                 >
-                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[420px] min-[1200px]:items-end">
                     <Button
                       variant="secondary"
                       leadingIcon={<Download size={15} />}
@@ -2393,7 +2553,7 @@ export function SettingsView({
                   </div>
                 </FieldRow>
                 <FieldRow label={t("settings.data")}>
-                  <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                  <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
                     <Button
                       variant="secondary"
                       leadingIcon={<Download size={15} />}
@@ -2495,6 +2655,47 @@ export function SettingsView({
                 aria-label={t("settings.ocrBatchSize")}
               />
             </label>
+            <label className="grid gap-2">
+              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+                {t("settings.ocrConcurrency")}
+              </span>
+              <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+                {t("settings.ocrConcurrencyHint")}
+              </span>
+              <TextInput
+                type="number"
+                min={1}
+                max={2}
+                value={String(draft.ocrConcurrency)}
+                onChange={(event) =>
+                  updateDraft((prev) => ({
+                    ...prev,
+                    ocrConcurrency: Number(event.target.value),
+                  }))
+                }
+                aria-label={t("settings.ocrConcurrency")}
+              />
+            </label>
+            <div className="flex items-start justify-between gap-4 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-3">
+              <div className="min-w-0">
+                <div className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+                  {t("settings.ocrFuzzySearch")}
+                </div>
+                <p className="mt-1 font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+                  {t("settings.ocrFuzzySearchHint")}
+                </p>
+              </div>
+              <Switch
+                checked={draft.ocrFuzzySearch}
+                onCheckedChange={(next) =>
+                  updateDraft((prev) => ({
+                    ...prev,
+                    ocrFuzzySearch: next,
+                  }))
+                }
+                aria-label={t("settings.ocrFuzzySearch")}
+              />
+            </div>
           </div>
         </Modal>
       )}
@@ -2530,12 +2731,12 @@ export function SettingsView({
             </h3>
             {[
               {
-                title: t("settings.customFiltersHelpChineseTitle"),
+                title: t("settings.customFiltersHelpIconAssetsTitle"),
                 rows: [
                   [
-                    t("settings.customFilterField.path"),
-                    t("settings.customFilterOperator.regex"),
-                    "\\p{Han}",
+                    t("settings.customFilterField.extension"),
+                    t("settings.customFilterOperator.oneOf"),
+                    ".svg,.ico",
                   ],
                 ],
               },
@@ -2564,7 +2765,6 @@ export function SettingsView({
                   ],
                   [
                     t("settings.customFilterField.status"),
-                    t("settings.customFilterOperator.is"),
                     t("settings.customFilterValue.unused"),
                   ],
                 ],
@@ -2574,12 +2774,10 @@ export function SettingsView({
                 rows: [
                   [
                     t("settings.customFilterField.nearDuplicate"),
-                    t("settings.customFilterOperator.is"),
                     t("settings.customFilterValue.true"),
                   ],
                   [
                     t("settings.customFilterField.optimizable"),
-                    t("settings.customFilterOperator.is"),
                     t("settings.customFilterValue.true"),
                   ],
                 ],
@@ -2593,14 +2791,21 @@ export function SettingsView({
                   {example.title}
                 </h4>
                 <div className="mt-2 grid gap-1">
-                  {example.rows.map(([field, operator, value]) => (
+                  {example.rows.map((row) => (
                     <div
-                      key={`${field}-${operator}-${value}`}
-                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)] gap-2 rounded-g-md bg-g-surface-2 px-2 py-1.5 font-g-mono text-g-chip tracking-g-mono text-g-ink-2"
+                      key={row.join("-")}
+                      className={cn(
+                        "grid gap-2 rounded-g-md bg-g-surface-2 px-2 py-1.5 font-g-mono text-g-chip tracking-g-mono text-g-ink-2",
+                        row.length === 2
+                          ? "grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]"
+                          : "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)]",
+                      )}
                     >
-                      <span className="truncate">{field}</span>
-                      <span className="truncate">{operator}</span>
-                      <span className="truncate">{value}</span>
+                      {row.map((cell, i) => (
+                        <span key={i} className="truncate">
+                          {cell}
+                        </span>
+                      ))}
                     </div>
                   ))}
                 </div>
