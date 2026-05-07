@@ -615,6 +615,7 @@ export function DuplicatesView({
                 value={extFilter}
                 aria-label={t("duplicates.filterExtension")}
                 size="sm"
+                className="w-[160px] shrink-0"
                 options={[
                   { value: "__all__", label: t("duplicates.allExtensions") },
                   ...uniqueExts.map((ext) => ({
