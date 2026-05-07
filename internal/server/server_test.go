@@ -82,22 +82,23 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
 	}
-	var catalog struct {
-		Items []struct {
-			ID              string `json:"id"`
-			ContentHash     string `json:"contentHash"`
-			HashAlgorithm   string `json:"hashAlgorithm"`
-			ThumbnailURL    string `json:"thumbnailUrl"`
-			Recommendations []any  `json:"optimizationRecommendations"`
-		} `json:"items"`
+	var summary struct {
+		ScanID int64 `json:"scanId"`
+		Stats  struct {
+			TotalFiles int `json:"totalFiles"`
+		} `json:"stats"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &summary); err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog.Items) != 1 || catalog.Items[0].ID == "" || catalog.Items[0].HashAlgorithm != "blake3" {
-		t.Fatalf("catalog body = %#v", catalog)
+	if summary.ScanID == 0 || summary.Stats.TotalFiles != 1 {
+		t.Fatalf("catalog summary = %#v", summary)
 	}
-	id := catalog.Items[0].ID
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 || items[0].ID == "" {
+		t.Fatalf("catalog items = %#v", items)
+	}
+	id := items[0].ID
 
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/scan", nil)
@@ -118,7 +119,7 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/thumbs/"+id, nil)
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || rec.Header().Get("content-type") != "image/png" || rec.Body.Len() == 0 {
-		t.Fatalf("thumb = %d %s len=%d", rec.Code, rec.Header().Get("content-type"), rec.Body.Len())
+		t.Fatalf("thumb = %d %s len=%d body=%s", rec.Code, rec.Header().Get("content-type"), rec.Body.Len(), rec.Body.String())
 	}
 
 	payload, _ := json.Marshal(map[string]string{"assetId": id})
@@ -155,7 +156,7 @@ func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	catalog, _, err := s.scanWithProgress(context.Background(), nil)
+	catalog, _, err := s.scanWithProgress(context.Background(), scanner.FullScanOptions(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,6 +390,10 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 	}
 	defer store.Close()
 	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
 		t.Fatal(err)
 	}
 	s, err := New(Options{Store: store, Version: "test"})
@@ -796,6 +801,10 @@ func TestSettingsExportImportResetDatabase(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
@@ -914,6 +923,10 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
@@ -1017,38 +1030,28 @@ func TestMergePreviewRouteForDuplicateAssets(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
-	}
-	var catalog struct {
-		Items []struct {
-			ID       string `json:"id"`
-			RepoPath string `json:"repoPath"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
-		t.Fatal(err)
-	}
+	items := catalogItemsForTest(t, s)
 	var duplicateID string
-	for _, item := range catalog.Items {
+	for _, item := range items {
 		if item.RepoPath == "src/b.png" {
 			duplicateID = item.ID
 		}
 	}
 	if duplicateID == "" {
-		t.Fatalf("catalog items = %#v", catalog.Items)
+		t.Fatalf("catalog items = %#v", items)
 	}
 
 	payload, _ := json.Marshal(map[string]string{"assetId": duplicateID, "preferredPath": "src/a.png"})
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/actions/merge-duplicates/preview", bytes.NewReader(payload))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/merge-duplicates/preview", bytes.NewReader(payload))
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"type":"merge"`) || !strings.Contains(rec.Body.String(), `"deletes":["src/b.png"]`) {
 		t.Fatalf("merge preview = %d %s", rec.Code, rec.Body.String())
@@ -1166,40 +1169,30 @@ func TestBatchDelete(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Fetch catalog to get asset IDs.
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
-	}
-	var catalog struct {
-		Items []struct {
-			ID       string `json:"id"`
-			RepoPath string `json:"repoPath"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
-		t.Fatal(err)
-	}
-	if len(catalog.Items) != 3 {
-		t.Fatalf("expected 3 catalog items, got %d: %#v", len(catalog.Items), catalog.Items)
+	// Fetch catalog items to get asset IDs.
+	items := catalogItemsForTest(t, s)
+	if len(items) != 3 {
+		t.Fatalf("expected 3 catalog items, got %d: %#v", len(items), items)
 	}
 	idsByPath := map[string]string{}
-	for _, item := range catalog.Items {
+	for _, item := range items {
 		idsByPath[item.RepoPath] = item.ID
 	}
 	deleteIDs := []string{idsByPath["src/a.png"], idsByPath["src/b.png"]}
 
 	// Empty body returns empty succeeded list.
 	payload, _ := json.Marshal(map[string][]string{"assetIds": {}})
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/delete", bytes.NewReader(payload))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/batch/delete", bytes.NewReader(payload))
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"succeeded":[]`) {
 		t.Fatalf("empty batch delete = %d %s", rec.Code, rec.Body.String())
@@ -1237,24 +1230,37 @@ func TestBatchDelete(t *testing.T) {
 
 func catalogAssetID(t *testing.T, s *Server) string {
 	t.Helper()
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 || items[0].ID == "" {
+		t.Fatalf("catalog body = %#v", items)
+	}
+	return items[0].ID
+}
+
+type catalogItemForTest struct {
+	ID              string `json:"id"`
+	RepoPath        string `json:"repoPath"`
+	ContentHash     string `json:"contentHash"`
+	HashAlgorithm   string `json:"hashAlgorithm"`
+	ThumbnailURL    string `json:"thumbnailUrl"`
+	Recommendations []any  `json:"optimizationRecommendations"`
+}
+
+func catalogItemsForTest(t *testing.T, s *Server) []catalogItemForTest {
+	t.Helper()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog/items", nil)
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("catalog items = %d %s", rec.Code, rec.Body.String())
 	}
-	var catalog struct {
-		Items []struct {
-			ID string `json:"id"`
-		} `json:"items"`
+	var page struct {
+		Items []catalogItemForTest `json:"items"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog.Items) != 1 || catalog.Items[0].ID == "" {
-		t.Fatalf("catalog body = %#v", catalog)
-	}
-	return catalog.Items[0].ID
+	return page.Items
 }
 
 func newMultipartPrecheckRequest(t *testing.T, filename, path string) *http.Request {
@@ -1327,36 +1333,26 @@ func TestBatchMovePreviewAndApply(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Fetch catalog to get asset ID.
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
-	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+	// Fetch catalog item ID.
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 catalog item, got %d", len(items))
 	}
-	var catalog struct {
-		Items []struct {
-			ID       string `json:"id"`
-			RepoPath string `json:"repoPath"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
-		t.Fatal(err)
-	}
-	if len(catalog.Items) != 1 {
-		t.Fatalf("expected 1 catalog item, got %d", len(catalog.Items))
-	}
-	assetID := catalog.Items[0].ID
+	assetID := items[0].ID
 
 	// POST batch move preview.
 	payload, _ := json.Marshal(map[string]any{"assetIds": []string{assetID}, "targetDir": "assets"})
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/move/preview", bytes.NewReader(payload))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/batch/move/preview", bytes.NewReader(payload))
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("batch move preview = %d %s", rec.Code, rec.Body.String())
@@ -1436,19 +1432,9 @@ func TestBatchExport(t *testing.T) {
 	scanRec := httptest.NewRecorder()
 	s.handler.ServeHTTP(scanRec, httptest.NewRequest(http.MethodPost, "/api/scan", nil))
 
-	catRec := httptest.NewRecorder()
-	s.handler.ServeHTTP(catRec, httptest.NewRequest(http.MethodGet, "/api/catalog", nil))
-	var cat struct {
-		Items []struct {
-			ID string `json:"id"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(catRec.Body.Bytes(), &cat); err != nil {
-		t.Fatal(err)
-	}
-
+	items := catalogItemsForTest(t, s)
 	ids := make([]string, 0)
-	for _, item := range cat.Items {
+	for _, item := range items {
 		ids = append(ids, item.ID)
 	}
 

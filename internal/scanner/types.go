@@ -18,11 +18,45 @@ const (
 	ScanPhasePersisting     ScanPhase = "persisting"
 )
 
+type ScanProfile string
+
+const (
+	ScanProfileFast   ScanProfile = "fast"
+	ScanProfileFull   ScanProfile = "full"
+	ScanProfileCustom ScanProfile = "custom"
+)
+
+type AnalysisState string
+
+const (
+	AnalysisComputed    AnalysisState = "computed"
+	AnalysisNotComputed AnalysisState = "notComputed"
+)
+
+type AnalysisOptions struct {
+	References     bool `json:"references"`
+	NearDuplicates bool `json:"nearDuplicates"`
+	Optimization   bool `json:"optimization"`
+}
+
+type ScanOptions struct {
+	Profile         ScanProfile     `json:"profile"`
+	ExcludePatterns []string        `json:"excludePatterns,omitempty"`
+	Analyses        AnalysisOptions `json:"analyses"`
+}
+
+type CatalogAnalysis struct {
+	References     AnalysisState `json:"references"`
+	NearDuplicates AnalysisState `json:"nearDuplicates"`
+	Optimization   AnalysisState `json:"optimization"`
+}
+
 type ScanProgress struct {
-	Phase   ScanPhase `json:"phase"`
-	Current int       `json:"current,omitempty"`
-	Total   int       `json:"total,omitempty"`
-	Message string    `json:"message,omitempty"`
+	Phase   ScanPhase     `json:"phase"`
+	Current int           `json:"current,omitempty"`
+	Total   int           `json:"total,omitempty"`
+	Message string        `json:"message,omitempty"`
+	State   AnalysisState `json:"state,omitempty"`
 }
 
 type ProgressFunc func(ScanProgress)
@@ -37,12 +71,14 @@ type Project struct {
 
 type Catalog struct {
 	GeneratedAt     string           `json:"generatedAt"`
+	ScanID          int64            `json:"scanId,omitempty"`
 	Projects        []Project        `json:"projects"`
 	Items           []AssetItem      `json:"items"`
 	DuplicateGroups []DuplicateGroup `json:"duplicateGroups"`
 	NearDuplicates  []NearDuplicate  `json:"nearDuplicates"`
 	LintFindings    []lint.Finding   `json:"lintFindings"`
 	Stats           CatalogStats     `json:"stats"`
+	Analysis        CatalogAnalysis  `json:"analysis"`
 }
 
 type CatalogStats struct {
@@ -63,6 +99,7 @@ type AssetItem struct {
 	LocalPath              string                   `json:"localPath"`
 	Ext                    string                   `json:"ext"`
 	Bytes                  int64                    `json:"bytes"`
+	ModifiedUnix           int64                    `json:"modifiedUnix"`
 	ContentHash            string                   `json:"contentHash"`
 	HashAlgorithm          string                   `json:"hashAlgorithm"`
 	Image                  imageproc.Metadata       `json:"image"`

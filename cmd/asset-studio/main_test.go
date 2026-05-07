@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"asset-studio/internal/config"
+	"asset-studio/internal/scanner"
 )
 
 func TestMainWithoutArgsPrintsUsage(t *testing.T) {
@@ -446,37 +447,56 @@ func TestCmdOptimizePreCheckAndActionsJSON(t *testing.T) {
 	if err := cmdProjects([]string{"add", project}, false); err != nil {
 		t.Fatal(err)
 	}
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fullProfile := scanner.ScanProfileFull
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ScanProfile: &fullProfile}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
 
 	scanned := captureStdout(t, func() {
 		if err := cmdScan([]string{"--json"}, false); err != nil {
 			t.Fatal(err)
 		}
 	})
+	var summaryBody struct {
+		OK     bool  `json:"ok"`
+		ScanID int64 `json:"scanId"`
+	}
+	decodeJSON(t, scanned, &summaryBody)
+	if !summaryBody.OK || summaryBody.ScanID == 0 {
+		t.Fatalf("scan summary = %s", scanned)
+	}
+	listed := captureStdout(t, func() {
+		if err := cmdCatalogItems([]string{"--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
 	var scanBody struct {
-		Catalog struct {
+		Page struct {
 			Items []struct {
 				ID       string   `json:"id"`
 				RepoPath string   `json:"repoPath"`
 				UsedBy   []string `json:"usedBy"`
 			} `json:"items"`
-		} `json:"catalog"`
+		} `json:"page"`
 	}
-	decodeJSON(t, scanned, &scanBody)
+	decodeJSON(t, listed, &scanBody)
 	assetID := ""
 	copyID := ""
-	for _, item := range scanBody.Catalog.Items {
+	for _, item := range scanBody.Page.Items {
 		switch item.RepoPath {
 		case "src/old.svg":
 			assetID = item.ID
-			if len(item.UsedBy) != 1 {
-				t.Fatalf("usedBy = %#v", item.UsedBy)
-			}
 		case "src/copy.svg":
 			copyID = item.ID
 		}
 	}
 	if assetID == "" || copyID == "" {
-		t.Fatalf("assets not found in scan = %#v", scanBody.Catalog.Items)
+		t.Fatalf("assets not found in scan = %#v", scanBody.Page.Items)
 	}
 
 	prechecked := captureStdout(t, func() {

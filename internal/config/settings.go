@@ -8,6 +8,7 @@ import (
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/ocr"
+	"asset-studio/internal/scanner"
 )
 
 func defaultExcludePatterns() []string {
@@ -27,6 +28,8 @@ func DefaultAppSettings() AppSettings {
 		DefaultProjectRoot:         "",
 		AutoScanOnOpen:             false,
 		ScanOnOpen:                 false,
+		ScanProfile:                scanner.ScanProfileFast,
+		ScanAnalyses:               scanner.DefaultScanOptions().Analyses,
 		OCREnabled:                 false,
 		OCRLanguages:               []string{"eng"},
 		OCRMaxPixels:               ocr.DefaultMaxPixels,
@@ -57,6 +60,16 @@ func normalizeOCRSettings(settings AppSettings) AppSettings {
 	return settings
 }
 
+func normalizeScanSettings(settings AppSettings) AppSettings {
+	options := scanner.NormalizeScanOptions(scanner.ScanOptions{
+		Profile:  settings.ScanProfile,
+		Analyses: settings.ScanAnalyses,
+	})
+	settings.ScanProfile = options.Profile
+	settings.ScanAnalyses = options.Analyses
+	return settings
+}
+
 func (s *Store) Settings() (AppSettings, error) {
 	settings := DefaultAppSettings()
 	var raw string
@@ -79,6 +92,7 @@ func (s *Store) Settings() (AppSettings, error) {
 	if settings.CustomAssetFilters == nil {
 		settings.CustomAssetFilters = []CustomAssetFilter{}
 	}
+	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	return settings, nil
 }
@@ -110,6 +124,12 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.ScanOnOpen != nil {
 		settings.ScanOnOpen = *update.ScanOnOpen
+	}
+	if update.ScanProfile != nil {
+		settings.ScanProfile = *update.ScanProfile
+	}
+	if update.ScanAnalyses != nil {
+		settings.ScanAnalyses = *update.ScanAnalyses
 	}
 	if update.OCREnabled != nil {
 		settings.OCREnabled = *update.OCREnabled
@@ -178,6 +198,7 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if settings.OptimizationDefaultQuality < 0 || settings.OptimizationDefaultQuality > 100 {
 		return AppSettings{}, apierr.New("settings_quality_invalid", "optimization quality must be between 0 and 100")
 	}
+	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	if len(settings.OCRLanguages) == 0 {
 		return AppSettings{}, apierr.New("settings_ocr_languages_required", "at least one OCR language is required")
@@ -292,11 +313,14 @@ func (s *Store) ResetData() error {
 		"near_duplicate_snapshots",
 		"duplicate_group_assets",
 		"duplicate_group_snapshots",
+		"lint_snapshots",
 		"optimization_snapshots",
 		"reference_snapshots",
 		"asset_snapshots",
 		"scans",
 		"projects",
+		"workspaces",
+		"app_settings",
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -312,5 +336,8 @@ func (s *Store) ResetData() error {
 			return err
 		}
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	return s.ensureDefaultWorkspace()
 }

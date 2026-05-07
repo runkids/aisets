@@ -57,6 +57,10 @@ func (s *Store) migrate() error {
 			started_at TEXT NOT NULL,
 			completed_at TEXT,
 			status TEXT NOT NULL,
+			scan_profile TEXT NOT NULL DEFAULT 'fast',
+			references_state TEXT NOT NULL DEFAULT 'computed',
+			near_duplicates_state TEXT NOT NULL DEFAULT 'computed',
+			optimization_state TEXT NOT NULL DEFAULT 'computed',
 			project_count INTEGER NOT NULL DEFAULT 0,
 			total_files INTEGER NOT NULL DEFAULT 0,
 			duplicate_groups INTEGER NOT NULL DEFAULT 0,
@@ -71,9 +75,11 @@ func (s *Store) migrate() error {
 			project_id TEXT NOT NULL,
 			project_name TEXT NOT NULL,
 			repo_path TEXT NOT NULL,
+			file_name TEXT NOT NULL DEFAULT '',
 			local_path TEXT NOT NULL,
 			ext TEXT NOT NULL,
 			bytes INTEGER NOT NULL,
+			modified_unix INTEGER NOT NULL DEFAULT 0,
 			content_hash TEXT,
 			hash_algorithm TEXT,
 			format TEXT,
@@ -120,6 +126,8 @@ func (s *Store) migrate() error {
 		`CREATE TABLE IF NOT EXISTS duplicate_group_assets (
 			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
 			group_id TEXT NOT NULL,
+			asset_id TEXT NOT NULL DEFAULT '',
+			project_id TEXT NOT NULL DEFAULT '',
 			repo_path TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS near_duplicate_snapshots (
@@ -132,6 +140,17 @@ func (s *Store) migrate() error {
 			distance INTEGER NOT NULL,
 			flipped INTEGER NOT NULL DEFAULT 0,
 			PRIMARY KEY (scan_id, near_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS lint_snapshots (
+			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+			rule_id TEXT NOT NULL,
+			severity TEXT NOT NULL,
+			file TEXT NOT NULL,
+			line INTEGER NOT NULL DEFAULT 0,
+			snippet TEXT NOT NULL DEFAULT '',
+			message TEXT NOT NULL DEFAULT '',
+			suggestion TEXT NOT NULL DEFAULT '',
+			asset_id TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS labels (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,11 +244,125 @@ func (s *Store) migrate() error {
 	if err := s.migrateOCRResultsSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateScanPerformanceSchema(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 1, nowUTC())
 	return err
+}
+
+func (s *Store) migrateScanPerformanceSchema() error {
+	scanColumns, err := s.tableColumns("scans")
+	if err != nil {
+		return err
+	}
+	scanStatements := map[string]string{
+		"scan_profile":          `ALTER TABLE scans ADD COLUMN scan_profile TEXT NOT NULL DEFAULT 'fast'`,
+		"references_state":      `ALTER TABLE scans ADD COLUMN references_state TEXT NOT NULL DEFAULT 'computed'`,
+		"near_duplicates_state": `ALTER TABLE scans ADD COLUMN near_duplicates_state TEXT NOT NULL DEFAULT 'computed'`,
+		"optimization_state":    `ALTER TABLE scans ADD COLUMN optimization_state TEXT NOT NULL DEFAULT 'computed'`,
+	}
+	for column, statement := range scanStatements {
+		if scanColumns[column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement); err != nil {
+			return err
+		}
+	}
+
+	dupColumns, err := s.tableColumns("duplicate_group_assets")
+	if err != nil {
+		return err
+	}
+	dupStatements := map[string]string{
+		"asset_id":   `ALTER TABLE duplicate_group_assets ADD COLUMN asset_id TEXT NOT NULL DEFAULT ''`,
+		"project_id": `ALTER TABLE duplicate_group_assets ADD COLUMN project_id TEXT NOT NULL DEFAULT ''`,
+	}
+	for column, statement := range dupStatements {
+		if dupColumns[column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement); err != nil {
+			return err
+		}
+	}
+	assetColumns, err := s.tableColumns("asset_snapshots")
+	if err != nil {
+		return err
+	}
+	if !assetColumns["file_name"] {
+		if _, err := s.db.Exec(`ALTER TABLE asset_snapshots ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+	if _, err := s.db.Exec(`UPDATE asset_snapshots SET file_name = asset_name(repo_path) WHERE file_name = ''`); err != nil {
+		return err
+	}
+	if !assetColumns["modified_unix"] {
+		if _, err := s.db.Exec(`ALTER TABLE asset_snapshots ADD COLUMN modified_unix INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	indexes := []string{
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_file_name ON asset_snapshots(scan_id, file_name COLLATE NOCASE, file_name, project_id, repo_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_project_path ON asset_snapshots(scan_id, project_id, repo_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_asset ON asset_snapshots(scan_id, asset_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_ext ON asset_snapshots(scan_id, ext)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_modified ON asset_snapshots(scan_id, modified_unix)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_used ON asset_snapshots(scan_id, used_count)`,
+		`CREATE INDEX IF NOT EXISTS idx_references_scan_asset ON reference_snapshots(scan_id, asset_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_optimization_scan_asset ON optimization_snapshots(scan_id, asset_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_duplicate_assets_scan_asset ON duplicate_group_assets(scan_id, asset_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_left ON near_duplicate_snapshots(scan_id, left_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_right ON near_duplicate_snapshots(scan_id, right_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_lint_snapshots_scan_severity ON lint_snapshots(scan_id, severity)`,
+	}
+	if _, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS lint_snapshots (
+			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+			rule_id TEXT NOT NULL,
+			severity TEXT NOT NULL,
+			file TEXT NOT NULL,
+			line INTEGER NOT NULL DEFAULT 0,
+			snippet TEXT NOT NULL DEFAULT '',
+			message TEXT NOT NULL DEFAULT '',
+			suggestion TEXT NOT NULL DEFAULT '',
+			asset_id TEXT NOT NULL DEFAULT ''
+		)
+	`); err != nil {
+		return err
+	}
+	for _, statement := range indexes {
+		if _, err := s.db.Exec(statement); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) tableColumns(table string) (map[string]bool, error) {
+	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return nil, err
+		}
+		columns[name] = true
+	}
+	return columns, rows.Err()
 }
 
 func (s *Store) migrateDefaultExcludePatterns() error {
@@ -277,25 +410,8 @@ func (s *Store) migrateDefaultExcludePatterns() error {
 }
 
 func (s *Store) migrateOCRResultsSchema() error {
-	rows, err := s.db.Query(`PRAGMA table_info(ocr_results)`)
+	columns, err := s.tableColumns("ocr_results")
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	columns := map[string]bool{}
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var defaultValue any
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
-			return err
-		}
-		columns[name] = true
-	}
-	if err := rows.Err(); err != nil {
 		return err
 	}
 	statements := []struct {
@@ -318,25 +434,8 @@ func (s *Store) migrateOCRResultsSchema() error {
 }
 
 func (s *Store) migrateProjectsWorkspaceSchema() error {
-	rows, err := s.db.Query(`PRAGMA table_info(projects)`)
+	columns, err := s.tableColumns("projects")
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	columns := map[string]bool{}
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var defaultValue any
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
-			return err
-		}
-		columns[name] = true
-	}
-	if err := rows.Err(); err != nil {
 		return err
 	}
 	if columns["workspace_id"] {
@@ -379,25 +478,8 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 }
 
 func (s *Store) migrateWorkspacesIconSchema() error {
-	rows, err := s.db.Query(`PRAGMA table_info(workspaces)`)
+	columns, err := s.tableColumns("workspaces")
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	columns := map[string]bool{}
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var defaultValue any
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
-			return err
-		}
-		columns[name] = true
-	}
-	if err := rows.Err(); err != nil {
 		return err
 	}
 	if columns["icon_image"] {
@@ -430,25 +512,8 @@ func (s *Store) ensureDefaultWorkspace() error {
 }
 
 func (s *Store) migrateAppSettingsSchema() error {
-	rows, err := s.db.Query(`PRAGMA table_info(app_settings)`)
+	columns, err := s.tableColumns("app_settings")
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	columns := map[string]bool{}
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var defaultValue any
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
-			return err
-		}
-		columns[name] = true
-	}
-	if err := rows.Err(); err != nil {
 		return err
 	}
 	if columns["value"] && !columns["value_json"] {

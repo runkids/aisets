@@ -42,6 +42,8 @@ func run(rawArgs []string) int {
 		err = cmdUpdate(args[1:], jsonOut)
 	case "scan":
 		err = cmdScan(args[1:], jsonOut)
+	case "catalog":
+		err = cmdCatalog(args[1:], jsonOut)
 	case "scans":
 		err = cmdScans(args[1:], jsonOut)
 	case "optimize":
@@ -89,6 +91,8 @@ func usageText() string {
   asset-studio settings reset-database --confirm RESET [--json]
   asset-studio update [--dry-run] [--force] [--json]
   asset-studio scan [projectPaths...] [--json]
+  asset-studio catalog items [--limit N] [--cursor C] [--project-id ID] [--q TEXT] [--status STATUS] [--sort SORT] [--json]
+  asset-studio catalog item --id ID [--json]
   asset-studio scans list [--json]
   asset-studio scans diff --base ID --target ID [--json]
   asset-studio optimize estimate [assetIds...] [--json]
@@ -106,6 +110,7 @@ Commands:
   settings   Inspect, export, import, or reset local state
   update     Update the Asset Studio CLI binary
   scan       Scan projects and print catalog summary or JSON
+  catalog    Query the latest scan catalog
   scans      List scan history or compare completed scans
   optimize   Estimate recommendations or generate a review script
   pre-check  Analyze files before adding them to a project

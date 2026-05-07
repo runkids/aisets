@@ -37,7 +37,12 @@ func scanCatalogWithID(ctx context.Context, store *config.Store) (scanner.Catalo
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
-	catalog, err := scanner.New().ScanWithProgress(ctx, toScannerProjects(store.Projects()), settings.ExcludePatterns, nil)
+	options := scanner.NormalizeScanOptions(scanner.ScanOptions{
+		Profile:         settings.ScanProfile,
+		Analyses:        settings.ScanAnalyses,
+		ExcludePatterns: settings.ExcludePatterns,
+	})
+	catalog, err := scanner.NewWithCacheDir(config.CacheDir()).ScanWithOptions(ctx, toScannerProjects(store.Projects()), options, nil)
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
@@ -45,25 +50,32 @@ func scanCatalogWithID(ctx context.Context, store *config.Store) (scanner.Catalo
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
+	catalog.ScanID = scanID
 	return catalog, scanID, nil
 }
 
+func ensureScanExists(ctx context.Context, store *config.Store) error {
+	if _, err := store.LatestScan(); err != nil {
+		if _, _, scanErr := scanCatalogWithID(ctx, store); scanErr != nil {
+			return scanErr
+		}
+	}
+	return nil
+}
+
 func projectAndItem(ctx context.Context, store *config.Store, assetID string) (scanner.Project, scanner.AssetItem, error) {
-	catalog, err := scanCatalog(ctx, store)
+	if err := ensureScanExists(ctx, store); err != nil {
+		return scanner.Project{}, scanner.AssetItem{}, err
+	}
+	detail, err := store.CatalogItemDetail(0, assetID)
 	if err != nil {
 		return scanner.Project{}, scanner.AssetItem{}, err
 	}
-	for _, item := range catalog.Items {
-		if item.ID != assetID {
-			continue
-		}
-		project, err := projectByID(store, item.ProjectID)
-		if err != nil {
-			return scanner.Project{}, scanner.AssetItem{}, err
-		}
-		return project, item, nil
+	project, err := projectByID(store, detail.Item.ProjectID)
+	if err != nil {
+		return scanner.Project{}, scanner.AssetItem{}, err
 	}
-	return scanner.Project{}, scanner.AssetItem{}, apierr.WithParams("asset_not_found", "asset not found", map[string]any{"assetId": assetID})
+	return project, detail.Item, nil
 }
 
 func projectByID(store *config.Store, id string) (scanner.Project, error) {
@@ -76,16 +88,28 @@ func projectByID(store *config.Store, id string) (scanner.Project, error) {
 }
 
 func selectedOptimizationItems(ctx context.Context, store *config.Store, ids []string) ([]scanner.AssetItem, error) {
-	catalog, err := scanCatalog(ctx, store)
-	if err != nil {
+	if err := ensureScanExists(ctx, store); err != nil {
 		return nil, err
 	}
 	if len(ids) == 0 {
-		out := make([]scanner.AssetItem, 0, len(catalog.Items))
-		for _, item := range catalog.Items {
-			if len(item.Optimization) > 0 {
-				out = append(out, item)
+		out := []scanner.AssetItem{}
+		cursor := ""
+		for {
+			page, err := store.CatalogItems(config.CatalogItemQuery{Status: "optimizable", Limit: 200, Cursor: cursor})
+			if err != nil {
+				return nil, err
 			}
+			for _, item := range page.Items {
+				detail, err := store.CatalogItemDetail(0, item.ID)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, detail.Item)
+			}
+			if page.NextCursor == "" {
+				break
+			}
+			cursor = page.NextCursor
 		}
 		return out, nil
 	}
@@ -94,11 +118,13 @@ func selectedOptimizationItems(ctx context.Context, store *config.Store, ids []s
 		idSet[id] = struct{}{}
 	}
 	out := make([]scanner.AssetItem, 0, len(ids))
-	for _, item := range catalog.Items {
-		if _, ok := idSet[item.ID]; ok {
-			out = append(out, item)
-			delete(idSet, item.ID)
+	for _, id := range ids {
+		detail, err := store.CatalogItemDetail(0, id)
+		if err != nil {
+			continue
 		}
+		out = append(out, detail.Item)
+		delete(idSet, id)
 	}
 	if len(idSet) > 0 {
 		missing := make([]string, 0, len(idSet))

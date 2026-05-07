@@ -54,11 +54,23 @@ func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error)
 }
 
 func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excludePatterns []string, progress ProgressFunc) (Catalog, error) {
+	options := FullScanOptions()
+	options.ExcludePatterns = excludePatterns
+	return s.ScanWithOptions(ctx, projects, options, progress)
+}
+
+func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, options ScanOptions, progress ProgressFunc) (Catalog, error) {
+	options = NormalizeScanOptions(options)
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
-	candidates, err := collectCandidates(ctx, projects, excludePatterns)
+	candidates, err := collectCandidates(ctx, projects, options.ExcludePatterns)
 	if err != nil {
 		return Catalog{}, err
 	}
+	defer func() {
+		if s.cache != nil {
+			_ = s.cache.Flush()
+		}
+	}()
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting, Current: len(candidates), Total: len(candidates)})
 	sizeCounts := map[int64]int{}
 	for _, candidate := range candidates {
@@ -80,7 +92,7 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				item, hit, err := s.buildItem(ctx, job.candidate, sizeCounts[job.candidate.info.Size()] > 1)
+				item, hit, err := s.buildItem(ctx, job.candidate, sizeCounts[job.candidate.info.Size()] > 1, options.Analyses.NearDuplicates, options.Analyses.Optimization)
 				results <- scanResult{index: job.index, item: item, cacheHit: hit, err: err}
 			}
 		}()
@@ -123,24 +135,34 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 		return items[i].RepoPath < items[j].RepoPath
 	})
 
-	notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
-	refs, err := buildReferenceMap(ctx, projects, items, excludePatterns, func(current, total int) {
-		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
-	})
-	if err != nil {
-		return Catalog{}, err
-	}
-	for i := range items {
-		items[i].References = refs[assetKey(items[i].ProjectID, items[i].RepoPath)]
-		items[i].UsedBy = uniqueReferenceFiles(items[i].References)
+	if options.Analyses.References {
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
+		refs, err := buildReferenceMap(ctx, projects, items, options.ExcludePatterns, func(current, total int) {
+			notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
+		})
+		if err != nil {
+			return Catalog{}, err
+		}
+		for i := range items {
+			items[i].References = refs[assetKey(items[i].ProjectID, items[i].RepoPath)]
+			items[i].UsedBy = uniqueReferenceFiles(items[i].References)
+		}
+	} else {
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, State: AnalysisNotComputed})
 	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseDuplicates})
 	dups := markDuplicates(items)
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseDuplicates, Current: len(items), Total: len(items)})
-	notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: 0, Total: len(items)})
-	near, err := markNearDuplicates(ctx, items, progress)
-	if err != nil {
-		return Catalog{}, err
+	near := []NearDuplicate{}
+	if options.Analyses.NearDuplicates {
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: 0, Total: len(items)})
+		var err error
+		near, err = markNearDuplicates(ctx, items, progress)
+		if err != nil {
+			return Catalog{}, err
+		}
+	} else {
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, State: AnalysisNotComputed})
 	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint})
 	lintFindings := runLint(projects, items)
@@ -149,7 +171,7 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 	unused := 0
 	dupFiles := 0
 	for i := range items {
-		if len(items[i].UsedBy) == 0 {
+		if options.Analyses.References && len(items[i].UsedBy) == 0 {
 			unused++
 		}
 		if items[i].DuplicateGroupID != nil {
@@ -172,6 +194,7 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 			LintFindings:    len(lintFindings),
 			CacheHits:       cacheHits,
 		},
+		Analysis: AnalysisFromOptions(options),
 	}
 	return normalizeCatalogSlices(catalog), nil
 }
@@ -197,7 +220,7 @@ func (s *Scanner) Thumbnail(ctx context.Context, catalog Catalog, id string, siz
 	return imageproc.ThumbnailResult{}, os.ErrNotExist
 }
 
-func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsSHA bool) (AssetItem, bool, error) {
+func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsSHA, needsDHash, needsOptimization bool) (AssetItem, bool, error) {
 	if ctx.Err() != nil {
 		return AssetItem{}, false, ctx.Err()
 	}
@@ -211,6 +234,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 		LocalPath:     candidate.path,
 		Ext:           strings.ToLower(filepath.Ext(candidate.path)),
 		Bytes:         info.Size(),
+		ModifiedUnix:  info.ModTime().Unix(),
 		URL:           "/api/assets/" + stableID(candidate.project.ID+":"+candidate.repo),
 		ThumbnailURL:  "/api/thumbs/" + stableID(candidate.project.ID+":"+candidate.repo),
 		HashAlgorithm: contentHashAlgorithm,
@@ -221,9 +245,13 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 			item.HashAlgorithm = record.HashAlgorithm
 		}
 		item.Image = record.Metadata
-		item.DHash = record.Hashes.DHash
-		item.DHashFlipped = record.Hashes.DHashFlipped
-		item.Optimization = toScannerOptimization(record.Optimization)
+		if needsDHash {
+			item.DHash = record.Hashes.DHash
+			item.DHashFlipped = record.Hashes.DHashFlipped
+		}
+		if needsOptimization {
+			item.Optimization = toScannerOptimization(record.Optimization)
+		}
 		if needsSHA && item.ContentHash == "" {
 			sum, err := contentHashFile(ctx, candidate.path)
 			if err != nil {
@@ -234,16 +262,35 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 			record.HashAlgorithm = contentHashAlgorithm
 			_ = s.cache.Set(cacheKey, record)
 		}
+		if needsDHash && item.DHash == "" {
+			hashes, _ := imageproc.DHash(candidate.path)
+			item.DHash = hashes.DHash
+			item.DHashFlipped = hashes.DHashFlipped
+			record.Hashes = hashes
+			_ = s.cache.Set(cacheKey, record)
+		}
+		if needsOptimization && len(item.Optimization) == 0 {
+			optimization := imageproc.EstimateOptimization(candidate.path, item.Image, info.Size())
+			item.Optimization = toScannerOptimization(optimization)
+			record.Optimization = optimization
+			_ = s.cache.Set(cacheKey, record)
+		}
 		return item, true, nil
 	}
 
 	meta, _ := imageproc.Probe(candidate.path)
-	hashes, _ := imageproc.DHash(candidate.path)
-	optimization := imageproc.EstimateOptimization(candidate.path, meta, info.Size())
 	item.Image = meta
-	item.DHash = hashes.DHash
-	item.DHashFlipped = hashes.DHashFlipped
-	item.Optimization = toScannerOptimization(optimization)
+	var hashes imageproc.Hashes
+	if needsDHash {
+		hashes, _ = imageproc.DHash(candidate.path)
+		item.DHash = hashes.DHash
+		item.DHashFlipped = hashes.DHashFlipped
+	}
+	var optimization []imageproc.Optimization
+	if needsOptimization {
+		optimization = imageproc.EstimateOptimization(candidate.path, meta, info.Size())
+		item.Optimization = toScannerOptimization(optimization)
+	}
 	if needsSHA {
 		sum, err := contentHashFile(ctx, candidate.path)
 		if err != nil {

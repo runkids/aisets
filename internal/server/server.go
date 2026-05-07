@@ -36,6 +36,7 @@ type Server struct {
 
 	mu            sync.Mutex
 	catalog       scanner.Catalog
+	catalogStale  bool
 	previews      map[string]actions.Preview
 	batchPreviews map[string]actions.BatchPreview
 }
@@ -48,7 +49,7 @@ func New(opts Options) (*Server, error) {
 		uiDistDir:     opts.UIDistDir,
 		version:       opts.Version,
 		mux:           http.NewServeMux(),
-		scanner:       scanner.New(),
+		scanner:       scanner.NewWithCacheDir(config.CacheDir()),
 		ocrEngine:     ocr.NewDefaultEngine(config.DataDir()),
 		previews:      map[string]actions.Preview{},
 		batchPreviews: map[string]actions.BatchPreview{},
@@ -108,6 +109,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/import", s.handleSettingsImport)
 	s.mux.HandleFunc("POST /api/settings/reset-database", s.handleSettingsResetDatabase)
 	s.mux.HandleFunc("GET /api/catalog", s.handleCatalog)
+	s.mux.HandleFunc("GET /api/catalog/items", s.handleCatalogItems)
+	s.mux.HandleFunc("GET /api/catalog/folders", s.handleCatalogFolders)
+	s.mux.HandleFunc("GET /api/catalog/items/{id}", s.handleCatalogItem)
+	s.mux.HandleFunc("GET /api/catalog/duplicates", s.handleCatalogDuplicates)
+	s.mux.HandleFunc("GET /api/catalog/lint", s.handleCatalogLint)
 	s.mux.HandleFunc("POST /api/scan", s.handleScan)
 	s.mux.HandleFunc("POST /api/ocr/install", s.handleOCRInstall)
 	s.mux.HandleFunc("POST /api/ocr/remove", s.handleOCRRemove)

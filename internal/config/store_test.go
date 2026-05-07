@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/imageproc"
@@ -378,6 +379,184 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 	assertRowCount(t, store, "duplicate_group_snapshots", 1)
 	assertRowCount(t, store, "duplicate_group_assets", 2)
 	assertRowCount(t, store, "near_duplicate_snapshots", 1)
+}
+
+func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	filter := []CustomAssetFilter{{
+		ID:      "cars",
+		Name:    "Cars",
+		Enabled: true,
+		Groups: []CustomAssetFilterGroup{{
+			Clauses: []CustomAssetFilterClause{{
+				Field:    "path",
+				Operator: "contains",
+				Value:    "car",
+			}},
+		}},
+	}}
+	if _, err := store.UpdateSettings(SettingsUpdate{CustomAssetFilters: filter}); err != nil {
+		t.Fatal(err)
+	}
+
+	dupID := "dup-car"
+	car := scanAsset(root, "p", "workspace", "src/car.png", 10, "car", 1, 0)
+	car.DuplicateGroupID = &dupID
+	car.ModifiedUnix = 10
+	carCopy := scanAsset(root, "p", "workspace", "src/car-copy.png", 11, "car", 0, 0)
+	carCopy.DuplicateGroupID = &dupID
+	carCopy.ModifiedUnix = 30
+	icon := scanAsset(root, "p", "workspace", "src/icon.png", 20, "icon", 0, 0)
+	icon.ModifiedUnix = 20
+	logo := scanAsset(root, "p", "workspace", "src/icons/logo.png", 12, "logo", 0, 0)
+	logo.ModifiedUnix = 5
+	carSVG := scanAsset(root, "p", "workspace", "src/car.svg", 30, "car-svg", 1, 0)
+	carSVG.ModifiedUnix = 40
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{car, icon, logo, carSVG, carCopy},
+		DuplicateGroups: []scanner.DuplicateGroup{{
+			ID:            dupID,
+			ContentHash:   "car",
+			HashAlgorithm: "blake3",
+			Paths:         []string{"src/car.png", "src/car-copy.png"},
+			PreferredPath: "src/car.png",
+		}},
+		Stats: scanner.CatalogStats{TotalFiles: 5, DuplicateGroups: 1, DuplicateFiles: 2, UnusedFiles: 3},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.CatalogItems(CatalogItemQuery{Status: "referenced", Ext: ".png", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/car.png" {
+		t.Fatalf("referenced png page = %#v", page)
+	}
+	if page.Facets.ExtensionTotal != 2 {
+		t.Fatalf("extension total should ignore active extension filter, facets = %#v", page.Facets)
+	}
+	if len(page.Facets.CustomFilters) != 1 || page.Facets.CustomFilters[0].Count != 1 {
+		t.Fatalf("custom filter facets = %#v", page.Facets.CustomFilters)
+	}
+
+	page, err = store.CatalogItems(CatalogItemQuery{CustomFilterID: "cars", Sort: "path", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 3 || len(page.Items) != 3 {
+		t.Fatalf("custom filtered page = %#v", page)
+	}
+	if got := []string{page.Items[0].RepoPath, page.Items[1].RepoPath, page.Items[2].RepoPath}; got[0] != "src/car-copy.png" || got[1] != "src/car.png" || got[2] != "src/car.svg" {
+		t.Fatalf("name order = %#v", got)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Status: "duplicate", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 2 || len(page.Items) != 2 || page.Facets.ProjectTotal != 2 {
+		t.Fatalf("duplicate page should use the same DB filter for list and facets = %#v", page)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Sort: "recent", Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := []string{page.Items[0].RepoPath, page.Items[1].RepoPath}; got[0] != "src/car.svg" || got[1] != "src/car-copy.png" {
+		t.Fatalf("recent order = %#v", got)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{AssetID: carCopy.ID, Query: "car-copy", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != carCopy.ID {
+		t.Fatalf("focused asset page = %#v", page)
+	}
+	folders, err := store.CatalogFolders(CatalogFolderQuery{Ext: ".png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folders.Total != 4 || len(folders.Folders) != 1 || folders.Folders[0].Path != "src" || folders.Folders[0].Count != 4 || !folders.Folders[0].HasChildren {
+		t.Fatalf("root folders = %#v", folders)
+	}
+	folders, err = store.CatalogFolders(CatalogFolderQuery{Ext: ".png", Folder: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folders.Total != 4 || len(folders.Folders) != 1 || folders.Folders[0].Path != "src/icons" || folders.Folders[0].Count != 1 {
+		t.Fatalf("child folders = %#v", folders)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Folder: "src/icons", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("folder filtered page = %#v", page)
+	}
+}
+
+func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	dupID := "dup-logo"
+	left := scanAsset(root, "p", "workspace", "src/logo.png", 10, "same", 1, 0)
+	left.DuplicateGroupID = &dupID
+	right := scanAsset(root, "p", "workspace", "src/logo-copy.png", 11, "same", 0, 0)
+	right.DuplicateGroupID = &dupID
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{left, right},
+		DuplicateGroups: []scanner.DuplicateGroup{{
+			ID:            dupID,
+			ContentHash:   "same",
+			HashAlgorithm: "blake3",
+			Paths:         []string{"src/logo.png", "src/logo-copy.png"},
+			PreferredPath: "src/logo.png",
+		}},
+		Stats: scanner.CatalogStats{TotalFiles: 2, DuplicateGroups: 1, DuplicateFiles: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct {
+		page CatalogDuplicatesPage
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		page, err := store.CatalogDuplicates(0, "exact", "", 10)
+		done <- result{page: page, err: err}
+	}()
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		if got.page.Total != 1 || len(got.page.Groups) != 1 {
+			t.Fatalf("exact duplicate page = %#v", got.page)
+		}
+		if paths := got.page.Groups[0].Paths; len(paths) != 2 || paths[0] != "src/logo-copy.png" || paths[1] != "src/logo.png" {
+			t.Fatalf("duplicate paths = %#v", paths)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("CatalogDuplicates exact did not return with a single database connection")
+	}
 }
 
 func TestScanHistoryAndDiff(t *testing.T) {
@@ -821,11 +1000,22 @@ func TestExportImportAndResetData(t *testing.T) {
 	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" || len(exported.Settings.CustomAssetFilters) != 1 {
 		t.Fatalf("exported = %#v", exported)
 	}
+	if _, err := store.AddWorkspace("Extra", ""); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.ResetData(); err != nil {
 		t.Fatal(err)
 	}
 	if projects := store.Projects(); len(projects) != 0 {
 		t.Fatalf("projects after reset = %#v", projects)
+	}
+	if ws := store.Workspaces(); len(ws) != 1 || ws[0].ID != "default" {
+		t.Fatalf("workspaces after reset = %#v", ws)
+	}
+	if s, err := store.Settings(); err != nil {
+		t.Fatal(err)
+	} else if s.WorkspaceName != "Asset Studio" || s.ActiveWorkspaceID != "default" {
+		t.Fatalf("settings after reset = %#v", s)
 	}
 	if err := store.ImportData(exported); err != nil {
 		t.Fatal(err)
@@ -861,6 +1051,7 @@ func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash 
 		LocalPath:     filepath.Join(root, repoPath),
 		Ext:           filepath.Ext(repoPath),
 		Bytes:         bytes,
+		ModifiedUnix:  bytes,
 		ContentHash:   hash,
 		HashAlgorithm: "blake3",
 		Image:         imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},

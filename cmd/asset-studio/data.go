@@ -150,7 +150,7 @@ func cmdScan(args []string, jsonOut bool) error {
 	}
 
 	if jsonOut {
-		return writeJSON(os.Stdout, map[string]any{"ok": true, "scanId": scanID, "catalog": catalog})
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "scanId": scanID, "stats": catalog.Stats, "analysis": catalog.Analysis})
 	}
 	fmt.Printf("Scan: %d\n", scanID)
 	fmt.Printf("Projects: %d\n", len(catalog.Projects))
@@ -174,6 +174,105 @@ func cmdScans(args []string, jsonOut bool) error {
 		}
 	}
 	return cmdScansList(args, jsonOut)
+}
+
+func cmdCatalog(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	if len(args) == 0 {
+		return cmdCatalogItems(args, jsonOut)
+	}
+	switch args[0] {
+	case "items":
+		return cmdCatalogItems(args[1:], jsonOut)
+	case "item":
+		return cmdCatalogItem(args[1:], jsonOut)
+	default:
+		return apierr.WithParams("catalog_unknown_subcommand", "catalog subcommand is unknown", map[string]any{"command": args[0]})
+	}
+}
+
+func cmdCatalogItems(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	fs := newFlagSet("catalog items", jsonOut)
+	limit := fs.Int("limit", 100, "item limit")
+	cursor := fs.String("cursor", "", "page cursor")
+	projectID := fs.String("project-id", "", "project id")
+	projectName := fs.String("project-name", "", "project name")
+	ext := fs.String("ext", "", "extension")
+	query := fs.String("q", "", "search query")
+	status := fs.String("status", "", "status filter")
+	sortValue := fs.String("sort", "", "sort")
+	customFilter := fs.String("custom-filter", "", "custom filter id")
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return apierr.WithParams("catalog_items_unexpected_args", "catalog items does not accept positional arguments", map[string]any{"args": fs.Args()})
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := ensureScanExists(context.Background(), store); err != nil {
+		return err
+	}
+	page, err := store.CatalogItems(config.CatalogItemQuery{
+		ProjectID:      *projectID,
+		ProjectName:    *projectName,
+		Ext:            *ext,
+		Query:          *query,
+		Status:         *status,
+		Sort:           *sortValue,
+		CustomFilterID: *customFilter,
+		Limit:          *limit,
+		Cursor:         *cursor,
+	})
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "page": page})
+	}
+	for _, item := range page.Items {
+		fmt.Printf("%s\t%s\t%s\n", item.ID, item.ProjectName, item.RepoPath)
+	}
+	return nil
+}
+
+func cmdCatalogItem(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	fs := newFlagSet("catalog item", jsonOut)
+	id := fs.String("id", "", "asset id")
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return apierr.WithParams("catalog_item_unexpected_args", "catalog item does not accept positional arguments", map[string]any{"args": fs.Args()})
+	}
+	if *id == "" {
+		return apierr.New("asset_id_required", "asset id is required")
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := ensureScanExists(context.Background(), store); err != nil {
+		return err
+	}
+	detail, err := store.CatalogItemDetail(0, *id)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "detail": detail})
+	}
+	fmt.Printf("%s\t%s\t%s\n", detail.Item.ID, detail.Item.ProjectName, detail.Item.RepoPath)
+	return nil
 }
 
 func cmdScansList(args []string, jsonOut bool) error {

@@ -11,6 +11,7 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/config"
 	"asset-studio/internal/optimize"
 	"asset-studio/internal/precheck"
 	"asset-studio/internal/scanner"
@@ -114,28 +115,38 @@ type optimizationSelectionBody struct {
 }
 
 func (s *Server) selectOptimizationItems(ctx context.Context, ids []string) ([]scanner.AssetItem, error) {
-	catalog, err := s.ensureCatalog(ctx)
-	if err != nil {
+	if _, err := s.ensureLatestScan(ctx); err != nil {
 		return nil, err
 	}
 	if len(ids) == 0 {
-		out := make([]scanner.AssetItem, 0, len(catalog.Items))
-		for _, item := range catalog.Items {
-			if len(item.Optimization) > 0 {
-				out = append(out, item)
+		out := []scanner.AssetItem{}
+		cursor := ""
+		for {
+			page, err := s.store.CatalogItems(config.CatalogItemQuery{Status: "optimizable", Limit: 200, Cursor: cursor})
+			if err != nil {
+				return nil, err
 			}
+			for _, item := range page.Items {
+				detail, err := s.store.CatalogItemDetail(0, item.ID)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, detail.Item)
+			}
+			if page.NextCursor == "" {
+				break
+			}
+			cursor = page.NextCursor
 		}
 		return out, nil
 	}
-	idSet := make(map[string]struct{}, len(ids))
+	out := make([]scanner.AssetItem, 0, len(ids))
 	for _, id := range ids {
-		idSet[id] = struct{}{}
-	}
-	out := make([]scanner.AssetItem, 0, len(idSet))
-	for _, item := range catalog.Items {
-		if _, ok := idSet[item.ID]; ok {
-			out = append(out, item)
+		detail, err := s.store.CatalogItemDetail(0, id)
+		if err != nil {
+			return nil, err
 		}
+		out = append(out, detail.Item)
 	}
 	return out, nil
 }
@@ -249,6 +260,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	s.markCatalogStale()
 	go func() {
 		_, _, _ = s.scan(context.Background())
 	}()
@@ -256,21 +268,18 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) projectAndItem(ctx context.Context, assetID string) (scanner.Project, scanner.AssetItem, error) {
-	catalog, err := s.ensureCatalog(ctx)
+	if _, err := s.ensureLatestScan(ctx); err != nil {
+		return scanner.Project{}, scanner.AssetItem{}, err
+	}
+	detail, err := s.store.CatalogItemDetail(0, assetID)
 	if err != nil {
 		return scanner.Project{}, scanner.AssetItem{}, err
 	}
-	for _, item := range catalog.Items {
-		if item.ID != assetID {
-			continue
-		}
-		project, err := s.projectByID(item.ProjectID)
-		if err != nil {
-			return scanner.Project{}, scanner.AssetItem{}, err
-		}
-		return project, item, nil
+	project, err := s.projectByID(detail.Item.ProjectID)
+	if err != nil {
+		return scanner.Project{}, scanner.AssetItem{}, err
 	}
-	return scanner.Project{}, scanner.AssetItem{}, apierr.New("asset_not_found", "asset not found")
+	return project, detail.Item, nil
 }
 
 func (s *Server) storePreview(preview actions.Preview) {

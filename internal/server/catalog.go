@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -37,18 +39,191 @@ func parseScanIDParam(raw, name string) (int64, error) {
 	return id, nil
 }
 
+func parseOptionalScanID(raw string) (int64, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	return parseScanIDParam(raw, "scanId")
+}
+
+func parseOptionalInt(raw, name string) (int, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, apierr.WithParams("integer_param_invalid", "integer query parameter is invalid", map[string]any{"param": name, "value": raw})
+	}
+	return value, nil
+}
+
+type scanRequest struct {
+	Profile  scanner.ScanProfile     `json:"profile"`
+	Analyses scanner.AnalysisOptions `json:"analyses"`
+}
+
+func (s *Server) scanOptionsFromRequest(r *http.Request) (scanner.ScanOptions, error) {
+	if r.Body == nil {
+		return scanner.ScanOptions{}, nil
+	}
+	defer r.Body.Close()
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return scanner.ScanOptions{}, err
+	}
+	if len(bytes) == 0 {
+		return scanner.ScanOptions{}, nil
+	}
+	var body scanRequest
+	if err := json.Unmarshal(bytes, &body); err != nil {
+		return scanner.ScanOptions{}, err
+	}
+	return scanner.ScanOptions{Profile: body.Profile, Analyses: body.Analyses}, nil
+}
+
 func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
-	catalog, err := s.ensureCatalog(r.Context())
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	summary, err := s.store.CatalogSummary()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	catalog, err = s.enrichCatalogOCR(r.Context(), catalog)
+	writeJSON(w, http.StatusOK, summary)
+}
+
+func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	limit, err := parseOptionalInt(r.URL.Query().Get("limit"), "limit")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.CatalogItems(config.CatalogItemQuery{
+		ScanID:         scanID,
+		AssetID:        r.URL.Query().Get("assetId"),
+		ProjectID:      r.URL.Query().Get("projectId"),
+		ProjectName:    r.URL.Query().Get("projectName"),
+		Ext:            r.URL.Query().Get("ext"),
+		Folder:         r.URL.Query().Get("folder"),
+		Query:          r.URL.Query().Get("q"),
+		Status:         r.URL.Query().Get("status"),
+		Sort:           r.URL.Query().Get("sort"),
+		CustomFilterID: r.URL.Query().Get("customFilter"),
+		Limit:          limit,
+		Cursor:         r.URL.Query().Get("cursor"),
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, catalog)
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) handleCatalogFolders(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.CatalogFolders(config.CatalogFolderQuery{
+		ScanID:         scanID,
+		ProjectID:      r.URL.Query().Get("projectId"),
+		ProjectName:    r.URL.Query().Get("projectName"),
+		Ext:            r.URL.Query().Get("ext"),
+		Folder:         r.URL.Query().Get("folder"),
+		Query:          r.URL.Query().Get("q"),
+		Status:         r.URL.Query().Get("status"),
+		CustomFilterID: r.URL.Query().Get("customFilter"),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) handleCatalogItem(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	detail, err := s.store.CatalogItemDetail(scanID, r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (s *Server) handleCatalogDuplicates(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	limit, err := parseOptionalInt(r.URL.Query().Get("limit"), "limit")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.CatalogDuplicates(scanID, r.URL.Query().Get("kind"), r.URL.Query().Get("cursor"), limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) handleCatalogLint(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	limit, err := parseOptionalInt(r.URL.Query().Get("limit"), "limit")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.CatalogLint(config.CatalogLintQuery{
+		ScanID:   scanID,
+		Severity: r.URL.Query().Get("severity"),
+		Limit:    limit,
+		Cursor:   r.URL.Query().Get("cursor"),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +239,17 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			"message": event.Message,
 		})
 	}
-	catalog, scanID, err := s.scanWithProgress(r.Context(), progress)
+	options, err := s.scanOptionsFromRequest(r)
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_invalid_request")})
+		return
+	}
+	catalog, scanID, err := s.scanWithProgress(r.Context(), options, progress)
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_failed")})
 		return
 	}
-	sendNDJSON(w, map[string]any{"type": "done", "scanId": scanID, "stats": catalog.Stats})
+	sendNDJSON(w, map[string]any{"type": "done", "scanId": scanID, "stats": catalog.Stats, "analysis": catalog.Analysis})
 }
 
 func (s *Server) handleScans(w http.ResponseWriter, _ *http.Request) {
@@ -116,28 +296,30 @@ func (s *Server) handleScanDiff(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	catalog, err := s.ensureCatalog(r.Context())
-	if err != nil {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	for _, item := range catalog.Items {
-		if item.ID != id {
-			continue
-		}
-		http.ServeFile(w, r, item.LocalPath)
+	item, err := s.store.CatalogItem(0, id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
 		return
 	}
-	writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "asset not found"))
+	http.ServeFile(w, r, item.LocalPath)
 }
 
 func (s *Server) handleThumb(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	catalog, err := s.ensureCatalog(r.Context())
-	if err != nil {
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	item, err := s.store.CatalogItem(0, id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	catalog := scanner.Catalog{Items: []scanner.AssetItem{item}}
 	result, err := s.scanner.Thumbnail(r.Context(), catalog, id, 256)
 	if errors.Is(err, os.ErrNotExist) {
 		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "asset not found"))
@@ -165,16 +347,27 @@ func (s *Server) ensureCatalog(ctx context.Context) (scanner.Catalog, error) {
 }
 
 func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
-	return s.scanWithProgress(ctx, nil)
+	return s.scanWithProgress(ctx, scanner.ScanOptions{}, nil)
 }
 
-func (s *Server) scanWithProgress(ctx context.Context, progress scanner.ProgressFunc) (scanner.Catalog, int64, error) {
+func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOptions, progress scanner.ProgressFunc) (scanner.Catalog, int64, error) {
 	projects := toScannerProjects(s.store.Projects())
 	settings, err := s.store.Settings()
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
-	catalog, err := s.scanner.ScanWithProgress(ctx, projects, settings.ExcludePatterns, progress)
+	options := scanner.NormalizeScanOptions(scanner.ScanOptions{
+		Profile:         settings.ScanProfile,
+		Analyses:        settings.ScanAnalyses,
+		ExcludePatterns: settings.ExcludePatterns,
+	})
+	if override.Profile != "" || override.Analyses != (scanner.AnalysisOptions{}) {
+		options.Profile = override.Profile
+		options.Analyses = override.Analyses
+		options = scanner.NormalizeScanOptions(options)
+		options.ExcludePatterns = settings.ExcludePatterns
+	}
+	catalog, err := s.scanner.ScanWithOptions(ctx, projects, options, progress)
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
@@ -185,17 +378,44 @@ func (s *Server) scanWithProgress(ctx context.Context, progress scanner.Progress
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
+	catalog.ScanID = scanID
 	s.mu.Lock()
 	s.catalog = catalog
+	s.catalogStale = false
 	s.mu.Unlock()
 	return catalog, scanID, nil
+}
+
+func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, error) {
+	s.mu.Lock()
+	stale := s.catalogStale
+	s.mu.Unlock()
+	if !stale {
+		summary, err := s.store.CatalogSummary()
+		if err == nil {
+			return summary, nil
+		}
+	}
+	_, _, err := s.scan(ctx)
+	if err != nil {
+		return config.CatalogSummary{}, err
+	}
+	return s.store.CatalogSummary()
 }
 
 func (s *Server) clearCatalog() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.catalog = scanner.Catalog{}
+	s.catalogStale = true
 	s.previews = map[string]actions.Preview{}
+}
+
+func (s *Server) markCatalogStale() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.catalog = scanner.Catalog{}
+	s.catalogStale = true
 }
 
 func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) (scanner.Catalog, error) {

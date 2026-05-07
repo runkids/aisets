@@ -12,9 +12,10 @@ import (
 )
 
 type Store struct {
-	path string
-	mu   sync.Mutex
-	data fileData
+	path  string
+	mu    sync.Mutex
+	data  fileData
+	dirty bool
 }
 
 type fileData struct {
@@ -75,7 +76,21 @@ func (s *Store) Set(key string, record Record) error {
 	}
 	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	s.data.Items[key] = record
-	return s.saveLocked()
+	s.dirty = true
+	return nil
+}
+
+func (s *Store) Flush() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.dirty {
+		return nil
+	}
+	if err := s.saveLocked(); err != nil {
+		return err
+	}
+	s.dirty = false
+	return nil
 }
 
 func (s *Store) Path() string {

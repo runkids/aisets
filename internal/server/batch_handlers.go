@@ -32,6 +32,7 @@ func (s *Server) handleBatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := actions.BatchDelete(project, items)
+	s.markCatalogStale()
 	go func() {
 		_, _, _ = s.scan(context.Background())
 	}()
@@ -107,6 +108,7 @@ func (s *Server) handleBatchApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	s.markCatalogStale()
 	go func() {
 		_, _, _ = s.scan(context.Background())
 	}()
@@ -171,19 +173,16 @@ func (s *Server) handleBatchExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) batchItems(ctx context.Context, ids []string) ([]scanner.AssetItem, scanner.Project, error) {
-	catalog, err := s.ensureCatalog(ctx)
-	if err != nil {
+	if _, err := s.ensureLatestScan(ctx); err != nil {
 		return nil, scanner.Project{}, err
 	}
-	idSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		idSet[id] = struct{}{}
-	}
 	items := make([]scanner.AssetItem, 0, len(ids))
-	for _, item := range catalog.Items {
-		if _, ok := idSet[item.ID]; ok {
-			items = append(items, item)
+	for _, id := range ids {
+		detail, err := s.store.CatalogItemDetail(0, id)
+		if err != nil {
+			continue
 		}
+		items = append(items, detail.Item)
 	}
 	if len(items) == 0 {
 		return nil, scanner.Project{}, apierr.New("asset_not_found", "none of the requested assets were found")

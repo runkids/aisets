@@ -30,6 +30,9 @@ func TestStoreHitMissInvalidationAndRestart(t *testing.T) {
 	if err := store.Set(key, record); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.Flush(); err != nil {
+		t.Fatal(err)
+	}
 	got, ok := store.Get(key, 10, 20)
 	if !ok || got.ContentHash != "hash" {
 		t.Fatalf("cache hit = %#v, %v", got, ok)
