@@ -294,6 +294,17 @@ export function App() {
       catalogSummary != null &&
       catalogSummary.analysis.nearDuplicates === "computed",
   );
+  const optimizeItemsQuery = useCatalogItemsInfiniteQuery(
+    catalogSummary?.scanId,
+    {
+      ...cleanupProjectParams,
+      status: "optimizable",
+      sort: "bytes-desc",
+    },
+    mode === "optimize" &&
+      catalogSummary != null &&
+      catalogSummary.analysis.optimization === "computed",
+  );
 
   const items = useMemo(
     () => catalogItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
@@ -412,6 +423,7 @@ export function App() {
       (duplicateItemsQuery.isFetching ||
         exactDuplicatesQuery.isFetching ||
         nearDuplicatesQuery.isFetching)) ||
+    (mode === "optimize" && optimizeItemsQuery.isFetching) ||
     scanMutation.isPending ||
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
@@ -531,11 +543,8 @@ export function App() {
     [catalog?.analysis.references, scopedItems],
   );
   const optimizeItems = useMemo(
-    () =>
-      catalog?.analysis.optimization === "computed"
-        ? scopedItems.filter((i) => i.optimizationRecommendations.length > 0)
-        : [],
-    [catalog?.analysis.optimization, scopedItems],
+    () => optimizeItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [optimizeItemsQuery.data],
   );
   const lintFindings = scopedLintFindings;
 
