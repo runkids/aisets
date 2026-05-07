@@ -40,9 +40,10 @@ type AnalysisOptions struct {
 }
 
 type ScanOptions struct {
-	Profile         ScanProfile     `json:"profile"`
-	ExcludePatterns []string        `json:"excludePatterns,omitempty"`
-	Analyses        AnalysisOptions `json:"analyses"`
+	Profile                ScanProfile                      `json:"profile"`
+	ExcludePatterns        []string                         `json:"excludePatterns,omitempty"`
+	Analyses               AnalysisOptions                  `json:"analyses"`
+	OptimizationThresholds imageproc.OptimizationThresholds `json:"optimizationThresholds,omitempty"`
 }
 
 type CatalogAnalysis struct {

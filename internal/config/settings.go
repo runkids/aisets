@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/imageproc"
 	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
@@ -40,6 +41,7 @@ func DefaultAppSettings() AppSettings {
 		ExcludePatterns:            defaultExcludePatterns(),
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
+		OptimizationThresholds:     imageproc.DefaultOptimizationThresholds(),
 		CustomAssetFilters:         []CustomAssetFilter{},
 		PreferredEditor:            "vscode",
 	}
@@ -92,6 +94,9 @@ func (s *Store) Settings() (AppSettings, error) {
 	}
 	if settings.CustomAssetFilters == nil {
 		settings.CustomAssetFilters = []CustomAssetFilter{}
+	}
+	if settings.OptimizationThresholds == (imageproc.OptimizationThresholds{}) {
+		settings.OptimizationThresholds = imageproc.DefaultOptimizationThresholds()
 	}
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
@@ -167,6 +172,25 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.OptimizationAutoApply != nil {
 		settings.OptimizationAutoApply = *update.OptimizationAutoApply
+	}
+	if update.OptimizationThresholds != nil {
+		t := *update.OptimizationThresholds
+		if t.SVGMinSavingsPercent < 0 || t.SVGMinSavingsPercent > 100 {
+			return AppSettings{}, apierr.New("settings_svg_savings_invalid", "SVG min savings percent must be between 0 and 100")
+		}
+		if t.MaxDimensionPx < 0 {
+			return AppSettings{}, apierr.New("settings_max_dimension_invalid", "max dimension must not be negative")
+		}
+		if t.FileSizeWarningKB < 0 {
+			return AppSettings{}, apierr.New("settings_file_size_warning_invalid", "file size warning must not be negative")
+		}
+		if t.FileSizeCriticalKB < 0 {
+			return AppSettings{}, apierr.New("settings_file_size_critical_invalid", "file size critical must not be negative")
+		}
+		if t.FileSizeWarningKB > 0 && t.FileSizeCriticalKB > 0 && t.FileSizeCriticalKB < t.FileSizeWarningKB {
+			return AppSettings{}, apierr.New("settings_file_size_critical_below_warning", "critical threshold must be >= warning threshold")
+		}
+		settings.OptimizationThresholds = t
 	}
 	if update.CustomAssetFilters != nil {
 		filters, err := normalizeCustomAssetFilters(update.CustomAssetFilters)
@@ -312,6 +336,7 @@ func (s *Store) ImportData(data ExportData) error {
 			ExcludePatterns:            data.Settings.ExcludePatterns,
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
+			OptimizationThresholds:     &data.Settings.OptimizationThresholds,
 			CustomAssetFilters:         data.Settings.CustomAssetFilters,
 			PreferredEditor:            &data.Settings.PreferredEditor,
 		}

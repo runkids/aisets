@@ -169,7 +169,7 @@ func TestSVGMinifyEstimate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := EstimateOptimization(path, meta, int64(len(content)))
+	out := EstimateOptimization(path, meta, int64(len(content)), DefaultOptimizationThresholds())
 	if len(out) == 0 || out[0].Category != "svg-minify" || out[0].SavingsBytes <= 0 {
 		t.Fatalf("EstimateOptimization = %#v", out)
 	}
@@ -179,7 +179,7 @@ func TestSVGMinifyEstimate(t *testing.T) {
 }
 
 func TestRasterOptimizationDistanceAndCacheHelpers(t *testing.T) {
-	out := EstimateOptimization("large.png", Metadata{Width: 3000, Height: 1200, Alpha: false}, 2*1024*1024)
+	out := EstimateOptimization("large.png", Metadata{Width: 3000, Height: 1200, Alpha: false}, 2*1024*1024, DefaultOptimizationThresholds())
 	if len(out) != 3 {
 		t.Fatalf("EstimateOptimization raster = %#v", out)
 	}
@@ -198,6 +198,135 @@ func TestRasterOptimizationDistanceAndCacheHelpers(t *testing.T) {
 			t.Fatalf("DistanceHex(%q, %q) unexpectedly ok", pair[0], pair[1])
 		}
 	}
+}
+
+func TestOptimizationThresholds(t *testing.T) {
+	t.Run("dimensions below threshold", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		out := EstimateOptimization("img.png", Metadata{Width: 2500, Height: 1000, Alpha: true}, 1024, th)
+		for _, o := range out {
+			if o.Category == "dimensions" {
+				t.Fatal("2500px should not trigger dimensions warning with default 2560px threshold")
+			}
+		}
+	})
+	t.Run("dimensions above threshold", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		th.MaxDimensionPx = 2400
+		out := EstimateOptimization("img.png", Metadata{Width: 2500, Height: 1000, Alpha: true}, 1024, th)
+		found := false
+		for _, o := range out {
+			if o.Category == "dimensions" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("2500px should trigger dimensions warning with 2400px threshold")
+		}
+	})
+	t.Run("dimensions disabled", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		th.MaxDimensionPx = 0
+		out := EstimateOptimization("img.png", Metadata{Width: 5000, Height: 5000, Alpha: true}, 1024, th)
+		for _, o := range out {
+			if o.Category == "dimensions" {
+				t.Fatal("dimensions check should be disabled when threshold is 0")
+			}
+		}
+	})
+	t.Run("file size warning", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		out := EstimateOptimization("img.jpg", Metadata{Width: 100, Height: 100}, 300*1024, th)
+		found := false
+		for _, o := range out {
+			if o.Category == "size" && o.Severity == "warning" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("300KB should trigger warning with default 200KB threshold")
+		}
+	})
+	t.Run("file size below threshold", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		th.FileSizeWarningKB = 500
+		out := EstimateOptimization("img.jpg", Metadata{Width: 100, Height: 100}, 300*1024, th)
+		for _, o := range out {
+			if o.Category == "size" {
+				t.Fatal("300KB should not trigger with 500KB warning threshold")
+			}
+		}
+	})
+	t.Run("file size critical", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		out := EstimateOptimization("img.jpg", Metadata{Width: 100, Height: 100}, 600*1024, th)
+		found := false
+		for _, o := range out {
+			if o.Category == "size" && o.Severity == "critical" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("600KB should trigger critical with default 500KB critical threshold")
+		}
+	})
+	t.Run("file size disabled", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		th.FileSizeWarningKB = 0
+		out := EstimateOptimization("img.jpg", Metadata{Width: 100, Height: 100}, 10*1024*1024, th)
+		for _, o := range out {
+			if o.Category == "size" {
+				t.Fatal("size check should be disabled when warning threshold is 0")
+			}
+		}
+	})
+	t.Run("png alpha enabled", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		out := EstimateOptimization("img.png", Metadata{Width: 100, Height: 100, Alpha: false}, 1024, th)
+		found := false
+		for _, o := range out {
+			if o.Category == "format" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("PNG without alpha should trigger format suggestion when enabled")
+		}
+	})
+	t.Run("png alpha disabled", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		th.PNGAlphaCheckEnabled = false
+		out := EstimateOptimization("img.png", Metadata{Width: 100, Height: 100, Alpha: false}, 1024, th)
+		for _, o := range out {
+			if o.Category == "format" {
+				t.Fatal("PNG alpha check should be skipped when disabled")
+			}
+		}
+	})
+	t.Run("all disabled", func(t *testing.T) {
+		th := OptimizationThresholds{
+			SVGMinSavingsPercent: 100,
+			MaxDimensionPx:       0,
+			FileSizeWarningKB:    0,
+			FileSizeCriticalKB:   0,
+			PNGAlphaCheckEnabled: false,
+		}
+		out := EstimateOptimization("img.png", Metadata{Width: 5000, Height: 5000, Alpha: false}, 10*1024*1024, th)
+		if len(out) != 0 {
+			t.Fatalf("all thresholds disabled should produce no findings, got %d", len(out))
+		}
+	})
+	t.Run("hash deterministic", func(t *testing.T) {
+		a := DefaultOptimizationThresholds()
+		b := DefaultOptimizationThresholds()
+		if a.Hash() != b.Hash() {
+			t.Fatal("same thresholds should produce same hash")
+		}
+		b.MaxDimensionPx = 1920
+		if a.Hash() == b.Hash() {
+			t.Fatal("different thresholds should produce different hash")
+		}
+	})
 }
 
 func TestGeometrySVGAndEncoderHelpers(t *testing.T) {

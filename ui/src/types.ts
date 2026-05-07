@@ -31,6 +31,7 @@ export type AppSettings = {
   excludePatterns: string[];
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
+  optimizationThresholds: OptimizationThresholds;
   customAssetFilters: CustomAssetFilter[];
   preferredEditor: string;
 };
@@ -111,6 +112,14 @@ export type OCRRuntime = {
   engineVersion: string;
   engineAvailable: boolean;
   engineError?: string;
+};
+
+export type OptimizationThresholds = {
+  svgMinSavingsPercent: number;
+  maxDimensionPx: number;
+  fileSizeWarningKB: number;
+  fileSizeCriticalKB: number;
+  pngAlphaCheckEnabled: boolean;
 };
 
 export type SettingsUpdate = Partial<AppSettings>;

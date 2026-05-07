@@ -60,6 +60,33 @@ type Optimization struct {
 	SavingsBytes   int64  `json:"savingsBytes,omitempty"`
 }
 
+type OptimizationThresholds struct {
+	SVGMinSavingsPercent int  `json:"svgMinSavingsPercent"`
+	MaxDimensionPx       int  `json:"maxDimensionPx"`
+	FileSizeWarningKB    int  `json:"fileSizeWarningKB"`
+	FileSizeCriticalKB   int  `json:"fileSizeCriticalKB"`
+	PNGAlphaCheckEnabled bool `json:"pngAlphaCheckEnabled"`
+}
+
+func DefaultOptimizationThresholds() OptimizationThresholds {
+	return OptimizationThresholds{
+		SVGMinSavingsPercent: 10,
+		MaxDimensionPx:       2560,
+		FileSizeWarningKB:    200,
+		FileSizeCriticalKB:   500,
+		PNGAlphaCheckEnabled: true,
+	}
+}
+
+func (t OptimizationThresholds) Hash() string {
+	raw := fmt.Sprintf("%d:%d:%d:%d:%t",
+		t.SVGMinSavingsPercent, t.MaxDimensionPx,
+		t.FileSizeWarningKB, t.FileSizeCriticalKB,
+		t.PNGAlphaCheckEnabled)
+	sum := blake3.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:8])
+}
+
 type ThumbnailResult struct {
 	Path      string `json:"path"`
 	CacheHit  bool   `json:"cacheHit"`
@@ -183,15 +210,15 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 	return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: int64(buf.Len())}, nil
 }
 
-func EstimateOptimization(path string, meta Metadata, sizeBytes int64) []Optimization {
+func EstimateOptimization(path string, meta Metadata, sizeBytes int64, thresholds OptimizationThresholds) []Optimization {
 	ext := strings.ToLower(filepath.Ext(path))
 	var out []Optimization
 	if ext == ".svg" {
-		if suggestion, ok := estimateSVG(path, sizeBytes); ok {
+		if suggestion, ok := estimateSVG(path, sizeBytes, thresholds.SVGMinSavingsPercent); ok {
 			out = append(out, suggestion)
 		}
 	}
-	if meta.Width > 2400 || meta.Height > 2400 {
+	if thresholds.MaxDimensionPx > 0 && (meta.Width > thresholds.MaxDimensionPx || meta.Height > thresholds.MaxDimensionPx) {
 		out = append(out, Optimization{
 			Category:       "dimensions",
 			Severity:       "warning",
@@ -201,9 +228,11 @@ func EstimateOptimization(path string, meta Metadata, sizeBytes int64) []Optimiz
 			Suggestion:     "Consider responsive variants or a smaller source image.",
 		})
 	}
-	if sizeBytes > 500*1024 {
+	warningBytes := int64(thresholds.FileSizeWarningKB) * 1024
+	criticalBytes := int64(thresholds.FileSizeCriticalKB) * 1024
+	if warningBytes > 0 && sizeBytes > warningBytes {
 		severity := "warning"
-		if sizeBytes > 1024*1024 {
+		if criticalBytes > 0 && sizeBytes > criticalBytes {
 			severity = "critical"
 		}
 		out = append(out, Optimization{
@@ -215,7 +244,7 @@ func EstimateOptimization(path string, meta Metadata, sizeBytes int64) []Optimiz
 			Suggestion:     "Review compression or modern image formats.",
 		})
 	}
-	if ext == ".png" && !meta.Alpha {
+	if thresholds.PNGAlphaCheckEnabled && ext == ".png" && !meta.Alpha {
 		out = append(out, Optimization{
 			Category:       "format",
 			Severity:       "info",
@@ -367,7 +396,7 @@ func fitSize(width, height, maxSize int) (int, int) {
 	return max(1, int(math.Round(float64(width)*scale))), max(1, int(math.Round(float64(height)*scale)))
 }
 
-func estimateSVG(path string, sizeBytes int64) (Optimization, bool) {
+func estimateSVG(path string, sizeBytes int64, minSavingsPercent int) (Optimization, bool) {
 	bytes, err := os.ReadFile(path)
 	if err != nil || len(bytes) == 0 {
 		return Optimization{}, false
@@ -381,6 +410,12 @@ func estimateSVG(path string, sizeBytes int64) (Optimization, bool) {
 	savings := sizeBytes - int64(len(minified))
 	if savings <= 0 {
 		return Optimization{}, false
+	}
+	if sizeBytes > 0 && minSavingsPercent > 0 {
+		pct := float64(savings) * 100 / float64(sizeBytes)
+		if pct < float64(minSavingsPercent) {
+			return Optimization{}, false
+		}
 	}
 	return Optimization{
 		Category:       "svg-minify",

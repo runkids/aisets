@@ -65,6 +65,7 @@ import type {
   CustomAssetFilterOperator,
   ExportData,
   OCRRunCounts,
+  OptimizationThresholds,
   ScanAnalyses,
   ScanProfile,
   SettingsInfo,
@@ -133,6 +134,7 @@ type SettingsDraft = {
   excludePatternsText: string;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
+  optimizationThresholds: OptimizationThresholds;
   customAssetFilters: CustomAssetFilter[];
 };
 
@@ -172,6 +174,13 @@ const defaultSettings: SettingsUpdate = {
   excludePatterns: [],
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
+  optimizationThresholds: {
+    svgMinSavingsPercent: 10,
+    maxDimensionPx: 2560,
+    fileSizeWarningKB: 200,
+    fileSizeCriticalKB: 500,
+    pngAlphaCheckEnabled: true,
+  },
   customAssetFilters: [],
 };
 
@@ -388,6 +397,9 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
+    optimizationThresholds:
+      settings?.optimizationThresholds ??
+      defaultSettings.optimizationThresholds!,
     customAssetFilters: settings?.customAssetFilters ?? [],
   };
 }
@@ -412,6 +424,7 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
       .filter(Boolean),
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
     optimizationAutoApply: draft.optimizationAutoApply,
+    optimizationThresholds: draft.optimizationThresholds,
     customAssetFilters: draft.customAssetFilters,
   };
 }
@@ -664,7 +677,7 @@ function WorkspaceDialogContent({
   return (
     <Modal
       title={
-        workspace ? t("settings.renameWorkspace") : t("settings.addWorkspace")
+        workspace ? t("settings.editWorkspace") : t("settings.addWorkspace")
       }
       onClose={onCancel}
       size="sm"
@@ -678,7 +691,7 @@ function WorkspaceDialogContent({
             onClick={submit}
             disabled={loading || !canSubmit}
           >
-            {workspace ? t("action.rename") : t("settings.addWorkspace")}
+            {workspace ? t("action.saveChanges") : t("settings.addWorkspace")}
           </Button>
         </div>
       }
@@ -961,6 +974,9 @@ export function SettingsView({
   }, []);
 
   const assetCountByProject: Record<string, number> = {};
+  for (const stat of catalogQuery.data?.projectStats ?? []) {
+    assetCountByProject[stat.projectId] = stat.totalFiles;
+  }
 
   function updateDraft(updater: (current: SettingsDraft) => SettingsDraft) {
     setDraftOverride((current) =>
@@ -1193,7 +1209,7 @@ export function SettingsView({
           setRenameWorkspaceId(null);
           setDraftOverride(draftFromSettings(result.settings));
           toast.success(
-            t("settings.renameWorkspaceSuccess", { name: value.name }),
+            t("settings.updateWorkspaceSuccess", { name: value.name }),
           );
         },
       },
@@ -1441,7 +1457,7 @@ export function SettingsView({
                                   setRenameWorkspaceId(workspace.id)
                                 }
                               >
-                                {t("action.rename")}
+                                {t("action.edit")}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -2192,42 +2208,35 @@ export function SettingsView({
               className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
               padding="none"
             >
-              <SectionHeading
-                title={t("settings.section.customFilters")}
-                description={t("settings.customFiltersDesc")}
-                icon={sectionIcon("customFilters")}
-              />
+              <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                <span className="shrink-0 text-g-ink-3">
+                  {sectionIcon("customFilters")}
+                </span>
+                <span className="flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                  {t("settings.section.customFilters")}
+                </span>
+                <IconButton
+                  size="sm"
+                  aria-label={t("settings.customFiltersHelp")}
+                  onClick={() => setCustomFiltersHelpOpen(true)}
+                >
+                  <Info size={15} />
+                </IconButton>
+              </div>
               <div className="px-6 py-5 md:px-8">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="font-g-display text-g-h3 font-[650] leading-[1.2] tracking-g-tight text-g-ink">
-                      {t("settings.customFilters")}
-                    </h2>
-                    <p className="mt-1 max-w-[62ch] font-g text-g-ui tracking-g-ui text-g-ink-3">
-                      {t("settings.customFiltersDesc")}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <IconButton
+                {draft.customAssetFilters.length > 0 && (
+                  <div className="mb-4 flex items-center justify-end">
+                    <Button
+                      variant="secondary"
                       size="sm"
-                      aria-label={t("settings.customFiltersHelp")}
-                      onClick={() => setCustomFiltersHelpOpen(true)}
+                      leadingIcon={<Plus size={13} />}
+                      disabled={working}
+                      onClick={onAddCustomFilter}
                     >
-                      <Info size={15} />
-                    </IconButton>
-                    {draft.customAssetFilters.length > 0 && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        leadingIcon={<Plus size={13} />}
-                        disabled={working}
-                        onClick={onAddCustomFilter}
-                      >
-                        {t("settings.addCustomFilter")}
-                      </Button>
-                    )}
+                      {t("settings.addCustomFilter")}
+                    </Button>
                   </div>
-                </div>
+                )}
 
                 {draft.customAssetFilters.length === 0 ? (
                   <EmptyState
@@ -2559,108 +2568,410 @@ export function SettingsView({
           )}
 
           {activeSection === "optimization" && (
-            <Card
-              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
-              padding="none"
-            >
-              <SectionHeading
-                title={t("settings.section.optimization")}
-                description={t("settings.optimizationDesc")}
-                icon={sectionIcon("optimization")}
-              />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                <FieldRow
-                  label={t("settings.defaultQuality")}
-                  description={t("settings.defaultQualityHint")}
-                  icon={<Sliders size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={draft.optimizationDefaultQuality}
-                        disabled={
-                          settingsQuery.isLoading || updateMutation.isPending
-                        }
-                        onChange={(event) =>
-                          updateDraft((prev) => ({
-                            ...prev,
-                            optimizationDefaultQuality: Number(
-                              event.target.value,
-                            ),
-                          }))
-                        }
-                        className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
-                        aria-label={t("settings.defaultQuality")}
-                      />
-                      <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
-                        {draft.optimizationDefaultQuality}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      {(
-                        [
-                          { label: t("settings.qualityLow"), value: 60 },
-                          { label: t("settings.qualityStandard"), value: 80 },
-                          { label: t("settings.qualityHigh"), value: 95 },
-                          { label: t("settings.qualityMax"), value: 100 },
-                        ] as const
-                      ).map((preset) => (
-                        <button
-                          key={preset.value}
-                          type="button"
+            <>
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <span className="shrink-0 text-g-ink-3">
+                    {sectionIcon("optimization")}
+                  </span>
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.section.optimization")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.defaultQuality")}
+                    description={t("settings.defaultQualityHint")}
+                    icon={<Sliders size={15} />}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={draft.optimizationDefaultQuality}
                           disabled={
                             settingsQuery.isLoading || updateMutation.isPending
                           }
-                          onClick={() =>
+                          onChange={(event) =>
                             updateDraft((prev) => ({
                               ...prev,
-                              optimizationDefaultQuality: preset.value,
+                              optimizationDefaultQuality: Number(
+                                event.target.value,
+                              ),
                             }))
                           }
-                          className={cn(
-                            "flex-1 rounded-g-md border px-2 py-1 font-g text-g-caption font-[510] tracking-g-ui transition-[background,border-color,color] duration-[120ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]",
-                            draft.optimizationDefaultQuality === preset.value
-                              ? "border-g-active-bg bg-g-active-bg text-g-active-text"
-                              : "border-g-line bg-g-surface hover:bg-g-surface-2 text-g-ink-2",
-                          )}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                          className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                          aria-label={t("settings.defaultQuality")}
+                        />
+                        <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                          {draft.optimizationDefaultQuality}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {(
+                          [
+                            { label: t("settings.qualityLow"), value: 60 },
+                            { label: t("settings.qualityStandard"), value: 80 },
+                            { label: t("settings.qualityHigh"), value: 95 },
+                            { label: t("settings.qualityMax"), value: 100 },
+                          ] as const
+                        ).map((preset) => (
+                          <Button
+                            key={preset.value}
+                            variant="chip"
+                            size="sm"
+                            data-active={
+                              draft.optimizationDefaultQuality ===
+                                preset.value || undefined
+                            }
+                            disabled={
+                              settingsQuery.isLoading ||
+                              updateMutation.isPending
+                            }
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                optimizationDefaultQuality: preset.value,
+                              }))
+                            }
+                            className="flex-1"
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.autoApply")}
-                  description={t("settings.autoApplyHint")}
-                  icon={<Sliders size={15} />}
-                >
-                  <Switch
-                    checked={draft.optimizationAutoApply}
-                    onCheckedChange={(next) =>
-                      updateDraft((prev) => ({
-                        ...prev,
-                        optimizationAutoApply: next,
-                      }))
-                    }
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    aria-label={t("settings.autoApply")}
-                  />
-                </FieldRow>
-                {updateMutation.error && (
-                  <Notice tone="danger">
-                    {errorMessage(updateMutation.error)}
-                  </Notice>
-                )}
-                {settingActions}
-              </div>
-            </Card>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.autoApply")}
+                    description={t("settings.autoApplyHint")}
+                    icon={<Sliders size={15} />}
+                  >
+                    <Switch
+                      checked={draft.optimizationAutoApply}
+                      onCheckedChange={(next) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          optimizationAutoApply: next,
+                        }))
+                      }
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                      aria-label={t("settings.autoApply")}
+                    />
+                  </FieldRow>
+                  {updateMutation.error && (
+                    <Notice tone="danger">
+                      {errorMessage(updateMutation.error)}
+                    </Notice>
+                  )}
+                  {settingActions}
+                </div>
+              </Card>
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Sliders size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.thresholdsHeading")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.svgMinSavings")}
+                    description={t("settings.svgMinSavingsHint")}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0}
+                          max={50}
+                          value={
+                            draft.optimizationThresholds.svgMinSavingsPercent
+                          }
+                          onChange={(e) =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              optimizationThresholds: {
+                                ...prev.optimizationThresholds,
+                                svgMinSavingsPercent: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                          disabled={
+                            settingsQuery.isLoading || updateMutation.isPending
+                          }
+                        />
+                        <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                          {draft.optimizationThresholds.svgMinSavingsPercent}%
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {[0, 5, 10, 20].map((v) => (
+                          <Button
+                            key={v}
+                            variant="chip"
+                            size="sm"
+                            data-active={
+                              draft.optimizationThresholds
+                                .svgMinSavingsPercent === v || undefined
+                            }
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                optimizationThresholds: {
+                                  ...prev.optimizationThresholds,
+                                  svgMinSavingsPercent: v,
+                                },
+                              }))
+                            }
+                            disabled={
+                              settingsQuery.isLoading ||
+                              updateMutation.isPending
+                            }
+                            className="flex-1"
+                          >
+                            {v}%
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.maxDimension")}
+                    description={t("settings.maxDimensionHint")}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={800}
+                          max={5120}
+                          step={64}
+                          value={draft.optimizationThresholds.maxDimensionPx}
+                          onChange={(e) =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              optimizationThresholds: {
+                                ...prev.optimizationThresholds,
+                                maxDimensionPx: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                          disabled={
+                            settingsQuery.isLoading || updateMutation.isPending
+                          }
+                        />
+                        <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                          {draft.optimizationThresholds.maxDimensionPx}px
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {[1920, 2560, 3840].map((v) => (
+                          <Button
+                            key={v}
+                            variant="chip"
+                            size="sm"
+                            data-active={
+                              draft.optimizationThresholds.maxDimensionPx ===
+                                v || undefined
+                            }
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                optimizationThresholds: {
+                                  ...prev.optimizationThresholds,
+                                  maxDimensionPx: v,
+                                },
+                              }))
+                            }
+                            disabled={
+                              settingsQuery.isLoading ||
+                              updateMutation.isPending
+                            }
+                            className="flex-1"
+                          >
+                            {v}px
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.fileSizeWarning")}
+                    description={t("settings.fileSizeWarningHint")}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={50}
+                          max={2000}
+                          step={50}
+                          value={draft.optimizationThresholds.fileSizeWarningKB}
+                          onChange={(e) =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              optimizationThresholds: {
+                                ...prev.optimizationThresholds,
+                                fileSizeWarningKB: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                          disabled={
+                            settingsQuery.isLoading || updateMutation.isPending
+                          }
+                        />
+                        <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                          {draft.optimizationThresholds.fileSizeWarningKB}KB
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {[100, 200, 500, 1000].map((v) => (
+                          <Button
+                            key={v}
+                            variant="chip"
+                            size="sm"
+                            data-active={
+                              draft.optimizationThresholds.fileSizeWarningKB ===
+                                v || undefined
+                            }
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                optimizationThresholds: {
+                                  ...prev.optimizationThresholds,
+                                  fileSizeWarningKB: v,
+                                },
+                              }))
+                            }
+                            disabled={
+                              settingsQuery.isLoading ||
+                              updateMutation.isPending
+                            }
+                            className="flex-1"
+                          >
+                            {v >= 1000 ? `${v / 1000}MB` : `${v}KB`}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.fileSizeCritical")}
+                    description={t("settings.fileSizeCriticalHint")}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={100}
+                          max={5000}
+                          step={100}
+                          value={
+                            draft.optimizationThresholds.fileSizeCriticalKB
+                          }
+                          onChange={(e) =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              optimizationThresholds: {
+                                ...prev.optimizationThresholds,
+                                fileSizeCriticalKB: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                          disabled={
+                            settingsQuery.isLoading || updateMutation.isPending
+                          }
+                        />
+                        <span className="inline-flex h-g-btn-sm min-w-[52px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                          {draft.optimizationThresholds.fileSizeCriticalKB >=
+                          1000
+                            ? `${(draft.optimizationThresholds.fileSizeCriticalKB / 1000).toFixed(1)}MB`
+                            : `${draft.optimizationThresholds.fileSizeCriticalKB}KB`}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {[200, 500, 1000, 2000].map((v) => (
+                          <Button
+                            key={v}
+                            variant="chip"
+                            size="sm"
+                            data-active={
+                              draft.optimizationThresholds
+                                .fileSizeCriticalKB === v || undefined
+                            }
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                optimizationThresholds: {
+                                  ...prev.optimizationThresholds,
+                                  fileSizeCriticalKB: v,
+                                },
+                              }))
+                            }
+                            disabled={
+                              settingsQuery.isLoading ||
+                              updateMutation.isPending
+                            }
+                            className="flex-1"
+                          >
+                            {v >= 1000 ? `${v / 1000}MB` : `${v}KB`}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.pngAlphaCheck")}
+                    description={t("settings.pngAlphaCheckHint")}
+                  >
+                    <Switch
+                      checked={
+                        draft.optimizationThresholds.pngAlphaCheckEnabled
+                      }
+                      onCheckedChange={(next) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          optimizationThresholds: {
+                            ...prev.optimizationThresholds,
+                            pngAlphaCheckEnabled: next,
+                          },
+                        }))
+                      }
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                      aria-label={t("settings.pngAlphaCheck")}
+                    />
+                  </FieldRow>
+                  {updateMutation.error && (
+                    <Notice tone="danger">
+                      {errorMessage(updateMutation.error)}
+                    </Notice>
+                  )}
+                  {settingActions}
+                </div>
+              </Card>
+            </>
           )}
 
           {activeSection === "hotkeys" && (

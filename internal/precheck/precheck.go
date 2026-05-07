@@ -99,7 +99,7 @@ func Analyze(ctx context.Context, name, localPath string, catalog scanner.Catalo
 	res.NearMatches = findNearMatches(hashes.DHash, hashes.DHashFlipped, contentHash, catalog)
 	res.NamingIssues = checkNaming(name)
 
-	for _, opt := range imageproc.EstimateOptimization(localPath, meta, info.Size()) {
+	for _, opt := range imageproc.EstimateOptimization(localPath, meta, info.Size(), imageproc.DefaultOptimizationThresholds()) {
 		res.Optimization = append(res.Optimization, scanner.OptimizationSuggestion{
 			Category:       opt.Category,
 			ReasonCode:     opt.ReasonCode,

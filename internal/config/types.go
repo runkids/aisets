@@ -1,6 +1,9 @@
 package config
 
-import "asset-studio/internal/scanner"
+import (
+	"asset-studio/internal/imageproc"
+	"asset-studio/internal/scanner"
+)
 
 type Workspace struct {
 	ID           string `json:"id"`
@@ -19,45 +22,47 @@ type Project struct {
 }
 
 type AppSettings struct {
-	WorkspaceName              string                  `json:"workspaceName"`
-	ActiveWorkspaceID          string                  `json:"activeWorkspaceId"`
-	DefaultProjectRoot         string                  `json:"defaultProjectRoot"`
-	AutoScanOnOpen             bool                    `json:"autoScanOnOpen"`
-	ScanOnOpen                 bool                    `json:"scanOnOpen"`
-	ScanProfile                scanner.ScanProfile     `json:"scanProfile"`
-	ScanAnalyses               scanner.AnalysisOptions `json:"scanAnalyses"`
-	OCREnabled                 bool                    `json:"ocrEnabled"`
-	OCRLanguages               []string                `json:"ocrLanguages"`
-	OCRMaxPixels               int                     `json:"ocrMaxPixels"`
-	OCRBatchSize               int                     `json:"ocrBatchSize"`
-	OCRConcurrency             int                     `json:"ocrConcurrency"`
-	OCRFuzzySearch             bool                    `json:"ocrFuzzySearch"`
-	ExcludePatterns            []string                `json:"excludePatterns"`
-	OptimizationDefaultQuality int                     `json:"optimizationDefaultQuality"`
-	OptimizationAutoApply      bool                    `json:"optimizationAutoApply"`
-	CustomAssetFilters         []CustomAssetFilter     `json:"customAssetFilters"`
-	PreferredEditor            string                  `json:"preferredEditor"`
+	WorkspaceName              string                           `json:"workspaceName"`
+	ActiveWorkspaceID          string                           `json:"activeWorkspaceId"`
+	DefaultProjectRoot         string                           `json:"defaultProjectRoot"`
+	AutoScanOnOpen             bool                             `json:"autoScanOnOpen"`
+	ScanOnOpen                 bool                             `json:"scanOnOpen"`
+	ScanProfile                scanner.ScanProfile              `json:"scanProfile"`
+	ScanAnalyses               scanner.AnalysisOptions          `json:"scanAnalyses"`
+	OCREnabled                 bool                             `json:"ocrEnabled"`
+	OCRLanguages               []string                         `json:"ocrLanguages"`
+	OCRMaxPixels               int                              `json:"ocrMaxPixels"`
+	OCRBatchSize               int                              `json:"ocrBatchSize"`
+	OCRConcurrency             int                              `json:"ocrConcurrency"`
+	OCRFuzzySearch             bool                             `json:"ocrFuzzySearch"`
+	ExcludePatterns            []string                         `json:"excludePatterns"`
+	OptimizationDefaultQuality int                              `json:"optimizationDefaultQuality"`
+	OptimizationAutoApply      bool                             `json:"optimizationAutoApply"`
+	OptimizationThresholds     imageproc.OptimizationThresholds `json:"optimizationThresholds"`
+	CustomAssetFilters         []CustomAssetFilter              `json:"customAssetFilters"`
+	PreferredEditor            string                           `json:"preferredEditor"`
 }
 
 type SettingsUpdate struct {
-	WorkspaceName              *string                  `json:"workspaceName"`
-	ActiveWorkspaceID          *string                  `json:"activeWorkspaceId"`
-	DefaultProjectRoot         *string                  `json:"defaultProjectRoot"`
-	AutoScanOnOpen             *bool                    `json:"autoScanOnOpen"`
-	ScanOnOpen                 *bool                    `json:"scanOnOpen"`
-	ScanProfile                *scanner.ScanProfile     `json:"scanProfile"`
-	ScanAnalyses               *scanner.AnalysisOptions `json:"scanAnalyses"`
-	OCREnabled                 *bool                    `json:"ocrEnabled"`
-	OCRLanguages               []string                 `json:"ocrLanguages"`
-	OCRMaxPixels               *int                     `json:"ocrMaxPixels"`
-	OCRBatchSize               *int                     `json:"ocrBatchSize"`
-	OCRConcurrency             *int                     `json:"ocrConcurrency"`
-	OCRFuzzySearch             *bool                    `json:"ocrFuzzySearch"`
-	ExcludePatterns            []string                 `json:"excludePatterns"`
-	OptimizationDefaultQuality *int                     `json:"optimizationDefaultQuality"`
-	OptimizationAutoApply      *bool                    `json:"optimizationAutoApply"`
-	CustomAssetFilters         []CustomAssetFilter      `json:"customAssetFilters"`
-	PreferredEditor            *string                  `json:"preferredEditor"`
+	WorkspaceName              *string                           `json:"workspaceName"`
+	ActiveWorkspaceID          *string                           `json:"activeWorkspaceId"`
+	DefaultProjectRoot         *string                           `json:"defaultProjectRoot"`
+	AutoScanOnOpen             *bool                             `json:"autoScanOnOpen"`
+	ScanOnOpen                 *bool                             `json:"scanOnOpen"`
+	ScanProfile                *scanner.ScanProfile              `json:"scanProfile"`
+	ScanAnalyses               *scanner.AnalysisOptions          `json:"scanAnalyses"`
+	OCREnabled                 *bool                             `json:"ocrEnabled"`
+	OCRLanguages               []string                          `json:"ocrLanguages"`
+	OCRMaxPixels               *int                              `json:"ocrMaxPixels"`
+	OCRBatchSize               *int                              `json:"ocrBatchSize"`
+	OCRConcurrency             *int                              `json:"ocrConcurrency"`
+	OCRFuzzySearch             *bool                             `json:"ocrFuzzySearch"`
+	ExcludePatterns            []string                          `json:"excludePatterns"`
+	OptimizationDefaultQuality *int                              `json:"optimizationDefaultQuality"`
+	OptimizationAutoApply      *bool                             `json:"optimizationAutoApply"`
+	OptimizationThresholds     *imageproc.OptimizationThresholds `json:"optimizationThresholds"`
+	CustomAssetFilters         []CustomAssetFilter               `json:"customAssetFilters"`
+	PreferredEditor            *string                           `json:"preferredEditor"`
 }
 
 type CustomAssetFilter struct {

@@ -24,17 +24,18 @@ type fileData struct {
 }
 
 type Record struct {
-	ProjectID     string                   `json:"projectId"`
-	RepoPath      string                   `json:"repoPath"`
-	Size          int64                    `json:"size"`
-	MTimeUnix     int64                    `json:"mtimeUnix"`
-	ContentHash   string                   `json:"contentHash,omitempty"`
-	HashAlgorithm string                   `json:"hashAlgorithm,omitempty"`
-	Metadata      imageproc.Metadata       `json:"metadata"`
-	Hashes        imageproc.Hashes         `json:"hashes"`
-	Optimization  []imageproc.Optimization `json:"optimization,omitempty"`
-	ThumbKey      string                   `json:"thumbKey,omitempty"`
-	UpdatedAt     string                   `json:"updatedAt"`
+	ProjectID      string                   `json:"projectId"`
+	RepoPath       string                   `json:"repoPath"`
+	Size           int64                    `json:"size"`
+	MTimeUnix      int64                    `json:"mtimeUnix"`
+	ContentHash    string                   `json:"contentHash,omitempty"`
+	HashAlgorithm  string                   `json:"hashAlgorithm,omitempty"`
+	Metadata       imageproc.Metadata       `json:"metadata"`
+	Hashes         imageproc.Hashes         `json:"hashes"`
+	Optimization   []imageproc.Optimization `json:"optimization,omitempty"`
+	ThresholdsHash string                   `json:"thresholdsHash,omitempty"`
+	ThumbKey       string                   `json:"thumbKey,omitempty"`
+	UpdatedAt      string                   `json:"updatedAt"`
 }
 
 func Open(dir string) (*Store, error) {

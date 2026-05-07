@@ -23,6 +23,7 @@ const buttonVariants = cva(
           "bg-transparent text-g-ink-2 [&:hover:not(:disabled)]:bg-g-surface-2 [&:hover:not(:disabled)]:text-g-ink",
         danger:
           "bg-g-red text-g-canvas [&:hover:not(:disabled)]:brightness-[1.08]",
+        chip: "border-g-line bg-g-surface text-g-ink-2 [&:hover:not(:disabled)]:bg-g-surface-2 data-[active=true]:border-g-active-bg data-[active=true]:bg-g-active-bg/10 data-[active=true]:text-g-active-bg",
       },
       size: {
         sm: "h-g-btn-sm px-2.5 text-g-caption [&_svg]:size-3",
