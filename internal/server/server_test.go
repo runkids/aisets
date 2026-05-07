@@ -1117,6 +1117,92 @@ func TestServerHelpersBasePathAndUIHandlers(t *testing.T) {
 	}
 }
 
+func TestBatchDelete(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "src", "a.png"))
+	writePNG(t, filepath.Join(project, "src", "b.png"))
+	writePNG(t, filepath.Join(project, "src", "keep.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fetch catalog to get asset IDs.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+	}
+	var catalog struct {
+		Items []struct {
+			ID       string `json:"id"`
+			RepoPath string `json:"repoPath"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Items) != 3 {
+		t.Fatalf("expected 3 catalog items, got %d: %#v", len(catalog.Items), catalog.Items)
+	}
+	idsByPath := map[string]string{}
+	for _, item := range catalog.Items {
+		idsByPath[item.RepoPath] = item.ID
+	}
+	deleteIDs := []string{idsByPath["src/a.png"], idsByPath["src/b.png"]}
+
+	// Empty body returns empty succeeded list.
+	payload, _ := json.Marshal(map[string][]string{"assetIds": {}})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/delete", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"succeeded":[]`) {
+		t.Fatalf("empty batch delete = %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Delete a.png and b.png.
+	payload, _ = json.Marshal(map[string][]string{"assetIds": deleteIDs})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/delete", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch delete = %d %s", rec.Code, rec.Body.String())
+	}
+	var result struct {
+		Succeeded []string `json:"succeeded"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Succeeded) != 2 {
+		t.Fatalf("expected 2 succeeded, got %d: %s", len(result.Succeeded), rec.Body.String())
+	}
+
+	// Verify files on disk.
+	if _, err := os.Stat(filepath.Join(project, "src", "a.png")); !os.IsNotExist(err) {
+		t.Fatal("a.png should have been deleted")
+	}
+	if _, err := os.Stat(filepath.Join(project, "src", "b.png")); !os.IsNotExist(err) {
+		t.Fatal("b.png should have been deleted")
+	}
+	if _, err := os.Stat(filepath.Join(project, "src", "keep.png")); err != nil {
+		t.Fatal("keep.png should still exist")
+	}
+}
+
 func catalogAssetID(t *testing.T, s *Server) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
