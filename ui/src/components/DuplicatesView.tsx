@@ -578,7 +578,11 @@ export function DuplicatesView({
           <Tabs
             value={tab}
             ariaLabel={t("duplicates.title")}
-            onChange={setTab}
+            onChange={(v) => {
+              setTab(v);
+              setSelected(new Set());
+              setBulkMode(false);
+            }}
             items={[
               {
                 value: "exact",
@@ -826,7 +830,7 @@ function SimilarPairCard({
         <Badge
           tone={nd.distance <= 5 ? "red" : nd.distance <= 8 ? "amber" : "blue"}
         >
-          d={nd.distance}
+          {Math.round((1 - nd.distance / 64) * 100)}%
         </Badge>
         {nd.flipped && (
           <span className="text-[9px] text-g-ink-4">
@@ -852,11 +856,11 @@ function SimilarPairCard({
         </div>
       ) : (
         <div className="mx-auto max-w-md">
-          <div className="relative overflow-hidden rounded-g-md border border-g-line">
-            <AssetThumbnail
+          <div className="relative aspect-square overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
+            <img
               src={left.thumbnailUrl || left.url}
-              size="fill"
-              className="rounded-none border-0"
+              alt=""
+              className="absolute inset-0 size-full object-contain"
             />
             <img
               src={right.thumbnailUrl || right.url}
