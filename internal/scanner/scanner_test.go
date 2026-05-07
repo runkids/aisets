@@ -194,6 +194,25 @@ func TestScanWithProgressHonorsExcludePatterns(t *testing.T) {
 	}
 }
 
+func TestScanRejectsFlatDifferentColorNearDuplicate(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "src", "red.png"), solidImage(16, 16, color.NRGBA{R: 255, A: 255}))
+	writePNG(t, filepath.Join(root, "src", "blue.png"), solidImage(16, 16, color.NRGBA{B: 255, A: 255}))
+
+	catalog, err := NewWithCacheDir(filepath.Join(t.TempDir(), "cache")).Scan(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.NearDuplicates) != 0 {
+		t.Fatalf("near duplicates = %#v, want none for flat assets with different colors", catalog.NearDuplicates)
+	}
+	for _, item := range catalog.Items {
+		if len(item.Similar) != 0 {
+			t.Fatalf("%s similar = %#v, want none", item.RepoPath, item.Similar)
+		}
+	}
+}
+
 func TestScanUsesPersistentCacheAndNearDuplicates(t *testing.T) {
 	root := t.TempDir()
 	cacheDir := filepath.Join(t.TempDir(), "cache")

@@ -75,6 +75,34 @@ func TestAnalyzeHashesUncachedCatalogItemsForExactMatches(t *testing.T) {
 	}
 }
 
+func TestAnalyzeRejectsNearHashWhenColorsDiffer(t *testing.T) {
+	root := t.TempDir()
+	upload := filepath.Join(root, "upload.png")
+	existing := filepath.Join(root, "existing.png")
+	writePNG(t, upload, color.NRGBA{R: 255, A: 255})
+	writePNG(t, existing, color.NRGBA{B: 255, A: 255})
+	hashes, err := imageproc.DHash(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := scanner.Catalog{Items: []scanner.AssetItem{{
+		ID:          "asset-1",
+		RepoPath:    "assets/existing.png",
+		LocalPath:   existing,
+		ProjectName: "web",
+		ContentHash: "different",
+		DHash:       hashes.DHash,
+	}}}
+
+	got, err := Analyze(context.Background(), "clean-name.png", upload, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.NearMatches) != 0 || got.Verdict != VerdictOK {
+		t.Fatalf("result = %#v, want no near matches for flat assets with different colors", got)
+	}
+}
+
 func TestAnalyzeReportsNearMatchesIncludingFlippedHashes(t *testing.T) {
 	root := t.TempDir()
 	upload := filepath.Join(root, "upload.png")
@@ -137,10 +165,10 @@ func TestFindMatchesAndNamingHelpers(t *testing.T) {
 	if got := findExactMatches("hash", catalog); len(got) != 1 || got[0].AssetID != "exact" {
 		t.Fatalf("exact matches = %#v", got)
 	}
-	if got := findNearMatches("", "", "", catalog); len(got) != 0 {
+	if got := findNearMatches("", "", "", "", catalog); len(got) != 0 {
 		t.Fatalf("empty near matches = %#v", got)
 	}
-	if got := findNearMatches("also-not-hex", "", "", catalog); len(got) != 0 {
+	if got := findNearMatches("", "also-not-hex", "", "", catalog); len(got) != 0 {
 		t.Fatalf("invalid near matches = %#v", got)
 	}
 

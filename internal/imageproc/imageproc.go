@@ -161,6 +161,65 @@ func DistanceHex(a, b string) (int, bool) {
 	return bits.OnesCount64(av ^ bv), true
 }
 
+const (
+	NearDuplicateVisualDistanceThreshold = 45
+	visualDistanceSampleSize             = 16
+)
+
+func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
+	imgA, err := decodeRaster(pathA)
+	if err != nil {
+		return 0, err
+	}
+	imgB, err := decodeRaster(pathB)
+	if err != nil {
+		return 0, err
+	}
+	if flipB {
+		imgB = flipHorizontal(imgB)
+	}
+	sampleA := visualSample(imgA)
+	sampleB := visualSample(imgB)
+	var total int
+	for y := 0; y < visualDistanceSampleSize; y++ {
+		for x := 0; x < visualDistanceSampleSize; x++ {
+			rA, gA, bA, aA := rgba8(sampleA.At(x, y))
+			rB, gB, bB, aB := rgba8(sampleB.At(x, y))
+			total += absInt(rA-rB) + absInt(gA-gB) + absInt(bA-bB) + absInt(aA-aB)
+		}
+	}
+	return int(math.Round(float64(total) / float64(visualDistanceSampleSize*visualDistanceSampleSize*4))), nil
+}
+
+func visualSample(img image.Image) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, visualDistanceSampleSize, visualDistanceSampleSize))
+	xdraw.CatmullRom.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Src, nil)
+	return dst
+}
+
+func rgba8(c color.Color) (int, int, int, int) {
+	r, g, b, a := c.RGBA()
+	return int(r >> 8), int(g >> 8), int(b >> 8), int(a >> 8)
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func IsVisualMatch(leftPath, rightPath string, flipped bool) bool {
+	if leftPath == "" || rightPath == "" {
+		return true
+	}
+	distance, err := VisualDistance(leftPath, rightPath, flipped)
+	if err != nil {
+		return true
+	}
+	return distance <= NearDuplicateVisualDistanceThreshold
+}
+
 func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, error) {
 	if size <= 0 {
 		size = 256

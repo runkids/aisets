@@ -96,7 +96,7 @@ func Analyze(ctx context.Context, name, localPath string, catalog scanner.Catalo
 	}
 
 	res.ExactMatches = findExactMatchesWithFallback(ctx, contentHash, info.Size(), catalog)
-	res.NearMatches = findNearMatches(hashes.DHash, hashes.DHashFlipped, contentHash, catalog)
+	res.NearMatches = findNearMatches(localPath, hashes.DHash, hashes.DHashFlipped, contentHash, catalog)
 	res.NamingIssues = checkNaming(name)
 
 	for _, opt := range imageproc.EstimateOptimization(localPath, meta, info.Size(), imageproc.DefaultOptimizationThresholds()) {
@@ -191,7 +191,7 @@ func exactMatch(item scanner.AssetItem) ExactMatch {
 	}
 }
 
-func findNearMatches(dHash, dHashFlipped, contentHash string, catalog scanner.Catalog) []NearMatch {
+func findNearMatches(localPath, dHash, dHashFlipped, contentHash string, catalog scanner.Catalog) []NearMatch {
 	out := make([]NearMatch, 0)
 	if dHash == "" {
 		return out
@@ -209,7 +209,7 @@ func findNearMatches(dHash, dHashFlipped, contentHash string, catalog scanner.Ca
 				flipped = true
 			}
 		}
-		if ok && dist <= NearDuplicateThreshold {
+		if ok && dist <= NearDuplicateThreshold && imageproc.IsVisualMatch(localPath, item.LocalPath, flipped) {
 			out = append(out, NearMatch{
 				AssetID:     item.ID,
 				RepoPath:    item.RepoPath,

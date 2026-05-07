@@ -99,6 +99,40 @@ func TestDHashAndMirroredHash(t *testing.T) {
 	}
 }
 
+func TestVisualDistanceRejectsColorOnlyHashCollisions(t *testing.T) {
+	root := t.TempDir()
+	red := filepath.Join(root, "red.png")
+	blue := filepath.Join(root, "blue.png")
+	original := filepath.Join(root, "original.png")
+	mirrored := filepath.Join(root, "mirrored.png")
+	writePNG(t, red, solidImage(16, 16, color.NRGBA{R: 255, A: 255}))
+	writePNG(t, blue, solidImage(16, 16, color.NRGBA{B: 255, A: 255}))
+	writePNG(t, original, asymmetricImage(16, 16))
+	writePNG(t, mirrored, flipHorizontal(asymmetricImage(16, 16)))
+
+	same, err := VisualDistance(red, red, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same != 0 {
+		t.Fatalf("same visual distance = %d, want 0", same)
+	}
+	different, err := VisualDistance(red, blue, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if different <= NearDuplicateVisualDistanceThreshold {
+		t.Fatalf("different color visual distance = %d, want > %d", different, NearDuplicateVisualDistanceThreshold)
+	}
+	flipped, err := VisualDistance(original, mirrored, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flipped != 0 {
+		t.Fatalf("mirrored visual distance = %d, want 0", flipped)
+	}
+}
+
 func TestSVGThumbnailAndDHashUseGoRasterizer(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "icon.svg")

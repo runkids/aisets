@@ -86,7 +86,7 @@ func markNearDuplicates(ctx context.Context, items []AssetItem, progress Progres
 					flipped = true
 				}
 			}
-			if !ok || distance > threshold {
+			if !ok || distance > threshold || !imageproc.IsVisualMatch(items[i].LocalPath, items[j].LocalPath, flipped) {
 				continue
 			}
 			items[i].Similar = append(items[i].Similar, items[j].ID)
