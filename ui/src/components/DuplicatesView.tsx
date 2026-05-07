@@ -452,21 +452,19 @@ export function DuplicatesView({
                       : "border-g-line hover:border-g-line-strong hover:bg-g-surface-2",
                 )}
                 onClick={() => {
-                  if (isPreferred) {
-                    onOpenAsset?.(member.id);
-                  } else {
-                    if (!bulkMode) setBulkMode(true);
+                  if (bulkMode && !isPreferred) {
                     toggleSelect(member.id);
+                  } else {
+                    onOpenAsset?.(member.id);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    if (isPreferred) {
-                      onOpenAsset?.(member.id);
-                    } else {
-                      if (!bulkMode) setBulkMode(true);
+                    if (bulkMode && !isPreferred) {
                       toggleSelect(member.id);
+                    } else {
+                      onOpenAsset?.(member.id);
                     }
                   }
                 }}
@@ -482,7 +480,7 @@ export function DuplicatesView({
                     {t("duplicates.keep")}
                   </span>
                 )}
-                {!isPreferred && (
+                {bulkMode && !isPreferred && (
                   <Checkbox
                     asChild
                     checked={isSelected}
