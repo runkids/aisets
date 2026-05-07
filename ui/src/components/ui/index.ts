@@ -1,6 +1,7 @@
 export { AssetThumbnail } from "./AssetThumbnail";
 export { Badge } from "./Badge";
 export { Button, IconButton } from "./Button";
+export { Checkbox, checkboxVariants, type CheckboxProps } from "./Checkbox";
 export { Card, CardBody } from "./Card";
 export { CopyButton } from "./CopyButton";
 export { ConfirmDialog } from "./ConfirmDialog";

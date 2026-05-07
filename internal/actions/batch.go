@@ -39,13 +39,14 @@ type BatchMoveEntry struct {
 	To   string `json:"to"`
 }
 
-// BatchPreview holds the preview for a batch move operation.
+// BatchPreview holds the preview for a batch move/merge operation.
 type BatchPreview struct {
 	ID        string           `json:"id"`
 	Type      string           `json:"type"`
 	ProjectID string           `json:"projectId"`
 	Moves     []BatchMoveEntry `json:"moves"`
 	Changes   []Change         `json:"changes"`
+	Deletes   []string         `json:"deletes,omitempty"`
 	Blockers  []Blocker        `json:"blockers"`
 	CanApply  bool             `json:"canApply"`
 	CreatedAt string           `json:"createdAt"`
@@ -76,6 +77,39 @@ func BatchMovePreview(project scanner.Project, items []scanner.AssetItem, target
 		preview.Blockers = append(preview.Blockers, blockers...)
 	}
 	preview.CanApply = len(preview.Blockers) == 0 && len(preview.Moves) > 0
+	return preview
+}
+
+// BatchMergePreview generates a preview for merging multiple duplicate assets.
+// Each item's references are rewritten to its group's preferred path, and the
+// item itself is marked for deletion.
+func BatchMergePreview(project scanner.Project, items []scanner.AssetItem, preferredPaths map[string]string) BatchPreview {
+	preview := BatchPreview{
+		ID:        newID("batch-merge:" + project.ID),
+		Type:      "batch-merge",
+		ProjectID: project.ID,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	for _, item := range items {
+		groupID := ""
+		if item.DuplicateGroupID != nil {
+			groupID = *item.DuplicateGroupID
+		}
+		preferred, ok := preferredPaths[groupID]
+		if !ok || preferred == "" {
+			preview.Blockers = append(preview.Blockers, blocker(item.RepoPath, 0, "missing_preferred_path", "no preferred path for duplicate group"))
+			continue
+		}
+		preferred = cleanRepoPath(preferred)
+		if preferred == item.RepoPath {
+			continue
+		}
+		changes, blockers := referenceChanges(project, item, preferred)
+		preview.Changes = append(preview.Changes, changes...)
+		preview.Blockers = append(preview.Blockers, blockers...)
+		preview.Deletes = append(preview.Deletes, item.RepoPath)
+	}
+	preview.CanApply = len(preview.Blockers) == 0 && (len(preview.Deletes) > 0 || len(preview.Changes) > 0)
 	return preview
 }
 
@@ -134,9 +168,21 @@ func BatchApply(project scanner.Project, preview BatchPreview) (ApplyResult, err
 		}
 	}
 
+	// Delete files (for batch merge).
+	for _, del := range preview.Deletes {
+		abs, err := safeAbs(project.Path, del)
+		if err != nil {
+			return ApplyResult{}, err
+		}
+		if err := os.Remove(abs); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return ApplyResult{}, err
+		}
+	}
+
 	return ApplyResult{
 		AppliedAt:         time.Now().UTC().Format(time.RFC3339),
 		ChangedReferences: len(preview.Changes),
+		DeletedFiles:      len(preview.Deletes),
 		MovedFiles:        len(preview.Moves),
 	}, nil
 }

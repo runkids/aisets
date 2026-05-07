@@ -85,6 +85,29 @@ func (s *Server) handleBatchRenamePreview(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
 }
 
+func (s *Server) handleBatchMergePreview(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AssetIDs       []string          `json:"assetIds"`
+		PreferredPaths map[string]string `json:"preferredPaths"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.AssetIDs) == 0 {
+		writeError(w, http.StatusBadRequest, apierr.New("asset_ids_required", "assetIds must not be empty"))
+		return
+	}
+	items, project, err := s.batchItems(r.Context(), body.AssetIDs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	preview := actions.BatchMergePreview(project, items, body.PreferredPaths)
+	s.storeBatchPreview(preview)
+	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
+}
+
 func (s *Server) handleBatchApply(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token string `json:"token"`

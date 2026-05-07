@@ -335,6 +335,24 @@ func (s *Server) handleThumb(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, result.Path)
 }
 
+func (s *Server) handleDuplicateTrend(w http.ResponseWriter, r *http.Request) {
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	points, err := s.store.DuplicateTrend(limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if points == nil {
+		points = []config.DuplicateTrendPoint{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"points": points})
+}
+
 func (s *Server) ensureCatalog(ctx context.Context) (scanner.Catalog, error) {
 	s.mu.Lock()
 	hasCatalog := s.catalog.GeneratedAt != ""

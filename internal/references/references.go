@@ -282,13 +282,45 @@ func Resolve(projectRoot, importerRepoPath, specifier string) string {
 		return cleanRepoPath(filepath.ToSlash(filepath.Join("src", strings.TrimPrefix(spec, "@/"))))
 	}
 	if strings.HasPrefix(spec, "/") {
-		return cleanRepoPath(strings.TrimPrefix(spec, "/"))
+		assetPath := strings.TrimPrefix(spec, "/")
+		if publicPath := resolvePublicAsset(projectRoot, importerRepoPath, assetPath); publicPath != "" {
+			return publicPath
+		}
+		return cleanRepoPath(assetPath)
 	}
 	if strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "../") {
 		base := filepath.Dir(filepath.FromSlash(importerRepoPath))
 		return cleanRepoPath(filepath.ToSlash(filepath.Join(base, filepath.FromSlash(spec))))
 	}
 	return cleanRepoPath(spec)
+}
+
+func resolvePublicAsset(projectRoot, importerRepoPath, assetPath string) string {
+	assetPath = cleanRepoPath(assetPath)
+	if assetPath == "" {
+		return ""
+	}
+	for dir := filepath.ToSlash(filepath.Dir(importerRepoPath)); ; dir = parentRepoDir(dir) {
+		candidate := cleanRepoPath(filepath.ToSlash(filepath.Join(filepath.FromSlash(dir), "public", filepath.FromSlash(assetPath))))
+		if candidate != "" {
+			info, err := os.Stat(filepath.Join(projectRoot, filepath.FromSlash(candidate)))
+			if err == nil && !info.IsDir() {
+				return candidate
+			}
+		}
+		if dir == "." || dir == "" {
+			break
+		}
+	}
+	return ""
+}
+
+func parentRepoDir(dir string) string {
+	parent := filepath.ToSlash(filepath.Dir(filepath.FromSlash(dir)))
+	if parent == dir {
+		return "."
+	}
+	return parent
 }
 
 func CodeExtensions() map[string]bool {

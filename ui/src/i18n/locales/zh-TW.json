@@ -304,7 +304,21 @@
     "noExact": "沒有找到完全相同的重複素材",
     "noExactDesc": "所有掃描的素材都是獨一無二的。",
     "noSimilar": "沒有偵測到相似素材",
-    "noSimilarDesc": "此次掃描未偵測到視覺上相似的素材。"
+    "noSimilarDesc": "此次掃描未偵測到視覺上相似的素材。",
+    "expandGroup": "展開分組",
+    "collapseGroup": "摺疊分組",
+    "statGroups": "分組",
+    "statFiles": "檔案",
+    "statSavings": "可節省",
+    "statSimilar": "相似",
+    "searchPlaceholder": "搜尋路徑或雜湊…",
+    "filterExtension": "副檔名",
+    "allExtensions": "所有副檔名",
+    "sideBySideMode": "並排",
+    "overlayMode": "疊加",
+    "overlayOpacity": "疊加透明度",
+    "mergeConfirmTitle": "合併 {{count}} 個重複檔案",
+    "mergeConfirmBody": "移除 {{count}} 個重複副本（{{size}}），並更新 {{refs}} 個引用指向保留路徑。"
   },
   "optimize": {
     "title": "最佳化",
@@ -526,7 +540,7 @@
     "scanOnOpen": "開啟工作區時掃描",
     "scanOnOpenHint": "啟動 Asset Studio 並載入專案後，自動重新掃描一次 catalog",
     "scanProfileLabel": "掃描模式",
-    "scanProfileHint": "大型工作區預設使用 Fast；Full 會執行所有分析",
+    "scanProfileHint": "預設使用 Full，會執行所有分析；大型工作區可改用 Fast",
     "scanProfile": {
       "fast": "Fast",
       "fastHint": "走訪檔案、讀取圖片 metadata，並建立 exact duplicates。",

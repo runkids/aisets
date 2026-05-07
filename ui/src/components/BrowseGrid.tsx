@@ -8,14 +8,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  Check,
-  CircleOff,
-  Copy,
-  LoaderCircle,
-  Sparkles,
-  Square,
-} from "lucide-react";
+import { CircleOff, Copy, LoaderCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
 import { imageBackgroundClassName } from "../imageBackground";
@@ -25,7 +18,7 @@ import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
-import { Badge, ImagePreview, Tooltip } from "./ui";
+import { Badge, Checkbox, ImagePreview, Tooltip } from "./ui";
 
 type BrowseGridProps = {
   items: AssetItem[];
@@ -241,24 +234,17 @@ export function BrowseGrid({
                 )}
               </div>
             )}
-            <span
-              className={`absolute top-2 right-2 grid size-[22px] place-items-center rounded-g-md border border-g-line-strong bg-g-surface text-g-ink-3 transition-[opacity,background,color,border-color] duration-[120ms] ease-[var(--g-ease)] pointer-events-none group-data-[selected=true]/card:opacity-100 group-data-[selected=true]/card:bg-g-accent group-data-[selected=true]/card:border-g-accent group-data-[selected=true]/card:text-g-accent-ink ${bulkMode ? "opacity-0 group-hover/card:opacity-100" : "opacity-0"}`}
-              role={bulkMode ? "checkbox" : undefined}
-              aria-checked={bulkMode ? isSelected : undefined}
-              aria-label={
-                bulkMode
-                  ? isSelected
-                    ? t("action.deselect")
-                    : t("action.select")
-                  : undefined
-              }
-            >
-              {isSelected || (!bulkMode && isActive) ? (
-                <Check size={12} />
-              ) : (
-                <Square size={10} />
+            <Checkbox
+              asChild
+              checked={isSelected || (!bulkMode && isActive)}
+              tabIndex={-1}
+              size="md"
+              className={cn(
+                "absolute top-2 right-2 pointer-events-none shadow-g-sm opacity-0 transition-opacity duration-[120ms] ease-[var(--g-ease)] data-[state=checked]:!opacity-100 group-data-[selected=true]/card:!opacity-100",
+                bulkMode && "group-hover/card:opacity-100",
               )}
-            </span>
+              aria-hidden="true"
+            />
           </div>
         </ImagePreview>
         <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)] group-data-[selected=true]/card:bg-g-accent-soft">

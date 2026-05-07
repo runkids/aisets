@@ -426,6 +426,15 @@ React API:
 - Focus: border `--g-input-border-focus`, `--g-input-shadow-focus`, bg `--g-surface` (`command` stays borderless and shadowless). Focus uses a quiet neutral outline in both themes, not blue, coral, or lime. Dialog prompt inputs and legacy inline search fields follow the same default white/Graphite input surface.
 - Invalid: border `--g-red`, `aria-invalid=true`
 
+### 5.8.1 Checkbox
+
+Canonical shared primitive: `Checkbox` from `ui/src/components/ui/Checkbox.tsx`, backed by Radix Checkbox and styled with CVA.
+
+- Base: square control, 4px radius, `--g-surface` bg, `--g-line-strong` border, token focus ring
+- Sizes: `sm` 14px, `md` 16px, `lg` 20px
+- Checked / indeterminate: `--g-accent` fill, `--g-accent-ink` Lucide check icon
+- Browse and duplicate card selection uses the checkbox directly in the top-right corner; do not add a large outer shell around it.
+
 ### 5.9 Asset Card `.acard`
 
 - `--g-surface` bg, `1px solid --g-line` border, **6px radius**, flex column
@@ -437,7 +446,7 @@ React API:
     .acard-thumb     1:1, --g-surface-2 bg, border-bottom --g-line
       img            max 82% w/h, object-fit contain
       .acard-flags   absolute top-left, opaque token-mixed status flags (surface + 18% tone) with 52% tone border, 590 text, Lucide icon, and `--g-shadow-sm`; must stay readable on both white thumbnails and dark card surfaces
-      .acard-check   absolute top-right, 0→1 opacity on hover/selected
+      .acard-check   absolute top-right token checkbox only, 0→1 opacity on hover/selected
     .acard-meta      8px 10px padding
       .acard-name    mono 12px / 510, truncate
       .acard-path    mono 10px / Storm Cloud, truncate
@@ -753,6 +762,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ### 6.5 Lint
 
+- Page body starts directly with search/severity controls; do not render a large page title or subtitle.
 - `.lint-kpi`: 4-column KPI grid (critical / warning / info / total)
 - `.lint-controls`: sticky top-0, solid `--g-canvas`, z 10
 - Grouped findings (3 levels):
@@ -763,6 +773,7 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ### 6.6 Pre-Check
 
+- Page body starts directly with the dropzone or result summary controls; do not render a large page title or subtitle.
 - Top dropzone (§5.18) accepting drag/drop/paste/click
 - `.precheck-result-card`: flex row (56px thumb + body), `--g-surface` bg, 6px radius
 - Verdict badge: pass=`chip-green`, warning=`chip-amber`, fail=`chip-red`

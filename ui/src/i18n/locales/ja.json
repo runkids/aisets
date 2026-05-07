@@ -273,7 +273,21 @@
     "noExact": "完全一致する重複はありません。",
     "noExactDesc": "スキャンされたすべてのアセットはユニークです。",
     "noSimilar": "類似アセットは検出されませんでした。",
-    "noSimilarDesc": "このスキャンでは視覚的に類似したアセットは検出されませんでした。"
+    "noSimilarDesc": "このスキャンでは視覚的に類似したアセットは検出されませんでした。",
+    "expandGroup": "グループを展開",
+    "collapseGroup": "グループを折りたたむ",
+    "statGroups": "グループ",
+    "statFiles": "ファイル",
+    "statSavings": "削減可能",
+    "statSimilar": "類似",
+    "searchPlaceholder": "パスまたはハッシュで検索…",
+    "filterExtension": "拡張子",
+    "allExtensions": "すべての拡張子",
+    "sideBySideMode": "並列",
+    "overlayMode": "オーバーレイ",
+    "overlayOpacity": "オーバーレイ透明度",
+    "mergeConfirmTitle": "{{count}}件の重複をマージ",
+    "mergeConfirmBody": "{{count}}件の重複コピー（{{size}}）を削除し、{{refs}}件の参照を推奨パスに更新します。"
   },
   "optimize": {
     "title": "Optimize",
@@ -448,7 +462,7 @@
     "scanOnOpen": "ワークスペースを開いた時にスキャン",
     "scanOnOpenHint": "Asset Studio の起動後、プロジェクトを読み込んだら catalog を一度自動で再スキャンします。",
     "scanProfileLabel": "スキャンモード",
-    "scanProfileHint": "大きなワークスペースでは Fast が既定です。Full はすべての分析を実行します。",
+    "scanProfileHint": "既定では Full を使用し、すべての分析を実行します。大きなワークスペースでは Fast を使用できます。",
     "scanProfile": {
       "fast": "Fast",
       "fastHint": "ファイルを走査し、画像 metadata を読み取り、exact duplicates を作成します。",

@@ -11,6 +11,7 @@ import {
   applyPreview,
   batchApply,
   batchDelete,
+  batchMergePreview,
   batchMovePreview,
   batchRenamePreview,
   deleteUnusedPreview,
@@ -538,6 +539,18 @@ export function useBatchRenamePreviewMutation() {
       assetIds: string[];
       rules: RenameRules;
     }) => batchRenamePreview(assetIds, rules),
+  });
+}
+
+export function useBatchMergePreviewMutation() {
+  return useMutation({
+    mutationFn: ({
+      assetIds,
+      preferredPaths,
+    }: {
+      assetIds: string[];
+      preferredPaths: Record<string, string>;
+    }) => batchMergePreview(assetIds, preferredPaths),
   });
 }
 

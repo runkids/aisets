@@ -79,6 +79,31 @@ func TestBuildMapResolvesProjectReferences(t *testing.T) {
 	}
 }
 
+func TestBuildMapResolvesAbsolutePublicReferences(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "ui", "public", "favicon.png"), "image")
+	mustWrite(t, filepath.Join(root, "ui", "public", "brand", "app-icon.png"), "image")
+	mustWrite(t, filepath.Join(root, "ui", "index.html"), `<link rel="icon" href="/favicon.png" />`)
+	mustWrite(t, filepath.Join(root, "ui", "public", "site.webmanifest"), `{"icons":[{"src":"/brand/app-icon.png"}]}`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{
+			{ProjectID: "p", RepoPath: "ui/public/favicon.png"},
+			{ProjectID: "p", RepoPath: "ui/public/brand/app-icon.png"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := refs["p\x00ui/public/favicon.png"]; len(got) != 1 || got[0].File != "ui/index.html" {
+		t.Fatalf("favicon refs = %#v, want ui/index.html", got)
+	}
+	if got := refs["p\x00ui/public/brand/app-icon.png"]; len(got) != 1 || got[0].File != "ui/public/site.webmanifest" {
+		t.Fatalf("app icon refs = %#v, want ui/public/site.webmanifest", got)
+	}
+}
+
 func TestBuildMapWithProgressExcludesMatchedCodeFiles(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "src", "assets", "logo.png"), "image")

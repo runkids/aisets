@@ -544,6 +544,19 @@ export function batchRenamePreview(
   });
 }
 
+export function batchMergePreview(
+  assetIds: string[],
+  preferredPaths: Record<string, string>,
+) {
+  return request<BatchPreviewResponse>(
+    "/api/actions/batch/merge-duplicates/preview",
+    {
+      method: "POST",
+      body: JSON.stringify({ assetIds, preferredPaths }),
+    },
+  );
+}
+
 export function batchApply(endpoint: string, token: string) {
   return request<{ result: unknown }>(endpoint, {
     method: "POST",

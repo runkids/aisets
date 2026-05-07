@@ -285,7 +285,21 @@
     "noExact": "정확히 일치하는 중복이 없습니다.",
     "noExactDesc": "스캔된 모든 에셋이 고유합니다.",
     "noSimilar": "유사한 에셋이 감지되지 않았습니다.",
-    "noSimilarDesc": "이번 스캔에서 시각적으로 유사한 에셋이 감지되지 않았습니다."
+    "noSimilarDesc": "이번 스캔에서 시각적으로 유사한 에셋이 감지되지 않았습니다.",
+    "expandGroup": "그룹 펼치기",
+    "collapseGroup": "그룹 접기",
+    "statGroups": "그룹",
+    "statFiles": "파일",
+    "statSavings": "절약 가능",
+    "statSimilar": "유사",
+    "searchPlaceholder": "경로 또는 해시 검색…",
+    "filterExtension": "확장자",
+    "allExtensions": "모든 확장자",
+    "sideBySideMode": "나란히",
+    "overlayMode": "오버레이",
+    "overlayOpacity": "오버레이 불투명도",
+    "mergeConfirmTitle": "{{count}}개 중복 병합",
+    "mergeConfirmBody": "{{count}}개의 중복 복사본({{size}})을 제거하고 {{refs}}개의 참조를 기본 경로로 업데이트합니다."
   },
   "optimize": {
     "title": "Optimize",
@@ -460,7 +474,7 @@
     "scanOnOpen": "워크스페이스를 열 때 스캔",
     "scanOnOpenHint": "Asset Studio가 시작되고 프로젝트가 로드되면 catalog를 한 번 자동으로 다시 스캔합니다.",
     "scanProfileLabel": "스캔 모드",
-    "scanProfileHint": "큰 워크스페이스는 기본적으로 Fast를 사용합니다. Full은 모든 분석을 실행합니다.",
+    "scanProfileHint": "기본값은 Full이며 모든 분석을 실행합니다. 큰 워크스페이스에서는 Fast를 사용할 수 있습니다.",
     "scanProfile": {
       "fast": "Fast",
       "fastHint": "파일을 탐색하고 이미지 metadata를 읽은 뒤 exact duplicates를 만듭니다.",

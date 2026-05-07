@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"asset-studio/internal/imageproc"
 )
@@ -25,7 +26,7 @@ func markDuplicates(items []AssetItem) []DuplicateGroup {
 			paths = append(paths, items[index].RepoPath)
 		}
 		sort.Strings(paths)
-		preferred := paths[0]
+		preferred := selectPreferred(items, indexes)
 		id := "dup-" + hash[:10]
 		for _, index := range indexes {
 			items[index].DuplicateGroupID = &id
@@ -38,6 +39,27 @@ func markDuplicates(items []AssetItem) []DuplicateGroup {
 		return groups[i].PreferredPath < groups[j].PreferredPath
 	})
 	return groups
+}
+
+// selectPreferred picks the best file to keep from a duplicate group.
+// Scoring: most references > shallowest path > shortest path > alphabetical.
+func selectPreferred(items []AssetItem, indexes []int) string {
+	best := indexes[0]
+	bestScore := preferredScore(items[best])
+	for _, idx := range indexes[1:] {
+		s := preferredScore(items[idx])
+		if s > bestScore || (s == bestScore && items[idx].RepoPath < items[best].RepoPath) {
+			best, bestScore = idx, s
+		}
+	}
+	return items[best].RepoPath
+}
+
+func preferredScore(item AssetItem) int {
+	refs := len(item.UsedBy) * 1000
+	depth := strings.Count(item.RepoPath, "/")
+	length := len(item.RepoPath)
+	return refs - depth*10 - length
 }
 
 func markNearDuplicates(ctx context.Context, items []AssetItem, progress ProgressFunc) ([]NearDuplicate, error) {

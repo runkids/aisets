@@ -60,6 +60,28 @@ func TestScanCatalogDuplicatesAndUnused(t *testing.T) {
 	}
 }
 
+func TestScanMarksVitePublicAbsoluteReferencesUsed(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "ui", "public", "favicon.png"), solidImage(2, 2, color.White))
+	writePNG(t, filepath.Join(root, "ui", "public", "brand", "app-icon.png"), solidImage(2, 2, color.Black))
+	mustWrite(t, filepath.Join(root, "ui", "index.html"), `<link rel="icon" href="/favicon.png" />`)
+	mustWrite(t, filepath.Join(root, "ui", "src", "AppTopbar.tsx"), `<img src="/brand/app-icon.png" />`)
+
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	catalog, err := s.Scan(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Stats.UnusedFiles != 0 {
+		t.Fatalf("unused files = %d, want 0; items = %#v", catalog.Stats.UnusedFiles, catalog.Items)
+	}
+	for _, item := range catalog.Items {
+		if len(item.UsedBy) == 0 {
+			t.Fatalf("%s usedBy = %#v, want public absolute reference", item.RepoPath, item.UsedBy)
+		}
+	}
+}
+
 func TestScanCatalogJSONUsesEmptyArrays(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "src", "unused.png"), solidImage(2, 2, color.NRGBA{A: 128}))

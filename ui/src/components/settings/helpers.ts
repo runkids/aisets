@@ -100,12 +100,13 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? "",
     autoScanOnOpen: settings?.autoScanOnOpen ?? false,
     scanOnOpen: settings?.scanOnOpen ?? false,
-    scanProfile: settings?.scanProfile ?? "fast",
-    scanAnalyses: settings?.scanAnalyses ?? {
-      references: false,
-      nearDuplicates: false,
-      optimization: false,
-    },
+    scanProfile: settings?.scanProfile ?? defaultSettings.scanProfile ?? "full",
+    scanAnalyses: settings?.scanAnalyses ??
+      defaultSettings.scanAnalyses ?? {
+        references: true,
+        nearDuplicates: true,
+        optimization: true,
+      },
     ocrEnabled: settings?.ocrEnabled ?? false,
     ocrLanguages: settings?.ocrLanguages ?? defaultOCRLanguages,
     ocrMaxPixels: settings?.ocrMaxPixels ?? 2_000_000,

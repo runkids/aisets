@@ -11,9 +11,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImageBackgroundMode } from "../imageBackground";
-import { Select, TextInput, type SegmentedControlItem } from "./ui";
+import { Button, Select, TextInput, type SegmentedControlItem } from "./ui";
 import {
-  BrowseActionToggle,
   BrowseIconToggleGroup,
   BrowseSizeToggleGroup,
   BrowseStatusBar,
@@ -137,13 +136,14 @@ export function BrowseToolbar({
           className="w-36 flex-none"
         />
 
-        <BrowseActionToggle
-          active={bulkMode}
-          label={t("toolbar.bulkSelect")}
-          onToggle={onBulkToggle}
+        <Button
+          variant={bulkMode ? "primary" : "secondary"}
+          size="md"
+          leadingIcon={<CheckSquare size={14} />}
+          onClick={onBulkToggle}
         >
-          <CheckSquare size={16} />
-        </BrowseActionToggle>
+          {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+        </Button>
 
         <TextInput
           variant="search"

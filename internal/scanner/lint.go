@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 
 	"asset-studio/internal/lint"
@@ -50,6 +51,24 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 			}
 			findings = append(findings, lint.Run(ctx)...)
 		}
+	}
+	for _, item := range items {
+		if item.DuplicateGroupID == nil || item.PreferredDuplicatePath == nil {
+			continue
+		}
+		if item.RepoPath == *item.PreferredDuplicatePath {
+			continue
+		}
+		findings = append(findings, lint.Finding{
+			RuleID:     "duplicate-asset",
+			Severity:   "warning",
+			File:       item.RepoPath,
+			Line:       0,
+			Snippet:    "",
+			Message:    fmt.Sprintf("Identical copy exists at %s", *item.PreferredDuplicatePath),
+			Suggestion: "Remove this copy and update references to use the preferred path.",
+			AssetID:    item.ID,
+		})
 	}
 	return findings
 }

@@ -115,3 +115,41 @@ func (s *Store) duplicateGroupPaths(scanID int64, groupID string) ([]string, err
 	}
 	return paths, rows.Err()
 }
+
+type DuplicateTrendPoint struct {
+	ScanID          int64  `json:"scanId"`
+	CompletedAt     string `json:"completedAt"`
+	DuplicateGroups int    `json:"duplicateGroups"`
+	DuplicateFiles  int    `json:"duplicateFiles"`
+	NearDuplicates  int    `json:"nearDuplicates"`
+	TotalFiles      int    `json:"totalFiles"`
+}
+
+func (s *Store) DuplicateTrend(limit int) ([]DuplicateTrendPoint, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := s.db.Query(`
+		SELECT id, completed_at, duplicate_groups, duplicate_files, near_duplicates, total_files
+		FROM scans
+		WHERE status = 'completed' AND completed_at IS NOT NULL
+		ORDER BY completed_at ASC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var points []DuplicateTrendPoint
+	for rows.Next() {
+		var p DuplicateTrendPoint
+		if err := rows.Scan(&p.ScanID, &p.CompletedAt, &p.DuplicateGroups, &p.DuplicateFiles, &p.NearDuplicates, &p.TotalFiles); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return points, nil
+}

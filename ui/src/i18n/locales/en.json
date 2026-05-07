@@ -203,7 +203,7 @@
     "scanOnOpen": "Scan when opening a workspace",
     "scanOnOpenHint": "After Asset Studio starts and projects load, automatically rescan the catalog once.",
     "scanProfileLabel": "Scan profile",
-    "scanProfileHint": "Fast is the default for large workspaces; Full runs every analysis.",
+    "scanProfileHint": "Full is the default and runs every analysis; use Fast for large workspaces.",
     "scanProfile": {
       "fast": "Fast",
       "fastHint": "Walk files, read image metadata, and group exact duplicates.",
@@ -640,7 +640,21 @@
     "noExact": "No exact duplicates found.",
     "noExactDesc": "All scanned assets appear to be unique.",
     "noSimilar": "No similar assets detected.",
-    "noSimilarDesc": "No visually similar assets were detected in this scan."
+    "noSimilarDesc": "No visually similar assets were detected in this scan.",
+    "expandGroup": "Expand group",
+    "collapseGroup": "Collapse group",
+    "statGroups": "Groups",
+    "statFiles": "Files",
+    "statSavings": "Savings",
+    "statSimilar": "Similar",
+    "searchPlaceholder": "Search path or hash…",
+    "filterExtension": "Extension",
+    "allExtensions": "All extensions",
+    "sideBySideMode": "Side by side",
+    "overlayMode": "Overlay",
+    "overlayOpacity": "Overlay opacity",
+    "mergeConfirmTitle": "Merge {{count}} duplicates",
+    "mergeConfirmBody": "Remove {{count}} duplicate copies ({{size}}) and update {{refs}} references to use the preferred paths."
   },
   "optimize": {
     "title": "Optimize",

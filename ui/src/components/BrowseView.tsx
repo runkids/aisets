@@ -958,7 +958,7 @@ export function BrowseView({
               </div>
             </div>
           ) : (
-            <div className="mt-1 min-h-0 flex-1">
+            <div className="min-h-0 flex-1">
               {view === "list" ? (
                 <BrowseList
                   items={items}

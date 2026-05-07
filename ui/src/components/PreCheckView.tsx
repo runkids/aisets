@@ -150,37 +150,27 @@ export function PreCheckView({ onOpenAsset }: Props) {
 
   return (
     <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
-            {t("precheck.title")}
-          </h1>
-          <p className="mt-2.5 max-w-[540px] text-[14px] text-g-ink-3">
-            {t("precheck.sub")}
-          </p>
+      {results.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+          <Badge tone="line">
+            {t("precheck.summary.ok", { count: summary.ok })}
+          </Badge>
+          <Badge tone="warning">
+            {t("precheck.summary.warning", { count: summary.warning })}
+          </Badge>
+          <Badge tone="danger">
+            {t("precheck.summary.duplicate", { count: summary.duplicate })}
+          </Badge>
+          <Button
+            size="sm"
+            variant="secondary"
+            leadingIcon={<X size={12} />}
+            onClick={clearResults}
+          >
+            {t("action.clear")}
+          </Button>
         </div>
-        {results.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge tone="line">
-              {t("precheck.summary.ok", { count: summary.ok })}
-            </Badge>
-            <Badge tone="warning">
-              {t("precheck.summary.warning", { count: summary.warning })}
-            </Badge>
-            <Badge tone="danger">
-              {t("precheck.summary.duplicate", { count: summary.duplicate })}
-            </Badge>
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<X size={12} />}
-              onClick={clearResults}
-            >
-              {t("action.clear")}
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       <div
         className="mb-4 cursor-pointer rounded-g-lg border-2 border-dashed border-g-line-strong bg-g-surface px-8 py-[60px] text-center transition-all duration-200 ease-g hover:border-g-accent hover:bg-[color-mix(in_srgb,var(--g-accent-soft)_50%,var(--g-surface))]"
