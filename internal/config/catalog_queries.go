@@ -264,7 +264,8 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
 			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
 			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, '')
+			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
+			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
@@ -395,7 +396,8 @@ func (s *Store) CatalogItem(scanID int64, assetID string) (scanner.AssetItem, er
 		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
 			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
 			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, '')
+			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
+			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
@@ -1047,11 +1049,11 @@ type assetRowScanner interface {
 func scanAssetFromRow(row assetRowScanner) (scanner.AssetItem, error) {
 	var item scanner.AssetItem
 	var animated, alpha int
-	var usedCount int
+	var usedCount, optCount int
 	var groupID, preferredPath string
 	err := row.Scan(&item.ID, &item.ProjectID, &item.ProjectName, &item.RepoPath, &item.LocalPath, &item.Ext,
 		&item.Bytes, &item.ModifiedUnix, &item.ContentHash, &item.HashAlgorithm, &item.Image.Format, &item.Image.Width, &item.Image.Height,
-		&animated, &alpha, &item.Image.Pages, &item.DHash, &item.DHashFlipped, &usedCount, &groupID, &preferredPath)
+		&animated, &alpha, &item.Image.Pages, &item.DHash, &item.DHashFlipped, &usedCount, &groupID, &preferredPath, &optCount)
 	if err != nil {
 		return scanner.AssetItem{}, err
 	}
@@ -1063,7 +1065,7 @@ func scanAssetFromRow(row assetRowScanner) (scanner.AssetItem, error) {
 	item.References = []scanner.AssetReference{}
 	item.Duplicates = []string{}
 	item.Similar = []string{}
-	item.Optimization = []scanner.OptimizationSuggestion{}
+	item.Optimization = make([]scanner.OptimizationSuggestion, optCount)
 	if groupID != "" {
 		item.DuplicateGroupID = &groupID
 	}
@@ -1125,7 +1127,8 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
 			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
 			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, '')
+			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
+			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
 		FROM duplicate_group_assets d
 		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = d.scan_id AND g.group_id = d.group_id
