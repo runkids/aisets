@@ -229,9 +229,11 @@ export function DuplicatesView({
   const debouncedSearch = useDebouncedValue(search, 250);
 
   const uniqueExts = useMemo(() => {
-    const exts = new Set(items.map((i) => i.ext));
+    const exts = new Set(
+      groupViews.flatMap((g) => g.members.map((m) => m.ext)),
+    );
     return Array.from(exts).sort();
-  }, [items]);
+  }, [groupViews]);
 
   const filteredGroups = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
