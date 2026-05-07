@@ -385,7 +385,19 @@ export function DuplicatesView({
 
     return (
       <Card key={group.id} padding="md">
-        <div className="mb-3 flex items-center gap-2">
+        <div
+          className={cn(
+            "mb-3 flex items-center gap-2",
+            bulkMode &&
+              "cursor-pointer rounded-g-sm -mx-1 px-1 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2",
+          )}
+          onClick={
+            bulkMode
+              ? () => toggleGroupSelect(group.members, group.preferredPath)
+              : undefined
+          }
+          role={bulkMode ? "button" : undefined}
+        >
           {bulkMode && (
             <Checkbox
               checked={groupAllSelected}
