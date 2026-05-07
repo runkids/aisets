@@ -28,7 +28,7 @@ import {
   useBatchApplyMutation,
 } from "../queries";
 import type { RenameRules } from "../types";
-import type { BatchPreviewResponse } from "../api";
+import { batchExport, type BatchPreviewResponse } from "../api";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
 import { RenameRuleModal } from "./RenameRuleModal";
@@ -45,6 +45,28 @@ import { EmptyState } from "./ui";
 
 type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
 type BrowseFilters = { project: string; ext: string; customFilter: string };
+type BrowseStoredState = {
+  filters: BrowseFilters;
+  view: ViewMode;
+  gridSize: "s" | "m" | "l";
+  bgMode: "checker" | "light" | "dark";
+  searchQuery: string;
+  statusFilter: StatusFilter;
+  sortMode: SortMode;
+};
+
+const BROWSE_STATE_STORAGE_KEY = "asset-studio-browse-state";
+const viewModes: ViewMode[] = ["grid", "list", "tree"];
+const gridSizes: BrowseStoredState["gridSize"][] = ["s", "m", "l"];
+const bgModes: BrowseStoredState["bgMode"][] = ["checker", "light", "dark"];
+const statusFilters: StatusFilter[] = [
+  "",
+  "unused",
+  "duplicate",
+  "optimize",
+  "referenced",
+];
+const sortModes: SortMode[] = ["name", "size", "recent"];
 
 type Props = {
   items: AssetItem[];
@@ -58,6 +80,106 @@ type Props = {
   onAutoScrollDone: () => void;
   onOpenAsset: (id: string) => void;
 };
+
+function defaultBrowseStoredState(
+  projectFilterName: string,
+  initialCustomFilterId: string,
+): BrowseStoredState {
+  return {
+    filters: {
+      project: projectFilterName,
+      ext: "",
+      customFilter: initialCustomFilterId,
+    },
+    view: "grid",
+    gridSize: "m",
+    bgMode: "checker",
+    searchQuery: "",
+    statusFilter: "",
+    sortMode: "name",
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function stringOrDefault(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function optionOrDefault<T extends string>(
+  value: unknown,
+  options: T[],
+  fallback: T,
+) {
+  return typeof value === "string" && options.includes(value as T)
+    ? (value as T)
+    : fallback;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function normalizeBrowseStoredState(
+  value: unknown,
+  defaults: BrowseStoredState,
+  pinned?: { project?: string; customFilter?: string },
+): BrowseStoredState {
+  const state = isRecord(value) ? value : {};
+  const rawFilters = isRecord(state.filters) ? state.filters : {};
+  const filters = {
+    project: stringOrDefault(rawFilters.project, defaults.filters.project),
+    ext: stringOrDefault(rawFilters.ext, defaults.filters.ext),
+    customFilter: stringOrDefault(
+      rawFilters.customFilter,
+      defaults.filters.customFilter,
+    ),
+  };
+
+  if (pinned?.project) filters.project = pinned.project;
+  if (pinned?.customFilter) filters.customFilter = pinned.customFilter;
+
+  return {
+    filters,
+    view: optionOrDefault(state.view, viewModes, defaults.view),
+    gridSize: optionOrDefault(state.gridSize, gridSizes, defaults.gridSize),
+    bgMode: optionOrDefault(state.bgMode, bgModes, defaults.bgMode),
+    searchQuery: stringOrDefault(state.searchQuery, defaults.searchQuery),
+    statusFilter: optionOrDefault(
+      state.statusFilter,
+      statusFilters,
+      defaults.statusFilter,
+    ),
+    sortMode: optionOrDefault(state.sortMode, sortModes, defaults.sortMode),
+  };
+}
+
+function readBrowseStoredState(
+  defaults: BrowseStoredState,
+  pinned?: { project?: string; customFilter?: string },
+) {
+  if (typeof window === "undefined") return defaults;
+  try {
+    const raw = window.localStorage.getItem(BROWSE_STATE_STORAGE_KEY);
+    return normalizeBrowseStoredState(
+      raw ? JSON.parse(raw) : null,
+      defaults,
+      pinned,
+    );
+  } catch {
+    return defaults;
+  }
+}
+
+function writeBrowseStoredState(state: BrowseStoredState) {
+  try {
+    window.localStorage.setItem(
+      BROWSE_STATE_STORAGE_KEY,
+      JSON.stringify(state),
+    );
+  } catch {
+    // Ignore browser storage failures; filters still work for this session.
+  }
+}
 
 function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
   switch (status) {
@@ -356,17 +478,32 @@ export function BrowseView({
   onOpenAsset,
 }: Props) {
   const { t } = useTranslation();
-  const [filters, setFilters] = useState(() => ({
-    project: projectFilterName,
-    ext: "",
-    customFilter: initialCustomFilterId,
-  }));
-  const [view, setView] = useState<ViewMode>("grid");
-  const [gridSize, setGridSize] = useState<"s" | "m" | "l">("m");
-  const [bgMode, setBgMode] = useState<"checker" | "light" | "dark">("checker");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
-  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [initialBrowseState] = useState(() =>
+    readBrowseStoredState(
+      defaultBrowseStoredState(projectFilterName, initialCustomFilterId),
+      {
+        project: projectFilterName || undefined,
+        customFilter: initialCustomFilterId || undefined,
+      },
+    ),
+  );
+  const [filters, setFilters] = useState(initialBrowseState.filters);
+  const [view, setView] = useState<ViewMode>(initialBrowseState.view);
+  const [gridSize, setGridSize] = useState<"s" | "m" | "l">(
+    initialBrowseState.gridSize,
+  );
+  const [bgMode, setBgMode] = useState<"checker" | "light" | "dark">(
+    initialBrowseState.bgMode,
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    initialBrowseState.searchQuery,
+  );
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    initialBrowseState.statusFilter,
+  );
+  const [sortMode, setSortMode] = useState<SortMode>(
+    initialBrowseState.sortMode,
+  );
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedFolder, setSelectedFolder] = useState("");
@@ -385,6 +522,30 @@ export function BrowseView({
   const movePreviewMut = useBatchMovePreviewMutation();
   const renamePreviewMut = useBatchRenamePreviewMutation();
   const batchApplyMut = useBatchApplyMutation();
+
+  useEffect(() => {
+    writeBrowseStoredState({
+      filters: {
+        ...filters,
+        project: projectFilterName ? "" : filters.project,
+      },
+      view,
+      gridSize,
+      bgMode,
+      searchQuery,
+      statusFilter,
+      sortMode,
+    });
+  }, [
+    bgMode,
+    filters,
+    gridSize,
+    projectFilterName,
+    searchQuery,
+    sortMode,
+    statusFilter,
+    view,
+  ]);
 
   useEffect(() => {
     if (!autoScrollAssetId) return undefined;
@@ -631,8 +792,8 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
-                disabled
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={() => batchExport(Array.from(selected))}
               >
                 <Download size={12} />
                 {t("action.batchExport")}

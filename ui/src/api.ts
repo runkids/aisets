@@ -371,3 +371,21 @@ export function batchApply(endpoint: string, token: string) {
     body: JSON.stringify({ token }),
   });
 }
+
+export async function batchExport(assetIds: string[]) {
+  const res = await fetch("/api/actions/batch/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assetIds }),
+  });
+  if (!res.ok) throw new Error("Export failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ??
+    "assets-export.zip";
+  a.click();
+  URL.revokeObjectURL(url);
+}
