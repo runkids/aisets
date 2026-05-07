@@ -758,7 +758,7 @@ export function BrowseView({
           />
 
           {bulkMode && selected.size > 0 && (
-            <div className="sticky top-0 z-[5] mb-4 flex min-h-[44px] items-center gap-3 rounded-g-md border border-g-line-strong bg-g-surface-3 px-3 py-2 text-[13px] text-g-ink shadow-g-md animate-[slideUp2_200ms_var(--g-ease-out)]">
+            <div className="sticky top-0 z-[5] mb-4 flex min-h-[44px] items-center gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-[13px] text-g-ink shadow-g-md animate-[slideUp2_200ms_var(--g-ease-out)]">
               <span className="font-g-mono text-[13px] font-[510]">
                 {t("selection.summary", {
                   count: selected.size,
@@ -768,7 +768,7 @@ export function BrowseView({
               <span className="flex-1" />
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
                 onClick={copyPaths}
               >
                 <Copy size={12} />
@@ -776,7 +776,7 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
                 onClick={() => setShowMoveDir(true)}
               >
                 <FolderInput size={12} />
@@ -784,7 +784,7 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
                 onClick={() => setShowRenameRules(true)}
               >
                 <PenLine size={12} />
@@ -792,7 +792,7 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
                 onClick={() => batchExport(Array.from(selected))}
               >
                 <Download size={12} />
@@ -800,7 +800,7 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-g-red px-2.5 text-[12px] font-[510] text-g-canvas hover:brightness-[1.08]"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 text-[12px] font-[510] text-g-ink hover:bg-g-surface-3"
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 size={12} />
