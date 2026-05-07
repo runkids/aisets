@@ -693,6 +693,21 @@
     "total": "總計：{{size}}",
     "empty": "沒有找到未使用素材。"
   },
+  "batch": {
+    "previewSummary": "{{moves}} 個檔案變更 · {{refs}} 個引用更新",
+    "blockersTitle": "{{count}} 個阻擋項目",
+    "fileChanges": "檔案變更（{{count}}）",
+    "refChanges": "引用更新（{{count}}）"
+  },
+  "rename": {
+    "rulesTitle": "批次重新命名規則",
+    "lowercase": "轉為小寫",
+    "replaceSpaces": "空格和特殊字元替換為底線",
+    "prefix": "前綴",
+    "suffix": "後綴",
+    "preview": "預覽",
+    "apply": "套用重新命名"
+  },
   "projects": {
     "workspaceName": "Asset Studio",
     "workspace": "工作區",

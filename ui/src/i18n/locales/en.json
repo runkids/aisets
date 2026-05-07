@@ -693,6 +693,21 @@
     "total": "Total: {{size}}",
     "empty": "No unused assets found."
   },
+  "batch": {
+    "previewSummary": "{{moves}} file changes · {{refs}} reference updates",
+    "blockersTitle": "{{count}} blockers",
+    "fileChanges": "File changes ({{count}})",
+    "refChanges": "Reference updates ({{count}})"
+  },
+  "rename": {
+    "rulesTitle": "Batch Rename Rules",
+    "lowercase": "Convert to lowercase",
+    "replaceSpaces": "Replace spaces & special chars with underscore",
+    "prefix": "Prefix",
+    "suffix": "Suffix",
+    "preview": "Preview",
+    "apply": "Apply Rename"
+  },
   "projects": {
     "workspaceName": "Asset Studio",
     "workspace": "Workspace",

@@ -312,3 +312,10 @@ export type BatchResult = {
   skipped: string[];
   appliedAt: string;
 };
+
+export type RenameRules = {
+  lowercase?: boolean;
+  replaceChars?: Record<string, string>;
+  prefix?: string;
+  suffix?: string;
+};
