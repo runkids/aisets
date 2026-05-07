@@ -782,7 +782,10 @@
       "nearDesc": "Fast scans keep exact duplicate data only. Run a full scan to compare visually similar assets.",
       "optimizationTitle": "Optimization was not computed",
       "optimizationDesc": "Fast scans skip format and compression suggestions. Run a full scan to review optimizable assets.",
-      "fullScan": "Run full scan"
+      "fullScan": "Run full scan",
+      "nearSkippedTitle": "Near-duplicate analysis was skipped",
+      "nearSkippedDesc": "Your catalog has {{count}} assets. Near-duplicate comparison was automatically skipped to avoid long scan times. You can still run it manually.",
+      "nearSkippedAction": "Run with near-duplicates"
     }
   },
   "unused": {

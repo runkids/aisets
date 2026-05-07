@@ -681,6 +681,24 @@ export function App() {
     );
   }
 
+  function onNearDuplicateScan() {
+    setScanProgress(null);
+    setScanProgressVisible(true);
+    scanMutation.mutate(
+      {
+        profile: "custom",
+        analyses: {
+          references: true,
+          nearDuplicates: true,
+          optimization: true,
+        },
+      },
+      {
+        onError: (e) => toast.error(errorMessage(e)),
+      },
+    );
+  }
+
   function onRename(item: AssetItem) {
     setRenameTarget(item);
   }
@@ -887,10 +905,28 @@ export function App() {
               ) : mode === "duplicates" && scopedCatalog ? (
                 catalog?.analysis.nearDuplicates === "notComputed" ? (
                   <NotComputedState
-                    title={t("catalog.notComputed.nearTitle")}
-                    description={t("catalog.notComputed.nearDesc")}
-                    action={t("catalog.notComputed.fullScan")}
-                    onAction={onFullScan}
+                    title={
+                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                        ? t("catalog.notComputed.nearSkippedTitle")
+                        : t("catalog.notComputed.nearTitle")
+                    }
+                    description={
+                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                        ? t("catalog.notComputed.nearSkippedDesc", {
+                            count: catalog?.stats.totalFiles ?? 0,
+                          })
+                        : t("catalog.notComputed.nearDesc")
+                    }
+                    action={
+                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                        ? t("catalog.notComputed.nearSkippedAction")
+                        : t("catalog.notComputed.fullScan")
+                    }
+                    onAction={
+                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                        ? onNearDuplicateScan
+                        : onFullScan
+                    }
                   />
                 ) : (
                   <DuplicatesView

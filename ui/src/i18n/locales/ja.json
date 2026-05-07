@@ -587,7 +587,10 @@
       "nearDesc": "Fast scan は exact duplicate データだけを保持します。見た目が近いアセットを比較するには full scan を実行してください。",
       "optimizationTitle": "Optimization は未計算です",
       "optimizationDesc": "Fast scan は形式と圧縮の提案をスキップします。最適化可能なアセットを見るには full scan を実行してください。",
-      "fullScan": "Full scan を実行"
+      "fullScan": "Full scan を実行",
+      "nearSkippedTitle": "類似重複分析を自動スキップしました",
+      "nearSkippedDesc": "カタログに {{count}} 件のアセットがあります。類似重複比較は O(n²) のため、スキャン時間短縮のため自動スキップされました。手動で実行できます。",
+      "nearSkippedAction": "類似重複分析を実行"
     }
   },
   "unused": {

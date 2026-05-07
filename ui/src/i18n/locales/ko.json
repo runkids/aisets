@@ -592,7 +592,10 @@
       "nearDesc": "Fast scan은 exact duplicate 데이터만 유지합니다. 시각적으로 비슷한 에셋을 비교하려면 full scan을 실행하세요.",
       "optimizationTitle": "Optimization이 계산되지 않았습니다",
       "optimizationDesc": "Fast scan은 형식 및 압축 제안을 건너뜁니다. 최적화 가능한 에셋을 보려면 full scan을 실행하세요.",
-      "fullScan": "Full scan 실행"
+      "fullScan": "Full scan 실행",
+      "nearSkippedTitle": "유사 중복 분석이 자동 건너뛰었습니다",
+      "nearSkippedDesc": "카탈로그에 {{count}}개의 에셋이 있습니다. 유사 중복 비교는 O(n²)이므로 스캔 시간 단축을 위해 자동 건너뛰었습니다. 수동으로 실행할 수 있습니다.",
+      "nearSkippedAction": "유사 중복 분석 실행"
     }
   },
   "unused": {

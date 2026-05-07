@@ -782,7 +782,10 @@
       "nearDesc": "Fast scan 只保留 exact duplicate 資料。執行 full scan 後才能比對視覺相似素材。",
       "optimizationTitle": "Optimization 尚未計算",
       "optimizationDesc": "Fast scan 會略過格式與壓縮建議。執行 full scan 後才能檢視可最佳化素材。",
-      "fullScan": "執行 full scan"
+      "fullScan": "執行 full scan",
+      "nearSkippedTitle": "已自動跳過近似重複分析",
+      "nearSkippedDesc": "目前有 {{count}} 個素材。近似重複比對為 O(n²) 運算，已自動跳過以避免過長掃描時間。你仍可手動執行。",
+      "nearSkippedAction": "執行近似重複分析"
     }
   },
   "unused": {
