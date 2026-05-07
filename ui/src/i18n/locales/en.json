@@ -555,7 +555,21 @@
     "workspace_name_empty": "Workspace name must not be empty.",
     "workspace_icon_invalid": "Workspace image must be a PNG, JPEG, GIF, or WebP data URL under 512 KB.",
     "workspace_not_found": "Workspace not found.",
-    "workspace_last_required": "At least one workspace is required."
+    "workspace_last_required": "At least one workspace is required.",
+    "settings_svg_savings_invalid": "SVG min savings percent must be between 0 and 100.",
+    "settings_max_dimension_invalid": "Max dimension must not be negative.",
+    "settings_file_size_warning_invalid": "File size warning threshold must not be negative.",
+    "settings_file_size_critical_invalid": "File size critical threshold must not be negative.",
+    "settings_file_size_critical_below_warning": "Critical threshold must be greater than or equal to warning threshold.",
+    "scan_not_found": "Scan not found.",
+    "scan_id_required": "Scan ID is required.",
+    "scan_id_invalid": "Scan ID is invalid.",
+    "empty_selection": "No assets selected.",
+    "asset_ids_required": "At least one asset must be selected.",
+    "target_already_exists": "Target file already exists.",
+    "target_path_required": "Target path is required.",
+    "preview_has_blockers": "Preview has unresolved blockers.",
+    "project_icon_invalid": "Project image must be a PNG, JPEG, GIF, or WebP data URL under 512 KB."
   },
   "topbar": {
     "totalLabel": "{{projects}} projects · {{assets}} assets",
@@ -595,6 +609,20 @@
     "critical": "Critical",
     "warning": "Warning",
     "info": "Suggestion"
+  },
+  "optimization": {
+    "reason": {
+      "image_dimensions_large": "Image dimensions exceed common web display sizes.",
+      "asset_file_large": "Large assets can slow down initial page loading.",
+      "png_without_alpha": "PNG without alpha often compresses better as JPEG, WebP, or AVIF.",
+      "svg_can_minify": "SVG can be minified without changing source references."
+    },
+    "suggestion": {
+      "use_responsive_or_smaller_source": "Consider responsive variants or a smaller source image.",
+      "review_compression_or_modern_format": "Review compression settings or try modern image formats.",
+      "try_modern_photographic_format": "Try a photographic format for non-transparent raster images.",
+      "preview_svg_minify": "Preview minified SVG output before applying."
+    }
   },
   "sort": {
     "byCount": "By Count",

@@ -1016,6 +1016,7 @@ export function App() {
         <AssetDrawer
           key={drawerAsset.id}
           asset={drawerAsset}
+          assetIds={items.map((i) => i.id)}
           onClose={() => setDrawerId("")}
           onRename={onRename}
           onDelete={onDelete}

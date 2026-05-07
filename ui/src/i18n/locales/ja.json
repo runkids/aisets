@@ -188,7 +188,21 @@
     "workspace_name_empty": "ワークスペース名は空にできません。",
     "workspace_icon_invalid": "ワークスペース画像は 512 KB 以下の PNG、JPEG、GIF、WebP data URL にしてください。",
     "workspace_not_found": "ワークスペースが見つかりません。",
-    "workspace_last_required": "少なくとも 1 つのワークスペースが必要です。"
+    "workspace_last_required": "少なくとも 1 つのワークスペースが必要です。",
+    "settings_svg_savings_invalid": "SVG 最小削減率は 0〜100 の間である必要があります。",
+    "settings_max_dimension_invalid": "最大寸法は負の値にできません。",
+    "settings_file_size_warning_invalid": "ファイルサイズ警告しきい値は負の値にできません。",
+    "settings_file_size_critical_invalid": "ファイルサイズ重大しきい値は負の値にできません。",
+    "settings_file_size_critical_below_warning": "重大しきい値は警告しきい値以上である必要があります。",
+    "scan_not_found": "スキャン記録が見つかりません。",
+    "scan_id_required": "スキャン ID が必要です。",
+    "scan_id_invalid": "スキャン ID が無効です。",
+    "empty_selection": "アセットが選択されていません。",
+    "asset_ids_required": "少なくとも 1 つのアセットを選択してください。",
+    "target_already_exists": "ターゲットファイルが既に存在します。",
+    "target_path_required": "ターゲットパスが必要です。",
+    "preview_has_blockers": "プレビューに未解決のブロッカーがあります。",
+    "project_icon_invalid": "プロジェクト画像は 512 KB 以下の PNG、JPEG、GIF、または WebP data URL である必要があります。"
   },
   "topbar": {
     "totalLabel": "{{projects}} プロジェクト · {{assets}} アセット",
@@ -228,6 +242,20 @@
     "critical": "重大",
     "warning": "警告",
     "info": "提案"
+  },
+  "optimization": {
+    "reason": {
+      "image_dimensions_large": "画像サイズが一般的なウェブ表示サイズを超えています。",
+      "asset_file_large": "ファイルが大きいとページ読み込みが遅くなる可能性があります。",
+      "png_without_alpha": "透過なしの PNG は JPEG・WebP・AVIF の方が圧縮効率が良い場合があります。",
+      "svg_can_minify": "SVG は参照を変更せずに圧縮できます。"
+    },
+    "suggestion": {
+      "use_responsive_or_smaller_source": "レスポンシブバリアントまたは小さいソース画像の使用を検討してください。",
+      "review_compression_or_modern_format": "圧縮設定を確認するか、最新の画像フォーマットを試してください。",
+      "try_modern_photographic_format": "非透過ラスター画像には写真フォーマットを試してください。",
+      "preview_svg_minify": "適用前に圧縮後の SVG 出力をプレビューしてください。"
+    }
   },
   "sort": {
     "byCount": "件数順",

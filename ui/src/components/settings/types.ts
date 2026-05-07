@@ -1,0 +1,57 @@
+import type { ImageBackgroundMode } from "../../imageBackground";
+import type {
+  CustomAssetFilter,
+  OptimizationThresholds,
+  ScanAnalyses,
+  ScanProfile,
+  SettingsInfo,
+} from "../../types";
+
+export type ThemePreference = "light" | "dark" | "system";
+
+export type SettingsViewProps = {
+  theme: ThemePreference;
+  imagePreviewEnabled: boolean;
+  imageBackgroundMode: ImageBackgroundMode;
+  onThemeChange: (theme: ThemePreference) => void;
+  onImagePreviewEnabledChange: (enabled: boolean) => void;
+  onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
+};
+
+export type Section =
+  | "workspace"
+  | "projects"
+  | "theme"
+  | "scanning"
+  | "customFilters"
+  | "optimization"
+  | "hotkeys"
+  | "about";
+
+export type SettingsDraft = {
+  workspaceName: string;
+  defaultProjectRoot: string;
+  autoScanOnOpen: boolean;
+  scanOnOpen: boolean;
+  scanProfile: ScanProfile;
+  scanAnalyses: ScanAnalyses;
+  ocrEnabled: boolean;
+  ocrLanguages: string[];
+  ocrMaxPixels: number;
+  ocrBatchSize: number;
+  ocrConcurrency: number;
+  ocrFuzzySearch: boolean;
+  excludePatternsText: string;
+  optimizationDefaultQuality: number;
+  optimizationAutoApply: boolean;
+  optimizationThresholds: OptimizationThresholds;
+  customAssetFilters: CustomAssetFilter[];
+};
+
+export type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+export type OCRLanguagePack =
+  SettingsInfo["ocrRuntime"]["availableLanguages"][number];

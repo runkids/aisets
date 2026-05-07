@@ -491,8 +491,8 @@ Canonical shared primitive: `Modal` from `ui/src/components/ui/Modal.tsx`. Share
 Canonical shared primitive: `Toast` from `ui/src/components/ui/Toast.tsx`; `ToastProvider` owns queue/timers only.
 
 - Stack: fixed bottom-right 24px, z 200, max `min(420px, 90vw)`, 8px gap.
-- Toast frame: rounded 12px, `--g-shadow-pop`, click dismiss, focus ring `--g-shadow-focus`.
-- Content uses `Notice` tone variants, so status always includes icon + text, not color alone.
+- Toast frame: rounded 12px, `--g-surface` solid background, `--g-line-strong` border, `--g-shadow-pop`, click dismiss, focus ring `--g-shadow-focus`.
+- Content uses a compact status icon well plus text on the solid toast surface, so status always includes icon + text, not color alone, and remains readable over thumbnails or dark panels. Do not reuse the full `Notice` soft-tint panel inside toast; its translucent backgrounds blend into image cards.
 - Auto-dismiss defaults: 3.5s; danger 6s.
 
 ### 5.15 Command Palette `.cmdk`
