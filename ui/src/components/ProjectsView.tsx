@@ -9,14 +9,14 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AssetItem, Catalog, Project } from "../types";
+import type { Catalog, Project } from "../types";
 import {
   useRemoveProjectMutation,
   useRenameProjectMutation,
   useSettingsQuery,
 } from "../queries";
 import { errorMessage } from "../i18n/index";
-import { fileName, formatBytes } from "../ui";
+import { formatBytes } from "../ui";
 import type { Mode } from "../ui";
 import {
   Badge,
@@ -29,6 +29,7 @@ import {
   IconWell,
   PromptDialog,
   StackedBar,
+  StatCard,
   Tabs,
   TextInput,
   type DropdownMenuItem,
@@ -45,7 +46,7 @@ type Props = {
 
 export type ProjectStat = {
   project: Project;
-  items: AssetItem[];
+  assetCount: number;
   bytes: number;
   used: number;
   unused: number;
@@ -79,38 +80,32 @@ function formatScanTime(value: string, locale: string) {
 }
 
 function buildProjectStats(catalog: Catalog, locale: string): ProjectStat[] {
+  const statsByProject = new Map(
+    catalog.projectStats.map((stat) => [stat.projectId, stat]),
+  );
   return catalog.projects.map((project) => {
-    const items = catalog.items.filter((item) => item.projectId === project.id);
-    const bytes = items.reduce((sum, item) => sum + item.bytes, 0);
-    const unused = items.filter((item) => item.usedBy.length === 0).length;
-    const duplicates = items.filter(
-      (item) => item.duplicateGroupId != null,
-    ).length;
-    const optimizable = items.filter(
-      (item) => item.optimizationRecommendations.length > 0,
-    ).length;
-    const lint = catalog.lintFindings.filter((finding) =>
-      items.some(
-        (item) =>
-          finding.assetId === item.id ||
-          finding.file.startsWith(item.projectName),
-      ),
-    ).length;
-    const used = items.length - unused;
+    const projectStats = statsByProject.get(project.id);
+    const assetCount = projectStats?.totalFiles ?? 0;
+    const bytes = projectStats?.totalBytes ?? 0;
+    const unused = projectStats?.unusedFiles ?? 0;
+    const duplicates = projectStats?.duplicateFiles ?? 0;
+    const optimizable = projectStats?.optimizableFiles ?? 0;
+    const lint = projectStats?.lintFindings ?? 0;
+    const used = assetCount - unused;
     const weightedIssues = unused + duplicates + optimizable + lint;
     const health =
-      items.length === 0
+      assetCount === 0
         ? 100
         : Math.max(
             0,
             Math.round(
-              100 - (weightedIssues / Math.max(items.length * 2, 1)) * 100,
+              100 - (weightedIssues / Math.max(assetCount * 2, 1)) * 100,
             ),
           );
 
     return {
       project,
-      items,
+      assetCount,
       bytes,
       used,
       unused,
@@ -129,6 +124,13 @@ function healthTone(health: number): "green" | "amber" | "red" {
   return "red";
 }
 
+function healthColorClass(health: number): string {
+  const tone = healthTone(health);
+  if (tone === "green") return "text-g-green";
+  if (tone === "amber") return "text-g-amber";
+  return "text-g-red";
+}
+
 function projectCreatedAtTime(project: Project) {
   const time = project.createdAt ? new Date(project.createdAt).getTime() : 0;
   return Number.isNaN(time) ? 0 : time;
@@ -139,7 +141,7 @@ export function sortProjectStats(stats: ProjectStat[], sort: SortKey) {
   return [...stats].sort((a, b) => {
     if (sort === "count")
       return (
-        b.items.length - a.items.length ||
+        b.assetCount - a.assetCount ||
         a.project.name.localeCompare(b.project.name)
       );
     if (sort === "size")
@@ -159,40 +161,6 @@ export function sortProjectStats(stats: ProjectStat[], sort: SortKey) {
 
 function buildHealthSegments(stat: ProjectStat): StackedBarSegment[] {
   return [{ value: stat.health, tone: healthTone(stat.health) }];
-}
-
-function KpiCell({
-  label,
-  value,
-  tone,
-  onClick,
-}: {
-  label: string;
-  value: string | number;
-  tone?: "red" | "amber";
-  onClick?: () => void;
-}) {
-  const colorClass =
-    tone === "red"
-      ? "text-g-red"
-      : tone === "amber"
-        ? "text-g-amber"
-        : "text-g-ink";
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      className={`text-left ${onClick ? "-m-2 cursor-pointer rounded-g-md p-2 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus" : ""}`}
-      onClick={onClick}
-    >
-      <div className="text-g-chip font-[510] text-g-ink-3">{label}</div>
-      <div
-        className={`mt-1 font-g-display text-heading font-[590] leading-none tracking-heading tabular-nums ${colorClass}`}
-      >
-        {value}
-      </div>
-    </Tag>
-  );
 }
 
 function useProjectMenuItems(
@@ -237,7 +205,7 @@ function ProjectCard({
     <Card>
       <CardBody padding="md">
         <div className="flex items-start gap-3">
-          <IconWell size="lg" tone="neutral">
+          <IconWell size="lg" tone={healthTone(stat.health)}>
             <FolderKanban />
           </IconWell>
           <div className="min-w-0 flex-1">
@@ -246,7 +214,7 @@ function ProjectCard({
                 {stat.project.name}
               </h3>
               <Badge tone="line">
-                {t("projects.filesCount", { count: stat.items.length })}
+                {t("projects.filesCount", { count: stat.assetCount })}
               </Badge>
             </div>
             <code className="mt-0.5 block truncate font-g-mono text-g-chip text-g-ink-4">
@@ -269,19 +237,24 @@ function ProjectCard({
           />
         </div>
 
-        <StackedBar
-          segments={buildHealthSegments(stat)}
-          total={100}
-          className="mt-4 bg-g-surface-2 data-[track-tone=green]:bg-[color-mix(in_srgb,var(--g-green)_16%,var(--g-surface-2))] data-[track-tone=amber]:bg-[color-mix(in_srgb,var(--g-amber)_16%,var(--g-surface-2))] data-[track-tone=red]:bg-[color-mix(in_srgb,var(--g-red)_16%,var(--g-surface-2))] [&>span]:opacity-90"
-          ariaLabel={t("projects.healthBadge", { health: stat.health })}
-          trackTone={healthTone(stat.health)}
-        />
+        <div className="mt-4 flex items-center gap-3">
+          <StackedBar
+            segments={buildHealthSegments(stat)}
+            total={100}
+            className="flex-1 bg-g-surface-2 data-[track-tone=green]:bg-[color-mix(in_srgb,var(--g-green)_16%,var(--g-surface-2))] data-[track-tone=amber]:bg-[color-mix(in_srgb,var(--g-amber)_16%,var(--g-surface-2))] data-[track-tone=red]:bg-[color-mix(in_srgb,var(--g-red)_16%,var(--g-surface-2))] [&>span]:opacity-90"
+            ariaLabel={t("projects.healthBadge", { health: stat.health })}
+            trackTone={healthTone(stat.health)}
+          />
+          <span
+            className={`shrink-0 font-g-display text-[20px] font-[590] leading-none tabular-nums ${healthColorClass(stat.health)}`}
+          >
+            {stat.health}
+            <span className="text-[11px] font-[510]">%</span>
+          </span>
+        </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Badge tone="line">{formatBytes(stat.bytes)}</Badge>
-          <Badge tone={healthTone(stat.health)}>
-            {t("projects.healthBadge", { health: stat.health })}
-          </Badge>
           {stat.unused > 0 && (
             <Badge tone="red">
               {t("projects.unusedBadge", { count: stat.unused })}
@@ -407,9 +380,11 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
     [t],
   );
 
-  const items = catalog.items ?? [];
   const projects = catalog.projects ?? [];
-  const totalBytes = items.reduce((sum, item) => sum + item.bytes, 0);
+  const totalBytes = catalog.projectStats.reduce(
+    (sum, stat) => sum + stat.totalBytes,
+    0,
+  );
   const projectStats = useMemo(
     () => buildProjectStats(catalog, i18n.language),
     [catalog, i18n.language],
@@ -420,12 +395,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
       ? projectStats.filter(
           (stat) =>
             stat.project.name.toLowerCase().includes(keyword) ||
-            stat.project.path.toLowerCase().includes(keyword) ||
-            stat.items.some(
-              (item) =>
-                item.repoPath.toLowerCase().includes(keyword) ||
-                fileName(item.repoPath).toLowerCase().includes(keyword),
-            ),
+            stat.project.path.toLowerCase().includes(keyword),
         )
       : projectStats;
     return sortProjectStats(filtered, sort);
@@ -441,60 +411,62 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      {/* Workspace hero */}
-      <Card variant="default" padding="md">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <WorkspaceAvatar
-              name={workspaceName}
-              iconImage={activeWorkspace?.iconImage}
-              className="size-12 bg-g-surface-2 text-lg shadow-g-inset"
-            />
-            <div>
-              <div className="text-g-chip font-[510] uppercase tracking-[0.06em] text-g-ink-3">
-                {t("projects.workspace")}
-              </div>
-              <h2 className="font-g-display text-[17px] font-[590] tracking-[-0.013em] text-g-ink">
-                {workspaceName}
-              </h2>
+    <div className="flex w-full flex-col gap-3">
+      {/* ── Workspace hero ── */}
+      <div className="flex flex-col gap-4 rounded-g-md border border-g-line bg-g-surface p-4 shadow-g-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <WorkspaceAvatar
+            name={workspaceName}
+            iconImage={activeWorkspace?.iconImage}
+            className="size-14 bg-g-surface-2 text-xl shadow-g-inset"
+          />
+          <div>
+            <div className="text-g-chip font-[510] uppercase tracking-[0.06em] text-g-ink-4">
+              {t("projects.workspace")}
             </div>
-          </div>
-          <div className="flex items-center gap-1 text-g-caption text-g-ink-4">
-            <span className="size-1.5 rounded-g-pill bg-g-green" />
-            <span>{t("projects.lastCompletedScan")}</span>
-            <span className="font-g-mono tabular-nums">{lastScan}</span>
+            <h2 className="font-g-display text-[22px] font-[590] tracking-[-0.018em] text-g-ink">
+              {workspaceName}
+            </h2>
           </div>
         </div>
-
-        {/* KPI row */}
-        <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-g-line pt-4 md:grid-cols-5">
-          <KpiCell label={t("projects.projects")} value={projects.length} />
-          <KpiCell
-            label={t("projects.totalAssets")}
-            value={catalog.stats.totalFiles}
-          />
-          <KpiCell
-            label={t("projects.totalSize")}
-            value={formatBytes(totalBytes)}
-          />
-          <KpiCell
-            label={t("projects.unused")}
-            value={unused}
-            tone="red"
-            onClick={() => onJump("unused")}
-          />
-          <KpiCell
-            label={t("projects.duplicateGroups")}
-            value={duplicateFiles}
-            tone="amber"
-            onClick={() => onJump("duplicates")}
-          />
+        <div className="flex items-center gap-1.5 text-g-caption text-g-ink-4">
+          <span className="size-1.5 rounded-g-pill bg-g-green" />
+          <span>{t("projects.lastCompletedScan")}</span>
+          <span className="font-g-mono tabular-nums">{lastScan}</span>
         </div>
-      </Card>
+      </div>
 
-      {/* Toolbar: search + sort */}
-      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3 pb-0 pt-0">
+      {/* ── Stats grid ── */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+        <StatCard
+          label={t("projects.projects")}
+          value={projects.length}
+          icon={<FolderKanban size={14} />}
+        />
+        <StatCard
+          label={t("projects.totalAssets")}
+          value={catalog.stats.totalFiles}
+        />
+        <StatCard
+          label={t("projects.totalSize")}
+          value={formatBytes(totalBytes)}
+        />
+        <StatCard
+          label={t("projects.unused")}
+          value={unused}
+          tone={unused > 0 ? "red" : "neutral"}
+          onClick={() => onJump("unused")}
+        />
+        <StatCard
+          label={t("projects.duplicateGroups")}
+          value={duplicateFiles}
+          tone={duplicateFiles > 0 ? "amber" : "neutral"}
+          onClick={() => onJump("duplicates")}
+        />
+      </div>
+
+      {/* ── Toolbar: search + sort ── */}
+      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3">
         <Card padding="md">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <TextInput
@@ -521,7 +493,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
         </Card>
       </div>
 
-      {/* Project cards */}
+      {/* ── Project cards ── */}
       {visibleProjects.length === 0 ? (
         <EmptyState
           title={t("projects.noProjects")}
@@ -535,7 +507,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
           }
         />
       ) : (
-        <section className="grid grid-cols-1 gap-x-4 gap-y-2 lg:grid-cols-2">
+        <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {visibleProjects.map((stat) => (
             <ProjectCard
               key={stat.project.id}
@@ -548,6 +520,7 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
           <AddProjectCard onAddProject={onAddProject} />
         </section>
       )}
+
       <PromptDialog
         open={renameTarget != null}
         title={t("projects.renameDialogTitle")}

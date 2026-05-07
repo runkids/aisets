@@ -3,6 +3,7 @@ import {
   Filter,
   FolderKanban,
   FolderOpen,
+  LoaderCircle,
   Recycle,
   Search,
   Settings,
@@ -15,20 +16,20 @@ import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type { AssetItem, CustomAssetFilter } from "../types";
 import { cn } from "@/lib/cn";
-import { matchesOCRSearchText } from "../ocrSearch";
+import { useCatalogItemsInfiniteQuery } from "../queries";
+import { useDebouncedValue } from "../useDebouncedValue";
 import { fileName, type Mode } from "../ui";
 import { AssetThumbnail, Keycap, TextInput } from "./ui";
 import { DialogOverlay, DialogSurface, DialogViewport } from "./ui/DialogShell";
 
 type Props = {
   open: boolean;
-  assets: AssetItem[];
+  scanId?: number;
   customFilters: CustomAssetFilter[];
   ocrEnabled: boolean;
-  ocrFuzzySearch: boolean;
   onClose: () => void;
   onNavigate: (mode: Mode) => void;
-  onOpenAsset: (id: string) => void;
+  onOpenAsset: (asset: AssetItem) => void;
   onOpenCustomFilter: (id: string) => void;
 };
 
@@ -52,10 +53,9 @@ const MODE_ITEMS: ModeItem[] = [
 
 export function CommandPalette({
   open,
-  assets,
+  scanId,
   customFilters,
   ocrEnabled,
-  ocrFuzzySearch,
   onClose,
   onNavigate,
   onOpenAsset,
@@ -65,6 +65,17 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debouncedQuery = useDebouncedValue(query, 180);
+  const searchPending = query.trim() !== debouncedQuery.trim();
+  const assetQuery = useCatalogItemsInfiniteQuery(
+    scanId,
+    { q: debouncedQuery.trim() || undefined, limit: 20 },
+    open && debouncedQuery.trim() !== "",
+  );
+  const searchedAssets = useMemo(
+    () => assetQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [assetQuery.data],
+  );
 
   useEffect(() => {
     if (!open) return undefined;
@@ -77,7 +88,7 @@ export function CommandPalette({
   }, [open]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     const modesWithLabels = MODE_ITEMS.map((mode) => ({
       ...mode,
       label: t(mode.labelKey),
@@ -96,25 +107,14 @@ export function CommandPalette({
             filter.id.toLowerCase().includes(q)),
       )
       .slice(0, 6);
-    const matched: AssetResult[] = assets
-      .flatMap((asset) => {
-        const pathMatch =
-          fileName(asset.repoPath).toLowerCase().includes(q) ||
-          asset.repoPath.toLowerCase().includes(q);
-        const ocrMatch =
-          ocrEnabled &&
-          asset.ocr?.status === "ready" &&
-          matchesOCRSearchText(
-            asset.ocr.normalizedText ?? asset.ocr.text ?? "",
-            q,
-            { fuzzy: ocrFuzzySearch },
-          );
-        if (!pathMatch && !ocrMatch) return [];
-        return [{ asset, matchedOCR: !pathMatch && ocrMatch }];
-      })
+    const matched: AssetResult[] = searchedAssets
+      .map((asset) => ({
+        asset,
+        matchedOCR: ocrEnabled && asset.ocr?.status === "ready",
+      }))
       .slice(0, 8);
     return { modes, filters, assets: matched };
-  }, [query, assets, customFilters, ocrEnabled, ocrFuzzySearch, t]);
+  }, [debouncedQuery, searchedAssets, customFilters, ocrEnabled, t]);
 
   const totalItems =
     results.modes.length + results.filters.length + results.assets.length;
@@ -148,7 +148,7 @@ export function CommandPalette({
     } else {
       const asset =
         results.assets[index - results.modes.length - results.filters.length];
-      if (asset) onOpenAsset(asset.asset.id);
+      if (asset) onOpenAsset(asset.asset);
     }
     onClose();
   }
@@ -262,8 +262,11 @@ export function CommandPalette({
                 )}
 
                 {results.assets.length > 0 && (
-                  <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
-                    {t("commandPalette.assets")}
+                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
+                    <span>{t("commandPalette.assets")}</span>
+                    {(assetQuery.isFetching || searchPending) && (
+                      <LoaderCircle size={11} className="animate-spin" />
+                    )}
                   </div>
                 )}
                 {results.assets.map((result, index) => {
@@ -302,11 +305,13 @@ export function CommandPalette({
                   );
                 })}
 
-                {totalItems === 0 && (
-                  <div className="px-4 py-5 text-g-ink-4 text-[13px] text-center">
-                    {t("common.noResults")}
-                  </div>
-                )}
+                {totalItems === 0 &&
+                  !assetQuery.isFetching &&
+                  !searchPending && (
+                    <div className="px-4 py-5 text-g-ink-4 text-[13px] text-center">
+                      {t("common.noResults")}
+                    </div>
+                  )}
               </div>
             </DialogSurface>
           </DialogPrimitive.Content>

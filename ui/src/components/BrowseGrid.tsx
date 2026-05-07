@@ -8,14 +8,22 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
+import {
+  Check,
+  CircleOff,
+  Copy,
+  LoaderCircle,
+  Sparkles,
+  Square,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
 import { imageBackgroundClassName } from "../imageBackground";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
-import { fileName, formatBytes } from "../ui";
+import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
 
@@ -32,6 +40,9 @@ type BrowseGridProps = {
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 };
 
 const SIZE_CONFIG: Record<
@@ -48,18 +59,6 @@ const CARD_FLAG_CLASS_NAME =
 const CARD_FLAG_DUPLICATE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-amber)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-amber)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-amber)_78%,var(--g-ink)_22%)]`;
 const CARD_FLAG_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-red)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-red)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-red)_78%,var(--g-ink)_22%)]`;
 const CARD_FLAG_OPTIMIZE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-blue)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-blue)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-blue)_78%,var(--g-ink)_22%)]`;
-
-function formatExt(ext: string) {
-  return ext.replace(/^\./, "").toUpperCase();
-}
-
-function hasDuplicates(item: AssetItem) {
-  return (
-    item.duplicates.length > 0 ||
-    item.similar.length > 0 ||
-    item.duplicateGroupId != null
-  );
-}
 
 function useElementWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -96,10 +95,14 @@ export function BrowseGrid({
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
 }: BrowseGridProps) {
   const { t } = useTranslation();
   const cfg = SIZE_CONFIG[gridSize];
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [gridRef, gridWidth] = useElementWidth<HTMLElement>();
   const columnCount = Math.max(
     1,
@@ -150,6 +153,13 @@ export function BrowseGrid({
     toIndex: toRowIndex,
     enabled: gridWidth > 0,
     onDone: onAutoScrollDone,
+  });
+
+  useInfiniteScrollSentinel({
+    rootRef: scrollRef,
+    sentinelRef: loadMoreRef,
+    enabled: hasMore && !loadingMore,
+    onLoadMore,
   });
 
   function renderCard(item: AssetItem) {
@@ -307,6 +317,15 @@ export function BrowseGrid({
           </div>
         ))}
       </section>
+      {hasMore && (
+        <div
+          ref={loadMoreRef}
+          className="flex h-12 items-center justify-center gap-2 font-g-mono text-g-caption text-g-ink-3"
+        >
+          {loadingMore && <LoaderCircle size={13} className="animate-spin" />}
+          {loadingMore ? t("common.loading") : null}
+        </div>
+      )}
     </div>
   );
 }

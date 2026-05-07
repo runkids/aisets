@@ -65,6 +65,8 @@ import type {
   CustomAssetFilterOperator,
   ExportData,
   OCRRunCounts,
+  ScanAnalyses,
+  ScanProfile,
   SettingsInfo,
   SettingsUpdate,
   Workspace,
@@ -119,6 +121,8 @@ type SettingsDraft = {
   defaultProjectRoot: string;
   autoScanOnOpen: boolean;
   scanOnOpen: boolean;
+  scanProfile: ScanProfile;
+  scanAnalyses: ScanAnalyses;
   ocrEnabled: boolean;
   ocrLanguages: string[];
   ocrMaxPixels: number;
@@ -152,6 +156,12 @@ const defaultSettings: SettingsUpdate = {
   defaultProjectRoot: "",
   autoScanOnOpen: false,
   scanOnOpen: false,
+  scanProfile: "fast",
+  scanAnalyses: {
+    references: false,
+    nearDuplicates: false,
+    optimization: false,
+  },
   ocrEnabled: false,
   ocrLanguages: ["eng"],
   ocrMaxPixels: 2_000_000,
@@ -163,6 +173,28 @@ const defaultSettings: SettingsUpdate = {
   optimizationAutoApply: false,
   customAssetFilters: [],
 };
+
+const scanProfileOptions: Array<{
+  value: ScanProfile;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "fast",
+    label: "Fast",
+    description: "Metadata and exact duplicates",
+  },
+  {
+    value: "full",
+    label: "Full",
+    description: "All catalog analyses",
+  },
+  {
+    value: "custom",
+    label: "Custom",
+    description: "Choose expensive analyses",
+  },
+];
 
 const customFilterFields: CustomAssetFilterField[] = [
   "path",
@@ -340,6 +372,12 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? "",
     autoScanOnOpen: settings?.autoScanOnOpen ?? false,
     scanOnOpen: settings?.scanOnOpen ?? false,
+    scanProfile: settings?.scanProfile ?? "fast",
+    scanAnalyses: settings?.scanAnalyses ?? {
+      references: false,
+      nearDuplicates: false,
+      optimization: false,
+    },
     ocrEnabled: settings?.ocrEnabled ?? false,
     ocrLanguages: settings?.ocrLanguages ?? defaultOCRLanguages,
     ocrMaxPixels: settings?.ocrMaxPixels ?? 2_000_000,
@@ -359,6 +397,8 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     defaultProjectRoot: draft.defaultProjectRoot,
     autoScanOnOpen: draft.autoScanOnOpen,
     scanOnOpen: draft.scanOnOpen,
+    scanProfile: draft.scanProfile,
+    scanAnalyses: draft.scanAnalyses,
     ocrEnabled: draft.ocrEnabled,
     ocrLanguages: draft.ocrLanguages,
     ocrMaxPixels: draft.ocrMaxPixels,
@@ -837,7 +877,6 @@ export function SettingsView({
   const activeWorkspaceId = settings?.activeWorkspaceId ?? "default";
   const projects = catalogQuery.data?.projects ?? [];
   const settingsProjects = settings?.projects ?? projects;
-  const items = catalogQuery.data?.items ?? [];
   const workspaceProjects = new Map(
     workspaces.map((workspace) => [
       workspace.id,
@@ -921,10 +960,6 @@ export function SettingsView({
   }, []);
 
   const assetCountByProject: Record<string, number> = {};
-  for (const item of items) {
-    assetCountByProject[item.projectId] =
-      (assetCountByProject[item.projectId] ?? 0) + 1;
-  }
 
   function updateDraft(updater: (current: SettingsDraft) => SettingsDraft) {
     setDraftOverride((current) =>
@@ -1205,6 +1240,8 @@ export function SettingsView({
   async function onResetSettings() {
     const result = await updateMutation.mutateAsync(defaultSettings);
     setDraftOverride(draftFromSettings(result.settings));
+    await removeOCRMutation.mutateAsync(undefined).catch(() => {});
+    setOCRProgress("");
     toast.success(t("toast.settingsReset"));
   }
 
@@ -1822,6 +1859,79 @@ export function SettingsView({
                     />
                   </FieldRow>
                   <FieldRow
+                    label={t("settings.scanProfileLabel")}
+                    description={t("settings.scanProfileHint")}
+                    icon={<Sliders size={15} />}
+                    align="start"
+                  >
+                    <div className="w-full min-[1200px]:w-[420px]">
+                      <Select
+                        value={draft.scanProfile}
+                        options={scanProfileOptions.map((option) => ({
+                          ...option,
+                          label: t(`settings.scanProfile.${option.value}`),
+                          description: t(
+                            `settings.scanProfile.${option.value}Hint`,
+                          ),
+                        }))}
+                        onChange={(value) =>
+                          updateDraft((prev) => ({
+                            ...prev,
+                            scanProfile: value as ScanProfile,
+                          }))
+                        }
+                        aria-label={t("settings.scanProfileLabel")}
+                      />
+                    </div>
+                  </FieldRow>
+                  {draft.scanProfile === "custom" && (
+                    <FieldRow
+                      label={t("settings.scanAnalysesLabel")}
+                      description={t("settings.scanAnalysesHint")}
+                      icon={<Sliders size={15} />}
+                      align="start"
+                    >
+                      <div className="grid w-full gap-2 min-[1200px]:w-[420px]">
+                        {(
+                          [
+                            "references",
+                            "nearDuplicates",
+                            "optimization",
+                          ] as const
+                        ).map((analysis) => (
+                          <label
+                            key={analysis}
+                            className="flex min-h-10 items-center justify-between gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-g text-g-ui font-[510] text-g-ink">
+                                {t(`settings.scanAnalyses.${analysis}`)}
+                              </span>
+                              <span className="block truncate text-g-caption text-g-ink-3">
+                                {t(`settings.scanAnalyses.${analysis}Hint`)}
+                              </span>
+                            </span>
+                            <Switch
+                              checked={draft.scanAnalyses[analysis]}
+                              onCheckedChange={(next) =>
+                                updateDraft((prev) => ({
+                                  ...prev,
+                                  scanAnalyses: {
+                                    ...prev.scanAnalyses,
+                                    [analysis]: next,
+                                  },
+                                }))
+                              }
+                              aria-label={t(
+                                `settings.scanAnalyses.${analysis}`,
+                              )}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </FieldRow>
+                  )}
+                  <FieldRow
                     label={t("settings.excludePatterns")}
                     description={t("settings.excludePatternsHint")}
                     icon={<Sliders size={15} />}
@@ -2042,7 +2152,13 @@ export function SettingsView({
                           </p>
                         )}
                       {ocrProgress && (
-                        <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                        <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+                          {ocrRunActive && (
+                            <LoaderCircle
+                              size={12}
+                              className="animate-spin shrink-0"
+                            />
+                          )}
                           {ocrProgress}
                         </p>
                       )}

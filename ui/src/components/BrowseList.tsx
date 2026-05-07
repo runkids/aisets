@@ -1,14 +1,22 @@
 import { useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
+import {
+  Check,
+  CircleOff,
+  Copy,
+  LoaderCircle,
+  Sparkles,
+  Square,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
 import { imageBackgroundClassName } from "../imageBackground";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
-import { fileName, formatBytes } from "../ui";
+import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
 
@@ -24,6 +32,9 @@ type BrowseListProps = {
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 };
 
 const ROW_HEIGHT = 60;
@@ -33,18 +44,6 @@ const listResponsiveClassName =
   "max-[768px]:gap-3 max-[768px]:px-3 max-[768px]:[&>:nth-child(n+4)]:hidden";
 const listRowClassName = `grid cursor-pointer ${listGridClassName} items-center gap-4 min-h-[56px] border-b border-g-line px-4 py-2 text-left transition-[background,box-shadow] duration-[120ms] ease-[var(--g-ease)] hover:bg-g-surface-2 focus-visible:shadow-g-focus data-[active=true]:bg-g-accent-soft data-[active=true]:shadow-[inset_4px_0_0_var(--g-accent)] ${listResponsiveClassName}`;
 const listHeaderClassName = `sticky top-0 z-[2] grid ${listGridClassName} items-center gap-4 min-h-[36px] border-b border-g-line bg-g-surface-2 px-4 py-2 text-left text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 ${listResponsiveClassName}`;
-
-function formatExt(ext: string) {
-  return ext.replace(/^\./, "").toUpperCase();
-}
-
-function hasDuplicates(item: AssetItem) {
-  return (
-    item.duplicates.length > 0 ||
-    item.similar.length > 0 ||
-    item.duplicateGroupId != null
-  );
-}
 
 export function BrowseList({
   items,
@@ -58,9 +57,13 @@ export function BrowseList({
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
 }: BrowseListProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is intentionally used for every Browse list so large image catalogs stay responsive.
   const rowVirtualizer = useVirtualizer({
     count: items.length,
@@ -77,6 +80,13 @@ export function BrowseList({
     scrollRef,
     virtualizer: rowVirtualizer,
     onDone: onAutoScrollDone,
+  });
+
+  useInfiniteScrollSentinel({
+    rootRef: scrollRef,
+    sentinelRef: loadMoreRef,
+    enabled: hasMore && !loadingMore,
+    onLoadMore,
   });
 
   function renderRow(item: AssetItem, style?: CSSProperties) {
@@ -218,6 +228,15 @@ export function BrowseList({
           })}
         </div>
       </div>
+      {hasMore && (
+        <div
+          ref={loadMoreRef}
+          className="flex h-12 items-center justify-center gap-2 font-g-mono text-g-caption text-g-ink-3"
+        >
+          {loadingMore && <LoaderCircle size={13} className="animate-spin" />}
+          {loadingMore ? t("common.loading") : null}
+        </div>
+      )}
     </div>
   );
 }

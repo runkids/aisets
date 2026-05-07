@@ -10,7 +10,7 @@ function stat(name: string, createdAt?: string): ProjectStat {
       path: `/${name}`,
       createdAt,
     },
-    items: [],
+    assetCount: 0,
     bytes: 0,
     used: 0,
     unused: 0,

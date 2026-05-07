@@ -99,7 +99,7 @@ export function LintView({ findings, onOpenAsset }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState title={t("lint.empty")} />
+        <EmptyState title={t("lint.empty")} description={t("lint.emptyDesc")} />
       ) : (
         <div
           ref={scrollRef}

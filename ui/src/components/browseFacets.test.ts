@@ -11,6 +11,7 @@ function makeItem(projectName: string): AssetItem {
     localPath: `/tmp/${projectName}/asset.png`,
     ext: ".png",
     bytes: 1,
+    modifiedUnix: 0,
     contentHash: projectName,
     hashAlgorithm: "sha1",
     image: {

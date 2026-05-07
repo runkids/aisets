@@ -7,6 +7,7 @@ import {
   Search,
   Sun,
   Trees,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImageBackgroundMode } from "../imageBackground";
@@ -148,7 +149,21 @@ export function BrowseToolbar({
           variant="search"
           placeholder={t("toolbar.search")}
           icon={<Search size={16} />}
-          suffix={<ArrowDownAZ size={14} aria-hidden="true" />}
+          suffix={
+            <span className="inline-flex items-center gap-1">
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label={t("toolbar.clearSearch")}
+                  className="inline-flex shrink-0 cursor-pointer rounded-full p-0.5 text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink"
+                  onClick={() => onSearchChange("")}
+                >
+                  <X size={14} />
+                </button>
+              )}
+              <ArrowDownAZ size={14} aria-hidden="true" />
+            </span>
+          }
           value={searchQuery}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
           className="ml-auto flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:ml-0 max-md:flex-[1_1_100%] max-md:max-w-none"

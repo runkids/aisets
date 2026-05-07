@@ -57,20 +57,6 @@ export function DuplicatesView({
 
   return (
     <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
-            {t("duplicates.title")}{" "}
-            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
-              {t("duplicates.groupsCount", { count: groups.length })}
-            </em>
-          </h1>
-          <p className="mt-2.5 max-w-[540px] text-g-body text-g-ink-3">
-            {t("duplicates.description")}
-          </p>
-        </div>
-      </div>
-
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <Tabs
           value={tab}
@@ -160,7 +146,10 @@ export function DuplicatesView({
             </Card>
           ))}
           {groupViews.length === 0 && (
-            <EmptyState title={t("duplicates.noExact")} />
+            <EmptyState
+              title={t("duplicates.noExact")}
+              description={t("duplicates.noExactDesc")}
+            />
           )}
         </div>
       )}
@@ -236,7 +225,10 @@ export function DuplicatesView({
             );
           })}
           {nearDuplicates.length === 0 && (
-            <EmptyState title={t("duplicates.noSimilar")} />
+            <EmptyState
+              title={t("duplicates.noSimilar")}
+              description={t("duplicates.noSimilarDesc")}
+            />
           )}
         </div>
       )}

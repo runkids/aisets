@@ -15,27 +15,39 @@ import {
   Folder,
   FolderInput,
   FolderOpen,
+  LoaderCircle,
   PenLine,
   Trash2,
 } from "lucide-react";
 import {
   customFilterOptions,
   matchesCustomAssetFilter,
+  type CustomFilterOption,
 } from "../customAssetFilters";
 import {
   useBatchDeleteMutation,
   useBatchMovePreviewMutation,
   useBatchRenamePreviewMutation,
   useBatchApplyMutation,
+  useCatalogFoldersQuery,
 } from "../queries";
-import type { RenameRules } from "../types";
-import { batchExport, type BatchPreviewResponse } from "../api";
+import {
+  batchExport,
+  type BatchPreviewResponse,
+  type CatalogFoldersParams,
+} from "../api";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
 import { RenameRuleModal } from "./RenameRuleModal";
 import { DirectoryPickerModal } from "./DirectoryPickerModal";
 import { matchesOCRSearchText } from "../ocrSearch";
-import type { AssetItem, CustomAssetFilter } from "../types";
+import type {
+  AssetItem,
+  CatalogFolderNode,
+  CustomAssetFilter,
+  RenameRules,
+} from "../types";
+import { useDebouncedValue } from "../useDebouncedValue";
 import { fileName, formatBytes } from "../ui";
 import { BrowseGrid } from "./BrowseGrid";
 import { BrowseList } from "./BrowseList";
@@ -75,17 +87,43 @@ type Props = {
   initialCustomFilterId: string;
   customFilters: CustomAssetFilter[];
   projectNames: string[];
+  scanId?: number;
+  projectFilterId?: string;
   projectFilterName: string;
+  initialSearchQuery: string;
+  initialFocusAssetId: string;
+  projectOptions?: Array<{ id: string; count: number }>;
+  projectTotal?: number;
+  extensionOptions?: Array<{ id: string; count: number }>;
+  extensionTotal?: number;
+  customFilterFacetOptions?: CustomFilterOption[];
+  customFilterTotal?: number;
   imagePreviewEnabled: boolean;
   ocrEnabled: boolean;
   ocrFuzzySearch: boolean;
+  initialLoading?: boolean;
+  pending?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
   onAutoScrollDone: () => void;
   onOpenAsset: (id: string) => void;
+  onLoadMore?: () => void;
+  onQueryParamsChange?: (params: {
+    assetId?: string;
+    projectName?: string;
+    ext?: string;
+    q?: string;
+    status?: string;
+    sort?: string;
+    customFilter?: string;
+    folder?: string;
+  }) => void;
 };
 
 function defaultBrowseStoredState(
   projectFilterName: string,
   initialCustomFilterId: string,
+  initialSearchQuery = "",
 ): BrowseStoredState {
   return {
     filters: {
@@ -95,7 +133,7 @@ function defaultBrowseStoredState(
     },
     view: "grid",
     gridSize: "m",
-    searchQuery: "",
+    searchQuery: initialSearchQuery,
     statusFilter: "",
     sortMode: "name",
   };
@@ -123,7 +161,7 @@ function optionOrDefault<T extends string>(
 export function normalizeBrowseStoredState(
   value: unknown,
   defaults: BrowseStoredState,
-  pinned?: { project?: string; customFilter?: string },
+  pinned?: { project?: string; customFilter?: string; searchQuery?: string },
 ): BrowseStoredState {
   const state = isRecord(value) ? value : {};
   const rawFilters = isRecord(state.filters) ? state.filters : {};
@@ -138,12 +176,16 @@ export function normalizeBrowseStoredState(
 
   if (pinned?.project) filters.project = pinned.project;
   if (pinned?.customFilter) filters.customFilter = pinned.customFilter;
+  const searchQuery =
+    pinned?.searchQuery != null
+      ? pinned.searchQuery
+      : stringOrDefault(state.searchQuery, defaults.searchQuery);
 
   return {
     filters,
     view: optionOrDefault(state.view, viewModes, defaults.view),
     gridSize: optionOrDefault(state.gridSize, gridSizes, defaults.gridSize),
-    searchQuery: stringOrDefault(state.searchQuery, defaults.searchQuery),
+    searchQuery,
     statusFilter: optionOrDefault(
       state.statusFilter,
       statusFilters,
@@ -155,7 +197,7 @@ export function normalizeBrowseStoredState(
 
 function readBrowseStoredState(
   defaults: BrowseStoredState,
-  pinned?: { project?: string; customFilter?: string },
+  pinned?: { project?: string; customFilter?: string; searchQuery?: string },
 ) {
   if (typeof window === "undefined") return defaults;
   try {
@@ -186,7 +228,7 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
     case "unused":
       return item.usedBy.length === 0;
     case "duplicate":
-      return item.duplicates.length > 0 || item.similar.length > 0;
+      return Boolean(item.duplicateGroupId) || item.similar.length > 0;
     case "optimize":
       return item.optimizationRecommendations.length > 0;
     case "referenced":
@@ -194,6 +236,20 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
     default:
       return true;
   }
+}
+
+function apiStatus(status: StatusFilter) {
+  if (status === "optimize") return "optimizable";
+  if (status === "unused" || status === "duplicate" || status === "referenced")
+    return status;
+  return "";
+}
+
+function apiSort(sort: SortMode) {
+  if (sort === "size") return "bytes-desc";
+  if (sort === "recent") return "recent";
+  if (sort === "name") return "path";
+  return "";
 }
 
 function hasEmptyOCRText(item: AssetItem): boolean {
@@ -270,63 +326,13 @@ export function applyBrowseFilters({
   return { facetBaseItems, filteredWithoutCustom, filtered, emptyOCRTextCount };
 }
 
-type FolderNode = {
-  name: string;
-  path: string;
-  count: number;
-  children: FolderNode[];
-};
-
-function buildFolderTree(items: AssetItem[]): FolderNode {
-  const root: FolderNode = {
-    name: "",
-    path: "",
-    count: items.length,
-    children: [],
-  };
-  const map = new Map<string, FolderNode>();
-  map.set("", root);
-
-  for (const item of items) {
-    const parts = item.repoPath.split("/");
-    let current = "";
-    for (let i = 0; i < parts.length - 1; i++) {
-      const parent = current;
-      current = current ? `${current}/${parts[i]}` : parts[i];
-      if (!map.has(current)) {
-        const node: FolderNode = {
-          name: parts[i],
-          path: current,
-          count: 0,
-          children: [],
-        };
-        map.set(current, node);
-        map.get(parent)!.children.push(node);
-      }
-    }
-  }
-
-  for (const item of items) {
-    const parts = item.repoPath.split("/");
-    let current = "";
-    for (let i = 0; i < parts.length - 1; i++) {
-      current = current ? `${current}/${parts[i]}` : parts[i];
-      const node = map.get(current);
-      if (node) node.count++;
-    }
-  }
-
-  function sortChildren(node: FolderNode) {
-    node.children.sort((a, b) => a.name.localeCompare(b.name));
-    for (const child of node.children) sortChildren(child);
-  }
-  sortChildren(root);
-
-  return root;
-}
+type TreeQueryBase = Omit<CatalogFoldersParams, "scanId" | "folder">;
 
 type TreePanelProps = {
-  root: FolderNode;
+  scanId?: number;
+  rootFolders: CatalogFolderNode[];
+  rootLoading: boolean;
+  queryBase: TreeQueryBase;
   selectedFolder: string;
   expanded: Set<string>;
   onSelectFolder: (path: string) => void;
@@ -336,7 +342,10 @@ type TreePanelProps = {
 };
 
 function TreePanel({
-  root,
+  scanId,
+  rootFolders,
+  rootLoading,
+  queryBase,
   selectedFolder,
   expanded,
   onSelectFolder,
@@ -360,11 +369,22 @@ function TreePanel({
           </span>
         </button>
 
-        {root.children.map((child) => (
+        {rootLoading && (
+          <div className="flex min-h-7 items-center gap-1 rounded-g-md px-2 py-[5px] font-g-mono text-[12px] text-g-ink-3">
+            <span className="grid size-4 place-items-center">
+              <LoaderCircle size={12} className="animate-spin" />
+            </span>
+            {allLabel}
+          </div>
+        )}
+
+        {rootFolders.map((child) => (
           <TreeNode
             key={child.path}
             node={child}
             depth={1}
+            scanId={scanId}
+            queryBase={queryBase}
             selectedFolder={selectedFolder}
             expanded={expanded}
             onSelectFolder={onSelectFolder}
@@ -379,13 +399,17 @@ function TreePanel({
 function TreeNode({
   node,
   depth,
+  scanId,
+  queryBase,
   selectedFolder,
   expanded,
   onSelectFolder,
   onToggleExpand,
 }: {
-  node: FolderNode;
+  node: CatalogFolderNode;
   depth: number;
+  scanId?: number;
+  queryBase: TreeQueryBase;
   selectedFolder: string;
   expanded: Set<string>;
   onSelectFolder: (path: string) => void;
@@ -393,7 +417,13 @@ function TreeNode({
 }) {
   const isExpanded = expanded.has(node.path);
   const isSelected = selectedFolder === node.path;
-  const hasChildren = node.children.length > 0;
+  const hasChildren = node.hasChildren;
+  const childrenQuery = useCatalogFoldersQuery(
+    scanId,
+    { ...queryBase, folder: node.path },
+    isExpanded && hasChildren,
+  );
+  const children = childrenQuery.data?.folders ?? [];
 
   return (
     <>
@@ -432,12 +462,25 @@ function TreeNode({
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
         <span className="shrink-0 text-[10px] opacity-60">{node.count}</span>
       </button>
+      {isExpanded && hasChildren && childrenQuery.isLoading && (
+        <div
+          className="flex min-h-7 items-center gap-1 rounded-g-md pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] font-g-mono text-[12px] text-g-ink-3"
+          style={{ "--tree-depth": depth + 1 } as CSSProperties}
+        >
+          <span className="grid size-4 shrink-0 place-items-center">
+            <LoaderCircle size={12} className="animate-spin" />
+          </span>
+          {node.name}
+        </div>
+      )}
       {isExpanded &&
-        node.children.map((child) => (
+        children.map((child) => (
           <TreeNode
             key={child.path}
             node={child}
             depth={depth + 1}
+            scanId={scanId}
+            queryBase={queryBase}
             selectedFolder={selectedFolder}
             expanded={expanded}
             onSelectFolder={onSelectFolder}
@@ -448,28 +491,6 @@ function TreeNode({
   );
 }
 
-function sortItems(items: AssetItem[], mode: SortMode): AssetItem[] {
-  const sorted = [...items];
-  switch (mode) {
-    case "name":
-      sorted.sort((a, b) =>
-        fileName(a.repoPath).localeCompare(fileName(b.repoPath)),
-      );
-      break;
-    case "size":
-      sorted.sort((a, b) => b.bytes - a.bytes);
-      break;
-    case "recent":
-      break;
-  }
-  return sorted;
-}
-
-function treeHasPath(node: FolderNode, path: string): boolean {
-  if (node.path === path) return true;
-  return node.children.some((child) => treeHasPath(child, path));
-}
-
 export function BrowseView({
   items,
   activeAssetId,
@@ -477,12 +498,28 @@ export function BrowseView({
   initialCustomFilterId,
   customFilters,
   projectNames,
+  scanId,
+  projectFilterId,
   projectFilterName,
+  initialSearchQuery,
+  initialFocusAssetId,
+  projectOptions,
+  projectTotal,
+  extensionOptions,
+  extensionTotal,
+  customFilterFacetOptions,
+  customFilterTotal,
   imagePreviewEnabled,
   ocrEnabled,
   ocrFuzzySearch,
+  initialLoading = false,
+  pending = false,
+  loadingMore = false,
+  hasMore = false,
   onAutoScrollDone,
   onOpenAsset,
+  onLoadMore,
+  onQueryParamsChange,
 }: Props) {
   const { t } = useTranslation();
   const [initialBrowseState] = useState(() =>
@@ -491,9 +528,11 @@ export function BrowseView({
       {
         project: projectFilterName || undefined,
         customFilter: initialCustomFilterId || undefined,
+        searchQuery: initialSearchQuery || undefined,
       },
     ),
   );
+  const [focusAssetId, setFocusAssetId] = useState(initialFocusAssetId);
   const [filters, setFilters] = useState(initialBrowseState.filters);
   const [view, setView] = useState<ViewMode>(initialBrowseState.view);
   const [gridSize, setGridSize] = useState<"s" | "m" | "l">(
@@ -503,6 +542,7 @@ export function BrowseView({
   const [searchQuery, setSearchQuery] = useState(
     initialBrowseState.searchQuery,
   );
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     initialBrowseState.statusFilter,
   );
@@ -529,6 +569,64 @@ export function BrowseView({
   const renamePreviewMut = useBatchRenamePreviewMutation();
   const batchApplyMut = useBatchApplyMutation();
 
+  const activeSelectedFolder = view === "tree" ? selectedFolder : "";
+  const folderQueryBase = useMemo<TreeQueryBase>(
+    () => ({
+      projectId: projectFilterId || undefined,
+      projectName: projectFilterId
+        ? undefined
+        : projectFilterName || filters.project || undefined,
+      ext: filters.ext || undefined,
+      q: debouncedSearchQuery.trim() || undefined,
+      status: apiStatus(statusFilter) || undefined,
+      customFilter: filters.customFilter || undefined,
+    }),
+    [
+      debouncedSearchQuery,
+      filters.customFilter,
+      filters.ext,
+      filters.project,
+      projectFilterId,
+      projectFilterName,
+      statusFilter,
+    ],
+  );
+  const rootFoldersQuery = useCatalogFoldersQuery(
+    scanId,
+    { ...folderQueryBase, folder: "" },
+    view === "tree",
+  );
+
+  function clearFocusedAssetQuery() {
+    if (focusAssetId) setFocusAssetId("");
+  }
+
+  function handleFiltersChange(next: BrowseFilters) {
+    clearFocusedAssetQuery();
+    setSelectedFolder("");
+    setExpandedFolders(new Set());
+    setFilters(next);
+  }
+
+  function handleSearchChange(next: string) {
+    clearFocusedAssetQuery();
+    setSelectedFolder("");
+    setExpandedFolders(new Set());
+    setSearchQuery(next);
+  }
+
+  function handleStatusFilterChange(next: StatusFilter) {
+    clearFocusedAssetQuery();
+    setSelectedFolder("");
+    setExpandedFolders(new Set());
+    setStatusFilter(next);
+  }
+
+  function handleSortChange(next: SortMode) {
+    clearFocusedAssetQuery();
+    setSortMode(next);
+  }
+
   useEffect(() => {
     writeBrowseStoredState({
       filters: {
@@ -537,7 +635,7 @@ export function BrowseView({
       },
       view,
       gridSize,
-      searchQuery,
+      searchQuery: focusAssetId ? "" : searchQuery,
       statusFilter,
       sortMode,
     });
@@ -546,21 +644,46 @@ export function BrowseView({
     gridSize,
     projectFilterName,
     searchQuery,
+    focusAssetId,
     sortMode,
     statusFilter,
     view,
   ]);
 
   useEffect(() => {
+    onQueryParamsChange?.({
+      assetId: focusAssetId || undefined,
+      projectName: projectFilterName || filters.project || undefined,
+      ext: filters.ext || undefined,
+      q: debouncedSearchQuery.trim() || undefined,
+      status: apiStatus(statusFilter) || undefined,
+      sort: apiSort(sortMode) || undefined,
+      customFilter: filters.customFilter || undefined,
+      folder: activeSelectedFolder || undefined,
+    });
+  }, [
+    activeSelectedFolder,
+    debouncedSearchQuery,
+    filters.customFilter,
+    filters.ext,
+    filters.project,
+    focusAssetId,
+    onQueryParamsChange,
+    projectFilterName,
+    sortMode,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
     if (!autoScrollAssetId) return undefined;
     const resetId = window.setTimeout(() => {
       setFilters({ project: projectFilterName, ext: "", customFilter: "" });
-      setSearchQuery("");
+      setSearchQuery(initialSearchQuery);
       setStatusFilter("");
       setSelectedFolder("");
     }, 0);
     return () => window.clearTimeout(resetId);
-  }, [autoScrollAssetId, projectFilterName]);
+  }, [autoScrollAssetId, initialSearchQuery, projectFilterName]);
 
   const allProjects = useMemo(
     () => projectFacetIds({ items, projectNames, projectFilterName }),
@@ -571,76 +694,72 @@ export function BrowseView({
     [items],
   );
 
-  const { facetBaseItems, filteredWithoutCustom, filtered, emptyOCRTextCount } =
-    useMemo(
-      () =>
-        applyBrowseFilters({
-          items,
-          filters,
-          searchQuery,
-          statusFilter,
-          customFilters,
-          ocrEnabled,
-          ocrFuzzySearch,
-        }),
-      [
-        customFilters,
-        filters,
+  const { facetBaseItems, filteredWithoutCustom, emptyOCRTextCount } = useMemo(
+    () =>
+      applyBrowseFilters({
         items,
+        filters,
+        searchQuery: debouncedSearchQuery,
+        statusFilter,
+        customFilters,
         ocrEnabled,
         ocrFuzzySearch,
-        searchQuery,
-        statusFilter,
-      ],
-    );
+      }),
+    [
+      customFilters,
+      debouncedSearchQuery,
+      filters,
+      items,
+      ocrEnabled,
+      ocrFuzzySearch,
+      statusFilter,
+    ],
+  );
 
   const projectFacet = useMemo(
     () =>
-      facetOptions(
-        allProjects,
-        facetBaseItems.filter((i) => !filters.ext || i.ext === filters.ext),
-        "projectName",
-      ),
-    [allProjects, facetBaseItems, filters.ext],
+      projectOptions
+        ? { options: projectOptions, total: projectTotal ?? items.length }
+        : facetOptions(
+            allProjects,
+            facetBaseItems.filter((i) => !filters.ext || i.ext === filters.ext),
+            "projectName",
+          ),
+    [
+      allProjects,
+      facetBaseItems,
+      filters.ext,
+      items.length,
+      projectOptions,
+      projectTotal,
+    ],
   );
   const extensionFacet = useMemo(
     () =>
-      facetOptions(
-        allExtensions,
-        facetBaseItems.filter(
-          (i) => !filters.project || i.projectName === filters.project,
-        ),
-        "ext",
-      ),
-    [allExtensions, facetBaseItems, filters.project],
+      extensionOptions
+        ? { options: extensionOptions, total: extensionTotal ?? items.length }
+        : facetOptions(
+            allExtensions,
+            facetBaseItems.filter(
+              (i) => !filters.project || i.projectName === filters.project,
+            ),
+            "ext",
+          ),
+    [
+      allExtensions,
+      extensionOptions,
+      extensionTotal,
+      facetBaseItems,
+      filters.project,
+      items.length,
+    ],
   );
 
   const customFilterFacet = useMemo(
-    () => customFilterOptions(customFilters, filteredWithoutCustom),
-    [customFilters, filteredWithoutCustom],
-  );
-
-  const folderTree = useMemo(() => buildFolderTree(filtered), [filtered]);
-  const activeSelectedFolder = useMemo(() => {
-    return selectedFolder && treeHasPath(folderTree, selectedFolder)
-      ? selectedFolder
-      : "";
-  }, [folderTree, selectedFolder]);
-
-  const folderFiltered = useMemo(() => {
-    if (view !== "tree" || !activeSelectedFolder) return filtered;
-    return filtered.filter((i) => {
-      const dir = i.repoPath.substring(0, i.repoPath.lastIndexOf("/"));
-      return (
-        dir === activeSelectedFolder ||
-        dir.startsWith(activeSelectedFolder + "/")
-      );
-    });
-  }, [activeSelectedFolder, filtered, view]);
-
-  const sorted = useMemo(
-    () => sortItems(folderFiltered, sortMode),
-    [folderFiltered, sortMode],
+    () =>
+      customFilterFacetOptions ??
+      customFilterOptions(customFilters, filteredWithoutCustom),
+    [customFilterFacetOptions, customFilters, filteredWithoutCustom],
   );
 
   const toggleSelect = useCallback((id: string) => {
@@ -745,6 +864,8 @@ export function BrowseView({
     });
   }
 
+  const showInitialLoading = initialLoading || (pending && items.length === 0);
+
   return (
     <>
       <FilterRail
@@ -756,9 +877,9 @@ export function BrowseView({
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
         customFilterOptions={customFilterFacet}
-        customFilterTotal={filteredWithoutCustom.length}
+        customFilterTotal={customFilterTotal ?? filteredWithoutCustom.length}
         ocrEnabled={ocrEnabled}
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
         <div className="max-w-none p-0 flex h-full flex-col">
@@ -773,9 +894,9 @@ export function BrowseView({
             onViewChange={setView}
             onGridSizeChange={setGridSize}
             onBgModeChange={setBgMode}
-            onSearchChange={setSearchQuery}
-            onStatusFilterChange={setStatusFilter}
-            onSortChange={setSortMode}
+            onSearchChange={handleSearchChange}
+            onStatusFilterChange={handleStatusFilterChange}
+            onSortChange={handleSortChange}
             onBulkToggle={toggleBulkMode}
           />
 
@@ -831,7 +952,22 @@ export function BrowseView({
             </div>
           )}
 
-          {sorted.length === 0 ? (
+          {showInitialLoading ? (
+            <div className="mt-1 grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
+              {Array.from({ length: 18 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="min-h-[188px] rounded-g-md border border-g-line bg-g-surface shadow-g-sm"
+                >
+                  <div className="aspect-square animate-pulse rounded-t-g-md bg-g-surface-2" />
+                  <div className="space-y-2 p-3">
+                    <div className="h-3 w-3/4 animate-pulse rounded-full bg-g-surface-2" />
+                    <div className="h-3 w-1/2 animate-pulse rounded-full bg-g-surface-2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : items.length === 0 ? (
             <EmptyState
               title={t("browse.empty")}
               description={
@@ -850,17 +986,20 @@ export function BrowseView({
           ) : view === "tree" ? (
             <div className="mt-1 flex min-h-0 flex-1 gap-4">
               <TreePanel
-                root={folderTree}
+                scanId={scanId}
+                rootFolders={rootFoldersQuery.data?.folders ?? []}
+                rootLoading={rootFoldersQuery.isLoading}
+                queryBase={folderQueryBase}
                 selectedFolder={activeSelectedFolder}
                 expanded={expandedFolders}
                 onSelectFolder={setSelectedFolder}
                 onToggleExpand={handleToggleExpand}
                 allLabel={t("browse.allFolders")}
-                totalCount={filtered.length}
+                totalCount={rootFoldersQuery.data?.total ?? items.length}
               />
               <div className="min-h-0 min-w-0 flex-1">
                 <BrowseGrid
-                  items={sorted}
+                  items={items}
                   gridSize={gridSize}
                   bgMode={bgMode}
                   bulkMode={bulkMode}
@@ -879,7 +1018,7 @@ export function BrowseView({
             <div className="mt-1 min-h-0 flex-1">
               {view === "list" ? (
                 <BrowseList
-                  items={sorted}
+                  items={items}
                   bgMode={bgMode}
                   bulkMode={bulkMode}
                   selected={selected}
@@ -890,10 +1029,13 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
+                  hasMore={hasMore}
+                  loadingMore={loadingMore}
+                  onLoadMore={onLoadMore}
                 />
               ) : (
                 <BrowseGrid
-                  items={sorted}
+                  items={items}
                   gridSize={gridSize}
                   bgMode={bgMode}
                   bulkMode={bulkMode}
@@ -905,6 +1047,9 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
+                  hasMore={hasMore}
+                  loadingMore={loadingMore}
+                  onLoadMore={onLoadMore}
                 />
               )}
             </div>

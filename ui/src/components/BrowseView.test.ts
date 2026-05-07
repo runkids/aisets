@@ -12,6 +12,7 @@ function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {
     localPath: "/workspace/src/assets/icon.png",
     ext: ".png",
     bytes: 100,
+    modifiedUnix: 0,
     contentHash: "hash",
     hashAlgorithm: "sha1",
     image: {
@@ -224,6 +225,23 @@ describe("applyBrowseFilters", () => {
       "ocr-match",
       "path-only",
     ]);
+  });
+
+  it("keeps DB-backed duplicate rows when the list item only has a duplicate group id", () => {
+    const items = [
+      makeItem({ id: "duplicate", duplicateGroupId: "group-1" }),
+      makeItem({ id: "regular" }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: { project: "", ext: "", customFilter: "" },
+      searchQuery: "",
+      statusFilter: "duplicate",
+      customFilters: [],
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual(["duplicate"]);
   });
 
   it("does not use cached OCR text when OCR is disabled", () => {
