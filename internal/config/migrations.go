@@ -175,10 +175,35 @@ func (s *Store) migrate() error {
 			error_code TEXT,
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS ocr_results (
+			project_id TEXT NOT NULL,
+			repo_path TEXT NOT NULL,
+			content_hash TEXT NOT NULL,
+			hash_algorithm TEXT NOT NULL,
+			engine_name TEXT NOT NULL,
+			engine_version TEXT NOT NULL,
+			settings_hash TEXT NOT NULL,
+			status TEXT NOT NULL,
+			text TEXT NOT NULL DEFAULT '',
+			normalized_text TEXT NOT NULL DEFAULT '',
+			text_status TEXT NOT NULL DEFAULT '',
+			languages_json TEXT NOT NULL DEFAULT '[]',
+			scripts_json TEXT NOT NULL DEFAULT '[]',
+			confidence REAL,
+			error_code TEXT,
+			error_message TEXT,
+			duration_ms INTEGER NOT NULL DEFAULT 0,
+			mode TEXT NOT NULL DEFAULT '',
+			attempts INTEGER NOT NULL DEFAULT 0,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, engine_name, engine_version, settings_hash)
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_scans_completed_at ON scans(completed_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_project_path ON asset_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_hash ON asset_snapshots(hash_algorithm, content_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_ocr_results_project_path ON ocr_results(project_id, repo_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_ocr_results_hash ON ocr_results(hash_algorithm, content_hash)`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {
@@ -194,11 +219,55 @@ func (s *Store) migrate() error {
 	if err := s.migrateAppSettingsSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateOCRResultsSchema(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 1, nowUTC())
 	return err
+}
+
+func (s *Store) migrateOCRResultsSchema() error {
+	rows, err := s.db.Query(`PRAGMA table_info(ocr_results)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	statements := []struct {
+		column string
+		sql    string
+	}{
+		{"text_status", `ALTER TABLE ocr_results ADD COLUMN text_status TEXT NOT NULL DEFAULT ''`},
+		{"mode", `ALTER TABLE ocr_results ADD COLUMN mode TEXT NOT NULL DEFAULT ''`},
+		{"attempts", `ALTER TABLE ocr_results ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`},
+	}
+	for _, statement := range statements {
+		if columns[statement.column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement.sql); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) migrateProjectsWorkspaceSchema() error {

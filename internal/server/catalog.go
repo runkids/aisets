@@ -9,6 +9,8 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/config"
+	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
 
@@ -37,6 +39,11 @@ func parseScanIDParam(raw, name string) (int64, error) {
 
 func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 	catalog, err := s.ensureCatalog(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	catalog, err = s.enrichCatalogOCR(catalog)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -185,4 +192,32 @@ func (s *Server) clearCatalog() {
 	defer s.mu.Unlock()
 	s.catalog = scanner.Catalog{}
 	s.previews = map[string]actions.Preview{}
+}
+
+func (s *Server) enrichCatalogOCR(catalog scanner.Catalog) (scanner.Catalog, error) {
+	settings, err := s.store.Settings()
+	if err != nil {
+		return scanner.Catalog{}, err
+	}
+	if !settings.OCREnabled {
+		return catalog, nil
+	}
+	ocrSettings := config.OCRSettingsFromApp(settings)
+	results, err := s.store.OCRResults(catalog.Items, ocrSettings, s.ocrEngine.Name(), s.ocrEngine.Version())
+	if err != nil {
+		return scanner.Catalog{}, err
+	}
+	for index := range catalog.Items {
+		result, ok := results[catalog.Items[index].ProjectID+"\x00"+catalog.Items[index].RepoPath]
+		if ok {
+			copy := result
+			catalog.Items[index].OCR = &copy
+			continue
+		}
+		if eligibleForOCRMetadata(catalog.Items[index], ocrSettings).Status == ocr.StatusPending {
+			result := ocr.Result{Status: ocr.StatusPending}
+			catalog.Items[index].OCR = &result
+		}
+	}
+	return catalog, nil
 }

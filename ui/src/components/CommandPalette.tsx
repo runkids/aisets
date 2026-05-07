@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem, CustomAssetFilter } from "../types";
 import { cn } from "@/lib/cn";
+import { matchesOCRSearchText } from "../ocrSearch";
 import { fileName, type Mode } from "../ui";
 import { Keycap, TextInput } from "./ui";
 
@@ -28,6 +29,7 @@ type Props = {
 };
 
 type ModeItem = { id: Mode; labelKey: string; icon: ReactNode };
+type AssetResult = { asset: AssetItem; matchedOCR: boolean };
 
 const MODE_ITEMS: ModeItem[] = [
   {
@@ -88,12 +90,20 @@ export function CommandPalette({
             filter.id.toLowerCase().includes(q)),
       )
       .slice(0, 6);
-    const matched = assets
-      .filter(
-        (asset) =>
+    const matched: AssetResult[] = assets
+      .flatMap((asset) => {
+        const pathMatch =
           fileName(asset.repoPath).toLowerCase().includes(q) ||
-          asset.repoPath.toLowerCase().includes(q),
-      )
+          asset.repoPath.toLowerCase().includes(q);
+        const ocrMatch =
+          asset.ocr?.status === "ready" &&
+          matchesOCRSearchText(
+            asset.ocr.normalizedText ?? asset.ocr.text ?? "",
+            q,
+          );
+        if (!pathMatch && !ocrMatch) return [];
+        return [{ asset, matchedOCR: !pathMatch && ocrMatch }];
+      })
       .slice(0, 8);
     return { modes, filters, assets: matched };
   }, [query, assets, customFilters, t]);
@@ -130,7 +140,7 @@ export function CommandPalette({
     } else {
       const asset =
         results.assets[index - results.modes.length - results.filters.length];
-      if (asset) onOpenAsset(asset.id);
+      if (asset) onOpenAsset(asset.asset.id);
     }
     onClose();
   }
@@ -241,7 +251,8 @@ export function CommandPalette({
               {t("commandPalette.assets")}
             </div>
           )}
-          {results.assets.map((asset, index) => {
+          {results.assets.map((result, index) => {
+            const { asset } = result;
             const resultIndex =
               results.modes.length + results.filters.length + index;
             return (
@@ -275,7 +286,9 @@ export function CommandPalette({
                     {fileName(asset.repoPath)}
                   </span>
                   <span className="overflow-hidden text-current opacity-[0.62] font-g-mono text-[11px] tracking-[-0.015em] text-ellipsis whitespace-nowrap">
-                    {asset.repoPath}
+                    {result.matchedOCR
+                      ? t("commandPalette.ocrMatch")
+                      : asset.repoPath}
                   </span>
                 </span>
                 <span className="ml-auto text-current opacity-60 font-g-mono text-[11px] font-[510] tracking-[-0.015em] whitespace-nowrap">

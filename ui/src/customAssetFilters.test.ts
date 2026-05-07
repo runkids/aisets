@@ -125,6 +125,46 @@ describe("matchesCustomAssetFilter", () => {
     }
   });
 
+  it("matches OCR clauses only for ready cached OCR text", () => {
+    const item = makeItem({
+      ocr: {
+        status: "ready",
+        text: "SALE 活動",
+        normalizedText: "sale 活動",
+        languages: ["eng", "chi_tra"],
+        scripts: ["han", "latin"],
+        confidence: 0.82,
+        durationMs: 120,
+      },
+    });
+
+    for (const clause of [
+      { field: "ocrText", operator: "contains", value: "sale" },
+      { field: "ocrText", operator: "regex", value: "活動" },
+      { field: "ocrLanguage", operator: "oneOf", value: "eng,chi_sim" },
+      { field: "ocrScript", operator: "equals", value: "han" },
+      { field: "ocrConfidence", operator: "gte", value: "0.8" },
+      { field: "ocrStatus", operator: "is", value: "ready" },
+    ] as const) {
+      expect(
+        matchesCustomAssetFilter(item, filter([{ clauses: [clause] }])),
+      ).toBe(true);
+    }
+
+    expect(
+      matchesCustomAssetFilter(
+        makeItem({ ocr: { status: "pending" } }),
+        filter([
+          {
+            clauses: [
+              { field: "ocrText", operator: "contains", value: "sale" },
+            ],
+          },
+        ]),
+      ),
+    ).toBe(false);
+  });
+
   it("ignores disabled filters and returns zero-count options", () => {
     const filters: CustomAssetFilter[] = [
       {

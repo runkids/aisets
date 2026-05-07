@@ -21,6 +21,11 @@ type AppSettings struct {
 	DefaultProjectRoot         string              `json:"defaultProjectRoot"`
 	AutoScanOnOpen             bool                `json:"autoScanOnOpen"`
 	ScanOnOpen                 bool                `json:"scanOnOpen"`
+	OCREnabled                 bool                `json:"ocrEnabled"`
+	OCRLanguages               []string            `json:"ocrLanguages"`
+	OCRMaxPixels               int                 `json:"ocrMaxPixels"`
+	OCRBatchSize               int                 `json:"ocrBatchSize"`
+	OCRConcurrency             int                 `json:"ocrConcurrency"`
 	ExcludePatterns            []string            `json:"excludePatterns"`
 	OptimizationDefaultQuality int                 `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      bool                `json:"optimizationAutoApply"`
@@ -33,6 +38,11 @@ type SettingsUpdate struct {
 	DefaultProjectRoot         *string             `json:"defaultProjectRoot"`
 	AutoScanOnOpen             *bool               `json:"autoScanOnOpen"`
 	ScanOnOpen                 *bool               `json:"scanOnOpen"`
+	OCREnabled                 *bool               `json:"ocrEnabled"`
+	OCRLanguages               []string            `json:"ocrLanguages"`
+	OCRMaxPixels               *int                `json:"ocrMaxPixels"`
+	OCRBatchSize               *int                `json:"ocrBatchSize"`
+	OCRConcurrency             *int                `json:"ocrConcurrency"`
 	ExcludePatterns            []string            `json:"excludePatterns"`
 	OptimizationDefaultQuality *int                `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      *bool               `json:"optimizationAutoApply"`

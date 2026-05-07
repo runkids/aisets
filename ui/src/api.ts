@@ -4,6 +4,7 @@ import type {
   Catalog,
   DirectoryListing,
   ExportData,
+  OCRRunEvent,
   Project,
   ScanEvent,
   SettingsInfo,
@@ -61,6 +62,11 @@ export function getCatalog() {
 function throwAPIError(error: APIErrorBody["error"] | undefined) {
   if (error?.code) throw new APIError(error.code, error.message, error.params);
   throw new APIError("scan_failed", "scan failed");
+}
+
+function throwOCRAPIError(error: APIErrorBody["error"] | undefined) {
+  if (error?.code) throw new APIError(error.code, error.message, error.params);
+  throw new APIError("ocr_failed", "OCR failed");
 }
 
 function parseScanLine(
@@ -124,6 +130,78 @@ export async function scanCatalog(options?: {
   const finalEvent = parseScanLine(buffer, options?.onEvent);
   if (finalEvent?.type === "done") done = finalEvent;
   return done ?? ({ type: "done" } as const);
+}
+
+function parseOCRLine(
+  line: string,
+  onEvent?: (event: OCRRunEvent) => void,
+): OCRRunEvent | null {
+  if (!line.trim()) return null;
+  const event = JSON.parse(line) as OCRRunEvent;
+  onEvent?.(event);
+  if (event.type === "error") throwOCRAPIError(event.error);
+  return event;
+}
+
+export async function runOCR(options?: {
+  onEvent?: (event: OCRRunEvent) => void;
+  signal?: AbortSignal;
+}) {
+  const response = await fetch(`${basePath}/api/ocr/run`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code)
+      throw new APIError(error.code, error.message, error.params);
+    throw new APIError("http_error", `HTTP ${response.status}`, {
+      status: response.status,
+    });
+  }
+  if (!response.body) {
+    const text = await response.text();
+    let done: Extract<OCRRunEvent, { type: "done" }> | null = null;
+    for (const line of text.split("\n")) {
+      const event = parseOCRLine(line, options?.onEvent);
+      if (event?.type === "done") done = event;
+    }
+    return done;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: Extract<OCRRunEvent, { type: "done" }> | null = null;
+  for (;;) {
+    const chunk = await reader.read();
+    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parseOCRLine(line, options?.onEvent);
+      if (event?.type === "done") done = event;
+    }
+    if (chunk.done) break;
+  }
+  const finalEvent = parseOCRLine(buffer, options?.onEvent);
+  if (finalEvent?.type === "done") done = finalEvent;
+  return done;
+}
+
+export function installOCR(languages: string[]) {
+  return request<{ settings?: SettingsInfo }>("/api/ocr/install", {
+    method: "POST",
+    body: JSON.stringify({ languages }),
+  });
+}
+
+export function removeOCR(languages: string[] = []) {
+  return request<{ settings?: SettingsInfo }>("/api/ocr/remove", {
+    method: "POST",
+    body: JSON.stringify({ languages }),
+  });
 }
 
 export function addProject(path: string) {

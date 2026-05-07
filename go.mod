@@ -24,7 +24,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tdewolff/parse/v2 v2.8.2-0.20250806174018-50048bb39781 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
-	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	modernc.org/libc v1.72.0 // indirect

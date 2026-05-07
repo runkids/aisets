@@ -23,6 +23,19 @@ function listValue(value: string) {
     .filter(Boolean);
 }
 
+function includesValue(
+  values: string[] | undefined,
+  operator: string,
+  value: string,
+) {
+  const target = (values ?? []).map((part) => part.toLowerCase());
+  if (operator === "equals") return target.includes(value.toLowerCase());
+  if (operator === "oneOf") {
+    return listValue(value).some((part) => target.includes(part.toLowerCase()));
+  }
+  return false;
+}
+
 function matchesText(
   text: string,
   operator: string,
@@ -117,6 +130,35 @@ function matchesClause(
         clause.operator === "is" &&
         item.optimizationRecommendations.length > 0 === booleanValue(value)
       );
+    case "ocrText":
+      if (item.ocr?.status !== "ready") return false;
+      return matchesText(
+        item.ocr.normalizedText ?? item.ocr.text ?? "",
+        clause.operator,
+        value,
+      );
+    case "ocrLanguage":
+      return (
+        item.ocr?.status === "ready" &&
+        includesValue(item.ocr.languages, clause.operator, value)
+      );
+    case "ocrScript":
+      return (
+        item.ocr?.status === "ready" &&
+        includesValue(item.ocr.scripts, clause.operator, value)
+      );
+    case "ocrConfidence": {
+      if (item.ocr?.status !== "ready" || item.ocr.confidence == null) {
+        return false;
+      }
+      const limit = Number(value);
+      if (!Number.isFinite(limit)) return false;
+      if (clause.operator === "gte") return item.ocr.confidence >= limit;
+      if (clause.operator === "lte") return item.ocr.confidence <= limit;
+      return false;
+    }
+    case "ocrStatus":
+      return clause.operator === "is" && item.ocr?.status === value;
     default:
       return false;
   }

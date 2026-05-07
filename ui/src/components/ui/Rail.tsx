@@ -27,7 +27,7 @@ const railHeadingVariants = cva(
 
 const railItemVariants = cva(
   [
-    "flex min-h-[28px] w-full cursor-pointer items-center justify-between gap-2 rounded-[var(--g-r-md)] !px-2 !py-1.5 text-left font-g text-[12px] leading-[1.4] tracking-[-0.012em]",
+    "flex min-h-[28px] w-full cursor-pointer items-center justify-between gap-2 rounded-[var(--g-r-md)] !px-2 !py-1.5 text-left font-g text-g-ui leading-[1.4] tracking-g-ui",
     "transition-[background,color,box-shadow] duration-[120ms] ease-[var(--g-ease)]",
     "focus-visible:outline-none focus-visible:shadow-[var(--g-shadow-focus)] disabled:cursor-not-allowed disabled:!opacity-[0.38]",
   ],

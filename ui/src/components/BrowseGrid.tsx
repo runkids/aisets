@@ -11,7 +11,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { ocrStatusLabel } from "../ocrStatus";
 import { fileName, formatBytes } from "../ui";
+import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
 
 type BrowseGridProps = {
@@ -156,6 +158,7 @@ export function BrowseGrid({
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       optimizable ? t("browse.flagOptimizable") : "",
+      ocrStatusLabel(t, item),
     ].filter(Boolean);
     const referenceLabel = t("asset.refs", { count: item.usedBy.length });
     const ariaLabel = [item.repoPath, referenceLabel, ...statusLabels].join(
@@ -254,6 +257,7 @@ export function BrowseGrid({
           </Tooltip>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="line">{formatExt(item.ext)}</Badge>
+            <OCRStatusBadge item={item} />
             <Badge>{formatBytes(item.bytes)}</Badge>
             <Tooltip label={referenceLabel} placement="top">
               <span className="ml-auto inline-flex">

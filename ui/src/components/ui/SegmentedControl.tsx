@@ -38,12 +38,12 @@ const itemVariants = cva(
   {
     variants: {
       variant: {
-        text: "h-[26px] min-w-8 px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
-        icon: "size-[26px] min-w-0 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
+        text: "h-[26px] min-w-8 px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-g-ui tracking-g-ui text-g-ink-3",
+        icon: "size-[26px] min-w-0 p-0 rounded-[calc(var(--g-r-md)-2px)] text-g-ui tracking-g-ui text-g-ink-3",
         fixed:
-          "h-[26px] w-8 p-0 rounded-[calc(var(--g-r-md)-2px)] text-[13px] tracking-[-0.012em] text-g-ink-3",
+          "h-[26px] w-8 p-0 rounded-[calc(var(--g-r-md)-2px)] text-g-ui tracking-g-ui text-g-ink-3",
         status:
-          "min-h-[34px] h-[34px] px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-sm text-g-ink-2",
+          "min-h-[34px] h-[34px] px-2.5 rounded-[calc(var(--g-r-md)-2px)] text-g-body text-g-ink-2",
       },
     },
     defaultVariants: {

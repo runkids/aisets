@@ -11,6 +11,14 @@ import (
 
 const contentHashAlgorithm = "blake3"
 
+func ContentHash(ctx context.Context, path string) (string, string, error) {
+	sum, err := contentHashFile(ctx, path)
+	if err != nil {
+		return "", "", err
+	}
+	return sum, contentHashAlgorithm, nil
+}
+
 func contentHashFile(ctx context.Context, path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {

@@ -70,7 +70,7 @@ export function Modal({
             <DialogPrimitive.Title asChild>
               <header className="flex items-start gap-3 border-b border-g-line bg-g-surface px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-g-display text-xl font-[590] tracking-[-0.022em] text-g-ink">
+                  <h2 className="font-g-display text-heading-sm font-[590] tracking-heading-sm text-g-ink">
                     {title}
                   </h2>
                   {description && (

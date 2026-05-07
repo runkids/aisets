@@ -10,6 +10,7 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/config"
+	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
 
@@ -30,6 +31,7 @@ type Server struct {
 	mux       *http.ServeMux
 	handler   http.Handler
 	scanner   *scanner.Scanner
+	ocrEngine ocr.Engine
 	onReady   func()
 
 	mu       sync.Mutex
@@ -46,6 +48,7 @@ func New(opts Options) (*Server, error) {
 		version:   opts.Version,
 		mux:       http.NewServeMux(),
 		scanner:   scanner.New(),
+		ocrEngine: ocr.NewDefaultEngine(config.DataDir()),
 		previews:  map[string]actions.Preview{},
 	}
 	s.routes()
@@ -102,6 +105,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/reset-database", s.handleSettingsResetDatabase)
 	s.mux.HandleFunc("GET /api/catalog", s.handleCatalog)
 	s.mux.HandleFunc("POST /api/scan", s.handleScan)
+	s.mux.HandleFunc("POST /api/ocr/install", s.handleOCRInstall)
+	s.mux.HandleFunc("POST /api/ocr/remove", s.handleOCRRemove)
+	s.mux.HandleFunc("POST /api/ocr/run", s.handleOCRRun)
 	s.mux.HandleFunc("GET /api/scans", s.handleScans)
 	s.mux.HandleFunc("GET /api/scans/{id}", s.handleScanSummary)
 	s.mux.HandleFunc("GET /api/scans/diff", s.handleScanDiff)

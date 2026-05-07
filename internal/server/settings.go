@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
+	"asset-studio/internal/ocr"
 )
 
 func settingsErrorStatus(err error) int {
@@ -21,6 +23,7 @@ type settingsInfo struct {
 	DatabasePath string             `json:"databasePath"`
 	DataDir      string             `json:"dataDir"`
 	CacheDir     string             `json:"cacheDir"`
+	OCRRuntime   ocr.RuntimeStatus  `json:"ocrRuntime"`
 }
 
 func (s *Server) currentSettingsInfo() (settingsInfo, error) {
@@ -35,6 +38,7 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 		DatabasePath: s.store.Path(),
 		DataDir:      config.DataDir(),
 		CacheDir:     config.CacheDir(),
+		OCRRuntime:   ocr.Runtime(context.Background(), config.DataDir(), s.ocrEngine),
 	}, nil
 }
 

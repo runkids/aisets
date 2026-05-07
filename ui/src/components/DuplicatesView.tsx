@@ -65,7 +65,7 @@ export function DuplicatesView({
               {t("duplicates.groupsCount", { count: groups.length })}
             </em>
           </h1>
-          <p className="mt-2.5 max-w-[540px] text-sm text-g-ink-3">
+          <p className="mt-2.5 max-w-[540px] text-g-body text-g-ink-3">
             {t("duplicates.description")}
           </p>
         </div>

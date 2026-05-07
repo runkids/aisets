@@ -20,6 +20,7 @@ import (
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
 	"asset-studio/internal/imageproc"
+	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
 
@@ -403,6 +404,11 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/settings", bytes.NewReader([]byte(`{
 		"workspaceName": "Team Assets",
 		"scanOnOpen": true,
+		"ocrEnabled": true,
+		"ocrLanguages": ["eng", "chi_tra"],
+		"ocrMaxPixels": 1000,
+		"ocrBatchSize": 2,
+		"ocrConcurrency": 1,
 		"excludePatterns": ["dist", " tmp "],
 		"optimizationDefaultQuality": 72
 	}`)))
@@ -414,9 +420,16 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 		Settings struct {
 			WorkspaceName              string   `json:"workspaceName"`
 			ScanOnOpen                 bool     `json:"scanOnOpen"`
+			OCREnabled                 bool     `json:"ocrEnabled"`
+			OCRLanguages               []string `json:"ocrLanguages"`
+			OCRMaxPixels               int      `json:"ocrMaxPixels"`
+			OCRBatchSize               int      `json:"ocrBatchSize"`
 			ExcludePatterns            []string `json:"excludePatterns"`
 			OptimizationDefaultQuality int      `json:"optimizationDefaultQuality"`
 			DatabasePath               string   `json:"databasePath"`
+			OCRRuntime                 struct {
+				Installed bool `json:"installed"`
+			} `json:"ocrRuntime"`
 		} `json:"settings"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
@@ -424,6 +437,9 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	}
 	if patched.Settings.WorkspaceName != "Team Assets" || !patched.Settings.ScanOnOpen || patched.Settings.OptimizationDefaultQuality != 72 || patched.Settings.DatabasePath == "" {
 		t.Fatalf("patched settings = %#v", patched.Settings)
+	}
+	if !patched.Settings.OCREnabled || strings.Join(patched.Settings.OCRLanguages, ",") != "eng,chi_tra" || patched.Settings.OCRMaxPixels != 1000 || patched.Settings.OCRBatchSize != 2 || patched.Settings.OCRRuntime.Installed {
+		t.Fatalf("patched OCR settings = %#v", patched.Settings)
 	}
 	if len(patched.Settings.ExcludePatterns) != 2 || patched.Settings.ExcludePatterns[1] != "tmp" {
 		t.Fatalf("patched exclude patterns = %#v", patched.Settings.ExcludePatterns)
@@ -434,6 +450,259 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"workspaceName":"Team Assets"`) {
 		t.Fatalf("settings get = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCatalogEnrichesOCRFromCacheOnly(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	enabled := true
+	if _, err := store.UpdateSettings(config.SettingsUpdate{OCREnabled: &enabled}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := scanner.AssetItem{
+		ID:            "asset",
+		ProjectID:     "project",
+		ProjectName:   "Project",
+		RepoPath:      "assets/hero.png",
+		LocalPath:     filepath.Join(root, "hero.png"),
+		Ext:           ".png",
+		ContentHash:   "hash",
+		HashAlgorithm: "blake3",
+		Image:         imageproc.Metadata{Format: "png", Width: 100, Height: 50},
+	}
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ocrSettings := config.OCRSettingsFromApp(settings)
+	if err := store.UpsertOCRResult(ocr.Result{
+		ProjectID:     item.ProjectID,
+		RepoPath:      item.RepoPath,
+		ContentHash:   item.ContentHash,
+		HashAlgorithm: item.HashAlgorithm,
+		EngineName:    s.ocrEngine.Name(),
+		EngineVersion: s.ocrEngine.Version(),
+		SettingsHash:  ocr.SettingsHash(ocrSettings),
+		Status:        ocr.StatusReady,
+		Text:          "SALE",
+		Languages:     []string{"eng"},
+		Scripts:       []string{"latin"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Items[0].OCR == nil || catalog.Items[0].OCR.Status != ocr.StatusReady || catalog.Items[0].OCR.Text != "SALE" {
+		t.Fatalf("enriched catalog = %#v", catalog.Items[0].OCR)
+	}
+	item.ContentHash = "changed"
+	catalog, err = s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Items[0].OCR == nil || catalog.Items[0].OCR.Status != ocr.StatusPending {
+		t.Fatalf("stale OCR result should not match = %#v", catalog.Items[0].OCR)
+	}
+	item.ContentHash = ""
+	item.HashAlgorithm = "blake3"
+	catalog, err = s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Items[0].OCR == nil || catalog.Items[0].OCR.Status != ocr.StatusPending {
+		t.Fatalf("missing hash OCR candidate should be pending = %#v", catalog.Items[0].OCR)
+	}
+}
+
+func TestOCRRunRequiresEnabledAndInstalledRuntime(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.ocrEngine = fakeOCREngine{}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ocr/run", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"code":"ocr_disabled"`) {
+		t.Fatalf("disabled OCR run = %d %s", rec.Code, rec.Body.String())
+	}
+	enabled := true
+	if _, err := store.UpdateSettings(config.SettingsUpdate{OCREnabled: &enabled}); err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/ocr/run", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"code":"ocr_not_installed"`) {
+		t.Fatalf("missing runtime OCR run = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+type fakeOCREngine struct{}
+
+func (fakeOCREngine) Name() string { return "fake-ocr" }
+
+func (fakeOCREngine) Version() string { return "test" }
+
+func (fakeOCREngine) Extract(context.Context, string, []string) (ocr.Extraction, error) {
+	return ocr.Extraction{Text: "SALE", Languages: []string{"eng"}, Scripts: []string{"latin"}, DurationMs: 1}, nil
+}
+
+func TestOCRRunHashesMissingCandidatesBeforeCacheLookup(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	enabled := true
+	batchSize := 1
+	if _, err := store.UpdateSettings(config.SettingsUpdate{OCREnabled: &enabled, OCRLanguages: []string{"eng"}, OCRBatchSize: &batchSize}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(ocr.DataDir(config.DataDir()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ocr.PackPath(config.DataDir(), "eng"), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.ocrEngine = fakeOCREngine{}
+	missingHashPath := filepath.Join(root, "missing-hash.png")
+	if err := os.WriteFile(missingHashPath, []byte("missing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s.catalog = scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Items: []scanner.AssetItem{
+			{
+				ID:            "missing-hash",
+				ProjectID:     "project",
+				RepoPath:      "assets/missing-hash.png",
+				Ext:           ".png",
+				LocalPath:     missingHashPath,
+				HashAlgorithm: "blake3",
+				Image:         imageproc.Metadata{Format: "png", Width: 100, Height: 50},
+			},
+			{
+				ID:            "vector",
+				ProjectID:     "project",
+				RepoPath:      "assets/vector.svg",
+				Ext:           ".svg",
+				ContentHash:   "h1",
+				HashAlgorithm: "blake3",
+				Image:         imageproc.Metadata{Format: "svg", Width: 100, Height: 50},
+			},
+			{
+				ID:            "image",
+				ProjectID:     "project",
+				RepoPath:      "assets/image.png",
+				Ext:           ".png",
+				LocalPath:     filepath.Join(root, "image.png"),
+				ContentHash:   "h2",
+				HashAlgorithm: "blake3",
+				Image:         imageproc.Metadata{Format: "png", Width: 100, Height: 50},
+			},
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ocr/run", nil)
+	s.handler.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `"ready":1`) || !strings.Contains(body, `"hasMore":true`) || strings.Contains(body, `"ocr_missing_hash"`) {
+		t.Fatalf("first OCR run should hash and process the missing-hash image: %s", body)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/ocr/run", nil)
+	s.handler.ServeHTTP(rec, req)
+	body = rec.Body.String()
+	if !strings.Contains(body, `"cacheHit":1`) || !strings.Contains(body, `"ready":1`) || !strings.Contains(body, `"hasMore":false`) {
+		t.Fatalf("second OCR run should cache hashed item and process next item: %s", body)
+	}
+}
+
+func TestOCRRunRefreshesLegacyReadyEmptyResult(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	enabled := true
+	if _, err := store.UpdateSettings(config.SettingsUpdate{OCREnabled: &enabled, OCRLanguages: []string{"eng"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(ocr.DataDir(config.DataDir()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ocr.PackPath(config.DataDir(), "eng"), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.ocrEngine = fakeOCREngine{}
+	item := scanner.AssetItem{
+		ID:            "empty",
+		ProjectID:     "project",
+		RepoPath:      "assets/empty.png",
+		Ext:           ".png",
+		LocalPath:     filepath.Join(root, "empty.png"),
+		ContentHash:   "hash-empty",
+		HashAlgorithm: "blake3",
+		Image:         imageproc.Metadata{Format: "png", Width: 100, Height: 50},
+	}
+	s.catalog = scanner.Catalog{GeneratedAt: "2026-05-07T00:00:00Z", Items: []scanner.AssetItem{item}}
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ocrSettings := config.OCRSettingsFromApp(settings)
+	if err := store.UpsertOCRResult(ocr.Result{
+		ProjectID:     item.ProjectID,
+		RepoPath:      item.RepoPath,
+		ContentHash:   item.ContentHash,
+		HashAlgorithm: item.HashAlgorithm,
+		EngineName:    s.ocrEngine.Name(),
+		EngineVersion: s.ocrEngine.Version(),
+		SettingsHash:  ocr.SettingsHash(ocrSettings),
+		Status:        ocr.StatusReady,
+		Text:          "",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ocr/run", nil)
+	s.handler.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `"ready":1`) || strings.Contains(body, `"cacheHit":1`) {
+		t.Fatalf("legacy empty OCR result should be refreshed, body = %s", body)
 	}
 }
 

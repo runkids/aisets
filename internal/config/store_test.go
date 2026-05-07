@@ -10,6 +10,7 @@ import (
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/imageproc"
+	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
 
@@ -482,11 +483,24 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	if _, err := store.UpdateSettings(SettingsUpdate{OptimizationDefaultQuality: &badQuality}); err == nil || err.(apierr.Error).Code != "settings_quality_invalid" {
 		t.Fatalf("bad quality err = %T %[1]v", err)
 	}
+	badOCRBatch := 0
+	if _, err := store.UpdateSettings(SettingsUpdate{OCRBatchSize: &badOCRBatch}); err == nil || err.(apierr.Error).Code != "settings_ocr_batch_size_invalid" {
+		t.Fatalf("bad OCR batch err = %T %[1]v", err)
+	}
+	badOCRConcurrency := 2
+	if _, err := store.UpdateSettings(SettingsUpdate{OCRConcurrency: &badOCRConcurrency}); err == nil || err.(apierr.Error).Code != "settings_ocr_concurrency_invalid" {
+		t.Fatalf("bad OCR concurrency err = %T %[1]v", err)
+	}
 
 	workspace := " Team Assets "
 	rootPath := " /repo "
 	autoScan := true
 	scanOnOpen := true
+	ocrEnabled := true
+	ocrLanguages := []string{"eng", "chi_tra", "eng", "unknown"}
+	ocrMaxPixels := 1000
+	ocrBatchSize := 3
+	ocrConcurrency := 1
 	autoApply := true
 	quality := 0
 	settings, err := store.UpdateSettings(SettingsUpdate{
@@ -494,6 +508,11 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 		DefaultProjectRoot:         &rootPath,
 		AutoScanOnOpen:             &autoScan,
 		ScanOnOpen:                 &scanOnOpen,
+		OCREnabled:                 &ocrEnabled,
+		OCRLanguages:               ocrLanguages,
+		OCRMaxPixels:               &ocrMaxPixels,
+		OCRBatchSize:               &ocrBatchSize,
+		OCRConcurrency:             &ocrConcurrency,
 		OptimizationDefaultQuality: &quality,
 		OptimizationAutoApply:      &autoApply,
 	})
@@ -502,6 +521,9 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	}
 	if settings.WorkspaceName != "Team Assets" || settings.DefaultProjectRoot != "/repo" || !settings.AutoScanOnOpen || !settings.ScanOnOpen || settings.OptimizationDefaultQuality != 0 || !settings.OptimizationAutoApply {
 		t.Fatalf("settings = %#v", settings)
+	}
+	if !settings.OCREnabled || strings.Join(settings.OCRLanguages, ",") != "eng,chi_tra" || settings.OCRMaxPixels != 1000 || settings.OCRBatchSize != 3 || settings.OCRConcurrency != 1 {
+		t.Fatalf("OCR settings = %#v", settings)
 	}
 }
 
@@ -609,6 +631,11 @@ func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
 			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "bytes", Operator: "gte", Value: "-1"}}}}}},
 			code:    "custom_filter_bytes_invalid",
 		},
+		{
+			name:    "invalid OCR confidence",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "ocrConfidence", Operator: "gte", Value: "2"}}}}}},
+			code:    "custom_filter_confidence_invalid",
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -617,6 +644,81 @@ func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
 				t.Fatalf("err = %T %[1]v, want %s", err, tt.code)
 			}
 		})
+	}
+}
+
+func TestOCRResultsPersistAndMatchCurrentSettings(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	settings := OCRSettingsFromApp(DefaultAppSettings())
+	item := scanner.AssetItem{
+		ProjectID:     "project",
+		RepoPath:      "assets/hero.png",
+		ContentHash:   "hash-a",
+		HashAlgorithm: "blake3",
+	}
+	engineName := "test-ocr"
+	engineVersion := "test"
+	result := ocr.Result{
+		ProjectID:     item.ProjectID,
+		RepoPath:      item.RepoPath,
+		ContentHash:   item.ContentHash,
+		HashAlgorithm: item.HashAlgorithm,
+		EngineName:    engineName,
+		EngineVersion: engineVersion,
+		SettingsHash:  ocr.SettingsHash(settings),
+		Status:        ocr.StatusReady,
+		Text:          "Sale 活動",
+		Languages:     []string{"eng", "chi_tra"},
+		Scripts:       []string{"han", "latin"},
+		DurationMs:    42,
+	}
+	if err := store.UpsertOCRResult(result); err != nil {
+		t.Fatal(err)
+	}
+	results, err := store.OCRResults([]scanner.AssetItem{item}, settings, engineName, engineVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := results[item.ProjectID+"\x00"+item.RepoPath]
+	if got.Status != ocr.StatusReady || got.NormalizedText != "sale 活動" || got.DurationMs != 42 {
+		t.Fatalf("OCR result = %#v", got)
+	}
+	emptyResult := result
+	emptyResult.RepoPath = "assets/empty.png"
+	emptyResult.ContentHash = "hash-empty"
+	emptyResult.Text = ""
+	emptyResult.DurationMs = 7
+	emptyResult.Attempts = 3
+	emptyResult.Mode = "psm_11"
+	if err := store.UpsertOCRResult(emptyResult); err != nil {
+		t.Fatal(err)
+	}
+	emptyItem := item
+	emptyItem.RepoPath = emptyResult.RepoPath
+	emptyItem.ContentHash = emptyResult.ContentHash
+	results, err = store.OCRResults([]scanner.AssetItem{emptyItem}, settings, engineName, engineVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty := results[emptyItem.ProjectID+"\x00"+emptyItem.RepoPath]
+	if !empty.EmptyText || empty.TextStatus != ocr.TextStatusEmpty || empty.Attempts != 3 || empty.Mode != "psm_11" {
+		t.Fatalf("empty OCR result = %#v", empty)
+	}
+	changedSettings := settings
+	changedSettings.MaxPixels++
+	results, err = store.OCRResults([]scanner.AssetItem{item}, changedSettings, engineName, engineVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("stale OCR result matched changed settings = %#v", results)
 	}
 }
 

@@ -19,6 +19,7 @@ import {
   customFilterOptions,
   matchesCustomAssetFilter,
 } from "../customAssetFilters";
+import { matchesOCRSearchText } from "../ocrSearch";
 import type { AssetItem, CustomAssetFilter } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { BrowseGrid } from "./BrowseGrid";
@@ -59,6 +60,15 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
   }
 }
 
+function hasEmptyOCRText(item: AssetItem): boolean {
+  return Boolean(
+    item.ocr?.status === "ready" &&
+    (item.ocr.emptyText ||
+      (!(item.ocr.normalizedText ?? item.ocr.text ?? "").trim() &&
+        item.ocr.textStatus === "empty")),
+  );
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function applyBrowseFilters({
   items,
@@ -75,11 +85,17 @@ export function applyBrowseFilters({
 }) {
   const q = searchQuery.trim().toLowerCase();
   const facetBaseItems = items.filter((item) => {
+    const rawOCRText =
+      item.ocr?.status === "ready"
+        ? (item.ocr.normalizedText ?? item.ocr.text ?? "")
+        : "";
+    const ocrText = rawOCRText.trim() ? rawOCRText : "";
     if (!matchesStatus(item, statusFilter)) return false;
     if (
       q &&
       !fileName(item.repoPath).toLowerCase().includes(q) &&
-      !item.repoPath.toLowerCase().includes(q)
+      !item.repoPath.toLowerCase().includes(q) &&
+      !matchesOCRSearchText(ocrText, q)
     )
       return false;
     return true;
@@ -98,7 +114,19 @@ export function applyBrowseFilters({
         matchesCustomAssetFilter(item, selectedCustomFilter),
       )
     : filteredWithoutCustom;
-  return { facetBaseItems, filteredWithoutCustom, filtered };
+  const emptyOCRTextCount = items.filter((item) => {
+    if (!matchesStatus(item, statusFilter)) return false;
+    if (filters.project && item.projectName !== filters.project) return false;
+    if (filters.ext && item.ext !== filters.ext) return false;
+    if (
+      selectedCustomFilter &&
+      !matchesCustomAssetFilter(item, selectedCustomFilter)
+    ) {
+      return false;
+    }
+    return hasEmptyOCRText(item);
+  }).length;
+  return { facetBaseItems, filteredWithoutCustom, filtered, emptyOCRTextCount };
 }
 
 type FolderNode = {
@@ -352,17 +380,18 @@ export function BrowseView({
     [items],
   );
 
-  const { facetBaseItems, filteredWithoutCustom, filtered } = useMemo(
-    () =>
-      applyBrowseFilters({
-        items,
-        filters,
-        searchQuery,
-        statusFilter,
-        customFilters,
-      }),
-    [customFilters, filters, items, searchQuery, statusFilter],
-  );
+  const { facetBaseItems, filteredWithoutCustom, filtered, emptyOCRTextCount } =
+    useMemo(
+      () =>
+        applyBrowseFilters({
+          items,
+          filters,
+          searchQuery,
+          statusFilter,
+          customFilters,
+        }),
+      [customFilters, filters, items, searchQuery, statusFilter],
+    );
 
   const projectFacet = useMemo(
     () =>
@@ -532,7 +561,21 @@ export function BrowseView({
           )}
 
           {sorted.length === 0 ? (
-            <EmptyState title={t("browse.empty")} />
+            <EmptyState
+              title={t("browse.empty")}
+              description={
+                searchQuery.trim() && emptyOCRTextCount > 0
+                  ? t("browse.emptyOCRTextHint", {
+                      count: emptyOCRTextCount,
+                    })
+                  : undefined
+              }
+              tone={
+                searchQuery.trim() && emptyOCRTextCount > 0
+                  ? "warning"
+                  : "neutral"
+              }
+            />
           ) : view === "tree" ? (
             <div className="mt-1 flex min-h-0 flex-1 gap-4">
               <TreePanel

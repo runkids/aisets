@@ -1,6 +1,8 @@
 import {
   ArrowLeftRight,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Download,
   Filter,
   FolderKanban,
@@ -8,6 +10,7 @@ import {
   Image,
   Info,
   Keyboard,
+  LoaderCircle,
   Monitor,
   Moon,
   Paintbrush,
@@ -17,11 +20,13 @@ import {
   Scan,
   Settings2,
   Sliders,
+  Square,
   Sun,
   Trash2,
   Upload,
 } from "lucide-react";
 import type { ChangeEvent, ReactNode } from "react";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportSettings } from "../api";
@@ -31,11 +36,14 @@ import {
   useCatalogQuery,
   useDirectoryListingQuery,
   useImportSettingsMutation,
+  useInstallOCRMutation,
   useRemoveProjectMutation,
+  useRemoveOCRMutation,
   useRemoveWorkspaceMutation,
   useRenameProjectMutation,
   useRenameWorkspaceMutation,
   useResetDatabaseMutation,
+  useRunOCRMutation,
   useSettingsQuery,
   useSwitchWorkspaceMutation,
   useUpdateSettingsMutation,
@@ -47,6 +55,7 @@ import type {
   CustomAssetFilterGroup,
   CustomAssetFilterOperator,
   ExportData,
+  OCRRunCounts,
   SettingsInfo,
   SettingsUpdate,
   Workspace,
@@ -97,6 +106,11 @@ type SettingsDraft = {
   defaultProjectRoot: string;
   autoScanOnOpen: boolean;
   scanOnOpen: boolean;
+  ocrEnabled: boolean;
+  ocrLanguages: string[];
+  ocrMaxPixels: number;
+  ocrBatchSize: number;
+  ocrConcurrency: number;
   excludePatternsText: string;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
@@ -124,6 +138,11 @@ const defaultSettings: SettingsUpdate = {
   defaultProjectRoot: "",
   autoScanOnOpen: false,
   scanOnOpen: false,
+  ocrEnabled: false,
+  ocrLanguages: ["eng", "chi_tra", "chi_sim"],
+  ocrMaxPixels: 2_000_000,
+  ocrBatchSize: 25,
+  ocrConcurrency: 1,
   excludePatterns: [],
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
@@ -140,6 +159,11 @@ const customFilterFields: CustomAssetFilterField[] = [
   "duplicate",
   "nearDuplicate",
   "optimizable",
+  "ocrText",
+  "ocrLanguage",
+  "ocrScript",
+  "ocrConfidence",
+  "ocrStatus",
 ];
 
 const customFilterOperatorsByField: Record<
@@ -155,6 +179,11 @@ const customFilterOperatorsByField: Record<
   duplicate: ["is"],
   nearDuplicate: ["is"],
   optimizable: ["is"],
+  ocrText: ["contains", "regex"],
+  ocrLanguage: ["equals", "oneOf"],
+  ocrScript: ["equals", "oneOf"],
+  ocrConfidence: ["gte", "lte"],
+  ocrStatus: ["is"],
 };
 
 function defaultClauseValue(
@@ -173,6 +202,14 @@ function defaultClauseValue(
   if (field === "project") return "Project";
   if (field === "bytes") return "0";
   if (field === "status") return "unused";
+  if (field === "ocrText" && operator === "regex") return "SALE|活動";
+  if (field === "ocrText") return "SALE";
+  if (field === "ocrLanguage" && operator === "oneOf") return "eng,chi_tra";
+  if (field === "ocrLanguage") return "eng";
+  if (field === "ocrScript" && operator === "oneOf") return "latin,han";
+  if (field === "ocrScript") return "han";
+  if (field === "ocrConfidence") return "0.6";
+  if (field === "ocrStatus") return "ready";
   return "true";
 }
 
@@ -212,6 +249,7 @@ function clauseValueOptions(field: CustomAssetFilterField) {
     field === "optimizable"
   )
     return ["true", "false"];
+  if (field === "ocrStatus") return ["pending", "ready", "failed", "skipped"];
   return null;
 }
 
@@ -221,17 +259,39 @@ const projectRowActionRevealClass =
   "flex flex-wrap items-center gap-1.5 pl-3 sm:pointer-events-none sm:absolute sm:right-2 sm:top-1/2 sm:z-10 sm:-translate-y-1/2 sm:flex-nowrap sm:rounded-g-md sm:bg-g-surface-2 sm:p-1 sm:pl-1 sm:opacity-0 sm:shadow-g-sm sm:transition-opacity sm:duration-[120ms] sm:ease-g sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100";
 const ghostDangerClass = "text-g-red hover:bg-g-red-soft hover:text-g-red";
 const smButtonOverrideClass =
-  "!h-g-btn-sm !px-2.5 !font-g !text-[12px] !leading-none !tracking-g-ui";
+  "!h-g-btn-sm !px-2.5 !font-g !text-g-caption !leading-none !tracking-g-ui";
 const rowActionButtonClass = smButtonOverrideClass;
 const rowActionDangerButtonClass = `${rowActionButtonClass} ${ghostDangerClass}`;
 const workspaceDialogButtonClass = `${smButtonOverrideClass} [&_svg]:!size-3`;
 const workspaceDialogDangerButtonClass = `${workspaceDialogButtonClass} ${ghostDangerClass}`;
 const activeWorkspaceBadgeClass =
-  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink-2 shadow-g-sm font-g text-[12px] font-[590] leading-none tracking-[-0.012em] [&_svg]:size-3.5 [&_svg]:text-g-green";
+  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink-2 shadow-g-sm font-g text-g-ui font-[590] leading-none tracking-g-ui [&_svg]:size-3.5 [&_svg]:text-g-green";
 const switchWorkspaceButtonClass =
-  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink shadow-g-sm font-g text-[12px] font-[590] leading-none tracking-[-0.012em] [&_svg]:size-3.5 hover:bg-g-surface-3";
+  "inline-flex items-center justify-center gap-2 w-[112px] h-8 px-3 border border-g-line-strong rounded-g-md bg-g-surface-2 text-g-ink shadow-g-sm font-g text-g-ui font-[590] leading-none tracking-g-ui [&_svg]:size-3.5 hover:bg-g-surface-3";
 const projectAssetsBadgeClass =
   "shrink-0 border-g-line bg-g-surface-2 text-g-ink-3";
+const defaultOCRLanguages = ["eng", "chi_tra", "chi_sim"];
+const fallbackOCRLanguages = [
+  "eng",
+  "chi_tra",
+  "chi_sim",
+  "jpn",
+  "kor",
+  "fra",
+  "deu",
+  "spa",
+  "por",
+  "ita",
+  "nld",
+  "rus",
+  "ukr",
+  "ara",
+  "hin",
+  "tha",
+  "vie",
+  "ind",
+  "msa",
+];
 
 function isStandaloneApp() {
   return (
@@ -249,6 +309,11 @@ function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       settings?.defaultProjectRoot ?? defaultSettings.defaultProjectRoot ?? "",
     autoScanOnOpen: settings?.autoScanOnOpen ?? false,
     scanOnOpen: settings?.scanOnOpen ?? false,
+    ocrEnabled: settings?.ocrEnabled ?? false,
+    ocrLanguages: settings?.ocrLanguages ?? defaultOCRLanguages,
+    ocrMaxPixels: settings?.ocrMaxPixels ?? 2_000_000,
+    ocrBatchSize: settings?.ocrBatchSize ?? 25,
+    ocrConcurrency: settings?.ocrConcurrency ?? 1,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
@@ -262,6 +327,11 @@ function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     defaultProjectRoot: draft.defaultProjectRoot,
     autoScanOnOpen: draft.autoScanOnOpen,
     scanOnOpen: draft.scanOnOpen,
+    ocrEnabled: draft.ocrEnabled,
+    ocrLanguages: draft.ocrLanguages,
+    ocrMaxPixels: draft.ocrMaxPixels,
+    ocrBatchSize: draft.ocrBatchSize,
+    ocrConcurrency: draft.ocrConcurrency,
     excludePatterns: draft.excludePatternsText
       .split(/[\n,]/)
       .map((part) => part.trim())
@@ -306,6 +376,136 @@ function FieldRow({
         {children}
       </div>
     </div>
+  );
+}
+
+type OCRLanguagePack = SettingsInfo["ocrRuntime"]["availableLanguages"][number];
+
+function ocrLanguageLabel(
+  language: string,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  const key = `settings.ocrLanguageLabels.${language}`;
+  const label = t(key);
+  return label === key ? language : label;
+}
+
+function ocrProgressLabel(
+  counts: OCRRunCounts,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  const skipReasons = counts.skipReasons ?? {};
+  const [topSkipReason, topSkipCount] =
+    Object.entries(skipReasons).sort((a, b) => b[1] - a[1])[0] ?? [];
+  const skipReasonLabel = topSkipReason
+    ? t(`settings.ocrSkipReason.${topSkipReason}`, {
+        defaultValue: topSkipReason,
+      })
+    : "";
+  const key = topSkipReason
+    ? "settings.ocrProgressWithSkipReason"
+    : "settings.ocrProgress";
+  return t(key, {
+    processed: counts.processed,
+    ready: counts.ready,
+    failed: counts.failed,
+    skipped: counts.skipped,
+    cacheHit: counts.cacheHit,
+    skipReason: skipReasonLabel,
+    skipReasonCount: topSkipCount ?? 0,
+  });
+}
+
+function OCRLanguageSelect({
+  value,
+  packs,
+  disabled,
+  onChange,
+}: {
+  value: string[];
+  packs: OCRLanguagePack[];
+  disabled: boolean;
+  onChange: (languages: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const knownPacks =
+    packs.length > 0
+      ? packs
+      : fallbackOCRLanguages.map((language) => ({
+          language,
+          installed: false,
+          sizeBytes: 0,
+        }));
+  const knownLanguages = new Set(knownPacks.map((pack) => pack.language));
+  const options = [
+    ...knownPacks,
+    ...value
+      .filter((language) => !knownLanguages.has(language))
+      .map((language) => ({ language, installed: false, sizeBytes: 0 })),
+  ];
+  const selected = new Set(value);
+  const selectedLabels = value.map((language) => ocrLanguageLabel(language, t));
+  const label =
+    selectedLabels.length > 0
+      ? selectedLabels.join(", ")
+      : t("settings.ocrLanguagesPlaceholder");
+
+  function toggleLanguage(language: string) {
+    if (selected.has(language)) {
+      if (value.length <= 1) return;
+      onChange(value.filter((item) => item !== language));
+      return;
+    }
+    onChange([...value, language]);
+  }
+
+  return (
+    <DropdownMenuPrimitive.Root>
+      <DropdownMenuPrimitive.Trigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex h-g-btn-md w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+          aria-label={t("settings.ocrLanguages")}
+        >
+          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+          <ChevronDown size={15} className="shrink-0" />
+        </button>
+      </DropdownMenuPrimitive.Trigger>
+
+      <DropdownMenuPrimitive.Portal>
+        <DropdownMenuPrimitive.Content
+          align="end"
+          sideOffset={6}
+          className="z-[60] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
+          style={{ maxHeight: 320 }}
+        >
+          {options.map((pack) => (
+            <DropdownMenuPrimitive.CheckboxItem
+              key={pack.language}
+              checked={selected.has(pack.language)}
+              onCheckedChange={() => toggleLanguage(pack.language)}
+              onSelect={(event) => event.preventDefault()}
+              className="group flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-g-md px-3 py-2 text-left font-g text-g-body leading-[1.4] font-[510] text-g-ink-2 outline-none transition-[background,color,box-shadow] duration-[120ms] ease-g focus-visible:shadow-g-focus data-[highlighted]:bg-g-surface-3 data-[highlighted]:text-g-ink data-[state=checked]:text-g-ink"
+            >
+              <span className="grid size-4 shrink-0 place-items-center rounded-g-sm border border-g-line bg-g-surface-2 text-g-active-text transition-[background,border-color,color] duration-[120ms] ease-g group-data-[state=checked]:border-g-active-bg group-data-[state=checked]:bg-g-active-bg group-data-[state=checked]:text-g-active-text">
+                <DropdownMenuPrimitive.ItemIndicator>
+                  <Check size={12} />
+                </DropdownMenuPrimitive.ItemIndicator>
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {ocrLanguageLabel(pack.language, t)}
+              </span>
+              <Badge tone={pack.installed ? "green" : "line"}>
+                {pack.installed
+                  ? t("settings.installed")
+                  : t("settings.notInstalled")}
+              </Badge>
+            </DropdownMenuPrimitive.CheckboxItem>
+          ))}
+        </DropdownMenuPrimitive.Content>
+      </DropdownMenuPrimitive.Portal>
+    </DropdownMenuPrimitive.Root>
   );
 }
 
@@ -553,6 +753,8 @@ export function SettingsView({
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
   const [removeProjectId, setRemoveProjectId] = useState<string | null>(null);
   const [customFiltersHelpOpen, setCustomFiltersHelpOpen] = useState(false);
+  const [runOCRConfirmOpen, setRunOCRConfirmOpen] = useState(false);
+  const [removeOCRConfirmOpen, setRemoveOCRConfirmOpen] = useState(false);
   const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const [installPrompt, setInstallPrompt] =
@@ -568,11 +770,30 @@ export function SettingsView({
   const catalogQuery = useCatalogQuery();
   const addWorkspaceMutation = useAddWorkspaceMutation();
   const importMutation = useImportSettingsMutation();
+  const installOCRMutation = useInstallOCRMutation();
   const removeProjectMutation = useRemoveProjectMutation();
+  const removeOCRMutation = useRemoveOCRMutation();
   const removeWorkspaceMutation = useRemoveWorkspaceMutation();
   const renameProjectMutation = useRenameProjectMutation();
   const renameWorkspaceMutation = useRenameWorkspaceMutation();
   const resetMutation = useResetDatabaseMutation();
+  const [ocrProgress, setOCRProgress] = useState("");
+  const [ocrRunStopping, setOCRRunStopping] = useState(false);
+  const [ocrRunActive, setOCRRunActive] = useState(false);
+  const ocrRunBatchRef = useRef(0);
+  const ocrRunAbortRef = useRef<AbortController | null>(null);
+  const runOCRMutation = useRunOCRMutation({
+    onEvent: (event) => {
+      if ("counts" in event && event.counts) {
+        setOCRProgress(
+          t("settings.ocrBatchProgress", {
+            batch: Math.max(ocrRunBatchRef.current, 1),
+            progress: ocrProgressLabel(event.counts, t),
+          }),
+        );
+      }
+    },
+  });
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
   const updateMutation = useUpdateSettingsMutation();
 
@@ -616,14 +837,37 @@ export function SettingsView({
   const working =
     addWorkspaceMutation.isPending ||
     importMutation.isPending ||
+    installOCRMutation.isPending ||
     removeProjectMutation.isPending ||
+    removeOCRMutation.isPending ||
     removeWorkspaceMutation.isPending ||
     renameProjectMutation.isPending ||
     renameWorkspaceMutation.isPending ||
     resetMutation.isPending ||
     switchWorkspaceMutation.isPending ||
     updateMutation.isPending;
-  const settingsActionDisabled = settingsQuery.isLoading || working;
+  const ocrWorking = ocrRunActive || runOCRMutation.isPending;
+  const settingsActionDisabled =
+    settingsQuery.isLoading || working || ocrWorking;
+  const ocrLanguagePacks = settings?.ocrRuntime.availableLanguages ?? [];
+  const installedOCRLanguages = new Set(
+    ocrLanguagePacks
+      .filter((pack) => pack.installed)
+      .map((pack) => pack.language),
+  );
+  const selectedOCRLanguageList = selectedOCRLanguages();
+  const hasSelectedOCRLanguages = selectedOCRLanguageList.length > 0;
+  const hasUninstalledSelectedOCRLanguages = selectedOCRLanguageList.some(
+    (language) => !installedOCRLanguages.has(language),
+  );
+  const hasInstalledSelectedOCRLanguages = selectedOCRLanguageList.some(
+    (language) => installedOCRLanguages.has(language),
+  );
+  const missingSelectedOCRLanguages = selectedOCRLanguageList.filter(
+    (language) => !installedOCRLanguages.has(language),
+  );
+  const selectedOCRLanguagesInstalled =
+    hasSelectedOCRLanguages && missingSelectedOCRLanguages.length === 0;
 
   useEffect(() => {
     function onBeforeInstallPrompt(event: Event) {
@@ -643,6 +887,12 @@ export function SettingsView({
       window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, [t]);
+
+  useEffect(() => {
+    return () => {
+      ocrRunAbortRef.current?.abort();
+    };
+  }, []);
 
   const assetCountByProject: Record<string, number> = {};
   for (const item of items) {
@@ -790,6 +1040,72 @@ export function SettingsView({
         title: t("toast.settingsSaveFailed"),
       });
     }
+  }
+
+  function selectedOCRLanguages() {
+    return draft.ocrLanguages;
+  }
+
+  async function onInstallOCR() {
+    try {
+      await installOCRMutation.mutateAsync(selectedOCRLanguages());
+      toast.success(t("settings.ocrInstallSuccess"));
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("settings.ocrInstallFailed"),
+      });
+    }
+  }
+
+  async function onRemoveOCR() {
+    setRemoveOCRConfirmOpen(false);
+    try {
+      await removeOCRMutation.mutateAsync(selectedOCRLanguages());
+      setOCRProgress("");
+      toast.success(t("settings.ocrRemoveSuccess"));
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("settings.ocrRemoveFailed"),
+      });
+    }
+  }
+
+  async function onRunOCRConfirmed() {
+    setRunOCRConfirmOpen(false);
+    try {
+      setOCRRunActive(true);
+      setOCRRunStopping(false);
+      setOCRProgress("");
+      ocrRunBatchRef.current = 0;
+      await updateMutation.mutateAsync(updateFromDraft(draft));
+      for (;;) {
+        const controller = new AbortController();
+        ocrRunAbortRef.current = controller;
+        ocrRunBatchRef.current += 1;
+        const result = await runOCRMutation.mutateAsync(controller.signal);
+        if (!result?.hasMore || controller.signal.aborted) {
+          break;
+        }
+      }
+      toast.success(t("settings.ocrRunSuccess"));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast.info(t("settings.ocrRunStopped"));
+        return;
+      }
+      toast.error(errorMessage(error), {
+        title: t("settings.ocrRunFailed"),
+      });
+    } finally {
+      ocrRunAbortRef.current = null;
+      setOCRRunActive(false);
+      setOCRRunStopping(false);
+    }
+  }
+
+  function onStopOCR() {
+    setOCRRunStopping(true);
+    ocrRunAbortRef.current?.abort();
   }
 
   function onAddWorkspace(value: { name: string; iconImage: string }) {
@@ -1412,8 +1728,215 @@ export function SettingsView({
                     placeholder={"node_modules\n.git\ndist/**"}
                     rows={6}
                     className="w-full md:w-[420px]"
-                    textareaClassName="min-h-36 resize-y"
+                    textareaClassName="min-h-36"
                   />
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.ocrEnabled")}
+                  description={t("settings.ocrEnabledHint")}
+                  icon={<Scan size={15} />}
+                >
+                  <Switch
+                    checked={draft.ocrEnabled}
+                    onCheckedChange={(next) =>
+                      updateDraft((prev) => ({ ...prev, ocrEnabled: next }))
+                    }
+                    disabled={
+                      settingsQuery.isLoading || updateMutation.isPending
+                    }
+                    aria-label={t("settings.ocrEnabled")}
+                  />
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.ocrLanguages")}
+                  description={t("settings.ocrLanguagesHint")}
+                  icon={<Globe2 size={15} />}
+                  align="start"
+                >
+                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                    <OCRLanguageSelect
+                      value={draft.ocrLanguages}
+                      packs={ocrLanguagePacks}
+                      onChange={(languages) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          ocrLanguages: languages,
+                        }))
+                      }
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                    />
+                    <div className="flex flex-wrap justify-start gap-1.5 md:justify-end">
+                      {ocrLanguagePacks.map((pack) => (
+                        <Badge
+                          key={pack.language}
+                          tone={pack.installed ? "green" : "line"}
+                        >
+                          {ocrLanguageLabel(pack.language, t)}
+                          {pack.installed
+                            ? ""
+                            : ` ${t("settings.notInstalled")}`}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.ocrLimits")}
+                  description={t("settings.ocrLimitsHint")}
+                  icon={<Sliders size={15} />}
+                  align="start"
+                >
+                  <div className="grid w-full gap-2 md:w-[420px] md:grid-cols-2">
+                    <TextInput
+                      type="number"
+                      value={String(draft.ocrMaxPixels)}
+                      onChange={(event) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          ocrMaxPixels: Number(event.target.value),
+                        }))
+                      }
+                      aria-label={t("settings.ocrMaxPixels")}
+                    />
+                    <TextInput
+                      type="number"
+                      value={String(draft.ocrBatchSize)}
+                      onChange={(event) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          ocrBatchSize: Number(event.target.value),
+                        }))
+                      }
+                      aria-label={t("settings.ocrBatchSize")}
+                    />
+                  </div>
+                </FieldRow>
+                <FieldRow
+                  label={t("settings.ocrRuntime")}
+                  description={t("settings.ocrRuntimeHint")}
+                  icon={<Download size={15} />}
+                  align="start"
+                >
+                  <div className="flex w-full flex-col items-start gap-2 md:w-[420px] md:items-end">
+                    <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                      <Button
+                        variant="secondary"
+                        leadingIcon={
+                          installOCRMutation.isPending ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-[icon-spin_900ms_linear_infinite]"
+                            />
+                          ) : (
+                            <Download size={14} />
+                          )
+                        }
+                        onClick={() => void onInstallOCR()}
+                        disabled={
+                          working ||
+                          ocrWorking ||
+                          !hasSelectedOCRLanguages ||
+                          !hasUninstalledSelectedOCRLanguages
+                        }
+                      >
+                        {installOCRMutation.isPending
+                          ? t("settings.ocrInstalling")
+                          : t("settings.ocrInstall")}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        leadingIcon={
+                          removeOCRMutation.isPending ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-[icon-spin_900ms_linear_infinite]"
+                            />
+                          ) : (
+                            <Trash2 size={14} />
+                          )
+                        }
+                        onClick={() => setRemoveOCRConfirmOpen(true)}
+                        disabled={
+                          working ||
+                          ocrWorking ||
+                          !settings?.ocrRuntime.installed ||
+                          !hasInstalledSelectedOCRLanguages
+                        }
+                      >
+                        {removeOCRMutation.isPending
+                          ? t("settings.ocrRemoving")
+                          : t("settings.ocrRemove")}
+                      </Button>
+                      {ocrWorking ? (
+                        <Button
+                          variant="secondary"
+                          leadingIcon={
+                            ocrRunStopping ? (
+                              <LoaderCircle
+                                size={14}
+                                className="animate-[icon-spin_900ms_linear_infinite]"
+                              />
+                            ) : (
+                              <Square size={14} />
+                            )
+                          }
+                          onClick={onStopOCR}
+                          disabled={ocrRunStopping}
+                        >
+                          {ocrRunStopping
+                            ? t("settings.ocrStopping")
+                            : t("settings.ocrStop")}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          leadingIcon={<Scan size={14} />}
+                          onClick={() => setRunOCRConfirmOpen(true)}
+                          disabled={
+                            working ||
+                            !draft.ocrEnabled ||
+                            !settings?.ocrRuntime.installed ||
+                            !settings?.ocrRuntime.engineAvailable ||
+                            !selectedOCRLanguagesInstalled
+                          }
+                        >
+                          {t("settings.ocrRun")}
+                        </Button>
+                      )}
+                    </div>
+                    <p className="font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {settings?.ocrRuntime.installed
+                        ? t("settings.ocrInstalled")
+                        : t("settings.ocrNotInstalled")}
+                    </p>
+                    <p className="max-w-[420px] text-left font-g text-g-caption tracking-g-ui text-g-ink-3 md:text-right">
+                      {t("settings.ocrCacheScopeHint")}
+                    </p>
+                    {settings?.ocrRuntime.engineAvailable === false && (
+                      <p className="font-g text-g-caption tracking-g-ui text-g-red">
+                        {t("settings.ocrEngineUnavailable", {
+                          error: settings.ocrRuntime.engineError,
+                        })}
+                      </p>
+                    )}
+                    {settings?.ocrRuntime.installed &&
+                      missingSelectedOCRLanguages.length > 0 && (
+                        <p className="font-g text-g-caption tracking-g-ui text-g-red">
+                          {t("settings.ocrMissingSelectedLanguages", {
+                            languages: missingSelectedOCRLanguages
+                              .map((language) => ocrLanguageLabel(language, t))
+                              .join(", "),
+                          })}
+                        </p>
+                      )}
+                    {ocrProgress && (
+                      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                        {ocrProgress}
+                      </p>
+                    )}
+                  </div>
                 </FieldRow>
                 {updateMutation.error && (
                   <Notice tone="danger">
@@ -2075,6 +2598,41 @@ export function SettingsView({
         loading={removeProjectMutation.isPending}
         onConfirm={onRemoveProject}
         onCancel={() => setRemoveProjectId(null)}
+      />
+      <ConfirmDialog
+        open={runOCRConfirmOpen}
+        title={t("settings.ocrRunConfirmTitle")}
+        message={
+          <div className="grid gap-2">
+            <p>{t("settings.ocrRunConfirmIntro")}</p>
+            <ul className="m-0 list-disc space-y-1 pl-4">
+              <li>{t("settings.ocrRunConfirmLocal")}</li>
+              <li>
+                {t("settings.ocrRunConfirmBatch", {
+                  batchSize: draft.ocrBatchSize,
+                })}
+              </li>
+              <li>{t("settings.ocrRunConfirmSettings")}</li>
+              <li>{t("settings.ocrRunConfirmSearch")}</li>
+            </ul>
+          </div>
+        }
+        confirmText={t("settings.ocrRunConfirmAction")}
+        cancelText={t("common.cancel")}
+        loading={ocrWorking}
+        onConfirm={() => void onRunOCRConfirmed()}
+        onCancel={() => setRunOCRConfirmOpen(false)}
+      />
+      <ConfirmDialog
+        open={removeOCRConfirmOpen}
+        title={t("settings.ocrRemoveConfirmTitle")}
+        message={t("settings.ocrRemoveConfirmMessage")}
+        confirmText={t("settings.ocrRemoveConfirmAction")}
+        cancelText={t("common.cancel")}
+        variant="danger"
+        loading={removeOCRMutation.isPending}
+        onConfirm={() => void onRemoveOCR()}
+        onCancel={() => setRemoveOCRConfirmOpen(false)}
       />
       <ConfirmDialog
         open={resetSettingsOpen}

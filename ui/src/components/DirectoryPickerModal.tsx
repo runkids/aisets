@@ -68,7 +68,7 @@ export function DirectoryPickerModal({
       onClose={resetAndClose}
       footer={
         <>
-          <div className="min-w-0 truncate text-sm text-(--g-ink-4)">
+          <div className="min-w-0 truncate text-g-body text-g-ink-4">
             {currentPath || t("directoryPicker.defaultDir")}
           </div>
           <div className="ml-auto flex gap-2">

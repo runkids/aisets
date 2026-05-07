@@ -4,7 +4,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { ocrStatusLabel } from "../ocrStatus";
 import { fileName, formatBytes } from "../ui";
+import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
 
 type BrowseListProps = {
@@ -76,6 +78,7 @@ export function BrowseList({
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       optimizable ? t("browse.flagOptimizable") : "",
+      ocrStatusLabel(t, item),
     ].filter(Boolean);
     const ariaLabel = [item.repoPath, ...statusLabels].join(" · ");
 
@@ -147,6 +150,7 @@ export function BrowseList({
         </span>
         <span className="flex min-w-0 flex-wrap items-center gap-1">
           <Badge tone="line">{formatExt(item.ext)}</Badge>
+          <OCRStatusBadge item={item} />
           {duplicate && (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
               <Copy size={10} />

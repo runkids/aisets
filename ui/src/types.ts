@@ -19,6 +19,11 @@ export type AppSettings = {
   defaultProjectRoot: string;
   autoScanOnOpen: boolean;
   scanOnOpen: boolean;
+  ocrEnabled: boolean;
+  ocrLanguages: string[];
+  ocrMaxPixels: number;
+  ocrBatchSize: number;
+  ocrConcurrency: number;
   excludePatterns: string[];
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
@@ -34,7 +39,12 @@ export type CustomAssetFilterField =
   | "status"
   | "duplicate"
   | "nearDuplicate"
-  | "optimizable";
+  | "optimizable"
+  | "ocrText"
+  | "ocrLanguage"
+  | "ocrScript"
+  | "ocrConfidence"
+  | "ocrStatus";
 
 export type CustomAssetFilterOperator =
   | "contains"
@@ -70,6 +80,22 @@ export type SettingsInfo = AppSettings & {
   databasePath: string;
   dataDir: string;
   cacheDir: string;
+  ocrRuntime: OCRRuntime;
+};
+
+export type OCRRuntime = {
+  availableLanguages: Array<{
+    language: string;
+    installed: boolean;
+    sizeBytes: number;
+    path?: string;
+  }>;
+  installed: boolean;
+  dataDir: string;
+  engineName: string;
+  engineVersion: string;
+  engineAvailable: boolean;
+  engineError?: string;
 };
 
 export type SettingsUpdate = Partial<AppSettings>;
@@ -127,6 +153,22 @@ export type AssetItem = {
     suggestionCode: string;
     suggestion: string;
   }>;
+  ocr?: {
+    status: "pending" | "ready" | "failed" | "skipped";
+    text?: string;
+    normalizedText?: string;
+    textStatus?: "available" | "empty";
+    emptyText?: boolean;
+    languages?: string[];
+    scripts?: string[];
+    confidence?: number;
+    errorCode?: string;
+    errorMessage?: string;
+    durationMs?: number;
+    mode?: string;
+    attempts?: number;
+    updatedAt?: string;
+  };
 };
 
 export type DuplicateGroup = {
@@ -196,6 +238,28 @@ export type ScanEvent =
     }
   | { type: "done"; scanId?: number; stats?: Catalog["stats"] }
   | { type: "error"; error?: APIErrorBody["error"] };
+
+export type OCRRunCounts = {
+  queued: number;
+  processed: number;
+  ready: number;
+  failed: number;
+  skipped: number;
+  cacheHit: number;
+  skipReasons?: Record<string, number>;
+};
+
+export type OCRRunEvent =
+  | { type: "start"; counts: OCRRunCounts }
+  | {
+      type: "progress";
+      assetId: string;
+      repoPath: string;
+      status: string;
+      counts: OCRRunCounts;
+    }
+  | { type: "done"; counts: OCRRunCounts; hasMore?: boolean }
+  | { type: "error"; error?: APIErrorBody["error"]; counts?: OCRRunCounts };
 
 export type ActionPreview = {
   id: string;

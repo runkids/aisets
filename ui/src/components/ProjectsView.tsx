@@ -187,7 +187,7 @@ function KpiCell({
     >
       <div className="text-g-chip font-[510] text-g-ink-3">{label}</div>
       <div
-        className={`mt-1 font-g-display text-2xl font-[590] leading-none tracking-[-0.022em] tabular-nums ${colorClass}`}
+        className={`mt-1 font-g-display text-heading font-[590] leading-none tracking-heading tabular-nums ${colorClass}`}
       >
         {value}
       </div>

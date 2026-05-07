@@ -131,4 +131,75 @@ describe("applyBrowseFilters", () => {
     ]);
     expect(result.filtered.map((item) => item.id)).toEqual(["icon"]);
   });
+
+  it("matches ready OCR text in Browse search", () => {
+    const items = [
+      makeItem({
+        id: "ocr-match",
+        repoPath: "src/assets/banner.png",
+        ocr: {
+          status: "ready",
+          text: "Summer SALE",
+          normalizedText: "summer sale",
+        },
+      }),
+      makeItem({ id: "path-only", repoPath: "src/assets/sale-icon.png" }),
+      makeItem({
+        id: "pending",
+        repoPath: "src/assets/pending.png",
+        ocr: {
+          status: "pending",
+          text: "sale",
+        },
+      }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: { project: "", ext: "", customFilter: "" },
+      searchQuery: "sale",
+      statusFilter: "",
+      customFilters: [],
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual([
+      "ocr-match",
+      "path-only",
+    ]);
+  });
+
+  it("does not match empty OCR text but reports empty OCR text candidates", () => {
+    const items = [
+      makeItem({
+        id: "empty-ocr",
+        repoPath: "src/assets/banner.png",
+        ocr: {
+          status: "ready",
+          textStatus: "empty",
+          emptyText: true,
+        },
+      }),
+      makeItem({
+        id: "ocr-match",
+        repoPath: "src/assets/card.png",
+        ocr: {
+          status: "ready",
+          text: "FOREST PART",
+          normalizedText: "forest part",
+          textStatus: "available",
+        },
+      }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: { project: "", ext: "", customFilter: "" },
+      searchQuery: "party",
+      statusFilter: "",
+      customFilters: [],
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual(["ocr-match"]);
+    expect(result.emptyOCRTextCount).toBe(1);
+  });
 });

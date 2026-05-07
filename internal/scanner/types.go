@@ -3,6 +3,7 @@ package scanner
 import (
 	"asset-studio/internal/imageproc"
 	"asset-studio/internal/lint"
+	"asset-studio/internal/ocr"
 )
 
 type ScanPhase string
@@ -76,6 +77,7 @@ type AssetItem struct {
 	Similar                []string                 `json:"similar"`
 	PreferredDuplicatePath *string                  `json:"preferredDuplicatePath"`
 	Optimization           []OptimizationSuggestion `json:"optimizationRecommendations"`
+	OCR                    *ocr.Result              `json:"ocr,omitempty"`
 }
 
 type AssetReference struct {

@@ -177,7 +177,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
               invalid,
               disabled,
             }),
-            "min-h-28 items-start py-2.5",
+            "!h-auto min-h-28 items-start py-2.5",
           )}
         >
           <textarea

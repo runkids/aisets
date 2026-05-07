@@ -99,7 +99,7 @@ export function DashboardView({ catalog, onJump }: Props) {
           <CardBody padding="md">
             <div className="mb-4 flex items-center gap-2">
               <FileImage size={18} />
-              <h2 className="text-lg font-extrabold">
+              <h2 className="text-subheading font-[650]">
                 {t("dashboard.byFormat")}
               </h2>
             </div>
@@ -141,7 +141,7 @@ export function DashboardView({ catalog, onJump }: Props) {
           <CardBody padding="md">
             <div className="mb-4 flex items-center gap-2">
               <Sparkles size={18} />
-              <h2 className="text-lg font-extrabold">
+              <h2 className="text-subheading font-[650]">
                 {t("dashboard.topLargest")}
               </h2>
             </div>
@@ -179,7 +179,7 @@ export function DashboardView({ catalog, onJump }: Props) {
           <Card>
             <CardBody padding="md">
               <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-lg font-extrabold">
+                <h2 className="text-subheading font-[650]">
                   {t("dashboard.lintHealth")}
                 </h2>
               </div>
@@ -230,7 +230,7 @@ export function DashboardView({ catalog, onJump }: Props) {
         <CardBody padding="md">
           <div className="mb-4 flex items-center gap-2">
             <HardDrive size={18} />
-            <h2 className="text-lg font-extrabold">
+            <h2 className="text-subheading font-[650]">
               {t("dashboard.projects")}
             </h2>
           </div>

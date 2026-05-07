@@ -156,7 +156,7 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
               {t("asset.assets", { count: items.length })}
             </em>
           </h1>
-          <p className="mt-2.5 max-w-[540px] text-sm text-g-ink-3">
+          <p className="mt-2.5 max-w-[540px] text-g-body text-g-ink-3">
             {t("optimize.description")}
           </p>
         </div>

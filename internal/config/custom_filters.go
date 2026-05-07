@@ -116,6 +116,35 @@ func normalizeCustomAssetFilterClause(clause CustomAssetFilterClause) (CustomAss
 		if clause.Value != "true" && clause.Value != "false" {
 			return CustomAssetFilterClause{}, apierr.New("custom_filter_boolean_invalid", "custom filter boolean value is invalid")
 		}
+	case "ocrText":
+		if !isOneOf(clause.Operator, "contains", "regex") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if err := validateCustomFilterTextValue(clause); err != nil {
+			return CustomAssetFilterClause{}, err
+		}
+	case "ocrLanguage", "ocrScript":
+		if !isOneOf(clause.Operator, "equals", "oneOf") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if clause.Value == "" || (clause.Operator == "oneOf" && len(splitCustomFilterList(clause.Value)) == 0) {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_value_required", "custom filter clause value is required")
+		}
+	case "ocrConfidence":
+		if clause.Operator != "gte" && clause.Operator != "lte" {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		value, err := strconv.ParseFloat(clause.Value, 64)
+		if err != nil || value < 0 || value > 1 {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_confidence_invalid", "custom filter confidence value is invalid")
+		}
+	case "ocrStatus":
+		if clause.Operator != "is" {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if !isOneOf(clause.Value, "pending", "ready", "failed", "skipped") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_ocr_status_invalid", "custom filter OCR status is invalid")
+		}
 	default:
 		return CustomAssetFilterClause{}, apierr.New("custom_filter_field_invalid", "custom filter field is invalid")
 	}

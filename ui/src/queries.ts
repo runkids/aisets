@@ -7,18 +7,26 @@ import {
   getCatalog,
   getSettings,
   importSettings,
+  installOCR,
   listDirectories,
+  removeOCR,
   removeProject,
   removeWorkspace,
   renamePreview,
   renameProject,
   renameWorkspace,
   resetDatabase,
+  runOCR,
   scanCatalog,
   switchWorkspace,
   updateSettings,
 } from "./api";
-import type { ExportData, ScanEvent, SettingsUpdate } from "./types";
+import type {
+  ExportData,
+  OCRRunEvent,
+  ScanEvent,
+  SettingsUpdate,
+} from "./types";
 
 export const catalogQueryKey = ["catalog"] as const;
 export const settingsQueryKey = ["settings"] as const;
@@ -57,6 +65,40 @@ export function useScanCatalogMutation(options?: {
   return useMutation({
     mutationFn: () => scanCatalog({ onEvent: options?.onEvent }),
     onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useRunOCRMutation(options?: {
+  onEvent?: (event: OCRRunEvent) => void;
+}) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (signal?: AbortSignal) =>
+      runOCR({ onEvent: options?.onEvent, signal }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useInstallOCRMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (languages: string[]) => installOCR(languages),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: settingsQueryKey });
+    },
+  });
+}
+
+export function useRemoveOCRMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (languages?: string[]) => removeOCR(languages),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: settingsQueryKey });
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },
   });

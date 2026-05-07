@@ -99,6 +99,70 @@ export function AssetDrawer({
             </table>
           </div>
 
+          {asset.ocr && (
+            <div className="mb-5">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
+                  {t("assetDrawer.ocr")}
+                </span>
+                <Badge
+                  tone={
+                    asset.ocr.status === "ready"
+                      ? "green"
+                      : asset.ocr.status === "failed"
+                        ? "red"
+                        : asset.ocr.status === "skipped"
+                          ? "amber"
+                          : "line"
+                  }
+                  className="text-[10px]"
+                >
+                  {t(`ocr.status.${asset.ocr.status}`)}
+                </Badge>
+              </div>
+              {asset.ocr.status === "ready" && asset.ocr.text ? (
+                <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
+                  <p className="whitespace-pre-wrap font-g text-g-ui leading-[1.5] text-g-ink">
+                    {asset.ocr.text}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(asset.ocr.languages ?? []).map((language) => (
+                      <Badge key={language} tone="line">
+                        {language}
+                      </Badge>
+                    ))}
+                    {(asset.ocr.scripts ?? []).map((script) => (
+                      <Badge key={script} tone="blue">
+                        {script}
+                      </Badge>
+                    ))}
+                    {asset.ocr.durationMs != null && (
+                      <Badge tone="line">{asset.ocr.durationMs}ms</Badge>
+                    )}
+                    {asset.ocr.mode && (
+                      <Badge tone="line">{asset.ocr.mode}</Badge>
+                    )}
+                    {asset.ocr.attempts != null && asset.ocr.attempts > 1 && (
+                      <Badge tone="amber">
+                        {t("assetDrawer.ocrAttempts", {
+                          count: asset.ocr.attempts,
+                        })}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ) : asset.ocr.status === "ready" && asset.ocr.emptyText ? (
+                <p className="font-g text-g-caption text-g-ink-3">
+                  {t("assetDrawer.ocrEmptyText")}
+                </p>
+              ) : (
+                <p className="font-g text-g-caption text-g-ink-3">
+                  {asset.ocr.errorMessage || t("assetDrawer.ocrNoText")}
+                </p>
+              )}
+            </div>
+          )}
+
           {asset.references.length > 0 && (
             <div className="mb-5">
               <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">

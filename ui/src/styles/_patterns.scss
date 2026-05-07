@@ -14,6 +14,25 @@
   background-size: 12px 12px;
 }
 
+/* Visible but subtle textarea resize grip */
+textarea::-webkit-resizer {
+  background:
+    linear-gradient(
+      135deg,
+      transparent 60%,
+      var(--g-ink-3) 60%,
+      var(--g-ink-3) 65%,
+      transparent 65%
+    ),
+    linear-gradient(
+      135deg,
+      transparent 75%,
+      var(--g-ink-3) 75%,
+      var(--g-ink-3) 80%,
+      transparent 80%
+    );
+}
+
 /* Utility */
 .mono {
   font-family: var(--g-mono);

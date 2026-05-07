@@ -21,7 +21,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
       onClose={onCancel}
       footer={
         <>
-          <div className="text-sm text-(--g-ink-4)">
+          <div className="text-g-body text-g-ink-4">
             {preview.changes.length} changes · {preview.deletes.length} deletes
           </div>
           <div className="ml-auto flex gap-2">

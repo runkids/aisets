@@ -51,7 +51,7 @@ Tailwind classes use the `g-` prefix to reference design tokens:
 - Radius: `rounded-g-sm` (4px), `rounded-g-md` (6px), `rounded-g-lg` (12px)
 - Shadows: `shadow-g-sm`, `shadow-g-md`, `shadow-g-pop`, `shadow-g-focus`
 - Fonts: `font-g` (body), `font-g-mono`, `font-g-display`
-- Text: `text-g-chip` (11px), `text-g-caption` (12px), `text-g-ui` (13px), `text-g-body` (14px)
+- Text: `text-g-chip` (10px), `text-g-caption` (11px), `text-g-ui` (12px), `text-g-body` (13px)
 - Easing: `ease-g`, `ease-g-out`, `ease-g-spring`
 - Button heights: `h-g-btn-sm` (26px), `h-g-btn-md` (32px), `h-g-btn-lg` (36px)
 
@@ -69,6 +69,19 @@ silently. The fix: **remove the SCSS class entirely** and replace with full Tail
 
 Also: `twMerge` in Tailwind v4 can't always resolve spacing-scale utilities (`w-80`) against
 keyword utilities (`w-full`). Use arbitrary values (`w-[320px]`) when combining with CVA bases.
+
+### twMerge font-size vs color conflict (critical)
+
+`twMerge` treats ALL `text-*` classes as one group. Custom theme tokens like `text-g-ui`
+(font-size) and `text-g-ink` (color) look identical to twMerge — it keeps only the last one,
+**silently dropping font-size**. This is fixed in `cn.ts` via `extendTailwindMerge` registering
+font-size tokens in a separate class group.
+
+**Before changing font-size tokens:** run `twMerge('text-g-ui text-g-ink')` to verify the
+font-size class survives. If it's dropped, fix `cn.ts` `classGroups.font-size` first.
+
+**When adding new `text-*` theme tokens:** register them in `cn.ts` `extendTailwindMerge →
+classGroups → font-size` or they will be silently eaten by color classes.
 
 ---
 

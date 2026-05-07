@@ -55,7 +55,7 @@
   --font-g-mono: var(--g-mono);
   --font-g-display: var(--g-display);
 
-  /* Existing type scale (backward-compat) */
+  /* Core type scale */
   --text-g-chip: 11px;
   --text-g-chip--line-height: 1.33;
   --text-g-caption: 12px;
@@ -67,37 +67,37 @@
   --tracking-g-ui: -0.012em;
   --tracking-g-mono: -0.015em;
 
-  /* Extended type scale */
+  /* Extended type scale — headings */
   --text-caption: 12px;
   --text-caption--line-height: 1.5;
-  --text-body-sm: 14px;
+  --text-body-sm: 13px;
   --text-body-sm--line-height: 1.5;
-  --text-body: 16px;
+  --text-body: 14px;
   --text-body--line-height: 1.5;
-  --text-subheading: 18px;
-  --text-subheading--line-height: 1.38;
-  --text-heading-sm: 24px;
-  --text-heading-sm--line-height: 1.25;
-  --text-heading: 32px;
-  --text-heading--line-height: 1.25;
-  --text-heading-lg: 48px;
-  --text-heading-lg--line-height: 1.13;
-  --text-display: 80px;
-  --text-display--line-height: 1;
-  --tracking-caption: -0.7px;
-  --tracking-body-sm: -0.7px;
-  --tracking-body: -0.43px;
-  --tracking-subheading: -0.36px;
-  --tracking-heading-sm: -0.24px;
-  --tracking-heading: -0.64px;
-  --tracking-heading-lg: -1.2px;
-  --tracking-display: -3.2px;
+  --text-subheading: 16px;
+  --text-subheading--line-height: 1.4;
+  --text-heading-sm: 18px;
+  --text-heading-sm--line-height: 1.33;
+  --text-heading: 22px;
+  --text-heading--line-height: 1.27;
+  --text-heading-lg: 28px;
+  --text-heading-lg--line-height: 1.2;
+  --text-display: 36px;
+  --text-display--line-height: 1.1;
+  --tracking-caption: -0.12px;
+  --tracking-body-sm: -0.15px;
+  --tracking-body: -0.15px;
+  --tracking-subheading: -0.2px;
+  --tracking-heading-sm: -0.3px;
+  --tracking-heading: -0.4px;
+  --tracking-heading-lg: -0.6px;
+  --tracking-display: -0.8px;
 
   --ease-g: var(--g-ease);
   --ease-g-out: var(--g-ease-out);
   --ease-g-spring: var(--g-ease-spring);
 
-  /* Button heights (existing) */
+  /* Button heights */
   --spacing-g-btn-sm: 26px;
   --spacing-g-btn-md: 32px;
   --spacing-g-btn-lg: 36px;
