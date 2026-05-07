@@ -72,7 +72,7 @@ export function DuplicatesView({
   const [pathsCopied, setPathsCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [search, setSearch] = useState("");
-  const [extFilter, setExtFilter] = useState("");
+  const [extFilter, setExtFilter] = useState("__all__");
 
   /* ── Data fetching (unchanged) ── */
 
@@ -235,10 +235,10 @@ export function DuplicatesView({
 
   const filteredGroups = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
-    if (!q && !extFilter) return groupViews;
+    const ext = extFilter === "__all__" ? "" : extFilter;
+    if (!q && !ext) return groupViews;
     return groupViews.filter((g) => {
-      if (extFilter && !g.members.some((m) => m.ext === extFilter))
-        return false;
+      if (ext && !g.members.some((m) => m.ext === ext)) return false;
       if (!q) return true;
       return (
         g.contentHash.toLowerCase().includes(q) ||
@@ -252,7 +252,7 @@ export function DuplicatesView({
   }, [groupViews, debouncedSearch, extFilter]);
 
   const groupedByExt = useMemo(() => {
-    if (extFilter) return null;
+    if (extFilter !== "__all__") return null;
     const map = new Map<string, typeof filteredGroups>();
     for (const g of filteredGroups) {
       const ext = g.members[0]?.ext || "";
@@ -616,7 +616,7 @@ export function DuplicatesView({
                 aria-label={t("duplicates.filterExtension")}
                 size="sm"
                 options={[
-                  { value: "", label: t("duplicates.allExtensions") },
+                  { value: "__all__", label: t("duplicates.allExtensions") },
                   ...uniqueExts.map((ext) => ({
                     value: ext,
                     label: formatExt(ext),
