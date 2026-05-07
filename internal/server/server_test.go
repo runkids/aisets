@@ -104,6 +104,43 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	}
 }
 
+func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
+	writePNG(t, filepath.Join(root, "src", "assets", "logo.png"))
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./assets/logo.png"`)
+	mustWrite(t, filepath.Join(root, "src", "views", "BrowseView.fixture.ts"), `const fixture = "src/assets/logo.png"`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{root}); err != nil {
+		t.Fatal(err)
+	}
+	patterns := []string{"**/*.fixture.*"}
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ExcludePatterns: patterns}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catalog, _, err := s.scanWithProgress(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Items) != 1 {
+		t.Fatalf("items = %#v", catalog.Items)
+	}
+	if len(catalog.Items[0].UsedBy) != 1 || catalog.Items[0].UsedBy[0] != "src/App.tsx" {
+		t.Fatalf("usedBy = %#v, want only src/App.tsx", catalog.Items[0].UsedBy)
+	}
+}
+
 func TestScanHistoryRoutes(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
@@ -469,15 +506,21 @@ func TestCatalogEnrichesOCRFromCacheOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	heroPath := filepath.Join(root, "hero.png")
+	writePNG(t, heroPath)
+	sum, algorithm, err := scanner.ContentHash(context.Background(), heroPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	item := scanner.AssetItem{
 		ID:            "asset",
 		ProjectID:     "project",
 		ProjectName:   "Project",
 		RepoPath:      "assets/hero.png",
-		LocalPath:     filepath.Join(root, "hero.png"),
+		LocalPath:     heroPath,
 		Ext:           ".png",
-		ContentHash:   "hash",
-		HashAlgorithm: "blake3",
+		ContentHash:   sum,
+		HashAlgorithm: algorithm,
 		Image:         imageproc.Metadata{Format: "png", Width: 100, Height: 50},
 	}
 	settings, err := store.Settings()
@@ -500,7 +543,7 @@ func TestCatalogEnrichesOCRFromCacheOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	catalog, err := s.enrichCatalogOCR(context.Background(), scanner.Catalog{Items: []scanner.AssetItem{item}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +551,7 @@ func TestCatalogEnrichesOCRFromCacheOnly(t *testing.T) {
 		t.Fatalf("enriched catalog = %#v", catalog.Items[0].OCR)
 	}
 	item.ContentHash = "changed"
-	catalog, err = s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	catalog, err = s.enrichCatalogOCR(context.Background(), scanner.Catalog{Items: []scanner.AssetItem{item}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,12 +560,12 @@ func TestCatalogEnrichesOCRFromCacheOnly(t *testing.T) {
 	}
 	item.ContentHash = ""
 	item.HashAlgorithm = "blake3"
-	catalog, err = s.enrichCatalogOCR(scanner.Catalog{Items: []scanner.AssetItem{item}})
+	catalog, err = s.enrichCatalogOCR(context.Background(), scanner.Catalog{Items: []scanner.AssetItem{item}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if catalog.Items[0].OCR == nil || catalog.Items[0].OCR.Status != ocr.StatusPending {
-		t.Fatalf("missing hash OCR candidate should be pending = %#v", catalog.Items[0].OCR)
+	if catalog.Items[0].OCR == nil || catalog.Items[0].OCR.Status != ocr.StatusReady || catalog.Items[0].OCR.Text != "SALE" || catalog.Items[0].ContentHash != sum {
+		t.Fatalf("missing hash OCR result should be restored from content hash = item %#v ocr %#v", catalog.Items[0], catalog.Items[0].OCR)
 	}
 }
 

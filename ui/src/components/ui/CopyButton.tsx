@@ -3,16 +3,36 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
 const copyButtonVariants = cva(
   [
-    "inline-flex cursor-pointer items-center justify-center text-g-ink-3 hover:text-g-ink-2",
-    "transition-colors duration-[120ms] ease-g",
+    "inline-flex cursor-pointer items-center justify-center rounded-g-sm text-g-ink-3",
+    "transition-[background,color] duration-[120ms] ease-g",
+    "hover:bg-g-surface-3 hover:text-g-ink",
   ],
   {
     variants: {
       size: {
-        sm: "size-4 [&_svg]:size-3.5",
-        md: "size-5 [&_svg]:size-4",
+        sm: "size-6 [&_svg]:size-3.5",
+        md: "size-7 [&_svg]:size-4",
       },
     },
     defaultVariants: {
@@ -47,11 +67,12 @@ function CopyButton({
       aria-label={label}
       className={cn(
         copyButtonVariants({ size }),
-        copied && "text-g-green",
+        copied && "text-g-green hover:text-g-green",
         className,
       )}
-      onClick={() => {
-        navigator.clipboard.writeText(value);
+      onClick={(e) => {
+        e.stopPropagation();
+        copyText(value);
         setCopied(true);
       }}
     >

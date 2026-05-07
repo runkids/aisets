@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"asset-studio/internal/references"
 )
 
 var imageExts = map[string]bool{
@@ -29,7 +31,7 @@ type fileCandidate struct {
 	info    os.FileInfo
 }
 
-func collectCandidates(ctx context.Context, projects []Project) ([]fileCandidate, error) {
+func collectCandidates(ctx context.Context, projects []Project, excludePatterns []string) ([]fileCandidate, error) {
 	var candidates []fileCandidate
 	for _, project := range projects {
 		err := filepath.WalkDir(project.Path, func(path string, entry os.DirEntry, err error) error {
@@ -49,18 +51,22 @@ func collectCandidates(ctx context.Context, projects []Project) ([]fileCandidate
 			if !imageExts[ext] {
 				return nil
 			}
-			info, err := entry.Info()
+			repoPath, err := filepath.Rel(project.Path, path)
 			if err != nil {
 				return nil
 			}
-			repoPath, err := filepath.Rel(project.Path, path)
+			repoPath = filepath.ToSlash(repoPath)
+			if references.MatchesAnyExcludePattern(excludePatterns, repoPath) {
+				return nil
+			}
+			info, err := entry.Info()
 			if err != nil {
 				return nil
 			}
 			candidates = append(candidates, fileCandidate{
 				project: project,
 				path:    path,
-				repo:    filepath.ToSlash(repoPath),
+				repo:    repoPath,
 				info:    info,
 			})
 			return nil

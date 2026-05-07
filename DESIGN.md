@@ -356,7 +356,8 @@ React API:
 
 - `variant="segment"`: wrapper `--g-surface-2` bg, `1px solid --g-line` border, 6px radius, 3px inner padding, `--g-shadow-inset`; active child uses `--g-surface`, `--g-ink`, `--g-shadow-sm`.
 - `variant="pills"`: no wrapper chrome; children use line borders and active `--g-active-bg` / `--g-active-text`.
-- Sizes: `sm` = 26px height, `md` = 32px height.
+- `variant="underline"`: drawer/detail tabs only; full-width token surface with bottom `--g-line` divider, 56px triggers, 16px inter-tab gap, active child uses `--g-ink` + 2px `--g-accent` underline.
+- Sizes: `sm` = 26px height, `md` = 32px height; `underline` normalizes both sizes to 56px for drawer tap targets.
 - Children: Inter 12–13px / 510 / token text. Icons 13px.
 - `Tabs variant="segment"` is the unified page-tab recipe for content tabs and tab-like sort/status rows. Duplicates Exact/Similar + sort, Browse status filters, Projects sort, and Settings theme selection all use the same wrapper (`--g-surface-2`, `--g-line`, 6px radius, inset shadow) with active children on `--g-surface` + `--g-ink` + `--g-shadow-sm`.
 - `SegmentedControl`: reserved for compact toolbar toggles (`text`, `icon`, `fixed`) such as Browse view / size / background. Its wrapper uses the same 32px control height, 6px radius, `--g-surface-2` background, token border, inset shadow, and 2px inner padding. Active children use the same selected recipe as segment tabs: `--g-surface` background, `--g-ink` text, and `--g-shadow-sm`; do not use `--g-active-*` fills for these tab-like toolbar toggles.
@@ -468,7 +469,7 @@ React API:
 - 480px wide (95vw max), fixed right, slide-in 240ms `--g-ease-out`
 - Background `--g-surface-2` (Deep Slate, elevated)
 - Backdrop: `rgba(8,9,10,0.6)` + `backdrop-filter: blur(4px)`
-- Structure: `.drawer-h` (compact header, 12px block / 16px inline padding, border-bottom `--g-line`) → compact sticky tab strip (6px block / 16px inline padding) → `.drawer-body` (scrollable, 16px padding)
+- Structure: `.drawer-h` (compact header, 8px block / 16px inline padding, border-bottom `--g-line`) → compact sticky tab strip (6px top / 4px bottom / 16px inline padding, no bottom divider) → `.drawer-body` (scrollable, 16px padding)
 - **Enhanced variant `.dv2`**: min(680px, 95vw)
   - Hero area: `--g-surface-3` Charcoal bg with subtle `--g-info` linear-gradient overlay
   - Sticky tab strip: `--g-surface-2` bg, active tab gets a 2px **Neon Lime** underline + Porcelain text

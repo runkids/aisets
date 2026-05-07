@@ -45,6 +45,18 @@ const b = ` + "`./assets/${name}.png`" + `
 	}
 }
 
+func TestExtractIgnoresBareImageExtensions(t *testing.T) {
+	content := `
+const suffix = ".png"
+const querySuffix = ".webp?raw"
+const file = "logo.png"
+`
+	refs := Extract(content)
+	if len(refs) != 1 || refs[0].Specifier != "logo.png" {
+		t.Fatalf("refs = %#v, want only logo.png", refs)
+	}
+}
+
 func TestBuildMapResolvesProjectReferences(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "src", "assets", "logo.png"), "image")
@@ -64,6 +76,28 @@ func TestBuildMapResolvesProjectReferences(t *testing.T) {
 	}
 	if got[0].File != "src/App.tsx" || got[1].File != "src/style.css" {
 		t.Fatalf("refs sorted/resolved = %#v", got)
+	}
+}
+
+func TestBuildMapWithProgressExcludesMatchedCodeFiles(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "src", "assets", "logo.png"), "image")
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "@/assets/logo.png"`)
+	mustWrite(t, filepath.Join(root, "src", "views", "BrowseView.test.ts"), `const fixture = "src/assets/logo.png"`)
+	mustWrite(t, filepath.Join(root, "src", "__tests__", "nested", "fixture.ts"), `const fixture = "src/assets/logo.png"`)
+
+	refs, err := BuildMapWithProgress(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{{ProjectID: "p", RepoPath: "src/assets/logo.png"}},
+		[]string{"**/*.test.*", "**/__tests__/**"},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := refs["p\x00src/assets/logo.png"]
+	if len(got) != 1 || got[0].File != "src/App.tsx" {
+		t.Fatalf("refs = %#v, want only src/App.tsx", got)
 	}
 }
 

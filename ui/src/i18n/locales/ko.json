@@ -365,6 +365,7 @@
     "format": "Format",
     "size": "Size",
     "dimensions": "Dimensions",
+    "usedFiles": "Used files",
     "hash": "Hash",
     "references": "References ({{count}})",
     "more": "+{{count}} more",

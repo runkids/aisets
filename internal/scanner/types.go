@@ -85,6 +85,7 @@ type AssetReference struct {
 	Line      int    `json:"line"`
 	Specifier string `json:"specifier"`
 	Kind      string `json:"kind"`
+	Snippet   string `json:"snippet,omitempty"`
 }
 
 type DuplicateGroup struct {

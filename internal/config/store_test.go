@@ -198,6 +198,71 @@ func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
 	if settings.DefaultProjectRoot != "" {
 		t.Fatalf("default project root = %q", settings.DefaultProjectRoot)
 	}
+	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
+	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(wantExcludePatterns, ",") {
+		t.Fatalf("default exclude patterns = %#v", settings.ExcludePatterns)
+	}
+}
+
+func TestStoreMigratesEmptyExcludePatternsToDefaultsOnce(t *testing.T) {
+	root := t.TempDir()
+	dataHome := filepath.Join(root, "data")
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	dataDir := filepath.Join(dataHome, "asset-studio")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 1, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":[]}`, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
+	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(wantExcludePatterns, ",") {
+		t.Fatalf("migrated exclude patterns = %#v", settings.ExcludePatterns)
+	}
+	if _, err := store.UpdateSettings(SettingsUpdate{ExcludePatterns: []string{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	settings, err = reopened.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(settings.ExcludePatterns) != 0 {
+		t.Fatalf("exclude patterns after user clear = %#v", settings.ExcludePatterns)
+	}
 }
 
 func TestStoreUpdatesSettings(t *testing.T) {

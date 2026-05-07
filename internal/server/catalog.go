@@ -43,7 +43,7 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	catalog, err = s.enrichCatalogOCR(catalog)
+	catalog, err = s.enrichCatalogOCR(r.Context(), catalog)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -170,7 +170,11 @@ func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
 
 func (s *Server) scanWithProgress(ctx context.Context, progress scanner.ProgressFunc) (scanner.Catalog, int64, error) {
 	projects := toScannerProjects(s.store.Projects())
-	catalog, err := s.scanner.ScanWithProgress(ctx, projects, progress)
+	settings, err := s.store.Settings()
+	if err != nil {
+		return scanner.Catalog{}, 0, err
+	}
+	catalog, err := s.scanner.ScanWithProgress(ctx, projects, settings.ExcludePatterns, progress)
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}
@@ -194,7 +198,7 @@ func (s *Server) clearCatalog() {
 	s.previews = map[string]actions.Preview{}
 }
 
-func (s *Server) enrichCatalogOCR(catalog scanner.Catalog) (scanner.Catalog, error) {
+func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) (scanner.Catalog, error) {
 	settings, err := s.store.Settings()
 	if err != nil {
 		return scanner.Catalog{}, err
@@ -203,6 +207,25 @@ func (s *Server) enrichCatalogOCR(catalog scanner.Catalog) (scanner.Catalog, err
 		return catalog, nil
 	}
 	ocrSettings := config.OCRSettingsFromApp(settings)
+	for index := range catalog.Items {
+		item := &catalog.Items[index]
+		if item.ContentHash != "" && item.HashAlgorithm != "" {
+			continue
+		}
+		if eligibleForOCRMetadata(*item, ocrSettings).Status != ocr.StatusPending {
+			continue
+		}
+		sum, algorithm, err := scanner.ContentHash(ctx, item.LocalPath)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return scanner.Catalog{}, err
+			}
+			continue
+		}
+		item.ContentHash = sum
+		item.HashAlgorithm = algorithm
+		s.updateCatalogOCRHash(*item)
+	}
 	results, err := s.store.OCRResults(catalog.Items, ocrSettings, s.ocrEngine.Name(), s.ocrEngine.Version())
 	if err != nil {
 		return scanner.Catalog{}, err

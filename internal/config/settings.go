@@ -10,6 +10,16 @@ import (
 	"asset-studio/internal/ocr"
 )
 
+func defaultExcludePatterns() []string {
+	return []string{
+		"**/*.test.*",
+		"**/*.spec.*",
+		"**/__tests__/**",
+		"**/__mocks__/**",
+		"**/*.stories.*",
+	}
+}
+
 func DefaultAppSettings() AppSettings {
 	return AppSettings{
 		WorkspaceName:              "Asset Studio",
@@ -22,7 +32,7 @@ func DefaultAppSettings() AppSettings {
 		OCRMaxPixels:               ocr.DefaultMaxPixels,
 		OCRBatchSize:               ocr.DefaultBatchSize,
 		OCRConcurrency:             ocr.DefaultConcurrency,
-		ExcludePatterns:            []string{},
+		ExcludePatterns:            defaultExcludePatterns(),
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
 		CustomAssetFilters:         []CustomAssetFilter{},

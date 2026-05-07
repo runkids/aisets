@@ -114,6 +114,7 @@ export type AssetReference = {
   line: number;
   specifier: string;
   kind: string;
+  snippet?: string;
 };
 
 export type AssetItem = {

@@ -3,6 +3,7 @@ package references
 import (
 	"context"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -26,6 +27,7 @@ type Reference struct {
 	Line      int    `json:"line"`
 	Specifier string `json:"specifier"`
 	Kind      string `json:"kind"`
+	Snippet   string `json:"snippet,omitempty"`
 }
 
 type ProgressFunc func(current, total int)
@@ -55,10 +57,10 @@ var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\
 var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
 
 func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[string][]Reference, error) {
-	return BuildMapWithProgress(ctx, projects, assets, nil)
+	return BuildMapWithProgress(ctx, projects, assets, nil, nil)
 }
 
-func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asset, progress ProgressFunc) (map[string][]Reference, error) {
+func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asset, excludePatterns []string, progress ProgressFunc) (map[string][]Reference, error) {
 	assetSets := map[string]map[string]bool{}
 	for _, asset := range assets {
 		if assetSets[asset.ProjectID] == nil {
@@ -66,7 +68,7 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 		}
 		assetSets[asset.ProjectID][asset.RepoPath] = true
 	}
-	files, err := collectCodeCandidates(ctx, projects)
+	files, err := collectCodeCandidates(ctx, projects, excludePatterns)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +132,7 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 	return out, nil
 }
 
-func collectCodeCandidates(ctx context.Context, projects []Project) ([]codeCandidate, error) {
+func collectCodeCandidates(ctx context.Context, projects []Project, excludePatterns []string) ([]codeCandidate, error) {
 	var files []codeCandidate
 	for _, project := range projects {
 		err := filepath.WalkDir(project.Path, func(path string, entry os.DirEntry, err error) error {
@@ -153,7 +155,11 @@ func collectCodeCandidates(ctx context.Context, projects []Project) ([]codeCandi
 			if err != nil {
 				return nil
 			}
-			files = append(files, codeCandidate{project: project, path: path, repo: filepath.ToSlash(repoFile)})
+			repoFile = filepath.ToSlash(repoFile)
+			if MatchesAnyExcludePattern(excludePatterns, repoFile) {
+				return nil
+			}
+			files = append(files, codeCandidate{project: project, path: path, repo: repoFile})
 			return nil
 		})
 		if err != nil {
@@ -161,6 +167,60 @@ func collectCodeCandidates(ctx context.Context, projects []Project) ([]codeCandi
 		}
 	}
 	return files, nil
+}
+
+func MatchesAnyExcludePattern(patterns []string, repoPath string) bool {
+	for _, pattern := range patterns {
+		if MatchExcludePattern(pattern, repoPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func MatchExcludePattern(pattern, repoPath string) bool {
+	pattern = filepath.ToSlash(strings.TrimSpace(pattern))
+	repoPath = strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(repoPath)), "./")
+	if pattern == "" || repoPath == "" {
+		return false
+	}
+	patternParts := splitPathPattern(pattern)
+	pathParts := splitPathPattern(repoPath)
+	return matchPathParts(patternParts, pathParts)
+}
+
+func splitPathPattern(value string) []string {
+	value = strings.Trim(value, "/")
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, "/")
+}
+
+func matchPathParts(patternParts, pathParts []string) bool {
+	if len(patternParts) == 0 {
+		return len(pathParts) == 0
+	}
+	if patternParts[0] == "**" {
+		if matchPathParts(patternParts[1:], pathParts) {
+			return true
+		}
+		for len(pathParts) > 0 {
+			pathParts = pathParts[1:]
+			if matchPathParts(patternParts[1:], pathParts) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(pathParts) == 0 {
+		return false
+	}
+	matched, err := pathpkg.Match(patternParts[0], pathParts[0])
+	if err != nil || !matched {
+		return false
+	}
+	return matchPathParts(patternParts[1:], pathParts[1:])
 }
 
 func Extract(content string) []Reference {
@@ -177,20 +237,26 @@ func Extract(content string) []Reference {
 			continue
 		}
 		spec := content[start:end]
+		if isBareImageExtension(spec) {
+			continue
+		}
 		kind := "string"
 		if isPattern(spec) {
 			kind = "pattern"
 		}
-		out = append(out, Reference{Line: lineNumberAt(content, start), Specifier: spec, Kind: kind})
+		out = append(out, Reference{Line: lineNumberAt(content, start), Specifier: spec, Kind: kind, Snippet: lineContentAt(content, start)})
 	}
 	for _, match := range css {
 		start, end := match[2], match[3]
 		spec := content[start:end]
+		if isBareImageExtension(spec) {
+			continue
+		}
 		kind := "css-url"
 		if isPattern(spec) {
 			kind = "pattern"
 		}
-		out = append(out, Reference{Line: lineNumberAt(content, start), Specifier: spec, Kind: kind})
+		out = append(out, Reference{Line: lineNumberAt(content, start), Specifier: spec, Kind: kind, Snippet: lineContentAt(content, start)})
 	}
 	return out
 }
@@ -248,6 +314,10 @@ func stripQuery(path string) string {
 	return strings.Split(strings.TrimSpace(path), "?")[0]
 }
 
+func isBareImageExtension(spec string) bool {
+	return imageExts[strings.ToLower(stripQuery(spec))]
+}
+
 func cleanRepoPath(path string) string {
 	path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
 	path = strings.TrimPrefix(path, "./")
@@ -255,6 +325,18 @@ func cleanRepoPath(path string) string {
 		return ""
 	}
 	return path
+}
+
+func lineContentAt(content string, index int) string {
+	start := index
+	for start > 0 && content[start-1] != '\n' {
+		start--
+	}
+	end := index
+	for end < len(content) && content[end] != '\n' {
+		end++
+	}
+	return strings.TrimSpace(content[start:end])
 }
 
 func lineNumberAt(content string, index int) int {

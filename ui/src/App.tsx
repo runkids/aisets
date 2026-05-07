@@ -569,6 +569,7 @@ export function App() {
             onClose={() => setDrawerId("")}
             onRename={onRename}
             onDelete={onDelete}
+            onOpenAsset={setDrawerId}
           />
         )}
 

@@ -1,157 +1,18 @@
-import {
-  ExternalLink,
-  Pencil,
-  Trash2,
-  AlertCircle,
-  Copy as CopyIcon,
-  Eye,
-  Zap,
-  ScanText,
-} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes } from "../ui";
-import { Badge, CopyButton, IconButton, Tooltip, ZoomableImage } from "./ui";
-
-type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
+import { CopyButton, ZoomableImage } from "./ui";
 
 type Props = {
   asset: AssetItem;
-  onTabChange: (tab: DrawerTab) => void;
-  onRename?: (item: AssetItem) => void;
-  onDelete?: (item: AssetItem) => void;
 };
 
-export function AssetDrawerOverview({
-  asset,
-  onTabChange,
-  onRename,
-  onDelete,
-}: Props) {
+export function AssetDrawerOverview({ asset }: Props) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-col gap-5">
-      <ZoomableImage
-        key={asset.url}
-        src={asset.url}
-        alt={fileName(asset.repoPath)}
-        className="aspect-square w-full"
-      />
-
-      <div className="flex items-center gap-1.5">
-        <span
-          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui font-medium text-g-ink"
-          title={asset.repoPath}
-        >
-          {fileName(asset.repoPath)}
-        </span>
-        <Tooltip label={t("action.openFile")}>
-          <a
-            href={asset.url}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex size-7 items-center justify-center rounded-g-md text-g-ink-3 hover:bg-g-surface-2 hover:text-g-ink"
-          >
-            <ExternalLink size={14} />
-          </a>
-        </Tooltip>
-        {onRename && (
-          <Tooltip label={t("action.rename")}>
-            <IconButton
-              onClick={() => onRename(asset)}
-              aria-label={t("action.rename")}
-            >
-              <Pencil size={14} />
-            </IconButton>
-          </Tooltip>
-        )}
-        {onDelete && asset.usedBy.length === 0 && (
-          <Tooltip label={t("action.delete")}>
-            <IconButton
-              onClick={() => onDelete(asset)}
-              aria-label={t("action.delete")}
-            >
-              <Trash2 size={14} />
-            </IconButton>
-          </Tooltip>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {asset.references.length === 0 && (
-          <button
-            type="button"
-            onClick={() => onTabChange("usage")}
-            className="cursor-pointer"
-          >
-            <Badge tone="red">
-              <AlertCircle size={10} />
-              {t("assetDrawer.chipUnused")}
-            </Badge>
-          </button>
-        )}
-        {asset.duplicates.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onTabChange("similar")}
-            className="cursor-pointer"
-          >
-            <Badge tone="amber">
-              <CopyIcon size={10} />
-              {t("assetDrawer.chipDuplicate")}
-            </Badge>
-          </button>
-        )}
-        {asset.similar.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onTabChange("similar")}
-            className="cursor-pointer"
-          >
-            <Badge tone="purple">
-              <Eye size={10} />
-              {t("assetDrawer.chipSimilar")}
-            </Badge>
-          </button>
-        )}
-        {asset.optimizationRecommendations.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onTabChange("optimize")}
-            className="cursor-pointer"
-          >
-            <Badge tone="blue">
-              <Zap size={10} />
-              {t("assetDrawer.chipOptimizable")}
-            </Badge>
-          </button>
-        )}
-        {asset.ocr && (
-          <button
-            type="button"
-            onClick={() => onTabChange("ocr")}
-            className="cursor-pointer"
-          >
-            <Badge
-              tone={
-                asset.ocr.status === "ready"
-                  ? "green"
-                  : asset.ocr.status === "failed"
-                    ? "red"
-                    : asset.ocr.status === "skipped"
-                      ? "amber"
-                      : "line"
-              }
-            >
-              <ScanText size={10} />
-              {t("assetDrawer.chipOCR")}
-            </Badge>
-          </button>
-        )}
-      </div>
-
-      <div>
+    <div className="flex flex-col gap-4">
+      <section className="rounded-g-md border border-g-line bg-g-surface p-4">
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
           {t("assetDrawer.metadata")}
         </div>
@@ -199,7 +60,14 @@ export function AssetDrawerOverview({
             )}
           </tbody>
         </table>
-      </div>
+      </section>
+
+      <ZoomableImage
+        key={asset.url}
+        src={asset.url}
+        alt={fileName(asset.repoPath)}
+        className="aspect-square w-full"
+      />
     </div>
   );
 }

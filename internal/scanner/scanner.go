@@ -50,12 +50,12 @@ func NewWithCacheDir(cacheDir string) *Scanner {
 }
 
 func (s *Scanner) Scan(ctx context.Context, projects []Project) (Catalog, error) {
-	return s.ScanWithProgress(ctx, projects, nil)
+	return s.ScanWithProgress(ctx, projects, nil, nil)
 }
 
-func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, progress ProgressFunc) (Catalog, error) {
+func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excludePatterns []string, progress ProgressFunc) (Catalog, error) {
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
-	candidates, err := collectCandidates(ctx, projects)
+	candidates, err := collectCandidates(ctx, projects, excludePatterns)
 	if err != nil {
 		return Catalog{}, err
 	}
@@ -124,7 +124,7 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, prog
 	})
 
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
-	refs, err := buildReferenceMap(ctx, projects, items, func(current, total int) {
+	refs, err := buildReferenceMap(ctx, projects, items, excludePatterns, func(current, total int) {
 		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
 	})
 	if err != nil {

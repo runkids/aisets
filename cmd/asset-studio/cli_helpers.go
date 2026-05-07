@@ -33,7 +33,11 @@ func scanCatalog(ctx context.Context, store *config.Store) (scanner.Catalog, err
 }
 
 func scanCatalogWithID(ctx context.Context, store *config.Store) (scanner.Catalog, int64, error) {
-	catalog, err := scanner.New().Scan(ctx, toScannerProjects(store.Projects()))
+	settings, err := store.Settings()
+	if err != nil {
+		return scanner.Catalog{}, 0, err
+	}
+	catalog, err := scanner.New().ScanWithProgress(ctx, toScannerProjects(store.Projects()), settings.ExcludePatterns, nil)
 	if err != nil {
 		return scanner.Catalog{}, 0, err
 	}

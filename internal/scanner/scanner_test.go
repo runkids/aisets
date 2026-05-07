@@ -107,7 +107,7 @@ func TestScanWithProgressReportsPhases(t *testing.T) {
 
 	var events []ScanProgress
 	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
-	_, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, func(event ScanProgress) {
+	_, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, nil, func(event ScanProgress) {
 		events = append(events, event)
 	})
 	if err != nil {
@@ -146,6 +146,29 @@ func TestScanSkipsHeavyDirectories(t *testing.T) {
 	}
 	if catalog.Items[0].RepoPath != "src/kept.png" {
 		t.Fatalf("repo path = %s, want src/kept.png", catalog.Items[0].RepoPath)
+	}
+}
+
+func TestScanWithProgressHonorsExcludePatterns(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "src", "assets", "logo.png"), solidImage(2, 2, color.White))
+	writePNG(t, filepath.Join(root, "src", "__mocks__", "mock.png"), solidImage(2, 2, color.Black))
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./assets/logo.png"`)
+	mustWrite(t, filepath.Join(root, "src", "views", "BrowseView.test.ts"), `const fixture = "src/assets/logo.png"`)
+
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	catalog, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, []string{"**/*.test.*", "**/__mocks__/**"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Stats.TotalFiles != 1 {
+		t.Fatalf("total files = %d, want 1", catalog.Stats.TotalFiles)
+	}
+	if catalog.Items[0].RepoPath != "src/assets/logo.png" {
+		t.Fatalf("repo path = %s, want src/assets/logo.png", catalog.Items[0].RepoPath)
+	}
+	if len(catalog.Items[0].UsedBy) != 1 || catalog.Items[0].UsedBy[0] != "src/App.tsx" {
+		t.Fatalf("usedBy = %#v, want only src/App.tsx", catalog.Items[0].UsedBy)
 	}
 }
 
@@ -204,7 +227,7 @@ func TestCollectCandidatesAndContentHashHonorContext(t *testing.T) {
 	writePNG(t, filepath.Join(root, "src", "asset.png"), solidImage(2, 2, color.White))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := collectCandidates(ctx, []Project{{ID: root, Name: "fixture", Path: root}}); !errors.Is(err, context.Canceled) {
+	if _, err := collectCandidates(ctx, []Project{{ID: root, Name: "fixture", Path: root}}, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("collectCandidates canceled err = %v", err)
 	}
 	if _, err := contentHashFile(ctx, filepath.Join(root, "src", "asset.png")); !errors.Is(err, context.Canceled) {

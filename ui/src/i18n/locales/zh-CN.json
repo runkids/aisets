@@ -353,6 +353,7 @@
     "format": "格式",
     "size": "大小",
     "dimensions": "尺寸",
+    "usedFiles": "使用文件",
     "hash": "Hash",
     "references": "引用（{{count}}）",
     "more": "+{{count}} 更多",

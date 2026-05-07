@@ -629,6 +629,7 @@
     "format": "Format",
     "size": "Size",
     "dimensions": "Dimensions",
+    "usedFiles": "Used files",
     "hash": "Hash",
     "references": "References ({{count}})",
     "more": "+{{count}} more",
@@ -660,7 +661,8 @@
     "similarScore": "{{score}}% similar",
     "similarMirrored": "Mirrored",
     "noSimilar": "No similar files",
-    "noDuplicates": "No exact duplicates"
+    "noDuplicates": "No exact duplicates",
+    "refCount": "{{count}} refs"
   },
   "ocr": {
     "badge": {

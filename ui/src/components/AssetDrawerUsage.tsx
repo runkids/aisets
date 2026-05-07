@@ -37,8 +37,9 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
   const virtualizer = useVirtualizer({
     count: references.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => 68,
     overscan: 8,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   const editorUrl = (file: string, line: number) => {
@@ -59,7 +60,7 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
           {t("assetDrawer.references", { count: references.length })}
@@ -71,7 +72,7 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
         />
       </div>
 
-      <div ref={parentRef} className="max-h-[400px] overflow-y-auto">
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-y-auto">
         <div
           className="relative w-full"
           style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -81,40 +82,54 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
             return (
               <div
                 key={virtualRow.index}
-                className="absolute left-0 top-0 flex w-full items-center gap-1.5 border-b border-g-line px-1 py-1.5"
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
+                className="absolute left-0 top-0 w-full pb-1.5"
                 style={{
-                  height: `${virtualRow.size}px`,
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1 font-g-mono text-g-caption">
-                    <span className="truncate text-g-ink">{ref.file}</span>
-                    <span className="shrink-0 text-g-ink-4">:{ref.line}</span>
+                <div className="rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-g-mono text-g-caption">
+                        <span className="text-g-ink">{ref.file}</span>
+                        <span className="text-g-ink-3">:{ref.line}</span>
+                      </div>
+                      {(ref.snippet || ref.specifier) && (
+                        <div className="mt-1 break-all font-g-mono text-g-chip text-g-ink-4">
+                          {ref.snippet || ref.specifier}
+                        </div>
+                      )}
+                      <div className="mt-1">
+                        <Badge tone="line" className="text-[10px]">
+                          {ref.kind}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
+                      <CopyButton
+                        value={`${ref.file}:${ref.line}`}
+                        label="Copy reference"
+                      />
+                      <Tooltip
+                        label={t("assetDrawer.openInEditor", {
+                          editor: preferredEditor,
+                        })}
+                      >
+                        <a
+                          href={editorUrl(ref.file, ref.line)}
+                          className="inline-flex size-6 items-center justify-center rounded-g-sm text-g-ink-3 transition-[background,color] duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink"
+                          aria-label={t("assetDrawer.openInEditor", {
+                            editor: preferredEditor,
+                          })}
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </Tooltip>
+                    </div>
                   </div>
                 </div>
-                <Badge tone="line" className="shrink-0 text-[10px]">
-                  {ref.kind}
-                </Badge>
-                <CopyButton
-                  value={`${ref.file}:${ref.line}`}
-                  label="Copy reference"
-                />
-                <Tooltip
-                  label={t("assetDrawer.openInEditor", {
-                    editor: preferredEditor,
-                  })}
-                >
-                  <a
-                    href={editorUrl(ref.file, ref.line)}
-                    className="inline-flex size-4 items-center justify-center text-g-ink-3 hover:text-g-ink-2"
-                    aria-label={t("assetDrawer.openInEditor", {
-                      editor: preferredEditor,
-                    })}
-                  >
-                    <ExternalLink size={12} />
-                  </a>
-                </Tooltip>
               </div>
             );
           })}

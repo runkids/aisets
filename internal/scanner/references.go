@@ -7,7 +7,7 @@ import (
 	"asset-studio/internal/references"
 )
 
-func buildReferenceMap(ctx context.Context, projects []Project, items []AssetItem, progress func(current, total int)) (map[string][]AssetReference, error) {
+func buildReferenceMap(ctx context.Context, projects []Project, items []AssetItem, excludePatterns []string, progress func(current, total int)) (map[string][]AssetReference, error) {
 	refProjects := make([]references.Project, 0, len(projects))
 	for _, project := range projects {
 		refProjects = append(refProjects, references.Project{ID: project.ID, Path: project.Path})
@@ -16,7 +16,7 @@ func buildReferenceMap(ctx context.Context, projects []Project, items []AssetIte
 	for _, item := range items {
 		assets = append(assets, references.Asset{ProjectID: item.ProjectID, RepoPath: item.RepoPath})
 	}
-	refMap, err := references.BuildMapWithProgress(ctx, refProjects, assets, progress)
+	refMap, err := references.BuildMapWithProgress(ctx, refProjects, assets, excludePatterns, progress)
 	if err != nil {
 		return nil, err
 	}
@@ -29,6 +29,7 @@ func buildReferenceMap(ctx context.Context, projects []Project, items []AssetIte
 				Line:      ref.Line,
 				Specifier: ref.Specifier,
 				Kind:      ref.Kind,
+				Snippet:   ref.Snippet,
 			})
 		}
 		out[key] = converted
