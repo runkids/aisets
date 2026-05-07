@@ -235,3 +235,106 @@ func TestBatchApply_Move(t *testing.T) {
 		t.Fatalf("expected reference to ../assets/b.png in content: %s", content)
 	}
 }
+
+func TestApplyRenameRules(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		rules RenameRules
+		want  string
+	}{
+		{
+			name:  "lowercase",
+			input: "HERO.PNG",
+			rules: RenameRules{Lowercase: true},
+			want:  "hero.png",
+		},
+		{
+			name:  "prefix",
+			input: "icon.png",
+			rules: RenameRules{Prefix: "app-"},
+			want:  "app-icon.png",
+		},
+		{
+			name:  "suffix before extension",
+			input: "icon.png",
+			rules: RenameRules{Suffix: "-v2"},
+			want:  "icon-v2.png",
+		},
+		{
+			name:  "replace chars",
+			input: "my file (1).png",
+			rules: RenameRules{ReplaceChars: map[string]string{" ": "_", "(": "", ")": ""}},
+			want:  "my_file_1.png",
+		},
+		{
+			name:  "all rules combined",
+			input: "My Icon.PNG",
+			rules: RenameRules{Lowercase: true, Prefix: "ic-", Suffix: "-24"},
+			want:  "ic-my icon-24.png",
+		},
+		{
+			name:  "no-op empty rules",
+			input: "already-good.png",
+			rules: RenameRules{},
+			want:  "already-good.png",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := applyRenameRules(tc.input, tc.rules)
+			if got != tc.want {
+				t.Fatalf("applyRenameRules(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBatchRenamePreview(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "img", "My Icon (1).png"), "icon1")
+	mustWrite(t, filepath.Join(root, "img", "BANNER.PNG"), "banner")
+
+	project := scanner.Project{ID: root, Name: "fixture", Path: root}
+	items := []scanner.AssetItem{
+		{ID: "id-icon", ProjectID: root, RepoPath: "img/My Icon (1).png"},
+		{ID: "id-banner", ProjectID: root, RepoPath: "img/BANNER.PNG"},
+	}
+	rules := RenameRules{
+		Lowercase:    true,
+		ReplaceChars: map[string]string{" ": "_", "(": "", ")": ""},
+		Prefix:       "icon-",
+	}
+
+	preview := BatchRenamePreview(project, items, rules)
+
+	if preview.Type != "batch-rename" {
+		t.Fatalf("type = %q, want batch-rename", preview.Type)
+	}
+	if len(preview.Moves) != 2 {
+		t.Fatalf("expected 2 moves, got %d", len(preview.Moves))
+	}
+
+	// Verify the first move: "My Icon (1).png" → "icon-my_icon_1.png"
+	if preview.Moves[0].From != "img/My Icon (1).png" {
+		t.Fatalf("move[0].From = %q, want %q", preview.Moves[0].From, "img/My Icon (1).png")
+	}
+	if preview.Moves[0].To != "img/icon-my_icon_1.png" {
+		t.Fatalf("move[0].To = %q, want %q", preview.Moves[0].To, "img/icon-my_icon_1.png")
+	}
+
+	// Verify the second move: "BANNER.PNG" → "icon-banner.png"
+	if preview.Moves[1].From != "img/BANNER.PNG" {
+		t.Fatalf("move[1].From = %q, want %q", preview.Moves[1].From, "img/BANNER.PNG")
+	}
+	if preview.Moves[1].To != "img/icon-banner.png" {
+		t.Fatalf("move[1].To = %q, want %q", preview.Moves[1].To, "img/icon-banner.png")
+	}
+
+	if !preview.CanApply {
+		t.Fatal("expected CanApply=true")
+	}
+	if len(preview.Blockers) != 0 {
+		t.Fatalf("expected 0 blockers, got %v", preview.Blockers)
+	}
+}

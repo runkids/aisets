@@ -11,6 +11,14 @@ import (
 	"asset-studio/internal/scanner"
 )
 
+// RenameRules defines how to transform file names in a batch rename.
+type RenameRules struct {
+	Lowercase    bool              `json:"lowercase,omitempty"`
+	ReplaceChars map[string]string `json:"replaceChars,omitempty"`
+	Prefix       string            `json:"prefix,omitempty"`
+	Suffix       string            `json:"suffix,omitempty"`
+}
+
 // BatchDeleteResult holds the outcome of a batch delete operation.
 type BatchDeleteResult struct {
 	Succeeded []string          `json:"succeeded"`
@@ -131,6 +139,66 @@ func BatchApply(project scanner.Project, preview BatchPreview) (ApplyResult, err
 		ChangedReferences: len(preview.Changes),
 		MovedFiles:        len(preview.Moves),
 	}, nil
+}
+
+// applyRenameRules transforms a filename according to the rules.
+// Order: replaceChars → lowercase → prefix → suffix. Suffix is inserted before extension.
+func applyRenameRules(name string, rules RenameRules) string {
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+
+	for old, repl := range rules.ReplaceChars {
+		base = strings.ReplaceAll(base, old, repl)
+	}
+	if rules.Lowercase {
+		base = strings.ToLower(base)
+		ext = strings.ToLower(ext)
+	}
+	base = rules.Prefix + base + rules.Suffix
+	return base + ext
+}
+
+// BatchRenamePreview generates a preview for renaming multiple assets by rules.
+func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rules RenameRules) BatchPreview {
+	preview := BatchPreview{
+		ID:        newID("batch-rename:" + project.ID),
+		Type:      "batch-rename",
+		ProjectID: project.ID,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	for _, item := range items {
+		dir := filepath.Dir(item.RepoPath)
+		oldName := filepath.Base(item.RepoPath)
+		newName := applyRenameRules(oldName, rules)
+		if newName == oldName {
+			continue
+		}
+
+		newPath := filepath.Join(dir, newName)
+		if dir == "." {
+			newPath = newName
+		}
+
+		targetAbs, err := safeAbs(project.Path, newPath)
+		if err != nil {
+			preview.Blockers = append(preview.Blockers, blocker(item.RepoPath, 0, actionErrorCode(err), err.Error()))
+			continue
+		}
+		if _, err := os.Stat(targetAbs); err == nil && newPath != item.RepoPath {
+			preview.Blockers = append(preview.Blockers, blocker(item.RepoPath, 0, "target_already_exists", "Target file already exists: "+newPath))
+			continue
+		}
+
+		preview.Moves = append(preview.Moves, BatchMoveEntry{From: item.RepoPath, To: newPath})
+
+		changes, blockers := referenceChanges(project, item, newPath)
+		preview.Changes = append(preview.Changes, changes...)
+		preview.Blockers = append(preview.Blockers, blockers...)
+	}
+
+	preview.CanApply = len(preview.Blockers) == 0 && len(preview.Moves) > 0
+	return preview
 }
 
 // BatchDelete removes the given asset files from disk, classifying each
