@@ -34,6 +34,7 @@ import {
   CopyButton,
   EmptyState,
   Modal,
+  Range,
   Select,
   StatCard,
   Tabs,
@@ -451,19 +452,21 @@ export function DuplicatesView({
                       : "border-g-line hover:border-g-line-strong hover:bg-g-surface-2",
                 )}
                 onClick={() => {
-                  if (bulkMode && !isPreferred) {
-                    toggleSelect(member.id);
-                  } else {
+                  if (isPreferred) {
                     onOpenAsset?.(member.id);
+                  } else {
+                    if (!bulkMode) setBulkMode(true);
+                    toggleSelect(member.id);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    if (bulkMode && !isPreferred) {
-                      toggleSelect(member.id);
-                    } else {
+                    if (isPreferred) {
                       onOpenAsset?.(member.id);
+                    } else {
+                      if (!bulkMode) setBulkMode(true);
+                      toggleSelect(member.id);
                     }
                   }
                 }}
@@ -479,7 +482,7 @@ export function DuplicatesView({
                     {t("duplicates.keep")}
                   </span>
                 )}
-                {bulkMode && !isPreferred && (
+                {!isPreferred && (
                   <Checkbox
                     asChild
                     checked={isSelected}
@@ -856,13 +859,11 @@ function SimilarPairCard({
             <span className="text-g-chip text-g-ink-4">
               {fileName(left.repoPath)}
             </span>
-            <input
-              type="range"
+            <Range
               min={0}
               max={100}
               value={overlayOpacity}
               onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-              className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-g-surface-3 accent-g-accent"
               aria-label={t("duplicates.overlayOpacity")}
             />
             <span className="text-g-chip text-g-ink-4">
