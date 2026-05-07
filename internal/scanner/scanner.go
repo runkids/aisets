@@ -72,6 +72,10 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		}
 	}()
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting, Current: len(candidates), Total: len(candidates)})
+	const nearDupThreshold = 10_000
+	if options.Profile != ScanProfileCustom && len(candidates) >= nearDupThreshold && options.Analyses.NearDuplicates {
+		options.Analyses.NearDuplicates = false
+	}
 	sizeCounts := map[int64]int{}
 	for _, candidate := range candidates {
 		sizeCounts[candidate.info.Size()]++
