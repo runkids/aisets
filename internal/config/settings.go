@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 
 	"asset-studio/internal/apierr"
@@ -262,17 +263,38 @@ func (s *Store) ImportData(data ExportData) error {
 			return err
 		}
 	}
-	projectsByWorkspace := map[string][]string{}
+	projectsByWorkspace := map[string][]Project{}
 	for _, project := range data.Projects {
+		if strings.TrimSpace(project.Path) == "" {
+			continue
+		}
 		workspaceID := project.WorkspaceID
 		if workspaceID == "" {
 			workspaceID = s.activeWorkspaceID()
 		}
-		projectsByWorkspace[workspaceID] = append(projectsByWorkspace[workspaceID], project.Path)
+		project.WorkspaceID = workspaceID
+		projectsByWorkspace[workspaceID] = append(projectsByWorkspace[workspaceID], project)
 	}
-	for workspaceID, paths := range projectsByWorkspace {
+	for workspaceID, projects := range projectsByWorkspace {
+		paths := make([]string, 0, len(projects))
+		for _, project := range projects {
+			paths = append(paths, project.Path)
+		}
 		if err := s.AddProjectsToWorkspace(workspaceID, paths); err != nil {
 			return err
+		}
+		for _, project := range projects {
+			name := strings.TrimSpace(project.Name)
+			if name == "" {
+				continue
+			}
+			abs, err := filepath.Abs(project.Path)
+			if err != nil {
+				return err
+			}
+			if err := s.RenameProject(projectID(workspaceID, abs), name, project.IconImage); err != nil {
+				return err
+			}
 		}
 	}
 	if data.Settings != nil {

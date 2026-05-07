@@ -128,11 +128,12 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.RenameProject(project, "Renamed"); err != nil {
+	iconImage := "data:image/png;base64,aWNvbg=="
+	if err := store.RenameProject(project, "Renamed", iconImage); err != nil {
 		t.Fatal(err)
 	}
 	projects := store.Projects()
-	if len(projects) != 1 || projects[0].Name != "Renamed" {
+	if len(projects) != 1 || projects[0].Name != "Renamed" || projects[0].IconImage != iconImage {
 		t.Fatalf("projects after rename = %#v", projects)
 	}
 	if err := store.RemoveProject(project); err != nil {
@@ -140,6 +141,13 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 	}
 	if projects := store.Projects(); len(projects) != 0 {
 		t.Fatalf("projects after remove = %#v", projects)
+	}
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	projects = store.Projects()
+	if len(projects) != 1 || projects[0].IconImage != "" {
+		t.Fatalf("projects after restore = %#v", projects)
 	}
 }
 
@@ -699,7 +707,7 @@ func TestProjectMutationValidationErrors(t *testing.T) {
 	}
 	defer store.Close()
 
-	for _, err := range []error{store.RemoveProject("missing"), store.RenameProject("missing", "Name"), store.RenameProject("missing", "   ")} {
+	for _, err := range []error{store.RemoveProject("missing"), store.RenameProject("missing", "Name", ""), store.RenameProject("missing", "   ", "")} {
 		coded, ok := err.(apierr.Error)
 		if !ok || coded.Code == "" {
 			t.Fatalf("expected coded project error, got %T %[1]v", err)
@@ -707,6 +715,9 @@ func TestProjectMutationValidationErrors(t *testing.T) {
 	}
 	if _, err := store.AddWorkspace("Client", "data:text/plain;base64,bm8="); err == nil || err.(apierr.Error).Code != "workspace_icon_invalid" {
 		t.Fatalf("invalid workspace icon err = %T %[1]v", err)
+	}
+	if err := store.RenameProject(filepath.Join(root, "project"), "Project", "data:text/plain;base64,bm8="); err == nil || err.(apierr.Error).Code != "project_icon_invalid" {
+		t.Fatalf("invalid project icon err = %T %[1]v", err)
 	}
 }
 
@@ -983,6 +994,10 @@ func TestExportImportAndResetData(t *testing.T) {
 	if err := store.AddProjects([]string{project}); err != nil {
 		t.Fatal(err)
 	}
+	projectIcon := "data:image/png;base64,aWNvbg=="
+	if err := store.RenameProject(project, "Project Export", projectIcon); err != nil {
+		t.Fatal(err)
+	}
 	workspace := "Exported"
 	filters := []CustomAssetFilter{{
 		ID:      "legacy-icons",
@@ -997,7 +1012,7 @@ func TestExportImportAndResetData(t *testing.T) {
 	}
 
 	exported := store.ExportData()
-	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" || len(exported.Settings.CustomAssetFilters) != 1 {
+	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Projects[0].IconImage != projectIcon || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" || len(exported.Settings.CustomAssetFilters) != 1 {
 		t.Fatalf("exported = %#v", exported)
 	}
 	if _, err := store.AddWorkspace("Extra", ""); err != nil {
@@ -1020,7 +1035,7 @@ func TestExportImportAndResetData(t *testing.T) {
 	if err := store.ImportData(exported); err != nil {
 		t.Fatal(err)
 	}
-	if projects := store.Projects(); len(projects) != 1 || projects[0].Path != project {
+	if projects := store.Projects(); len(projects) != 1 || projects[0].Path != project || projects[0].IconImage != projectIcon || projects[0].Name != "Project Export" {
 		t.Fatalf("projects after import = %#v", projects)
 	}
 	settings, err := store.Settings()

@@ -42,6 +42,7 @@ func (s *Store) migrate() error {
 			workspace_id TEXT NOT NULL DEFAULT 'default',
 			name TEXT NOT NULL,
 			path TEXT NOT NULL,
+			icon_image TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT,
@@ -230,6 +231,9 @@ func (s *Store) migrate() error {
 		}
 	}
 	if err := s.migrateProjectsWorkspaceSchema(); err != nil {
+		return err
+	}
+	if err := s.migrateProjectsIconSchema(); err != nil {
 		return err
 	}
 	if err := s.migrateWorkspacesIconSchema(); err != nil {
@@ -459,6 +463,7 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 			workspace_id TEXT NOT NULL DEFAULT 'default',
 			name TEXT NOT NULL,
 			path TEXT NOT NULL,
+			icon_image TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT,
@@ -468,8 +473,8 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 		return err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO projects (id, workspace_id, name, path, created_at, updated_at, deleted_at)
-		SELECT id, 'default', name, path, created_at, updated_at, deleted_at
+		INSERT INTO projects (id, workspace_id, name, path, icon_image, created_at, updated_at, deleted_at)
+		SELECT id, 'default', name, path, '', created_at, updated_at, deleted_at
 		FROM projects_legacy
 	`); err != nil {
 		return err
@@ -478,6 +483,18 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Store) migrateProjectsIconSchema() error {
+	columns, err := s.tableColumns("projects")
+	if err != nil {
+		return err
+	}
+	if columns["icon_image"] {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE projects ADD COLUMN icon_image TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 func (s *Store) migrateWorkspacesIconSchema() error {

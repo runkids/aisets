@@ -88,7 +88,7 @@ func cmdProjectsRename(args []string, jsonOut bool) error {
 		return err
 	}
 	defer store.Close()
-	if err := store.RenameProject(*id, *name); err != nil {
+	if err := store.RenameProject(*id, *name, ""); err != nil {
 		return err
 	}
 	projects := store.Projects()

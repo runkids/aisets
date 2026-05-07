@@ -401,8 +401,10 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	projectIcon := "data:image/png;base64,aWNvbg=="
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/projects/rename", bytes.NewReader([]byte(`{"id":"`+project+`","name":"Team Assets"}`)))
+	renamePayload, _ := json.Marshal(map[string]string{"id": project, "name": "Team Assets", "iconImage": projectIcon})
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/rename", bytes.NewReader(renamePayload))
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("content-type"), "application/json") {
 		t.Fatalf("rename = %d %s %s", rec.Code, rec.Header().Get("content-type"), rec.Body.String())
@@ -413,7 +415,7 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &renamed); err != nil {
 		t.Fatal(err)
 	}
-	if len(renamed.Projects) != 1 || renamed.Projects[0].Name != "Team Assets" {
+	if len(renamed.Projects) != 1 || renamed.Projects[0].Name != "Team Assets" || renamed.Projects[0].IconImage != projectIcon {
 		t.Fatalf("renamed projects = %#v", renamed.Projects)
 	}
 

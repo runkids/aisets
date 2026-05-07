@@ -10,6 +10,7 @@ export type Project = {
   workspaceId: string;
   name: string;
   path: string;
+  iconImage?: string;
   createdAt?: string;
 };
 

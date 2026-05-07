@@ -381,10 +381,10 @@ export function removeWorkspace(id: string) {
   });
 }
 
-export function renameProject(id: string, name: string) {
+export function renameProject(id: string, name: string, iconImage = "") {
   return request<{ projects: Project[] }>("/api/projects/rename", {
     method: "POST",
-    body: JSON.stringify({ id, name }),
+    body: JSON.stringify({ id, name, iconImage }),
   });
 }
 

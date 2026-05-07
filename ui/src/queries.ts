@@ -450,8 +450,15 @@ export function useRemoveProjectMutation() {
 export function useRenameProjectMutation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      renameProject(id, name),
+    mutationFn: ({
+      id,
+      name,
+      iconImage,
+    }: {
+      id: string;
+      name: string;
+      iconImage?: string;
+    }) => renameProject(id, name, iconImage),
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: catalogQueryKey }),

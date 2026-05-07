@@ -15,7 +15,7 @@ func (s *Store) Projects() []Project {
 
 func (s *Store) AllProjects() []Project {
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, name, path, created_at
+		SELECT id, workspace_id, name, path, icon_image, created_at
 		FROM projects
 		WHERE deleted_at IS NULL
 		ORDER BY lower(path)
@@ -27,7 +27,7 @@ func (s *Store) AllProjects() []Project {
 	out := []Project{}
 	for rows.Next() {
 		var project Project
-		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.CreatedAt); err == nil {
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.IconImage, &project.CreatedAt); err == nil {
 			out = append(out, project)
 		}
 	}
@@ -42,7 +42,7 @@ func (s *Store) AllProjects() []Project {
 
 func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, name, path, created_at
+		SELECT id, workspace_id, name, path, icon_image, created_at
 		FROM projects
 		WHERE workspace_id = ? AND deleted_at IS NULL
 		ORDER BY lower(path)
@@ -54,7 +54,7 @@ func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	out := []Project{}
 	for rows.Next() {
 		var project Project
-		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.CreatedAt); err == nil {
+		if err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.IconImage, &project.CreatedAt); err == nil {
 			out = append(out, project)
 		}
 	}
@@ -103,7 +103,7 @@ func (s *Store) AddProjectsToWorkspace(workspaceID string, paths []string) error
 func (s *Store) RemoveProject(id string) error {
 	result, err := s.db.Exec(`
 		UPDATE projects
-		SET deleted_at = ?, updated_at = ?
+		SET icon_image = '', deleted_at = ?, updated_at = ?
 		WHERE id = ? AND deleted_at IS NULL
 	`, nowUTC(), nowUTC(), id)
 	if err != nil {
@@ -119,16 +119,20 @@ func (s *Store) RemoveProject(id string) error {
 	return nil
 }
 
-func (s *Store) RenameProject(id, name string) error {
+func (s *Store) RenameProject(id, name, iconImage string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return apierr.New("project_name_empty", "project name must not be empty")
 	}
+	iconImage, err := normalizeProjectIconImage(iconImage)
+	if err != nil {
+		return err
+	}
 	result, err := s.db.Exec(`
 		UPDATE projects
-		SET name = ?, updated_at = ?
+		SET name = ?, icon_image = ?, updated_at = ?
 		WHERE id = ? AND deleted_at IS NULL
-	`, name, nowUTC(), id)
+	`, name, iconImage, nowUTC(), id)
 	if err != nil {
 		return err
 	}

@@ -177,13 +177,21 @@ func (s *Store) workspace(id string) (Workspace, error) {
 }
 
 func normalizeWorkspaceIconImage(value string) (string, error) {
+	return normalizeIconImage(value, "workspace_icon_invalid", "workspace")
+}
+
+func normalizeProjectIconImage(value string) (string, error) {
+	return normalizeIconImage(value, "project_icon_invalid", "project")
+}
+
+func normalizeIconImage(value, code, label string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", nil
 	}
 	prefix, encoded, ok := strings.Cut(value, ",")
 	if !ok {
-		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL")
+		return "", apierr.New(code, label+" icon must be a PNG, JPEG, GIF, or WebP data URL")
 	}
 	allowedPrefix := false
 	for _, candidate := range []string{
@@ -198,11 +206,11 @@ func normalizeWorkspaceIconImage(value string) (string, error) {
 		}
 	}
 	if !allowedPrefix {
-		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL")
+		return "", apierr.New(code, label+" icon must be a PNG, JPEG, GIF, or WebP data URL")
 	}
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil || len(decoded) == 0 || len(decoded) > maxWorkspaceIconBytes {
-		return "", apierr.New("workspace_icon_invalid", "workspace icon must be a PNG, JPEG, GIF, or WebP data URL under 512 KB")
+		return "", apierr.New(code, label+" icon must be a PNG, JPEG, GIF, or WebP data URL under 512 KB")
 	}
 	return value, nil
 }

@@ -14,6 +14,7 @@ type Project struct {
 	WorkspaceID string `json:"workspaceId"`
 	Name        string `json:"name"`
 	Path        string `json:"path"`
+	IconImage   string `json:"iconImage,omitempty"`
 	CreatedAt   string `json:"createdAt,omitempty"`
 }
 

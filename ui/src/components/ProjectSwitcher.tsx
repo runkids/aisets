@@ -1,7 +1,8 @@
-import { Check, ChevronDown, FolderKanban, Layers3 } from "lucide-react";
+import { Check, ChevronDown, Layers3 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
+import { ProjectAvatar } from "./ProjectAvatar";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
 import { cn } from "@/lib/cn";
 
@@ -182,9 +183,16 @@ export function ProjectSwitcher({
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className={triggerIconClass} aria-hidden="true">
-          <Layers3 size={15} />
-        </span>
+        {selectedProject ? (
+          <ProjectAvatar
+            iconImage={selectedProject.iconImage}
+            className={cn(triggerIconClass, "[&_svg]:size-[15px]")}
+          />
+        ) : (
+          <span className={triggerIconClass} aria-hidden="true">
+            <Layers3 size={15} />
+          </span>
+        )}
         <span className={triggerCopyClass}>
           <span className={triggerWorkspaceNameClass}>{workspaceName}</span>
           <span className={triggerCurrentClass}>
@@ -308,7 +316,10 @@ export function ProjectSwitcher({
                 data-active={isSelected || undefined}
                 onClick={() => selectProject(project.id)}
               >
-                <FolderKanban size={18} aria-hidden="true" />
+                <ProjectAvatar
+                  iconImage={project.iconImage}
+                  className={cn(avatarClass, "[&_svg]:size-[18px]")}
+                />
                 <span className={optionCopyClass}>
                   <strong className={optionCopyStrongClass}>
                     {project.name}

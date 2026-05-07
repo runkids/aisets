@@ -27,7 +27,6 @@ import {
   DropdownMenu,
   EmptyState,
   IconWell,
-  PromptDialog,
   StackedBar,
   StatCard,
   Tabs,
@@ -36,6 +35,8 @@ import {
   type StackedBarSegment,
 } from "./ui";
 import { useToast } from "./ToastProvider";
+import { ProjectAvatar } from "./ProjectAvatar";
+import { ProjectDialog } from "./ProjectDialog";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
 type Props = {
@@ -172,7 +173,7 @@ function useProjectMenuItems(
   return useMemo(
     () => [
       {
-        label: t("projects.rename"),
+        label: t("action.edit"),
         icon: <Pencil />,
         onClick: () => onRename(project),
       },
@@ -205,9 +206,7 @@ function ProjectCard({
     <Card>
       <CardBody padding="md">
         <div className="flex items-start gap-3">
-          <IconWell size="lg" tone={healthTone(stat.health)}>
-            <FolderKanban />
-          </IconWell>
+          <ProjectAvatar iconImage={stat.project.iconImage} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate font-g-display text-[17px] font-[590] leading-tight tracking-[-0.013em] text-g-ink">
@@ -334,13 +333,13 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
   }, []);
 
   const handleRenameConfirm = useCallback(
-    (newName: string) => {
+    (value: { name: string; iconImage: string }) => {
       if (!renameTarget) return;
       renameMutation.mutate(
-        { id: renameTarget.id, name: newName },
+        { id: renameTarget.id, name: value.name, iconImage: value.iconImage },
         {
           onSuccess: () => {
-            toast.success(t("projects.renameSuccess", { name: newName }));
+            toast.success(t("projects.renameSuccess", { name: value.name }));
             setRenameTarget(null);
           },
           onError: (e) => {
@@ -521,13 +520,9 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
         </section>
       )}
 
-      <PromptDialog
+      <ProjectDialog
         open={renameTarget != null}
-        title={t("projects.renameDialogTitle")}
-        label={t("projects.renameLabel")}
-        defaultValue={renameTarget?.name ?? ""}
-        confirmText={t("projects.renameDialogConfirm")}
-        cancelText={t("common.cancel")}
+        project={renameTarget}
         loading={renameMutation.isPending}
         onConfirm={handleRenameConfirm}
         onCancel={() => setRenameTarget(null)}

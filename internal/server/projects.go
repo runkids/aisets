@@ -134,14 +134,15 @@ func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRenameProject(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		IconImage string `json:"iconImage"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.store.RenameProject(body.ID, body.Name); err != nil {
+	if err := s.store.RenameProject(body.ID, body.Name, body.IconImage); err != nil {
 		writeError(w, projectErrorStatus(err), err)
 		return
 	}

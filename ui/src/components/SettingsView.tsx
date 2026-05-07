@@ -82,7 +82,6 @@ import {
   Keycap,
   Modal,
   Notice,
-  PromptDialog,
   Rail,
   RailItem,
   RailSection,
@@ -92,6 +91,8 @@ import {
   Textarea,
   TextInput,
 } from "./ui";
+import { ProjectAvatar } from "./ProjectAvatar";
+import { ProjectDialog } from "./ProjectDialog";
 import { useToast } from "./ToastProvider";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
@@ -1213,14 +1214,18 @@ export function SettingsView({
     });
   }
 
-  function onRenameProject(name: string) {
+  function onRenameProject(value: { name: string; iconImage: string }) {
     if (!projectBeingRenamed) return;
     renameProjectMutation.mutate(
-      { id: projectBeingRenamed.id, name },
+      {
+        id: projectBeingRenamed.id,
+        name: value.name,
+        iconImage: value.iconImage,
+      },
       {
         onSuccess: () => {
           setRenameProjectId(null);
-          toast.success(t("projects.renameSuccess", { name }));
+          toast.success(t("projects.renameSuccess", { name: value.name }));
         },
       },
     );
@@ -1631,27 +1636,34 @@ export function SettingsView({
                                   key={project.id}
                                   className="group relative flex flex-col gap-2 px-4 py-2.5 transition-[background] duration-[120ms] ease-g hover:bg-g-surface-2 focus-within:bg-g-surface-2 sm:flex-row sm:items-center sm:justify-between"
                                 >
-                                  <div className="min-w-0">
-                                    <div className="flex min-w-0 items-center gap-2">
-                                      <div className="min-w-0 truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
-                                        {project.name}
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <ProjectAvatar
+                                      iconImage={project.iconImage}
+                                      className="size-9 bg-g-surface-3 [&_svg]:size-4"
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <div className="min-w-0 truncate font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                                          {project.name}
+                                        </div>
+                                        {project.workspaceId ===
+                                          activeWorkspaceId && (
+                                          <Badge
+                                            tone="line"
+                                            className={projectAssetsBadgeClass}
+                                          >
+                                            {t("settings.projectAssets", {
+                                              count:
+                                                assetCountByProject[
+                                                  project.id
+                                                ] ?? 0,
+                                            })}
+                                          </Badge>
+                                        )}
                                       </div>
-                                      {project.workspaceId ===
-                                        activeWorkspaceId && (
-                                        <Badge
-                                          tone="line"
-                                          className={projectAssetsBadgeClass}
-                                        >
-                                          {t("settings.projectAssets", {
-                                            count:
-                                              assetCountByProject[project.id] ??
-                                              0,
-                                          })}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
-                                      {project.path}
+                                      <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                        {project.path}
+                                      </div>
                                     </div>
                                   </div>
                                   <div className={projectRowActionRevealClass}>
@@ -1665,7 +1677,7 @@ export function SettingsView({
                                         setRenameProjectId(project.id)
                                       }
                                     >
-                                      {t("action.rename")}
+                                      {t("action.edit")}
                                     </Button>
                                     <Button
                                       variant="ghost"
@@ -3143,13 +3155,9 @@ export function SettingsView({
         onConfirm={onRemoveWorkspace}
         onCancel={() => setRemoveWorkspaceId(null)}
       />
-      <PromptDialog
+      <ProjectDialog
         open={Boolean(projectBeingRenamed)}
-        title={t("projects.renameDialogTitle")}
-        label={t("projects.renameLabel")}
-        defaultValue={projectBeingRenamed?.name ?? ""}
-        confirmText={t("projects.renameDialogConfirm")}
-        cancelText={t("common.cancel")}
+        project={projectBeingRenamed}
         loading={renameProjectMutation.isPending}
         onConfirm={onRenameProject}
         onCancel={() => setRenameProjectId(null)}
