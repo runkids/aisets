@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ExternalLink } from "lucide-react";
+import { FileCode } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetReference } from "../types";
 import { Badge, CopyButton, Tooltip } from "./ui";
@@ -28,9 +28,14 @@ const EDITOR_SCHEMES: Record<string, (path: string, line: number) => string> = {
 type Props = {
   references: AssetReference[];
   preferredEditor: string;
+  rootPath?: string;
 };
 
-export function AssetDrawerUsage({ references, preferredEditor }: Props) {
+export function AssetDrawerUsage({
+  references,
+  preferredEditor,
+  rootPath = "",
+}: Props) {
   const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +49,7 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
 
   const editorUrl = (file: string, line: number) => {
     const fn = EDITOR_SCHEMES[preferredEditor] ?? EDITOR_SCHEMES.vscode;
-    return fn(file, line);
+    return fn(rootPath + file, line);
   };
 
   const copyAllText = references
@@ -124,7 +129,7 @@ export function AssetDrawerUsage({ references, preferredEditor }: Props) {
                             editor: preferredEditor,
                           })}
                         >
-                          <ExternalLink size={14} />
+                          <FileCode size={14} />
                         </a>
                       </Tooltip>
                     </div>

@@ -4,7 +4,7 @@ func DefaultScanOptions() ScanOptions {
 	return ScanOptions{
 		Profile: ScanProfileFast,
 		Analyses: AnalysisOptions{
-			References:     false,
+			References:     true,
 			NearDuplicates: false,
 			Optimization:   false,
 		},

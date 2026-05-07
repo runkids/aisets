@@ -247,6 +247,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateScanPerformanceSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateScanProfileToFull(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -555,6 +558,53 @@ func (s *Store) migrateAppSettingsSchema() error {
 		}
 	}
 	if _, err := tx.Exec(`DROP TABLE app_settings_legacy`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) migrateScanProfileToFull() error {
+	const version = 4
+	var applied int
+	err := s.db.QueryRow(`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&applied)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	var raw string
+	err = s.db.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if raw != "" {
+		settings := DefaultAppSettings()
+		if err := json.Unmarshal([]byte(raw), &settings); err != nil {
+			return err
+		}
+		if settings.ScanProfile == "fast" || settings.ScanProfile == "" {
+			settings.ScanProfile = "full"
+			settings.ScanAnalyses.References = true
+			settings.ScanAnalyses.NearDuplicates = true
+			settings.ScanAnalyses.Optimization = true
+			normalized, err := json.Marshal(settings)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`UPDATE app_settings SET value = ?, updated_at = ? WHERE key = ?`, string(normalized), nowUTC(), "app"); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, nowUTC()); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -2,6 +2,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FileCode,
   LoaderCircle,
   Pencil,
   Trash2,
@@ -53,6 +54,37 @@ const fallbackCopy = (text: string) => {
   document.execCommand("copy");
   document.body.removeChild(textarea);
 };
+
+const EDITOR_SCHEMES: Record<string, (path: string, line: number) => string> = {
+  vscode: (p, l) => `vscode://file/${p}:${l}`,
+  cursor: (p, l) => `cursor://file/${p}:${l}`,
+  windsurf: (p, l) => `windsurf://file/${p}:${l}`,
+  antigravity: (p, l) => `antigravity://file/${p}:${l}`,
+  trae: (p, l) => `trae://file/${p}:${l}`,
+  webstorm: (p, l) =>
+    `jetbrains://webstorm/navigate/reference?path=${p}&line=${l}`,
+  idea: (p, l) => `jetbrains://idea/navigate/reference?path=${p}&line=${l}`,
+  goland: (p, l) => `jetbrains://goland/navigate/reference?path=${p}&line=${l}`,
+  pycharm: (p, l) =>
+    `jetbrains://pycharm/navigate/reference?path=${p}&line=${l}`,
+  rubymine: (p, l) =>
+    `jetbrains://rubymine/navigate/reference?path=${p}&line=${l}`,
+  phpstorm: (p, l) =>
+    `jetbrains://phpstorm/navigate/reference?path=${p}&line=${l}`,
+  zed: (p, l) => `zed://file/${p}:${l}`,
+  sublime: (p, l) => `subl://open?url=file://${p}&line=${l}`,
+};
+
+function editorUrl(editor: string, path: string, line: number) {
+  return (EDITOR_SCHEMES[editor] ?? EDITOR_SCHEMES.vscode)(path, line);
+}
+
+function projectRoot(localPath: string, repoPath: string) {
+  if (localPath.endsWith(repoPath)) {
+    return localPath.slice(0, localPath.length - repoPath.length);
+  }
+  return "";
+}
 
 type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
 
@@ -317,11 +349,23 @@ export function AssetDrawer({
                 <Button
                   size="sm"
                   variant="secondary"
+                  leadingIcon={<FileCode size={14} />}
+                  onClick={() => {
+                    window.open(editorUrl(preferredEditor, asset.localPath, 1));
+                  }}
+                >
+                  {t("assetDrawer.openInEditor", {
+                    editor: preferredEditor,
+                  })}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   leadingIcon={
                     pathCopied ? <Check size={14} /> : <Copy size={14} />
                   }
                   onClick={() => {
-                    copyText(asset.repoPath);
+                    copyText(asset.localPath);
                     setCopiedPath(asset.repoPath);
                   }}
                 >
@@ -389,6 +433,7 @@ export function AssetDrawer({
                 <AssetDrawerUsage
                   references={asset.references}
                   preferredEditor={preferredEditor}
+                  rootPath={projectRoot(asset.localPath, asset.repoPath)}
                 />
               )}
               {tab === "similar" && (

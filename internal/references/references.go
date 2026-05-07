@@ -46,6 +46,9 @@ var imageExts = map[string]bool{
 var codeExts = map[string]bool{
 	".css": true, ".html": true, ".js": true, ".jsx": true, ".mjs": true,
 	".scss": true, ".ts": true, ".tsx": true, ".vue": true,
+	".json": true, ".webmanifest": true,
+	".md": true, ".mdx": true,
+	".yaml": true, ".yml": true, ".toml": true,
 }
 
 var skipDirs = map[string]bool{
