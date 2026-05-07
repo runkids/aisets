@@ -10,15 +10,19 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   Folder,
+  FolderInput,
   FolderOpen,
-  Terminal,
+  PenLine,
   Trash2,
 } from "lucide-react";
 import {
   customFilterOptions,
   matchesCustomAssetFilter,
 } from "../customAssetFilters";
+import { useBatchDeleteMutation } from "../queries";
+import { BatchConfirmModal } from "./BatchConfirmModal";
 import { matchesOCRSearchText } from "../ocrSearch";
 import type { AssetItem, CustomAssetFilter } from "../types";
 import { fileName, formatBytes } from "../ui";
@@ -359,6 +363,8 @@ export function BrowseView({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set(),
   );
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const batchDeleteMut = useBatchDeleteMutation();
 
   useEffect(() => {
     if (!autoScrollAssetId) return undefined;
@@ -466,18 +472,25 @@ export function BrowseView({
     [items, selected],
   );
 
+  function handleBatchDelete() {
+    const ids = Array.from(selected);
+    batchDeleteMut.mutate(ids, {
+      onSuccess: () => {
+        setSelected(new Set());
+        setBulkMode(false);
+        setShowDeleteConfirm(false);
+      },
+      onError: () => {
+        setShowDeleteConfirm(false);
+      },
+    });
+  }
+
   function copyPaths() {
     const paths = items
       .filter((i) => selected.has(i.id))
       .map((i) => i.repoPath);
     navigator.clipboard?.writeText(paths.join("\n"));
-  }
-
-  function copyAsRm() {
-    const cmds = items
-      .filter((i) => selected.has(i.id))
-      .map((i) => `git rm "${i.repoPath}"`);
-    navigator.clipboard?.writeText(cmds.join("\n"));
   }
 
   function handleToggleExpand(path: string) {
@@ -541,18 +554,32 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink"
-                onClick={copyAsRm}
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
+                disabled
               >
-                <Terminal size={12} />
-                {t("action.copyGitRm")}
+                <FolderInput size={12} />
+                {t("action.batchMove")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
+                disabled
+              >
+                <PenLine size={12} />
+                {t("action.batchRename")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-7 items-center gap-1 rounded-g-md bg-transparent px-2.5 text-[12px] font-[510] text-g-ink-2 hover:bg-g-surface-2 hover:text-g-ink disabled:opacity-40"
+                disabled
+              >
+                <Download size={12} />
+                {t("action.batchExport")}
               </button>
               <button
                 type="button"
                 className="inline-flex h-7 items-center gap-1 rounded-g-md bg-g-red px-2.5 text-[12px] font-[510] text-g-canvas hover:brightness-[1.08]"
-                onClick={() => {
-                  /* delete action placeholder */
-                }}
+                onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 size={12} />
                 {t("action.deleteSelected")}
@@ -637,6 +664,15 @@ export function BrowseView({
           )}
         </div>
       </div>
+      {showDeleteConfirm && (
+        <BatchConfirmModal
+          count={selected.size}
+          sizeLabel={formatBytes(selectedBytes)}
+          working={batchDeleteMut.isPending}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={handleBatchDelete}
+        />
+      )}
     </>
   );
 }

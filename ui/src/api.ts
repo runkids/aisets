@@ -1,6 +1,7 @@
 import type {
   ActionPreview,
   APIErrorBody,
+  BatchResult,
   Catalog,
   DirectoryListing,
   ExportData,
@@ -315,5 +316,12 @@ export function applyPreview(endpoint: string, token: string) {
   return request<{ result: unknown }>(endpoint, {
     method: "POST",
     body: JSON.stringify({ token }),
+  });
+}
+
+export function batchDelete(assetIds: string[]) {
+  return request<BatchResult>("/api/actions/batch/delete", {
+    method: "POST",
+    body: JSON.stringify({ assetIds }),
   });
 }

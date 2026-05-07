@@ -3,6 +3,7 @@ import {
   addProject,
   addWorkspace,
   applyPreview,
+  batchDelete,
   deleteUnusedPreview,
   getCatalog,
   getSettings,
@@ -266,6 +267,16 @@ export function useRenameProjectMutation() {
         client.invalidateQueries({ queryKey: catalogQueryKey }),
         client.invalidateQueries({ queryKey: settingsQueryKey }),
       ]);
+    },
+  });
+}
+
+export function useBatchDeleteMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (assetIds: string[]) => batchDelete(assetIds),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
     },
   });
 }

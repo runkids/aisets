@@ -305,3 +305,10 @@ export type DirectoryListing = {
   parent: string;
   directories: Array<{ name: string; path: string }>;
 };
+
+export type BatchResult = {
+  succeeded: string[];
+  failed: Array<{ id: string; error: string }>;
+  skipped: string[];
+  appliedAt: string;
+};
