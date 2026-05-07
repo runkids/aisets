@@ -135,6 +135,22 @@ textarea::-webkit-resizer {
     transform: translateX(0);
   }
 }
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes slideOutR {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
 @keyframes slideUp2 {
   from {
     opacity: 0;

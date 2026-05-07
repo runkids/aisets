@@ -1,10 +1,10 @@
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type PointerEvent,
-  type WheelEvent,
 } from "react";
 import { cn } from "@/lib/cn";
 import {
@@ -32,7 +32,7 @@ function ZoomableImage({
   const bgMode = useImageBackgroundMode();
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const dragging = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -57,36 +57,46 @@ function ZoomableImage({
     applyScale(scale - ZOOM_STEP * scale);
   }, [applyScale, scale]);
 
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+  const scaleRef = useRef(scale);
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: globalThis.WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
-      applyScale(scale + delta * scale);
-    },
-    [applyScale, scale],
-  );
+      applyScale(scaleRef.current + delta * scaleRef.current);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [applyScale]);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
       if (scale <= minZoom) return;
-      dragging.current = true;
+      setIsDragging(true);
       lastPos.current = { x: e.clientX, y: e.clientY };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
     [minZoom, scale],
   );
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!dragging.current) return;
-    const dx = e.clientX - lastPos.current.x;
-    const dy = e.clientY - lastPos.current.y;
-    lastPos.current = { x: e.clientX, y: e.clientY };
-    setTranslate((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-  }, []);
+  const handlePointerMove = useCallback(
+    (e: PointerEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastPos.current.x;
+      const dy = e.clientY - lastPos.current.y;
+      lastPos.current = { x: e.clientX, y: e.clientY };
+      setTranslate((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    },
+    [isDragging],
+  );
 
   const handlePointerUp = useCallback(() => {
-    dragging.current = false;
+    setIsDragging(false);
   }, []);
 
   const zoomed = scale > minZoom;
@@ -100,7 +110,7 @@ function ZoomableImage({
         zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
         className,
       )}
-      onWheel={handleWheel}
+      style={{ touchAction: "none" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -111,7 +121,10 @@ function ZoomableImage({
         src={src}
         alt={alt}
         draggable={false}
-        className="size-full select-none object-contain transition-transform duration-100 ease-g"
+        className={cn(
+          "size-full select-none object-contain",
+          !isDragging && "transition-transform duration-100 ease-g",
+        )}
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
         }}

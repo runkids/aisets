@@ -33,7 +33,12 @@ export function AssetDrawerOptimize({ recommendations }: Props) {
               {rec.category}
             </Badge>
           </div>
-          <p className="text-g-caption text-g-ink-2">{rec.suggestion}</p>
+          <p className="text-g-caption text-g-ink">
+            {t(`optimization.reason.${rec.reasonCode}`)}
+          </p>
+          <p className="mt-1 text-g-caption text-g-ink-3">
+            → {t(`optimization.suggestion.${rec.suggestionCode}`)}
+          </p>
         </div>
       ))}
     </div>

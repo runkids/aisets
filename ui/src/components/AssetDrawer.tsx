@@ -1,5 +1,4 @@
 import {
-  Check,
   Copy,
   ExternalLink,
   FileCode,
@@ -35,6 +34,7 @@ import {
   type TabItem,
 } from "./ui";
 import { DialogDrawerSurface, DialogOverlay } from "./ui/DialogShell";
+import { useToast } from "./ToastProvider";
 
 const copyText = (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -90,6 +90,7 @@ type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
 
 type Props = {
   asset: AssetItem;
+  assetIds?: string[];
   onClose: () => void;
   onRename?: (item: AssetItem) => void;
   onDelete?: (item: AssetItem) => void;
@@ -104,6 +105,7 @@ type Props = {
 
 export function AssetDrawer({
   asset,
+  assetIds,
   onClose,
   onRename,
   onDelete,
@@ -116,8 +118,17 @@ export function AssetDrawer({
   onRetryDetail,
 }: Props) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [rawTab, setRawTab] = useState<DrawerTab>("overview");
-  const [copiedPath, setCopiedPath] = useState("");
+  const [closing, setClosing] = useState(false);
+
+  const requestClose = useCallback(() => setClosing(true), []);
+
+  useEffect(() => {
+    if (!closing) return;
+    const timer = window.setTimeout(onClose, 220);
+    return () => window.clearTimeout(timer);
+  }, [closing, onClose]);
   const settingsQuery = useSettingsQuery();
   const ocrVisible = Boolean(
     settingsQuery.data?.settings.ocrEnabled && asset.ocr,
@@ -185,14 +196,6 @@ export function AssetDrawer({
     [tabValues],
   );
 
-  const pathCopied = copiedPath === asset.repoPath;
-
-  useEffect(() => {
-    if (!copiedPath) return;
-    const timer = window.setTimeout(() => setCopiedPath(""), 1500);
-    return () => window.clearTimeout(timer);
-  }, [copiedPath]);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -204,19 +207,47 @@ export function AssetDrawer({
             : tabValues[Math.min(tabValues.length - 1, idx + 1)];
         setRawTab(next);
       }
+      if (
+        (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+        assetIds &&
+        assetIds.length > 0 &&
+        onOpenAsset
+      ) {
+        const idx = assetIds.indexOf(asset.id);
+        if (idx === -1) return;
+        const nextIdx =
+          e.key === "ArrowUp"
+            ? Math.max(0, idx - 1)
+            : Math.min(assetIds.length - 1, idx + 1);
+        if (nextIdx !== idx) {
+          e.preventDefault();
+          onOpenAsset(assetIds[nextIdx]);
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, tabValues]);
+  }, [tab, tabValues, asset.id, assetIds, onOpenAsset]);
 
   return (
-    <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
+    <DialogPrimitive.Root open onOpenChange={(o) => !o && requestClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay asChild>
-          <DialogOverlay layer="drawer" />
+          <DialogOverlay
+            layer="drawer"
+            style={{
+              transition: "opacity 180ms var(--g-ease)",
+              ...(closing ? { opacity: 0 } : {}),
+            }}
+          />
         </DialogPrimitive.Overlay>
         <DialogPrimitive.Content asChild>
-          <DialogDrawerSurface>
+          <DialogDrawerSurface
+            style={{
+              transition: "transform 200ms var(--g-ease)",
+              ...(closing ? { transform: "translateX(100%)" } : {}),
+            }}
+          >
             <header className="relative flex flex-col gap-3 border-b border-g-line bg-gradient-to-b from-g-surface-2 to-g-surface px-5 pb-3 pt-3.5 max-[600px]:px-4">
               <DialogPrimitive.Close asChild>
                 <IconButton
@@ -361,15 +392,13 @@ export function AssetDrawer({
                 <Button
                   size="sm"
                   variant="secondary"
-                  leadingIcon={
-                    pathCopied ? <Check size={14} /> : <Copy size={14} />
-                  }
+                  leadingIcon={<Copy size={14} />}
                   onClick={() => {
                     copyText(asset.localPath);
-                    setCopiedPath(asset.repoPath);
+                    toast.success(t("toast.copied"));
                   }}
                 >
-                  {pathCopied ? t("toast.copied") : t("action.copyPath")}
+                  {t("action.copyPath")}
                 </Button>
                 {onRename && (
                   <Tooltip label={t("action.rename")}>
