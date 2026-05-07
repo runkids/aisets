@@ -7,6 +7,10 @@ import {
   type WheelEvent,
 } from "react";
 import { cn } from "@/lib/cn";
+import {
+  imageBackgroundClassName,
+  useImageBackgroundMode,
+} from "@/imageBackground";
 
 type ZoomableImageProps = {
   src: string;
@@ -25,6 +29,7 @@ function ZoomableImage({
   minZoom = 1,
   maxZoom = 8,
 }: ZoomableImageProps) {
+  const bgMode = useImageBackgroundMode();
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragging = useRef(false);
@@ -90,7 +95,8 @@ function ZoomableImage({
     <div
       ref={containerRef}
       className={cn(
-        "relative overflow-hidden rounded-g-md border border-g-line bg-g-surface-2",
+        "relative overflow-hidden rounded-g-md border border-g-line",
+        imageBackgroundClassName(bgMode),
         zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
         className,
       )}

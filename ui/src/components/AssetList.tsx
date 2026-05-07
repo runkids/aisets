@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
 import { AssetCard } from "./AssetCard";
-import { Badge, Button, Card, EmptyState } from "./ui";
+import { AssetThumbnail, Badge, Button, Card, EmptyState } from "./ui";
 
 type Props = {
   items: AssetItem[];
@@ -51,14 +51,7 @@ export function AssetList({ items, view, onRename, onDelete }: Props) {
         const severity = primarySeverity(item);
         return (
           <Card key={item.id} className="flex items-center gap-4 p-3">
-            <div className="size-10 shrink-0 overflow-hidden rounded-g-md border border-g-line">
-              <img
-                src={item.url}
-                alt=""
-                loading="lazy"
-                className="size-full object-contain"
-              />
-            </div>
+            <AssetThumbnail src={item.url} size="sm" className="size-10" />
             <div className="min-w-0">
               <div className="truncate font-extrabold" title={item.repoPath}>
                 {item.repoPath}

@@ -40,6 +40,7 @@ import { fileName, formatBytes } from "../ui";
 import { BrowseGrid } from "./BrowseGrid";
 import { BrowseList } from "./BrowseList";
 import { BrowseToolbar, type SortMode, type ViewMode } from "./BrowseToolbar";
+import { useImageBackgroundControls } from "../imageBackground";
 import { FilterRail } from "./FilterRail";
 import { facetOptions, projectFacetIds } from "./browseFacets";
 import { EmptyState } from "./ui";
@@ -50,7 +51,6 @@ type BrowseStoredState = {
   filters: BrowseFilters;
   view: ViewMode;
   gridSize: "s" | "m" | "l";
-  bgMode: "checker" | "light" | "dark";
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
@@ -59,7 +59,6 @@ type BrowseStoredState = {
 const BROWSE_STATE_STORAGE_KEY = "asset-studio-browse-state";
 const viewModes: ViewMode[] = ["grid", "list", "tree"];
 const gridSizes: BrowseStoredState["gridSize"][] = ["s", "m", "l"];
-const bgModes: BrowseStoredState["bgMode"][] = ["checker", "light", "dark"];
 const statusFilters: StatusFilter[] = [
   "",
   "unused",
@@ -96,7 +95,6 @@ function defaultBrowseStoredState(
     },
     view: "grid",
     gridSize: "m",
-    bgMode: "checker",
     searchQuery: "",
     statusFilter: "",
     sortMode: "name",
@@ -145,7 +143,6 @@ export function normalizeBrowseStoredState(
     filters,
     view: optionOrDefault(state.view, viewModes, defaults.view),
     gridSize: optionOrDefault(state.gridSize, gridSizes, defaults.gridSize),
-    bgMode: optionOrDefault(state.bgMode, bgModes, defaults.bgMode),
     searchQuery: stringOrDefault(state.searchQuery, defaults.searchQuery),
     statusFilter: optionOrDefault(
       state.statusFilter,
@@ -502,9 +499,7 @@ export function BrowseView({
   const [gridSize, setGridSize] = useState<"s" | "m" | "l">(
     initialBrowseState.gridSize,
   );
-  const [bgMode, setBgMode] = useState<"checker" | "light" | "dark">(
-    initialBrowseState.bgMode,
-  );
+  const { mode: bgMode, setMode: setBgMode } = useImageBackgroundControls();
   const [searchQuery, setSearchQuery] = useState(
     initialBrowseState.searchQuery,
   );
@@ -542,13 +537,11 @@ export function BrowseView({
       },
       view,
       gridSize,
-      bgMode,
       searchQuery,
       statusFilter,
       sortMode,
     });
   }, [
-    bgMode,
     filters,
     gridSize,
     projectFilterName,

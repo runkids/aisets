@@ -7,6 +7,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import {
+  imageBackgroundClassName,
+  useImageBackgroundMode,
+} from "@/imageBackground";
 
 type ImagePreviewProps = {
   src: string;
@@ -26,6 +30,7 @@ export function ImagePreview({
   delay = 1000,
   enabled = true,
 }: ImagePreviewProps) {
+  const bgMode = useImageBackgroundMode();
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const timerRef = useRef<number | null>(null);
@@ -91,7 +96,8 @@ export function ImagePreview({
           <div
             className={cn(
               "h-[400px] w-[480px] overflow-hidden rounded-g-lg border border-g-line-strong",
-              "bg-g-surface shadow-g-pop pointer-events-none animate-[fadeIn_160ms_var(--g-ease)]",
+              "shadow-g-pop pointer-events-none animate-[fadeIn_160ms_var(--g-ease)]",
+              imageBackgroundClassName(bgMode),
             )}
             style={previewStyle}
           >

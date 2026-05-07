@@ -179,7 +179,6 @@ export function AssetDrawer({
                   src={asset.thumbnailUrl || asset.url}
                   alt={fileName(asset.repoPath)}
                   size="fill"
-                  bg="checker"
                   loading="eager"
                   className="size-[104px] rounded-g-lg p-1.5 max-[600px]:size-[84px] [&_img]:max-h-full [&_img]:max-w-full"
                 />

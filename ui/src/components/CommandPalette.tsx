@@ -17,7 +17,7 @@ import type { AssetItem, CustomAssetFilter } from "../types";
 import { cn } from "@/lib/cn";
 import { matchesOCRSearchText } from "../ocrSearch";
 import { fileName, type Mode } from "../ui";
-import { Keycap, TextInput } from "./ui";
+import { AssetThumbnail, Keycap, TextInput } from "./ui";
 import { DialogOverlay, DialogSurface, DialogViewport } from "./ui/DialogShell";
 
 type Props = {
@@ -279,23 +279,12 @@ export function CommandPalette({
                       onMouseEnter={() => setActiveIndex(resultIndex)}
                       onClick={() => selectItem(resultIndex)}
                     >
-                      <span
-                        className="grid place-items-center w-[34px] h-[34px] shrink-0 overflow-hidden border border-g-line rounded-g-md bg-g-surface"
-                        aria-hidden="true"
-                        style={{
-                          backgroundImage:
-                            "linear-gradient(45deg, var(--g-surface-3) 25%, transparent 25%), linear-gradient(-45deg, var(--g-surface-3) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--g-surface-3) 75%), linear-gradient(-45deg, transparent 75%, var(--g-surface-3) 75%)",
-                          backgroundPosition: "0 0, 0 6px, 6px -6px, 6px 0",
-                          backgroundSize: "12px 12px",
-                        }}
-                      >
-                        <img
-                          src={asset.thumbnailUrl || asset.url}
-                          alt=""
-                          loading="lazy"
-                          className="max-w-[90%] max-h-[90%] object-contain"
-                        />
-                      </span>
+                      <AssetThumbnail
+                        src={asset.thumbnailUrl || asset.url}
+                        size="sm"
+                        className="size-[34px] rounded-g-md"
+                        imageClassName="max-w-[90%] max-h-[90%]"
+                      />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-current font-g-mono text-xs font-[510]">
                           {fileName(asset.repoPath)}

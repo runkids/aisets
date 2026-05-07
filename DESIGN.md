@@ -443,7 +443,7 @@ React API:
       .acard-path    mono 10px / Storm Cloud, truncate
       .acard-row     chip stack, 4px gap; compact reference count badge (`N↗`) wrapped in custom `<Tooltip>` with localized full reference count
   ```
-- Thumb backgrounds via `data-bg`: `checker` (14px Charcoal/Pitch Black checker), `light` (`#fff`), `dark` (`--g-canvas`)
+- Thumb backgrounds are driven by the global image background preference: `checker` (14px token checker), `light`, or `dark`; the Browse toolbar may still change this global preference inline.
 
 ### 5.10 Optimize Row `.opt-row`
 
@@ -687,7 +687,7 @@ Canonical shared primitive: `StatCard` from `ui/src/components/ui/StatCard.tsx`.
 Canonical shared primitive: `AssetThumbnail` from `ui/src/components/ui/AssetThumbnail.tsx`.
 
 - Sizes: `sm` 36px, `md` 48px, `lg` 64px, `fill` square container.
-- Backgrounds: `surface`, `checker`, `light`, `dark` mapped to existing thumbnail background rules.
+- Backgrounds: `surface`, `checker`, `light`, `dark` mapped to token-backed thumbnail background rules. Asset thumbnails default to the global image background preference unless a caller intentionally overrides `bg`.
 - Container: `--g-r-sm`, 1px `--g-line`, grid centered, image object-fit contain.
 - Empty `alt` marks the thumbnail as decorative with `aria-hidden`.
 
@@ -973,6 +973,7 @@ Dark shadows can be opaque because the canvas is already black. Light shadows mu
 
 - Default theme preference is **dark** (`localStorage` absence or invalid value → dark). Explicit preferences are `"light"`, `"dark"`, and `"system"`.
 - The Settings theme row uses a three-option segmented control: Light (`Sun`), Dark (`Moon`), and System (`Monitor`). It fills the same control-column width as the language select and distributes the three options evenly. System resolves through `prefers-color-scheme` and updates when the OS preference changes.
+- Settings also owns the global image background preference (`checker`, `light`, `dark`) for asset thumbnails and previews. Browse keeps its inline background segmented control as a convenience entry point, but it writes the same global preference.
 - The resolved theme is applied via `[data-theme='dark' | 'light']` on `<html>`. `:root` defaults to light, dark overrides via attribute.
 - All token-driven components (buttons, inputs, modals, drawers, etc.) automatically theme-swap via CSS custom properties. No component needs `[data-theme]` selectors — theme-aware values flow through `_tokens.scss` and are consumed by Tailwind token aliases and CVA variants.
 

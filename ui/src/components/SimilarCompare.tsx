@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, ZoomableImage, type TabItem } from "@/components/ui";
+import {
+  imageBackgroundClassName,
+  useImageBackgroundMode,
+} from "@/imageBackground";
 import { cn } from "@/lib/cn";
 import { formatBytes } from "@/ui";
 
@@ -99,6 +103,7 @@ export function SimilarCompare({
   mirrored,
 }: Props) {
   const { t } = useTranslation();
+  const bgMode = useImageBackgroundMode();
   const [mode, setMode] = useState<Mode>("side");
   const [opacity, setOpacity] = useState(0.5);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -163,7 +168,10 @@ export function SimilarCompare({
         {mode === "overlay" && (
           <div className="flex flex-col gap-3">
             <div
-              className="relative flex items-center justify-center"
+              className={cn(
+                "relative flex items-center justify-center rounded-g-md",
+                imageBackgroundClassName(bgMode),
+              )}
               style={{ minHeight: 200 }}
             >
               <img

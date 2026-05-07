@@ -1,6 +1,7 @@
 import type { ImgHTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
+import { useImageBackgroundMode } from "@/imageBackground";
 
 const assetThumbnailVariants = cva(
   "grid shrink-0 place-items-center overflow-hidden rounded-g-sm border border-g-line",
@@ -14,10 +15,9 @@ const assetThumbnailVariants = cva(
       },
       bg: {
         surface: "bg-g-surface-2",
-        checker:
-          "bg-[repeating-conic-gradient(var(--g-surface-3)_0_25%,var(--g-canvas)_0_50%)] bg-[length:14px_14px]",
-        light: "bg-white",
-        dark: "bg-g-canvas",
+        checker: "asset-image-bg-checker",
+        light: "asset-image-bg-light",
+        dark: "asset-image-bg-dark",
       },
     },
     defaultVariants: {
@@ -43,9 +43,15 @@ export function AssetThumbnail({
   loading = "lazy",
   ...props
 }: AssetThumbnailProps) {
+  const globalBg = useImageBackgroundMode();
+  const effectiveBg = bg ?? globalBg;
+
   return (
     <span
-      className={cn(assetThumbnailVariants({ size, bg }), className)}
+      className={cn(
+        assetThumbnailVariants({ size, bg: effectiveBg }),
+        className,
+      )}
       aria-hidden={alt === "" ? true : undefined}
     >
       {src && (

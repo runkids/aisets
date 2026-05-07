@@ -9,6 +9,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
+import { cn } from "@/lib/cn";
+import type { ImageBackgroundMode } from "../imageBackground";
+import { imageBackgroundClassName } from "../imageBackground";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { ocrStatusLabel } from "../ocrStatus";
@@ -19,7 +22,7 @@ import { Badge, ImagePreview, Tooltip } from "./ui";
 type BrowseGridProps = {
   items: AssetItem[];
   gridSize: "s" | "m" | "l";
-  bgMode: "checker" | "light" | "dark";
+  bgMode: ImageBackgroundMode;
   bulkMode: boolean;
   selected: Set<string>;
   activeAssetId: string;
@@ -184,8 +187,10 @@ export function BrowseGrid({
           enabled={imagePreviewEnabled}
         >
           <div
-            className="relative grid place-items-center overflow-hidden border-b border-g-line bg-g-surface-2 data-[bg=dark]:bg-g-ink [[data-theme=dark]_&]:data-[bg=dark]:bg-g-canvas data-[bg=light]:bg-g-surface [[data-theme=dark]_&]:data-[bg=light]:bg-g-ink"
-            data-bg={bgMode}
+            className={cn(
+              "relative grid place-items-center overflow-hidden border-b border-g-line",
+              imageBackgroundClassName(bgMode),
+            )}
             style={{
               aspectRatio:
                 cfg.thumbRatio === 1

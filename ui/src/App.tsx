@@ -39,6 +39,11 @@ import {
   useSettingsQuery,
 } from "./queries";
 import { errorMessage } from "./i18n/index";
+import {
+  ImageBackgroundProvider,
+  normalizeImageBackgroundMode,
+  type ImageBackgroundMode,
+} from "./imageBackground";
 import type { ActionPreview, AssetItem, ScanEvent } from "./types";
 import { modeForPath, pathForMode, type Mode } from "./ui";
 
@@ -47,6 +52,8 @@ type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
+const IMAGE_BACKGROUND_STORAGE_KEY = "asset-studio-image-background";
+const BROWSE_STATE_STORAGE_KEY = "asset-studio-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
 const SCAN_ERROR_DISMISS_MS = 3500;
 
@@ -60,6 +67,21 @@ function storedThemePreference(): ThemePreference {
 function resolveThemePreference(theme: ThemePreference): ResolvedTheme {
   if (theme !== "system") return theme;
   return window.matchMedia(SYSTEM_THEME_QUERY).matches ? "dark" : "light";
+}
+
+function storedImageBackgroundMode(): ImageBackgroundMode {
+  const stored = window.localStorage.getItem(IMAGE_BACKGROUND_STORAGE_KEY);
+  const normalized = normalizeImageBackgroundMode(stored, "checker");
+  if (normalized === stored) return normalized;
+
+  try {
+    const browseState = JSON.parse(
+      window.localStorage.getItem(BROWSE_STATE_STORAGE_KEY) ?? "null",
+    ) as { bgMode?: unknown } | null;
+    return normalizeImageBackgroundMode(browseState?.bgMode, "checker");
+  } catch {
+    return "checker";
+  }
 }
 
 export function App() {
@@ -81,6 +103,8 @@ export function App() {
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
   });
+  const [imageBackgroundMode, setImageBackgroundMode] =
+    useState<ImageBackgroundMode>(storedImageBackgroundMode);
 
   const drawerId = searchParams.get("asset") ?? "";
   const browseCustomFilterId = searchParams.get("customFilter") ?? "";
@@ -145,6 +169,13 @@ export function App() {
       imagePreviewEnabled ? "on" : "off",
     );
   }, [imagePreviewEnabled]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      IMAGE_BACKGROUND_STORAGE_KEY,
+      imageBackgroundMode,
+    );
+  }, [imageBackgroundMode]);
 
   useEffect(() => {
     if (scanMutation.isPending) return undefined;
@@ -470,157 +501,165 @@ export function App() {
     [setAutoScrollAssetId],
   );
 
+  const appShell = (
+    <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
+      <div className="col-span-2 row-start-1">
+        <AppTopbar
+          working={working}
+          scanProgress={scanProgressVisible ? scanProgress : null}
+          onAddProject={() => setDirectoryPickerOpen(true)}
+          onRefresh={onRescan}
+          onOpenCmdK={() => setCmdkOpen(true)}
+        />
+      </div>
+      <NavSidebar
+        mode={mode}
+        badges={badges}
+        workspaceName={workspaceName}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        projects={projectSwitchProjects}
+        selectedProjectId={effectiveSelectedProjectId}
+        totalAssets={items.length}
+        onSelectWorkspace={onSwitchWorkspace}
+        onSelectProject={setSelectedProjectId}
+        onSelect={changeMode}
+      />
+      <section className="flex flex-col overflow-hidden bg-transparent">
+        <NoticeStack items={notices} />
+
+        <div className="flex flex-1 overflow-hidden">
+          {mode === "browse" ? (
+            <BrowseView
+              key={
+                selectedProject
+                  ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}`
+                  : `all-projects:${browseCustomFilterId}`
+              }
+              items={browseItems}
+              activeAssetId={drawerId}
+              autoScrollAssetId={autoScrollAssetId}
+              initialCustomFilterId={browseCustomFilterId}
+              customFilters={
+                settingsQuery.data?.settings.customAssetFilters ?? []
+              }
+              projectNames={browseProjectNames}
+              projectFilterName={selectedProject?.name ?? ""}
+              imagePreviewEnabled={imagePreviewEnabled}
+              ocrEnabled={ocrEnabled}
+              ocrFuzzySearch={ocrFuzzySearch}
+              onAutoScrollDone={clearAutoScrollAssetId}
+              onOpenAsset={setDrawerId}
+            />
+          ) : mode === "settings" ? (
+            <SettingsView
+              theme={theme}
+              imagePreviewEnabled={imagePreviewEnabled}
+              imageBackgroundMode={imageBackgroundMode}
+              onThemeChange={setTheme}
+              onImagePreviewEnabledChange={setImagePreviewEnabled}
+              onImageBackgroundModeChange={setImageBackgroundMode}
+            />
+          ) : (
+            <div
+              key={mode}
+              className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+            >
+              {mode === "precheck" ? (
+                <PreCheckView onOpenAsset={openAssetFromPalette} />
+              ) : displayCatalog == null &&
+                !catalogQuery.isLoading ? null : mode === "projects" &&
+                displayCatalog ? (
+                <ProjectsView
+                  catalog={displayCatalog}
+                  onJump={changeMode}
+                  onAddProject={() => setDirectoryPickerOpen(true)}
+                />
+              ) : mode === "duplicates" && scopedCatalog ? (
+                <DuplicatesView
+                  items={scopedItems}
+                  groups={scopedCatalog.duplicateGroups}
+                  nearDuplicates={scopedCatalog.nearDuplicates}
+                  onOpenAsset={setDrawerId}
+                />
+              ) : mode === "unused" ? (
+                <UnusedView items={unusedItems} onOpenAsset={setDrawerId} />
+              ) : mode === "optimize" ? (
+                <OptimizeView items={optimizeItems} onOpenAsset={setDrawerId} />
+              ) : mode === "lint" ? (
+                <LintView findings={lintFindings} onOpenAsset={setDrawerId} />
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <ScrollToTop />
+
+      {drawerAsset && (
+        <AssetDrawer
+          key={drawerAsset.id}
+          asset={drawerAsset}
+          onClose={() => setDrawerId("")}
+          onRename={onRename}
+          onDelete={onDelete}
+          onOpenAsset={setDrawerId}
+        />
+      )}
+
+      <CommandPalette
+        open={cmdkOpen}
+        assets={scopedItems}
+        customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
+        ocrEnabled={ocrEnabled}
+        ocrFuzzySearch={ocrFuzzySearch}
+        onClose={() => setCmdkOpen(false)}
+        onNavigate={changeMode}
+        onOpenAsset={openAssetFromPalette}
+        onOpenCustomFilter={openCustomFilterFromPalette}
+      />
+
+      {directoryPickerOpen && (
+        <DirectoryPickerModal
+          open={directoryPickerOpen}
+          working={addProjectMutation.isPending}
+          initialPath={directoryPickerInitialPath}
+          onClose={() => setDirectoryPickerOpen(false)}
+          onSelect={onAddProject}
+        />
+      )}
+
+      <PromptDialog
+        open={renameTarget != null}
+        title={t("action.rename")}
+        label={t("prompt.renamePath")}
+        defaultValue={renameTarget?.repoPath ?? ""}
+        confirmText={t("action.rename")}
+        cancelText={t("common.cancel")}
+        loading={renamePreviewMutation.isPending}
+        onConfirm={onRenameConfirm}
+        onCancel={() => setRenameTarget(null)}
+      />
+
+      {preview && (
+        <PreviewModal
+          preview={preview.value}
+          working={applyPreviewMutation.isPending}
+          onCancel={() => setPreview(null)}
+          onApply={onApplyPreview}
+        />
+      )}
+    </main>
+  );
+
   return (
     <TooltipPrimitive.Provider delayDuration={400}>
-      <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
-        <div className="col-span-2 row-start-1">
-          <AppTopbar
-            working={working}
-            scanProgress={scanProgressVisible ? scanProgress : null}
-            onAddProject={() => setDirectoryPickerOpen(true)}
-            onRefresh={onRescan}
-            onOpenCmdK={() => setCmdkOpen(true)}
-          />
-        </div>
-        <NavSidebar
-          mode={mode}
-          badges={badges}
-          workspaceName={workspaceName}
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspaceId}
-          projects={projectSwitchProjects}
-          selectedProjectId={effectiveSelectedProjectId}
-          totalAssets={items.length}
-          onSelectWorkspace={onSwitchWorkspace}
-          onSelectProject={setSelectedProjectId}
-          onSelect={changeMode}
-        />
-        <section className="flex flex-col overflow-hidden bg-transparent">
-          <NoticeStack items={notices} />
-
-          <div className="flex flex-1 overflow-hidden">
-            {mode === "browse" ? (
-              <BrowseView
-                key={
-                  selectedProject
-                    ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}`
-                    : `all-projects:${browseCustomFilterId}`
-                }
-                items={browseItems}
-                activeAssetId={drawerId}
-                autoScrollAssetId={autoScrollAssetId}
-                initialCustomFilterId={browseCustomFilterId}
-                customFilters={
-                  settingsQuery.data?.settings.customAssetFilters ?? []
-                }
-                projectNames={browseProjectNames}
-                projectFilterName={selectedProject?.name ?? ""}
-                imagePreviewEnabled={imagePreviewEnabled}
-                ocrEnabled={ocrEnabled}
-                ocrFuzzySearch={ocrFuzzySearch}
-                onAutoScrollDone={clearAutoScrollAssetId}
-                onOpenAsset={setDrawerId}
-              />
-            ) : mode === "settings" ? (
-              <SettingsView
-                theme={theme}
-                imagePreviewEnabled={imagePreviewEnabled}
-                onThemeChange={setTheme}
-                onImagePreviewEnabledChange={setImagePreviewEnabled}
-              />
-            ) : (
-              <div
-                key={mode}
-                className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
-              >
-                {mode === "precheck" ? (
-                  <PreCheckView onOpenAsset={openAssetFromPalette} />
-                ) : displayCatalog == null &&
-                  !catalogQuery.isLoading ? null : mode === "projects" &&
-                  displayCatalog ? (
-                  <ProjectsView
-                    catalog={displayCatalog}
-                    onJump={changeMode}
-                    onAddProject={() => setDirectoryPickerOpen(true)}
-                  />
-                ) : mode === "duplicates" && scopedCatalog ? (
-                  <DuplicatesView
-                    items={scopedItems}
-                    groups={scopedCatalog.duplicateGroups}
-                    nearDuplicates={scopedCatalog.nearDuplicates}
-                    onOpenAsset={setDrawerId}
-                  />
-                ) : mode === "unused" ? (
-                  <UnusedView items={unusedItems} onOpenAsset={setDrawerId} />
-                ) : mode === "optimize" ? (
-                  <OptimizeView
-                    items={optimizeItems}
-                    onOpenAsset={setDrawerId}
-                  />
-                ) : mode === "lint" ? (
-                  <LintView findings={lintFindings} onOpenAsset={setDrawerId} />
-                ) : null}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <ScrollToTop />
-
-        {drawerAsset && (
-          <AssetDrawer
-            key={drawerAsset.id}
-            asset={drawerAsset}
-            onClose={() => setDrawerId("")}
-            onRename={onRename}
-            onDelete={onDelete}
-            onOpenAsset={setDrawerId}
-          />
-        )}
-
-        <CommandPalette
-          open={cmdkOpen}
-          assets={scopedItems}
-          customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
-          ocrEnabled={ocrEnabled}
-          ocrFuzzySearch={ocrFuzzySearch}
-          onClose={() => setCmdkOpen(false)}
-          onNavigate={changeMode}
-          onOpenAsset={openAssetFromPalette}
-          onOpenCustomFilter={openCustomFilterFromPalette}
-        />
-
-        {directoryPickerOpen && (
-          <DirectoryPickerModal
-            open={directoryPickerOpen}
-            working={addProjectMutation.isPending}
-            initialPath={directoryPickerInitialPath}
-            onClose={() => setDirectoryPickerOpen(false)}
-            onSelect={onAddProject}
-          />
-        )}
-
-        <PromptDialog
-          open={renameTarget != null}
-          title={t("action.rename")}
-          label={t("prompt.renamePath")}
-          defaultValue={renameTarget?.repoPath ?? ""}
-          confirmText={t("action.rename")}
-          cancelText={t("common.cancel")}
-          loading={renamePreviewMutation.isPending}
-          onConfirm={onRenameConfirm}
-          onCancel={() => setRenameTarget(null)}
-        />
-
-        {preview && (
-          <PreviewModal
-            preview={preview.value}
-            working={applyPreviewMutation.isPending}
-            onCancel={() => setPreview(null)}
-            onApply={onApplyPreview}
-          />
-        )}
-      </main>
+      <ImageBackgroundProvider
+        mode={imageBackgroundMode}
+        onModeChange={setImageBackgroundMode}
+      >
+        {appShell}
+      </ImageBackgroundProvider>
     </TooltipPrimitive.Provider>
   );
 }

@@ -11,7 +11,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
-import { Badge, Button, EmptyState, IconButton, Modal, Notice } from "./ui";
+import {
+  AssetThumbnail,
+  Badge,
+  Button,
+  EmptyState,
+  IconButton,
+  Modal,
+  Notice,
+} from "./ui";
 
 type Props = {
   items: AssetItem[];
@@ -370,14 +378,11 @@ export function OptimizeView({ items, onOpenAsset }: Props) {
                   )}
                 </IconButton>
               </div>
-              <div className="grid size-16 place-items-center overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-                <img
-                  src={item.thumbnailUrl || item.url}
-                  alt=""
-                  loading="lazy"
-                  className="max-h-14 max-w-14 object-contain"
-                />
-              </div>
+              <AssetThumbnail
+                src={item.thumbnailUrl || item.url}
+                size="lg"
+                className="size-16 rounded-g-md"
+              />
               <div className="min-w-0 text-left">
                 <div className="truncate font-g-mono text-[13px] font-medium">
                   {fileName(item.repoPath)}

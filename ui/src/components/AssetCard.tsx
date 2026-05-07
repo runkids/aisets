@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
-import { Badge, Button } from "./ui";
+import { AssetThumbnail, Badge, Button } from "./ui";
 
 type Props = {
   item: AssetItem;
@@ -15,9 +15,11 @@ export function AssetCard({ item, onRename, onDelete }: Props) {
   const severity = primarySeverity(item);
   return (
     <article className="relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus">
-      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden border-b border-g-line bg-g-surface-2">
-        <img src={item.thumbnailUrl || item.url} alt="" loading="lazy" />
-      </div>
+      <AssetThumbnail
+        src={item.thumbnailUrl || item.url}
+        size="fill"
+        className="aspect-[4/3] rounded-none border-x-0 border-t-0"
+      />
       <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)]">
         <div>
           <div

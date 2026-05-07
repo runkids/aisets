@@ -2,6 +2,9 @@ import { useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, CircleOff, Copy, Sparkles, Square } from "lucide-react";
+import { cn } from "@/lib/cn";
+import type { ImageBackgroundMode } from "../imageBackground";
+import { imageBackgroundClassName } from "../imageBackground";
 import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { ocrStatusLabel } from "../ocrStatus";
@@ -11,7 +14,7 @@ import { Badge, ImagePreview, Tooltip } from "./ui";
 
 type BrowseListProps = {
   items: AssetItem[];
-  bgMode: "checker" | "light" | "dark";
+  bgMode: ImageBackgroundMode;
   bulkMode: boolean;
   selected: Set<string>;
   activeAssetId: string;
@@ -112,8 +115,10 @@ export function BrowseList({
           enabled={imagePreviewEnabled}
         >
           <div
-            className="relative grid size-10 place-items-center overflow-hidden rounded-g-md border border-g-line p-1 data-[bg=dark]:bg-g-ink [[data-theme=dark]_&]:data-[bg=dark]:bg-g-canvas data-[bg=light]:bg-g-surface [[data-theme=dark]_&]:data-[bg=light]:bg-g-ink"
-            data-bg={bgMode}
+            className={cn(
+              "relative grid size-10 place-items-center overflow-hidden rounded-g-md border border-g-line p-1",
+              imageBackgroundClassName(bgMode),
+            )}
           >
             <img
               src={imgSrc}

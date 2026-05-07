@@ -8,6 +8,7 @@ import {
   Filter,
   FolderKanban,
   Globe2,
+  Grid3X3,
   Image,
   Info,
   Keyboard,
@@ -55,6 +56,7 @@ import {
   useUpdateSettingsMutation,
   useVersionQuery,
 } from "../queries";
+import type { ImageBackgroundMode } from "../imageBackground";
 import type {
   CustomAssetFilter,
   CustomAssetFilterClause,
@@ -96,8 +98,10 @@ type ThemePreference = "light" | "dark" | "system";
 type Props = {
   theme: ThemePreference;
   imagePreviewEnabled: boolean;
+  imageBackgroundMode: ImageBackgroundMode;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
+  onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
 };
 
 type Section =
@@ -551,16 +555,6 @@ function sectionIcon(id: Section) {
   return sectionMeta.find((section) => section.id === id)?.icon;
 }
 
-function PathRow({ label, value }: { label: string; value?: string }) {
-  return (
-    <FieldRow label={label}>
-      <code className="max-w-full truncate rounded-g-pill bg-g-surface-2 px-3 py-1 font-g-mono text-g-chip tracking-g-mono text-g-ink-2">
-        {value ?? "..."}
-      </code>
-    </FieldRow>
-  );
-}
-
 const workspaceIconMaxBytes = 512 * 1024;
 const workspaceIconAccept = "image/png,image/jpeg,image/gif,image/webp";
 
@@ -763,8 +757,10 @@ function SettingsActions({
 export function SettingsView({
   theme,
   imagePreviewEnabled,
+  imageBackgroundMode,
   onThemeChange,
   onImagePreviewEnabledChange,
+  onImageBackgroundModeChange,
 }: Props) {
   const { i18n, t } = useTranslation();
   const toast = useToast();
@@ -1670,328 +1666,397 @@ export function SettingsView({
           )}
 
           {activeSection === "theme" && (
-            <Card
-              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
-              padding="none"
-            >
-              <SectionHeading
-                title={t("settings.section.theme")}
-                description={t("settings.appearanceDesc")}
-                icon={sectionIcon("theme")}
-              />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                <FieldRow
-                  label={t("settings.language")}
-                  icon={<Globe2 size={15} />}
-                >
-                  <Select
-                    value={i18n.language}
-                    options={languageOptionsForLocale().map((lang) => ({
-                      value: lang.code,
-                      label: lang.label,
-                    }))}
-                    onChange={(value) => i18n.changeLanguage(value)}
-                    aria-label={t("settings.language")}
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.theme")}
-                  icon={<Paintbrush size={15} />}
-                >
-                  <Tabs
-                    value={theme}
-                    items={[
-                      {
-                        value: "light",
-                        label: t("settings.light"),
-                        icon: <Sun size={15} />,
-                      },
-                      {
-                        value: "dark",
-                        label: t("settings.dark"),
-                        icon: <Moon size={15} />,
-                      },
-                      {
-                        value: "system",
-                        label: t("settings.system"),
-                        icon: <Monitor size={15} />,
-                      },
-                    ]}
-                    onChange={onThemeChange}
-                    ariaLabel={t("settings.theme")}
-                    className="w-full min-w-[280px] max-w-full [&_[role=tab]]:min-w-0 [&_[role=tab]]:flex-1"
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.imagePreview")}
-                  description={t("settings.imagePreviewHint")}
-                  icon={<Image size={15} />}
-                >
-                  <Switch
-                    checked={imagePreviewEnabled}
-                    onCheckedChange={onImagePreviewEnabledChange}
-                    aria-label={t("settings.imagePreview")}
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.preferredEditor")}
-                  description={t("settings.preferredEditorDesc")}
-                  icon={<Code size={15} />}
-                >
-                  <Select
-                    value={settings?.preferredEditor ?? "vscode"}
-                    options={editorOptions}
-                    onChange={(value) =>
-                      updateMutation.mutate({ preferredEditor: value })
-                    }
-                    aria-label={t("settings.preferredEditor")}
-                  />
-                </FieldRow>
-              </div>
-            </Card>
+            <div className="flex flex-col gap-4">
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Globe2 size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.displayGroup")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.language")}
+                    icon={<Globe2 size={15} />}
+                  >
+                    <Select
+                      value={i18n.language}
+                      options={languageOptionsForLocale().map((lang) => ({
+                        value: lang.code,
+                        label: lang.label,
+                      }))}
+                      onChange={(value) => i18n.changeLanguage(value)}
+                      aria-label={t("settings.language")}
+                    />
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.theme")}
+                    icon={<Paintbrush size={15} />}
+                  >
+                    <Tabs
+                      value={theme}
+                      items={[
+                        {
+                          value: "light",
+                          label: t("settings.light"),
+                          icon: <Sun size={15} />,
+                        },
+                        {
+                          value: "dark",
+                          label: t("settings.dark"),
+                          icon: <Moon size={15} />,
+                        },
+                        {
+                          value: "system",
+                          label: t("settings.system"),
+                          icon: <Monitor size={15} />,
+                        },
+                      ]}
+                      onChange={onThemeChange}
+                      ariaLabel={t("settings.theme")}
+                      className="w-full min-w-[280px] max-w-full [&_[role=tab]]:min-w-0 [&_[role=tab]]:flex-1"
+                    />
+                  </FieldRow>
+                </div>
+              </Card>
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Image size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.assetViewingGroup")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.imagePreview")}
+                    description={t("settings.imagePreviewHint")}
+                    icon={<Image size={15} />}
+                  >
+                    <Switch
+                      checked={imagePreviewEnabled}
+                      onCheckedChange={onImagePreviewEnabledChange}
+                      aria-label={t("settings.imagePreview")}
+                    />
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.imageBackground")}
+                    description={t("settings.imageBackgroundHint")}
+                    icon={<Grid3X3 size={15} />}
+                  >
+                    <Tabs
+                      value={imageBackgroundMode}
+                      items={[
+                        {
+                          value: "checker",
+                          label: t("toolbar.checkerBg"),
+                          icon: <Grid3X3 size={15} />,
+                        },
+                        {
+                          value: "light",
+                          label: t("toolbar.lightBg"),
+                          icon: <Sun size={15} />,
+                        },
+                        {
+                          value: "dark",
+                          label: t("toolbar.darkBg"),
+                          icon: <Moon size={15} />,
+                        },
+                      ]}
+                      onChange={onImageBackgroundModeChange}
+                      ariaLabel={t("settings.imageBackground")}
+                      className="w-full min-w-[280px] max-w-full [&_[role=tab]]:min-w-0 [&_[role=tab]]:flex-1"
+                    />
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.preferredEditor")}
+                    description={t("settings.preferredEditorDesc")}
+                    icon={<Code size={15} />}
+                  >
+                    <Select
+                      value={settings?.preferredEditor ?? "vscode"}
+                      options={editorOptions}
+                      onChange={(value) =>
+                        updateMutation.mutate({ preferredEditor: value })
+                      }
+                      aria-label={t("settings.preferredEditor")}
+                    />
+                  </FieldRow>
+                </div>
+              </Card>
+            </div>
           )}
 
           {activeSection === "scanning" && (
-            <Card
-              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
-              padding="none"
-            >
-              <SectionHeading
-                title={t("settings.section.scanning")}
-                description={t("settings.scanningDesc")}
-                icon={sectionIcon("scanning")}
-              />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                <FieldRow
-                  label={t("settings.scanOnOpen")}
-                  description={t("settings.scanOnOpenHint")}
-                  icon={<Scan size={15} />}
-                >
-                  <Switch
-                    checked={draft.scanOnOpen}
-                    onCheckedChange={(next) =>
-                      updateDraft((prev) => ({ ...prev, scanOnOpen: next }))
-                    }
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    aria-label={t("settings.scanOnOpen")}
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.excludePatterns")}
-                  description={t("settings.excludePatternsHint")}
-                  icon={<Sliders size={15} />}
-                  align="start"
-                >
-                  <Textarea
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    value={draft.excludePatternsText}
-                    onChange={(event) =>
-                      updateDraft((prev) => ({
-                        ...prev,
-                        excludePatternsText: event.target.value,
-                      }))
-                    }
-                    placeholder={"node_modules\n.git\ndist/**"}
-                    rows={6}
-                    className="w-full min-[1200px]:w-[420px]"
-                    textareaClassName="min-h-36"
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.ocrEnabled")}
-                  description={t("settings.ocrEnabledHint")}
-                  icon={<Scan size={15} />}
-                >
-                  <Switch
-                    checked={draft.ocrEnabled}
-                    onCheckedChange={(next) =>
-                      updateDraft((prev) => ({ ...prev, ocrEnabled: next }))
-                    }
-                    disabled={
-                      settingsQuery.isLoading || updateMutation.isPending
-                    }
-                    aria-label={t("settings.ocrEnabled")}
-                  />
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.ocrLanguages")}
-                  description={t("settings.ocrLanguagesHint")}
-                  icon={<Globe2 size={15} />}
-                  align="start"
-                >
-                  <div className="w-full min-[1200px]:w-[420px]">
-                    <OCRLanguageSelect
-                      value={draft.ocrLanguages}
-                      packs={ocrLanguagePacks}
-                      onChange={(languages) =>
+            <div className="flex flex-col gap-4">
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Scan size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.catalogGroup")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.scanOnOpen")}
+                    description={t("settings.scanOnOpenHint")}
+                    icon={<Scan size={15} />}
+                  >
+                    <Switch
+                      checked={draft.scanOnOpen}
+                      onCheckedChange={(next) =>
+                        updateDraft((prev) => ({ ...prev, scanOnOpen: next }))
+                      }
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                      aria-label={t("settings.scanOnOpen")}
+                    />
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.excludePatterns")}
+                    description={t("settings.excludePatternsHint")}
+                    icon={<Sliders size={15} />}
+                    align="start"
+                  >
+                    <Textarea
+                      disabled={
+                        settingsQuery.isLoading || updateMutation.isPending
+                      }
+                      value={draft.excludePatternsText}
+                      onChange={(event) =>
                         updateDraft((prev) => ({
                           ...prev,
-                          ocrLanguages: languages,
+                          excludePatternsText: event.target.value,
                         }))
                       }
-                      disabled={
-                        settingsQuery.isLoading || updateMutation.isPending
-                      }
+                      placeholder={"node_modules\n.git\ndist/**"}
+                      rows={6}
+                      className="w-full min-[1200px]:w-[420px]"
+                      textareaClassName="min-h-36 font-g-mono text-g-ui tracking-g-mono"
                     />
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.ocrLimits")}
-                  description={t("settings.ocrLimitsHint")}
-                  icon={<Sliders size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full items-center justify-start min-[1200px]:w-[420px] min-[1200px]:justify-end">
-                    <Button
-                      variant="secondary"
-                      className="min-w-[96px]"
-                      leadingIcon={<Sliders size={14} />}
-                      onClick={() => setOCRLimitsOpen(true)}
-                      aria-label={`${t("settings.ocrLimits")} ${t("settings.ocrLimitsEdit")}`}
+                  </FieldRow>
+                  {updateMutation.error && (
+                    <Notice tone="danger">
+                      {errorMessage(updateMutation.error)}
+                    </Notice>
+                  )}
+                  {settingActions}
+                </div>
+              </Card>
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Scan size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.ocrGroup")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow
+                    label={t("settings.ocrEnabled")}
+                    description={t("settings.ocrEnabledHint")}
+                    icon={<Scan size={15} />}
+                  >
+                    <Switch
+                      checked={draft.ocrEnabled}
+                      onCheckedChange={(next) =>
+                        updateDraft((prev) => ({ ...prev, ocrEnabled: next }))
+                      }
                       disabled={
                         settingsQuery.isLoading || updateMutation.isPending
                       }
-                    >
-                      {t("settings.ocrLimitsEdit")}
-                    </Button>
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.ocrRuntime")}
-                  description={t("settings.ocrRuntimeHint")}
-                  icon={<Download size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
-                    <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
+                      aria-label={t("settings.ocrEnabled")}
+                    />
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.ocrLanguages")}
+                    description={t("settings.ocrLanguagesHint")}
+                    icon={<Globe2 size={15} />}
+                    align="start"
+                  >
+                    <div className="w-full min-[1200px]:w-[420px]">
+                      <OCRLanguageSelect
+                        value={draft.ocrLanguages}
+                        packs={ocrLanguagePacks}
+                        onChange={(languages) =>
+                          updateDraft((prev) => ({
+                            ...prev,
+                            ocrLanguages: languages,
+                          }))
+                        }
+                        disabled={
+                          settingsQuery.isLoading || updateMutation.isPending
+                        }
+                      />
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.ocrLimits")}
+                    description={t("settings.ocrLimitsHint")}
+                    icon={<Sliders size={15} />}
+                    align="start"
+                  >
+                    <div className="flex w-full items-center justify-start min-[1200px]:w-[420px] min-[1200px]:justify-end">
                       <Button
                         variant="secondary"
-                        leadingIcon={
-                          installOCRMutation.isPending ? (
-                            <LoaderCircle
-                              size={14}
-                              className="animate-[icon-spin_900ms_linear_infinite]"
-                            />
-                          ) : (
-                            <Download size={14} />
-                          )
-                        }
-                        onClick={() => void onInstallOCR()}
+                        className="min-w-[96px]"
+                        leadingIcon={<Sliders size={14} />}
+                        onClick={() => setOCRLimitsOpen(true)}
+                        aria-label={`${t("settings.ocrLimits")} ${t("settings.ocrLimitsEdit")}`}
                         disabled={
-                          working ||
-                          ocrWorking ||
-                          !hasSelectedOCRLanguages ||
-                          !hasUninstalledSelectedOCRLanguages
+                          settingsQuery.isLoading || updateMutation.isPending
                         }
                       >
-                        {installOCRMutation.isPending
-                          ? t("settings.ocrInstalling")
-                          : t("settings.ocrInstall")}
+                        {t("settings.ocrLimitsEdit")}
                       </Button>
-                      <Button
-                        variant="secondary"
-                        leadingIcon={
-                          removeOCRMutation.isPending ? (
-                            <LoaderCircle
-                              size={14}
-                              className="animate-[icon-spin_900ms_linear_infinite]"
-                            />
-                          ) : (
-                            <Trash2 size={14} />
-                          )
-                        }
-                        onClick={() => setRemoveOCRConfirmOpen(true)}
-                        disabled={
-                          working ||
-                          ocrWorking ||
-                          !settings?.ocrRuntime.installed
-                        }
-                      >
-                        {removeOCRMutation.isPending
-                          ? t("settings.ocrRemoving")
-                          : t("settings.ocrRemove")}
-                      </Button>
-                      {ocrWorking ? (
+                    </div>
+                  </FieldRow>
+                  <FieldRow
+                    label={t("settings.ocrRuntime")}
+                    description={t("settings.ocrRuntimeHint")}
+                    icon={<Download size={15} />}
+                    align="start"
+                  >
+                    <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
+                      <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
                         <Button
                           variant="secondary"
                           leadingIcon={
-                            ocrRunStopping ? (
+                            installOCRMutation.isPending ? (
                               <LoaderCircle
                                 size={14}
                                 className="animate-[icon-spin_900ms_linear_infinite]"
                               />
                             ) : (
-                              <Square size={14} />
+                              <Download size={14} />
                             )
                           }
-                          onClick={onStopOCR}
-                          disabled={ocrRunStopping}
-                        >
-                          {ocrRunStopping
-                            ? t("settings.ocrStopping")
-                            : t("settings.ocrStop")}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          leadingIcon={<Scan size={14} />}
-                          onClick={() => setRunOCRConfirmOpen(true)}
+                          onClick={() => void onInstallOCR()}
                           disabled={
                             working ||
-                            !draft.ocrEnabled ||
-                            !settings?.ocrRuntime.installed ||
-                            !settings?.ocrRuntime.engineAvailable ||
-                            !selectedOCRLanguagesInstalled
+                            ocrWorking ||
+                            !hasSelectedOCRLanguages ||
+                            !hasUninstalledSelectedOCRLanguages
                           }
                         >
-                          {t("settings.ocrRun")}
+                          {installOCRMutation.isPending
+                            ? t("settings.ocrInstalling")
+                            : t("settings.ocrInstall")}
                         </Button>
-                      )}
-                    </div>
-                    <p className="font-g text-g-caption tracking-g-ui text-g-ink-3">
-                      {settings?.ocrRuntime.installed
-                        ? t("settings.ocrInstalled")
-                        : t("settings.ocrNotInstalled")}
-                    </p>
-                    <p className="w-full rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-left font-g text-g-ui leading-[1.55] tracking-g-ui text-g-ink-3">
-                      {t("settings.ocrCacheScopeHint")}
-                    </p>
-                    {settings?.ocrRuntime.engineAvailable === false && (
-                      <p className="font-g text-g-caption tracking-g-ui text-g-red">
-                        {t("settings.ocrEngineUnavailable", {
-                          error: settings.ocrRuntime.engineError,
-                        })}
+                        <Button
+                          variant="secondary"
+                          leadingIcon={
+                            removeOCRMutation.isPending ? (
+                              <LoaderCircle
+                                size={14}
+                                className="animate-[icon-spin_900ms_linear_infinite]"
+                              />
+                            ) : (
+                              <Trash2 size={14} />
+                            )
+                          }
+                          onClick={() => setRemoveOCRConfirmOpen(true)}
+                          disabled={
+                            working ||
+                            ocrWorking ||
+                            !settings?.ocrRuntime.installed
+                          }
+                        >
+                          {removeOCRMutation.isPending
+                            ? t("settings.ocrRemoving")
+                            : t("settings.ocrRemove")}
+                        </Button>
+                        {ocrWorking ? (
+                          <Button
+                            variant="secondary"
+                            leadingIcon={
+                              ocrRunStopping ? (
+                                <LoaderCircle
+                                  size={14}
+                                  className="animate-[icon-spin_900ms_linear_infinite]"
+                                />
+                              ) : (
+                                <Square size={14} />
+                              )
+                            }
+                            onClick={onStopOCR}
+                            disabled={ocrRunStopping}
+                          >
+                            {ocrRunStopping
+                              ? t("settings.ocrStopping")
+                              : t("settings.ocrStop")}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            leadingIcon={<Scan size={14} />}
+                            onClick={() => setRunOCRConfirmOpen(true)}
+                            disabled={
+                              working ||
+                              !draft.ocrEnabled ||
+                              !settings?.ocrRuntime.installed ||
+                              !settings?.ocrRuntime.engineAvailable ||
+                              !selectedOCRLanguagesInstalled
+                            }
+                          >
+                            {t("settings.ocrRun")}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="font-g text-g-caption tracking-g-ui text-g-ink-3">
+                        {settings?.ocrRuntime.installed
+                          ? t("settings.ocrInstalled")
+                          : t("settings.ocrNotInstalled")}
                       </p>
-                    )}
-                    {settings?.ocrRuntime.installed &&
-                      missingSelectedOCRLanguages.length > 0 && (
+                      <p className="w-full rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-left font-g text-g-ui leading-[1.55] tracking-g-ui text-g-ink-3">
+                        {t("settings.ocrCacheScopeHint")}
+                      </p>
+                      {settings?.ocrRuntime.engineAvailable === false && (
                         <p className="font-g text-g-caption tracking-g-ui text-g-red">
-                          {t("settings.ocrMissingSelectedLanguages", {
-                            languages: missingSelectedOCRLanguages
-                              .map((language) => ocrLanguageLabel(language, t))
-                              .join(", "),
+                          {t("settings.ocrEngineUnavailable", {
+                            error: settings.ocrRuntime.engineError,
                           })}
                         </p>
                       )}
-                    {ocrProgress && (
-                      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
-                        {ocrProgress}
-                      </p>
-                    )}
-                  </div>
-                </FieldRow>
-                {updateMutation.error && (
-                  <Notice tone="danger">
-                    {errorMessage(updateMutation.error)}
-                  </Notice>
-                )}
-                {settingActions}
-              </div>
-            </Card>
+                      {settings?.ocrRuntime.installed &&
+                        missingSelectedOCRLanguages.length > 0 && (
+                          <p className="font-g text-g-caption tracking-g-ui text-g-red">
+                            {t("settings.ocrMissingSelectedLanguages", {
+                              languages: missingSelectedOCRLanguages
+                                .map((language) =>
+                                  ocrLanguageLabel(language, t),
+                                )
+                                .join(", "),
+                            })}
+                          </p>
+                        )}
+                      {ocrProgress && (
+                        <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                          {ocrProgress}
+                        </p>
+                      )}
+                    </div>
+                  </FieldRow>
+                  {updateMutation.error && (
+                    <Notice tone="danger">
+                      {errorMessage(updateMutation.error)}
+                    </Notice>
+                  )}
+                  {settingActions}
+                </div>
+              </Card>
+            </div>
           )}
 
           {activeSection === "customFilters" && (
@@ -2367,7 +2432,7 @@ export function SettingsView({
 
           {activeSection === "optimization" && (
             <Card
-              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
+              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
               padding="none"
             >
               <SectionHeading
@@ -2380,30 +2445,65 @@ export function SettingsView({
                   label={t("settings.defaultQuality")}
                   description={t("settings.defaultQualityHint")}
                   icon={<Sliders size={15} />}
+                  align="start"
                 >
-                  <div className="flex w-full items-center justify-start gap-3 min-[1200px]:justify-end">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={draft.optimizationDefaultQuality}
-                      disabled={
-                        settingsQuery.isLoading || updateMutation.isPending
-                      }
-                      onChange={(event) =>
-                        updateDraft((prev) => ({
-                          ...prev,
-                          optimizationDefaultQuality: Number(
-                            event.target.value,
-                          ),
-                        }))
-                      }
-                      className="w-56 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
-                      aria-label={t("settings.defaultQuality")}
-                    />
-                    <Badge tone="line">
-                      {draft.optimizationDefaultQuality}
-                    </Badge>
+                  <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={draft.optimizationDefaultQuality}
+                        disabled={
+                          settingsQuery.isLoading || updateMutation.isPending
+                        }
+                        onChange={(event) =>
+                          updateDraft((prev) => ({
+                            ...prev,
+                            optimizationDefaultQuality: Number(
+                              event.target.value,
+                            ),
+                          }))
+                        }
+                        className="w-full flex-1 rounded-g-sm accent-g-active-bg focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                        aria-label={t("settings.defaultQuality")}
+                      />
+                      <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                        {draft.optimizationDefaultQuality}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {(
+                        [
+                          { label: t("settings.qualityLow"), value: 60 },
+                          { label: t("settings.qualityStandard"), value: 80 },
+                          { label: t("settings.qualityHigh"), value: 95 },
+                          { label: t("settings.qualityMax"), value: 100 },
+                        ] as const
+                      ).map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          disabled={
+                            settingsQuery.isLoading || updateMutation.isPending
+                          }
+                          onClick={() =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              optimizationDefaultQuality: preset.value,
+                            }))
+                          }
+                          className={cn(
+                            "flex-1 rounded-g-md border px-2 py-1 font-g text-g-caption font-[510] tracking-g-ui transition-[background,border-color,color] duration-[120ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]",
+                            draft.optimizationDefaultQuality === preset.value
+                              ? "border-g-active-bg bg-g-active-bg text-g-active-text"
+                              : "border-g-line bg-g-surface hover:bg-g-surface-2 text-g-ink-2",
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </FieldRow>
                 <FieldRow
@@ -2436,26 +2536,46 @@ export function SettingsView({
           )}
 
           {activeSection === "hotkeys" && (
-            <Card
-              className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm hover:border-g-line hover:shadow-g-sm"
-              padding="none"
-            >
-              <SectionHeading
-                title={t("settings.section.hotkeys")}
-                description={t("settings.hotkeysDesc")}
-                icon={sectionIcon("hotkeys")}
-              />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                {[
-                  { keys: "⌘ P", action: t("settings.hotkeyPalette") },
-                  { keys: "Esc", action: t("settings.hotkeyClose") },
-                ].map(({ keys, action }) => (
-                  <FieldRow key={keys} label={action}>
-                    <Keycap>{keys}</Keycap>
+            <div className="flex flex-col gap-4">
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <Keyboard size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.hotkeyGeneral")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow label={t("settings.hotkeyPalette")}>
+                    <Keycap>⌘ P</Keycap>
                   </FieldRow>
-                ))}
-              </div>
-            </Card>
+                  <FieldRow label={t("settings.hotkeyClose")}>
+                    <Keycap>Esc</Keycap>
+                  </FieldRow>
+                </div>
+              </Card>
+              <Card
+                className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+                padding="none"
+              >
+                <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+                  <ArrowLeftRight size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.hotkeyNavigation")}
+                  </span>
+                </div>
+                <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+                  <FieldRow label={t("settings.hotkeyPrevAsset")}>
+                    <Keycap>←</Keycap>
+                  </FieldRow>
+                  <FieldRow label={t("settings.hotkeyNextAsset")}>
+                    <Keycap>→</Keycap>
+                  </FieldRow>
+                </div>
+              </Card>
+            </div>
           )}
 
           {activeSection === "about" && (
@@ -2468,19 +2588,14 @@ export function SettingsView({
                 description={t("settings.aboutDesc")}
                 icon={sectionIcon("about")}
               />
-              <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-                <FieldRow
-                  label={t("settings.version")}
-                  description={
-                    versionQuery.data?.devMode
-                      ? t("settings.versionDevHint")
-                      : undefined
-                  }
-                  icon={<Info size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[420px] min-[1200px]:items-end">
-                    <div className="flex flex-wrap items-center justify-start gap-2 min-[1200px]:justify-end">
+              <div className="px-6 pt-5 pb-2 md:px-8">
+                {/* ── Version ── */}
+                <div className="flex flex-col gap-3 min-[1200px]:flex-row min-[1200px]:items-start min-[1200px]:justify-between min-[1200px]:gap-8">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
+                        Asset Studio
+                      </span>
                       <Badge tone="default">
                         {versionQuery.data?.currentVersion ?? "dev"}
                       </Badge>
@@ -2498,6 +2613,16 @@ export function SettingsView({
                         <Badge tone="green">{t("settings.upToDate")}</Badge>
                       )}
                     </div>
+                    <p className="mt-1 font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
+                      {t("settings.license")}: MIT
+                      {versionQuery.data?.devMode && (
+                        <span className="ml-2 text-g-ink-3">
+                          · {t("settings.versionDevHint")}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Button
                       variant="secondary"
                       leadingIcon={
@@ -2512,7 +2637,8 @@ export function SettingsView({
                         updateAppMutation.isPending ||
                         versionQuery.isLoading ||
                         (!versionQuery.data?.updateAvailable &&
-                          !versionQuery.data?.devMode)
+                          !versionQuery.data?.devMode &&
+                          !import.meta.env.DEV)
                       }
                     >
                       {updateAppMutation.isPending
@@ -2521,20 +2647,6 @@ export function SettingsView({
                           ? t("settings.updateAction")
                           : t("settings.upToDateAction")}
                     </Button>
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.license")}
-                  icon={<Info size={15} />}
-                >
-                  <span className="font-g text-g-ui text-g-ink-2">MIT</span>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.installApp")}
-                  description={t("settings.installAppHint")}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[420px] min-[1200px]:items-end">
                     <Button
                       variant="secondary"
                       leadingIcon={<Download size={15} />}
@@ -2545,15 +2657,27 @@ export function SettingsView({
                         ? t("settings.installInstalledAction")
                         : t("settings.installAppAction")}
                     </Button>
-                    {installMessage && (
-                      <Notice tone={installedApp ? "success" : "info"}>
-                        {installMessage}
-                      </Notice>
-                    )}
                   </div>
-                </FieldRow>
-                <FieldRow label={t("settings.data")}>
-                  <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
+                </div>
+                {installMessage && (
+                  <div className="mt-2">
+                    <Notice tone={installedApp ? "success" : "info"}>
+                      {installMessage}
+                    </Notice>
+                  </div>
+                )}
+
+                {/* ── Data ── */}
+                <div className="mt-6 border-t border-g-line pt-5">
+                  <div className="mb-3">
+                    <span className="block font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                      {t("settings.data")}
+                    </span>
+                    <p className="mt-0.5 max-w-[48ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
+                      {t("settings.dataDesc")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="secondary"
                       leadingIcon={<Download size={15} />}
@@ -2569,14 +2693,6 @@ export function SettingsView({
                     >
                       {t("settings.import")}
                     </Button>
-                    <Button
-                      variant="danger"
-                      leadingIcon={<RotateCcw size={15} />}
-                      onClick={() => setResetDatabaseOpen(true)}
-                      disabled={working}
-                    >
-                      {t("settings.resetDatabase")}
-                    </Button>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -2588,20 +2704,52 @@ export function SettingsView({
                         if (file) void onImport(file);
                       }}
                     />
+                    <span className="hidden h-4 w-px bg-g-line min-[480px]:block" />
+                    <Button
+                      variant="danger"
+                      leadingIcon={<RotateCcw size={15} />}
+                      onClick={() => setResetDatabaseOpen(true)}
+                      disabled={working}
+                    >
+                      {t("settings.resetDatabase")}
+                    </Button>
                   </div>
-                </FieldRow>
-                <PathRow
-                  label={t("settings.databasePath")}
-                  value={settings?.databasePath}
-                />
-                <PathRow
-                  label={t("settings.dataDir")}
-                  value={settings?.dataDir}
-                />
-                <PathRow
-                  label={t("settings.cacheDir")}
-                  value={settings?.cacheDir}
-                />
+                </div>
+
+                {/* ── Storage ── */}
+                <div className="mt-6 border-t border-g-line pt-5">
+                  <div className="mb-3">
+                    <span className="block font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
+                      {t("settings.storage")}
+                    </span>
+                    <p className="mt-0.5 max-w-[48ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
+                      {t("settings.storageDesc")}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    {(
+                      [
+                        ["databasePath", settings?.databasePath],
+                        ["dataDir", settings?.dataDir],
+                        ["cacheDir", settings?.cacheDir],
+                      ] as const
+                    ).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex flex-col gap-1 rounded-g-md bg-g-surface-2 px-3 py-2.5 min-[1200px]:flex-row min-[1200px]:items-center min-[1200px]:gap-4"
+                      >
+                        <span className="shrink-0 font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2 min-[1200px]:w-[100px]">
+                          {t(`settings.${key}`)}
+                        </span>
+                        <code className="min-w-0 break-all font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                          {value ?? "..."}
+                        </code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-4" />
               </div>
             </Card>
           )}
@@ -2613,12 +2761,21 @@ export function SettingsView({
           description={t("settings.ocrLimitsHelpDesc")}
           size="md"
           onClose={() => setOCRLimitsOpen(false)}
-          bodyClassName="space-y-5"
+          bodyClassName="space-y-4"
         >
           <Notice tone="info">{t("settings.ocrLimitsKeepDefaults")}</Notice>
-          <div className="grid gap-4">
-            <label className="grid gap-2">
-              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+
+          {/* ── Performance group ── */}
+          <fieldset className="space-y-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-3">
+            <legend className="sr-only">
+              {t("settings.ocrGroupPerformance")}
+            </legend>
+            <p className="mb-2.5 font-g text-g-caption font-[510] uppercase tracking-[0.04em] text-g-ink-3">
+              {t("settings.ocrGroupPerformance")}
+            </p>
+
+            <label className="grid gap-1.5">
+              <span className="font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
                 {t("settings.ocrMaxPixels")}
               </span>
               <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
@@ -2626,7 +2783,10 @@ export function SettingsView({
               </span>
               <TextInput
                 type="number"
+                min={100000}
+                step={100000}
                 value={String(draft.ocrMaxPixels)}
+                suffix={<span>{t("settings.ocrMaxPixelsSuffix")}</span>}
                 onChange={(event) =>
                   updateDraft((prev) => ({
                     ...prev,
@@ -2635,9 +2795,15 @@ export function SettingsView({
                 }
                 aria-label={t("settings.ocrMaxPixels")}
               />
+              <span className="font-g text-g-chip tracking-g-ui text-g-ink-3">
+                {t("settings.ocrMaxPixelsDefault")}
+              </span>
             </label>
-            <label className="grid gap-2">
-              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+
+            <div className="my-2 border-t border-g-line" role="separator" />
+
+            <label className="grid gap-1.5">
+              <span className="font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
                 {t("settings.ocrBatchSize")}
               </span>
               <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
@@ -2645,6 +2811,9 @@ export function SettingsView({
               </span>
               <TextInput
                 type="number"
+                min={1}
+                max={200}
+                step={5}
                 value={String(draft.ocrBatchSize)}
                 onChange={(event) =>
                   updateDraft((prev) => ({
@@ -2654,9 +2823,15 @@ export function SettingsView({
                 }
                 aria-label={t("settings.ocrBatchSize")}
               />
+              <span className="font-g text-g-chip tracking-g-ui text-g-ink-3">
+                {t("settings.ocrBatchSizeDefault")}
+              </span>
             </label>
-            <label className="grid gap-2">
-              <span className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+
+            <div className="my-2 border-t border-g-line" role="separator" />
+
+            <label className="grid gap-1.5">
+              <span className="font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
                 {t("settings.ocrConcurrency")}
               </span>
               <span className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
@@ -2675,10 +2850,22 @@ export function SettingsView({
                 }
                 aria-label={t("settings.ocrConcurrency")}
               />
+              <span className="font-g text-g-chip tracking-g-ui text-g-ink-3">
+                {t("settings.ocrConcurrencyDefault")}
+              </span>
             </label>
-            <div className="flex items-start justify-between gap-4 rounded-g-md border border-g-line bg-g-surface-2 px-3 py-3">
+          </fieldset>
+
+          {/* ── Search behavior group ── */}
+          <fieldset className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
+            <legend className="sr-only">{t("settings.ocrGroupSearch")}</legend>
+            <p className="mb-2.5 font-g text-g-caption font-[510] uppercase tracking-[0.04em] text-g-ink-3">
+              {t("settings.ocrGroupSearch")}
+            </p>
+
+            <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className="font-g-display text-g-body font-[590] tracking-g-ui text-g-ink">
+                <div className="font-g text-g-body font-[510] leading-[1.4] tracking-g-ui text-g-ink">
                   {t("settings.ocrFuzzySearch")}
                 </div>
                 <p className="mt-1 font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
@@ -2696,7 +2883,7 @@ export function SettingsView({
                 aria-label={t("settings.ocrFuzzySearch")}
               />
             </div>
-          </div>
+          </fieldset>
         </Modal>
       )}
       {customFiltersHelpOpen && (

@@ -78,13 +78,12 @@ export function AssetDrawerSimilar({ asset, onOpenAsset }: Props) {
                 onClick={() => onOpenAsset?.(dup.id)}
                 className="cursor-pointer overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color] duration-[120ms] ease-g hover:border-g-line-strong focus-visible:outline-none focus-visible:shadow-g-focus"
               >
-                <div className="flex aspect-square items-center justify-center bg-g-surface-2 p-2">
-                  <img
-                    src={dup.thumbnailUrl || dup.url}
-                    alt={fileName(dup.repoPath)}
-                    className="max-h-[85%] max-w-[85%] object-contain"
-                  />
-                </div>
+                <AssetThumbnail
+                  src={dup.thumbnailUrl || dup.url}
+                  alt={fileName(dup.repoPath)}
+                  size="fill"
+                  className="rounded-none border-0 p-2"
+                />
                 <div className="px-2.5 py-2">
                   <div className="truncate font-g-mono text-g-caption text-g-ink">
                     {fileName(dup.repoPath)}

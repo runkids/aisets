@@ -1,6 +1,7 @@
+import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
-import { Badge, Rail, RailItem, RailSection } from "./ui";
+import { Rail, RailItem, RailSection, Tooltip } from "./ui";
 
 type FilterOption = {
   id: string;
@@ -133,12 +134,17 @@ export function FilterRail({
                 count={
                   ocrUnavailable ? (
                     <span className="inline-flex items-center gap-1">
-                      <Badge
-                        tone="amber"
-                        className="h-[18px] px-1.5 text-[9px]"
+                      <Tooltip
+                        label={t("filter.requiresOCRHint")}
+                        placement="top"
                       >
-                        {t("filter.requiresOCR")}
-                      </Badge>
+                        <span
+                          className="inline-grid size-[18px] place-items-center rounded-g-sm text-g-amber"
+                          aria-label={t("filter.requiresOCR")}
+                        >
+                          <TriangleAlert size={13} />
+                        </span>
+                      </Tooltip>
                       <span>{option.count}</span>
                     </span>
                   ) : (

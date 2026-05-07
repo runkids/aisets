@@ -9,6 +9,7 @@ import {
   Trees,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { ImageBackgroundMode } from "../imageBackground";
 import { Select, TextInput, type SegmentedControlItem } from "./ui";
 import {
   BrowseActionToggle,
@@ -25,14 +26,14 @@ type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
 type BrowseToolbarProps = {
   view: ViewMode;
   gridSize: "s" | "m" | "l";
-  bgMode: "checker" | "light" | "dark";
+  bgMode: ImageBackgroundMode;
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
   bulkMode: boolean;
   onViewChange: (view: ViewMode) => void;
   onGridSizeChange: (size: "s" | "m" | "l") => void;
-  onBgModeChange: (mode: "checker" | "light" | "dark") => void;
+  onBgModeChange: (mode: ImageBackgroundMode) => void;
   onSearchChange: (query: string) => void;
   onStatusFilterChange: (status: StatusFilter) => void;
   onSortChange: (sort: SortMode) => void;
