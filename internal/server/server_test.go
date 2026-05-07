@@ -1279,6 +1279,105 @@ func writePNG(t *testing.T, path string) {
 	}
 }
 
+func TestBatchMovePreviewAndApply(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "src", "icon.png"))
+	mustWrite(t, filepath.Join(project, "src", "App.tsx"), `import icon from "./icon.png"`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fetch catalog to get asset ID.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+	}
+	var catalog struct {
+		Items []struct {
+			ID       string `json:"id"`
+			RepoPath string `json:"repoPath"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Items) != 1 {
+		t.Fatalf("expected 1 catalog item, got %d", len(catalog.Items))
+	}
+	assetID := catalog.Items[0].ID
+
+	// POST batch move preview.
+	payload, _ := json.Marshal(map[string]any{"assetIds": []string{assetID}, "targetDir": "assets"})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/move/preview", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch move preview = %d %s", rec.Code, rec.Body.String())
+	}
+	var previewResp struct {
+		Token   string `json:"token"`
+		Preview struct {
+			CanApply bool `json:"canApply"`
+		} `json:"preview"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &previewResp); err != nil {
+		t.Fatal(err)
+	}
+	if previewResp.Token == "" || !previewResp.Preview.CanApply {
+		t.Fatalf("batch move preview body = %#v", previewResp)
+	}
+
+	// POST batch move apply.
+	payload, _ = json.Marshal(map[string]string{"token": previewResp.Token})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/move/apply", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch move apply = %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"movedFiles":1`) {
+		t.Fatalf("batch move apply result = %s", rec.Body.String())
+	}
+
+	// Verify file moved on disk.
+	if _, err := os.Stat(filepath.Join(project, "assets", "icon.png")); err != nil {
+		t.Fatalf("icon.png should have been moved to assets/: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "src", "icon.png")); !os.IsNotExist(err) {
+		t.Fatal("src/icon.png should no longer exist")
+	}
+
+	// Verify reference updated.
+	content, _ := os.ReadFile(filepath.Join(project, "src", "App.tsx"))
+	if !strings.Contains(string(content), "../assets/icon.png") {
+		t.Fatalf("reference not updated, content = %s", content)
+	}
+
+	// Reusing the same token should fail.
+	payload, _ = json.Marshal(map[string]string{"token": previewResp.Token})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/actions/batch/move/apply", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"code":"preview_token_invalid"`) {
+		t.Fatalf("reused batch token = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

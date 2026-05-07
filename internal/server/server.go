@@ -34,22 +34,24 @@ type Server struct {
 	ocrEngine ocr.Engine
 	onReady   func()
 
-	mu       sync.Mutex
-	catalog  scanner.Catalog
-	previews map[string]actions.Preview
+	mu            sync.Mutex
+	catalog       scanner.Catalog
+	previews      map[string]actions.Preview
+	batchPreviews map[string]actions.BatchPreview
 }
 
 func New(opts Options) (*Server, error) {
 	s := &Server{
-		addr:      opts.Addr,
-		basePath:  normalizeBasePath(opts.BasePath),
-		store:     opts.Store,
-		uiDistDir: opts.UIDistDir,
-		version:   opts.Version,
-		mux:       http.NewServeMux(),
-		scanner:   scanner.New(),
-		ocrEngine: ocr.NewDefaultEngine(config.DataDir()),
-		previews:  map[string]actions.Preview{},
+		addr:          opts.Addr,
+		basePath:      normalizeBasePath(opts.BasePath),
+		store:         opts.Store,
+		uiDistDir:     opts.UIDistDir,
+		version:       opts.Version,
+		mux:           http.NewServeMux(),
+		scanner:       scanner.New(),
+		ocrEngine:     ocr.NewDefaultEngine(config.DataDir()),
+		previews:      map[string]actions.Preview{},
+		batchPreviews: map[string]actions.BatchPreview{},
 	}
 	s.routes()
 	s.handler = s.wrapBasePath(s.mux)
@@ -121,6 +123,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/actions/delete-unused/preview", s.handleDeletePreview)
 	s.mux.HandleFunc("POST /api/actions/delete-unused/apply", s.handleApply)
 	s.mux.HandleFunc("POST /api/actions/batch/delete", s.handleBatchDelete)
+	s.mux.HandleFunc("POST /api/actions/batch/move/preview", s.handleBatchMovePreview)
+	s.mux.HandleFunc("POST /api/actions/batch/move/apply", s.handleBatchApply)
+	s.mux.HandleFunc("POST /api/actions/batch/rename/preview", s.handleBatchRenamePreview)
+	s.mux.HandleFunc("POST /api/actions/batch/rename/apply", s.handleBatchApply)
 	s.mux.HandleFunc("POST /api/pre-check", s.handlePreCheck)
 	s.mux.HandleFunc("POST /api/actions/optimization/estimate", s.handleOptimizationEstimate)
 	s.mux.HandleFunc("POST /api/actions/optimization/generate-script", s.handleOptimizationGenerateScript)
