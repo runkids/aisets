@@ -122,8 +122,11 @@
   "common": {
     "cancel": "취소",
     "close": "닫기",
+    "loading": "로딩 중",
     "noResults": "결과 없음",
-    "none": "(없음)"
+    "none": "(없음)",
+    "retry": "다시 시도",
+    "yes": "예"
   },
   "status": {
     "scanning": "스캔 중",
@@ -249,8 +252,10 @@
     "canSave": "Can save ~{{size}}",
     "keep": "keep",
     "flipped": "뒤집힘",
-    "noExact": "No exact duplicates found.",
-    "noSimilar": "No similar assets detected."
+    "noExact": "정확히 일치하는 중복이 없습니다.",
+    "noExactDesc": "스캔된 모든 에셋이 고유합니다.",
+    "noSimilar": "유사한 에셋이 감지되지 않았습니다.",
+    "noSimilarDesc": "이번 스캔에서 시각적으로 유사한 에셋이 감지되지 않았습니다."
   },
   "optimize": {
     "title": "Optimize",
@@ -301,7 +306,8 @@
     "sortName": "이름",
     "sortSize": "크기",
     "sortRecent": "최근",
-    "bulkSelect": "일괄 선택"
+    "bulkSelect": "일괄 선택",
+    "clearSearch": "검색 지우기"
   },
   "browse": {
     "empty": "현재 필터와 일치하는 에셋이 없습니다",
@@ -317,14 +323,16 @@
     "listHeaderRefs": "참조",
     "listHeaderProject": "프로젝트",
     "listHeaderStatus": "상태",
-    "allFolders": "모든 폴더"
+    "allFolders": "모든 폴더",
+    "loadMore": "더 불러오기"
   },
   "lint": {
     "title": "Lint",
     "findingsCount": "발견 {{count}}개",
     "description": "성능 또는 접근성에 영향을 줄 수 있는 코드 수준 사용 패턴.",
     "searchPlaceholder": "파일 또는 규칙으로 필터...",
-    "empty": "현재 필터와 일치하는 lint 발견이 없습니다."
+    "empty": "현재 필터와 일치하는 lint 발견이 없습니다.",
+    "emptyDesc": "검색 조건 또는 심각도 필터를 조정해 보세요."
   },
   "commandPalette": {
     "placeholder": "에셋 검색 또는 페이지 이동...",
@@ -374,7 +382,11 @@
     "more": "+{{count}} more",
     "optimization": "Optimization",
     "duplicates": "Duplicates ({{count}})",
-    "actions": "Actions"
+    "actions": "Actions",
+    "modified": "수정일",
+    "animated": "애니메이션",
+    "alphaChannel": "알파",
+    "imagePages": "페이지"
   },
   "settings": {
     "section": {
@@ -417,6 +429,26 @@
     "ocrGroup": "텍스트 인식 (OCR)",
     "scanOnOpen": "워크스페이스를 열 때 스캔",
     "scanOnOpenHint": "Asset Studio가 시작되고 프로젝트가 로드되면 catalog를 한 번 자동으로 다시 스캔합니다.",
+    "scanProfileLabel": "스캔 모드",
+    "scanProfileHint": "큰 워크스페이스는 기본적으로 Fast를 사용합니다. Full은 모든 분석을 실행합니다.",
+    "scanProfile": {
+      "fast": "Fast",
+      "fastHint": "파일을 탐색하고 이미지 metadata를 읽은 뒤 exact duplicates를 만듭니다.",
+      "full": "Full",
+      "fullHint": "references, near duplicates, optimization 제안도 계산합니다.",
+      "custom": "Custom",
+      "customHint": "비용이 큰 분석을 선택해 실행합니다."
+    },
+    "scanAnalysesLabel": "사용자 지정 분석",
+    "scanAnalysesHint": "건너뛴 분석은 0개가 아니라 not computed로 표시됩니다.",
+    "scanAnalyses": {
+      "references": "References",
+      "referencesHint": "코드 참조와 미사용 에셋을 찾습니다.",
+      "nearDuplicates": "Near duplicates",
+      "nearDuplicatesHint": "perceptual hash로 시각적으로 비슷한 파일을 비교합니다.",
+      "optimization": "Optimization",
+      "optimizationHint": "형식 및 압축 제안을 계산합니다."
+    },
     "excludePatterns": "제외 패턴",
     "excludePatternsHint": "repo 상대 패턴을 한 줄에 하나씩 입력합니다. 쉼표 구분도 사용할 수 있습니다(예: dist/** 또는 tmp).",
     "customFilters": "사용자 지정 필터",
@@ -526,7 +558,7 @@
     "save": "저장",
     "reset": "재설정",
     "resetSettings": "설정 재설정",
-    "resetSettingsConfirm": "모든 앱 설정을 기본값으로 재설정할까요? 프로젝트, 스캔, 파일은 유지되지만 시작 환경설정, 최적화 기본값, 사용자 지정 필터는 재설정됩니다.",
+    "resetSettingsConfirm": "모든 앱 설정을 기본값으로 재설정하고 OCR 언어 팩을 제거할까요? 프로젝트, 스캔, 파일은 유지되지만 시작 환경설정, 최적화 기본값, 사용자 지정 필터 및 설치된 OCR 데이터는 삭제됩니다.",
     "data": "데이터",
     "dataDesc": "로컬 Asset Studio 상태를 내보내기, 가져오기 또는 재설정합니다.",
     "export": "내보내기",
@@ -552,11 +584,23 @@
     "removeWorkspaceConfirm": "{{name}}을(를) 삭제할까요? 프로젝트 파일은 디스크에 남지만 이 워크스페이스와 추적 중인 프로젝트 목록은 제거됩니다.",
     "removeWorkspaceSuccess": "{{name}} 워크스페이스를 삭제했습니다"
   },
+  "catalog": {
+    "notComputed": {
+      "referencesTitle": "References가 계산되지 않았습니다",
+      "referencesDesc": "Fast scan은 reference analysis를 건너뛰므로 이번 스캔에서는 unused assets를 판단할 수 없습니다.",
+      "nearTitle": "Near duplicates가 계산되지 않았습니다",
+      "nearDesc": "Fast scan은 exact duplicate 데이터만 유지합니다. 시각적으로 비슷한 에셋을 비교하려면 full scan을 실행하세요.",
+      "optimizationTitle": "Optimization이 계산되지 않았습니다",
+      "optimizationDesc": "Fast scan은 형식 및 압축 제안을 건너뜁니다. 최적화 가능한 에셋을 보려면 full scan을 실행하세요.",
+      "fullScan": "Full scan 실행"
+    }
+  },
   "unused": {
     "title": "미사용",
     "description": "마지막 스캔에서 코드 참조가 발견되지 않은 에셋입니다. 삭제 전에 검토하세요.",
     "total": "합계: {{size}}",
-    "empty": "미사용 에셋이 없습니다."
+    "empty": "미사용 에셋이 없습니다.",
+    "emptyDesc": "스캔된 모든 에셋에 코드 참조가 있습니다."
   },
   "projects": {
     "workspaceName": "Asset Studio",

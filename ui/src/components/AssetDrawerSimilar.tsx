@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useCatalogQuery } from "../queries";
-import type { AssetItem } from "../types";
+import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { SimilarCompare } from "./SimilarCompare";
 import { AssetThumbnail, EmptyState } from "./ui";
@@ -15,51 +14,43 @@ type EnrichedSimilar = {
 
 type Props = {
   asset: AssetItem;
+  duplicateItems: AssetItem[];
+  similarItems: AssetItem[];
+  nearDuplicates: NearDuplicate[];
   onOpenAsset?: (id: string) => void;
 };
 
-export function AssetDrawerSimilar({ asset, onOpenAsset }: Props) {
+export function AssetDrawerSimilar({
+  asset,
+  duplicateItems,
+  similarItems,
+  nearDuplicates,
+  onOpenAsset,
+}: Props) {
   const { t } = useTranslation();
-  const catalogQuery = useCatalogQuery();
   const [selectedIdx, setSelectedIdx] = useState(0);
 
-  const catalog = catalogQuery.data;
-  const itemMap = useMemo(
-    () => new Map(catalog?.items.map((i) => [i.id, i]) ?? []),
-    [catalog?.items],
-  );
-  const pathToItem = useMemo(
-    () => new Map(catalog?.items.map((i) => [i.repoPath, i]) ?? []),
-    [catalog?.items],
-  );
-
-  const duplicateItems = useMemo(
-    () =>
-      asset.duplicates
-        .map((path) => pathToItem.get(path))
-        .filter((i): i is AssetItem => i != null && i.id !== asset.id),
-    [asset.duplicates, asset.id, pathToItem],
-  );
-
   const enriched = useMemo(() => {
-    if (!catalog) return [];
-    return asset.similar
-      .map((id) => {
-        const item = itemMap.get(id);
-        if (!item) return null;
-        const nd = catalog.nearDuplicates.find(
+    return similarItems
+      .map((item) => {
+        const nd = nearDuplicates.find(
           (n) =>
-            (n.leftId === asset.id && n.rightId === id) ||
-            (n.rightId === asset.id && n.leftId === id),
+            (n.leftId === asset.id && n.rightId === item.id) ||
+            (n.rightId === asset.id && n.leftId === item.id),
         );
         const maxDistance = 64;
         const similarity = nd
           ? Math.round(((maxDistance - nd.distance) / maxDistance) * 100)
           : 0;
-        return { id, item, similarity, mirrored: nd?.flipped ?? false };
+        return {
+          id: item.id,
+          item,
+          similarity,
+          mirrored: nd?.flipped ?? false,
+        };
       })
       .filter((x): x is EnrichedSimilar => x !== null);
-  }, [asset.id, asset.similar, catalog, itemMap]);
+  }, [asset.id, nearDuplicates, similarItems]);
 
   const selected = enriched[selectedIdx] ?? enriched[0];
 

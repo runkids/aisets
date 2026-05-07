@@ -1,4 +1,12 @@
-import { Check, Copy, ExternalLink, Pencil, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  LoaderCircle,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -9,7 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useSettingsQuery } from "../queries";
-import type { AssetItem } from "../types";
+import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
 import { AssetDrawerOptimize } from "./AssetDrawerOptimize";
@@ -54,6 +62,12 @@ type Props = {
   onRename?: (item: AssetItem) => void;
   onDelete?: (item: AssetItem) => void;
   onOpenAsset?: (id: string) => void;
+  duplicateItems?: AssetItem[];
+  similarItems?: AssetItem[];
+  nearDuplicates?: NearDuplicate[];
+  detailLoading?: boolean;
+  detailError?: string;
+  onRetryDetail?: () => void;
 };
 
 export function AssetDrawer({
@@ -62,6 +76,12 @@ export function AssetDrawer({
   onRename,
   onDelete,
   onOpenAsset,
+  duplicateItems = [],
+  similarItems = [],
+  nearDuplicates = [],
+  detailLoading = false,
+  detailError,
+  onRetryDetail,
 }: Props) {
   const { t } = useTranslation();
   const [rawTab, setRawTab] = useState<DrawerTab>("overview");
@@ -77,7 +97,9 @@ export function AssetDrawer({
     asset.image.width > 0 && asset.image.height > 0
       ? `${asset.image.width} × ${asset.image.height}`
       : null;
-  const similarCount = asset.duplicates.length + asset.similar.length;
+  const similarCount =
+    (duplicateItems.length || asset.duplicates.length) +
+    (similarItems.length || asset.similar.length);
   const isUnused = asset.references.length === 0;
 
   const tabs = useMemo(() => {
@@ -163,7 +185,7 @@ export function AssetDrawer({
         </DialogPrimitive.Overlay>
         <DialogPrimitive.Content asChild>
           <DialogDrawerSurface>
-            <header className="relative flex flex-col gap-3.5 border-b border-g-line bg-gradient-to-b from-g-surface-2 to-g-surface px-5 pb-3.5 pt-4 max-[600px]:px-4">
+            <header className="relative flex flex-col gap-3 border-b border-g-line bg-gradient-to-b from-g-surface-2 to-g-surface px-5 pb-3 pt-3.5 max-[600px]:px-4">
               <DialogPrimitive.Close asChild>
                 <IconButton
                   size="sm"
@@ -174,50 +196,49 @@ export function AssetDrawer({
                 </IconButton>
               </DialogPrimitive.Close>
 
-              <div className="grid grid-cols-[104px_minmax(0,1fr)] items-start gap-4 pr-9 max-[600px]:grid-cols-[84px_minmax(0,1fr)] max-[600px]:gap-3">
+              <div className="grid grid-cols-[80px_minmax(0,1fr)] items-start gap-3.5 pr-9 max-[600px]:grid-cols-[64px_minmax(0,1fr)] max-[600px]:gap-3">
                 <AssetThumbnail
                   src={asset.thumbnailUrl || asset.url}
                   alt={fileName(asset.repoPath)}
                   size="fill"
                   loading="eager"
-                  className="size-[104px] rounded-g-lg p-1.5 max-[600px]:size-[84px] [&_img]:max-h-full [&_img]:max-w-full"
+                  className="size-[80px] rounded-g-lg p-1 max-[600px]:size-[64px] [&_img]:max-h-full [&_img]:max-w-full"
                 />
 
                 <div className="min-w-0">
                   <DialogPrimitive.Title asChild>
                     <h2
-                      className="line-clamp-2 break-all font-g-display text-lg font-[650] leading-tight tracking-[-0.025em] text-g-ink"
+                      className="line-clamp-2 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
                       title={fileName(asset.repoPath)}
                     >
                       {fileName(asset.repoPath)}
                     </h2>
                   </DialogPrimitive.Title>
                   <div
-                    className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui text-g-ink-3"
+                    className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui text-g-ink-3"
                     title={asset.repoPath}
                   >
                     {asset.repoPath}
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-                    <HeroStat
-                      label={t("assetDrawer.format")}
-                      value={asset.ext.replace(".", "").toUpperCase()}
-                    />
+                  <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-g-mono text-g-caption tabular-nums text-g-ink-2">
+                    <span className="font-medium text-g-ink">
+                      {asset.ext.replace(".", "").toUpperCase()}
+                    </span>
                     {dimensions && (
-                      <HeroStat
-                        label={t("assetDrawer.dimensions")}
-                        value={dimensions}
-                      />
+                      <>
+                        <span className="text-g-ink-5">·</span>
+                        <span>{dimensions}</span>
+                      </>
                     )}
-                    <HeroStat
-                      label={t("assetDrawer.size")}
-                      value={formatBytes(asset.bytes)}
-                    />
-                    <HeroStat
-                      label={t("assetDrawer.usedFiles")}
-                      value={asset.references.length.toString()}
-                    />
+                    <span className="text-g-ink-5">·</span>
+                    <span>{formatBytes(asset.bytes)}</span>
+                    <span className="text-g-ink-5">·</span>
+                    <span className="text-g-ink-3">
+                      {t("assetDrawer.refCount", {
+                        count: asset.references.length,
+                      })}
+                    </span>
                   </div>
 
                   {(isUnused ||
@@ -225,7 +246,7 @@ export function AssetDrawer({
                     asset.similar.length > 0 ||
                     asset.optimizationRecommendations.length > 0 ||
                     ocrVisible) && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {isUnused && (
                         <HeroBadgeButton
                           onClick={() => handleTabChange("usage")}
@@ -343,6 +364,26 @@ export function AssetDrawer({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 max-[600px]:p-4">
+              {detailLoading && (
+                <div className="mb-3 flex min-h-8 items-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 px-3 text-g-caption text-g-ink-3">
+                  <LoaderCircle size={14} className="animate-spin" />
+                  {t("common.loading")}
+                </div>
+              )}
+              {detailError && (
+                <div className="mb-3 flex min-h-10 items-center gap-3 rounded-g-md border border-g-line bg-g-surface-2 px-3 text-g-caption text-g-ink-2">
+                  <span className="min-w-0 flex-1">{detailError}</span>
+                  {onRetryDetail && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={onRetryDetail}
+                    >
+                      {t("common.retry")}
+                    </Button>
+                  )}
+                </div>
+              )}
               {tab === "overview" && <AssetDrawerOverview asset={asset} />}
               {tab === "usage" && (
                 <AssetDrawerUsage
@@ -351,7 +392,13 @@ export function AssetDrawer({
                 />
               )}
               {tab === "similar" && (
-                <AssetDrawerSimilar asset={asset} onOpenAsset={onOpenAsset} />
+                <AssetDrawerSimilar
+                  asset={asset}
+                  duplicateItems={duplicateItems}
+                  similarItems={similarItems}
+                  nearDuplicates={nearDuplicates}
+                  onOpenAsset={onOpenAsset}
+                />
               )}
               {tab === "optimize" && (
                 <AssetDrawerOptimize
@@ -366,19 +413,6 @@ export function AssetDrawer({
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
-  );
-}
-
-function HeroStat({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex min-w-0 flex-col gap-0.5">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
-        {label}
-      </span>
-      <span className="font-g-mono text-g-caption text-g-ink tabular-nums">
-        {value}
-      </span>
-    </span>
   );
 }
 

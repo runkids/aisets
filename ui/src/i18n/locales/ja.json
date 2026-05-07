@@ -122,8 +122,11 @@
   "common": {
     "cancel": "キャンセル",
     "close": "閉じる",
+    "loading": "読み込み中",
     "noResults": "結果なし",
-    "none": "（なし）"
+    "none": "（なし）",
+    "retry": "再試行",
+    "yes": "はい"
   },
   "status": {
     "scanning": "スキャン中",
@@ -237,8 +240,10 @@
     "canSave": "Can save ~{{size}}",
     "keep": "keep",
     "flipped": "反転",
-    "noExact": "No exact duplicates found.",
-    "noSimilar": "No similar assets detected."
+    "noExact": "完全一致する重複はありません。",
+    "noExactDesc": "スキャンされたすべてのアセットはユニークです。",
+    "noSimilar": "類似アセットは検出されませんでした。",
+    "noSimilarDesc": "このスキャンでは視覚的に類似したアセットは検出されませんでした。"
   },
   "optimize": {
     "title": "Optimize",
@@ -289,7 +294,8 @@
     "sortName": "名前",
     "sortSize": "サイズ",
     "sortRecent": "最近",
-    "bulkSelect": "一括選択"
+    "bulkSelect": "一括選択",
+    "clearSearch": "検索をクリア"
   },
   "browse": {
     "empty": "現在のフィルターに一致するアセットはありません",
@@ -305,14 +311,16 @@
     "listHeaderRefs": "参照",
     "listHeaderProject": "プロジェクト",
     "listHeaderStatus": "状態",
-    "allFolders": "すべてのフォルダー"
+    "allFolders": "すべてのフォルダー",
+    "loadMore": "さらに読み込む"
   },
   "lint": {
     "title": "Lint",
     "findingsCount": "{{count}} 件の検出",
     "description": "パフォーマンスまたはアクセシビリティに影響する可能性があるコードレベルの利用パターン。",
     "searchPlaceholder": "ファイルまたはルールで絞り込み...",
-    "empty": "現在のフィルターに一致する lint 検出はありません。"
+    "empty": "現在のフィルターに一致する lint 検出はありません。",
+    "emptyDesc": "検索条件または重大度フィルターを調整してみてください。"
   },
   "commandPalette": {
     "placeholder": "アセット検索またはページ移動...",
@@ -362,7 +370,11 @@
     "more": "+{{count}} more",
     "optimization": "Optimization",
     "duplicates": "Duplicates ({{count}})",
-    "actions": "Actions"
+    "actions": "Actions",
+    "modified": "更新日",
+    "animated": "アニメーション",
+    "alphaChannel": "アルファ",
+    "imagePages": "ページ数"
   },
   "settings": {
     "section": {
@@ -405,6 +417,26 @@
     "ocrGroup": "テキスト認識 (OCR)",
     "scanOnOpen": "ワークスペースを開いた時にスキャン",
     "scanOnOpenHint": "Asset Studio の起動後、プロジェクトを読み込んだら catalog を一度自動で再スキャンします。",
+    "scanProfileLabel": "スキャンモード",
+    "scanProfileHint": "大きなワークスペースでは Fast が既定です。Full はすべての分析を実行します。",
+    "scanProfile": {
+      "fast": "Fast",
+      "fastHint": "ファイルを走査し、画像 metadata を読み取り、exact duplicates を作成します。",
+      "full": "Full",
+      "fullHint": "references、near duplicates、optimization 提案も計算します。",
+      "custom": "Custom",
+      "customHint": "高コストな分析を選んで実行します。"
+    },
+    "scanAnalysesLabel": "カスタム分析",
+    "scanAnalysesHint": "スキップした分析は 0 件ではなく not computed として表示されます。",
+    "scanAnalyses": {
+      "references": "References",
+      "referencesHint": "コード参照と未使用アセットを探します。",
+      "nearDuplicates": "Near duplicates",
+      "nearDuplicatesHint": "perceptual hash で見た目が近いファイルを比較します。",
+      "optimization": "Optimization",
+      "optimizationHint": "形式と圧縮の提案を計算します。"
+    },
     "excludePatterns": "除外パターン",
     "excludePatternsHint": "repo 相対パターンを 1 行に 1 つ指定します。カンマ区切りも使えます（例: dist/** や tmp）。",
     "customFilters": "カスタムフィルター",
@@ -514,7 +546,7 @@
     "save": "保存",
     "reset": "リセット",
     "resetSettings": "設定をリセット",
-    "resetSettingsConfirm": "すべてのアプリ設定を既定値に戻しますか？プロジェクト、スキャン、ファイルは保持されますが、起動設定、最適化の既定値、カスタムフィルターはリセットされます。",
+    "resetSettingsConfirm": "すべてのアプリ設定を既定値に戻し、OCR 言語パックをアンインストールしますか？プロジェクト、スキャン、ファイルは保持されますが、起動設定、最適化の既定値、カスタムフィルター、インストール済みの OCR データは削除されます。",
     "data": "データ",
     "dataDesc": "ローカルの Asset Studio 状態をエクスポート、インポート、またはリセットします。",
     "export": "エクスポート",
@@ -547,11 +579,23 @@
     "removeWorkspaceConfirm": "{{name}} を削除しますか？プロジェクトファイルはディスクに残りますが、このワークスペースと追跡中のプロジェクト一覧は削除されます。",
     "removeWorkspaceSuccess": "ワークスペース {{name}} を削除しました"
   },
+  "catalog": {
+    "notComputed": {
+      "referencesTitle": "References は未計算です",
+      "referencesDesc": "Fast scan は reference analysis をスキップするため、このスキャンでは unused assets を判定できません。",
+      "nearTitle": "Near duplicates は未計算です",
+      "nearDesc": "Fast scan は exact duplicate データだけを保持します。見た目が近いアセットを比較するには full scan を実行してください。",
+      "optimizationTitle": "Optimization は未計算です",
+      "optimizationDesc": "Fast scan は形式と圧縮の提案をスキップします。最適化可能なアセットを見るには full scan を実行してください。",
+      "fullScan": "Full scan を実行"
+    }
+  },
   "unused": {
     "title": "未使用",
     "description": "前回のスキャンでコード参照が見つからなかったアセットです。削除前に確認してください。",
     "total": "合計：{{size}}",
-    "empty": "未使用アセットはありません。"
+    "empty": "未使用アセットはありません。",
+    "emptyDesc": "スキャンされたすべてのアセットにコード参照があります。"
   },
   "projects": {
     "workspaceName": "Asset Studio",

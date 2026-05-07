@@ -129,8 +129,11 @@
   "common": {
     "cancel": "取消",
     "close": "關閉",
+    "loading": "載入中",
     "noResults": "沒有結果",
-    "none": "（無）"
+    "none": "（無）",
+    "retry": "重試",
+    "yes": "是"
   },
   "status": {
     "scanning": "正在掃描",
@@ -269,7 +272,9 @@
     "keep": "保留",
     "flipped": "翻轉",
     "noExact": "沒有找到完全相同的重複素材",
-    "noSimilar": "沒有偵測到相似素材"
+    "noExactDesc": "所有掃描的素材都是獨一無二的。",
+    "noSimilar": "沒有偵測到相似素材",
+    "noSimilarDesc": "此次掃描未偵測到視覺上相似的素材。"
   },
   "optimize": {
     "title": "最佳化",
@@ -320,7 +325,8 @@
     "sortName": "名稱",
     "sortSize": "大小",
     "sortRecent": "最近",
-    "bulkSelect": "批次選取"
+    "bulkSelect": "批次選取",
+    "clearSearch": "清除搜尋"
   },
   "browse": {
     "empty": "沒有素材符合目前篩選",
@@ -337,14 +343,16 @@
     "listHeaderRefs": "引用",
     "listHeaderProject": "專案",
     "listHeaderStatus": "狀態",
-    "allFolders": "所有資料夾"
+    "allFolders": "所有資料夾",
+    "loadMore": "載入更多"
   },
   "lint": {
     "title": "Lint",
     "findingsCount": "{{count}} 個發現",
     "description": "可能影響效能或可及性的程式碼層級使用模式",
     "searchPlaceholder": "依檔案或規則篩選...",
-    "empty": "沒有 lint 發現符合目前篩選"
+    "empty": "沒有 lint 發現符合目前篩選",
+    "emptyDesc": "試試調整搜尋條件或嚴重程度篩選。"
   },
   "commandPalette": {
     "placeholder": "搜尋任何項目 — 素材、頁面、路徑…",
@@ -422,7 +430,11 @@
     "similarMirrored": "鏡像",
     "noSimilar": "無相似檔案",
     "noDuplicates": "無完全重複",
-    "refCount": "{{count}} 個引用"
+    "refCount": "{{count}} 個引用",
+    "modified": "修改日期",
+    "animated": "動畫",
+    "alphaChannel": "透明通道",
+    "imagePages": "頁數"
   },
   "ocr": {
     "badge": {
@@ -483,6 +495,26 @@
     "ocrGroup": "文字辨識 (OCR)",
     "scanOnOpen": "開啟工作區時掃描",
     "scanOnOpenHint": "啟動 Asset Studio 並載入專案後，自動重新掃描一次 catalog",
+    "scanProfileLabel": "掃描模式",
+    "scanProfileHint": "大型工作區預設使用 Fast；Full 會執行所有分析",
+    "scanProfile": {
+      "fast": "Fast",
+      "fastHint": "走訪檔案、讀取圖片 metadata，並建立 exact duplicates。",
+      "full": "Full",
+      "fullHint": "額外計算 references、near duplicates 與 optimization 建議。",
+      "custom": "Custom",
+      "customHint": "自行選擇要執行的高成本分析。"
+    },
+    "scanAnalysesLabel": "自訂分析",
+    "scanAnalysesHint": "略過的分析會顯示為 not computed，而不是 0 筆",
+    "scanAnalyses": {
+      "references": "References",
+      "referencesHint": "找出程式碼引用與未使用素材。",
+      "nearDuplicates": "Near duplicates",
+      "nearDuplicatesHint": "比對 perceptual hash 找出視覺相似檔案。",
+      "optimization": "Optimization",
+      "optimizationHint": "計算格式與壓縮建議。"
+    },
     "excludePatterns": "排除規則",
     "excludePatternsHint": "每行一條排除規則，也可用逗號分隔，例如 dist/** 或 tmp",
     "ocrEnabled": "在搜尋與篩選中使用 OCR",
@@ -709,7 +741,7 @@
     "save": "儲存",
     "reset": "重設",
     "resetSettings": "重設設定",
-    "resetSettingsConfirm": "要把所有 App 設定重設為預設值嗎？專案、掃描與檔案會保留，但啟動偏好、最佳化預設值與自訂篩選器會被重設",
+    "resetSettingsConfirm": "要把所有 App 設定重設為預設值並移除 OCR 語言包嗎？專案、掃描與檔案會保留，但啟動偏好、最佳化預設值、自訂篩選器與已安裝的 OCR 資料會被移除",
     "data": "資料",
     "dataDesc": "匯出、匯入或重設本機 Asset Studio 狀態",
     "export": "匯出",
@@ -742,11 +774,23 @@
     "removeWorkspaceConfirm": "要刪除 {{name}} 嗎？專案檔案會保留在磁碟上，但此工作區與追蹤專案清單會被移除",
     "removeWorkspaceSuccess": "已刪除工作區 {{name}}"
   },
+  "catalog": {
+    "notComputed": {
+      "referencesTitle": "References 尚未計算",
+      "referencesDesc": "Fast scan 會略過 reference analysis，因此這次掃描無法判斷 unused assets。",
+      "nearTitle": "Near duplicates 尚未計算",
+      "nearDesc": "Fast scan 只保留 exact duplicate 資料。執行 full scan 後才能比對視覺相似素材。",
+      "optimizationTitle": "Optimization 尚未計算",
+      "optimizationDesc": "Fast scan 會略過格式與壓縮建議。執行 full scan 後才能檢視可最佳化素材。",
+      "fullScan": "執行 full scan"
+    }
+  },
   "unused": {
     "title": "未使用",
     "description": "上次掃描中找不到程式碼引用的素材。刪除前請先檢查",
     "total": "總計：{{size}}",
-    "empty": "沒有找到未使用素材"
+    "empty": "沒有找到未使用素材",
+    "emptyDesc": "所有掃描的素材都有程式碼引用。"
   },
   "batch": {
     "previewSummary": "{{moves}} 個檔案變更 · {{refs}} 個引用更新",

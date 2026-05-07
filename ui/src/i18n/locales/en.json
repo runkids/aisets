@@ -129,8 +129,11 @@
   "common": {
     "cancel": "Cancel",
     "close": "Close",
+    "loading": "Loading",
     "noResults": "No results",
-    "none": "(none)"
+    "none": "(none)",
+    "retry": "Retry",
+    "yes": "Yes"
   },
   "status": {
     "scanning": "Scanning",
@@ -197,6 +200,26 @@
     "ocrGroup": "Text Recognition (OCR)",
     "scanOnOpen": "Scan when opening a workspace",
     "scanOnOpenHint": "After Asset Studio starts and projects load, automatically rescan the catalog once.",
+    "scanProfileLabel": "Scan profile",
+    "scanProfileHint": "Fast is the default for large workspaces; Full runs every analysis.",
+    "scanProfile": {
+      "fast": "Fast",
+      "fastHint": "Walk files, read image metadata, and group exact duplicates.",
+      "full": "Full",
+      "fullHint": "Also compute references, near duplicates, and optimization suggestions.",
+      "custom": "Custom",
+      "customHint": "Choose which expensive analyses to run."
+    },
+    "scanAnalysesLabel": "Custom analyses",
+    "scanAnalysesHint": "Skipped analyses show as not computed instead of zero results.",
+    "scanAnalyses": {
+      "references": "References",
+      "referencesHint": "Find code references and unused assets.",
+      "nearDuplicates": "Near duplicates",
+      "nearDuplicatesHint": "Compare perceptual hashes for visually similar files.",
+      "optimization": "Optimization",
+      "optimizationHint": "Compute format and compression suggestions."
+    },
     "excludePatterns": "Exclude patterns",
     "excludePatternsHint": "One repo-relative pattern per line; commas also work, such as dist/** or tmp.",
     "ocrEnabled": "Use OCR in search and filters",
@@ -423,7 +446,7 @@
     "save": "Save",
     "reset": "Reset",
     "resetSettings": "Reset Settings",
-    "resetSettingsConfirm": "Reset all app settings to defaults? Projects, scans, and files stay intact, but startup preferences, optimization defaults, and custom filters will reset.",
+    "resetSettingsConfirm": "Reset all app settings to defaults and uninstall OCR language packs? Projects, scans, and files stay intact, but startup preferences, optimization defaults, custom filters, and installed OCR data will be removed.",
     "data": "Data",
     "dataDesc": "Export, import, or reset local Asset Studio state.",
     "export": "Export",
@@ -571,7 +594,9 @@
     "keep": "keep",
     "flipped": "flipped",
     "noExact": "No exact duplicates found.",
-    "noSimilar": "No similar assets detected."
+    "noExactDesc": "All scanned assets appear to be unique.",
+    "noSimilar": "No similar assets detected.",
+    "noSimilarDesc": "No visually similar assets were detected in this scan."
   },
   "optimize": {
     "title": "Optimize",
@@ -622,7 +647,8 @@
     "sortName": "Name",
     "sortSize": "Size",
     "sortRecent": "Recent",
-    "bulkSelect": "Bulk select"
+    "bulkSelect": "Bulk select",
+    "clearSearch": "Clear search"
   },
   "browse": {
     "empty": "No assets match the current filters",
@@ -639,14 +665,16 @@
     "listHeaderRefs": "Refs",
     "listHeaderProject": "Project",
     "listHeaderStatus": "Status",
-    "allFolders": "All folders"
+    "allFolders": "All folders",
+    "loadMore": "Load more"
   },
   "lint": {
     "title": "Lint",
     "findingsCount": "{{count}} findings",
     "description": "Code-level usage patterns that may affect performance or accessibility.",
     "searchPlaceholder": "Filter by file or rule...",
-    "empty": "No lint findings match your filter."
+    "empty": "No lint findings match your filter.",
+    "emptyDesc": "Try adjusting the search or severity filter."
   },
   "commandPalette": {
     "placeholder": "Search anything — assets, pages, paths…",
@@ -724,7 +752,11 @@
     "similarMirrored": "Mirrored",
     "noSimilar": "No similar files",
     "noDuplicates": "No exact duplicates",
-    "refCount": "{{count}} refs"
+    "refCount": "{{count}} refs",
+    "modified": "Modified",
+    "animated": "Animated",
+    "alphaChannel": "Alpha",
+    "imagePages": "Pages"
   },
   "ocr": {
     "badge": {
@@ -742,11 +774,23 @@
       "skipped": "Skipped"
     }
   },
+  "catalog": {
+    "notComputed": {
+      "referencesTitle": "References were not computed",
+      "referencesDesc": "Fast scans skip reference analysis, so unused assets are not available for this scan.",
+      "nearTitle": "Near duplicates were not computed",
+      "nearDesc": "Fast scans keep exact duplicate data only. Run a full scan to compare visually similar assets.",
+      "optimizationTitle": "Optimization was not computed",
+      "optimizationDesc": "Fast scans skip format and compression suggestions. Run a full scan to review optimizable assets.",
+      "fullScan": "Run full scan"
+    }
+  },
   "unused": {
     "title": "Unused",
     "description": "Assets with no code references found in the last scan. Review before deleting.",
     "total": "Total: {{size}}",
-    "empty": "No unused assets found."
+    "empty": "No unused assets found.",
+    "emptyDesc": "All scanned assets have code references."
   },
   "batch": {
     "previewSummary": "{{moves}} file changes · {{refs}} reference updates",
