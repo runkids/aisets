@@ -1,0 +1,367 @@
+package config
+
+import (
+	"fmt"
+	"strings"
+
+	"asset-studio/internal/apierr"
+)
+
+func (s *Store) customCatalogFilterSQL(id string) (string, []any, error) {
+	settings, err := s.Settings()
+	if err != nil {
+		return "", nil, err
+	}
+	return customCatalogFilterSQLForFilters(id, settings.CustomAssetFilters)
+}
+
+func customCatalogFilterSQLForFilters(id string, filters []CustomAssetFilter) (string, []any, error) {
+	var selected *CustomAssetFilter
+	for index := range filters {
+		filter := filters[index]
+		if filter.ID == id && filter.Enabled {
+			selected = &filter
+			break
+		}
+	}
+	if selected == nil {
+		return "", nil, nil
+	}
+	groupClauses := []string{}
+	args := []any{}
+	for _, group := range selected.Groups {
+		parts := []string{}
+		for _, clause := range group.Clauses {
+			sqlClause, sqlArgs, err := catalogCustomClauseSQL(clause)
+			if err != nil {
+				return "", nil, err
+			}
+			parts = append(parts, sqlClause)
+			args = append(args, sqlArgs...)
+		}
+		if len(parts) > 0 {
+			groupClauses = append(groupClauses, "("+strings.Join(parts, " AND ")+")")
+		}
+	}
+	if len(groupClauses) == 0 {
+		return "", nil, nil
+	}
+	return "(" + strings.Join(groupClauses, " OR ") + ")", args, nil
+}
+
+func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (CatalogItemFacets, error) {
+	settings, err := s.Settings()
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	projectQuery := query
+	projectQuery.ProjectName = ""
+	projects, projectTotal, err := s.catalogFacetCounts(scanID, projectQuery, "a.project_name")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	extQuery := query
+	extQuery.Ext = ""
+	extensions, extensionTotal, err := s.catalogFacetCounts(scanID, extQuery, "a.ext")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	customQuery := query
+	customQuery.CustomFilterID = ""
+	_, customTotal, err := s.catalogFacetCounts(scanID, customQuery, "''")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
+	for _, filter := range settings.CustomAssetFilters {
+		if !filter.Enabled {
+			continue
+		}
+		filterQuery := customQuery
+		filterQuery.CustomFilterID = filter.ID
+		where, args, err := s.catalogItemWhere(scanID, filterQuery)
+		if err != nil {
+			return CatalogItemFacets{}, err
+		}
+		var count int
+		if err := s.db.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&count); err != nil {
+			return CatalogItemFacets{}, err
+		}
+		customFilters = append(customFilters, CatalogCustomFilterFacet{
+			ID:      filter.ID,
+			Label:   filter.Name,
+			Count:   count,
+			UsesOCR: customFilterUsesOCR(filter),
+		})
+	}
+	return CatalogItemFacets{
+		Projects:          projects,
+		ProjectTotal:      projectTotal,
+		Extensions:        extensions,
+		ExtensionTotal:    extensionTotal,
+		CustomFilters:     customFilters,
+		CustomFilterTotal: customTotal,
+	}, nil
+}
+
+func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr string) ([]CatalogFacetOption, int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(`
+		SELECT `+expr+` AS id, COUNT(*)
+		FROM asset_snapshots a
+		`+where+`
+		GROUP BY id
+		ORDER BY COUNT(*) DESC, id ASC
+	`, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	options := []CatalogFacetOption{}
+	for rows.Next() {
+		var option CatalogFacetOption
+		if err := rows.Scan(&option.ID, &option.Count); err != nil {
+			return nil, 0, err
+		}
+		if option.ID != "" {
+			options = append(options, option)
+		}
+	}
+	return options, total, rows.Err()
+}
+
+func customFilterUsesOCR(filter CustomAssetFilter) bool {
+	for _, group := range filter.Groups {
+		for _, clause := range group.Clauses {
+			switch clause.Field {
+			case "ocrText", "ocrLanguage", "ocrScript", "ocrConfidence", "ocrStatus":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, error) {
+	value := strings.TrimSpace(clause.Value)
+	switch clause.Field {
+	case "path":
+		return textClauseSQL("a.repo_path", clause.Operator, value)
+	case "folder":
+		return textClauseSQL("asset_folder(a.repo_path)", clause.Operator, value)
+	case "extension":
+		if clause.Operator == "equals" {
+			return "LOWER(a.ext) = ?", []any{normalizeCatalogExt(value)}, nil
+		}
+		sqlClause, args := inClauseSQL("LOWER(a.ext)", normalizedExtList(value))
+		return sqlClause, args, nil
+	case "project":
+		if clause.Operator == "oneOf" {
+			sqlClause, args := inClauseSQL("LOWER(a.project_name)", lowerList(value))
+			return sqlClause, args, nil
+		}
+		return textClauseSQL("a.project_name", clause.Operator, value)
+	case "bytes":
+		if clause.Operator == "gte" {
+			return "a.bytes >= ?", []any{value}, nil
+		}
+		return "a.bytes <= ?", []any{value}, nil
+	case "status":
+		if value == "unused" {
+			return "a.used_count = 0", nil, nil
+		}
+		return "a.used_count > 0", nil, nil
+	case "duplicate":
+		return booleanExistsSQL("EXISTS (SELECT 1 FROM duplicate_group_assets d3 WHERE d3.scan_id = a.scan_id AND d3.asset_id = a.asset_id)", value), nil, nil
+	case "nearDuplicate":
+		return booleanExistsSQL("EXISTS (SELECT 1 FROM near_duplicate_snapshots n2 WHERE n2.scan_id = a.scan_id AND (n2.left_id = a.asset_id OR n2.right_id = a.asset_id))", value), nil, nil
+	case "optimizable":
+		return booleanExistsSQL("EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id)", value), nil, nil
+	case "ocrText":
+		return ocrExistsSQL(textClauseSQL("COALESCE(ocr.normalized_text, ocr.text, '')", clause.Operator, value))
+	case "ocrLanguage":
+		if clause.Operator == "oneOf" {
+			return ocrJSONListExistsSQL("ocr.languages_json", lowerList(value)), nil, nil
+		}
+		return ocrJSONListExistsSQL("ocr.languages_json", []string{strings.ToLower(value)}), nil, nil
+	case "ocrScript":
+		if clause.Operator == "oneOf" {
+			return ocrJSONListExistsSQL("ocr.scripts_json", lowerList(value)), nil, nil
+		}
+		return ocrJSONListExistsSQL("ocr.scripts_json", []string{strings.ToLower(value)}), nil, nil
+	case "ocrConfidence":
+		if clause.Operator == "gte" {
+			return ocrExistsSQL("ocr.confidence >= ?", []any{value}, nil)
+		}
+		return ocrExistsSQL("ocr.confidence <= ?", []any{value}, nil)
+	case "ocrStatus":
+		return ocrExistsSQL("ocr.status = ?", []any{value}, nil)
+	default:
+		return "", nil, apierr.WithParams("custom_filter_field_invalid", "custom filter field is invalid", map[string]any{"field": clause.Field})
+	}
+}
+
+func textClauseSQL(expr, operator, value string) (string, []any, error) {
+	switch operator {
+	case "contains":
+		return "LOWER(" + expr + ") LIKE ? ESCAPE '\\'", []any{"%" + escapeLike(strings.ToLower(value)) + "%"}, nil
+	case "prefix":
+		return "LOWER(" + expr + ") LIKE ? ESCAPE '\\'", []any{escapeLike(strings.ToLower(value)) + "%"}, nil
+	case "suffix":
+		return "LOWER(" + expr + ") LIKE ? ESCAPE '\\'", []any{"%" + escapeLike(strings.ToLower(value))}, nil
+	case "equals":
+		return "LOWER(" + expr + ") = ?", []any{strings.ToLower(value)}, nil
+	case "regex":
+		return "regexp_like(" + expr + ", ?)", []any{value}, nil
+	default:
+		return "", nil, apierr.WithParams("custom_filter_operator_invalid", "custom filter operator is invalid", map[string]any{"operator": operator})
+	}
+}
+
+func inClauseSQL(expr string, values []string) (string, []any) {
+	if len(values) == 0 {
+		return "0 = 1", nil
+	}
+	placeholders := make([]string, len(values))
+	args := make([]any, len(values))
+	for index, value := range values {
+		placeholders[index] = "?"
+		args[index] = value
+	}
+	return expr + " IN (" + strings.Join(placeholders, ",") + ")", args
+}
+
+func booleanExistsSQL(existsExpr, value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "true") {
+		return existsExpr
+	}
+	return "NOT " + existsExpr
+}
+
+func ocrExistsSQL(clause string, args []any, err error) (string, []any, error) {
+	if err != nil {
+		return "", nil, err
+	}
+	return `EXISTS (
+		SELECT 1 FROM ocr_results ocr
+		WHERE ocr.project_id = a.project_id
+			AND ocr.repo_path = a.repo_path
+			AND ocr.content_hash = a.content_hash
+			AND ocr.hash_algorithm = a.hash_algorithm
+			AND ` + clause + `
+	)`, args, nil
+}
+
+func ocrJSONListExistsSQL(expr string, values []string) string {
+	if len(values) == 0 {
+		return "0 = 1"
+	}
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%'", expr, strings.ReplaceAll(value, "'", "''")))
+	}
+	return `EXISTS (
+		SELECT 1 FROM ocr_results ocr
+		WHERE ocr.project_id = a.project_id
+			AND ocr.repo_path = a.repo_path
+			AND ocr.content_hash = a.content_hash
+			AND ocr.hash_algorithm = a.hash_algorithm
+			AND (` + strings.Join(parts, " OR ") + `)
+	)`
+}
+
+func normalizedExtList(value string) []string {
+	parts := splitCustomFilterList(value)
+	for index := range parts {
+		parts[index] = normalizeCatalogExt(parts[index])
+	}
+	return parts
+}
+
+func lowerList(value string) []string {
+	parts := splitCustomFilterList(value)
+	for index := range parts {
+		parts[index] = strings.ToLower(parts[index])
+	}
+	return parts
+}
+
+func escapeLike(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `%`, `\%`)
+	value = strings.ReplaceAll(value, `_`, `\_`)
+	return value
+}
+
+func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, []any, error) {
+	clauses := []string{"a.scan_id = ?"}
+	args := []any{scanID}
+	if strings.TrimSpace(query.AssetID) != "" {
+		clauses = append(clauses, "a.asset_id = ?")
+		args = append(args, strings.TrimSpace(query.AssetID))
+	}
+	if strings.TrimSpace(query.ProjectID) != "" {
+		clauses = append(clauses, "a.project_id = ?")
+		args = append(args, strings.TrimSpace(query.ProjectID))
+	}
+	if strings.TrimSpace(query.ProjectName) != "" {
+		clauses = append(clauses, "a.project_name = ?")
+		args = append(args, strings.TrimSpace(query.ProjectName))
+	}
+	if ext := normalizeCatalogExt(query.Ext); ext != "" {
+		clauses = append(clauses, "LOWER(a.ext) = ?")
+		args = append(args, ext)
+	}
+	if folder := normalizeCatalogFolder(query.Folder); folder != "" {
+		clauses = append(clauses, "a.repo_path LIKE ? ESCAPE '\\'")
+		args = append(args, escapeLike(folder)+"/%")
+	}
+	if q := strings.TrimSpace(query.Query); q != "" {
+		clauses = append(clauses, `(a.repo_path LIKE ? OR a.project_name LIKE ? OR EXISTS (
+			SELECT 1 FROM ocr_results oq
+			WHERE oq.project_id = a.project_id
+				AND oq.repo_path = a.repo_path
+				AND oq.content_hash = a.content_hash
+				AND oq.hash_algorithm = a.hash_algorithm
+				AND (oq.normalized_text LIKE ? OR oq.text LIKE ?)
+		))`)
+		like := "%" + q + "%"
+		args = append(args, like, like, like, like)
+	}
+	switch strings.TrimSpace(query.Status) {
+	case "unused":
+		clauses = append(clauses, "a.used_count = 0")
+	case "referenced":
+		clauses = append(clauses, "a.used_count > 0")
+	case "duplicate":
+		clauses = append(clauses, `(EXISTS (
+			SELECT 1 FROM duplicate_group_assets d2
+			WHERE d2.scan_id = a.scan_id AND d2.asset_id = a.asset_id
+		) OR EXISTS (
+			SELECT 1 FROM near_duplicate_snapshots n
+			WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id)
+		))`)
+	case "optimizable":
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)")
+	case "nearDuplicate":
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM near_duplicate_snapshots n WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id))")
+	}
+	if customFilterID := strings.TrimSpace(query.CustomFilterID); customFilterID != "" {
+		clause, filterArgs, err := s.customCatalogFilterSQL(customFilterID)
+		if err != nil {
+			return "", nil, err
+		}
+		if clause != "" {
+			clauses = append(clauses, clause)
+			args = append(args, filterArgs...)
+		}
+	}
+	return "WHERE " + strings.Join(clauses, " AND "), args, nil
+}

@@ -1,0 +1,124 @@
+package config
+
+import (
+	"asset-studio/internal/lint"
+	"asset-studio/internal/scanner"
+)
+
+const catalogItemsLimitMax = 200
+
+type CatalogSummary struct {
+	ScanID       int64                   `json:"scanId"`
+	GeneratedAt  string                  `json:"generatedAt"`
+	Projects     []Project               `json:"projects"`
+	ProjectStats []CatalogProjectStats   `json:"projectStats"`
+	Stats        scanner.CatalogStats    `json:"stats"`
+	Analysis     scanner.CatalogAnalysis `json:"analysis"`
+}
+
+type CatalogProjectStats struct {
+	ProjectID        string `json:"projectId"`
+	TotalFiles       int    `json:"totalFiles"`
+	TotalBytes       int64  `json:"totalBytes"`
+	UnusedFiles      int    `json:"unusedFiles"`
+	DuplicateFiles   int    `json:"duplicateFiles"`
+	OptimizableFiles int    `json:"optimizableFiles"`
+	LintFindings     int    `json:"lintFindings"`
+}
+
+type CatalogItemQuery struct {
+	ScanID         int64
+	AssetID        string
+	ProjectID      string
+	ProjectName    string
+	Ext            string
+	Folder         string
+	Query          string
+	Status         string
+	Sort           string
+	CustomFilterID string
+	Limit          int
+	Cursor         string
+}
+
+type CatalogItemsPage struct {
+	Items      []scanner.AssetItem `json:"items"`
+	Total      int                 `json:"total"`
+	NextCursor string              `json:"nextCursor,omitempty"`
+	Facets     CatalogItemFacets   `json:"facets"`
+}
+
+type CatalogFacetOption struct {
+	ID    string `json:"id"`
+	Count int    `json:"count"`
+}
+
+type CatalogCustomFilterFacet struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Count   int    `json:"count"`
+	UsesOCR bool   `json:"usesOCR"`
+}
+
+type CatalogItemFacets struct {
+	Projects          []CatalogFacetOption       `json:"projects"`
+	ProjectTotal      int                        `json:"projectTotal"`
+	Extensions        []CatalogFacetOption       `json:"extensions"`
+	ExtensionTotal    int                        `json:"extensionTotal"`
+	CustomFilters     []CatalogCustomFilterFacet `json:"customFilters"`
+	CustomFilterTotal int                        `json:"customFilterTotal"`
+}
+
+type CatalogFolderQuery struct {
+	ScanID         int64
+	ProjectID      string
+	ProjectName    string
+	Ext            string
+	Folder         string
+	Query          string
+	Status         string
+	CustomFilterID string
+}
+
+type CatalogFolderNode struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Count       int    `json:"count"`
+	HasChildren bool   `json:"hasChildren"`
+}
+
+type CatalogFoldersPage struct {
+	Folders []CatalogFolderNode `json:"folders"`
+	Total   int                 `json:"total"`
+}
+
+type CatalogItemDetail struct {
+	Item         scanner.AssetItem                `json:"item"`
+	References   []scanner.AssetReference         `json:"references"`
+	Duplicates   []scanner.AssetItem              `json:"duplicates"`
+	Similar      []scanner.NearDuplicate          `json:"similar"`
+	SimilarItems []scanner.AssetItem              `json:"similarItems"`
+	Optimization []scanner.OptimizationSuggestion `json:"optimization"`
+	OCR          any                              `json:"ocr,omitempty"`
+}
+
+type CatalogDuplicatesPage struct {
+	Groups     []scanner.DuplicateGroup `json:"groups"`
+	Pairs      []scanner.NearDuplicate  `json:"pairs"`
+	Total      int                      `json:"total"`
+	NextCursor string                   `json:"nextCursor,omitempty"`
+}
+
+type CatalogLintQuery struct {
+	ScanID   int64
+	Severity string
+	Limit    int
+	Cursor   string
+}
+
+type CatalogLintPage struct {
+	Items      []lint.Finding `json:"items"`
+	Total      int            `json:"total"`
+	NextCursor string         `json:"nextCursor,omitempty"`
+}
