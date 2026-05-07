@@ -137,6 +137,7 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Tooltips via Radix, not `title`** | Native tooltips can't be styled, have inconsistent delay, and no keyboard trigger. |
 | **Lucide icons only** | Mixing icon sets (or using emoji) creates visual noise. |
 | **`cn()` for all class merging** | It wraps `clsx` + `twMerge` — handles conditional classes and deduplicates conflicts. |
+| **No left-edge accent bars** | Never add vertical colored bars/stripes on container edges. Use tinted bg + border + icon for tone. |
 
 ---
 
