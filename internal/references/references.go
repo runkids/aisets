@@ -306,7 +306,7 @@ func key(projectID, repoPath string) string {
 func referenceMayPointTo(repoPath, specifier string) bool {
 	clean := stripQuery(filepath.ToSlash(specifier))
 	clean = strings.TrimPrefix(clean, "./")
-	return clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, clean)
+	return clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+clean)
 }
 
 func isPattern(spec string) bool {

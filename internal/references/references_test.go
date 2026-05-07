@@ -116,6 +116,12 @@ func TestReferenceHelperFunctions(t *testing.T) {
 	if referenceMayPointTo("src/assets/logo.png", "./other.png") {
 		t.Fatal("unexpected reference match")
 	}
+	if referenceMayPointTo("demo/英/电子/PTG2029_choy sun doa.png", "a.png") {
+		t.Fatal("partial filename suffix should not match")
+	}
+	if !referenceMayPointTo("demo/icons/a.png", "a.png") {
+		t.Fatal("exact filename should match via path boundary")
+	}
 	if cleanRepoPath("../escape.png") != "" || cleanRepoPath("./src/a.png") != "src/a.png" {
 		t.Fatal("cleanRepoPath did not normalize safely")
 	}
