@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Catalog, Project } from "../types";
+import type { CatalogSummary, Project } from "../types";
 import {
   useRemoveProjectMutation,
   useRenameProjectMutation,
@@ -40,7 +40,7 @@ import { ProjectDialog } from "./ProjectDialog";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
 type Props = {
-  catalog: Catalog;
+  catalog: CatalogSummary;
   onJump: (mode: Mode, projectId?: string) => void;
   onAddProject?: () => void;
 };
@@ -80,7 +80,10 @@ function formatScanTime(value: string, locale: string) {
   }).format(date);
 }
 
-function buildProjectStats(catalog: Catalog, locale: string): ProjectStat[] {
+function buildProjectStats(
+  catalog: CatalogSummary,
+  locale: string,
+): ProjectStat[] {
   const statsByProject = new Map(
     catalog.projectStats.map((stat) => [stat.projectId, stat]),
   );

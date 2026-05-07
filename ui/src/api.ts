@@ -6,6 +6,7 @@ import type {
   CatalogFoldersPage,
   CatalogItemDetail,
   CatalogItemsPage,
+  CatalogLintPage,
   CatalogSummary,
   DirectoryListing,
   ExportData,
@@ -90,6 +91,14 @@ export type CatalogDuplicatesParams = {
   cursor?: string | null;
 };
 
+export type CatalogLintParams = {
+  scanId?: number;
+  projectId?: string;
+  severity?: string;
+  limit?: number;
+  cursor?: string | null;
+};
+
 function queryString(
   params: Record<string, string | number | undefined | null>,
 ) {
@@ -133,6 +142,22 @@ export function getCatalogDuplicates(
     `/api/catalog/duplicates${queryString({
       scanId: params.scanId,
       kind: params.kind,
+      limit: params.limit,
+      cursor: params.cursor,
+    })}`,
+    { signal: options?.signal },
+  );
+}
+
+export function getCatalogLint(
+  params: CatalogLintParams,
+  options?: { signal?: AbortSignal },
+) {
+  return request<CatalogLintPage>(
+    `/api/catalog/lint${queryString({
+      scanId: params.scanId,
+      projectId: params.projectId,
+      severity: params.severity,
       limit: params.limit,
       cursor: params.cursor,
     })}`,
@@ -202,16 +227,63 @@ function parseScanLine(
   return event;
 }
 
-async function parseScanText(
-  text: string,
-  onEvent?: (event: ScanEvent) => void,
-) {
-  let done: Extract<ScanEvent, { type: "done" }> | null = null;
-  for (const line of text.split("\n")) {
-    const event = parseScanLine(line, onEvent);
-    if (event?.type === "done") done = event;
+async function streamNDJSON<TEvent, TDone extends TEvent>({
+  response,
+  parseLine,
+  isDone,
+  fallbackDone,
+}: {
+  response: Response;
+  parseLine: (line: string) => TEvent | null;
+  isDone: (event: TEvent) => event is TDone;
+  fallbackDone: TDone | null;
+}): Promise<TDone | null> {
+  let done: TDone | null = null;
+
+  if (!response.body) {
+    const text = await response.text();
+    for (const line of text.split("\n")) {
+      const event = parseLine(line);
+      if (event && isDone(event)) done = event;
+    }
+    return done ?? fallbackDone;
   }
-  return done ?? ({ type: "done" } as const);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for (;;) {
+    const chunk = await reader.read();
+    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parseLine(line);
+      if (event && isDone(event)) done = event;
+    }
+    if (chunk.done) break;
+  }
+
+  const finalEvent = parseLine(buffer);
+  if (finalEvent && isDone(finalEvent)) done = finalEvent;
+  return done ?? fallbackDone;
+}
+
+function isScanDone(
+  event: ScanEvent,
+): event is Extract<ScanEvent, { type: "done" }> {
+  return event.type === "done";
+}
+
+function isOCRDone(
+  event: OCRRunEvent,
+): event is Extract<OCRRunEvent, { type: "done" }> {
+  return event.type === "done";
+}
+
+function scanDoneFallback(): Extract<ScanEvent, { type: "done" }> {
+  return { type: "done" };
 }
 
 export async function scanCatalog(options?: {
@@ -242,29 +314,12 @@ export async function scanCatalog(options?: {
     });
   }
 
-  if (!response.body)
-    return parseScanText(await response.text(), options?.onEvent);
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let done: Extract<ScanEvent, { type: "done" }> | null = null;
-
-  for (;;) {
-    const chunk = await reader.read();
-    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const event = parseScanLine(line, options?.onEvent);
-      if (event?.type === "done") done = event;
-    }
-    if (chunk.done) break;
-  }
-
-  const finalEvent = parseScanLine(buffer, options?.onEvent);
-  if (finalEvent?.type === "done") done = finalEvent;
-  return done ?? ({ type: "done" } as const);
+  return streamNDJSON<ScanEvent, Extract<ScanEvent, { type: "done" }>>({
+    response,
+    parseLine: (line) => parseScanLine(line, options?.onEvent),
+    isDone: isScanDone,
+    fallbackDone: scanDoneFallback(),
+  });
 }
 
 function parseOCRLine(
@@ -296,33 +351,12 @@ export async function runOCR(options?: {
       status: response.status,
     });
   }
-  if (!response.body) {
-    const text = await response.text();
-    let done: Extract<OCRRunEvent, { type: "done" }> | null = null;
-    for (const line of text.split("\n")) {
-      const event = parseOCRLine(line, options?.onEvent);
-      if (event?.type === "done") done = event;
-    }
-    return done;
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let done: Extract<OCRRunEvent, { type: "done" }> | null = null;
-  for (;;) {
-    const chunk = await reader.read();
-    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const event = parseOCRLine(line, options?.onEvent);
-      if (event?.type === "done") done = event;
-    }
-    if (chunk.done) break;
-  }
-  const finalEvent = parseOCRLine(buffer, options?.onEvent);
-  if (finalEvent?.type === "done") done = finalEvent;
-  return done;
+  return streamNDJSON<OCRRunEvent, Extract<OCRRunEvent, { type: "done" }>>({
+    response,
+    parseLine: (line) => parseOCRLine(line, options?.onEvent),
+    isDone: isOCRDone,
+    fallbackDone: null,
+  });
 }
 
 export function installOCR(languages: string[]) {

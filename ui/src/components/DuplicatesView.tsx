@@ -1,14 +1,17 @@
 import { GitMerge } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AssetItem, DuplicateGroup, NearDuplicate } from "../types";
+import {
+  useCatalogDuplicatesInfiniteQuery,
+  useCatalogItemsInfiniteQuery,
+} from "../queries";
 import { fileName, formatBytes } from "../ui";
 import { AssetThumbnail, Badge, Button, Card, EmptyState, Tabs } from "./ui";
 
 type Props = {
-  items: AssetItem[];
-  groups: DuplicateGroup[];
-  nearDuplicates: NearDuplicate[];
+  scanId?: number;
+  projectFilterId?: string;
+  enabled?: boolean;
   onOpenAsset?: (id: string) => void;
   onMerge?: (groupId: string) => void;
 };
@@ -17,16 +20,117 @@ type Tab = "exact" | "similar";
 type SortKey = "members" | "size";
 
 export function DuplicatesView({
-  items,
-  groups,
-  nearDuplicates,
+  scanId,
+  projectFilterId,
+  enabled = true,
   onOpenAsset,
   onMerge,
 }: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("exact");
   const [sort, setSort] = useState<SortKey>("members");
+  const duplicateItemsQuery = useCatalogItemsInfiniteQuery(
+    scanId,
+    {
+      projectId: projectFilterId || undefined,
+      status: "duplicate",
+      sort: "path",
+      limit: 200,
+    },
+    enabled,
+    0,
+  );
+  const exactDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
+    scanId,
+    { kind: "exact", limit: 200 },
+    enabled,
+  );
+  const nearDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
+    scanId,
+    { kind: "near", limit: 200 },
+    enabled,
+  );
+  const {
+    fetchNextPage: fetchNextDuplicateItemsPage,
+    hasNextPage: hasMoreDuplicateItems,
+    isFetchingNextPage: isFetchingMoreDuplicateItems,
+  } = duplicateItemsQuery;
+  const {
+    fetchNextPage: fetchNextExactDuplicatesPage,
+    hasNextPage: hasMoreExactDuplicates,
+    isFetchingNextPage: isFetchingMoreExactDuplicates,
+  } = exactDuplicatesQuery;
+  const {
+    fetchNextPage: fetchNextNearDuplicatesPage,
+    hasNextPage: hasMoreNearDuplicates,
+    isFetchingNextPage: isFetchingMoreNearDuplicates,
+  } = nearDuplicatesQuery;
+  const items = useMemo(
+    () => duplicateItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [duplicateItemsQuery.data],
+  );
+  const duplicateItemIds = useMemo(
+    () => new Set(items.map((item) => item.id)),
+    [items],
+  );
+  const exactDuplicateGroups = useMemo(
+    () => exactDuplicatesQuery.data?.pages.flatMap((page) => page.groups) ?? [],
+    [exactDuplicatesQuery.data],
+  );
+  const groups = useMemo(
+    () =>
+      exactDuplicateGroups.filter(
+        (group) =>
+          items.filter((item) => item.duplicateGroupId === group.id).length > 1,
+      ),
+    [exactDuplicateGroups, items],
+  );
+  const nearDuplicatePairs = useMemo(
+    () => nearDuplicatesQuery.data?.pages.flatMap((page) => page.pairs) ?? [],
+    [nearDuplicatesQuery.data],
+  );
+  const nearDuplicates = useMemo(
+    () =>
+      nearDuplicatePairs.filter(
+        (pair) =>
+          duplicateItemIds.has(pair.leftId) &&
+          duplicateItemIds.has(pair.rightId),
+      ),
+    [duplicateItemIds, nearDuplicatePairs],
+  );
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const loading =
+    (duplicateItemsQuery.isLoading ||
+      exactDuplicatesQuery.isLoading ||
+      nearDuplicatesQuery.isLoading) &&
+    items.length === 0 &&
+    groups.length === 0 &&
+    nearDuplicates.length === 0;
+
+  useEffect(() => {
+    if (!hasMoreDuplicateItems || isFetchingMoreDuplicateItems) return;
+    void fetchNextDuplicateItemsPage();
+  }, [
+    fetchNextDuplicateItemsPage,
+    hasMoreDuplicateItems,
+    isFetchingMoreDuplicateItems,
+  ]);
+  useEffect(() => {
+    if (!hasMoreExactDuplicates || isFetchingMoreExactDuplicates) return;
+    void fetchNextExactDuplicatesPage();
+  }, [
+    fetchNextExactDuplicatesPage,
+    hasMoreExactDuplicates,
+    isFetchingMoreExactDuplicates,
+  ]);
+  useEffect(() => {
+    if (!hasMoreNearDuplicates || isFetchingMoreNearDuplicates) return;
+    void fetchNextNearDuplicatesPage();
+  }, [
+    fetchNextNearDuplicatesPage,
+    hasMoreNearDuplicates,
+    isFetchingMoreNearDuplicates,
+  ]);
 
   const groupViews = useMemo(() => {
     return groups
@@ -93,7 +197,9 @@ export function DuplicatesView({
         )}
       </div>
 
-      {tab === "exact" && (
+      {loading ? (
+        <EmptyState title={t("common.loading")} />
+      ) : tab === "exact" ? (
         <div className="grid gap-3">
           {groupViews.map((group) => (
             <Card key={group.id} padding="md">
@@ -152,9 +258,9 @@ export function DuplicatesView({
             />
           )}
         </div>
-      )}
+      ) : null}
 
-      {tab === "similar" && (
+      {!loading && tab === "similar" && (
         <div className="grid gap-2">
           {nearDuplicates.map((nd) => {
             const left = itemById.get(nd.leftId);

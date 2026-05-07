@@ -532,6 +532,16 @@ func TestCmdOptimizePreCheckAndActionsJSON(t *testing.T) {
 		t.Fatalf("estimate body = %#v", estimateBody)
 	}
 
+	estimatedAll := captureStdout(t, func() {
+		if err := cmdOptimize([]string{"estimate", "--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	decodeJSON(t, estimatedAll, &estimateBody)
+	if !estimateBody.OK || estimateBody.Estimate.ItemCount != 2 {
+		t.Fatalf("estimate all body = %#v", estimateBody)
+	}
+
 	scripted := captureStdout(t, func() {
 		if err := cmdOptimize([]string{"script", assetID, "--json"}, false); err != nil {
 			t.Fatal(err)

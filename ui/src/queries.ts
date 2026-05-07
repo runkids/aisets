@@ -19,6 +19,7 @@ import {
   getCatalogFolders,
   getCatalogItemDetail,
   getCatalogItems,
+  getCatalogLint,
   getSettings,
   getVersionCheck,
   importSettings,
@@ -41,6 +42,7 @@ import type {
   CatalogDuplicatesParams,
   CatalogFoldersParams,
   CatalogItemsParams,
+  CatalogLintParams,
 } from "./api";
 import type {
   ExportData,
@@ -73,6 +75,13 @@ export const catalogKeys = {
       "duplicates",
       scanId ?? 0,
       normalizeCatalogDuplicatesParams(params),
+    ] as const,
+  lint: (scanId: number | undefined, params: CatalogLintParams) =>
+    [
+      ...catalogQueryKey,
+      "lint",
+      scanId ?? 0,
+      normalizeCatalogLintParams(params),
     ] as const,
   folders: (scanId: number | undefined, params: CatalogFoldersParams) =>
     [
@@ -108,6 +117,14 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
 function normalizeCatalogDuplicatesParams(params: CatalogDuplicatesParams) {
   return {
     kind: params.kind ?? "exact",
+    limit: params.limit ?? 100,
+  };
+}
+
+function normalizeCatalogLintParams(params: CatalogLintParams) {
+  return {
+    projectId: params.projectId ?? "",
+    severity: params.severity ?? "",
     limit: params.limit ?? 100,
   };
 }
@@ -151,6 +168,7 @@ export function useCatalogItemsInfiniteQuery(
   scanId: number | undefined,
   params: CatalogItemsParams,
   enabled = true,
+  maxPages = 8,
 ) {
   return useInfiniteQuery({
     queryKey: catalogKeys.items(scanId, params),
@@ -161,7 +179,28 @@ export function useCatalogItemsInfiniteQuery(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor || undefined,
-    maxPages: 8,
+    ...(maxPages > 0 ? { maxPages } : {}),
+    enabled: enabled && scanId != null,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCatalogLintInfiniteQuery(
+  scanId: number | undefined,
+  params: CatalogLintParams,
+  enabled = true,
+) {
+  return useInfiniteQuery({
+    queryKey: catalogKeys.lint(scanId, params),
+    queryFn: ({ pageParam, signal }) =>
+      getCatalogLint(
+        { ...params, scanId, cursor: pageParam, limit: params.limit ?? 100 },
+        { signal },
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor || undefined,
     enabled: enabled && scanId != null,
     staleTime: Infinity,
     gcTime: 10 * 60_000,

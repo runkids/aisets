@@ -214,10 +214,11 @@ func (s *Server) handleCatalogLint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, err := s.store.CatalogLint(config.CatalogLintQuery{
-		ScanID:   scanID,
-		Severity: r.URL.Query().Get("severity"),
-		Limit:    limit,
-		Cursor:   r.URL.Query().Get("cursor"),
+		ScanID:    scanID,
+		ProjectID: r.URL.Query().Get("projectId"),
+		Severity:  r.URL.Query().Get("severity"),
+		Limit:     limit,
+		Cursor:    r.URL.Query().Get("cursor"),
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)

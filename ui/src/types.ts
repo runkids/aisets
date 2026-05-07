@@ -325,6 +325,12 @@ export type CatalogDuplicatesPage = {
   nextCursor?: string;
 };
 
+export type CatalogLintPage = {
+  items: LintFinding[];
+  total: number;
+  nextCursor?: string;
+};
+
 export type CatalogFolderNode = {
   id: string;
   name: string;

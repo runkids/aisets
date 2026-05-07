@@ -2,6 +2,13 @@ package config
 
 import "asset-studio/internal/scanner"
 
+const catalogAssetSelectColumns = `
+	a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
+	a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
+	a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
+	a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, '')
+`
+
 type assetRowScanner interface {
 	Scan(dest ...any) error
 }
@@ -9,11 +16,11 @@ type assetRowScanner interface {
 func scanAssetFromRow(row assetRowScanner) (scanner.AssetItem, error) {
 	var item scanner.AssetItem
 	var animated, alpha int
-	var usedCount, optCount int
+	var usedCount int
 	var groupID, preferredPath string
 	err := row.Scan(&item.ID, &item.ProjectID, &item.ProjectName, &item.RepoPath, &item.LocalPath, &item.Ext,
 		&item.Bytes, &item.ModifiedUnix, &item.ContentHash, &item.HashAlgorithm, &item.Image.Format, &item.Image.Width, &item.Image.Height,
-		&animated, &alpha, &item.Image.Pages, &item.DHash, &item.DHashFlipped, &usedCount, &groupID, &preferredPath, &optCount)
+		&animated, &alpha, &item.Image.Pages, &item.DHash, &item.DHashFlipped, &usedCount, &groupID, &preferredPath)
 	if err != nil {
 		return scanner.AssetItem{}, err
 	}
@@ -25,7 +32,7 @@ func scanAssetFromRow(row assetRowScanner) (scanner.AssetItem, error) {
 	item.References = []scanner.AssetReference{}
 	item.Duplicates = []string{}
 	item.Similar = []string{}
-	item.Optimization = make([]scanner.OptimizationSuggestion, optCount)
+	item.Optimization = []scanner.OptimizationSuggestion{}
 	if groupID != "" {
 		item.DuplicateGroupID = &groupID
 	}

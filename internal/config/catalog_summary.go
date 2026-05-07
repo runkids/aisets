@@ -35,6 +35,10 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 	if err != nil {
 		return CatalogSummary{}, err
 	}
+	lintFindings, err := s.catalogLintFindingsCount(scan.ID)
+	if err != nil {
+		return CatalogSummary{}, err
+	}
 	return CatalogSummary{
 		ScanID:       scan.ID,
 		GeneratedAt:  scan.CompletedAt,
@@ -46,10 +50,23 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 			DuplicateFiles:  scan.DuplicateFiles,
 			UnusedFiles:     scan.UnusedFiles,
 			NearDuplicates:  scan.NearDuplicates,
+			LintFindings:    lintFindings,
 			CacheHits:       scan.CacheHits,
 		},
 		Analysis: scan.Analysis,
 	}, nil
+}
+
+func (s *Store) catalogLintFindingsCount(scanID int64) (int, error) {
+	var count int
+	if err := s.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM lint_snapshots
+		WHERE scan_id = ?
+	`, scanID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]CatalogProjectStats, error) {

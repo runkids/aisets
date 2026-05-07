@@ -1,6 +1,7 @@
 package config
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -57,5 +58,6 @@ func uniqueReferenceFiles(refs []scanner.AssetReference) []string {
 	for file := range seen {
 		out = append(out, file)
 	}
+	sort.Strings(out)
 	return out
 }

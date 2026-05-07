@@ -19,22 +19,20 @@ import {
   PenLine,
   Trash2,
 } from "lucide-react";
-import {
-  customFilterOptions,
-  matchesCustomAssetFilter,
-  type CustomFilterOption,
-} from "../customAssetFilters";
+import { matchesCustomAssetFilter } from "../customAssetFilters";
 import {
   useBatchDeleteMutation,
   useBatchMovePreviewMutation,
   useBatchRenamePreviewMutation,
   useBatchApplyMutation,
   useCatalogFoldersQuery,
+  useCatalogItemsInfiniteQuery,
 } from "../queries";
 import {
   batchExport,
   type BatchPreviewResponse,
   type CatalogFoldersParams,
+  type CatalogItemsParams,
 } from "../api";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
@@ -54,7 +52,6 @@ import { BrowseList } from "./BrowseList";
 import { BrowseToolbar, type SortMode, type ViewMode } from "./BrowseToolbar";
 import { useImageBackgroundControls } from "../imageBackground";
 import { FilterRail } from "./FilterRail";
-import { facetOptions, projectFacetIds } from "./browseFacets";
 import { EmptyState } from "./ui";
 
 type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
@@ -81,43 +78,20 @@ const statusFilters: StatusFilter[] = [
 const sortModes: SortMode[] = ["name", "size", "recent"];
 
 type Props = {
-  items: AssetItem[];
   activeAssetId: string;
   autoScrollAssetId: string;
   initialCustomFilterId: string;
   customFilters: CustomAssetFilter[];
-  projectNames: string[];
   scanId?: number;
   projectFilterId?: string;
   projectFilterName: string;
   initialSearchQuery: string;
   initialFocusAssetId: string;
-  projectOptions?: Array<{ id: string; count: number }>;
-  projectTotal?: number;
-  extensionOptions?: Array<{ id: string; count: number }>;
-  extensionTotal?: number;
-  customFilterFacetOptions?: CustomFilterOption[];
-  customFilterTotal?: number;
   imagePreviewEnabled: boolean;
   ocrEnabled: boolean;
   ocrFuzzySearch: boolean;
-  initialLoading?: boolean;
-  pending?: boolean;
-  loadingMore?: boolean;
-  hasMore?: boolean;
   onAutoScrollDone: () => void;
   onOpenAsset: (id: string) => void;
-  onLoadMore?: () => void;
-  onQueryParamsChange?: (params: {
-    assetId?: string;
-    projectName?: string;
-    ext?: string;
-    q?: string;
-    status?: string;
-    sort?: string;
-    customFilter?: string;
-    folder?: string;
-  }) => void;
 };
 
 function defaultBrowseStoredState(
@@ -492,34 +466,20 @@ function TreeNode({
 }
 
 export function BrowseView({
-  items,
   activeAssetId,
   autoScrollAssetId,
   initialCustomFilterId,
   customFilters,
-  projectNames,
   scanId,
   projectFilterId,
   projectFilterName,
   initialSearchQuery,
   initialFocusAssetId,
-  projectOptions,
-  projectTotal,
-  extensionOptions,
-  extensionTotal,
-  customFilterFacetOptions,
-  customFilterTotal,
   imagePreviewEnabled,
   ocrEnabled,
   ocrFuzzySearch,
-  initialLoading = false,
-  pending = false,
-  loadingMore = false,
-  hasMore = false,
   onAutoScrollDone,
   onOpenAsset,
-  onLoadMore,
-  onQueryParamsChange,
 }: Props) {
   const { t } = useTranslation();
   const [initialBrowseState] = useState(() =>
@@ -596,6 +556,43 @@ export function BrowseView({
     { ...folderQueryBase, folder: "" },
     view === "tree",
   );
+  const catalogItemsParams = useMemo<CatalogItemsParams>(
+    () => ({
+      assetId: focusAssetId || undefined,
+      projectId: projectFilterId || undefined,
+      projectName: projectFilterId
+        ? undefined
+        : projectFilterName || filters.project || undefined,
+      ext: filters.ext || undefined,
+      q: debouncedSearchQuery.trim() || undefined,
+      status: apiStatus(statusFilter) || undefined,
+      sort: apiSort(sortMode) || undefined,
+      customFilter: filters.customFilter || undefined,
+      folder: activeSelectedFolder || undefined,
+      limit: 100,
+    }),
+    [
+      activeSelectedFolder,
+      debouncedSearchQuery,
+      filters.customFilter,
+      filters.ext,
+      filters.project,
+      focusAssetId,
+      projectFilterId,
+      projectFilterName,
+      sortMode,
+      statusFilter,
+    ],
+  );
+  const catalogItemsQuery = useCatalogItemsInfiniteQuery(
+    scanId,
+    catalogItemsParams,
+  );
+  const items = useMemo(
+    () => catalogItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [catalogItemsQuery.data],
+  );
+  const facets = catalogItemsQuery.data?.pages[0]?.facets;
 
   function clearFocusedAssetQuery() {
     if (focusAssetId) setFocusAssetId("");
@@ -651,30 +648,6 @@ export function BrowseView({
   ]);
 
   useEffect(() => {
-    onQueryParamsChange?.({
-      assetId: focusAssetId || undefined,
-      projectName: projectFilterName || filters.project || undefined,
-      ext: filters.ext || undefined,
-      q: debouncedSearchQuery.trim() || undefined,
-      status: apiStatus(statusFilter) || undefined,
-      sort: apiSort(sortMode) || undefined,
-      customFilter: filters.customFilter || undefined,
-      folder: activeSelectedFolder || undefined,
-    });
-  }, [
-    activeSelectedFolder,
-    debouncedSearchQuery,
-    filters.customFilter,
-    filters.ext,
-    filters.project,
-    focusAssetId,
-    onQueryParamsChange,
-    projectFilterName,
-    sortMode,
-    statusFilter,
-  ]);
-
-  useEffect(() => {
     if (!autoScrollAssetId) return undefined;
     const resetId = window.setTimeout(() => {
       setFilters({ project: projectFilterName, ext: "", customFilter: "" });
@@ -685,16 +658,7 @@ export function BrowseView({
     return () => window.clearTimeout(resetId);
   }, [autoScrollAssetId, initialSearchQuery, projectFilterName]);
 
-  const allProjects = useMemo(
-    () => projectFacetIds({ items, projectNames, projectFilterName }),
-    [items, projectFilterName, projectNames],
-  );
-  const allExtensions = useMemo(
-    () => Array.from(new Set(items.map((i) => i.ext))).sort(),
-    [items],
-  );
-
-  const { facetBaseItems, filteredWithoutCustom, emptyOCRTextCount } = useMemo(
+  const { filteredWithoutCustom, emptyOCRTextCount } = useMemo(
     () =>
       applyBrowseFilters({
         items,
@@ -717,49 +681,23 @@ export function BrowseView({
   );
 
   const projectFacet = useMemo(
-    () =>
-      projectOptions
-        ? { options: projectOptions, total: projectTotal ?? items.length }
-        : facetOptions(
-            allProjects,
-            facetBaseItems.filter((i) => !filters.ext || i.ext === filters.ext),
-            "projectName",
-          ),
-    [
-      allProjects,
-      facetBaseItems,
-      filters.ext,
-      items.length,
-      projectOptions,
-      projectTotal,
-    ],
+    () => ({
+      options: facets?.projects,
+      total: facets?.projectTotal ?? items.length,
+    }),
+    [facets?.projectTotal, facets?.projects, items.length],
   );
   const extensionFacet = useMemo(
-    () =>
-      extensionOptions
-        ? { options: extensionOptions, total: extensionTotal ?? items.length }
-        : facetOptions(
-            allExtensions,
-            facetBaseItems.filter(
-              (i) => !filters.project || i.projectName === filters.project,
-            ),
-            "ext",
-          ),
-    [
-      allExtensions,
-      extensionOptions,
-      extensionTotal,
-      facetBaseItems,
-      filters.project,
-      items.length,
-    ],
+    () => ({
+      options: facets?.extensions,
+      total: facets?.extensionTotal ?? items.length,
+    }),
+    [facets?.extensionTotal, facets?.extensions, items.length],
   );
 
   const customFilterFacet = useMemo(
-    () =>
-      customFilterFacetOptions ??
-      customFilterOptions(customFilters, filteredWithoutCustom),
-    [customFilterFacetOptions, customFilters, filteredWithoutCustom],
+    () => facets?.customFilters ?? [],
+    [facets?.customFilters],
   );
 
   const toggleSelect = useCallback((id: string) => {
@@ -864,7 +802,10 @@ export function BrowseView({
     });
   }
 
-  const showInitialLoading = initialLoading || (pending && items.length === 0);
+  const pending =
+    catalogItemsQuery.isFetching && !catalogItemsQuery.isFetchingNextPage;
+  const showInitialLoading =
+    catalogItemsQuery.isLoading || (pending && items.length === 0);
 
   return (
     <>
@@ -877,7 +818,9 @@ export function BrowseView({
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
         customFilterOptions={customFilterFacet}
-        customFilterTotal={customFilterTotal ?? filteredWithoutCustom.length}
+        customFilterTotal={
+          facets?.customFilterTotal ?? filteredWithoutCustom.length
+        }
         ocrEnabled={ocrEnabled}
         onFiltersChange={handleFiltersChange}
       />
@@ -1029,9 +972,11 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
-                  hasMore={hasMore}
-                  loadingMore={loadingMore}
-                  onLoadMore={onLoadMore}
+                  hasMore={catalogItemsQuery.hasNextPage}
+                  loadingMore={catalogItemsQuery.isFetchingNextPage}
+                  onLoadMore={() => {
+                    void catalogItemsQuery.fetchNextPage();
+                  }}
                 />
               ) : (
                 <BrowseGrid
@@ -1047,9 +992,11 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
-                  hasMore={hasMore}
-                  loadingMore={loadingMore}
-                  onLoadMore={onLoadMore}
+                  hasMore={catalogItemsQuery.hasNextPage}
+                  loadingMore={catalogItemsQuery.isFetchingNextPage}
+                  onLoadMore={() => {
+                    void catalogItemsQuery.fetchNextPage();
+                  }}
                 />
               )}
             </div>

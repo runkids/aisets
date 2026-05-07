@@ -10,10 +10,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  catalogItemsTotalCount,
-  displayCatalogForMode,
   navigationBadges,
   optimizableBadgeCount,
+  scopedStatsForProject,
 } from "./appScope";
 import { AppTopbar } from "./components/AppTopbar";
 import { AssetDrawer } from "./components/AssetDrawer";
@@ -35,10 +34,8 @@ import { UnusedView } from "./components/UnusedView";
 import {
   useAddProjectMutation,
   useApplyPreviewMutation,
-  useCatalogDuplicatesInfiniteQuery,
   useSwitchWorkspaceMutation,
   useCatalogQuery,
-  useCatalogItemsInfiniteQuery,
   useCatalogItemDetailQuery,
   useDeleteUnusedPreviewMutation,
   useRenamePreviewMutation,
@@ -51,22 +48,12 @@ import {
   normalizeImageBackgroundMode,
   type ImageBackgroundMode,
 } from "./imageBackground";
-import type { ActionPreview, AssetItem, Catalog, ScanEvent } from "./types";
+import type { ActionPreview, AssetItem, ScanEvent } from "./types";
 import { fileName, modeForPath, pathForMode, type Mode } from "./ui";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
-type BrowseQueryParams = {
-  assetId?: string;
-  projectName?: string;
-  ext?: string;
-  q?: string;
-  status?: string;
-  sort?: string;
-  customFilter?: string;
-  folder?: string;
-};
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
 const IMAGE_BACKGROUND_STORAGE_KEY = "asset-studio-image-background";
@@ -123,10 +110,6 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [scanProgress, setScanProgress] = useState<ScanEvent | null>(null);
   const [scanProgressVisible, setScanProgressVisible] = useState(false);
-  const [browseQueryParams, setBrowseQueryParams] = useState<BrowseQueryParams>(
-    {},
-  );
-  const [browseQueryReady, setBrowseQueryReady] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
@@ -242,209 +225,66 @@ export function App() {
       ? selectedProjectId
       : "";
 
-  const catalogItemsQuery = useCatalogItemsInfiniteQuery(
-    catalogSummary?.scanId,
-    {
-      assetId: browseQueryParams.assetId,
-      projectId: effectiveSelectedProjectId || undefined,
-      projectName: browseQueryParams.projectName,
-      ext: browseQueryParams.ext,
-      q: browseQueryParams.q,
-      status: browseQueryParams.status,
-      sort: browseQueryParams.sort,
-      customFilter: browseQueryParams.customFilter,
-      folder: browseQueryParams.folder,
-      limit: 100,
-    },
-    catalogSummary != null && (mode !== "browse" || browseQueryReady),
+  const selectedProject = useMemo(() => {
+    return (
+      catalogSummary?.projects.find(
+        (project) => project.id === effectiveSelectedProjectId,
+      ) ?? null
+    );
+  }, [catalogSummary, effectiveSelectedProjectId]);
+
+  const selectedProjectStats = useMemo(() => {
+    if (!catalogSummary || !effectiveSelectedProjectId) return null;
+    return (
+      catalogSummary.projectStats.find(
+        (stat) => stat.projectId === effectiveSelectedProjectId,
+      ) ?? null
+    );
+  }, [catalogSummary, effectiveSelectedProjectId]);
+
+  const projectAssetCounts = useMemo(
+    () =>
+      new Map(
+        catalogSummary?.projectStats.map((stat) => [
+          stat.projectId,
+          stat.totalFiles,
+        ]),
+      ),
+    [catalogSummary?.projectStats],
   );
 
-  const cleanupProjectParams = {
-    projectId: effectiveSelectedProjectId || undefined,
-    limit: 200,
-  };
-  const unusedItemsQuery = useCatalogItemsInfiniteQuery(
-    catalogSummary?.scanId,
-    {
-      ...cleanupProjectParams,
-      status: "unused",
-      sort: "path",
-    },
-    mode === "unused" &&
-      catalogSummary != null &&
-      catalogSummary.analysis.references === "computed",
-  );
-  const duplicateItemsQuery = useCatalogItemsInfiniteQuery(
-    catalogSummary?.scanId,
-    {
-      ...cleanupProjectParams,
-      status: "duplicate",
-      sort: "path",
-    },
-    mode === "duplicates" &&
-      catalogSummary != null &&
-      catalogSummary.analysis.nearDuplicates === "computed",
-  );
-  const exactDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
-    catalogSummary?.scanId,
-    { kind: "exact", limit: 200 },
-    mode === "duplicates" &&
-      catalogSummary != null &&
-      catalogSummary.analysis.nearDuplicates === "computed",
-  );
-  const nearDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
-    catalogSummary?.scanId,
-    { kind: "near", limit: 200 },
-    mode === "duplicates" &&
-      catalogSummary != null &&
-      catalogSummary.analysis.nearDuplicates === "computed",
-  );
-  const optimizeItemsQuery = useCatalogItemsInfiniteQuery(
-    catalogSummary?.scanId,
-    {
-      ...cleanupProjectParams,
-      status: "optimizable",
-      sort: "bytes-desc",
-    },
-    mode === "optimize" &&
-      catalogSummary != null &&
-      catalogSummary.analysis.optimization === "computed",
-  );
+  const projectSwitchProjects = useMemo(() => {
+    return (catalogSummary?.projects ?? []).map((project) => ({
+      ...project,
+      assetCount: projectAssetCounts.get(project.id) ?? 0,
+    }));
+  }, [catalogSummary?.projects, projectAssetCounts]);
 
-  const items = useMemo(
-    () => catalogItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [catalogItemsQuery.data],
+  const scopedStats = useMemo(
+    () => scopedStatsForProject(catalogSummary, selectedProjectStats),
+    [catalogSummary, selectedProjectStats],
   );
-  const unusedPageItems = useMemo(
-    () => unusedItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [unusedItemsQuery.data],
+  const optimizeCount = optimizableBadgeCount(
+    catalogSummary,
+    selectedProjectStats,
+    0,
   );
-  const duplicatePageItems = useMemo(
-    () => duplicateItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [duplicateItemsQuery.data],
-  );
-  const exactDuplicateGroups = useMemo(
-    () => exactDuplicatesQuery.data?.pages.flatMap((page) => page.groups) ?? [],
-    [exactDuplicatesQuery.data],
-  );
-  const nearDuplicatePairs = useMemo(
-    () => nearDuplicatesQuery.data?.pages.flatMap((page) => page.pairs) ?? [],
-    [nearDuplicatesQuery.data],
-  );
-  const browseFacets = catalogItemsQuery.data?.pages[0]?.facets;
-
-  const catalog = useMemo<Catalog | null>(() => {
-    if (!catalogSummary) return null;
-    return {
-      ...catalogSummary,
-      items,
-      duplicateGroups: [],
-      nearDuplicates: [],
-      lintFindings: [],
-    };
-  }, [catalogSummary, items]);
-  const {
-    fetchNextPage: fetchNextUnusedItemsPage,
-    hasNextPage: hasMoreUnusedItems,
-    isFetchingNextPage: isFetchingMoreUnusedItems,
-  } = unusedItemsQuery;
-  const {
-    fetchNextPage: fetchNextDuplicateItemsPage,
-    hasNextPage: hasMoreDuplicateItems,
-    isFetchingNextPage: isFetchingMoreDuplicateItems,
-  } = duplicateItemsQuery;
-  const {
-    fetchNextPage: fetchNextExactDuplicatesPage,
-    hasNextPage: hasMoreExactDuplicates,
-    isFetchingNextPage: isFetchingMoreExactDuplicates,
-  } = exactDuplicatesQuery;
-  const {
-    fetchNextPage: fetchNextNearDuplicatesPage,
-    hasNextPage: hasMoreNearDuplicates,
-    isFetchingNextPage: isFetchingMoreNearDuplicates,
-  } = nearDuplicatesQuery;
-  const {
-    fetchNextPage: fetchNextOptimizeItemsPage,
-    hasNextPage: hasMoreOptimizeItems,
-    isFetchingNextPage: isFetchingMoreOptimizeItems,
-  } = optimizeItemsQuery;
-
-  useEffect(() => {
-    if (mode !== "unused") return;
-    if (!hasMoreUnusedItems || isFetchingMoreUnusedItems) return;
-    void fetchNextUnusedItemsPage();
-  }, [
-    fetchNextUnusedItemsPage,
-    hasMoreUnusedItems,
-    isFetchingMoreUnusedItems,
-    mode,
-  ]);
-
-  useEffect(() => {
-    if (mode !== "duplicates") return;
-    if (!hasMoreDuplicateItems || isFetchingMoreDuplicateItems) return;
-    void fetchNextDuplicateItemsPage();
-  }, [
-    fetchNextDuplicateItemsPage,
-    hasMoreDuplicateItems,
-    isFetchingMoreDuplicateItems,
-    mode,
-  ]);
-
-  useEffect(() => {
-    if (mode !== "duplicates") return;
-    if (!hasMoreExactDuplicates || isFetchingMoreExactDuplicates) return;
-    void fetchNextExactDuplicatesPage();
-  }, [
-    fetchNextExactDuplicatesPage,
-    hasMoreExactDuplicates,
-    isFetchingMoreExactDuplicates,
-    mode,
-  ]);
-
-  useEffect(() => {
-    if (mode !== "duplicates") return;
-    if (!hasMoreNearDuplicates || isFetchingMoreNearDuplicates) return;
-    void fetchNextNearDuplicatesPage();
-  }, [
-    fetchNextNearDuplicatesPage,
-    hasMoreNearDuplicates,
-    isFetchingMoreNearDuplicates,
-    mode,
-  ]);
-
-  useEffect(() => {
-    if (mode !== "optimize") return;
-    if (!hasMoreOptimizeItems || isFetchingMoreOptimizeItems) return;
-    void fetchNextOptimizeItemsPage();
-  }, [
-    fetchNextOptimizeItemsPage,
-    hasMoreOptimizeItems,
-    isFetchingMoreOptimizeItems,
-    mode,
-  ]);
+  const badges = navigationBadges(catalogSummary, scopedStats, optimizeCount);
 
   useEffect(() => {
     const settings = settingsQuery.data?.settings;
-    if (autoScanStartedRef.current || !settings || !catalog) return;
+    if (autoScanStartedRef.current || !settings || !catalogSummary) return;
     if (!settings.scanOnOpen && !settings.autoScanOnOpen) return;
-    if (catalog.projects.length === 0) return;
+    if (catalogSummary.projects.length === 0) return;
 
     autoScanStartedRef.current = true;
     scanMutation.mutate(undefined, {
       onError: (error) => toast.error(errorMessage(error)),
     });
-  }, [catalog, scanMutation, settingsQuery.data?.settings, toast]);
+  }, [catalogSummary, scanMutation, settingsQuery.data?.settings, toast]);
 
   const working =
     catalogQuery.isFetching ||
-    catalogItemsQuery.isFetching ||
-    (mode === "unused" && unusedItemsQuery.isFetching) ||
-    (mode === "duplicates" &&
-      (duplicateItemsQuery.isFetching ||
-        exactDuplicatesQuery.isFetching ||
-        nearDuplicatesQuery.isFetching)) ||
-    (mode === "optimize" && optimizeItemsQuery.isFetching) ||
     scanMutation.isPending ||
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
@@ -458,194 +298,13 @@ export function App() {
     { id: activeWorkspaceId, name: workspaceName, projectCount: 0 },
   ];
 
-  const selectedProject = useMemo(() => {
-    return (
-      catalog?.projects.find(
-        (project) => project.id === effectiveSelectedProjectId,
-      ) ?? null
-    );
-  }, [catalog, effectiveSelectedProjectId]);
-
-  const selectedProjectStats = useMemo(() => {
-    if (!catalog || !effectiveSelectedProjectId) return null;
-    return (
-      catalog.projectStats.find(
-        (stat) => stat.projectId === effectiveSelectedProjectId,
-      ) ?? null
-    );
-  }, [catalog, effectiveSelectedProjectId]);
-
-  const projectAssetCounts = useMemo(
-    () =>
-      new Map(
-        catalog?.projectStats.map((stat) => [stat.projectId, stat.totalFiles]),
-      ),
-    [catalog?.projectStats],
-  );
-
-  const projectSwitchProjects = useMemo(() => {
-    return (catalog?.projects ?? []).map((project) => ({
-      ...project,
-      assetCount: projectAssetCounts.get(project.id) ?? 0,
-    }));
-  }, [catalog, projectAssetCounts]);
-
-  const browseProjectNames = useMemo(() => {
-    if (!catalog) return [];
-    if (selectedProject) return [selectedProject.name];
-    return catalog.projects.map((project) => project.name);
-  }, [catalog, selectedProject]);
-
-  const scopedItems = useMemo(() => {
-    return effectiveSelectedProjectId
-      ? items.filter((item) => item.projectId === effectiveSelectedProjectId)
-      : items;
-  }, [effectiveSelectedProjectId, items]);
-
-  const scopedItemIds = useMemo(
-    () => new Set(scopedItems.map((item) => item.id)),
-    [scopedItems],
-  );
-  const duplicatePageItemIds = useMemo(
-    () => new Set(duplicatePageItems.map((item) => item.id)),
-    [duplicatePageItems],
-  );
-  const duplicatePageGroups = useMemo(
-    () =>
-      exactDuplicateGroups.filter(
-        (group) =>
-          duplicatePageItems.filter(
-            (item) => item.duplicateGroupId === group.id,
-          ).length > 1,
-      ),
-    [duplicatePageItems, exactDuplicateGroups],
-  );
-  const duplicatePageNearDuplicates = useMemo(
-    () =>
-      nearDuplicatePairs.filter(
-        (pair) =>
-          duplicatePageItemIds.has(pair.leftId) &&
-          duplicatePageItemIds.has(pair.rightId),
-      ),
-    [duplicatePageItemIds, nearDuplicatePairs],
-  );
-
-  const scopedDuplicateGroups = useMemo(() => {
-    if (!catalog) return [];
-    return catalog.duplicateGroups.filter(
-      (group) =>
-        scopedItems.filter((item) => item.duplicateGroupId === group.id)
-          .length > 1,
-    );
-  }, [catalog, scopedItems]);
-
-  const scopedNearDuplicates = useMemo(() => {
-    if (!catalog) return [];
-    return catalog.nearDuplicates.filter(
-      (pair) =>
-        scopedItemIds.has(pair.leftId) && scopedItemIds.has(pair.rightId),
-    );
-  }, [catalog, scopedItemIds]);
-
-  const scopedLintFindings = useMemo(() => {
-    if (!catalog) return [];
-    if (!selectedProject) return catalog.lintFindings;
-    return catalog.lintFindings.filter((finding) => {
-      if (finding.assetId) return scopedItemIds.has(finding.assetId);
-      return finding.file.startsWith(selectedProject.name);
-    });
-  }, [catalog, scopedItemIds, selectedProject]);
-
-  const unusedItems = useMemo(
-    () =>
-      catalog?.analysis.references === "computed"
-        ? scopedItems.filter((i) => i.usedBy.length === 0)
-        : [],
-    [catalog?.analysis.references, scopedItems],
-  );
-  const optimizeItems = useMemo(
-    () => optimizeItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [optimizeItemsQuery.data],
-  );
-  const lintFindings = scopedLintFindings;
-
-  const optimizeCount = optimizableBadgeCount(
-    catalog,
-    selectedProjectStats,
-    optimizeItems.length,
-  );
-  const optimizeTotalCount = catalogItemsTotalCount(
-    optimizeItemsQuery.data?.pages[0]?.total,
-    optimizeCount,
-  );
-  const scopedStats = useMemo(
-    () =>
-      catalog && !effectiveSelectedProjectId
-        ? catalog.stats
-        : {
-            totalFiles: selectedProjectStats?.totalFiles ?? scopedItems.length,
-            duplicateGroups: scopedDuplicateGroups.length,
-            duplicateFiles:
-              selectedProjectStats?.duplicateFiles ??
-              scopedItems.filter(
-                (item) =>
-                  item.duplicateGroupId &&
-                  scopedDuplicateGroups.some(
-                    (group) => group.id === item.duplicateGroupId,
-                  ),
-              ).length,
-            unusedFiles:
-              selectedProjectStats?.unusedFiles ?? unusedItems.length,
-            nearDuplicates: scopedNearDuplicates.length,
-            lintFindings:
-              selectedProjectStats?.lintFindings ?? scopedLintFindings.length,
-            cacheHits: catalog?.stats.cacheHits ?? 0,
-          },
-    [
-      catalog,
-      effectiveSelectedProjectId,
-      scopedDuplicateGroups,
-      scopedItems,
-      scopedLintFindings,
-      scopedNearDuplicates,
-      selectedProjectStats,
-      unusedItems.length,
-    ],
-  );
-
-  const scopedCatalog = useMemo(() => {
-    if (!catalog) return null;
-    const projects = selectedProject ? [selectedProject] : catalog.projects;
-    return {
-      ...catalog,
-      projects,
-      items: scopedItems,
-      duplicateGroups: scopedDuplicateGroups,
-      nearDuplicates: scopedNearDuplicates,
-      lintFindings: scopedLintFindings,
-      stats: scopedStats,
-    };
-  }, [
-    catalog,
-    scopedDuplicateGroups,
-    scopedItems,
-    scopedLintFindings,
-    scopedNearDuplicates,
-    scopedStats,
-    selectedProject,
-  ]);
-
-  const badges = navigationBadges(catalog, scopedStats, optimizeCount);
-  const displayCatalog = displayCatalogForMode(mode, catalog, scopedCatalog);
-
   const drawerDetailQuery = useCatalogItemDetailQuery(
-    catalog?.scanId,
+    catalogSummary?.scanId,
     drawerId,
     drawerId !== "",
   );
   const drawerAsset = drawerId
     ? (drawerDetailQuery.data?.item ??
-      items.find((i) => i.id === drawerId) ??
       (drawerSeedAsset?.id === drawerId ? drawerSeedAsset : undefined))
     : undefined;
   const directoryPickerInitialPath =
@@ -822,25 +481,6 @@ export function App() {
     [setAutoScrollAssetId],
   );
 
-  const onBrowseQueryParamsChange = useCallback(
-    (next: BrowseQueryParams) => {
-      setBrowseQueryReady(true);
-      setBrowseQueryParams((prev) =>
-        prev.projectName === next.projectName &&
-        prev.assetId === next.assetId &&
-        prev.ext === next.ext &&
-        prev.q === next.q &&
-        prev.status === next.status &&
-        prev.sort === next.sort &&
-        prev.customFilter === next.customFilter &&
-        prev.folder === next.folder
-          ? prev
-          : next,
-      );
-    },
-    [setBrowseQueryParams, setBrowseQueryReady],
-  );
-
   const appShell = (
     <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
       <div className="col-span-2 row-start-1">
@@ -860,7 +500,7 @@ export function App() {
         activeWorkspaceId={activeWorkspaceId}
         projects={projectSwitchProjects}
         selectedProjectId={effectiveSelectedProjectId}
-        totalAssets={catalog?.stats.totalFiles ?? items.length}
+        totalAssets={catalogSummary?.stats.totalFiles ?? 0}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}
         onSelect={changeMode}
@@ -876,7 +516,6 @@ export function App() {
                   ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}`
                   : `all-projects:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}`
               }
-              items={scopedItems}
               activeAssetId={drawerId}
               autoScrollAssetId={autoScrollAssetId}
               initialCustomFilterId={browseCustomFilterId}
@@ -885,35 +524,14 @@ export function App() {
               customFilters={
                 settingsQuery.data?.settings.customAssetFilters ?? []
               }
-              projectNames={browseProjectNames}
               scanId={catalogSummary?.scanId}
               projectFilterId={effectiveSelectedProjectId || undefined}
               projectFilterName={selectedProject?.name ?? ""}
-              projectOptions={browseFacets?.projects}
-              projectTotal={browseFacets?.projectTotal}
-              extensionOptions={browseFacets?.extensions}
-              extensionTotal={browseFacets?.extensionTotal}
-              customFilterFacetOptions={browseFacets?.customFilters}
-              customFilterTotal={browseFacets?.customFilterTotal}
               imagePreviewEnabled={imagePreviewEnabled}
               ocrEnabled={ocrEnabled}
               ocrFuzzySearch={ocrFuzzySearch}
-              initialLoading={
-                (!browseQueryReady || catalogItemsQuery.isLoading) &&
-                items.length === 0
-              }
-              pending={
-                catalogItemsQuery.isFetching &&
-                !catalogItemsQuery.isFetchingNextPage
-              }
               onAutoScrollDone={clearAutoScrollAssetId}
               onOpenAsset={setDrawerId}
-              onQueryParamsChange={onBrowseQueryParamsChange}
-              loadingMore={catalogItemsQuery.isFetchingNextPage}
-              hasMore={catalogItemsQuery.hasNextPage}
-              onLoadMore={() => {
-                void catalogItemsQuery.fetchNextPage();
-              }}
             />
           ) : mode === "settings" ? (
             <SettingsView
@@ -931,50 +549,49 @@ export function App() {
             >
               {mode === "precheck" ? (
                 <PreCheckView onOpenAsset={openAssetIdFromPalette} />
-              ) : displayCatalog == null &&
+              ) : catalogSummary == null &&
                 !catalogQuery.isLoading ? null : mode === "projects" &&
-                displayCatalog ? (
+                catalogSummary ? (
                 <ProjectsView
-                  catalog={displayCatalog}
+                  catalog={catalogSummary}
                   onJump={changeMode}
                   onAddProject={() => setDirectoryPickerOpen(true)}
                 />
-              ) : mode === "duplicates" && scopedCatalog ? (
-                catalog?.analysis.nearDuplicates === "notComputed" ? (
+              ) : mode === "duplicates" && catalogSummary ? (
+                catalogSummary.analysis.nearDuplicates === "notComputed" ? (
                   <NotComputedState
                     title={
-                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                      catalogSummary.stats.totalFiles >= 10_000
                         ? t("catalog.notComputed.nearSkippedTitle")
                         : t("catalog.notComputed.nearTitle")
                     }
                     description={
-                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                      catalogSummary.stats.totalFiles >= 10_000
                         ? t("catalog.notComputed.nearSkippedDesc", {
-                            count: catalog?.stats.totalFiles ?? 0,
+                            count: catalogSummary.stats.totalFiles,
                           })
                         : t("catalog.notComputed.nearDesc")
                     }
                     action={
-                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                      catalogSummary.stats.totalFiles >= 10_000
                         ? t("catalog.notComputed.nearSkippedAction")
                         : t("catalog.notComputed.fullScan")
                     }
                     onAction={
-                      (catalog?.stats.totalFiles ?? 0) >= 10_000
+                      catalogSummary.stats.totalFiles >= 10_000
                         ? onNearDuplicateScan
                         : onFullScan
                     }
                   />
                 ) : (
                   <DuplicatesView
-                    items={duplicatePageItems}
-                    groups={duplicatePageGroups}
-                    nearDuplicates={duplicatePageNearDuplicates}
+                    scanId={catalogSummary.scanId}
+                    projectFilterId={effectiveSelectedProjectId || undefined}
                     onOpenAsset={setDrawerId}
                   />
                 )
               ) : mode === "unused" ? (
-                catalog?.analysis.references === "notComputed" ? (
+                catalogSummary?.analysis.references === "notComputed" ? (
                   <NotComputedState
                     title={t("catalog.notComputed.referencesTitle")}
                     description={t("catalog.notComputed.referencesDesc")}
@@ -983,12 +600,13 @@ export function App() {
                   />
                 ) : (
                   <UnusedView
-                    items={unusedPageItems}
+                    scanId={catalogSummary?.scanId}
+                    projectFilterId={effectiveSelectedProjectId || undefined}
                     onOpenAsset={setDrawerId}
                   />
                 )
               ) : mode === "optimize" ? (
-                catalog?.analysis.optimization === "notComputed" ? (
+                catalogSummary?.analysis.optimization === "notComputed" ? (
                   <NotComputedState
                     title={t("catalog.notComputed.optimizationTitle")}
                     description={t("catalog.notComputed.optimizationDesc")}
@@ -997,13 +615,17 @@ export function App() {
                   />
                 ) : (
                   <OptimizeView
-                    items={optimizeItems}
-                    totalCount={optimizeTotalCount}
+                    scanId={catalogSummary?.scanId}
+                    projectFilterId={effectiveSelectedProjectId || undefined}
                     onOpenAsset={setDrawerId}
                   />
                 )
               ) : mode === "lint" ? (
-                <LintView findings={lintFindings} onOpenAsset={setDrawerId} />
+                <LintView
+                  scanId={catalogSummary?.scanId}
+                  projectFilterId={effectiveSelectedProjectId || undefined}
+                  onOpenAsset={setDrawerId}
+                />
               ) : null}
             </div>
           )}
@@ -1016,7 +638,7 @@ export function App() {
         <AssetDrawer
           key={drawerAsset.id}
           asset={drawerAsset}
-          assetIds={items.map((i) => i.id)}
+          assetIds={[drawerAsset.id]}
           onClose={() => setDrawerId("")}
           onRename={onRename}
           onDelete={onDelete}
@@ -1040,7 +662,7 @@ export function App() {
 
       <CommandPalette
         open={cmdkOpen}
-        scanId={catalog?.scanId}
+        scanId={catalogSummary?.scanId}
         customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
         ocrEnabled={ocrEnabled}
         onClose={() => setCmdkOpen(false)}

@@ -21,6 +21,7 @@ import (
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
 	"asset-studio/internal/imageproc"
+	"asset-studio/internal/lint"
 	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
@@ -247,6 +248,59 @@ func TestScanHistoryRoutes(t *testing.T) {
 	}
 	if diff.Summary.Added != 1 || diff.Summary.Removed != 1 || diff.Summary.Modified != 1 {
 		t.Fatalf("diff body = %#v", diff)
+	}
+}
+
+func TestCatalogLintRouteFiltersByProject(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	left := serverScanAsset(root, "src/left.png", 100, "left", 0)
+	left.ProjectID = "left"
+	left.ProjectName = "Left"
+	right := serverScanAsset(root, "src/right.png", 100, "right", 0)
+	right.ProjectID = "right"
+	right.ProjectName = "Right"
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects: []scanner.Project{
+			{ID: "left", Name: "Left", Path: filepath.Join(root, "left")},
+			{ID: "right", Name: "Right", Path: filepath.Join(root, "right")},
+		},
+		Items: []scanner.AssetItem{left, right},
+		LintFindings: []lint.Finding{
+			{RuleID: "left", Severity: "warning", File: "src/left.tsx", AssetID: left.ID},
+			{RuleID: "right", Severity: "warning", File: "src/right.tsx", AssetID: right.ID},
+			{RuleID: "global", Severity: "info", File: "src/App.tsx"},
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 2, LintFindings: 3},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog/lint?projectId=left", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog lint = %d %s", rec.Code, rec.Body.String())
+	}
+	var page struct {
+		Items []lint.Finding `json:"items"`
+		Total int            `json:"total"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].AssetID != left.ID {
+		t.Fatalf("catalog lint project page = %#v", page)
 	}
 }
 
@@ -934,7 +988,11 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assetID := catalogAssetID(t, s)
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 || len(items[0].Recommendations) == 0 {
+		t.Fatalf("catalog items should include optimization recommendations = %#v", items)
+	}
+	assetID := items[0].ID
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/actions/optimization/estimate", bytes.NewReader([]byte(`{"assetIds":[]}`)))

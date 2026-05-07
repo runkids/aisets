@@ -92,39 +92,18 @@ func selectedOptimizationItems(ctx context.Context, store *config.Store, ids []s
 		return nil, err
 	}
 	if len(ids) == 0 {
-		out := []scanner.AssetItem{}
-		cursor := ""
-		for {
-			page, err := store.CatalogItems(config.CatalogItemQuery{Status: "optimizable", Limit: 200, Cursor: cursor})
-			if err != nil {
-				return nil, err
-			}
-			for _, item := range page.Items {
-				detail, err := store.CatalogItemDetail(0, item.ID)
-				if err != nil {
-					return nil, err
-				}
-				out = append(out, detail.Item)
-			}
-			if page.NextCursor == "" {
-				break
-			}
-			cursor = page.NextCursor
-		}
-		return out, nil
+		return store.AllOptimizableItems(0)
 	}
 	idSet := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
 		idSet[id] = struct{}{}
 	}
-	out := make([]scanner.AssetItem, 0, len(ids))
-	for _, id := range ids {
-		detail, err := store.CatalogItemDetail(0, id)
-		if err != nil {
-			continue
-		}
-		out = append(out, detail.Item)
-		delete(idSet, id)
+	out, err := store.CatalogItemsWithOptimizationByIDs(0, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range out {
+		delete(idSet, item.ID)
 	}
 	if len(idSet) > 0 {
 		missing := make([]string, 0, len(idSet))

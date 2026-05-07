@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   catalogItemsTotalCount,
-  displayCatalogForMode,
   displayTotalsForMode,
   navigationBadges,
   optimizableBadgeCount,
+  scopedStatsForProject,
 } from "./appScope";
-import type { Catalog, Project } from "./types";
+import type { CatalogSummary, Project } from "./types";
 
 function makeProject(id: string): Project {
   return { id, workspaceId: "default", name: id, path: `/${id}` };
 }
 
-function makeCatalog(
+function makeSummary(
   projectIds: string[],
   totalFiles: number,
   optimizableFilesByProject: number[] = [],
-): Catalog {
+): CatalogSummary {
   return {
     generatedAt: "2026-05-06T12:00:00.000Z",
     projects: projectIds.map(makeProject),
@@ -29,10 +29,6 @@ function makeCatalog(
       optimizableFiles: optimizableFilesByProject[index] ?? 0,
       lintFindings: 0,
     })),
-    items: [],
-    duplicateGroups: [],
-    nearDuplicates: [],
-    lintFindings: [],
     stats: {
       totalFiles,
       duplicateGroups: 0,
@@ -50,27 +46,53 @@ function makeCatalog(
   };
 }
 
-describe("displayCatalogForMode", () => {
-  it("uses the full catalog for Projects regardless of the selected project scope", () => {
-    const fullCatalog = makeCatalog(["001", "workspace"], 4);
-    const scopedCatalog = makeCatalog(["workspace"], 3);
+describe("scopedStatsForProject", () => {
+  it("uses the summary stats when no project is selected", () => {
+    const summary = makeSummary(["001", "workspace"], 4);
 
-    expect(displayCatalogForMode("projects", fullCatalog, scopedCatalog)).toBe(
-      fullCatalog,
-    );
-    expect(
-      displayTotalsForMode("projects", fullCatalog, scopedCatalog),
-    ).toEqual({ projects: 2, assets: 4 });
+    expect(scopedStatsForProject(summary, null)).toBe(summary.stats);
   });
 
-  it("keeps asset workflow modes scoped to the selected project", () => {
-    const fullCatalog = makeCatalog(["001", "workspace"], 4);
-    const scopedCatalog = makeCatalog(["workspace"], 3);
+  it("derives selected-project totals from projectStats without fake arrays", () => {
+    const summary = makeSummary(["001", "workspace"], 4);
+    const projectStats = {
+      ...summary.projectStats[1],
+      totalFiles: 3,
+      duplicateFiles: 1,
+      unusedFiles: 2,
+      lintFindings: 3,
+    };
 
-    expect(displayCatalogForMode("browse", fullCatalog, scopedCatalog)).toBe(
-      scopedCatalog,
-    );
-    expect(displayTotalsForMode("browse", fullCatalog, scopedCatalog)).toEqual({
+    expect(scopedStatsForProject(summary, projectStats)).toEqual({
+      totalFiles: 3,
+      duplicateGroups: 1,
+      duplicateFiles: 1,
+      unusedFiles: 2,
+      nearDuplicates: 0,
+      lintFindings: 3,
+      cacheHits: 0,
+    });
+  });
+});
+
+describe("displayTotalsForMode", () => {
+  it("uses global summary totals for Projects", () => {
+    const summary = makeSummary(["001", "workspace"], 4);
+    const scopedStats = { ...summary.stats, totalFiles: 3 };
+
+    expect(displayTotalsForMode("projects", summary, scopedStats)).toEqual({
+      projects: 2,
+      assets: 4,
+    });
+  });
+
+  it("uses scoped stats for asset workflow modes", () => {
+    const summary = makeSummary(["001", "workspace"], 4);
+    const scopedStats = { ...summary.stats, totalFiles: 3 };
+
+    expect(
+      displayTotalsForMode("browse", summary, scopedStats, "workspace"),
+    ).toEqual({
       projects: 1,
       assets: 3,
     });
@@ -79,12 +101,10 @@ describe("displayCatalogForMode", () => {
 
 describe("optimizableBadgeCount", () => {
   it("uses project stats before the Optimize list query has loaded", () => {
-    const fullCatalog = makeCatalog(["001", "workspace"], 4, [2, 3]);
+    const summary = makeSummary(["001", "workspace"], 4, [2, 3]);
 
-    expect(optimizableBadgeCount(fullCatalog, null, 0)).toBe(5);
-    expect(
-      optimizableBadgeCount(fullCatalog, fullCatalog.projectStats[1], 0),
-    ).toBe(3);
+    expect(optimizableBadgeCount(summary, null, 0)).toBe(5);
+    expect(optimizableBadgeCount(summary, summary.projectStats[1], 0)).toBe(3);
     expect(optimizableBadgeCount(null, null, 7)).toBe(7);
   });
 });
@@ -98,16 +118,16 @@ describe("catalogItemsTotalCount", () => {
 
 describe("navigationBadges", () => {
   it("always counts all Projects while keeping asset workflow counts scoped", () => {
-    const fullCatalog = makeCatalog(["001", "workspace"], 4);
-    const scopedCatalog = makeCatalog(["workspace"], 3);
+    const summary = makeSummary(["001", "workspace"], 4);
     const scopedStats = {
-      ...scopedCatalog.stats,
+      ...summary.stats,
+      totalFiles: 3,
       duplicateFiles: 1,
       unusedFiles: 2,
       lintFindings: 3,
     };
 
-    expect(navigationBadges(fullCatalog, scopedStats, 1)).toEqual({
+    expect(navigationBadges(summary, scopedStats, 1)).toEqual({
       projects: 2,
       total: 3,
       duplicate: 1,

@@ -9,22 +9,51 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCatalogItemsInfiniteQuery } from "../queries";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { AssetThumbnail, Badge, Button, EmptyState, IconButton } from "./ui";
 
 type Props = {
-  items: AssetItem[];
+  scanId?: number;
+  projectFilterId?: string;
+  enabled?: boolean;
   onOpenAsset?: (id: string) => void;
   onDelete?: (items: AssetItem[]) => void;
 };
 
 const ROW_HEIGHT = 60;
 
-export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
+export function UnusedView({
+  scanId,
+  projectFilterId,
+  enabled = true,
+  onOpenAsset,
+  onDelete,
+}: Props) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pathsCopied, setPathsCopied] = useState(false);
+  const itemsQuery = useCatalogItemsInfiniteQuery(
+    scanId,
+    {
+      projectId: projectFilterId || undefined,
+      status: "unused",
+      sort: "path",
+      limit: 200,
+    },
+    enabled,
+    0,
+  );
+  const items = useMemo(
+    () => itemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [itemsQuery.data],
+  );
+  const {
+    fetchNextPage: fetchNextItemsPage,
+    hasNextPage: hasMoreItems,
+    isFetchingNextPage: isFetchingMoreItems,
+  } = itemsQuery;
   const totalBytes = useMemo(
     () => items.reduce((sum, i) => sum + i.bytes, 0),
     [items],
@@ -62,6 +91,10 @@ export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
     const timer = window.setTimeout(() => setPathsCopied(false), 1500);
     return () => window.clearTimeout(timer);
   }, [pathsCopied]);
+  useEffect(() => {
+    if (!hasMoreItems || isFetchingMoreItems) return;
+    void fetchNextItemsPage();
+  }, [fetchNextItemsPage, hasMoreItems, isFetchingMoreItems]);
 
   function copyPaths() {
     const paths = items
@@ -141,7 +174,9 @@ export function UnusedView({ items, onOpenAsset, onDelete }: Props) {
         </span>
       </div>
 
-      {items.length === 0 ? (
+      {itemsQuery.isLoading && items.length === 0 ? (
+        <EmptyState title={t("common.loading")} />
+      ) : items.length === 0 ? (
         <EmptyState
           title={t("unused.empty")}
           description={t("unused.emptyDesc")}

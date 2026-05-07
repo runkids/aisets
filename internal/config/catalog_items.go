@@ -28,11 +28,7 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	orderBy := catalogItemOrder(query.Sort)
 	args = append(args, limit+1, offset)
 	rows, err := s.db.Query(`
-		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
-			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
-			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
-			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
+		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
@@ -60,6 +56,9 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 		items = items[:limit]
 		next = strconv.Itoa(offset + limit)
 	}
+	if err := s.hydrateAssetOptimization(scanID, items); err != nil {
+		return CatalogItemsPage{}, err
+	}
 	facets, err := s.catalogItemFacets(scanID, query)
 	if err != nil {
 		return CatalogItemsPage{}, err
@@ -73,11 +72,7 @@ func (s *Store) CatalogItem(scanID int64, assetID string) (scanner.AssetItem, er
 		return scanner.AssetItem{}, err
 	}
 	row := s.db.QueryRow(`
-		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
-			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
-			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
-			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
+		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id

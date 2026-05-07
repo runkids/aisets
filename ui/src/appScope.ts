@@ -1,5 +1,8 @@
-import type { Catalog } from "./types";
+import type { CatalogSummary } from "./types";
 import type { Mode } from "./ui";
+
+export type CatalogStats = CatalogSummary["stats"];
+export type CatalogProjectStats = CatalogSummary["projectStats"][number];
 
 export type NavigationBadges = {
   projects: number;
@@ -10,35 +13,56 @@ export type NavigationBadges = {
   lint: number;
 };
 
-export function displayCatalogForMode(
-  mode: Mode,
-  catalog: Catalog | null,
-  scopedCatalog: Catalog | null,
-) {
-  return mode === "projects" ? catalog : scopedCatalog;
+export function scopedStatsForProject(
+  summary: CatalogSummary | null,
+  projectStats: CatalogProjectStats | null,
+): CatalogStats {
+  if (!summary) {
+    return {
+      totalFiles: 0,
+      duplicateGroups: 0,
+      duplicateFiles: 0,
+      unusedFiles: 0,
+      nearDuplicates: 0,
+      lintFindings: 0,
+      cacheHits: 0,
+    };
+  }
+  if (!projectStats) return summary.stats;
+  return {
+    totalFiles: projectStats.totalFiles,
+    duplicateGroups: projectStats.duplicateFiles,
+    duplicateFiles: projectStats.duplicateFiles,
+    unusedFiles: projectStats.unusedFiles,
+    nearDuplicates: 0,
+    lintFindings: projectStats.lintFindings,
+    cacheHits: summary.stats.cacheHits,
+  };
 }
 
 export function displayTotalsForMode(
   mode: Mode,
-  catalog: Catalog | null,
-  scopedCatalog: Catalog | null,
+  summary: CatalogSummary | null,
+  scopedStats: CatalogStats,
+  selectedProjectId = "",
 ) {
-  const displayCatalog = displayCatalogForMode(mode, catalog, scopedCatalog);
-  if (!displayCatalog) return null;
+  if (!summary) return null;
   return {
-    projects: displayCatalog.projects.length,
-    assets: displayCatalog.stats.totalFiles,
+    projects:
+      mode === "projects" || !selectedProjectId ? summary.projects.length : 1,
+    assets:
+      mode === "projects" ? summary.stats.totalFiles : scopedStats.totalFiles,
   };
 }
 
 export function optimizableBadgeCount(
-  catalog: Catalog | null,
-  selectedProjectStats: Catalog["projectStats"][number] | null,
+  summary: CatalogSummary | null,
+  selectedProjectStats: CatalogProjectStats | null,
   fallbackCount: number,
 ) {
   if (selectedProjectStats) return selectedProjectStats.optimizableFiles;
-  if (catalog) {
-    return catalog.projectStats.reduce(
+  if (summary) {
+    return summary.projectStats.reduce(
       (total, stat) => total + stat.optimizableFiles,
       0,
     );
@@ -54,12 +78,12 @@ export function catalogItemsTotalCount(
 }
 
 export function navigationBadges(
-  catalog: Catalog | null,
-  scopedStats: Catalog["stats"],
+  summary: CatalogSummary | null,
+  scopedStats: CatalogStats,
   optimizeCount: number,
 ): NavigationBadges {
   return {
-    projects: catalog?.projects.length ?? 0,
+    projects: summary?.projects.length ?? 0,
     total: scopedStats.totalFiles,
     duplicate: scopedStats.duplicateFiles,
     unused: scopedStats.unusedFiles,

@@ -1,12 +1,14 @@
 import { AlertTriangle, Info, XCircle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { LintFinding } from "../types";
+import { useCatalogLintInfiniteQuery } from "../queries";
 import { Badge, EmptyState } from "./ui";
 
 type Props = {
-  findings: LintFinding[];
+  scanId?: number;
+  projectFilterId?: string;
+  enabled?: boolean;
   onOpenAsset?: (id: string) => void;
 };
 
@@ -19,11 +21,38 @@ const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
 
 const FINDING_HEIGHT = 110;
 
-export function LintView({ findings, onOpenAsset }: Props) {
+export function LintView({
+  scanId,
+  projectFilterId,
+  enabled = true,
+  onOpenAsset,
+}: Props) {
   const { t } = useTranslation();
   const [severityFilter, setSeverityFilter] = useState("");
   const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lintQuery = useCatalogLintInfiniteQuery(
+    scanId,
+    {
+      projectId: projectFilterId || undefined,
+      limit: 200,
+    },
+    enabled,
+  );
+  const findings = useMemo(
+    () => lintQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [lintQuery.data],
+  );
+  const {
+    fetchNextPage: fetchNextLintPage,
+    hasNextPage: hasMoreLint,
+    isFetchingNextPage: isFetchingMoreLint,
+  } = lintQuery;
+
+  useEffect(() => {
+    if (!hasMoreLint || isFetchingMoreLint) return;
+    void fetchNextLintPage();
+  }, [fetchNextLintPage, hasMoreLint, isFetchingMoreLint]);
 
   const counts = useMemo(() => {
     const c = { critical: 0, warning: 0, info: 0 };
@@ -60,20 +89,6 @@ export function LintView({ findings, onOpenAsset }: Props) {
 
   return (
     <div className="mx-auto flex h-full max-w-[1600px] flex-col px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <h1 className="m-0 font-g-display text-[44px] font-bold leading-[1.05] tracking-[-0.035em] text-g-ink max-[768px]:text-[30px]">
-            {t("lint.title")}{" "}
-            <em className="ml-2.5 align-[0.6em] font-g text-[0.32em] font-medium not-italic uppercase tracking-[0.06em] text-g-ink-3">
-              {t("lint.findingsCount", { count: findings.length })}
-            </em>
-          </h1>
-          <p className="mt-2.5 max-w-[540px] text-[14px] text-g-ink-3">
-            {t("lint.description")}
-          </p>
-        </div>
-      </div>
-
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex max-w-[280px] items-center gap-2 rounded-g-md border border-g-input-border bg-g-surface px-3 py-[7px] transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:border-g-input-hover hover:bg-g-input-hover-bg focus-within:border-g-input-focus focus-within:bg-g-surface focus-within:shadow-g-input-focus">
           <input
@@ -98,7 +113,9 @@ export function LintView({ findings, onOpenAsset }: Props) {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {lintQuery.isLoading && filtered.length === 0 ? (
+        <EmptyState title={t("common.loading")} />
+      ) : filtered.length === 0 ? (
         <EmptyState title={t("lint.empty")} description={t("lint.emptyDesc")} />
       ) : (
         <div

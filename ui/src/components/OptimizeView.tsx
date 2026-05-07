@@ -7,8 +7,9 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useCatalogItemsInfiniteQuery } from "../queries";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
 import {
@@ -22,8 +23,9 @@ import {
 } from "./ui";
 
 type Props = {
-  items: AssetItem[];
-  totalCount: number;
+  scanId?: number;
+  projectFilterId?: string;
+  enabled?: boolean;
   onOpenAsset?: (id: string) => void;
 };
 
@@ -36,7 +38,12 @@ function categoryOfItem(item: AssetItem): Set<string> {
   return cats;
 }
 
-export function OptimizeView({ items, totalCount, onOpenAsset }: Props) {
+export function OptimizeView({
+  scanId,
+  projectFilterId,
+  enabled = true,
+  onOpenAsset,
+}: Props) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("");
@@ -45,6 +52,32 @@ export function OptimizeView({ items, totalCount, onOpenAsset }: Props) {
   const [scriptOpen, setScriptOpen] = useState<{ script: string } | null>(null);
   const [scriptWorking, setScriptWorking] = useState(false);
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const itemsQuery = useCatalogItemsInfiniteQuery(
+    scanId,
+    {
+      projectId: projectFilterId || undefined,
+      status: "optimizable",
+      sort: "bytes-desc",
+      limit: 200,
+    },
+    enabled,
+    0,
+  );
+  const items = useMemo(
+    () => itemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [itemsQuery.data],
+  );
+  const {
+    fetchNextPage: fetchNextItemsPage,
+    hasNextPage: hasMoreItems,
+    isFetchingNextPage: isFetchingMoreItems,
+  } = itemsQuery;
+  const totalCount = itemsQuery.data?.pages[0]?.total ?? items.length;
+
+  useEffect(() => {
+    if (!hasMoreItems || isFetchingMoreItems) return;
+    void fetchNextItemsPage();
+  }, [fetchNextItemsPage, hasMoreItems, isFetchingMoreItems]);
 
   const counts = useMemo(() => {
     const sev = { critical: 0, warning: 0, info: 0 };
@@ -350,87 +383,91 @@ export function OptimizeView({ items, totalCount, onOpenAsset }: Props) {
       )}
 
       <div>
-        {filtered.map((item) => {
-          const sev = primarySeverity(item);
-          const rec = item.optimizationRecommendations[0];
-          const isSelected = selected.has(item.id);
-          return (
-            <div
-              key={item.id}
-              className="relative mb-2.5 grid cursor-pointer items-center gap-4 rounded-g-lg border border-g-line bg-g-surface px-[18px] py-3.5 transition-all duration-[120ms] ease-g hover:translate-x-0.5 hover:border-g-line-strong grid-cols-[28px_64px_1fr_220px_140px] max-[768px]:grid-cols-[28px_48px_1fr] max-[768px]:gap-2.5 max-[768px]:[&>:nth-child(4)]:col-start-3 max-[768px]:[&>:nth-child(5)]:col-start-3"
-              onClick={() => onOpenAsset?.(item.id)}
-            >
+        {itemsQuery.isLoading && filtered.length === 0 ? (
+          <EmptyState title={t("common.loading")} />
+        ) : (
+          filtered.map((item) => {
+            const sev = primarySeverity(item);
+            const rec = item.optimizationRecommendations[0];
+            const isSelected = selected.has(item.id);
+            return (
               <div
-                className="flex items-center justify-center"
-                onClick={(e) => e.stopPropagation()}
+                key={item.id}
+                className="relative mb-2.5 grid cursor-pointer items-center gap-4 rounded-g-lg border border-g-line bg-g-surface px-[18px] py-3.5 transition-all duration-[120ms] ease-g hover:translate-x-0.5 hover:border-g-line-strong grid-cols-[28px_64px_1fr_220px_140px] max-[768px]:grid-cols-[28px_48px_1fr] max-[768px]:gap-2.5 max-[768px]:[&>:nth-child(4)]:col-start-3 max-[768px]:[&>:nth-child(5)]:col-start-3"
+                onClick={() => onOpenAsset?.(item.id)}
               >
-                <IconButton
-                  size="sm"
-                  active={isSelected}
-                  onClick={() => toggleOne(item.id)}
-                  aria-label={
-                    isSelected ? t("action.deselect") : t("action.select")
-                  }
+                <div
+                  className="flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {isSelected ? (
-                    <CheckSquare size={16} />
-                  ) : (
-                    <Square size={16} />
-                  )}
-                </IconButton>
-              </div>
-              <AssetThumbnail
-                src={item.thumbnailUrl || item.url}
-                size="lg"
-                className="size-16 rounded-g-md"
-              />
-              <div className="min-w-0 text-left">
-                <div className="truncate font-g-mono text-[13px] font-medium">
-                  {fileName(item.repoPath)}
-                </div>
-                <div className="mt-0.5 truncate font-g-mono text-g-chip text-g-ink-4">
-                  {item.repoPath}
-                </div>
-                {rec && (
-                  <div className="mt-1.5 text-xs text-g-ink-2">
-                    {rec.suggestion}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-1">
-                {sev && (
-                  <Badge
-                    tone={
-                      sev === "critical"
-                        ? "red"
-                        : sev === "warning"
-                          ? "amber"
-                          : "blue"
+                  <IconButton
+                    size="sm"
+                    active={isSelected}
+                    onClick={() => toggleOne(item.id)}
+                    aria-label={
+                      isSelected ? t("action.deselect") : t("action.select")
                     }
                   >
-                    {t(`severity.${sev}`)}
-                  </Badge>
-                )}
-                {item.optimizationRecommendations.map((r, i) => (
-                  <Badge key={i} tone="line" className="text-[10px]">
-                    {t(`optimize.category.${r.category}`, {
-                      defaultValue: r.category,
-                    })}
-                  </Badge>
-                ))}
-              </div>
-              <div className="text-right">
-                <div className="font-g-mono text-g-ui font-[510] text-g-ink">
-                  {formatBytes(item.bytes)}
+                    {isSelected ? (
+                      <CheckSquare size={16} />
+                    ) : (
+                      <Square size={16} />
+                    )}
+                  </IconButton>
                 </div>
-                <div className="text-g-chip text-g-ink-4">
-                  {item.ext.replace(".", "").toUpperCase()}
+                <AssetThumbnail
+                  src={item.thumbnailUrl || item.url}
+                  size="lg"
+                  className="size-16 rounded-g-md"
+                />
+                <div className="min-w-0 text-left">
+                  <div className="truncate font-g-mono text-[13px] font-medium">
+                    {fileName(item.repoPath)}
+                  </div>
+                  <div className="mt-0.5 truncate font-g-mono text-g-chip text-g-ink-4">
+                    {item.repoPath}
+                  </div>
+                  {rec && (
+                    <div className="mt-1.5 text-xs text-g-ink-2">
+                      {rec.suggestion}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  {sev && (
+                    <Badge
+                      tone={
+                        sev === "critical"
+                          ? "red"
+                          : sev === "warning"
+                            ? "amber"
+                            : "blue"
+                      }
+                    >
+                      {t(`severity.${sev}`)}
+                    </Badge>
+                  )}
+                  {item.optimizationRecommendations.map((r, i) => (
+                    <Badge key={i} tone="line" className="text-[10px]">
+                      {t(`optimize.category.${r.category}`, {
+                        defaultValue: r.category,
+                      })}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="text-right">
+                  <div className="font-g-mono text-g-ui font-[510] text-g-ink">
+                    {formatBytes(item.bytes)}
+                  </div>
+                  <div className="text-g-chip text-g-ink-4">
+                    {item.ext.replace(".", "").toUpperCase()}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-        {filtered.length === 0 && (
+            );
+          })
+        )}
+        {!itemsQuery.isLoading && filtered.length === 0 && (
           <EmptyState
             title={t("common.noResults")}
             description={t("optimize.noRecommendations")}

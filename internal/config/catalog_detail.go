@@ -103,11 +103,7 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 		return []scanner.AssetItem{}, nil
 	}
 	rows, err := s.db.Query(`
-		SELECT a.asset_id, a.project_id, a.project_name, a.repo_path, a.local_path, a.ext,
-			a.bytes, COALESCE(a.modified_unix, 0), COALESCE(a.content_hash, ''), COALESCE(a.hash_algorithm, ''), COALESCE(a.format, ''),
-			a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
-			a.used_count, COALESCE(d.group_id, ''), COALESCE(g.preferred_path, ''),
-			(SELECT COUNT(*) FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
+		SELECT `+catalogAssetSelectColumns+`
 		FROM duplicate_group_assets d
 		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = d.scan_id AND g.group_id = d.group_id

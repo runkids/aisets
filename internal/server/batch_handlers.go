@@ -176,13 +176,9 @@ func (s *Server) batchItems(ctx context.Context, ids []string) ([]scanner.AssetI
 	if _, err := s.ensureLatestScan(ctx); err != nil {
 		return nil, scanner.Project{}, err
 	}
-	items := make([]scanner.AssetItem, 0, len(ids))
-	for _, id := range ids {
-		detail, err := s.store.CatalogItemDetail(0, id)
-		if err != nil {
-			continue
-		}
-		items = append(items, detail.Item)
+	items, err := s.store.CatalogItemsByIDs(0, ids)
+	if err != nil {
+		return nil, scanner.Project{}, err
 	}
 	if len(items) == 0 {
 		return nil, scanner.Project{}, apierr.New("asset_not_found", "none of the requested assets were found")

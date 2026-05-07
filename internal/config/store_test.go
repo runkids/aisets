@@ -11,6 +11,7 @@ import (
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/imageproc"
+	"asset-studio/internal/lint"
 	"asset-studio/internal/ocr"
 	"asset-studio/internal/scanner"
 )
@@ -508,6 +509,113 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
 		t.Fatalf("folder filtered page = %#v", page)
+	}
+}
+
+func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	optimizable := scanAsset(root, "p", "workspace", "src/hero.png", 1000, "hero", 2, 700)
+	plain := scanAsset(root, "p", "workspace", "src/plain.png", 100, "plain", 1, 0)
+	plain.Optimization = nil
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{optimizable, plain},
+		Stats:       scanner.CatalogStats{TotalFiles: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := store.CatalogItemsByIDs(0, []string{plain.ID, "missing", optimizable.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].ID != plain.ID || items[1].ID != optimizable.ID {
+		t.Fatalf("batch items order = %#v", items)
+	}
+	if len(items[0].References) != 1 || len(items[0].UsedBy) != 1 || items[0].UsedBy[0] != "src/ref.tsx" {
+		t.Fatalf("plain references = %#v usedBy=%#v", items[0].References, items[0].UsedBy)
+	}
+	if len(items[1].References) != 2 || len(items[1].UsedBy) != 1 {
+		t.Fatalf("optimizable references = %#v usedBy=%#v", items[1].References, items[1].UsedBy)
+	}
+
+	selected, err := store.CatalogItemsWithOptimizationByIDs(0, []string{plain.ID, optimizable.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selected) != 2 || len(selected[0].Optimization) != 0 || len(selected[1].Optimization) != 1 || selected[1].Optimization[0].SavingsBytes != 700 {
+		t.Fatalf("selected optimization items = %#v", selected)
+	}
+
+	all, err := store.AllOptimizableItems(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 1 || all[0].ID != optimizable.ID || len(all[0].Optimization) != 1 {
+		t.Fatalf("all optimizable = %#v", all)
+	}
+
+	page, err := store.CatalogItems(CatalogItemQuery{Status: "optimizable", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != optimizable.ID || len(page.Items[0].Optimization) != 1 || page.Items[0].Optimization[0].ReasonCode != "large_asset" {
+		t.Fatalf("optimizable catalog page = %#v", page)
+	}
+}
+
+func TestCatalogLintFiltersByProjectID(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	left := scanAsset(root, "p1", "left", "src/left.png", 100, "left", 0, 0)
+	left.Optimization = nil
+	right := scanAsset(root, "p2", "right", "src/right.png", 100, "right", 0, 0)
+	right.Optimization = nil
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects: []scanner.Project{
+			{ID: "p1", Name: "left", Path: filepath.Join(root, "left")},
+			{ID: "p2", Name: "right", Path: filepath.Join(root, "right")},
+		},
+		Items: []scanner.AssetItem{left, right},
+		LintFindings: []lint.Finding{
+			{RuleID: "asset/left", Severity: "warning", File: "src/left.tsx", AssetID: left.ID},
+			{RuleID: "asset/right", Severity: "warning", File: "src/right.tsx", AssetID: right.ID},
+			{RuleID: "app/global", Severity: "info", File: "src/App.tsx"},
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 2, LintFindings: 3},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.CatalogLint(CatalogLintQuery{ProjectID: "p1", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].AssetID != left.ID {
+		t.Fatalf("project lint page = %#v", page)
+	}
+
+	summary, err := store.CatalogSummary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Stats.LintFindings != 3 {
+		t.Fatalf("summary lint findings = %d", summary.Stats.LintFindings)
 	}
 }
 

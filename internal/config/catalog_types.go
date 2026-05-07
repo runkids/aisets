@@ -111,10 +111,11 @@ type CatalogDuplicatesPage struct {
 }
 
 type CatalogLintQuery struct {
-	ScanID   int64
-	Severity string
-	Limit    int
-	Cursor   string
+	ScanID    int64
+	ProjectID string
+	Severity  string
+	Limit     int
+	Cursor    string
 }
 
 type CatalogLintPage struct {

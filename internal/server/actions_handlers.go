@@ -11,7 +11,6 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
 	"asset-studio/internal/optimize"
 	"asset-studio/internal/precheck"
 	"asset-studio/internal/scanner"
@@ -119,36 +118,17 @@ func (s *Server) selectOptimizationItems(ctx context.Context, ids []string) ([]s
 		return nil, err
 	}
 	if len(ids) == 0 {
-		out := []scanner.AssetItem{}
-		cursor := ""
-		for {
-			page, err := s.store.CatalogItems(config.CatalogItemQuery{Status: "optimizable", Limit: 200, Cursor: cursor})
-			if err != nil {
-				return nil, err
-			}
-			for _, item := range page.Items {
-				detail, err := s.store.CatalogItemDetail(0, item.ID)
-				if err != nil {
-					return nil, err
-				}
-				out = append(out, detail.Item)
-			}
-			if page.NextCursor == "" {
-				break
-			}
-			cursor = page.NextCursor
-		}
-		return out, nil
+		return s.store.AllOptimizableItems(0)
 	}
-	out := make([]scanner.AssetItem, 0, len(ids))
-	for _, id := range ids {
-		detail, err := s.store.CatalogItemDetail(0, id)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, detail.Item)
+	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, ids)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	missing := missingAssetIDs(ids, items)
+	if len(missing) > 0 {
+		return nil, apierr.WithParams("asset_not_found", "one or more assets were not found", map[string]any{"assetIds": missing})
+	}
+	return items, nil
 }
 
 func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +143,23 @@ func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, optimize.Compute(items))
+}
+
+func missingAssetIDs(ids []string, items []scanner.AssetItem) []string {
+	found := map[string]bool{}
+	for _, item := range items {
+		found[item.ID] = true
+	}
+	missing := []string{}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if id == "" || found[id] || seen[id] {
+			continue
+		}
+		seen[id] = true
+		missing = append(missing, id)
+	}
+	return missing
 }
 
 func (s *Server) handleOptimizationGenerateScript(w http.ResponseWriter, r *http.Request) {
