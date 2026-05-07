@@ -19,6 +19,8 @@ export type AppSettings = {
   defaultProjectRoot: string;
   autoScanOnOpen: boolean;
   scanOnOpen: boolean;
+  scanProfile: ScanProfile;
+  scanAnalyses: ScanAnalyses;
   ocrEnabled: boolean;
   ocrLanguages: string[];
   ocrMaxPixels: number;
@@ -30,6 +32,16 @@ export type AppSettings = {
   optimizationAutoApply: boolean;
   customAssetFilters: CustomAssetFilter[];
   preferredEditor: string;
+};
+
+export type ScanProfile = "fast" | "full" | "custom";
+
+export type AnalysisState = "computed" | "notComputed";
+
+export type ScanAnalyses = {
+  references: boolean;
+  nearDuplicates: boolean;
+  optimization: boolean;
 };
 
 export type CustomAssetFilterField =
@@ -143,6 +155,7 @@ export type AssetItem = {
   localPath: string;
   ext: string;
   bytes: number;
+  modifiedUnix: number;
   contentHash: string;
   hashAlgorithm: string;
   image: {
@@ -191,6 +204,11 @@ export type AssetItem = {
   };
 };
 
+export type OptimizationRecommendation =
+  AssetItem["optimizationRecommendations"][number];
+
+export type OCRResult = NonNullable<AssetItem["ocr"]>;
+
 export type SimilarFile = {
   id: string;
   path: string;
@@ -234,8 +252,18 @@ export type LintFinding = {
 };
 
 export type Catalog = {
+  scanId?: number;
   generatedAt: string;
   projects: Project[];
+  projectStats: Array<{
+    projectId: string;
+    totalFiles: number;
+    totalBytes: number;
+    unusedFiles: number;
+    duplicateFiles: number;
+    optimizableFiles: number;
+    lintFindings: number;
+  }>;
   items: AssetItem[];
   duplicateGroups: DuplicateGroup[];
   nearDuplicates: NearDuplicate[];
@@ -249,6 +277,65 @@ export type Catalog = {
     lintFindings: number;
     cacheHits: number;
   };
+  analysis: {
+    references: AnalysisState;
+    nearDuplicates: AnalysisState;
+    optimization: AnalysisState;
+  };
+};
+
+export type CatalogSummary = Pick<
+  Catalog,
+  "scanId" | "generatedAt" | "projects" | "projectStats" | "stats" | "analysis"
+>;
+
+export type CatalogItemsPage = {
+  items: AssetItem[];
+  total: number;
+  nextCursor?: string;
+  facets: {
+    projects: Array<{ id: string; count: number }>;
+    projectTotal: number;
+    extensions: Array<{ id: string; count: number }>;
+    extensionTotal: number;
+    customFilters: Array<{
+      id: string;
+      label: string;
+      count: number;
+      usesOCR: boolean;
+    }>;
+    customFilterTotal: number;
+  };
+};
+
+export type CatalogDuplicatesPage = {
+  groups: DuplicateGroup[];
+  pairs: NearDuplicate[];
+  total: number;
+  nextCursor?: string;
+};
+
+export type CatalogFolderNode = {
+  id: string;
+  name: string;
+  path: string;
+  count: number;
+  hasChildren: boolean;
+};
+
+export type CatalogFoldersPage = {
+  folders: CatalogFolderNode[];
+  total: number;
+};
+
+export type CatalogItemDetail = {
+  item: AssetItem;
+  references: AssetReference[];
+  duplicates: AssetItem[];
+  similar: NearDuplicate[];
+  similarItems: AssetItem[];
+  optimization: OptimizationRecommendation[];
+  ocr?: OCRResult;
 };
 
 export type ScanProgressPhase =
@@ -268,8 +355,14 @@ export type ScanEvent =
       current?: number;
       total?: number;
       message?: string;
+      state?: AnalysisState;
     }
-  | { type: "done"; scanId?: number; stats?: Catalog["stats"] }
+  | {
+      type: "done";
+      scanId?: number;
+      stats?: Catalog["stats"];
+      analysis?: Catalog["analysis"];
+    }
   | { type: "error"; error?: APIErrorBody["error"] };
 
 export type OCRRunCounts = {

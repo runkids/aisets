@@ -8,7 +8,16 @@ import "./i18n/index";
 import "./styles/globals.scss";
 import "./styles/tailwind.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 5 * 60_000,
+      retry: 1,
+      staleTime: 15_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 const root = document.getElementById("root");
 
 if (!root) throw new Error("Missing #root element");

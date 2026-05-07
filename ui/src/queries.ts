@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   addProject,
   addWorkspace,
@@ -9,6 +15,10 @@ import {
   batchRenamePreview,
   deleteUnusedPreview,
   getCatalog,
+  getCatalogDuplicates,
+  getCatalogFolders,
+  getCatalogItemDetail,
+  getCatalogItems,
   getSettings,
   getVersionCheck,
   importSettings,
@@ -28,16 +38,91 @@ import {
   updateSettings,
 } from "./api";
 import type {
+  CatalogDuplicatesParams,
+  CatalogFoldersParams,
+  CatalogItemsParams,
+} from "./api";
+import type {
   ExportData,
   OCRRunEvent,
   RenameRules,
+  ScanAnalyses,
   ScanEvent,
+  ScanProfile,
   SettingsUpdate,
 } from "./types";
 
 export const catalogQueryKey = ["catalog"] as const;
 export const settingsQueryKey = ["settings"] as const;
 export const versionQueryKey = ["version"] as const;
+
+export const catalogKeys = {
+  all: catalogQueryKey,
+  summary: (workspaceId?: string) =>
+    [...catalogQueryKey, "summary", workspaceId ?? "default"] as const,
+  items: (scanId: number | undefined, params: CatalogItemsParams) =>
+    [
+      ...catalogQueryKey,
+      "items",
+      scanId ?? 0,
+      normalizeCatalogItemsParams(params),
+    ] as const,
+  duplicates: (scanId: number | undefined, params: CatalogDuplicatesParams) =>
+    [
+      ...catalogQueryKey,
+      "duplicates",
+      scanId ?? 0,
+      normalizeCatalogDuplicatesParams(params),
+    ] as const,
+  folders: (scanId: number | undefined, params: CatalogFoldersParams) =>
+    [
+      ...catalogQueryKey,
+      "folders",
+      scanId ?? 0,
+      normalizeCatalogFoldersParams(params),
+    ] as const,
+  item: (scanId: number | undefined, assetId: string) =>
+    [...catalogQueryKey, "item", scanId ?? 0, assetId] as const,
+};
+
+type ScanMutationInput = {
+  profile?: ScanProfile;
+  analyses?: Partial<ScanAnalyses>;
+};
+
+function normalizeCatalogItemsParams(params: CatalogItemsParams) {
+  return {
+    assetId: params.assetId ?? "",
+    projectId: params.projectId ?? "",
+    projectName: params.projectName ?? "",
+    ext: params.ext ?? "",
+    folder: params.folder ?? "",
+    q: params.q ?? "",
+    status: params.status ?? "",
+    sort: params.sort ?? "",
+    customFilter: params.customFilter ?? "",
+    limit: params.limit ?? 100,
+  };
+}
+
+function normalizeCatalogDuplicatesParams(params: CatalogDuplicatesParams) {
+  return {
+    kind: params.kind ?? "exact",
+    limit: params.limit ?? 100,
+  };
+}
+
+function normalizeCatalogFoldersParams(params: CatalogFoldersParams) {
+  return {
+    projectId: params.projectId ?? "",
+    projectName: params.projectName ?? "",
+    ext: params.ext ?? "",
+    folder: params.folder ?? "",
+    q: params.q ?? "",
+    status: params.status ?? "",
+    customFilter: params.customFilter ?? "",
+  };
+}
 
 export function directoryListingQueryOptions(path: string, enabled: boolean) {
   return {
@@ -52,10 +137,86 @@ export function useDirectoryListingQuery(path: string, enabled: boolean) {
   return useQuery(directoryListingQueryOptions(path, enabled));
 }
 
-export function useCatalogQuery() {
+export function useCatalogSummaryQuery(workspaceId?: string) {
   return useQuery({
-    queryKey: catalogQueryKey,
-    queryFn: getCatalog,
+    queryKey: catalogKeys.summary(workspaceId),
+    queryFn: ({ signal }) => getCatalog({ signal }),
+    staleTime: 30_000,
+  });
+}
+
+export const useCatalogQuery = useCatalogSummaryQuery;
+
+export function useCatalogItemsInfiniteQuery(
+  scanId: number | undefined,
+  params: CatalogItemsParams,
+  enabled = true,
+) {
+  return useInfiniteQuery({
+    queryKey: catalogKeys.items(scanId, params),
+    queryFn: ({ pageParam, signal }) =>
+      getCatalogItems(
+        { ...params, scanId, cursor: pageParam, limit: params.limit ?? 100 },
+        { signal },
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor || undefined,
+    maxPages: 8,
+    enabled: enabled && scanId != null,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCatalogDuplicatesInfiniteQuery(
+  scanId: number | undefined,
+  params: CatalogDuplicatesParams,
+  enabled = true,
+) {
+  return useInfiniteQuery({
+    queryKey: catalogKeys.duplicates(scanId, params),
+    queryFn: ({ pageParam, signal }) =>
+      getCatalogDuplicates(
+        { ...params, scanId, cursor: pageParam, limit: params.limit ?? 100 },
+        { signal },
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor || undefined,
+    enabled: enabled && scanId != null,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCatalogItemDetailQuery(
+  scanId: number | undefined,
+  assetId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: catalogKeys.item(scanId, assetId),
+    queryFn: ({ signal }) => getCatalogItemDetail(scanId, assetId, { signal }),
+    enabled: enabled && scanId != null && assetId !== "",
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+  });
+}
+
+export function useCatalogFoldersQuery(
+  scanId: number | undefined,
+  params: CatalogFoldersParams,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: catalogKeys.folders(scanId, params),
+    queryFn: ({ signal }) =>
+      getCatalogFolders({ ...params, scanId }, { signal }),
+    enabled: enabled && scanId != null,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -88,7 +249,12 @@ export function useScanCatalogMutation(options?: {
 }) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => scanCatalog({ onEvent: options?.onEvent }),
+    mutationFn: (input?: ScanMutationInput) =>
+      scanCatalog({
+        onEvent: options?.onEvent,
+        profile: input?.profile,
+        analyses: input?.analyses,
+      }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

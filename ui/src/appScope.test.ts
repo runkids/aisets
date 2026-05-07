@@ -14,6 +14,15 @@ function makeCatalog(projectIds: string[], totalFiles: number): Catalog {
   return {
     generatedAt: "2026-05-06T12:00:00.000Z",
     projects: projectIds.map(makeProject),
+    projectStats: projectIds.map((projectId, index) => ({
+      projectId,
+      totalFiles: index === 0 ? totalFiles : 0,
+      totalBytes: 0,
+      unusedFiles: 0,
+      duplicateFiles: 0,
+      optimizableFiles: 0,
+      lintFindings: 0,
+    })),
     items: [],
     duplicateGroups: [],
     nearDuplicates: [],
@@ -26,6 +35,11 @@ function makeCatalog(projectIds: string[], totalFiles: number): Catalog {
       nearDuplicates: 0,
       lintFindings: 0,
       cacheHits: 0,
+    },
+    analysis: {
+      references: "computed",
+      nearDuplicates: "computed",
+      optimization: "computed",
     },
   };
 }

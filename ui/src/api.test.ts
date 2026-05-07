@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { scanCatalog, updateSettings } from "./api";
+import { getCatalogDuplicates, scanCatalog, updateSettings } from "./api";
 import type { ScanEvent } from "./types";
 
 function streamFromChunks(chunks: string[]) {
@@ -56,6 +56,36 @@ describe("scanCatalog", () => {
       code: "scan_failed",
       name: "APIError",
     });
+  });
+});
+
+describe("getCatalogDuplicates", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests the duplicate groups endpoint with paging params", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ groups: [], pairs: [], total: 0 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getCatalogDuplicates({
+      scanId: 7,
+      kind: "near",
+      limit: 200,
+      cursor: "200",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/catalog/duplicates?scanId=7&kind=near&limit=200&cursor=200",
+      expect.objectContaining({
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    );
   });
 });
 

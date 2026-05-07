@@ -15,6 +15,7 @@ function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {
     localPath: "/repo/src/assets/hero-中文.png",
     ext: ".png",
     bytes: 2048,
+    modifiedUnix: 0,
     contentHash: "hash",
     hashAlgorithm: "blake3",
     image: {

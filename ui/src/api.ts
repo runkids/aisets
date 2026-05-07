@@ -2,12 +2,18 @@ import type {
   ActionPreview,
   APIErrorBody,
   BatchResult,
-  Catalog,
+  CatalogDuplicatesPage,
+  CatalogFoldersPage,
+  CatalogItemDetail,
+  CatalogItemsPage,
+  CatalogSummary,
   DirectoryListing,
   ExportData,
   OCRRunEvent,
   Project,
+  ScanAnalyses,
   ScanEvent,
+  ScanProfile,
   SettingsInfo,
   SettingsUpdate,
   UpdateAppResult,
@@ -58,8 +64,121 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getCatalog() {
-  return request<Catalog>("/api/catalog");
+export function getCatalog(options?: { signal?: AbortSignal }) {
+  return request<CatalogSummary>("/api/catalog", { signal: options?.signal });
+}
+
+export type CatalogItemsParams = {
+  scanId?: number;
+  assetId?: string;
+  projectId?: string;
+  projectName?: string;
+  ext?: string;
+  folder?: string;
+  q?: string;
+  status?: string;
+  sort?: string;
+  customFilter?: string;
+  limit?: number;
+  cursor?: string | null;
+};
+
+export type CatalogDuplicatesParams = {
+  scanId?: number;
+  kind?: "exact" | "near";
+  limit?: number;
+  cursor?: string | null;
+};
+
+function queryString(
+  params: Record<string, string | number | undefined | null>,
+) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const raw = search.toString();
+  return raw ? `?${raw}` : "";
+}
+
+export function getCatalogItems(
+  params: CatalogItemsParams,
+  options?: { signal?: AbortSignal },
+) {
+  return request<CatalogItemsPage>(
+    `/api/catalog/items${queryString({
+      scanId: params.scanId,
+      assetId: params.assetId,
+      projectId: params.projectId,
+      projectName: params.projectName,
+      ext: params.ext,
+      folder: params.folder,
+      q: params.q,
+      status: params.status,
+      sort: params.sort,
+      customFilter: params.customFilter,
+      limit: params.limit,
+      cursor: params.cursor,
+    })}`,
+    { signal: options?.signal },
+  );
+}
+
+export function getCatalogDuplicates(
+  params: CatalogDuplicatesParams,
+  options?: { signal?: AbortSignal },
+) {
+  return request<CatalogDuplicatesPage>(
+    `/api/catalog/duplicates${queryString({
+      scanId: params.scanId,
+      kind: params.kind,
+      limit: params.limit,
+      cursor: params.cursor,
+    })}`,
+    { signal: options?.signal },
+  );
+}
+
+export type CatalogFoldersParams = {
+  scanId?: number;
+  projectId?: string;
+  projectName?: string;
+  ext?: string;
+  folder?: string;
+  q?: string;
+  status?: string;
+  customFilter?: string;
+};
+
+export function getCatalogFolders(
+  params: CatalogFoldersParams,
+  options?: { signal?: AbortSignal },
+) {
+  return request<CatalogFoldersPage>(
+    `/api/catalog/folders${queryString({
+      scanId: params.scanId,
+      projectId: params.projectId,
+      projectName: params.projectName,
+      ext: params.ext,
+      folder: params.folder,
+      q: params.q,
+      status: params.status,
+      customFilter: params.customFilter,
+    })}`,
+    { signal: options?.signal },
+  );
+}
+
+export function getCatalogItemDetail(
+  scanId: number | undefined,
+  assetId: string,
+  options?: { signal?: AbortSignal },
+) {
+  return request<CatalogItemDetail>(
+    `/api/catalog/items/${assetId}${queryString({ scanId })}`,
+    { signal: options?.signal },
+  );
 }
 
 function throwAPIError(error: APIErrorBody["error"] | undefined) {
@@ -97,8 +216,21 @@ async function parseScanText(
 
 export async function scanCatalog(options?: {
   onEvent?: (event: ScanEvent) => void;
+  profile?: ScanProfile;
+  analyses?: Partial<ScanAnalyses>;
 }) {
-  const response = await fetch(`${basePath}/api/scan`, { method: "POST" });
+  const body =
+    options?.profile || options?.analyses
+      ? JSON.stringify({
+          profile: options.profile,
+          analyses: options.analyses,
+        })
+      : undefined;
+  const response = await fetch(`${basePath}/api/scan`, {
+    method: "POST",
+    body,
+    headers: body ? { "content-type": "application/json" } : undefined,
+  });
   if (!response.ok) {
     const text = await response.text();
     const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
