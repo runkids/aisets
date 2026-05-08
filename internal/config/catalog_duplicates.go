@@ -17,17 +17,28 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 	offset := parseCursorOffset(q.Cursor)
 
 	if q.Kind == "near" {
+		nearJoin, nearWhere, nearArgs := s.nearDuplicateFilters(scanID, q.ProjectName, q.Ext)
+
 		var total int
-		if err := s.db.QueryRow(`SELECT COUNT(*) FROM near_duplicate_snapshots WHERE scan_id = ?`, scanID).Scan(&total); err != nil {
+		countSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT n.near_id) FROM near_duplicate_snapshots n%s WHERE n.scan_id = ?%s`, nearJoin, nearWhere)
+		countArgs := make([]any, 0, 1+len(nearArgs))
+		countArgs = append(countArgs, scanID)
+		countArgs = append(countArgs, nearArgs...)
+		if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
 			return CatalogDuplicatesPage{}, err
 		}
-		rows, err := s.db.Query(`
-			SELECT near_id, left_id, right_id, left_path, right_path, distance, flipped
-			FROM near_duplicate_snapshots
-			WHERE scan_id = ?
-			ORDER BY distance ASC, left_path ASC, right_path ASC
+		selectSQL := fmt.Sprintf(`
+			SELECT DISTINCT n.near_id, n.left_id, n.right_id, n.left_path, n.right_path, n.distance, n.flipped
+			FROM near_duplicate_snapshots n%s
+			WHERE n.scan_id = ?%s
+			ORDER BY n.distance ASC, n.left_path ASC, n.right_path ASC
 			LIMIT ? OFFSET ?
-		`, scanID, limit+1, offset)
+		`, nearJoin, nearWhere)
+		selectArgs := make([]any, 0, 1+len(nearArgs)+2)
+		selectArgs = append(selectArgs, scanID)
+		selectArgs = append(selectArgs, nearArgs...)
+		selectArgs = append(selectArgs, limit+1, offset)
+		rows, err := s.db.Query(selectSQL, selectArgs...)
 		if err != nil {
 			return CatalogDuplicatesPage{}, err
 		}
@@ -55,10 +66,20 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 
 	filterJoin, filterWhere, filterArgs := s.duplicateGroupFilters(scanID, q.ProjectName, q.Ext)
 
-	var total int
+	var total, totalFiles int
 	countSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT g.group_id) FROM duplicate_group_snapshots g%s WHERE g.scan_id = ?%s`, filterJoin, filterWhere)
 	countArgs := append([]any{scanID}, filterArgs...)
 	if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
+		return CatalogDuplicatesPage{}, err
+	}
+	filesSQL := fmt.Sprintf(`SELECT COUNT(*) FROM duplicate_group_assets da
+		WHERE da.scan_id = ? AND da.group_id IN (
+			SELECT DISTINCT g.group_id FROM duplicate_group_snapshots g%s WHERE g.scan_id = ?%s
+		)`, filterJoin, filterWhere)
+	filesArgs := make([]any, 0, 2+len(filterArgs))
+	filesArgs = append(filesArgs, scanID, scanID)
+	filesArgs = append(filesArgs, filterArgs...)
+	if err := s.db.QueryRow(filesSQL, filesArgs...).Scan(&totalFiles); err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
 
@@ -110,7 +131,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 			return CatalogDuplicatesPage{}, err
 		}
 	}
-	return CatalogDuplicatesPage{Groups: groups, Pairs: []scanner.NearDuplicate{}, Total: total, NextCursor: next, Facets: facets}, nil
+	return CatalogDuplicatesPage{Groups: groups, Pairs: []scanner.NearDuplicate{}, Total: total, TotalFiles: totalFiles, NextCursor: next, Facets: facets}, nil
 }
 
 func (s *Store) duplicateGroupFilters(scanID int64, projectName, ext string) (join, where string, args []any) {
@@ -128,6 +149,26 @@ func (s *Store) duplicateGroupFilters(scanID int64, projectName, ext string) (jo
 	if ext != "" {
 		conds = append(conds, " AND a.ext = ?")
 		args = append(args, ext)
+	}
+	where = strings.Join(conds, "")
+	return join, where, args
+}
+
+func (s *Store) nearDuplicateFilters(scanID int64, projectName, ext string) (join, where string, args []any) {
+	if projectName == "" && ext == "" {
+		return "", "", nil
+	}
+	join = `
+		JOIN asset_snapshots al ON al.scan_id = n.scan_id AND al.asset_id = n.left_id
+		JOIN asset_snapshots ar ON ar.scan_id = n.scan_id AND ar.asset_id = n.right_id`
+	var conds []string
+	if projectName != "" {
+		conds = append(conds, " AND (al.project_name = ? OR ar.project_name = ?)")
+		args = append(args, projectName, projectName)
+	}
+	if ext != "" {
+		conds = append(conds, " AND (al.ext = ? OR ar.ext = ?)")
+		args = append(args, ext, ext)
 	}
 	where = strings.Join(conds, "")
 	return join, where, args

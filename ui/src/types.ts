@@ -360,6 +360,7 @@ export type CatalogDuplicatesPage = {
   groups: DuplicateGroup[];
   pairs: NearDuplicate[];
   total: number;
+  totalFiles: number;
   nextCursor?: string;
   facets: {
     projects: Array<{ id: string; count: number }>;

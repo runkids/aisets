@@ -664,7 +664,7 @@ export function App() {
             ) : (
               <DuplicatesView
                 scanId={catalogSummary.scanId}
-                projectFilterId={effectiveSelectedProjectId || undefined}
+                projectFilterName={selectedProject?.name ?? ""}
                 onOpenAsset={setDrawerId}
               />
             )

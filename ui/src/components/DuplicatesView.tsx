@@ -48,7 +48,7 @@ import { FilterRail } from "./FilterRail";
 
 type Props = {
   scanId?: number;
-  projectFilterId?: string;
+  projectFilterName?: string;
   enabled?: boolean;
   onOpenAsset?: (id: string) => void;
   onMerge?: (groupId: string) => void;
@@ -62,7 +62,7 @@ const ACTION_BTN =
 
 export function DuplicatesView({
   scanId,
-  projectFilterId,
+  projectFilterName = "",
   enabled = true,
   onOpenAsset,
   onMerge,
@@ -85,12 +85,13 @@ export function DuplicatesView({
   const exactScrollRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
 
+  const effectiveProject = projectFilterName || railFilter.project || undefined;
+
   /* ── Data fetching ── */
 
   const duplicateItemsQuery = useCatalogItemsInfiniteQuery(
     scanId,
     {
-      projectName: projectFilterId || railFilter.project || undefined,
       ext: railFilter.ext || undefined,
       q: debouncedSearch || undefined,
       status: "duplicate",
@@ -104,7 +105,7 @@ export function DuplicatesView({
     scanId,
     {
       kind: "exact",
-      projectName: railFilter.project || undefined,
+      projectName: effectiveProject,
       ext: railFilter.ext || undefined,
       limit: 200,
     },
@@ -112,7 +113,12 @@ export function DuplicatesView({
   );
   const nearDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
     scanId,
-    { kind: "near", limit: 200 },
+    {
+      kind: "near",
+      projectName: effectiveProject,
+      ext: railFilter.ext || undefined,
+      limit: 200,
+    },
     enabled,
   );
   const {
@@ -134,40 +140,13 @@ export function DuplicatesView({
     () => duplicateItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [duplicateItemsQuery.data],
   );
-  const duplicateItemIds = useMemo(
-    () => new Set(items.map((item) => item.id)),
-    [items],
-  );
-  const exactDuplicateGroups = useMemo(
+  const groups = useMemo(
     () => exactDuplicatesQuery.data?.pages.flatMap((page) => page.groups) ?? [],
     [exactDuplicatesQuery.data],
   );
-  const groups = useMemo(() => {
-    const groupCounts = new Map<string, number>();
-    for (const item of items) {
-      if (item.duplicateGroupId) {
-        groupCounts.set(
-          item.duplicateGroupId,
-          (groupCounts.get(item.duplicateGroupId) ?? 0) + 1,
-        );
-      }
-    }
-    return exactDuplicateGroups.filter(
-      (group) => (groupCounts.get(group.id) ?? 0) > 1,
-    );
-  }, [exactDuplicateGroups, items]);
-  const nearDuplicatePairs = useMemo(
+  const nearDuplicates = useMemo(
     () => nearDuplicatesQuery.data?.pages.flatMap((page) => page.pairs) ?? [],
     [nearDuplicatesQuery.data],
-  );
-  const nearDuplicates = useMemo(
-    () =>
-      nearDuplicatePairs.filter(
-        (pair) =>
-          duplicateItemIds.has(pair.leftId) &&
-          duplicateItemIds.has(pair.rightId),
-      ),
-    [duplicateItemIds, nearDuplicatePairs],
   );
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const loading =
@@ -539,7 +518,7 @@ export function DuplicatesView({
                   />
                 )}
                 {!bulkMode && (
-                  <span className="absolute right-1.5 top-1.5 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
+                  <span className="absolute right-1.5 top-1.5 rounded-g-sm bg-g-surface/80 shadow-g-sm backdrop-blur-sm opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
                     <CopyButton value={member.repoPath} size="sm" />
                   </span>
                 )}
@@ -579,7 +558,6 @@ export function DuplicatesView({
   /* ── Render ── */
 
   const exactFirstPage = exactDuplicatesQuery.data?.pages[0];
-  const itemsFirstPage = duplicateItemsQuery.data?.pages[0];
   const nearFirstPage = nearDuplicatesQuery.data?.pages[0];
 
   return (
@@ -589,6 +567,7 @@ export function DuplicatesView({
         filters={railFilter}
         projectOptions={exactFirstPage?.facets.projects}
         projectTotal={exactFirstPage?.facets.projectTotal}
+        projectScopeName={projectFilterName}
         extensionOptions={exactFirstPage?.facets.extensions}
         extensionTotal={exactFirstPage?.facets.extensionTotal}
         extensionHeading={t("duplicates.filterByExt")}
@@ -610,7 +589,7 @@ export function DuplicatesView({
               />
               <StatCard
                 label={t("duplicates.statFiles")}
-                value={itemsFirstPage?.total ?? items.length}
+                value={exactFirstPage?.totalFiles ?? items.length}
                 icon={<Files size={14} />}
               />
               <StatCard

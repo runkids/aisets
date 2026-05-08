@@ -120,6 +120,7 @@ type CatalogDuplicatesPage struct {
 	Groups     []scanner.DuplicateGroup `json:"groups"`
 	Pairs      []scanner.NearDuplicate  `json:"pairs"`
 	Total      int                      `json:"total"`
+	TotalFiles int                      `json:"totalFiles"`
 	NextCursor string                   `json:"nextCursor,omitempty"`
 	Facets     CatalogDuplicatesFacets  `json:"facets"`
 }

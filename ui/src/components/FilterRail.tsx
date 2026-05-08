@@ -62,7 +62,10 @@ export function FilterRail({
   onFiltersChange,
 }: FilterRailProps) {
   const { t } = useTranslation();
-  const projects = projectOptions ?? countBy(items, "projectName");
+  const allProjects = projectOptions ?? countBy(items, "projectName");
+  const projects = projectScopeName
+    ? allProjects.filter((p) => p.id === projectScopeName)
+    : allProjects;
   const extensions = extensionOptions ?? countBy(items, "ext");
   const customFilters = customFilterOptions ?? [];
   const allProjectsCount = projectTotal ?? items.length;

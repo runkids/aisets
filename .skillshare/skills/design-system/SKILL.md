@@ -195,6 +195,8 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **API totals, not loaded counts** | StatCards, Tabs, FilterRail use `query.data.pages[0].total` / `.facets`. Never `items.length` during lazy loading. |
 | **Lazy load via sentinel** | Use `useInfiniteScrollSentinel`, not `useEffect` auto-pagination. |
 | **Facets match the view's unit** | DuplicatesView shows groups → facets must count groups (from duplicates API), not files (from items API). Use `project_name` not `project_id` for display. |
+| **Query key normalizers** | Adding a filter param to `CatalogXxxParams` → also add it to `normalizeCatalogXxxParams` in `queries.ts`. Omitting it means the React Query cache key won't change, silently returning stale data. |
+| **Cross-filter facets** | FilterRail facets use cross-filter: project facets computed with ext filter (project cleared), vice versa. Backend facet function accepts both params, clears the "self" dimension. |
 
 ---
 

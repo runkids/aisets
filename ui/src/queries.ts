@@ -119,6 +119,8 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
 function normalizeCatalogDuplicatesParams(params: CatalogDuplicatesParams) {
   return {
     kind: params.kind ?? "exact",
+    projectName: params.projectName ?? "",
+    ext: params.ext ?? "",
     limit: params.limit ?? 100,
   };
 }
