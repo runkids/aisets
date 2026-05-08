@@ -105,6 +105,39 @@ export function BrowseToolbar({
   return (
     <div className="sticky top-0 z-[4] grid gap-2.5 mb-1 pb-1 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
       <div className="flex flex-wrap items-center gap-3">
+        <TextInput
+          variant="search"
+          placeholder={t("toolbar.search")}
+          icon={<Search size={16} />}
+          suffix={
+            <span className="inline-flex items-center gap-1">
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label={t("toolbar.clearSearch")}
+                  className="inline-flex shrink-0 cursor-pointer rounded-full p-0.5 text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink"
+                  onClick={() => onSearchChange("")}
+                >
+                  <X size={14} />
+                </button>
+              )}
+              <ArrowDownAZ size={14} aria-hidden="true" />
+            </span>
+          }
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.currentTarget.value)}
+          className="flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:flex-[1_1_100%] max-md:max-w-none"
+          inputClassName="font-g text-g-ui tracking-g-ui"
+        />
+
+        <Select
+          value={sortMode}
+          options={sortItems}
+          onChange={(value) => onSortChange(value as SortMode)}
+          aria-label={t("toolbar.sort")}
+          className="w-36 flex-none"
+        />
+
         <BrowseIconToggleGroup
           value={view}
           items={viewItems}
@@ -128,14 +161,6 @@ export function BrowseToolbar({
           ariaLabel={t("toolbar.backgroundMode")}
         />
 
-        <Select
-          value={sortMode}
-          options={sortItems}
-          onChange={(value) => onSortChange(value as SortMode)}
-          aria-label={t("toolbar.sort")}
-          className="w-36 flex-none"
-        />
-
         <Button
           variant={bulkMode ? "primary" : "secondary"}
           size="md"
@@ -144,31 +169,6 @@ export function BrowseToolbar({
         >
           {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
         </Button>
-
-        <TextInput
-          variant="search"
-          placeholder={t("toolbar.search")}
-          icon={<Search size={16} />}
-          suffix={
-            <span className="inline-flex items-center gap-1">
-              {searchQuery && (
-                <button
-                  type="button"
-                  aria-label={t("toolbar.clearSearch")}
-                  className="inline-flex shrink-0 cursor-pointer rounded-full p-0.5 text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink"
-                  onClick={() => onSearchChange("")}
-                >
-                  <X size={14} />
-                </button>
-              )}
-              <ArrowDownAZ size={14} aria-hidden="true" />
-            </span>
-          }
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.currentTarget.value)}
-          className="ml-auto flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:ml-0 max-md:flex-[1_1_100%] max-md:max-w-none"
-          inputClassName="font-g text-g-ui tracking-g-ui"
-        />
       </div>
 
       <BrowseStatusBar

@@ -1,4 +1,5 @@
 import type { ImageBackgroundMode } from "../../imageBackground";
+import type { OCRActivityState } from "../../ocrActivity";
 import type {
   CustomAssetFilter,
   OptimizationThresholds,
@@ -13,9 +14,13 @@ export type SettingsViewProps = {
   theme: ThemePreference;
   imagePreviewEnabled: boolean;
   imageBackgroundMode: ImageBackgroundMode;
+  ocrActivity: OCRActivityState;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
   onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
+  onStartOCR: (saveSettings: () => Promise<void>) => void;
+  onStopOCR: () => void;
+  onDismissOCR: () => void;
 };
 
 export type Section =

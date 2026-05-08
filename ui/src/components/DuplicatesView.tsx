@@ -608,46 +608,44 @@ export function DuplicatesView({
               ]}
             />
           )}
-          <span className="flex-1" />
           {tab === "exact" && (
-            <Button
-              variant={bulkMode ? "primary" : "secondary"}
-              size="md"
-              leadingIcon={<CheckSquare size={14} />}
-              onClick={toggleBulkMode}
-            >
-              {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
-            </Button>
-          )}
-        </div>
-        {tab === "exact" && (
-          <div className="mt-2 flex items-center gap-2">
             <TextInput
               variant="search"
               placeholder={t("duplicates.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               icon={<Search size={14} />}
-              className="min-w-0 flex-1"
+              className="min-w-0 flex-[1_1_180px]"
             />
-            {uniqueExts.length > 1 && (
-              <Select
-                value={extFilter}
-                aria-label={t("duplicates.filterExtension")}
-                size="md"
-                className="w-[160px] shrink-0"
-                options={[
-                  { value: "__all__", label: t("duplicates.allExtensions") },
-                  ...uniqueExts.map((ext) => ({
-                    value: ext,
-                    label: formatExt(ext),
-                  })),
-                ]}
-                onChange={setExtFilter}
-              />
-            )}
-          </div>
-        )}
+          )}
+          {tab === "exact" && uniqueExts.length > 1 && (
+            <Select
+              value={extFilter}
+              aria-label={t("duplicates.filterExtension")}
+              size="md"
+              className="w-[140px] shrink-0"
+              options={[
+                { value: "__all__", label: t("duplicates.allExtensions") },
+                ...uniqueExts.map((ext) => ({
+                  value: ext,
+                  label: formatExt(ext),
+                })),
+              ]}
+              onChange={setExtFilter}
+            />
+          )}
+          {tab === "exact" && (
+            <Button
+              variant={bulkMode ? "primary" : "secondary"}
+              size="md"
+              leadingIcon={<CheckSquare size={14} />}
+              onClick={toggleBulkMode}
+              className="shrink-0"
+            >
+              {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+            </Button>
+          )}
+        </div>
 
         {bulkMode && selected.size > 0 && (
           <div className="mt-2 flex min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">

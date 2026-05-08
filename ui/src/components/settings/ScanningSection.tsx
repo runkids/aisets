@@ -35,6 +35,7 @@ type ScanningSectionProps = {
   ocrWorking: boolean;
   ocrRunStopping: boolean;
   ocrRunActive: boolean;
+  ocrStopDisabled: boolean;
   ocrProgress: string;
   ocrLanguagePacks: OCRLanguagePack[];
   hasSelectedOCRLanguages: boolean;
@@ -63,6 +64,7 @@ export function ScanningSection({
   ocrWorking,
   ocrRunStopping,
   ocrRunActive,
+  ocrStopDisabled,
   ocrProgress,
   ocrLanguagePacks,
   hasSelectedOCRLanguages,
@@ -337,7 +339,7 @@ export function ScanningSection({
                         )
                       }
                       onClick={onStopOCR}
-                      disabled={ocrRunStopping}
+                      disabled={ocrRunStopping || ocrStopDisabled}
                     >
                       {ocrRunStopping
                         ? t("settings.ocrStopping")

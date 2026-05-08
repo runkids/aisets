@@ -1,14 +1,21 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type ComponentProps,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import {
   navigationBadges,
   optimizableBadgeCount,
@@ -30,8 +37,8 @@ import { ScrollToTop } from "./components/ScrollToTop";
 import { Button, EmptyState, NoticeStack, PromptDialog } from "./components/ui";
 import { SettingsView } from "./components/SettingsView";
 import { useToast } from "./components/ToastProvider";
-import { UnusedView } from "./components/UnusedView";
 import {
+  catalogQueryKey,
   useAddProjectMutation,
   useApplyPreviewMutation,
   useSwitchWorkspaceMutation,
@@ -42,7 +49,14 @@ import {
   useScanCatalogMutation,
   useSettingsQuery,
 } from "./queries";
+import { runOCR } from "./api";
 import { errorMessage } from "./i18n/index";
+import {
+  initialOCRActivityState,
+  isOCRActivityBusy,
+  ocrActivityReducer,
+  runOCRActivity,
+} from "./ocrActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -92,6 +106,7 @@ export function App() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = modeForPath(location.pathname);
 
@@ -110,6 +125,12 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [scanProgress, setScanProgress] = useState<ScanEvent | null>(null);
   const [scanProgressVisible, setScanProgressVisible] = useState(false);
+  const [ocrActivity, dispatchOCRActivity] = useReducer(
+    ocrActivityReducer,
+    initialOCRActivityState,
+  );
+  const ocrActivityAbortRef = useRef<AbortController | null>(null);
+  const ocrActivityRunRef = useRef<Promise<void> | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
@@ -288,6 +309,8 @@ export function App() {
     scanMutation.isPending ||
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
+  const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
+  const catalogActionsDisabled = working || ocrActivityBusy;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
   const ocrEnabled = settingsQuery.data?.settings.ocrEnabled ?? false;
@@ -334,6 +357,7 @@ export function App() {
     });
 
   function onAddProject(path: string) {
+    if (ocrActivityBusy) return;
     addProjectMutation.mutate(path, {
       onSuccess: () => {
         setDirectoryPickerOpen(false);
@@ -345,6 +369,7 @@ export function App() {
 
   function onSwitchWorkspace(workspaceId: string) {
     if (workspaceId === activeWorkspaceId) return;
+    if (ocrActivityBusy) return;
     switchWorkspaceMutation.mutate(workspaceId, {
       onSuccess: (result) => {
         setSelectedProjectId("");
@@ -358,7 +383,54 @@ export function App() {
     });
   }
 
+  function onStartOCRActivity(saveSettings: () => Promise<void>) {
+    if (ocrActivityRunRef.current) return;
+
+    const run = (async () => {
+      const result = await runOCRActivity({
+        abortRef: ocrActivityAbortRef,
+        dispatch: dispatchOCRActivity,
+        saveSettings,
+        runBatch: ({ signal, onEvent }) => runOCR({ signal, onEvent }),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+
+      if (result.status === "done") {
+        toast.success(t("settings.ocrRunSuccess"));
+      } else if (result.status === "stopped") {
+        toast.info(t("settings.ocrRunStopped"));
+      } else {
+        toast.error(result.errorMessage, {
+          title: t("settings.ocrRunFailed"),
+        });
+      }
+    })().finally(() => {
+      ocrActivityRunRef.current = null;
+    });
+
+    ocrActivityRunRef.current = run;
+  }
+
+  function onStopOCRActivity() {
+    if (!ocrActivityAbortRef.current) return;
+    dispatchOCRActivity({ type: "stopping" });
+    ocrActivityAbortRef.current?.abort();
+  }
+
+  function onDismissOCRActivity() {
+    dispatchOCRActivity({ type: "dismiss" });
+  }
+
+  function onOpenOCRSettings() {
+    navigate({
+      pathname: pathForMode("settings"),
+      search: "?section=scanning",
+    });
+  }
+
   function onRescan() {
+    if (ocrActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(undefined, {
@@ -367,6 +439,7 @@ export function App() {
   }
 
   function onFullScan() {
+    if (ocrActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
@@ -378,6 +451,7 @@ export function App() {
   }
 
   function onNearDuplicateScan() {
+    if (ocrActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
@@ -431,6 +505,10 @@ export function App() {
 
   async function onApplyPreview() {
     if (!preview) return;
+    if (ocrActivityBusy) {
+      toast.info(t("activity.ocrLockedAction"));
+      return;
+    }
     try {
       await applyPreviewMutation.mutateAsync({
         endpoint: preview.endpoint,
@@ -486,10 +564,15 @@ export function App() {
       <div className="col-span-2 row-start-1">
         <AppTopbar
           working={working}
+          catalogActionsDisabled={catalogActionsDisabled}
           scanProgress={scanProgressVisible ? scanProgress : null}
+          ocrActivity={ocrActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
           onRefresh={onRescan}
           onOpenCmdK={() => setCmdkOpen(true)}
+          onStopOCR={onStopOCRActivity}
+          onDismissOCR={onDismissOCRActivity}
+          onOpenOCRSettings={onOpenOCRSettings}
         />
       </div>
       <NavSidebar
@@ -501,6 +584,7 @@ export function App() {
         projects={projectSwitchProjects}
         selectedProjectId={effectiveSelectedProjectId}
         totalAssets={catalogSummary?.stats.totalFiles ?? 0}
+        workspaceSwitchDisabled={ocrActivityBusy}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}
         onSelect={changeMode}
@@ -538,9 +622,13 @@ export function App() {
               theme={theme}
               imagePreviewEnabled={imagePreviewEnabled}
               imageBackgroundMode={imageBackgroundMode}
+              ocrActivity={ocrActivity}
               onThemeChange={setTheme}
               onImagePreviewEnabledChange={setImagePreviewEnabled}
               onImageBackgroundModeChange={setImageBackgroundMode}
+              onStartOCR={onStartOCRActivity}
+              onStopOCR={onStopOCRActivity}
+              onDismissOCR={onDismissOCRActivity}
             />
           ) : (
             <div
@@ -586,21 +674,6 @@ export function App() {
                 ) : (
                   <DuplicatesView
                     scanId={catalogSummary.scanId}
-                    projectFilterId={effectiveSelectedProjectId || undefined}
-                    onOpenAsset={setDrawerId}
-                  />
-                )
-              ) : mode === "unused" ? (
-                catalogSummary?.analysis.references === "notComputed" ? (
-                  <NotComputedState
-                    title={t("catalog.notComputed.referencesTitle")}
-                    description={t("catalog.notComputed.referencesDesc")}
-                    action={t("catalog.notComputed.fullScan")}
-                    onAction={onFullScan}
-                  />
-                ) : (
-                  <UnusedView
-                    scanId={catalogSummary?.scanId}
                     projectFilterId={effectiveSelectedProjectId || undefined}
                     onOpenAsset={setDrawerId}
                   />
@@ -674,7 +747,7 @@ export function App() {
       {directoryPickerOpen && (
         <DirectoryPickerModal
           open={directoryPickerOpen}
-          working={addProjectMutation.isPending}
+          working={addProjectMutation.isPending || ocrActivityBusy}
           initialPath={directoryPickerInitialPath}
           onClose={() => setDirectoryPickerOpen(false)}
           onSelect={onAddProject}
@@ -696,13 +769,25 @@ export function App() {
       {preview && (
         <PreviewModal
           preview={preview.value}
-          working={applyPreviewMutation.isPending}
+          working={applyPreviewMutation.isPending || ocrActivityBusy}
           onCancel={() => setPreview(null)}
           onApply={onApplyPreview}
         />
       )}
     </main>
   );
+
+  if (mode === "unused") {
+    try {
+      const raw = localStorage.getItem("asset-studio-browse-state");
+      const state = raw ? JSON.parse(raw) : {};
+      state.statusFilter = "unused";
+      localStorage.setItem("asset-studio-browse-state", JSON.stringify(state));
+    } catch {
+      /* ignore */
+    }
+    return <Navigate to="/browse" replace />;
+  }
 
   return (
     <TooltipPrimitive.Provider delayDuration={400}>

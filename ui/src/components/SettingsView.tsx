@@ -1,7 +1,9 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { exportSettings } from "../api";
 import { errorMessage } from "../i18n/index";
+import { isOCRActivityBusy } from "../ocrActivity";
 import {
   useCatalogQuery,
   useAddWorkspaceMutation,
@@ -13,7 +15,6 @@ import {
   useRenameProjectMutation,
   useRenameWorkspaceMutation,
   useResetDatabaseMutation,
-  useRunOCRMutation,
   useSettingsQuery,
   useSwitchWorkspaceMutation,
   useUpdateAppMutation,
@@ -49,21 +50,24 @@ export function SettingsView({
   theme,
   imagePreviewEnabled,
   imageBackgroundMode,
+  ocrActivity,
   onThemeChange,
   onImagePreviewEnabledChange,
   onImageBackgroundModeChange,
+  onStartOCR,
+  onStopOCR,
+  onDismissOCR,
 }: SettingsViewProps) {
   const { t } = useTranslation();
   const toast = useToast();
-  const [activeSection, setActiveSection] = useState<Section>("workspace");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSection = sectionFromParam(searchParams.get("section"));
+  const [localSection, setLocalSection] = useState<Section>("workspace");
+  const activeSection = requestedSection ?? localSection;
   const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
     null,
   );
-  const ocrRunBatchRef = useRef(0);
-  const ocrRunAbortRef = useRef<AbortController | null>(null);
-  const [ocrProgress, setOCRProgress] = useState("");
-  const [ocrRunStopping, setOCRRunStopping] = useState(false);
-  const [ocrRunActive, setOCRRunActive] = useState(false);
+  const ocrWorking = isOCRActivityBusy(ocrActivity);
 
   const settingsQuery = useSettingsQuery();
   const defaultDirectoryQuery = useDirectoryListingQuery(
@@ -81,18 +85,6 @@ export function SettingsView({
   const renameProjectMutation = useRenameProjectMutation();
   const renameWorkspaceMutation = useRenameWorkspaceMutation();
   const resetMutation = useResetDatabaseMutation();
-  const runOCRMutation = useRunOCRMutation({
-    onEvent: (event) => {
-      if ("counts" in event && event.counts) {
-        setOCRProgress(
-          t("settings.ocrBatchProgress", {
-            batch: Math.max(ocrRunBatchRef.current, 1),
-            progress: ocrProgressLabel(event.counts, t),
-          }),
-        );
-      }
-    },
-  });
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
   const updateAppMutation = useUpdateAppMutation();
   const updateMutation = useUpdateSettingsMutation();
@@ -134,9 +126,15 @@ export function SettingsView({
     switchWorkspaceMutation.isPending ||
     updateAppMutation.isPending ||
     updateMutation.isPending;
-  const ocrWorking = ocrRunActive || runOCRMutation.isPending;
   const settingsActionDisabled =
     settingsQuery.isLoading || working || ocrWorking;
+  const ocrProgress =
+    ocrActivity.counts && ocrActivity.batch > 0
+      ? t("settings.ocrBatchProgress", {
+          batch: ocrActivity.batch,
+          progress: ocrProgressLabel(ocrActivity.counts, t),
+        })
+      : "";
   const ocrLanguagePacks = settings?.ocrRuntime.availableLanguages ?? [];
   const installedOCRLanguages = new Set(
     ocrLanguagePacks
@@ -191,7 +189,7 @@ export function SettingsView({
   async function onRemoveOCR() {
     try {
       await removeOCRMutation.mutateAsync(undefined);
-      setOCRProgress("");
+      onDismissOCR();
       toast.success(t("settings.ocrRemoveSuccess"));
     } catch (error) {
       toast.error(errorMessage(error), {
@@ -200,41 +198,11 @@ export function SettingsView({
     }
   }
 
-  async function onRunOCRConfirmed() {
-    try {
-      setOCRRunActive(true);
-      setOCRRunStopping(false);
-      setOCRProgress("");
-      ocrRunBatchRef.current = 0;
-      await updateMutation.mutateAsync(updateFromDraft(draft));
-      for (;;) {
-        const controller = new AbortController();
-        ocrRunAbortRef.current = controller;
-        ocrRunBatchRef.current += 1;
-        const result = await runOCRMutation.mutateAsync(controller.signal);
-        if (!result?.hasMore || controller.signal.aborted) {
-          break;
-        }
-      }
-      toast.success(t("settings.ocrRunSuccess"));
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        toast.info(t("settings.ocrRunStopped"));
-        return;
-      }
-      toast.error(errorMessage(error), {
-        title: t("settings.ocrRunFailed"),
-      });
-    } finally {
-      ocrRunAbortRef.current = null;
-      setOCRRunActive(false);
-      setOCRRunStopping(false);
-    }
-  }
-
-  function onStopOCR() {
-    setOCRRunStopping(true);
-    ocrRunAbortRef.current?.abort();
+  function onRunOCRConfirmed() {
+    onStartOCR(async () => {
+      const result = await updateMutation.mutateAsync(updateFromDraft(draft));
+      setDraftOverride(draftFromSettings(result.settings));
+    });
   }
 
   async function onSwitchWorkspace(workspaceId: string) {
@@ -310,7 +278,7 @@ export function SettingsView({
     const result = await updateMutation.mutateAsync(defaultSettings);
     setDraftOverride(draftFromSettings(result.settings));
     await removeOCRMutation.mutateAsync(undefined).catch(() => {});
-    setOCRProgress("");
+    onDismissOCR();
     toast.success(t("toast.settingsReset"));
   }
 
@@ -425,6 +393,19 @@ export function SettingsView({
     );
   }
 
+  function selectSection(section: Section) {
+    setLocalSection(section);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (section === "workspace") next.delete("section");
+        else next.set("section", section);
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
   return (
     <>
       <Rail
@@ -441,7 +422,7 @@ export function SettingsView({
               active={activeSection === id}
               icon={icon}
               label={t(`settings.section.${id}`)}
-              onClick={() => setActiveSection(id)}
+              onClick={() => selectSection(id)}
             />
           ))}
         </RailSection>
@@ -456,7 +437,7 @@ export function SettingsView({
               draft={draft}
               defaultRootPlaceholder={defaultRootPlaceholder}
               defaultRootCurrentPath={defaultRootCurrentPath}
-              working={working}
+              working={working || ocrWorking}
               settingActions={settingActionsFor("workspace")}
               onUpdateDraft={updateDraft}
               onAddWorkspace={onAddWorkspace}
@@ -476,7 +457,7 @@ export function SettingsView({
               activeWorkspaceId={activeWorkspaceId}
               workspaceProjects={workspaceProjects}
               assetCountByProject={assetCountByProject}
-              working={working}
+              working={working || ocrWorking}
               onRenameProject={onRenameProject}
               onRemoveProject={onRemoveProject}
               onSwitchWorkspace={onSwitchWorkspace}
@@ -504,8 +485,13 @@ export function SettingsView({
               settingsLoading={settingsQuery.isLoading}
               working={working}
               ocrWorking={ocrWorking}
-              ocrRunStopping={ocrRunStopping}
-              ocrRunActive={ocrRunActive}
+              ocrRunStopping={ocrActivity.phase === "stopping"}
+              ocrStopDisabled={ocrActivity.phase === "saving"}
+              ocrRunActive={
+                ocrActivity.phase === "saving" ||
+                ocrActivity.phase === "running" ||
+                ocrActivity.phase === "stopping"
+              }
               ocrProgress={ocrProgress}
               ocrLanguagePacks={ocrLanguagePacks}
               hasSelectedOCRLanguages={hasSelectedOCRLanguages}
@@ -574,4 +560,10 @@ export function SettingsView({
       </div>
     </>
   );
+}
+
+function sectionFromParam(value: string | null): Section | null {
+  return sectionMeta.some((section) => section.id === value)
+    ? (value as Section)
+    : null;
 }

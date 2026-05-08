@@ -7,7 +7,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
@@ -36,6 +35,7 @@ type Props = {
   projects: ProjectSwitcherProject[];
   selectedProjectId: string;
   totalAssets: number;
+  workspaceSwitchDisabled?: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelect: (mode: Mode) => void;
@@ -50,6 +50,7 @@ export function NavSidebar({
   projects,
   selectedProjectId,
   totalAssets,
+  workspaceSwitchDisabled = false,
   onSelectWorkspace,
   onSelectProject,
   onSelect,
@@ -92,13 +93,6 @@ export function NavSidebar({
           icon: <Recycle size={18} />,
           badge: "duplicate",
           tone: "amber",
-        },
-        {
-          id: "unused",
-          label: t("nav.unused"),
-          icon: <Trash2 size={18} />,
-          badge: "unused",
-          tone: "red",
         },
         {
           id: "optimize",
@@ -148,6 +142,7 @@ export function NavSidebar({
           projects={projects}
           selectedProjectId={selectedProjectId}
           totalAssets={totalAssets}
+          workspaceSwitchDisabled={workspaceSwitchDisabled}
           onSelectWorkspace={onSelectWorkspace}
           onSelectProject={onSelectProject}
         />

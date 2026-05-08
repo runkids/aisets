@@ -36,14 +36,17 @@ type Props = {
 
 export function BatchPreviewModal({
   title,
-  moves,
-  changes,
-  blockers,
+  moves: rawMoves,
+  changes: rawChanges,
+  blockers: rawBlockers,
   canApply,
   working,
   onCancel,
   onApply,
 }: Props) {
+  const moves = rawMoves ?? [];
+  const changes = rawChanges ?? [];
+  const blockers = rawBlockers ?? [];
   const { t } = useTranslation();
   const [showRefs, setShowRefs] = useState(false);
 

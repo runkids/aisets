@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { Tooltip } from "./ui";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
 import { cn } from "@/lib/cn";
 
@@ -17,6 +18,7 @@ type Props = {
   projects: ProjectSwitcherProject[];
   selectedProjectId: string;
   totalAssets: number;
+  workspaceSwitchDisabled?: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
 };
@@ -80,6 +82,7 @@ const optionClass = cn(
   "hover:not-data-active:bg-g-surface-3 hover:not-data-active:text-g-ink",
   "focus-visible:not-data-active:bg-g-surface-3 focus-visible:not-data-active:text-g-ink",
   "data-active:bg-g-surface-3 data-active:text-g-ink data-active:font-[510]",
+  "disabled:cursor-not-allowed disabled:opacity-[0.38]",
   "focus-visible:outline-none focus-visible:shadow-g-focus",
   "[&_svg]:shrink-0",
 );
@@ -123,6 +126,7 @@ export function ProjectSwitcher({
   projects,
   selectedProjectId,
   totalAssets,
+  workspaceSwitchDisabled = false,
   onSelectWorkspace,
   onSelectProject,
 }: Props) {
@@ -162,6 +166,7 @@ export function ProjectSwitcher({
   }, [open]);
 
   function selectWorkspace(workspaceId: string) {
+    if (workspaceSwitchDisabled) return;
     onSelectWorkspace(workspaceId);
   }
 
@@ -228,7 +233,7 @@ export function ProjectSwitcher({
           </div>
           {workspaces.map((workspace) => {
             const isActive = activeWorkspaceId === workspace.id;
-            return (
+            const workspaceButton = (
               <button
                 key={workspace.id}
                 type="button"
@@ -237,6 +242,7 @@ export function ProjectSwitcher({
                 role="menuitemradio"
                 aria-checked={isActive}
                 data-active={isActive || undefined}
+                disabled={workspaceSwitchDisabled}
                 onClick={() => selectWorkspace(workspace.id)}
               >
                 <WorkspaceAvatar
@@ -262,6 +268,18 @@ export function ProjectSwitcher({
                   aria-hidden="true"
                 />
               </button>
+            );
+            if (!workspaceSwitchDisabled) {
+              return workspaceButton;
+            }
+            return (
+              <Tooltip
+                key={workspace.id}
+                label={t("activity.ocrLockedTooltip")}
+                placement="right"
+              >
+                <span className="block">{workspaceButton}</span>
+              </Tooltip>
             );
           })}
 

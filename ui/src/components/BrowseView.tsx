@@ -332,13 +332,13 @@ function TreePanel({
       <div className="p-2">
         <button
           type="button"
-          className="flex w-full items-center gap-1 min-h-7 rounded-g-md font-g-mono text-[12px] leading-[1.4] text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
+          className="group flex w-full items-center gap-1 min-h-7 rounded-g-md font-g font-normal text-g-ui leading-[1.4] tracking-g-ui text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
           data-active={selectedFolder === "" || undefined}
           onClick={() => onSelectFolder("")}
         >
           <FolderOpen size={13} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{allLabel}</span>
-          <span className="shrink-0 font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums">
+          <span className="shrink-0 font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums group-data-[active=true]:text-current group-data-[active=true]:opacity-70">
             {totalCount}
           </span>
         </button>
@@ -403,7 +403,7 @@ function TreeNode({
     <>
       <button
         type="button"
-        className="flex w-full items-center gap-1 min-h-7 rounded-g-md font-g-mono text-[12px] leading-[1.4] text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
+        className="group flex w-full items-center gap-1 min-h-7 rounded-g-md font-g font-normal text-g-ui leading-[1.4] tracking-g-ui text-left text-g-ink-2 transition-[background,color] duration-[120ms] ease-g pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] hover:bg-g-surface-2 hover:text-g-ink focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)]"
         data-active={isSelected || undefined}
         style={{ "--tree-depth": depth } as CSSProperties}
         onClick={() => {
@@ -434,11 +434,13 @@ function TreeNode({
           <Folder size={13} className="shrink-0" />
         )}
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
-        <span className="shrink-0 text-[10px] opacity-60">{node.count}</span>
+        <span className="shrink-0 font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums group-data-[active=true]:text-current group-data-[active=true]:opacity-70">
+          {node.count}
+        </span>
       </button>
       {isExpanded && hasChildren && childrenQuery.isLoading && (
         <div
-          className="flex min-h-7 items-center gap-1 rounded-g-md pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] font-g-mono text-[12px] text-g-ink-3"
+          className="flex min-h-7 items-center gap-1 rounded-g-md pl-[calc(8px+var(--tree-depth,0)*14px)] pr-2 py-[5px] font-g font-normal text-g-ui tracking-g-ui text-g-ink-3"
           style={{ "--tree-depth": depth + 1 } as CSSProperties}
         >
           <span className="grid size-4 shrink-0 place-items-center">

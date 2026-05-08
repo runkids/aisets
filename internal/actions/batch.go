@@ -58,6 +58,9 @@ func BatchMovePreview(project scanner.Project, items []scanner.AssetItem, target
 		ID:        newID("batch-move:" + project.ID + ":" + targetDir),
 		Type:      "batch-move",
 		ProjectID: project.ID,
+		Moves:     []BatchMoveEntry{},
+		Changes:   []Change{},
+		Blockers:  []Blocker{},
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	for _, item := range items {
@@ -88,6 +91,9 @@ func BatchMergePreview(project scanner.Project, items []scanner.AssetItem, prefe
 		ID:        newID("batch-merge:" + project.ID),
 		Type:      "batch-merge",
 		ProjectID: project.ID,
+		Moves:     []BatchMoveEntry{},
+		Changes:   []Change{},
+		Blockers:  []Blocker{},
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	for _, item := range items {
@@ -210,6 +216,9 @@ func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rule
 		ID:        newID("batch-rename:" + project.ID),
 		Type:      "batch-rename",
 		ProjectID: project.ID,
+		Moves:     []BatchMoveEntry{},
+		Changes:   []Change{},
+		Blockers:  []Blocker{},
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 

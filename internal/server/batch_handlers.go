@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"asset-studio/internal/actions"
@@ -57,7 +58,13 @@ func (s *Server) handleBatchMovePreview(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	preview := actions.BatchMovePreview(project, items, body.TargetDir)
+	targetDir := body.TargetDir
+	if filepath.IsAbs(targetDir) {
+		if rel, err := filepath.Rel(project.Path, targetDir); err == nil {
+			targetDir = filepath.ToSlash(rel)
+		}
+	}
+	preview := actions.BatchMovePreview(project, items, targetDir)
 	s.storeBatchPreview(preview)
 	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
 }
