@@ -21,9 +21,13 @@ ARG PNPM_VERSION
 RUN npm install -g pnpm@${PNPM_VERSION} \
   && go install github.com/air-verse/air@latest
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 RUN useradd --create-home --shell /bin/bash developer \
   && mkdir -p /workspace /go/pkg/mod /go/build-cache \
   && chown -R developer:developer /workspace /go /home/developer
+ENV PATH="/home/developer/.cargo/bin:${PATH}"
 
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

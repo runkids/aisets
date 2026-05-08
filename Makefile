@@ -1,6 +1,7 @@
 BINARY ?= bin/asset-studio
+IMGTOOLS_DIR = tools/imgtools
 
-.PHONY: help build test fmt vet check devc devc-up devc-down devc-restart devc-reset devc-status ui-install ui-build ui-dev build-all
+.PHONY: help build test fmt vet check devc devc-up devc-down devc-restart devc-reset devc-status ui-install ui-build ui-dev build-all imgtools imgtools-test
 
 help:
 	@echo "Common tasks:"
@@ -26,7 +27,7 @@ fmt:
 vet:
 	go vet ./...
 
-check: vet test
+check: vet test imgtools-test
 
 devc:
 	./scripts/devc.sh up && ./scripts/devc.sh shell
@@ -52,9 +53,28 @@ ui-install:
 ui-build:
 	cd ui && pnpm run build
 
-ui-dev:
+ui-dev: imgtools-install
 	@trap 'kill 0' EXIT; \
 	air & \
 	cd ui && pnpm run dev
 
-build-all: ui-build build
+imgtools:
+	cargo build --release --manifest-path $(IMGTOOLS_DIR)/Cargo.toml
+
+imgtools-install: imgtools
+	mkdir -p $(dir $(BINARY))
+	cp $(IMGTOOLS_DIR)/target/release/asset-studio-imgtools $(dir $(BINARY))
+
+imgtools-embed: imgtools
+	mkdir -p internal/imgtools/bin
+	cp $(IMGTOOLS_DIR)/target/release/asset-studio-imgtools internal/imgtools/bin/
+
+imgtools-test:
+	cargo test --manifest-path $(IMGTOOLS_DIR)/Cargo.toml
+	cargo clippy --manifest-path $(IMGTOOLS_DIR)/Cargo.toml -- -D warnings
+
+build-embed: ui-build imgtools-embed
+	mkdir -p $(dir $(BINARY))
+	go build -tags embed_imgtools -o $(BINARY) ./cmd/asset-studio
+
+build-all: ui-build build imgtools-install

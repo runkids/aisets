@@ -67,3 +67,35 @@ jobs:
 
       - name: UI tests
         run: cd ui && pnpm run test
+
+  imgtools-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/imgtools/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tools/imgtools/Cargo.lock') }}
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/imgtools/Cargo.toml -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/imgtools/Cargo.toml -- --check
+
+      - name: Tests
+        run: cargo test --manifest-path tools/imgtools/Cargo.toml
+
+      - name: Build release
+        run: cargo build --release --manifest-path tools/imgtools/Cargo.toml

@@ -20,6 +20,7 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/imgtools"
 	"asset-studio/internal/scanner"
 
 	"github.com/gen2brain/avif"
@@ -218,6 +219,9 @@ func referencePolicy(item scanner.AssetItem) string {
 }
 
 func defaultToolChecker(name string) bool {
+	if name == "asset-studio-imgtools" {
+		return imgtools.Available()
+	}
 	_, err := exec.LookPath(name)
 	return err == nil
 }
@@ -316,9 +320,9 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 				ops[index].Operation = "convert-webp"
 				ops[index].OutputFormat = "webp"
 				ops[index].TargetPath = replaceExt(ops[index].RepoPath, ".webp")
-				ops[index].Tool = "cwebp"
+				ops[index].Tool = "asset-studio-imgtools"
 
-				if hasTool("cwebp") {
+				if hasTool("asset-studio-imgtools") {
 					fbCandidate, fbBytes, fbErr := buildCandidate(project, ops[index], req)
 					if fbErr == nil && fbBytes < ops[index].CurrentBytes {
 						ops[index].CandidatePath = fbCandidate
@@ -340,7 +344,7 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 				} else {
 					ops[index].Available = false
 					ops[index].ReasonCode = "optimizer_tool_missing"
-					ops[index].BlockedReason = "Required optimizer tool is not installed: cwebp"
+					ops[index].BlockedReason = "Required optimizer tool is not installed: asset-studio-imgtools"
 				}
 			}
 
@@ -648,6 +652,10 @@ func buildResizeCandidate(source, format string, maxDimension, quality int) (str
 }
 
 func buildExternalCandidate(source string, op Operation, req Request) (string, int64, error) {
+	bin, err := imgtools.Binary()
+	if err != nil {
+		return "", 0, apierr.WithParams("optimizer_tool_missing", "asset-studio-imgtools not found", map[string]any{"tool": "asset-studio-imgtools"})
+	}
 	ext := "." + op.OutputFormat
 	target, err := os.CreateTemp("", "asset-studio-optimize-*"+ext)
 	if err != nil {
@@ -655,18 +663,17 @@ func buildExternalCandidate(source string, op Operation, req Request) (string, i
 	}
 	targetPath := target.Name()
 	_ = target.Close()
-	var cmd *exec.Cmd
+	var args []string
 	switch op.Operation {
-	case "convert-webp":
-		cmd = exec.Command("cwebp", "-q", fmt.Sprintf("%d", req.Quality), source, "-o", targetPath)
-	case "webp-recompress":
-		cmd = exec.Command("cwebp", "-q", fmt.Sprintf("%d", req.Quality), source, "-o", targetPath)
+	case "convert-webp", "webp-recompress":
+		args = []string{"convert", "--format", "webp", "--quality", fmt.Sprintf("%d", req.Quality), source, targetPath}
 	default:
 		return "", 0, apierr.WithParams("operation_unsupported", "optimization operation is unsupported", map[string]any{"operation": op.Operation})
 	}
+	cmd := exec.Command(bin, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(targetPath)
-		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": op.Tool, "output": string(out)})
+		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": "asset-studio-imgtools", "output": string(out)})
 	}
 	info, err := os.Stat(targetPath)
 	if err != nil {

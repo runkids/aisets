@@ -105,6 +105,7 @@ export function highlightBashLine(line: string): React.ReactNode {
 }
 
 export const toolInstallCommands: Record<string, string> = {
+  "asset-studio-imgtools": "Bundled with Asset Studio",
   cwebp: "brew install webp",
   avifenc: "brew install libavif",
   magick: "brew install imagemagick",

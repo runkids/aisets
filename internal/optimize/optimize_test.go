@@ -512,8 +512,8 @@ func TestMeasureOperationsGIFSuggestsWebPWhenCwebpMissing(t *testing.T) {
 	if result[0].OutputFormat != "webp" {
 		t.Fatalf("expected webp output format, got %s", result[0].OutputFormat)
 	}
-	if result[0].Tool != "cwebp" {
-		t.Fatalf("expected cwebp tool, got %s", result[0].Tool)
+	if result[0].Tool != "asset-studio-imgtools" {
+		t.Fatalf("expected asset-studio-imgtools tool, got %s", result[0].Tool)
 	}
 	if result[0].Available {
 		t.Fatal("expected tool to be marked unavailable")
@@ -530,8 +530,8 @@ func TestMeasureOperationsGIFSuggestsWebPWhenCwebpMissing(t *testing.T) {
 }
 
 func TestMeasureOperationsGIFFallbackToWebP(t *testing.T) {
-	if !defaultToolChecker("cwebp") {
-		t.Skip("cwebp not installed, skipping WebP fallback test")
+	if !defaultToolChecker("asset-studio-imgtools") {
+		t.Skip("asset-studio-imgtools not installed, skipping WebP fallback test")
 	}
 	root := t.TempDir()
 	gifPath := filepath.Join(root, "src", "anim.gif")
