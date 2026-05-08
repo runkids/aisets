@@ -1,7 +1,10 @@
 import {
   ArrowRight,
+  Copy,
   FolderKanban,
   FolderPlus,
+  HardDrive,
+  Images,
   MoreHorizontal,
   Pencil,
   Search,
@@ -16,6 +19,7 @@ import {
   useSettingsQuery,
 } from "../queries";
 import { errorMessage } from "../i18n/index";
+import { projectScanIntentLabel } from "../projectScanIntent";
 import { formatBytes } from "../ui";
 import type { Mode } from "../ui";
 import {
@@ -218,6 +222,9 @@ function ProjectCard({
               <Badge tone="line">
                 {t("projects.filesCount", { count: stat.assetCount })}
               </Badge>
+              <Badge tone="line">
+                {projectScanIntentLabel(t, stat.project.scanIntent)}
+              </Badge>
             </div>
             <code className="mt-0.5 block truncate font-g-mono text-g-chip text-g-ink-4">
               {stat.project.path}
@@ -336,10 +343,19 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
   }, []);
 
   const handleRenameConfirm = useCallback(
-    (value: { name: string; iconImage: string }) => {
+    (value: {
+      name: string;
+      iconImage: string;
+      scanIntent: NonNullable<Project["scanIntent"]>;
+    }) => {
       if (!renameTarget) return;
       renameMutation.mutate(
-        { id: renameTarget.id, name: value.name, iconImage: value.iconImage },
+        {
+          id: renameTarget.id,
+          name: value.name,
+          iconImage: value.iconImage,
+          scanIntent: value.scanIntent,
+        },
         {
           onSuccess: () => {
             toast.success(t("projects.renameSuccess", { name: value.name }));
@@ -448,21 +464,25 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
         <StatCard
           label={t("projects.totalAssets")}
           value={catalog.stats.totalFiles}
+          icon={<Images size={14} />}
         />
         <StatCard
           label={t("projects.totalSize")}
           value={formatBytes(totalBytes)}
+          icon={<HardDrive size={14} />}
         />
         <StatCard
           label={t("projects.unused")}
           value={unused}
           tone={unused > 0 ? "red" : "neutral"}
+          icon={<Trash2 size={14} />}
           onClick={() => onJump("unused")}
         />
         <StatCard
           label={t("projects.duplicateGroups")}
           value={duplicateFiles}
           tone={duplicateFiles > 0 ? "amber" : "neutral"}
+          icon={<Copy size={14} />}
           onClick={() => onJump("duplicates")}
         />
       </div>

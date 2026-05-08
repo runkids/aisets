@@ -114,7 +114,12 @@
     "noSubdirs": "No subdirectories",
     "noSubdirsDesc": "You can add the current directory directly.",
     "selectStart": "Select a starting directory",
-    "selectStartDesc": "Enter a path and press \"Go\", or start browsing from the default directory."
+    "selectStartDesc": "Enter a path and press \"Go\", or start browsing from the default directory.",
+    "projectType": "Project type",
+    "projectTypeHint": "Choose how Asset Studio should interpret references and unused files.",
+    "detectingIntent": "Detecting project type",
+    "detectedIntent": "Suggested: {{intent}}",
+    "detectIntentFailed": "Could not detect a project type. Choose one manually."
   },
   "preview": {
     "canApplyDesc": "This operation can be applied. Please review the changes before writing to files.",
@@ -142,6 +147,7 @@
     "scanningDesc": "Updating asset catalog…",
     "all": "All",
     "unused": "Unused",
+    "possiblyUnused": "Possibly unused",
     "duplicate": "Duplicate",
     "optimizable": "Optimizable",
     "referenced": "Referenced"
@@ -157,6 +163,24 @@
       "nearDuplicates": "Comparing similar assets",
       "lint": "Running asset rules",
       "persisting": "Saving scan results"
+    }
+  },
+  "projectIntent": {
+    "code": {
+      "label": "Code project",
+      "description": "Scan code references, unused files, and applicable lint findings."
+    },
+    "assetPack": {
+      "label": "Asset pack",
+      "description": "Skip code references and unused checks; focus on duplicates, metadata, optimization, and organization."
+    },
+    "library": {
+      "label": "Reusable library",
+      "description": "Scan internal references but treat unused as advisory because consumers may live outside this repo."
+    },
+    "mixed": {
+      "label": "Mixed / not sure",
+      "description": "Scan conservatively and treat zero-reference assets as review candidates."
     }
   },
   "settings": {
@@ -738,8 +762,10 @@
     "emptyOCRTextHint": "{{count}} images finished OCR with no recognized text, so visible image text may not be searchable yet.",
     "flagDuplicate": "Duplicate",
     "flagUnused": "Unused",
+    "flagPossiblyUnused": "Possibly unused",
     "flagOptimizable": "Optimize",
     "flagUnusedShort": "Unused",
+    "flagPossiblyUnusedShort": "Possible",
     "flagOptimizableShort": "Opt",
     "gridAriaLabel": "Asset grid",
     "listAriaLabel": "Asset list",
@@ -792,8 +818,33 @@
       "optimization": "Optimization",
       "naming": "Naming"
     },
-    "nearDistance": "d={{distance}}",
-    "nearDistanceFlipped": "d={{distance}} · flipped"
+    "nearDistance": "{{pct}}% similar",
+    "nearDistanceFlipped": "{{pct}}% similar · flipped",
+    "verdictReason": {
+      "ok": "No conflicts detected.",
+      "exactMatch": "An asset with identical content already exists in the catalog.",
+      "nearMatch": "Visually similar assets exist; review before adding.",
+      "criticalOpt": "Asset has critical optimization recommendations.",
+      "naming": "Filename has style issues."
+    },
+    "optReason": {
+      "image_dimensions_large": "Image dimensions are unusually large for a UI asset.",
+      "asset_file_large": "File size is large; may impact load performance.",
+      "png_without_alpha": "PNG without alpha often compresses better as JPEG, WebP, or AVIF.",
+      "svg_can_minify": "SVG can be minified to reduce file size."
+    },
+    "optSuggestion": {
+      "use_responsive_or_smaller_source": "Consider using responsive images or a smaller source.",
+      "review_compression_or_modern_format": "Review compression settings or convert to a modern format.",
+      "try_modern_photographic_format": "Try a photographic format for non-transparent raster images.",
+      "preview_svg_minify": "Preview SVG minification to check for visual regressions."
+    },
+    "namingIssue": {
+      "contains_spaces": "Filename contains spaces; prefer dashes or underscores.",
+      "uppercase_letters": "Filename contains uppercase letters; prefer lowercase.",
+      "special_chars": "Filename contains special characters that may cause URL/path issues.",
+      "leading_punctuation": "Filename starts with punctuation."
+    }
   },
   "assetDrawer": {
     "metadata": "Metadata",
@@ -819,11 +870,14 @@
     "tabOptimize": "Optimize",
     "tabOCR": "OCR",
     "chipUnused": "Unused",
+    "chipPossiblyUnused": "Possibly unused",
     "chipDuplicate": "Duplicate",
     "chipSimilar": "Similar",
     "chipOptimizable": "Optimizable",
     "chipOCR": "OCR",
     "usageEmpty": "No code references found. This asset is a deletion candidate.",
+    "usagePossiblyUnused": "No references found, but coverage is advisory for this project. Review manually; delete-unused is disabled.",
+    "usageNotApplicable": "Unused detection is disabled for this project type because files may be consumed outside this repository.",
     "copyAll": "Copy all",
     "openInEditor": "Open in {{editor}}",
     "exactDuplicates": "Exact Duplicates",
@@ -948,6 +1002,7 @@
     "renameDialogTitle": "Rename project",
     "editDialogTitle": "Edit project",
     "renameLabel": "Project name",
+    "projectType": "Project type",
     "renameDialogConfirm": "Rename",
     "projectIcon": "Project image",
     "projectIconHint": "PNG, JPEG, GIF, or WebP up to 512 KB. Used in project cards and project lists.",

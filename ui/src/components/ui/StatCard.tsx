@@ -48,7 +48,7 @@ export function StatCard({
 }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-center gap-1.5 font-g text-g-chip font-[510] uppercase tracking-[0.08em] text-[var(--stat-tone)]">
+      <div className="flex items-center gap-1.5 font-g text-g-chip font-[510] uppercase tracking-[0.08em] text-g-ink-4">
         {icon}
         {label}
       </div>

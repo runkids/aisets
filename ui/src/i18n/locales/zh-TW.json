@@ -114,7 +114,12 @@
     "noSubdirs": "沒有子目錄",
     "noSubdirsDesc": "可以直接加入目前目錄",
     "selectStart": "選擇起始目錄",
-    "selectStartDesc": "輸入路徑後按「前往」，或使用預設目錄開始瀏覽"
+    "selectStartDesc": "輸入路徑後按「前往」，或使用預設目錄開始瀏覽",
+    "projectType": "專案類型",
+    "projectTypeHint": "選擇 Asset Studio 應如何判讀引用與未使用檔案",
+    "detectingIntent": "正在偵測專案類型",
+    "detectedIntent": "建議：{{intent}}",
+    "detectIntentFailed": "無法偵測專案類型，請手動選擇"
   },
   "preview": {
     "canApplyDesc": "這次操作可套用。請確認變更後再寫入檔案",
@@ -142,6 +147,7 @@
     "scanningDesc": "正在更新素材 catalog…",
     "all": "全部",
     "unused": "未使用",
+    "possiblyUnused": "可能未使用",
     "duplicate": "重複",
     "optimizable": "可最佳化",
     "referenced": "已引用"
@@ -157,6 +163,24 @@
       "nearDuplicates": "比對相似素材中",
       "lint": "執行素材規則中",
       "persisting": "儲存掃描結果中"
+    }
+  },
+  "projectIntent": {
+    "code": {
+      "label": "程式碼專案",
+      "description": "掃描程式碼引用、未使用檔案與適用的 lint 發現"
+    },
+    "assetPack": {
+      "label": "素材包",
+      "description": "跳過程式碼引用與未使用檢查，專注於重複、 metadata、最佳化與整理"
+    },
+    "library": {
+      "label": "可重用 library",
+      "description": "掃描內部引用，但因外部 consumer 可能存在，未使用只作為參考"
+    },
+    "mixed": {
+      "label": "混合 / 不確定",
+      "description": "保守掃描，將零引用素材視為待人工確認"
     }
   },
   "error": {
@@ -402,8 +426,10 @@
     "emptyOCRTextHint": "{{count}} 張圖片已完成 OCR 但沒有辨識出文字，因此輸入圖片上的字不一定會命中",
     "flagDuplicate": "重複",
     "flagUnused": "未使用",
+    "flagPossiblyUnused": "可能未使用",
     "flagOptimizable": "可最佳化",
     "flagUnusedShort": "未使用",
+    "flagPossiblyUnusedShort": "可能未用",
     "flagOptimizableShort": "最佳化",
     "gridAriaLabel": "素材格狀檢視",
     "listAriaLabel": "素材清單檢視",
@@ -456,8 +482,33 @@
       "optimization": "最佳化",
       "naming": "命名"
     },
-    "nearDistance": "d={{distance}}",
-    "nearDistanceFlipped": "d={{distance}} · 翻轉"
+    "nearDistance": "相似度 {{pct}}%",
+    "nearDistanceFlipped": "相似度 {{pct}}% · 翻轉",
+    "verdictReason": {
+      "ok": "未偵測到衝突。",
+      "exactMatch": "目錄中已存在內容完全相同的素材。",
+      "nearMatch": "存在視覺相似的素材，建議加入前先確認。",
+      "criticalOpt": "素材有嚴重的最佳化建議。",
+      "naming": "檔名有風格問題。"
+    },
+    "optReason": {
+      "image_dimensions_large": "圖片尺寸對 UI 素材而言異常大。",
+      "asset_file_large": "檔案大小偏大，可能影響載入效能。",
+      "png_without_alpha": "無透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 獲得更好的壓縮。",
+      "svg_can_minify": "SVG 可進行壓縮以縮小檔案大小。"
+    },
+    "optSuggestion": {
+      "use_responsive_or_smaller_source": "建議使用響應式圖片或較小的來源檔。",
+      "review_compression_or_modern_format": "檢查壓縮設定，或轉換為現代格式。",
+      "try_modern_photographic_format": "嘗試使用攝影格式處理非透明的點陣圖片。",
+      "preview_svg_minify": "預覽 SVG 壓縮結果以確認是否有視覺差異。"
+    },
+    "namingIssue": {
+      "contains_spaces": "檔名含有空格，建議使用連字號或底線。",
+      "uppercase_letters": "檔名含有大寫字母，建議使用小寫。",
+      "special_chars": "檔名含有特殊字元，可能導致 URL 或路徑問題。",
+      "leading_punctuation": "檔名以標點符號開頭。"
+    }
   },
   "assetDrawer": {
     "metadata": "中繼資料",
@@ -483,11 +534,14 @@
     "tabOptimize": "最佳化",
     "tabOCR": "OCR",
     "chipUnused": "未使用",
+    "chipPossiblyUnused": "可能未使用",
     "chipDuplicate": "重複",
     "chipSimilar": "相似",
     "chipOptimizable": "可最佳化",
     "chipOCR": "OCR",
     "usageEmpty": "未找到程式碼引用。此素材為刪除候選",
+    "usagePossiblyUnused": "未找到引用，但此專案的引用覆蓋只作為參考。請人工確認；delete-unused 已停用",
+    "usageNotApplicable": "此專案類型停用未使用偵測，因為檔案可能在 repo 外被消費",
     "copyAll": "複製全部",
     "openInEditor": "在 {{editor}} 中開啟",
     "exactDuplicates": "完全重複",
@@ -948,6 +1002,7 @@
     "renameDialogTitle": "重新命名專案",
     "editDialogTitle": "編輯專案",
     "renameLabel": "專案名稱",
+    "projectType": "專案類型",
     "renameDialogConfirm": "重新命名",
     "projectIcon": "專案圖片",
     "projectIconHint": "支援 PNG、JPEG、GIF 或 WebP，最大 512 KB；用於專案卡片與專案列表",

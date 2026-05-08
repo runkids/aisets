@@ -435,8 +435,33 @@
       "optimization": "최적화",
       "naming": "이름"
     },
-    "nearDistance": "d={{distance}}",
-    "nearDistanceFlipped": "d={{distance}} · 뒤집힘"
+    "nearDistance": "유사도 {{pct}}%",
+    "nearDistanceFlipped": "유사도 {{pct}}% · 반전",
+    "verdictReason": {
+      "ok": "충돌이 감지되지 않았습니다.",
+      "exactMatch": "카탈로그에 동일한 콘텐츠의 에셋이 이미 존재합니다.",
+      "nearMatch": "시각적으로 유사한 에셋이 존재합니다. 추가 전에 확인해 주세요.",
+      "criticalOpt": "에셋에 중요한 최적화 권장 사항이 있습니다.",
+      "naming": "파일명에 스타일 문제가 있습니다."
+    },
+    "optReason": {
+      "image_dimensions_large": "이미지 크기가 UI 에셋에 비해 비정상적으로 큽니다.",
+      "asset_file_large": "파일 크기가 커서 로드 성능에 영향을 줄 수 있습니다.",
+      "png_without_alpha": "알파 채널이 없는 PNG는 JPEG, WebP 또는 AVIF로 더 나은 압축이 가능합니다.",
+      "svg_can_minify": "SVG를 압축하여 파일 크기를 줄일 수 있습니다."
+    },
+    "optSuggestion": {
+      "use_responsive_or_smaller_source": "반응형 이미지 또는 더 작은 소스 사용을 고려해 주세요.",
+      "review_compression_or_modern_format": "압축 설정을 검토하거나 최신 형식으로 변환해 주세요.",
+      "try_modern_photographic_format": "비투명 래스터 이미지에는 사진 형식을 시도해 보세요.",
+      "preview_svg_minify": "SVG 압축 결과를 미리 보고 시각적 차이가 없는지 확인해 주세요."
+    },
+    "namingIssue": {
+      "contains_spaces": "파일명에 공백이 포함되어 있습니다. 하이픈 또는 밑줄을 권장합니다.",
+      "uppercase_letters": "파일명에 대문자가 포함되어 있습니다. 소문자를 권장합니다.",
+      "special_chars": "파일명에 URL/경로 문제를 일으킬 수 있는 특수 문자가 포함되어 있습니다.",
+      "leading_punctuation": "파일명이 구두점으로 시작합니다."
+    }
   },
   "assetDrawer": {
     "metadata": "Metadata",

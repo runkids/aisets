@@ -423,8 +423,33 @@
       "optimization": "最適化",
       "naming": "命名"
     },
-    "nearDistance": "d={{distance}}",
-    "nearDistanceFlipped": "d={{distance}} · 反転"
+    "nearDistance": "類似度 {{pct}}%",
+    "nearDistanceFlipped": "類似度 {{pct}}% · 反転",
+    "verdictReason": {
+      "ok": "競合は検出されませんでした。",
+      "exactMatch": "カタログに同一内容のアセットが既に存在します。",
+      "nearMatch": "視覚的に類似するアセットが存在します。追加前にご確認ください。",
+      "criticalOpt": "アセットに重大な最適化の推奨事項があります。",
+      "naming": "ファイル名にスタイルの問題があります。"
+    },
+    "optReason": {
+      "image_dimensions_large": "画像のサイズがUIアセットとしては異常に大きいです。",
+      "asset_file_large": "ファイルサイズが大きく、読み込み性能に影響する可能性があります。",
+      "png_without_alpha": "アルファなしのPNGはJPEG、WebP、またはAVIFの方が圧縮率が高い場合があります。",
+      "svg_can_minify": "SVGを圧縮してファイルサイズを削減できます。"
+    },
+    "optSuggestion": {
+      "use_responsive_or_smaller_source": "レスポンシブ画像またはより小さいソースの使用を検討してください。",
+      "review_compression_or_modern_format": "圧縮設定を見直すか、モダンなフォーマットに変換してください。",
+      "try_modern_photographic_format": "非透過のラスター画像には写真向けフォーマットをお試しください。",
+      "preview_svg_minify": "SVG圧縮をプレビューして視覚的な差異がないか確認してください。"
+    },
+    "namingIssue": {
+      "contains_spaces": "ファイル名にスペースが含まれています。ハイフンまたはアンダースコアを推奨します。",
+      "uppercase_letters": "ファイル名に大文字が含まれています。小文字を推奨します。",
+      "special_chars": "ファイル名にURL/パスの問題を引き起こす可能性のある特殊文字が含まれています。",
+      "leading_punctuation": "ファイル名が句読点で始まっています。"
+    }
   },
   "assetDrawer": {
     "metadata": "Metadata",

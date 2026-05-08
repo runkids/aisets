@@ -23,6 +23,8 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 - Icons from Lucide React only — never emoji as structural icons.
 - Every `<button>` without visible text needs `aria-label`.
 - Every overlay needs ESC dismissal + focus trap + focus restoration.
+- **i18n code-first:** Backend API must return machine-readable codes (`reasonCode`, `code`, `suggestionCode`), not hardcoded human-readable strings. Frontend translates codes via `t(\`namespace.${code}\`, { defaultValue: fallbackString })`. Never display raw backend English strings to the user.
+- **StatCard consistency:** Every `<StatCard>` must include an `icon` prop (Lucide, `size={14}`). Use semantic `tone` for actionable metrics (e.g. `tone={count > 0 ? "red" : "neutral"}`). Do not omit icons on some cards — all cards in a stats grid must look uniform.
 
 ### 2.2 Go
 - Standard `gofmt`, `go vet`, table-driven tests. Project conventions follow `internal/` package layout.
@@ -31,6 +33,10 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 - New backend packages, exported functions, API handlers, scanner/lint rules, action flows, pre-check logic, optimization logic, config migrations, and cache/download behavior must not land with 0% direct coverage. If a branch cannot be exercised deterministically, document why in the PR/commit notes and cover the nearest pure helper instead.
 - Backend bug fixes start with a regression test that fails before the fix. Prefer table-driven tests for rule engines and focused integration tests for HTTP/store/scanner flows.
 - `internal/scanner` and `internal/lint` are the two main domain packages — read them before changing scan or lint output shape, since UI consumes their JSON.
+- **Project scan intent is authoritative.** Each project has a `scanIntent` (`code`, `assetPack`, `library`, `mixed`) that controls how references, unused files, and reference-lint are interpreted. Do not infer deletion safety from `usedBy.length === 0` or `references.length === 0`.
+- For catalog items, use backend policy fields: `usageClassification`, `deleteUnusedAllowed`, and `lintApplicability`. UI filters, badges, drawers, actions, and custom filters must consume these fields instead of recomputing safe-unused state.
+- `unusedFiles` means safe delete-unused candidates only. Advisory or not-applicable counts belong in `possiblyUnusedFiles` and `usageNotApplicableFiles`. Asset packs skip reference-dependent analysis; library, mixed, and partial-coverage code projects can show "possibly unused" but must not enable delete-unused.
+- When project `scanIntent` changes, treat reference-dependent catalog state as stale and require a rescan before enabling unused/delete-unused behavior. Persist and compare scan-time intent where scan history or diff logic depends on unused transitions.
 
 ---
 

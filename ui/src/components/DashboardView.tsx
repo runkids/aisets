@@ -68,28 +68,28 @@ export function DashboardView({ catalog, onJump }: Props) {
           label={t("dashboard.totalAssets")}
           value={catalog.stats.totalFiles}
           meta={formatBytes(totalBytes)}
-          icon={<Boxes size={18} />}
+          icon={<Boxes size={14} />}
           onClick={() => onJump("browse")}
         />
         <StatCard
           label={t("dashboard.duplicateGroups")}
           value={catalog.stats.duplicateGroups}
           meta={t("dashboard.savingsMeta", { size: formatBytes(savings) })}
-          icon={<Copy size={18} />}
+          icon={<Copy size={14} />}
           onClick={() => onJump("duplicates")}
         />
         <StatCard
           label={t("dashboard.unused")}
           value={catalog.stats.unusedFiles}
           meta={t("dashboard.unusedMeta")}
-          icon={<Trash2 size={18} />}
+          icon={<Trash2 size={14} />}
           onClick={() => onJump("unused")}
         />
         <StatCard
           label={t("dashboard.optimizable")}
           value={optimizeCount}
           meta={t("dashboard.optimizeMeta")}
-          icon={<Sparkles size={18} />}
+          icon={<Sparkles size={14} />}
           onClick={() => onJump("optimize")}
         />
       </section>
@@ -98,7 +98,7 @@ export function DashboardView({ catalog, onJump }: Props) {
         <Card>
           <CardBody padding="md">
             <div className="mb-4 flex items-center gap-2">
-              <FileImage size={18} />
+              <FileImage size={14} />
               <h2 className="text-subheading font-[650]">
                 {t("dashboard.byFormat")}
               </h2>
@@ -140,7 +140,7 @@ export function DashboardView({ catalog, onJump }: Props) {
         <Card>
           <CardBody padding="md">
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles size={18} />
+              <Sparkles size={14} />
               <h2 className="text-subheading font-[650]">
                 {t("dashboard.topLargest")}
               </h2>
@@ -229,7 +229,7 @@ export function DashboardView({ catalog, onJump }: Props) {
       <Card>
         <CardBody padding="md">
           <div className="mb-4 flex items-center gap-2">
-            <HardDrive size={18} />
+            <HardDrive size={14} />
             <h2 className="text-subheading font-[650]">
               {t("dashboard.projects")}
             </h2>

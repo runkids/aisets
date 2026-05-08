@@ -124,7 +124,52 @@ DropdownMenu, Notice, Toast, EmptyState, and more. Check before building from sc
 
 ---
 
-## 3. Design principles
+## 3. Page layout philosophy
+
+Every view follows the Browse / Duplicates blueprint. Deviating from this structure makes the
+product feel inconsistent.
+
+### 3.1 Content-first — no decorative chrome
+
+- **No page titles or hero sections.** Content (StatCards, toolbar, grid) starts at the top edge.
+- **No standalone empty states.** If a page has a primary action area (e.g. dropzone), merge the
+  empty-state message into that area. Never stack two centered visual blocks vertically.
+- **No description paragraphs.** The sidebar nav label is sufficient context. Add help via tooltip.
+
+### 3.2 Three-layer structure
+
+Every data view follows: **StatCards → Sticky Toolbar → Content Grid**.
+
+```
+┌──────────────────────────────────────────────┐
+│ [StatCard] [StatCard] [StatCard] [StatCard]  │  ← summary row
+│ [StackedBar ···························]     │  ← optional health bar
+├──────────────────────────────────────────────┤
+│ [Tabs] [Search···] [Sort ▾] [View ▾] [Act]  │  ← sticky toolbar (z:4–5)
+├──────────────────────────────────────────────┤
+│ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐  │
+│ │card│ │card│ │card│ │card│ │card│ │card│  │  ← content grid
+│ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘  │
+└──────────────────────────────────────────────┘
+```
+
+- Omit layers that don't apply (e.g. PreCheck has no toolbar, Browse has no StatCards).
+- Sidebar `FilterRail` is a separate column — never embed filters in the main content area.
+
+### 3.3 StatCard neutrality
+
+StatCard icon and label are always `text-g-ink-4` (neutral grey). The large number value provides
+emphasis. Semantic color goes only on badge/chip elements in the content area, not on stat labels.
+
+### 3.4 Information density
+
+- 4px base spacing, compact density. Avoid large padding between functional elements.
+- File metadata uses compact `<Badge>` chips, not full sentences.
+- Details open in drawers/panels on click — not inline-expanded paragraphs.
+
+---
+
+## 4. Component rules
 
 These aren't taste preferences — each prevents a specific class of bugs:
 
@@ -138,10 +183,15 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Lucide icons only** | Mixing icon sets (or using emoji) creates visual noise. |
 | **`cn()` for all class merging** | It wraps `clsx` + `twMerge` — handles conditional classes and deduplicates conflicts. |
 | **No left-edge accent bars** | Never add vertical colored bars/stripes on container edges. Use tinted bg + border + icon for tone. |
+| **StatCard icon mandatory** | Every `<StatCard>` must have `icon={<LucideIcon size={14} />}`. Omitting icons on some cards in a grid breaks visual rhythm. |
+| **i18n code-first** | Never render backend strings directly. Use `t(\`ns.${code}\`, { defaultValue: raw })` with the machine code field. |
+| **Collapsible via grid-rows** | Animated expand/collapse uses `grid-rows-[0fr]` → `grid-rows-[1fr]` with `overflow-hidden` inner div. Add `motion-reduce:transition-none`. |
+| **Upload results accumulate** | Multi-batch upload flows append to existing results via ref + `setResults(prev => [...prev, ...incoming])`. Clear button resets all. |
+| **Module-level state cache** | Views that unmount on route change use module-level `let _state` + `useEffect` sync to persist data across navigations. Cleared on page refresh. |
 
 ---
 
-## 4. Pre-delivery checklist
+## 5. Pre-delivery checklist
 
 Run through before reporting any UI task as done:
 
@@ -157,7 +207,7 @@ Run through before reporting any UI task as done:
 
 ---
 
-## 5. Reference
+## 6. Reference
 
 For full token tables (all colors, spacing, radius, shadow values), type scale, surface
 hierarchy, component specs, accessibility rules, and view-by-view patterns:
