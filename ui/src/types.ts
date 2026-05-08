@@ -305,6 +305,7 @@ export type Catalog = {
     usageNotApplicableFiles?: number;
     referencedFiles?: number;
     duplicateFiles: number;
+    duplicateGroups: number;
     optimizableFiles: number;
     lintFindings: number;
   }>;
@@ -360,6 +361,12 @@ export type CatalogDuplicatesPage = {
   pairs: NearDuplicate[];
   total: number;
   nextCursor?: string;
+  facets: {
+    projects: Array<{ id: string; count: number }>;
+    projectTotal: number;
+    extensions: Array<{ id: string; count: number }>;
+    extensionTotal: number;
+  };
 };
 
 export type CatalogLintPage = {
@@ -409,6 +416,7 @@ export type ScanEvent =
       total?: number;
       message?: string;
       state?: AnalysisState;
+      reason?: "" | "skippedByUser" | "skippedByThreshold" | "notApplicable";
     }
   | {
       type: "done";

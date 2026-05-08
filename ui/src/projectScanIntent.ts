@@ -45,10 +45,26 @@ export function intentSelectOptions(t: TFunction) {
 
 export function usageClassification(item: AssetItem) {
   if (item.usageClassification) return item.usageClassification;
-  return item.usedBy.length > 0 ? "referenced" : "unused";
+  return item.usedBy.length > 0 ? "referenced" : "notApplicable";
 }
 
 export function canDeleteUnused(item: AssetItem) {
-  if (item.deleteUnusedAllowed != null) return item.deleteUnusedAllowed;
-  return usageClassification(item) === "unused";
+  return (
+    item.deleteUnusedAllowed === true && usageClassification(item) === "unused"
+  );
+}
+
+export function notApplicableUsageLabel(
+  t: TFunction,
+  item: AssetItem,
+  options: { short?: boolean } = {},
+) {
+  if (item.scanIntent === "assetPack") {
+    return projectScanIntentLabel(t, "assetPack");
+  }
+  return t(
+    options.short
+      ? "browse.flagUsageNotCheckedShort"
+      : "browse.flagUsageNotChecked",
+  );
 }

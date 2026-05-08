@@ -89,6 +89,8 @@ export type CatalogItemsParams = {
 export type CatalogDuplicatesParams = {
   scanId?: number;
   kind?: "exact" | "near";
+  projectName?: string;
+  ext?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -144,6 +146,8 @@ export function getCatalogDuplicates(
     `/api/catalog/duplicates${queryString({
       scanId: params.scanId,
       kind: params.kind,
+      projectName: params.projectName,
+      ext: params.ext,
       limit: params.limit,
       cursor: params.cursor,
     })}`,

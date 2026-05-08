@@ -23,6 +23,9 @@ export function scopedStatsForProject(
       duplicateGroups: 0,
       duplicateFiles: 0,
       unusedFiles: 0,
+      possiblyUnusedFiles: 0,
+      usageNotApplicableFiles: 0,
+      referencedFiles: 0,
       nearDuplicates: 0,
       lintFindings: 0,
       cacheHits: 0,
@@ -31,9 +34,12 @@ export function scopedStatsForProject(
   if (!projectStats) return summary.stats;
   return {
     totalFiles: projectStats.totalFiles,
-    duplicateGroups: projectStats.duplicateFiles,
+    duplicateGroups: projectStats.duplicateGroups,
     duplicateFiles: projectStats.duplicateFiles,
     unusedFiles: projectStats.unusedFiles,
+    possiblyUnusedFiles: projectStats.possiblyUnusedFiles ?? 0,
+    usageNotApplicableFiles: projectStats.usageNotApplicableFiles ?? 0,
+    referencedFiles: projectStats.referencedFiles ?? 0,
     nearDuplicates: 0,
     lintFindings: projectStats.lintFindings,
     cacheHits: summary.stats.cacheHits,
@@ -85,7 +91,7 @@ export function navigationBadges(
   return {
     projects: summary?.projects.length ?? 0,
     total: scopedStats.totalFiles,
-    duplicate: scopedStats.duplicateFiles,
+    duplicate: scopedStats.duplicateGroups,
     unused: scopedStats.unusedFiles,
     optimize: optimizeCount,
     lint: scopedStats.lintFindings,

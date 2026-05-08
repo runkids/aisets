@@ -26,6 +26,7 @@ function makeSummary(
       totalBytes: 0,
       unusedFiles: 0,
       duplicateFiles: 0,
+      duplicateGroups: 0,
       optimizableFiles: optimizableFilesByProject[index] ?? 0,
       lintFindings: 0,
     })),
@@ -59,6 +60,7 @@ describe("scopedStatsForProject", () => {
       ...summary.projectStats[1],
       totalFiles: 3,
       duplicateFiles: 1,
+      duplicateGroups: 1,
       unusedFiles: 2,
       lintFindings: 3,
     };
@@ -68,6 +70,9 @@ describe("scopedStatsForProject", () => {
       duplicateGroups: 1,
       duplicateFiles: 1,
       unusedFiles: 2,
+      possiblyUnusedFiles: 0,
+      usageNotApplicableFiles: 0,
+      referencedFiles: 0,
       nearDuplicates: 0,
       lintFindings: 3,
       cacheHits: 0,
@@ -122,7 +127,8 @@ describe("navigationBadges", () => {
     const scopedStats = {
       ...summary.stats,
       totalFiles: 3,
-      duplicateFiles: 1,
+      duplicateGroups: 1,
+      duplicateFiles: 2,
       unusedFiles: 2,
       lintFindings: 3,
     };
