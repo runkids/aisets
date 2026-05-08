@@ -9,6 +9,9 @@ fi
 cd /workspace
 /workspace/.devcontainer/start-dev.sh
 
+echo "▸ Building imgtools (Rust) ..."
+make imgtools-install
+
 echo "▸ Building asset-studio binary ..."
 make build
 
@@ -18,6 +21,5 @@ echo "▸ Installing UI dependencies ..."
 touch "$HOME/.devcontainer-initialized"
 
 echo ""
-echo "Asset Studio devcontainer ready."
-echo "Run: ui /workspace"
-echo "Use: ui --app /workspace for a desktop-style app window when available."
+echo "▸ Starting dev servers ..."
+/workspace/.devcontainer/bin/ui --no-open /workspace &

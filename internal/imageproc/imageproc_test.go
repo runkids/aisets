@@ -3,6 +3,7 @@ package imageproc
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"image"
 	"image/color"
 	"image/draw"
@@ -10,6 +11,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -314,25 +316,38 @@ func TestOptimizationThresholds(t *testing.T) {
 			}
 		}
 	})
-	t.Run("png alpha enabled", func(t *testing.T) {
+	t.Run("png without alpha → avif suggestion", func(t *testing.T) {
 		th := DefaultOptimizationThresholds()
 		out := EstimateOptimization("img.png", Metadata{Width: 100, Height: 100, Alpha: false}, 1024, th)
 		found := false
 		for _, o := range out {
-			if o.Category == "format" {
+			if o.SuggestionCode == "try_modern_photographic_format" {
 				found = true
 			}
 		}
 		if !found {
-			t.Fatal("PNG without alpha should trigger format suggestion when enabled")
+			t.Fatal("PNG without alpha should suggest modern photographic format")
 		}
 	})
-	t.Run("png alpha disabled", func(t *testing.T) {
+	t.Run("png with alpha → webp suggestion", func(t *testing.T) {
+		th := DefaultOptimizationThresholds()
+		out := EstimateOptimization("img.png", Metadata{Width: 100, Height: 100, Alpha: true}, 1024, th)
+		found := false
+		for _, o := range out {
+			if o.SuggestionCode == "try_alpha_preserving_format" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("PNG with alpha should suggest alpha-preserving format (WebP)")
+		}
+	})
+	t.Run("png alpha check disabled", func(t *testing.T) {
 		th := DefaultOptimizationThresholds()
 		th.PNGAlphaCheckEnabled = false
 		out := EstimateOptimization("img.png", Metadata{Width: 100, Height: 100, Alpha: false}, 1024, th)
 		for _, o := range out {
-			if o.Category == "format" {
+			if o.SuggestionCode == "try_modern_photographic_format" {
 				t.Fatal("PNG alpha check should be skipped when disabled")
 			}
 		}
@@ -472,5 +487,143 @@ func mustWriteBytes(t *testing.T, path string, content []byte) {
 	}
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func findImgtoolsBinary(t *testing.T) string {
+	t.Helper()
+	candidates := []string{
+		filepath.Join("..", "..", "bin", "asset-studio-imgtools"),
+	}
+	for _, c := range candidates {
+		abs, err := filepath.Abs(c)
+		if err != nil {
+			continue
+		}
+		if _, err := os.Stat(abs); err == nil {
+			if err := exec.Command(abs, "version").Run(); err == nil {
+				return abs
+			}
+		}
+	}
+	if p, err := exec.LookPath("asset-studio-imgtools"); err == nil {
+		if err := exec.Command(p, "version").Run(); err == nil {
+			return p
+		}
+	}
+	t.Skip("asset-studio-imgtools binary not available or not executable")
+	return ""
+}
+
+func TestImgtoolsProbeIntegration(t *testing.T) {
+	bin := findImgtoolsBinary(t)
+	root := t.TempDir()
+
+	pngPath := filepath.Join(root, "test.png")
+	writePNG(t, pngPath, checkerImage(24, 18, true))
+
+	out, err := exec.Command(bin, "probe", pngPath).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta Metadata
+	if err := json.Unmarshal(out, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta.Format != "png" || meta.Width != 24 || meta.Height != 18 {
+		t.Fatalf("probe = %+v", meta)
+	}
+	if !meta.Alpha {
+		t.Fatal("expected alpha=true for PNG with transparency")
+	}
+}
+
+func TestImgtoolsDHashIntegration(t *testing.T) {
+	bin := findImgtoolsBinary(t)
+	root := t.TempDir()
+
+	imgPath := filepath.Join(root, "asym.png")
+	writePNG(t, imgPath, asymmetricImage(16, 16))
+
+	out, err := exec.Command(bin, "dhash", imgPath).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hashes Hashes
+	if err := json.Unmarshal(out, &hashes); err != nil {
+		t.Fatal(err)
+	}
+	if hashes.DHash == "" || hashes.DHashFlipped == "" {
+		t.Fatalf("dhash = %+v", hashes)
+	}
+	if len(hashes.DHash) != 16 || len(hashes.DHashFlipped) != 16 {
+		t.Fatalf("hash length: dHash=%d dHashFlipped=%d", len(hashes.DHash), len(hashes.DHashFlipped))
+	}
+}
+
+func TestImgtoolsVisualDistanceIntegration(t *testing.T) {
+	bin := findImgtoolsBinary(t)
+	root := t.TempDir()
+
+	redPath := filepath.Join(root, "red.png")
+	bluePath := filepath.Join(root, "blue.png")
+	writePNG(t, redPath, solidImage(16, 16, color.NRGBA{R: 255, A: 255}))
+	writePNG(t, bluePath, solidImage(16, 16, color.NRGBA{B: 255, A: 255}))
+
+	out, err := exec.Command(bin, "visual-distance", redPath, redPath).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var same struct {
+		Distance int `json:"distance"`
+	}
+	if err := json.Unmarshal(out, &same); err != nil {
+		t.Fatal(err)
+	}
+	if same.Distance != 0 {
+		t.Fatalf("same image distance = %d, want 0", same.Distance)
+	}
+
+	out, err = exec.Command(bin, "visual-distance", redPath, bluePath).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var diff struct {
+		Distance int `json:"distance"`
+	}
+	if err := json.Unmarshal(out, &diff); err != nil {
+		t.Fatal(err)
+	}
+	if diff.Distance <= NearDuplicateVisualDistanceThreshold {
+		t.Fatalf("red vs blue distance = %d, want > %d", diff.Distance, NearDuplicateVisualDistanceThreshold)
+	}
+}
+
+func TestImgtoolsThumbnailIntegration(t *testing.T) {
+	bin := findImgtoolsBinary(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "big.png")
+	dst := filepath.Join(root, "thumb.png")
+	writePNG(t, src, checkerImage(200, 150, false))
+
+	if err := exec.Command(bin, "thumbnail", "--size", "64", src, dst).Run(); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("thumbnail output is empty")
+	}
+
+	thumbImg, err := decodeRaster(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounds := thumbImg.Bounds()
+	if bounds.Dx() > 64 || bounds.Dy() > 64 {
+		t.Fatalf("thumbnail dimensions %dx%d exceed size 64", bounds.Dx(), bounds.Dy())
 	}
 }

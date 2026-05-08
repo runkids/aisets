@@ -145,6 +145,7 @@ func operationForItem(item scanner.AssetItem, req Request, hasTool toolChecker) 
 	case "resize-variant":
 		op.OutputFormat = strings.TrimPrefix(ext, ".")
 		op.TargetPath = resizeTargetPath(item.RepoPath, req.MaxDimensionPx)
+		op.Tool = "asset-studio-imgtools"
 		if req.OutputMode == OutputModeReplace {
 			op.Operation = "resize-replace"
 			op.TargetPath = item.RepoPath
@@ -152,9 +153,19 @@ func operationForItem(item scanner.AssetItem, req Request, hasTool toolChecker) 
 	case "convert-avif":
 		op.OutputFormat = "avif"
 		op.TargetPath = replaceExt(item.RepoPath, ".avif")
+		op.Tool = "asset-studio-imgtools"
+	case "convert-webp":
+		op.OutputFormat = "webp"
+		op.TargetPath = replaceExt(item.RepoPath, ".webp")
+		op.Tool = "asset-studio-imgtools"
+	case "webp-recompress":
+		op.OutputFormat = "webp"
+		op.TargetPath = item.RepoPath
+		op.Tool = "asset-studio-imgtools"
 	case "gif-optimize":
 		op.OutputFormat = "gif"
 		op.TargetPath = item.RepoPath
+		op.Tool = "asset-studio-imgtools"
 	default:
 		op.Operation = "manual-review"
 		op.OutputFormat = strings.TrimPrefix(ext, ".")
@@ -548,6 +559,24 @@ func buildSVGMinifyCandidate(source string) (string, int64, error) {
 	return writeCandidate(source, ".svg", minified)
 }
 
+func formatQuality(op Operation, reqQuality int) int {
+	if reqQuality > 0 {
+		return reqQuality
+	}
+	switch op.Operation {
+	case "convert-avif":
+		return 50
+	case "convert-webp":
+		return 80
+	case "webp-recompress":
+		return 60
+	case "gif-optimize":
+		return 75
+	default:
+		return 80
+	}
+}
+
 func buildImgtoolsCandidate(source string, op Operation, req Request) (string, int64, error) {
 	bin, err := imgtools.Binary()
 	if err != nil {
@@ -561,7 +590,8 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 	targetPath := target.Name()
 	_ = target.Close()
 
-	args := []string{"convert", "--format", op.OutputFormat, "--quality", fmt.Sprintf("%d", req.Quality)}
+	quality := formatQuality(op, req.Quality)
+	args := []string{"convert", "--format", op.OutputFormat, "--quality", fmt.Sprintf("%d", quality)}
 	if op.Operation == "convert-avif" {
 		args = append(args, "--speed", "6")
 	}

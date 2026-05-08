@@ -27,7 +27,11 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN useradd --create-home --shell /bin/bash developer \
   && mkdir -p /workspace /go/pkg/mod /go/build-cache \
   && chown -R developer:developer /workspace /go /home/developer
-ENV PATH="/home/developer/.cargo/bin:${PATH}"
+
+USER developer
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt
+USER root
+ENV PATH="/home/developer/.cargo/bin:/root/.cargo/bin:${PATH}"
 
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

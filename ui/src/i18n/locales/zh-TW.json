@@ -434,12 +434,14 @@
       "image_dimensions_large": "圖片尺寸超過常見的網頁顯示大小",
       "asset_file_large": "檔案過大可能拖慢頁面載入速度",
       "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 壓縮效果更好",
+      "png_with_alpha": "含透明度的 PNG 以 WebP 儲存效率更高",
       "svg_can_minify": "SVG 可在不影響引用的情況下進行壓縮"
     },
     "suggestion": {
       "use_responsive_or_smaller_source": "考慮使用響應式變體或較小的來源圖片",
       "review_compression_or_modern_format": "檢視壓縮設定或嘗試現代圖片格式",
       "try_modern_photographic_format": "對非透明點陣圖嘗試照片格式",
+      "try_alpha_preserving_format": "嘗試 WebP 格式，支援透明度且壓縮更佳",
       "preview_svg_minify": "套用前先預覽壓縮後的 SVG 輸出"
     }
   },

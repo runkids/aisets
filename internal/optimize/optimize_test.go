@@ -98,8 +98,8 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 		"#!/usr/bin/env bash",
 		`svgo --input "assets/icon \"quoted\".svg" --output "assets/icon \"quoted\".svg"`,
 		`#   (no automated command for manual_review; review "assets/icon \"quoted\".svg" manually)`,
-		`avifenc --min 40 --max 50 "assets/photo.png" "assets/photo.avif"`,
-		`magick "assets/photo.png" -resize 1200x "assets/photo@1200.png"`,
+		`asset-studio-imgtools convert --format avif --quality 50 --speed 6 "assets/photo.png" "assets/photo.avif"`,
+		`asset-studio-imgtools resize --max-dimension 1200 "assets/photo.png" "assets/photo@1200.png"`,
 		`echo "asset-studio: optimization script complete."`,
 	} {
 		if !strings.Contains(script, want) {
@@ -123,10 +123,11 @@ func TestCommandForCompressionVariants(t *testing.T) {
 		path string
 		want string
 	}{
-		{"png conversion", "review_compression_or_modern_format", ".png", "a.png", `avifenc --min 40 --max 50 "a.png" "a.avif"`},
-		{"jpeg conversion", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `avifenc --min 40 --max 50 "a.jpeg" "a.avif"`},
-		{"webp conversion", "review_compression_or_modern_format", ".webp", "a.webp", `avifenc --min 40 --max 50 "a.webp" "a.avif"`},
-		{"gif compression", "review_compression_or_modern_format", ".gif", "a.gif", `gifsicle --optimize=3 --output "a.gif" "a.gif"`},
+		{"png conversion", "review_compression_or_modern_format", ".png", "a.png", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
+		{"jpeg conversion", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
+		{"webp recompress via size", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
+		{"gif recompress", "review_compression_or_modern_format", ".gif", "a.gif", `asset-studio-imgtools convert --format gif --quality 75 "a.gif" "a.gif"`},
+		{"webp recompress", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
 		{"unsupported modern format", "try_modern_photographic_format", ".svg", "a.svg", ""},
 		{"unknown code", "unknown", ".png", "a.png", ""},
 	}
@@ -220,11 +221,77 @@ func TestPlanUsesBuiltInOperationsForCommonFormats(t *testing.T) {
 	if len(ops) != 2 {
 		t.Fatalf("ops = %#v", ops)
 	}
-	if ops[0].Operation != "convert-avif" || ops[0].Tool != "" || !ops[0].CanApply {
+	if ops[0].Operation != "webp-recompress" || ops[0].Tool != "asset-studio-imgtools" {
 		t.Fatalf("webp op = %#v", ops[0])
 	}
-	if ops[1].Operation != "gif-optimize" || ops[1].Tool != "" || !ops[1].CanApply {
+	if ops[1].Operation != "gif-optimize" || ops[1].Tool != "asset-studio-imgtools" {
 		t.Fatalf("gif op = %#v", ops[1])
+	}
+	for i, name := range []string{"webp-recompress", "gif-optimize"} {
+		if ops[i].CanApply || ops[i].Available {
+			t.Fatalf("%s should be blocked when imgtools unavailable", name)
+		}
+	}
+
+	opsAvail := planWithTools(items, Request{}, func(string) bool { return true })
+	for i, name := range []string{"webp-recompress", "gif-optimize"} {
+		if !opsAvail[i].CanApply || !opsAvail[i].Available {
+			t.Fatalf("%s should be available when imgtools present", name)
+		}
+	}
+}
+
+func TestPlanRoutesFormatsByRules(t *testing.T) {
+	tests := []struct {
+		name   string
+		code   string
+		ext    string
+		wantOp string
+	}{
+		{"png no alpha → avif", "try_modern_photographic_format", ".png", "convert-avif"},
+		{"png alpha → webp", "try_alpha_preserving_format", ".png", "convert-webp"},
+		{"jpeg large → avif", "review_compression_or_modern_format", ".jpeg", "convert-avif"},
+		{"webp large → recompress", "review_compression_or_modern_format", ".webp", "webp-recompress"},
+		{"gif large → gif", "review_compression_or_modern_format", ".gif", "gif-optimize"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			items := []scanner.AssetItem{{
+				ID: "a", RepoPath: "src/img" + tt.ext, Ext: tt.ext, Bytes: 1000,
+				ScanIntent: scanner.ProjectScanIntentCode,
+				Image:      imageMeta(false),
+				Optimization: []scanner.OptimizationSuggestion{{
+					Category: "format", Severity: "info", SuggestionCode: tt.code,
+				}},
+			}}
+			ops := planWithTools(items, Request{}, func(string) bool { return true })
+			if len(ops) != 1 || ops[0].Operation != tt.wantOp {
+				t.Fatalf("got %q, want %q", ops[0].Operation, tt.wantOp)
+			}
+		})
+	}
+}
+
+func TestFormatQualityDefaults(t *testing.T) {
+	tests := []struct {
+		operation string
+		want      int
+	}{
+		{"convert-avif", 50},
+		{"convert-webp", 80},
+		{"webp-recompress", 60},
+		{"gif-optimize", 75},
+	}
+	for _, tt := range tests {
+		t.Run(tt.operation, func(t *testing.T) {
+			got := formatQuality(Operation{Operation: tt.operation}, 0)
+			if got != tt.want {
+				t.Fatalf("formatQuality(%s, 0) = %d, want %d", tt.operation, got, tt.want)
+			}
+		})
+	}
+	if got := formatQuality(Operation{Operation: "convert-avif"}, 70); got != 70 {
+		t.Fatalf("user override: got %d, want 70", got)
 	}
 }
 

@@ -783,12 +783,14 @@
       "image_dimensions_large": "Image dimensions exceed common web display sizes.",
       "asset_file_large": "Large assets can slow down initial page loading.",
       "png_without_alpha": "PNG without alpha often compresses better as JPEG, WebP, or AVIF.",
+      "png_with_alpha": "PNG with alpha can be more efficiently stored as WebP.",
       "svg_can_minify": "SVG can be minified without changing source references."
     },
     "suggestion": {
       "use_responsive_or_smaller_source": "Consider responsive variants or a smaller source image.",
       "review_compression_or_modern_format": "Review compression settings or try modern image formats.",
       "try_modern_photographic_format": "Try a photographic format for non-transparent raster images.",
+      "try_alpha_preserving_format": "Try WebP format which supports alpha with better compression.",
       "preview_svg_minify": "Preview minified SVG output before applying."
     }
   },

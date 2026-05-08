@@ -153,12 +153,17 @@ func commandFor(suggestionCode, ext, path string) string {
 		return fmt.Sprintf("svgo --input %s --output %s", q, q)
 	case "convert-avif":
 		out := shellQuote(replaceExt(path, ".avif"))
-		return fmt.Sprintf("avifenc --min 40 --max 50 %s %s", q, out)
+		return fmt.Sprintf("asset-studio-imgtools convert --format avif --quality 50 --speed 6 %s %s", q, out)
+	case "convert-webp":
+		out := shellQuote(replaceExt(path, ".webp"))
+		return fmt.Sprintf("asset-studio-imgtools convert --format webp --quality 80 %s %s", q, out)
+	case "webp-recompress":
+		return fmt.Sprintf("asset-studio-imgtools convert --format webp --quality 60 %s %s", q, q)
 	case "gif-optimize":
-		return fmt.Sprintf("gifsicle --optimize=3 --output %s %s", q, q)
+		return fmt.Sprintf("asset-studio-imgtools convert --format gif --quality 75 %s %s", q, q)
 	case "resize-variant":
 		out := shellQuote(replaceExt(path, "@1200"+ext))
-		return fmt.Sprintf("magick %s -resize 1200x %s", q, out)
+		return fmt.Sprintf("asset-studio-imgtools resize --max-dimension 1200 %s %s", q, out)
 	}
 	return ""
 }

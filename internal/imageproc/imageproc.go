@@ -3,6 +3,7 @@ package imageproc
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -16,10 +17,12 @@ import (
 	"math"
 	"math/bits"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"asset-studio/internal/imgtools"
 	"github.com/corona10/goimagehash"
 	_ "github.com/gen2brain/avif"
 	"github.com/srwiley/oksvg"
@@ -95,6 +98,26 @@ type ThumbnailResult struct {
 	SizeBytes int64  `json:"sizeBytes"`
 }
 
+func runImgtoolsJSON(result any, args ...string) error {
+	bin, err := imgtools.Binary()
+	if err != nil {
+		return err
+	}
+	out, err := exec.Command(bin, args...).Output()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(out, result)
+}
+
+func runImgtoolsExec(args ...string) error {
+	bin, err := imgtools.Binary()
+	if err != nil {
+		return err
+	}
+	return exec.Command(bin, args...).Run()
+}
+
 func Probe(path string) (Metadata, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".svg" {
@@ -107,6 +130,12 @@ func Probe(path string) (Metadata, error) {
 		}
 		return meta, err
 	}
+
+	var meta Metadata
+	if err := runImgtoolsJSON(&meta, "probe", path); err == nil {
+		return meta, nil
+	}
+
 	if ext == ".gif" {
 		return probeGIF(path)
 	}
@@ -121,7 +150,7 @@ func Probe(path string) (Metadata, error) {
 	if err != nil {
 		return Metadata{Format: strings.TrimPrefix(ext, "."), ErrorCode: "image_probe_failed", Error: err.Error()}, err
 	}
-	meta := Metadata{Format: normalizeFormat(format, ext), Width: cfg.Width, Height: cfg.Height, Pages: 1}
+	meta = Metadata{Format: normalizeFormat(format, ext), Width: cfg.Width, Height: cfg.Height, Pages: 1}
 	_, _ = file.Seek(0, io.SeekStart)
 	img, _, decodeErr := image.Decode(file)
 	if decodeErr == nil {
@@ -131,6 +160,12 @@ func Probe(path string) (Metadata, error) {
 }
 
 func DHash(path string) (Hashes, error) {
+	if !strings.EqualFold(filepath.Ext(path), ".svg") {
+		var result Hashes
+		if err := runImgtoolsJSON(&result, "dhash", path); err == nil {
+			return result, nil
+		}
+	}
 	img, err := decodeRaster(path)
 	if err != nil {
 		return Hashes{ErrorCode: "image_hash_failed", Error: err.Error()}, err
@@ -167,6 +202,20 @@ const (
 )
 
 func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
+	extA := strings.ToLower(filepath.Ext(pathA))
+	extB := strings.ToLower(filepath.Ext(pathB))
+	if extA != ".svg" && extB != ".svg" {
+		args := []string{"visual-distance", pathA, pathB}
+		if flipB {
+			args = append(args, "--flip-b")
+		}
+		var result struct {
+			Distance int `json:"distance"`
+		}
+		if err := runImgtoolsJSON(&result, args...); err == nil {
+			return result.Distance, nil
+		}
+	}
 	imgA, err := decodeRaster(pathA)
 	if err != nil {
 		return 0, err
@@ -251,6 +300,11 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 	if info, err := os.Stat(target); err == nil {
 		return ThumbnailResult{Path: target, CacheHit: true, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
 	}
+	if err := runImgtoolsExec("thumbnail", "--size", strconv.Itoa(size), path, target); err == nil {
+		if info, err := os.Stat(target); err == nil {
+			return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
+		}
+	}
 	img, err := decodeRaster(path)
 	if err != nil {
 		return ThumbnailResult{}, err
@@ -301,6 +355,16 @@ func EstimateOptimization(path string, meta Metadata, sizeBytes int64, threshold
 			Reason:         "Large assets can slow down initial route loading.",
 			SuggestionCode: "review_compression_or_modern_format",
 			Suggestion:     "Review compression or modern image formats.",
+		})
+	}
+	if ext == ".png" && meta.Alpha {
+		out = append(out, Optimization{
+			Category:       "format",
+			Severity:       "info",
+			ReasonCode:     "png_with_alpha",
+			Reason:         "PNG with alpha can be more efficiently stored as WebP.",
+			SuggestionCode: "try_alpha_preserving_format",
+			Suggestion:     "Try WebP format which supports alpha with better compression.",
 		})
 	}
 	if thresholds.PNGAlphaCheckEnabled && ext == ".png" && !meta.Alpha {

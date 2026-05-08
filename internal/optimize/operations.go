@@ -13,8 +13,10 @@ type operationRule struct {
 var operationRules = []operationRule{
 	{SuggestionCode: "preview_svg_minify", Operation: "svg-minify"},
 	{SuggestionCode: "use_responsive_or_smaller_source", Operation: "resize-variant"},
-	{SuggestionCode: "try_modern_photographic_format", Exts: []string{".png", ".jpg", ".jpeg", ".webp"}, Operation: "convert-avif"},
-	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".png", ".jpg", ".jpeg", ".webp"}, Operation: "convert-avif"},
+	{SuggestionCode: "try_alpha_preserving_format", Exts: []string{".png"}, Operation: "convert-webp"},
+	{SuggestionCode: "try_modern_photographic_format", Exts: []string{".png", ".jpg", ".jpeg"}, Operation: "convert-avif"},
+	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".png", ".jpg", ".jpeg"}, Operation: "convert-avif"},
+	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".webp"}, Operation: "webp-recompress"},
 	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".gif"}, Operation: "gif-optimize"},
 }
 

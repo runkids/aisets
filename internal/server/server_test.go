@@ -1494,7 +1494,7 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/actions/optimization/generate-script", bytes.NewReader([]byte(`{"assetIds":[]}`)))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "avifenc") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "asset-studio-imgtools") {
 		t.Fatalf("generate script = %d %s", rec.Code, rec.Body.String())
 	}
 
