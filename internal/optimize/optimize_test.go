@@ -1,9 +1,17 @@
 package optimize
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/gif"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"asset-studio/internal/actions"
+	"asset-studio/internal/imageproc"
 	"asset-studio/internal/scanner"
 )
 
@@ -89,7 +97,7 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 		"#!/usr/bin/env bash",
 		`svgo --input "assets/icon \"quoted\".svg" --output "assets/icon \"quoted\".svg"`,
 		`#   (no automated command for manual_review; review "assets/icon \"quoted\".svg" manually)`,
-		`cwebp -q 85 "assets/photo.png" -o "assets/photo.webp"`,
+		`avifenc --min 40 --max 50 "assets/photo.png" "assets/photo.avif"`,
 		`magick "assets/photo.png" -resize 1200x "assets/photo@1200.png"`,
 		`echo "asset-studio: optimization script complete."`,
 	} {
@@ -114,9 +122,9 @@ func TestCommandForCompressionVariants(t *testing.T) {
 		path string
 		want string
 	}{
-		{"png compression", "review_compression_or_modern_format", ".png", "a.png", `pngquant --quality=80-95 --skip-if-larger --force --output "a.png" "a.png"`},
-		{"jpeg compression", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `jpegoptim --max=85 --strip-all "a.jpeg"`},
-		{"webp recompress", "review_compression_or_modern_format", ".webp", "a.webp", `cwebp -q 80 "a.webp" -o "a.min.webp"`},
+		{"png conversion", "review_compression_or_modern_format", ".png", "a.png", `avifenc --min 40 --max 50 "a.png" "a.avif"`},
+		{"jpeg conversion", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `avifenc --min 40 --max 50 "a.jpeg" "a.avif"`},
+		{"webp conversion", "review_compression_or_modern_format", ".webp", "a.webp", `avifenc --min 40 --max 50 "a.webp" "a.avif"`},
 		{"gif compression", "review_compression_or_modern_format", ".gif", "a.gif", `gifsicle --optimize=3 --output "a.gif" "a.gif"`},
 		{"unsupported modern format", "try_modern_photographic_format", ".svg", "a.svg", ""},
 		{"unknown code", "unknown", ".png", "a.png", ""},
@@ -137,4 +145,438 @@ func TestReplaceExtAndShellQuote(t *testing.T) {
 	if got := shellQuote(""); got != `""` {
 		t.Fatalf("shellQuote empty = %q", got)
 	}
+}
+
+func TestPlanUsesProjectTypeOnlyForReferencePolicy(t *testing.T) {
+	items := []scanner.AssetItem{
+		{
+			ID:         "code",
+			RepoPath:   "src/photo.png",
+			Ext:        ".png",
+			Bytes:      1000,
+			ScanIntent: scanner.ProjectScanIntentCode,
+			Image:      imageMeta(false),
+			References: []scanner.AssetReference{{File: "src/app.tsx", Specifier: "./photo.png"}},
+			Optimization: []scanner.OptimizationSuggestion{{
+				Category:       "format",
+				Severity:       "info",
+				SuggestionCode: "try_modern_photographic_format",
+			}},
+		},
+		{
+			ID:         "pack",
+			RepoPath:   "icons/photo.png",
+			Ext:        ".png",
+			Bytes:      1000,
+			ScanIntent: scanner.ProjectScanIntentAssetPack,
+			Image:      imageMeta(false),
+			Optimization: []scanner.OptimizationSuggestion{{
+				Category:       "format",
+				Severity:       "info",
+				SuggestionCode: "try_modern_photographic_format",
+			}},
+		},
+	}
+	ops := planWithTools(items, Request{}, func(string) bool { return true })
+	if len(ops) != 2 || ops[0].Operation != "convert-avif" || ops[1].Operation != "convert-avif" {
+		t.Fatalf("ops = %#v", ops)
+	}
+	if ops[0].ReferencePolicy != "canUpdateReferences" || ops[1].ReferencePolicy != "manualReview" {
+		t.Fatalf("reference policies = %#v %#v", ops[0].ReferencePolicy, ops[1].ReferencePolicy)
+	}
+}
+
+func TestPlanUsesBuiltInOperationsForCommonFormats(t *testing.T) {
+	items := []scanner.AssetItem{
+		{
+			ID:         "webp",
+			RepoPath:   "src/photo.webp",
+			Ext:        ".webp",
+			Bytes:      1000,
+			ScanIntent: scanner.ProjectScanIntentCode,
+			Image:      imageMeta(false),
+			Optimization: []scanner.OptimizationSuggestion{{
+				Category:       "format",
+				Severity:       "info",
+				SuggestionCode: "review_compression_or_modern_format",
+			}},
+		},
+		{
+			ID:         "gif",
+			RepoPath:   "src/anim.gif",
+			Ext:        ".gif",
+			Bytes:      1000,
+			ScanIntent: scanner.ProjectScanIntentCode,
+			Image:      imageMeta(false),
+			Optimization: []scanner.OptimizationSuggestion{{
+				Category:       "animation",
+				Severity:       "info",
+				SuggestionCode: "review_compression_or_modern_format",
+			}},
+		},
+	}
+	ops := planWithTools(items, Request{}, func(string) bool { return false })
+	if len(ops) != 2 {
+		t.Fatalf("ops = %#v", ops)
+	}
+	if ops[0].Operation != "convert-avif" || ops[0].Tool != "" || !ops[0].CanApply {
+		t.Fatalf("webp op = %#v", ops[0])
+	}
+	if ops[1].Operation != "gif-optimize" || ops[1].Tool != "" || !ops[1].CanApply {
+		t.Fatalf("gif op = %#v", ops[1])
+	}
+}
+
+func TestPreviewAndApplySVGMinify(t *testing.T) {
+	root := t.TempDir()
+	svgPath := filepath.Join(root, "src", "icon.svg")
+	if err := os.MkdirAll(filepath.Dir(svgPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(svgPath, []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+  <g>
+    <rect x="0" y="0" width="20" height="20" fill="#ff0000"></rect>
+  </g>
+</svg>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := scanner.Project{ID: "p", Name: "web", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	item := scanner.AssetItem{
+		ID:          "a",
+		ProjectID:   "p",
+		ProjectName: "web",
+		RepoPath:    "src/icon.svg",
+		LocalPath:   svgPath,
+		Ext:         ".svg",
+		Bytes:       fileSize(t, svgPath),
+		ScanIntent:  scanner.ProjectScanIntentCode,
+		Image:       imageMeta(false),
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "svg-minify",
+			Severity:       "warning",
+			SuggestionCode: "preview_svg_minify",
+			SavingsBytes:   1,
+		}},
+	}
+	blocked := scanner.AssetItem{
+		ID:          "blocked",
+		ProjectID:   "p",
+		ProjectName: "web",
+		RepoPath:    "src/raw.bin",
+		Ext:         ".bin",
+		Bytes:       1024,
+		ScanIntent:  scanner.ProjectScanIntentCode,
+		Image:       imageMeta(false),
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "warning",
+			SuggestionCode: "unsupported_test_operation",
+		}},
+	}
+	preview, err := Preview(project, []scanner.AssetItem{item, blocked}, Request{OutputMode: OutputModeReplace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.CanApply || preview.Type != "optimization" {
+		t.Fatalf("preview = %#v", preview)
+	}
+	if len(preview.Blockers) != 1 || preview.Blockers[0].File != blocked.RepoPath {
+		t.Fatalf("blockers = %#v", preview.Blockers)
+	}
+	result, err := Apply(project, preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.MovedFiles != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	if got := fileSize(t, svgPath); got >= item.Bytes {
+		t.Fatalf("expected minified SVG to be smaller, before=%d after=%d", item.Bytes, got)
+	}
+	if _, err := os.Stat(svgPath); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReplacementEffectsUpdatesReferencesAndDeletesOriginal(t *testing.T) {
+	root := t.TempDir()
+	imagePath := filepath.Join(root, "src", "photo.png")
+	if err := os.MkdirAll(filepath.Dir(imagePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imagePath, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(root, "src", "app.tsx")
+	if err := os.WriteFile(sourcePath, []byte(`import photo from "./photo.png";`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := scanner.Project{ID: "p", Name: "web", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	item := scanner.AssetItem{
+		ID:          "a",
+		ProjectID:   "p",
+		ProjectName: "web",
+		RepoPath:    "src/photo.png",
+		LocalPath:   imagePath,
+		Ext:         ".png",
+		Bytes:       fileSize(t, imagePath),
+		ScanIntent:  scanner.ProjectScanIntentCode,
+		Image:       imageMeta(false),
+		References: []scanner.AssetReference{{
+			File:      "src/app.tsx",
+			Line:      1,
+			Specifier: "./photo.png",
+		}},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "warning",
+			SuggestionCode: "try_modern_photographic_format",
+			SavingsBytes:   1,
+		}},
+	}
+	ops := []Operation{{
+		AssetID:        "a",
+		RepoPath:       "src/photo.png",
+		TargetPath:     "src/photo.avif",
+		CurrentBytes:   item.Bytes,
+		EstimatedBytes: 1,
+		SavingsBytes:   item.Bytes - 1,
+		CanApply:       true,
+	}}
+	changes, deletes, blockers := replacementEffects(project, []scanner.AssetItem{item}, ops, Request{
+		OutputMode:       OutputModeReplace,
+		UpdateReferences: true,
+	})
+	if len(blockers) != 0 || len(changes) != 1 || len(deletes) != 1 {
+		t.Fatalf("changes=%#v deletes=%#v blockers=%#v", changes, deletes, blockers)
+	}
+	if changes[0].NewSpecifier != "./photo.avif" || deletes[0] != "src/photo.png" || ops[0].ReferenceEditCount != 1 {
+		t.Fatalf("changes/deletes/op = %#v %#v %#v", changes, deletes, ops[0])
+	}
+}
+
+func TestApplyOptimizationPreviewUpdatesReferencesAndDeletesOriginal(t *testing.T) {
+	root := t.TempDir()
+	imagePath := filepath.Join(root, "src", "photo.png")
+	if err := os.MkdirAll(filepath.Dir(imagePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imagePath, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	candidatePath := filepath.Join(root, "candidate.avif")
+	if err := os.WriteFile(candidatePath, []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(root, "src", "app.tsx")
+	if err := os.WriteFile(sourcePath, []byte(`import photo from "./photo.png";`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := scanner.Project{ID: "p", Name: "web", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	preview := actions.Preview{
+		ID:        "optimization-test",
+		Type:      "optimization",
+		ProjectID: "p",
+		Changes: []actions.Change{{
+			File:         "src/app.tsx",
+			Line:         1,
+			OldSpecifier: "./photo.png",
+			NewSpecifier: "./photo.avif",
+		}},
+		Deletes:  []string{"src/photo.png"},
+		CanApply: true,
+		Payload: map[string]any{"optimization": PreviewResult{Operations: []Operation{{
+			AssetID:       "a",
+			RepoPath:      "src/photo.png",
+			TargetPath:    "src/photo.avif",
+			CandidatePath: candidatePath,
+			CanApply:      true,
+		}}}},
+	}
+	result, err := Apply(project, preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.MovedFiles != 1 || result.ChangedReferences != 1 || result.DeletedFiles != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	if _, err := os.Stat(imagePath); !os.IsNotExist(err) {
+		t.Fatalf("expected original removed, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "src", "photo.avif")); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(bytes), `import photo from "./photo.avif";`) {
+		t.Fatalf("source was not updated: %s", string(bytes))
+	}
+}
+
+func TestReplacementEffectsBlocksReferencedConversionWithoutUpdate(t *testing.T) {
+	root := t.TempDir()
+	imagePath := filepath.Join(root, "src", "photo.png")
+	if err := os.MkdirAll(filepath.Dir(imagePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imagePath, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(root, "src", "app.tsx")
+	if err := os.WriteFile(sourcePath, []byte(`import photo from "./photo.png";`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := scanner.Project{ID: "p", Name: "web", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	item := scanner.AssetItem{
+		ID:          "a",
+		ProjectID:   "p",
+		ProjectName: "web",
+		RepoPath:    "src/photo.png",
+		LocalPath:   imagePath,
+		Ext:         ".png",
+		Bytes:       fileSize(t, imagePath),
+		ScanIntent:  scanner.ProjectScanIntentCode,
+		Image:       imageMeta(false),
+		References: []scanner.AssetReference{{
+			File:      "src/app.tsx",
+			Line:      1,
+			Specifier: "./photo.png",
+		}},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "warning",
+			SuggestionCode: "try_modern_photographic_format",
+			SavingsBytes:   1,
+		}},
+	}
+	ops := []Operation{{
+		AssetID:        "a",
+		RepoPath:       "src/photo.png",
+		TargetPath:     "src/photo.avif",
+		CurrentBytes:   item.Bytes,
+		EstimatedBytes: 1,
+		SavingsBytes:   item.Bytes - 1,
+		CanApply:       true,
+	}}
+	changes, deletes, blockers := replacementEffects(project, []scanner.AssetItem{item}, ops, Request{OutputMode: OutputModeReplace})
+	if len(changes) != 0 || len(deletes) != 0 || len(blockers) != 1 {
+		t.Fatalf("changes=%#v deletes=%#v blockers=%#v", changes, deletes, blockers)
+	}
+	if ops[0].CanApply || ops[0].ReasonCode != "replace_requires_reference_update" {
+		t.Fatalf("op = %#v", ops[0])
+	}
+}
+
+func writeTestGIF(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewPaletted(image.Rect(0, 0, 4, 4), color.Palette{color.Black, color.White})
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, &gif.GIF{
+		Image: []*image.Paletted{img},
+		Delay: []int{10},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMeasureOperationsGIFSuggestsWebPWhenCwebpMissing(t *testing.T) {
+	root := t.TempDir()
+	gifPath := filepath.Join(root, "src", "anim.gif")
+	writeTestGIF(t, gifPath)
+
+	project := scanner.Project{ID: "p", Name: "test", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	ops := []Operation{{
+		AssetID:      "a",
+		RepoPath:     "src/anim.gif",
+		Operation:    "gif-optimize",
+		OutputFormat: "gif",
+		TargetPath:   "src/anim.gif",
+		CurrentBytes: fileSize(t, gifPath),
+		CanApply:     true,
+		Available:    true,
+	}}
+
+	result, blockers := measureOperations(project, ops, Request{Quality: 80}, false, func(string) bool { return false })
+
+	if result[0].Operation != "convert-webp" {
+		t.Fatalf("expected convert-webp suggestion, got %s", result[0].Operation)
+	}
+	if result[0].OutputFormat != "webp" {
+		t.Fatalf("expected webp output format, got %s", result[0].OutputFormat)
+	}
+	if result[0].Tool != "cwebp" {
+		t.Fatalf("expected cwebp tool, got %s", result[0].Tool)
+	}
+	if result[0].Available {
+		t.Fatal("expected tool to be marked unavailable")
+	}
+	if result[0].CanApply {
+		t.Fatal("expected operation to be blocked")
+	}
+	if result[0].ReasonCode != "optimizer_tool_missing" {
+		t.Fatalf("expected optimizer_tool_missing, got %s", result[0].ReasonCode)
+	}
+	if len(blockers) != 1 {
+		t.Fatalf("expected 1 blocker, got %d", len(blockers))
+	}
+}
+
+func TestMeasureOperationsGIFFallbackToWebP(t *testing.T) {
+	if !defaultToolChecker("cwebp") {
+		t.Skip("cwebp not installed, skipping WebP fallback test")
+	}
+	root := t.TempDir()
+	gifPath := filepath.Join(root, "src", "anim.gif")
+	writeTestGIF(t, gifPath)
+
+	project := scanner.Project{ID: "p", Name: "test", Path: root, ScanIntent: scanner.ProjectScanIntentCode}
+	ops := []Operation{{
+		AssetID:      "a",
+		RepoPath:     "src/anim.gif",
+		Operation:    "gif-optimize",
+		OutputFormat: "gif",
+		TargetPath:   "src/anim.gif",
+		CurrentBytes: fileSize(t, gifPath),
+		CanApply:     true,
+		Available:    true,
+	}}
+
+	result, blockers := measureOperations(project, ops, Request{Quality: 80}, false, defaultToolChecker)
+
+	if result[0].Operation != "convert-webp" {
+		t.Fatalf("expected fallback to convert-webp, got %s", result[0].Operation)
+	}
+	if !result[0].CanApply {
+		t.Fatal("expected fallback operation to be applicable")
+	}
+	if result[0].OutputFormat != "webp" {
+		t.Fatalf("expected webp output, got %s", result[0].OutputFormat)
+	}
+	if result[0].SavingsBytes <= 0 {
+		t.Fatalf("expected positive savings, got %d", result[0].SavingsBytes)
+	}
+	if len(blockers) != 0 {
+		t.Fatalf("expected 0 blockers, got %d", len(blockers))
+	}
+}
+
+func imageMeta(alpha bool) imageproc.Metadata {
+	return imageproc.Metadata{Format: "png", Width: 10, Height: 10, Alpha: alpha}
+}
+
+func fileSize(t *testing.T, path string) int64 {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info.Size()
 }

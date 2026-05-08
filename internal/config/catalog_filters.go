@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/optimize"
 )
 
 func (s *Store) customCatalogFilterSQL(id string) (string, []any, error) {
@@ -86,7 +87,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	}
 	operationQuery := query
 	operationQuery.Operation = ""
-	operations, _, err := s.catalogOptimizationFacetCounts(scanID, operationQuery, optimizationOperationSQL("o.suggestion_code", "a.ext", "a.alpha"))
+	operations, _, err := s.catalogOptimizationFacetCounts(scanID, operationQuery, optimize.OperationSQL("o.suggestion_code", "a.ext"))
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -427,7 +428,7 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 			SELECT 1 FROM optimization_snapshots oo
 			WHERE oo.scan_id = a.scan_id
 				AND oo.asset_id = a.asset_id
-				AND `+optimizationOperationSQL("oo.suggestion_code", "a.ext", "a.alpha")+` = ?
+				AND `+optimize.OperationSQL("oo.suggestion_code", "a.ext")+` = ?
 		)`)
 		args = append(args, operation)
 	}
@@ -442,17 +443,4 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		}
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
-}
-
-func optimizationOperationSQL(suggestionColumn, extColumn, alphaColumn string) string {
-	return `CASE
-		WHEN ` + suggestionColumn + ` = 'preview_svg_minify' THEN 'svg-minify'
-		WHEN ` + suggestionColumn + ` = 'use_responsive_or_smaller_source' THEN 'resize-variant'
-		WHEN ` + suggestionColumn + ` = 'try_modern_photographic_format' THEN 'convert-avif'
-		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.png' THEN 'convert-avif'
-		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) IN ('.jpg', '.jpeg') THEN 'convert-avif'
-		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.webp' THEN 'convert-avif'
-		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.gif' THEN 'gif-optimize'
-		ELSE 'manual-review'
-	END`
 }

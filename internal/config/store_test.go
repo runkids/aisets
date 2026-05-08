@@ -647,6 +647,7 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	defer store.Close()
 
 	optimizable := scanAsset(root, "p", "workspace", "src/hero.png", 1000, "hero", 2, 700)
+	optimizable.Optimization[0].SuggestionCode = "review_compression_or_modern_format"
 	plain := scanAsset(root, "p", "workspace", "src/plain.png", 100, "plain", 1, 0)
 	plain.Optimization = nil
 	if _, err := store.RecordScan(scanner.Catalog{
@@ -679,6 +680,9 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	if len(selected) != 2 || len(selected[0].Optimization) != 0 || len(selected[1].Optimization) != 1 || selected[1].Optimization[0].SavingsBytes != 700 {
 		t.Fatalf("selected optimization items = %#v", selected)
 	}
+	if selected[1].Optimization[0].Operation != "convert-avif" {
+		t.Fatalf("selected optimization operation = %#v", selected[1].Optimization[0])
+	}
 
 	all, err := store.AllOptimizableItems(0)
 	if err != nil {
@@ -694,6 +698,9 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != optimizable.ID || len(page.Items[0].Optimization) != 1 || page.Items[0].Optimization[0].ReasonCode != "large_asset" {
 		t.Fatalf("optimizable catalog page = %#v", page)
+	}
+	if page.Items[0].Optimization[0].Operation != "convert-avif" {
+		t.Fatalf("catalog optimization operation = %#v", page.Items[0].Optimization[0])
 	}
 }
 
@@ -744,6 +751,9 @@ func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != webp.ID {
 		t.Fatalf("optimization-filtered page = %#v", page)
+	}
+	if page.Items[0].Optimization[0].Operation != "convert-avif" {
+		t.Fatalf("optimization operation = %#v", page.Items[0].Optimization[0])
 	}
 	if len(page.Facets.Operations) == 0 || page.Facets.Operations[0].ID != "convert-avif" {
 		t.Fatalf("operation facets = %#v", page.Facets.Operations)
@@ -928,18 +938,29 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 	left.DuplicateGroupID = &dupID
 	right := scanAsset(root, "p", "workspace", "src/logo-copy.png", 11, "same", 0, 0)
 	right.DuplicateGroupID = &dupID
+	secondDupID := "dup-mark"
+	secondLeft := scanAsset(root, "p", "workspace", "src/mark.png", 12, "same-mark", 0, 0)
+	secondLeft.DuplicateGroupID = &secondDupID
+	secondRight := scanAsset(root, "p", "workspace", "src/mark-copy.png", 13, "same-mark", 0, 0)
+	secondRight.DuplicateGroupID = &secondDupID
 	if _, err := store.RecordScan(scanner.Catalog{
 		GeneratedAt: "2026-05-07T00:00:00Z",
 		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
-		Items:       []scanner.AssetItem{left, right},
+		Items:       []scanner.AssetItem{left, right, secondLeft, secondRight},
 		DuplicateGroups: []scanner.DuplicateGroup{{
 			ID:            dupID,
 			ContentHash:   "same",
 			HashAlgorithm: "blake3",
 			Paths:         []string{"src/logo.png", "src/logo-copy.png"},
 			PreferredPath: "src/logo.png",
+		}, {
+			ID:            secondDupID,
+			ContentHash:   "same-mark",
+			HashAlgorithm: "blake3",
+			Paths:         []string{"src/mark.png", "src/mark-copy.png"},
+			PreferredPath: "src/mark.png",
 		}},
-		Stats: scanner.CatalogStats{TotalFiles: 2, DuplicateGroups: 1, DuplicateFiles: 2},
+		Stats: scanner.CatalogStats{TotalFiles: 4, DuplicateGroups: 2, DuplicateFiles: 4},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -959,7 +980,7 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 		if got.err != nil {
 			t.Fatal(got.err)
 		}
-		if got.page.Total != 1 || len(got.page.Groups) != 1 {
+		if got.page.Total != 2 || len(got.page.Groups) != 2 {
 			t.Fatalf("exact duplicate page = %#v", got.page)
 		}
 		if paths := got.page.Groups[0].Paths; len(paths) != 2 || paths[0] != "src/logo-copy.png" || paths[1] != "src/logo.png" {
@@ -974,6 +995,13 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 		}
 		if members[0].PreferredDuplicatePath == nil || *members[0].PreferredDuplicatePath != "src/logo.png" {
 			t.Fatalf("duplicate member preferred path = %#v", members[0].PreferredDuplicatePath)
+		}
+		secondMembers := got.page.Groups[1].Members
+		if got.page.Groups[1].ID != secondDupID || len(secondMembers) != 2 || secondMembers[0].RepoPath != "src/mark-copy.png" || secondMembers[1].RepoPath != "src/mark.png" {
+			t.Fatalf("second duplicate group = %#v", got.page.Groups[1])
+		}
+		if secondMembers[0].DuplicateGroupID == nil || *secondMembers[0].DuplicateGroupID != secondDupID {
+			t.Fatalf("second duplicate member group id = %#v", secondMembers[0].DuplicateGroupID)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("CatalogDuplicates exact did not return with a single database connection")

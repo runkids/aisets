@@ -221,6 +221,7 @@ export type AssetItem = {
     severity: "critical" | "warning" | "info";
     suggestionCode: string;
     suggestion: string;
+    operation?: string;
     estimatedBytes?: number;
     savingsBytes?: number;
   }>;

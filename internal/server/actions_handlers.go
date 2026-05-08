@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -19,30 +18,42 @@ import (
 func (s *Server) handleOptimizationPreview(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		AssetID string `json:"assetId"`
+		optimize.Request
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	_, item, err := s.projectAndItem(r.Context(), body.AssetID)
+	if body.AssetID != "" && len(body.AssetIDs) == 0 {
+		body.AssetIDs = []string{body.AssetID}
+	}
+	items, err := s.selectOptimizationItems(r.Context(), body.AssetIDs)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	script := ""
-	if len(item.Optimization) > 0 {
-		script = "# Preview only. Asset Studio v1.1 does not apply image optimization.\n"
-		script += "# Review recommendation codes before running a dedicated optimizer.\n"
-		for _, opt := range item.Optimization {
-			script += fmt.Sprintf("# %s: %s\n", opt.Category, opt.SuggestionCode)
+	if len(items) == 0 {
+		writeError(w, http.StatusBadRequest, apierr.New("optimization_selection_empty", "optimization selection is empty"))
+		return
+	}
+	project, err := s.projectByID(items[0].ProjectID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	for _, item := range items {
+		if item.ProjectID != project.ID {
+			writeError(w, http.StatusBadRequest, apierr.New("optimization_project_mixed", "optimization preview can only apply one project at a time"))
+			return
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"assetId":         item.ID,
-		"recommendations": item.Optimization,
-		"script":          script,
-		"canApply":        false,
-	})
+	preview, err := optimize.Preview(project, items, body.Request)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	s.storePreview(preview)
+	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
 }
 
 func (s *Server) handleRenamePreview(w http.ResponseWriter, r *http.Request) {
@@ -132,17 +143,60 @@ func (s *Server) selectOptimizationItems(ctx context.Context, ids []string) ([]s
 }
 
 func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Request) {
-	var body optimizationSelectionBody
+	var body struct {
+		optimize.Request
+	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	items, err := s.selectOptimizationItems(r.Context(), body.AssetIDs)
+	items, err := s.selectOptimizationItems(r.Context(), body.Request.AssetIDs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, optimize.Compute(items))
+	byProject := map[string][]scanner.AssetItem{}
+	for _, item := range items {
+		byProject[item.ProjectID] = append(byProject[item.ProjectID], item)
+	}
+	result := optimize.Estimate{BySeverity: map[string]int{"critical": 0, "warning": 0, "info": 0}}
+	categorySavings := map[string]*optimize.CategoryBreakdown{}
+	toolSeen := map[string]optimize.ToolStatus{}
+	for projectID, projectItems := range byProject {
+		project, err := s.projectByID(projectID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		estimate := optimize.ComputeWithProject(project, projectItems, body.Request)
+		result.ItemCount += estimate.ItemCount
+		result.TotalBytes += estimate.TotalBytes
+		result.SavingsBytes += estimate.SavingsBytes
+		result.Items = append(result.Items, estimate.Items...)
+		result.Operations = append(result.Operations, estimate.Operations...)
+		for severity, count := range estimate.BySeverity {
+			result.BySeverity[severity] += count
+		}
+		for _, category := range estimate.ByCategory {
+			current := categorySavings[category.Category]
+			if current == nil {
+				current = &optimize.CategoryBreakdown{Category: category.Category}
+				categorySavings[category.Category] = current
+			}
+			current.Count += category.Count
+			current.SavingsBytes += category.SavingsBytes
+		}
+		for _, tool := range estimate.Tools {
+			toolSeen[tool.Name] = tool
+		}
+	}
+	for _, category := range categorySavings {
+		result.ByCategory = append(result.ByCategory, *category)
+	}
+	for _, tool := range toolSeen {
+		result.Tools = append(result.Tools, tool)
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func missingAssetIDs(ids []string, items []scanner.AssetItem) []string {
@@ -252,7 +306,12 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	result, err := actions.Apply(project, preview)
+	var result actions.ApplyResult
+	if preview.Type == "optimization" {
+		result, err = optimize.Apply(project, preview)
+	} else {
+		result, err = actions.Apply(project, preview)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return

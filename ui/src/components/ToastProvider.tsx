@@ -80,7 +80,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {items.length > 0 && (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-[200] flex max-w-[min(420px,90vw)] flex-col gap-2">
+        <div className="pointer-events-none fixed bottom-6 right-6 z-[300] flex max-w-[min(420px,90vw)] flex-col gap-2">
           {items.map((it) => (
             <Toast
               key={it.id}

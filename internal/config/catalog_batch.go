@@ -1,6 +1,9 @@
 package config
 
-import "asset-studio/internal/scanner"
+import (
+	"asset-studio/internal/optimize"
+	"asset-studio/internal/scanner"
+)
 
 func (s *Store) CatalogItemsByIDs(scanID int64, ids []string) ([]scanner.AssetItem, error) {
 	scanID, err := s.resolveScanID(scanID)
@@ -157,6 +160,10 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 	}
 	idClause, idArgs := inClauseSQL("asset_id", ids)
 	args := append([]any{scanID}, idArgs...)
+	extByID := make(map[string]string, len(items))
+	for _, item := range items {
+		extByID[item.ID] = item.Ext
+	}
 	rows, err := s.db.Query(`
 		SELECT asset_id, category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes
 		FROM optimization_snapshots
@@ -174,6 +181,7 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 		if err := rows.Scan(&assetID, &opt.Category, &opt.Severity, &opt.ReasonCode, &opt.SuggestionCode, &opt.EstimatedBytes, &opt.SavingsBytes); err != nil {
 			return err
 		}
+		opt.Operation = optimize.SuggestionOperation(opt.SuggestionCode, extByID[assetID])
 		optsByID[assetID] = append(optsByID[assetID], opt)
 	}
 	if err := rows.Err(); err != nil {

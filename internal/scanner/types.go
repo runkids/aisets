@@ -206,6 +206,7 @@ type OptimizationSuggestion struct {
 	Severity       string `json:"severity"`
 	SuggestionCode string `json:"suggestionCode"`
 	Suggestion     string `json:"suggestion"`
+	Operation      string `json:"operation,omitempty"`
 	EstimatedBytes int64  `json:"estimatedBytes,omitempty"`
 	SavingsBytes   int64  `json:"savingsBytes,omitempty"`
 }

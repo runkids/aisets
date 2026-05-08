@@ -17,6 +17,8 @@ type Estimate struct {
 	ByCategory   []CategoryBreakdown `json:"byCategory"`
 	BySeverity   map[string]int      `json:"bySeverity"`
 	Items        []ItemEstimate      `json:"items"`
+	Operations   []Operation         `json:"operations"`
+	Tools        []ToolStatus        `json:"tools"`
 }
 
 type CategoryBreakdown struct {
@@ -36,6 +38,10 @@ type ItemEstimate struct {
 
 // Compute walks items and produces an aggregate Estimate.
 func Compute(items []scanner.AssetItem) Estimate {
+	return ComputeWithRequest(items, Request{})
+}
+
+func ComputeWithRequest(items []scanner.AssetItem, req Request) Estimate {
 	out := Estimate{
 		BySeverity: map[string]int{"critical": 0, "warning": 0, "info": 0},
 		Items:      make([]ItemEstimate, 0),
@@ -79,6 +85,21 @@ func Compute(items []scanner.AssetItem) Estimate {
 		}
 		return out.ByCategory[i].Count > out.ByCategory[j].Count
 	})
+	out.Operations = Plan(items, req)
+	out.Tools = ToolStatuses(out.Operations)
+	return out
+}
+
+func ComputeWithProject(project scanner.Project, items []scanner.AssetItem, req Request) Estimate {
+	out := ComputeWithRequest(items, req)
+	ops, _ := EstimateOperations(project, out.Operations, req)
+	out.Operations = ops
+	out.Tools = ToolStatuses(out.Operations)
+	var savings int64
+	for _, op := range out.Operations {
+		savings += op.SavingsBytes
+	}
+	out.SavingsBytes = savings
 	return out
 }
 
@@ -90,7 +111,7 @@ func GenerateScript(items []scanner.AssetItem) string {
 	b.WriteString("#!/usr/bin/env bash\n")
 	b.WriteString("# asset-studio: optimization script\n")
 	b.WriteString("# Review each command before running.\n")
-	b.WriteString("# Required tools: cwebp, avifenc, pngquant, jpegoptim, svgo, gifsicle, magick.\n")
+	b.WriteString("# Script fallback requires external CLI tools. In-app optimization uses built-in handlers for common formats.\n")
 	b.WriteString("set -euo pipefail\n\n")
 
 	count := 0
@@ -127,30 +148,15 @@ func GenerateScript(items []scanner.AssetItem) string {
 
 func commandFor(suggestionCode, ext, path string) string {
 	q := shellQuote(path)
-	switch suggestionCode {
-	case "preview_svg_minify":
+	switch SuggestionOperation(suggestionCode, ext) {
+	case "svg-minify":
 		return fmt.Sprintf("svgo --input %s --output %s", q, q)
-	case "try_modern_photographic_format":
-		switch ext {
-		case ".png", ".jpg", ".jpeg":
-			out := shellQuote(replaceExt(path, ".webp"))
-			return fmt.Sprintf("cwebp -q 85 %s -o %s", q, out)
-		}
-		return ""
-	case "review_compression_or_modern_format":
-		switch ext {
-		case ".png":
-			return fmt.Sprintf("pngquant --quality=80-95 --skip-if-larger --force --output %s %s", q, q)
-		case ".jpg", ".jpeg":
-			return fmt.Sprintf("jpegoptim --max=85 --strip-all %s", q)
-		case ".webp":
-			out := shellQuote(replaceExt(path, ".min.webp"))
-			return fmt.Sprintf("cwebp -q 80 %s -o %s", q, out)
-		case ".gif":
-			return fmt.Sprintf("gifsicle --optimize=3 --output %s %s", q, q)
-		}
-		return ""
-	case "use_responsive_or_smaller_source":
+	case "convert-avif":
+		out := shellQuote(replaceExt(path, ".avif"))
+		return fmt.Sprintf("avifenc --min 40 --max 50 %s %s", q, out)
+	case "gif-optimize":
+		return fmt.Sprintf("gifsicle --optimize=3 --output %s %s", q, q)
+	case "resize-variant":
 		out := shellQuote(replaceExt(path, "@1200"+ext))
 		return fmt.Sprintf("magick %s -resize 1200x %s", q, out)
 	}

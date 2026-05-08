@@ -116,17 +116,17 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 		groups = groups[:limit]
 		next = strconv.Itoa(offset + limit)
 	}
+	groupIDs := make([]string, 0, len(groups))
 	for i := range groups {
-		paths, err := s.duplicateGroupPaths(scanID, groups[i].ID)
-		if err != nil {
-			return CatalogDuplicatesPage{}, err
-		}
-		groups[i].Paths = paths
-		members, err := s.duplicateGroupMembers(scanID, groups[i].ID)
-		if err != nil {
-			return CatalogDuplicatesPage{}, err
-		}
-		groups[i].Members = members
+		groupIDs = append(groupIDs, groups[i].ID)
+	}
+	pathsByGroup, membersByGroup, err := s.duplicateGroupMembersByGroup(scanID, groupIDs)
+	if err != nil {
+		return CatalogDuplicatesPage{}, err
+	}
+	for i := range groups {
+		groups[i].Paths = pathsByGroup[groups[i].ID]
+		groups[i].Members = membersByGroup[groups[i].ID]
 	}
 
 	var facets CatalogDuplicatesFacets
@@ -245,57 +245,58 @@ func (s *Store) dupFacetCounts(scanID int64, groupByExpr, projectName, ext strin
 	return opts, total, nil
 }
 
-func (s *Store) duplicateGroupPaths(scanID int64, groupID string) ([]string, error) {
-	rows, err := s.db.Query(`
-		SELECT repo_path
-		FROM duplicate_group_assets
-		WHERE scan_id = ? AND group_id = ?
-		ORDER BY repo_path ASC
-	`, scanID, groupID)
-	if err != nil {
-		return nil, err
+func (s *Store) duplicateGroupMembersByGroup(scanID int64, groupIDs []string) (map[string][]string, map[string][]scanner.AssetItem, error) {
+	pathsByGroup := make(map[string][]string, len(groupIDs))
+	membersByGroup := make(map[string][]scanner.AssetItem, len(groupIDs))
+	if len(groupIDs) == 0 {
+		return pathsByGroup, membersByGroup, nil
 	}
-	defer rows.Close()
-	paths := []string{}
-	for rows.Next() {
-		var path string
-		if err := rows.Scan(&path); err != nil {
-			return nil, err
-		}
-		paths = append(paths, path)
-	}
-	return paths, rows.Err()
-}
-
-func (s *Store) duplicateGroupMembers(scanID int64, groupID string) ([]scanner.AssetItem, error) {
+	groupClause, groupArgs := inClauseSQL("da.group_id", groupIDs)
+	args := append([]any{scanID}, groupArgs...)
 	rows, err := s.db.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM duplicate_group_assets da
 		JOIN asset_snapshots a ON a.scan_id = da.scan_id AND a.asset_id = da.asset_id
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
-		WHERE da.scan_id = ? AND da.group_id = ?
-		ORDER BY a.repo_path ASC, a.asset_id ASC
-	`, scanID, groupID)
+		WHERE da.scan_id = ? AND `+groupClause+`
+		ORDER BY da.group_id ASC, a.repo_path ASC, a.asset_id ASC
+	`, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
-	members := []scanner.AssetItem{}
+	allMembers := []scanner.AssetItem{}
 	for rows.Next() {
 		item, err := scanAssetFromRow(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		members = append(members, item)
+		if item.DuplicateGroupID == nil {
+			continue
+		}
+		groupID := *item.DuplicateGroupID
+		pathsByGroup[groupID] = append(pathsByGroup[groupID], item.RepoPath)
+		membersByGroup[groupID] = append(membersByGroup[groupID], item)
+		allMembers = append(allMembers, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if err := s.hydrateAssetOptimization(scanID, members); err != nil {
-		return nil, err
+	if err := s.hydrateAssetOptimization(scanID, allMembers); err != nil {
+		return nil, nil, err
 	}
-	return members, nil
+	optimizedByID := make(map[string]scanner.AssetItem, len(allMembers))
+	for _, item := range allMembers {
+		optimizedByID[item.ID] = item
+	}
+	for groupID, members := range membersByGroup {
+		for index := range members {
+			members[index] = optimizedByID[members[index].ID]
+		}
+		membersByGroup[groupID] = members
+	}
+	return pathsByGroup, membersByGroup, nil
 }
 
 type DuplicateTrendPoint struct {
