@@ -15,13 +15,13 @@ const toastVariants = cva(
   {
     variants: {
       tone: {
-        info: "border-g-blue/25 bg-g-blue-soft/30 [--toast-accent:var(--g-blue)] [--toast-icon:var(--g-blue)]",
+        info: "border-g-blue/40 bg-[color-mix(in_srgb,var(--g-blue)_6%,var(--g-surface-2))] [--toast-icon:var(--g-blue)]",
         success:
-          "border-g-green/25 bg-g-green-soft/30 [--toast-accent:var(--g-green)] [--toast-icon:var(--g-green)]",
+          "border-g-green/40 bg-[color-mix(in_srgb,var(--g-green)_6%,var(--g-surface-2))] [--toast-icon:var(--g-green)]",
         warning:
-          "border-g-amber/25 bg-g-amber-soft/30 [--toast-accent:var(--g-amber)] [--toast-icon:var(--g-amber)]",
+          "border-g-amber/40 bg-[color-mix(in_srgb,var(--g-amber)_6%,var(--g-surface-2))] [--toast-icon:var(--g-amber)]",
         danger:
-          "border-g-red/25 bg-g-red-soft/30 [--toast-accent:var(--g-red)] [--toast-icon:var(--g-red)]",
+          "border-g-red/40 bg-[color-mix(in_srgb,var(--g-red)_6%,var(--g-surface-2))] [--toast-icon:var(--g-red)]",
       },
     },
     defaultVariants: { tone: "info" },
