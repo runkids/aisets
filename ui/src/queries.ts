@@ -11,6 +11,7 @@ import {
   applyPreview,
   batchApply,
   batchDelete,
+  batchCopy,
   batchMergePreview,
   batchMovePreview,
   batchRenamePreview,
@@ -622,6 +623,22 @@ export function useBatchApplyMutation() {
   return useMutation({
     mutationFn: ({ endpoint, token }: { endpoint: string; token: string }) =>
       batchApply(endpoint, token),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useBatchCopyMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assetIds,
+      targetDir,
+    }: {
+      assetIds: string[];
+      targetDir: string;
+    }) => batchCopy(assetIds, targetDir),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

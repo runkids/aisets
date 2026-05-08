@@ -66,6 +66,9 @@
     "batchDeleteConfirmBody": "即將永久刪除 {{count}} 個檔案（{{size}}）此操作無法復原",
     "batchDeleteSuccess": "已刪除 {{count}} 個檔案",
     "batchDeletePartial": "已刪除 {{succeeded}} / {{total}} 個檔案（{{failed}} 個失敗）",
+    "batchCopy": "複製到…",
+    "batchCopySuccess": "已複製 {{count}} 個檔案",
+    "batchCopyPartial": "已複製 {{succeeded}} / {{total}} 個檔案（{{failed}} 個失敗、{{skipped}} 個略過）",
     "batchMove": "搬移",
     "batchRename": "重新命名",
     "batchExport": "匯出",
@@ -207,7 +210,13 @@
     "detectedIntent": "建議：{{intent}}",
     "detectIntentFailed": "無法偵測專案類型，請手動選擇",
     "adding": "加入中…",
-    "addDisabledOcrBusy": "OCR 作業進行中，完成後即可加入"
+    "addDisabledOcrBusy": "OCR 作業進行中，完成後即可加入",
+    "moveDir": "搬移到這裡",
+    "moving": "搬移中…",
+    "copyDir": "複製到這裡",
+    "copying": "複製中…",
+    "titleMove": "選擇搬移目的地",
+    "titleCopy": "選擇複製目的地"
   },
   "preview": {
     "canApplyDesc": "這次操作可套用請確認變更後再寫入檔案",

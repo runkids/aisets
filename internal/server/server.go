@@ -141,6 +141,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/catalog/duplicates/trend", s.handleDuplicateTrend)
 	s.mux.HandleFunc("POST /api/actions/batch/merge-duplicates/preview", s.handleBatchMergePreview)
 	s.mux.HandleFunc("POST /api/actions/batch/merge-duplicates/apply", s.handleBatchApply)
+	s.mux.HandleFunc("POST /api/actions/batch/copy", s.handleBatchCopy)
 	s.mux.HandleFunc("POST /api/actions/batch/export", s.handleBatchExport)
 	s.mux.HandleFunc("POST /api/pre-check", s.handlePreCheck)
 	s.mux.HandleFunc("POST /api/actions/optimization/estimate", s.handleOptimizationEstimate)

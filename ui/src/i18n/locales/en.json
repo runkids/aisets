@@ -66,6 +66,9 @@
     "batchDeleteConfirmBody": "This will permanently delete {{count}} files ({{size}}). This cannot be undone.",
     "batchDeleteSuccess": "Deleted {{count}} files",
     "batchDeletePartial": "Deleted {{succeeded}} of {{total}} files ({{failed}} failed)",
+    "batchCopy": "Copy To",
+    "batchCopySuccess": "Copied {{count}} files",
+    "batchCopyPartial": "Copied {{succeeded}} of {{total}} files ({{failed}} failed, {{skipped}} skipped)",
     "batchMove": "Move",
     "batchRename": "Rename",
     "batchExport": "Export",
@@ -207,7 +210,13 @@
     "detectedIntent": "Suggested: {{intent}}",
     "detectIntentFailed": "Could not detect a project type. Choose one manually.",
     "adding": "Adding…",
-    "addDisabledOcrBusy": "OCR is running. You can add after it finishes."
+    "addDisabledOcrBusy": "OCR is running. You can add after it finishes.",
+    "moveDir": "Move Here",
+    "moving": "Moving…",
+    "copyDir": "Copy Here",
+    "copying": "Copying…",
+    "titleMove": "Select Move Destination",
+    "titleCopy": "Select Copy Destination"
   },
   "preview": {
     "canApplyDesc": "This operation can be applied. Please review the changes before writing to files.",

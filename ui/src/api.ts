@@ -625,6 +625,18 @@ export function batchApply(endpoint: string, token: string) {
   });
 }
 
+export function batchCopy(assetIds: string[], targetDir: string) {
+  return request<{
+    succeeded: string[];
+    failed: Array<{ id: string; error: string }>;
+    skipped: string[];
+    appliedAt: string;
+  }>("/api/actions/batch/copy", {
+    method: "POST",
+    body: JSON.stringify({ assetIds, targetDir }),
+  });
+}
+
 export async function batchExport(assetIds: string[]) {
   const res = await fetch("/api/actions/batch/export", {
     method: "POST",

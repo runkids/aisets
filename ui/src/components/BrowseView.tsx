@@ -16,6 +16,7 @@ import {
   Folder,
   FolderInput,
   FolderOpen,
+  FolderOutput,
   LoaderCircle,
   PenLine,
   Trash2,
@@ -23,6 +24,7 @@ import {
 import { matchesCustomAssetFilter } from "../customAssetFilters";
 import {
   useBatchDeleteMutation,
+  useBatchCopyMutation,
   useBatchMovePreviewMutation,
   useBatchRenamePreviewMutation,
   useBatchApplyMutation,
@@ -600,6 +602,7 @@ export function BrowseView({
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMoveDir, setShowMoveDir] = useState(false);
+  const [showCopyDir, setShowCopyDir] = useState(false);
   const [showRenameRules, setShowRenameRules] = useState(false);
   const [pathsCopied, setPathsCopied] = useState(false);
   const [batchPreview, setBatchPreview] = useState<{
@@ -608,6 +611,7 @@ export function BrowseView({
   } | null>(null);
 
   const batchDeleteMut = useBatchDeleteMutation();
+  const batchCopyMut = useBatchCopyMutation();
   const movePreviewMut = useBatchMovePreviewMutation();
   const renamePreviewMut = useBatchRenamePreviewMutation();
   const batchApplyMut = useBatchApplyMutation();
@@ -822,6 +826,19 @@ export function BrowseView({
     });
   }
 
+  function handleCopySelect(targetDir: string) {
+    setShowCopyDir(false);
+    batchCopyMut.mutate(
+      { assetIds: Array.from(selected), targetDir },
+      {
+        onSuccess: () => {
+          setSelected(new Set());
+          setBulkMode(false);
+        },
+      },
+    );
+  }
+
   function handleMoveSelect(targetDir: string) {
     setShowMoveDir(false);
     movePreviewMut.mutate(
@@ -944,6 +961,14 @@ export function BrowseView({
               >
                 {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
                 {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                onClick={() => setShowCopyDir(true)}
+              >
+                <FolderOutput size={14} />
+                {t("action.batchCopy")}
               </button>
               <button
                 type="button"
@@ -1097,9 +1122,20 @@ export function BrowseView({
       {showMoveDir && (
         <DirectoryPickerModal
           open={showMoveDir}
+          mode="move"
           working={movePreviewMut.isPending}
           onClose={() => setShowMoveDir(false)}
           onSelect={handleMoveSelect}
+        />
+      )}
+
+      {showCopyDir && (
+        <DirectoryPickerModal
+          open={showCopyDir}
+          mode="copy"
+          working={batchCopyMut.isPending}
+          onClose={() => setShowCopyDir(false)}
+          onSelect={handleCopySelect}
         />
       )}
 

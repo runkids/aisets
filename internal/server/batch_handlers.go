@@ -161,6 +161,38 @@ func (s *Server) takeBatchPreview(id string) (actions.BatchPreview, bool) {
 	return preview, ok
 }
 
+func (s *Server) handleBatchCopy(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AssetIDs  []string `json:"assetIds"`
+		TargetDir string   `json:"targetDir"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.AssetIDs) == 0 {
+		writeJSON(w, http.StatusOK, actions.BatchCopyResult{Succeeded: []string{}})
+		return
+	}
+	items, project, err := s.batchItems(r.Context(), body.AssetIDs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	targetDir := body.TargetDir
+	if filepath.IsAbs(targetDir) {
+		if rel, err := filepath.Rel(project.Path, targetDir); err == nil {
+			targetDir = filepath.ToSlash(rel)
+		}
+	}
+	result := actions.BatchCopy(project, items, targetDir)
+	s.markCatalogStale()
+	go func() {
+		_, _, _ = s.scan(context.Background())
+	}()
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleBatchExport(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		AssetIDs []string `json:"assetIds"`

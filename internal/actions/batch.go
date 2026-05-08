@@ -2,6 +2,7 @@ package actions
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -254,6 +255,63 @@ func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rule
 
 	preview.CanApply = len(preview.Blockers) == 0 && len(preview.Moves) > 0
 	return preview
+}
+
+// BatchCopyResult holds the outcome of a batch copy operation.
+type BatchCopyResult struct {
+	Succeeded []string          `json:"succeeded"`
+	Failed    []BatchFailedItem `json:"failed"`
+	Skipped   []string          `json:"skipped"`
+	AppliedAt string            `json:"appliedAt"`
+}
+
+// BatchCopy copies the given asset files into targetDir, preserving original filenames.
+func BatchCopy(project scanner.Project, items []scanner.AssetItem, targetDir string) BatchCopyResult {
+	result := BatchCopyResult{AppliedAt: time.Now().UTC().Format(time.RFC3339)}
+	for _, item := range items {
+		newPath := filepath.ToSlash(filepath.Join(targetDir, filepath.Base(item.RepoPath)))
+		srcAbs, err := safeAbs(project.Path, item.RepoPath)
+		if err != nil {
+			result.Failed = append(result.Failed, BatchFailedItem{ID: item.ID, Error: err.Error()})
+			continue
+		}
+		dstAbs, err := safeAbs(project.Path, newPath)
+		if err != nil {
+			result.Failed = append(result.Failed, BatchFailedItem{ID: item.ID, Error: err.Error()})
+			continue
+		}
+		if _, err := os.Stat(dstAbs); err == nil {
+			result.Skipped = append(result.Skipped, item.ID)
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(dstAbs), 0o755); err != nil {
+			result.Failed = append(result.Failed, BatchFailedItem{ID: item.ID, Error: err.Error()})
+			continue
+		}
+		if err := copyFile(srcAbs, dstAbs); err != nil {
+			result.Failed = append(result.Failed, BatchFailedItem{ID: item.ID, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, item.ID)
+	}
+	return result
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
 }
 
 // BatchDelete removes the given asset files from disk, classifying each

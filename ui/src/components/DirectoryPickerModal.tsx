@@ -39,6 +39,7 @@ type Props = {
   working: boolean;
   disabledReason?: string;
   initialPath?: string;
+  mode?: "addProject" | "move" | "copy";
   onClose: () => void;
   onSelect: (path: string, scanIntent: ProjectScanIntent) => void;
 };
@@ -48,6 +49,7 @@ export function DirectoryPickerModal({
   working,
   disabledReason,
   initialPath = "",
+  mode = "addProject",
   onClose,
   onSelect,
 }: Props) {
@@ -70,8 +72,10 @@ export function DirectoryPickerModal({
 
   const intentOptions = useMemo(() => intentSelectOptions(t), [t]);
 
+  const showScanIntent = mode === "addProject";
+
   useEffect(() => {
-    if (!open || !listing?.path) return;
+    if (!showScanIntent || !open || !listing?.path) return;
     let cancelled = false;
     void Promise.resolve()
       .then(() => {
@@ -101,7 +105,26 @@ export function DirectoryPickerModal({
     return () => {
       cancelled = true;
     };
-  }, [listing?.path, open]);
+  }, [showScanIntent, listing?.path, open]);
+
+  const titleKey =
+    mode === "move"
+      ? "directoryPicker.titleMove"
+      : mode === "copy"
+        ? "directoryPicker.titleCopy"
+        : "directoryPicker.title";
+  const confirmKey =
+    mode === "move"
+      ? "directoryPicker.moveDir"
+      : mode === "copy"
+        ? "directoryPicker.copyDir"
+        : "directoryPicker.addDir";
+  const workingKey =
+    mode === "move"
+      ? "directoryPicker.moving"
+      : mode === "copy"
+        ? "directoryPicker.copying"
+        : "directoryPicker.adding";
 
   if (!open) return null;
 
@@ -131,7 +154,7 @@ export function DirectoryPickerModal({
 
   return (
     <Modal
-      title={t("directoryPicker.title")}
+      title={t(titleKey)}
       description={t("directoryPicker.description")}
       onClose={resetAndClose}
       bodyPadding="none"
@@ -162,9 +185,7 @@ export function DirectoryPickerModal({
                       aria-hidden="true"
                     />
                   )}
-                  {working
-                    ? t("directoryPicker.adding")
-                    : t("directoryPicker.addDir")}
+                  {working ? t(workingKey) : t(confirmKey)}
                 </Button>
               </span>
             </Tooltip>
@@ -190,62 +211,68 @@ export function DirectoryPickerModal({
             </Button>
           </div>
 
-          <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-g text-g-ui font-[590] tracking-g-ui text-g-ink">
-                  {t("directoryPicker.projectType")}
-                </p>
-                <p className="mt-0.5 font-g text-g-caption tracking-g-ui text-g-ink-3">
-                  {t("directoryPicker.projectTypeHint")}
-                </p>
+          {showScanIntent && (
+            <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-g text-g-ui font-[590] tracking-g-ui text-g-ink">
+                    {t("directoryPicker.projectType")}
+                  </p>
+                  <p className="mt-0.5 font-g text-g-caption tracking-g-ui text-g-ink-3">
+                    {t("directoryPicker.projectTypeHint")}
+                  </p>
+                </div>
+                <Select
+                  value={scanIntent}
+                  options={intentOptions}
+                  onChange={(value) =>
+                    setScanIntent(value as ProjectScanIntent)
+                  }
+                  aria-label={t("directoryPicker.projectType")}
+                  className="w-full sm:w-[240px]"
+                />
               </div>
-              <Select
-                value={scanIntent}
-                options={intentOptions}
-                onChange={(value) => setScanIntent(value as ProjectScanIntent)}
-                aria-label={t("directoryPicker.projectType")}
-                className="w-full sm:w-[240px]"
-              />
-            </div>
-            <div className="mt-2 font-g text-g-caption tracking-g-ui text-g-ink-3">
-              {detecting ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 size={12} className="animate-spin" />
-                  {t("directoryPicker.detectingIntent")}
-                </span>
-              ) : detection ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Badge tone="green" className="gap-1">
-                    <CheckCircle2 size={10} aria-hidden="true" />
-                    {t("directoryPicker.detectedIntent", {
-                      intent: projectScanIntentLabel(
+              <div className="mt-2 font-g text-g-caption tracking-g-ui text-g-ink-3">
+                {detecting ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" />
+                    {t("directoryPicker.detectingIntent")}
+                  </span>
+                ) : detection ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Badge tone="green" className="gap-1">
+                      <CheckCircle2 size={10} aria-hidden="true" />
+                      {t("directoryPicker.detectedIntent", {
+                        intent: projectScanIntentLabel(
+                          t,
+                          normalizeProjectScanIntent(
+                            detection.suggestedScanIntent,
+                          ),
+                        ),
+                      })}
+                    </Badge>
+                    <span className="text-g-ink-4">
+                      {projectScanIntentDescription(
                         t,
                         normalizeProjectScanIntent(
                           detection.suggestedScanIntent,
                         ),
-                      ),
-                    })}
-                  </Badge>
-                  <span className="text-g-ink-4">
-                    {projectScanIntentDescription(
-                      t,
-                      normalizeProjectScanIntent(detection.suggestedScanIntent),
-                    )}
+                      )}
+                    </span>
                   </span>
-                </span>
-              ) : detectionError ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Badge tone="amber" className="gap-1">
-                    <AlertTriangle size={10} aria-hidden="true" />
-                    {t("directoryPicker.detectIntentFailed")}
-                  </Badge>
-                </span>
-              ) : (
-                <span>{projectScanIntentDescription(t, scanIntent)}</span>
-              )}
+                ) : detectionError ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Badge tone="amber" className="gap-1">
+                      <AlertTriangle size={10} aria-hidden="true" />
+                      {t("directoryPicker.detectIntentFailed")}
+                    </Badge>
+                  </span>
+                ) : (
+                  <span>{projectScanIntentDescription(t, scanIntent)}</span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="mx-5 mb-5 mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-g-md border border-g-line bg-g-canvas shadow-g-inset">
