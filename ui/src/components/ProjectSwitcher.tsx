@@ -29,7 +29,7 @@ const rootClass =
   "relative w-full min-w-0 shrink-0 max-[900px]:min-w-[190px] max-[900px]:w-[24vw] max-[720px]:min-w-[44px] max-[720px]:w-[44px] max-[720px]:shrink-0";
 
 const triggerClass = cn(
-  "relative flex w-full items-center gap-2 min-h-[44px] px-2.5 border border-g-line rounded-g-md bg-g-surface text-g-ink text-left shadow-g-sm",
+  "relative flex w-full items-center gap-2 min-h-[44px] px-2.5 py-2 border border-g-line rounded-g-md bg-g-surface text-g-ink text-left shadow-g-sm",
   "transition-[background,border-color,box-shadow,transform] duration-[120ms] ease-g",
   "before:absolute before:inset-[-4px] before:content-['']",
   "hover:bg-g-surface-2 hover:border-g-line-strong",
@@ -40,10 +40,10 @@ const triggerClass = cn(
 );
 
 const triggerIconClass =
-  "inline-flex items-center justify-center size-6 rounded-g-md bg-g-surface-3 text-g-ink-2 shrink-0";
+  "inline-flex items-center justify-center size-8 rounded-g-md bg-g-surface-3 text-g-ink-2 shrink-0";
 
 const triggerCopyClass =
-  "flex min-w-0 flex-1 flex-col gap-px max-[720px]:hidden";
+  "flex min-w-0 flex-1 flex-col gap-0.5 max-[720px]:hidden";
 
 const triggerWorkspaceNameClass =
   "overflow-hidden text-ellipsis text-g-ink-3 text-[10px] font-[510] tracking-[0.06em] leading-[1.1] uppercase";
@@ -51,8 +51,8 @@ const triggerWorkspaceNameClass =
 const triggerCurrentClass =
   "overflow-hidden text-ellipsis text-g-ink text-[13px] font-[510] tracking-[-0.012em] leading-[1.2] whitespace-nowrap";
 
-const triggerCurrentCountClass =
-  "text-g-ink-4 font-g-mono text-[11px] font-normal tracking-g-mono max-[900px]:hidden";
+const triggerCountLineClass =
+  "text-g-ink-4 font-g-mono text-[11px] font-normal tracking-g-mono leading-[1.1] max-[900px]:hidden";
 
 const triggerChevronClass = cn(
   "text-g-ink-4 shrink-0 transition-transform duration-[120ms] ease-g",
@@ -138,6 +138,7 @@ export function ProjectSwitcher({
   const selectedProject = projects.find(
     (project) => project.id === selectedProjectId,
   );
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const selectedName = selectedProject?.name ?? t("topbar.allProjects");
   const selectedAssetCount = selectedProject?.assetCount ?? totalAssets;
 
@@ -193,6 +194,12 @@ export function ProjectSwitcher({
             iconImage={selectedProject.iconImage}
             className={cn(triggerIconClass, "[&_svg]:size-[15px]")}
           />
+        ) : activeWorkspace?.iconImage ? (
+          <WorkspaceAvatar
+            name={workspaceName}
+            iconImage={activeWorkspace.iconImage}
+            className={cn(triggerIconClass, "border-0")}
+          />
         ) : (
           <span className={triggerIconClass} aria-hidden="true">
             <Layers3 size={15} />
@@ -200,11 +207,9 @@ export function ProjectSwitcher({
         )}
         <span className={triggerCopyClass}>
           <span className={triggerWorkspaceNameClass}>{workspaceName}</span>
-          <span className={triggerCurrentClass}>
-            {selectedName}
-            <span className={triggerCurrentCountClass}>
-              · {t("topbar.assetCount", { count: selectedAssetCount })}
-            </span>
+          <span className={triggerCurrentClass}>{selectedName}</span>
+          <span className={triggerCountLineClass}>
+            {t("topbar.assetCount", { count: selectedAssetCount })}
           </span>
         </span>
         <ChevronDown
