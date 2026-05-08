@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -565,6 +566,101 @@ func TestMeasureOperationsGIFFallbackToWebP(t *testing.T) {
 	}
 	if len(blockers) != 0 {
 		t.Fatalf("expected 0 blockers, got %d", len(blockers))
+	}
+}
+
+func writeTestPNG(t *testing.T, path string, w, h int) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			img.Set(x, y, color.RGBA{R: uint8(x % 256), G: uint8(y % 256), B: 128, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestImgtoolsConvertFormats(t *testing.T) {
+	if !defaultToolChecker("asset-studio-imgtools") {
+		t.Skip("asset-studio-imgtools not installed")
+	}
+	root := t.TempDir()
+	pngPath := filepath.Join(root, "src", "photo.png")
+	writeTestPNG(t, pngPath, 64, 64)
+	project := scanner.Project{ID: "p", Name: "test", Path: root}
+
+	tests := []struct {
+		name      string
+		operation string
+		format    string
+	}{
+		{"PNG→AVIF", "convert-avif", "avif"},
+		{"PNG→WebP", "convert-webp", "webp"},
+		{"PNG recompress", "png-recompress", "png"},
+		{"PNG→JPEG", "jpeg-recompress", "jpg"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			op := Operation{
+				AssetID:      "a",
+				RepoPath:     "src/photo.png",
+				Operation:    tc.operation,
+				OutputFormat: tc.format,
+				TargetPath:   "src/photo." + tc.format,
+				CurrentBytes: fileSize(t, pngPath),
+				CanApply:     true,
+				Available:    true,
+			}
+			candidate, estBytes, err := buildCandidate(project, op, Request{Quality: 80, MaxDimensionPx: 1200})
+			if err != nil {
+				t.Fatalf("buildCandidate failed: %v", err)
+			}
+			defer os.Remove(candidate)
+			if estBytes <= 0 {
+				t.Fatalf("expected positive output size, got %d", estBytes)
+			}
+			if candidate == "" {
+				t.Fatal("expected candidate path")
+			}
+		})
+	}
+}
+
+func TestImgtoolsResize(t *testing.T) {
+	if !defaultToolChecker("asset-studio-imgtools") {
+		t.Skip("asset-studio-imgtools not installed")
+	}
+	root := t.TempDir()
+	pngPath := filepath.Join(root, "src", "large.png")
+	writeTestPNG(t, pngPath, 2000, 1500)
+	project := scanner.Project{ID: "p", Name: "test", Path: root}
+
+	op := Operation{
+		AssetID:      "a",
+		RepoPath:     "src/large.png",
+		Operation:    "resize-variant",
+		OutputFormat: "png",
+		TargetPath:   "src/large-thumb.png",
+		CurrentBytes: fileSize(t, pngPath),
+		CanApply:     true,
+		Available:    true,
+	}
+	candidate, estBytes, err := buildCandidate(project, op, Request{Quality: 80, MaxDimensionPx: 800})
+	if err != nil {
+		t.Fatalf("buildCandidate failed: %v", err)
+	}
+	defer os.Remove(candidate)
+	if estBytes >= op.CurrentBytes {
+		t.Fatalf("expected resized output smaller than original, got %d >= %d", estBytes, op.CurrentBytes)
 	}
 }
 

@@ -23,6 +23,12 @@ enum Command {
         /// Quality (0-100)
         #[arg(long, default_value_t = 80)]
         quality: u8,
+        /// AVIF encoder speed (1=slow/best, 10=fast/worst)
+        #[arg(long, default_value_t = 6)]
+        speed: u8,
+        /// Resize to fit within this max dimension before converting
+        #[arg(long)]
+        resize: Option<u32>,
         /// Input file path
         input: String,
         /// Output file path
@@ -48,9 +54,11 @@ fn main() {
         Command::Convert {
             format,
             quality,
+            speed,
+            resize,
             input,
             output,
-        } => convert::run(&input, &output, &format, quality),
+        } => convert::run(&input, &output, &format, quality, speed, resize),
         Command::Resize {
             max_dimension,
             input,

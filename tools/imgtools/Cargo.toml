@@ -6,8 +6,10 @@ description = "Image processing CLI for Asset Studio"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-image = { version = "0.25", features = ["gif", "jpeg", "png", "webp"] }
+image = { version = "0.25", features = ["gif", "jpeg", "png", "webp", "avif"] }
 webp = "0.3"
+ravif = "0.13"
+rgb = "0.8"
 anyhow = "1"
 
 [profile.release]

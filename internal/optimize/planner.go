@@ -1,15 +1,10 @@
 package optimize
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"os"
 	"os/exec"
@@ -23,10 +18,8 @@ import (
 	"asset-studio/internal/imgtools"
 	"asset-studio/internal/scanner"
 
-	"github.com/gen2brain/avif"
 	minify "github.com/tdewolff/minify/v2"
 	minifysvg "github.com/tdewolff/minify/v2/svg"
-	"golang.org/x/image/draw"
 )
 
 type Strategy string
@@ -294,6 +287,9 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 				ops[index].EstimatedBytes = ops[index].CurrentBytes
 			}
 			ops[index].SavingsBytes = 0
+			if ops[index].Operation == "gif-optimize" {
+				gifFallbackToWebP(&ops[index], hasTool)
+			}
 			blockers = append(blockers, actions.Blocker{File: ops[index].RepoPath, Code: ops[index].ReasonCode, Reason: ops[index].BlockedReason})
 			continue
 		}
@@ -315,36 +311,9 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 				ops[index].CandidatePath = ""
 			}
 
-			// GIF fallback: suggest WebP conversion when gif-optimize yields no savings
 			if ops[index].Operation == "gif-optimize" {
-				ops[index].Operation = "convert-webp"
-				ops[index].OutputFormat = "webp"
-				ops[index].TargetPath = replaceExt(ops[index].RepoPath, ".webp")
-				ops[index].Tool = "asset-studio-imgtools"
-
-				if hasTool("asset-studio-imgtools") {
-					fbCandidate, fbBytes, fbErr := buildCandidate(project, ops[index], req)
-					if fbErr == nil && fbBytes < ops[index].CurrentBytes {
-						ops[index].CandidatePath = fbCandidate
-						ops[index].EstimatedBytes = fbBytes
-						ops[index].SavingsBytes = ops[index].CurrentBytes - fbBytes
-						ops[index].CanApply = true
-						ops[index].Available = true
-						ops[index].ReasonCode = ""
-						ops[index].BlockedReason = ""
-						if !keepCandidates {
-							_ = os.Remove(fbCandidate)
-							ops[index].CandidatePath = ""
-						}
-						continue
-					}
-					if fbCandidate != "" {
-						_ = os.Remove(fbCandidate)
-					}
-				} else {
-					ops[index].Available = false
-					ops[index].ReasonCode = "optimizer_tool_missing"
-					ops[index].BlockedReason = "Required optimizer tool is not installed: asset-studio-imgtools"
+				if gifTryWebPCandidate(project, &ops[index], req, keepCandidates, hasTool) {
+					continue
 				}
 			}
 
@@ -352,6 +321,45 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 		}
 	}
 	return ops, blockers
+}
+
+func gifFallbackToWebP(op *Operation, hasTool toolChecker) {
+	op.Operation = "convert-webp"
+	op.OutputFormat = "webp"
+	op.TargetPath = replaceExt(op.RepoPath, ".webp")
+	op.Tool = "asset-studio-imgtools"
+	op.CanApply = false
+	if !hasTool("asset-studio-imgtools") {
+		op.Available = false
+		op.ReasonCode = "optimizer_tool_missing"
+		op.BlockedReason = "Required optimizer tool is not installed: asset-studio-imgtools"
+	}
+}
+
+func gifTryWebPCandidate(project scanner.Project, op *Operation, req Request, keepCandidates bool, hasTool toolChecker) bool {
+	gifFallbackToWebP(op, hasTool)
+	if !hasTool("asset-studio-imgtools") {
+		return false
+	}
+	candidate, fbBytes, err := buildCandidate(project, *op, req)
+	if err != nil || fbBytes >= op.CurrentBytes {
+		if candidate != "" {
+			_ = os.Remove(candidate)
+		}
+		return false
+	}
+	op.CandidatePath = candidate
+	op.EstimatedBytes = fbBytes
+	op.SavingsBytes = op.CurrentBytes - fbBytes
+	op.CanApply = true
+	op.Available = true
+	op.ReasonCode = ""
+	op.BlockedReason = ""
+	if !keepCandidates {
+		_ = os.Remove(candidate)
+		op.CandidatePath = ""
+	}
+	return true
 }
 
 func replacementEffects(project scanner.Project, items []scanner.AssetItem, ops []Operation, req Request) ([]actions.Change, []string, []actions.Blocker) {
@@ -521,20 +529,8 @@ func buildCandidate(project scanner.Project, op Operation, req Request) (string,
 	switch op.Operation {
 	case "svg-minify":
 		return buildSVGMinifyCandidate(sourceAbs)
-	case "png-recompress":
-		return buildPNGCandidate(sourceAbs)
-	case "jpeg-recompress":
-		return buildJPEGCandidate(sourceAbs, req.Quality)
-	case "convert-avif":
-		return buildAVIFCandidate(sourceAbs, req.Quality)
-	case "resize-variant", "resize-replace":
-		return buildResizeCandidate(sourceAbs, op.OutputFormat, req.MaxDimensionPx, req.Quality)
-	case "gif-optimize":
-		return buildGIFCandidate(sourceAbs)
-	case "convert-webp", "webp-recompress":
-		return buildExternalCandidate(sourceAbs, op, req)
 	default:
-		return "", 0, apierr.WithParams("operation_unsupported", "optimization operation is unsupported", map[string]any{"operation": op.Operation})
+		return buildImgtoolsCandidate(sourceAbs, op, req)
 	}
 }
 
@@ -552,106 +548,7 @@ func buildSVGMinifyCandidate(source string) (string, int64, error) {
 	return writeCandidate(source, ".svg", minified)
 }
 
-func buildPNGCandidate(source string) (string, int64, error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return "", 0, err
-	}
-	var buf bytes.Buffer
-	enc := png.Encoder{CompressionLevel: png.BestCompression}
-	if err := enc.Encode(&buf, img); err != nil {
-		return "", 0, err
-	}
-	return writeCandidate(source, ".png", buf.Bytes())
-}
-
-func buildJPEGCandidate(source string, quality int) (string, int64, error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return "", 0, err
-	}
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
-		return "", 0, err
-	}
-	return writeCandidate(source, ".jpg", buf.Bytes())
-}
-
-func buildAVIFCandidate(source string, quality int) (string, int64, error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return "", 0, err
-	}
-	var buf bytes.Buffer
-	if err := avif.Encode(&buf, img, avif.Options{Quality: quality, QualityAlpha: quality, Speed: 10}); err != nil {
-		return "", 0, err
-	}
-	return writeCandidate(source, ".avif", buf.Bytes())
-}
-
-func buildGIFCandidate(source string) (string, int64, error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-	img, err := gif.DecodeAll(file)
-	if err != nil {
-		return "", 0, err
-	}
-	var buf bytes.Buffer
-	if err := gif.EncodeAll(&buf, img); err != nil {
-		return "", 0, err
-	}
-	return writeCandidate(source, ".gif", buf.Bytes())
-}
-
-func buildResizeCandidate(source, format string, maxDimension, quality int) (string, int64, error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return "", 0, err
-	}
-	bounds := img.Bounds()
-	w, h := fitBounds(bounds.Dx(), bounds.Dy(), maxDimension)
-	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
-	draw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, draw.Over, nil)
-	var buf bytes.Buffer
-	switch format {
-	case "jpg", "jpeg":
-		if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: quality}); err != nil {
-			return "", 0, err
-		}
-		return writeCandidate(source, ".jpg", buf.Bytes())
-	default:
-		enc := png.Encoder{CompressionLevel: png.BestCompression}
-		if err := enc.Encode(&buf, dst); err != nil {
-			return "", 0, err
-		}
-		return writeCandidate(source, ".png", buf.Bytes())
-	}
-}
-
-func buildExternalCandidate(source string, op Operation, req Request) (string, int64, error) {
+func buildImgtoolsCandidate(source string, op Operation, req Request) (string, int64, error) {
 	bin, err := imgtools.Binary()
 	if err != nil {
 		return "", 0, apierr.WithParams("optimizer_tool_missing", "asset-studio-imgtools not found", map[string]any{"tool": "asset-studio-imgtools"})
@@ -663,13 +560,16 @@ func buildExternalCandidate(source string, op Operation, req Request) (string, i
 	}
 	targetPath := target.Name()
 	_ = target.Close()
-	var args []string
-	switch op.Operation {
-	case "convert-webp", "webp-recompress":
-		args = []string{"convert", "--format", "webp", "--quality", fmt.Sprintf("%d", req.Quality), source, targetPath}
-	default:
-		return "", 0, apierr.WithParams("operation_unsupported", "optimization operation is unsupported", map[string]any{"operation": op.Operation})
+
+	args := []string{"convert", "--format", op.OutputFormat, "--quality", fmt.Sprintf("%d", req.Quality)}
+	if op.Operation == "convert-avif" {
+		args = append(args, "--speed", "6")
 	}
+	if op.Operation == "resize-variant" || op.Operation == "resize-replace" {
+		args = append(args, "--resize", fmt.Sprintf("%d", req.MaxDimensionPx))
+	}
+	args = append(args, source, targetPath)
+
 	cmd := exec.Command(bin, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(targetPath)
@@ -708,17 +608,6 @@ func copyFile(dst io.Writer, source string) error {
 	defer src.Close()
 	_, err = io.Copy(dst, src)
 	return err
-}
-
-func fitBounds(width, height, maxSize int) (int, int) {
-	if width <= 0 || height <= 0 || maxSize <= 0 {
-		return width, height
-	}
-	scale := min(float64(maxSize)/float64(width), float64(maxSize)/float64(height))
-	if scale >= 1 {
-		return width, height
-	}
-	return max(1, int(float64(width)*scale)), max(1, int(float64(height)*scale))
 }
 
 func safeAbs(root, repoPath string) (string, error) {

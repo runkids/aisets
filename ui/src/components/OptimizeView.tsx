@@ -1057,8 +1057,9 @@ export function OptimizeView({
                   const item = items[virtualRow.index];
                   if (!item) return null;
                   const sev = primarySeverity(item);
-                  const op = operationFor(item);
                   const planned = estimatedOperationsByAsset.get(item.id);
+                  const op =
+                    (planned?.operation as Operation) || operationFor(item);
                   const rec = item.optimizationRecommendations[0];
                   const recSavings = rec?.savingsBytes ?? 0;
                   const isSelected = selected.has(item.id);
