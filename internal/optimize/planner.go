@@ -714,9 +714,14 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 	}
 	args = append(args, source, targetPath)
 
-	cmd := exec.Command(bin, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(targetPath)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", 0, apierr.WithParams("optimizer_tool_timeout", "optimizer tool timed out", map[string]any{"tool": "asset-studio-imgtools"})
+		}
 		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": "asset-studio-imgtools", "output": string(out)})
 	}
 	info, err := os.Stat(targetPath)

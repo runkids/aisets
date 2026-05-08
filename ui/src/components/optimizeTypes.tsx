@@ -119,6 +119,7 @@ export async function streamEstimate(
   body: unknown,
   onOperation: (op: OptimizationOperation) => void,
   signal?: AbortSignal,
+  onEvent?: (event: EstimateStreamEvent) => void,
 ): Promise<void> {
   const response = await fetch("/api/actions/optimization/estimate-stream", {
     method: "POST",
@@ -145,6 +146,7 @@ export async function streamEstimate(
     for (const line of lines) {
       if (!line.trim()) continue;
       const event = JSON.parse(line) as EstimateStreamEvent;
+      onEvent?.(event);
       if (event.type === "error") throw new Error(event.error.message);
       if (event.type === "operation") onOperation(event.operation);
     }

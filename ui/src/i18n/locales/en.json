@@ -750,9 +750,20 @@
     "ocrError": "OCR failed",
     "ocrPreparing": "Preparing OCR",
     "ocrCounts": "processed {{processed}}, ready {{ready}}, failed {{failed}}, skipped {{skipped}}, cache {{cacheHit}}",
+    "optimizeTitle": "Optimize activity",
+    "optimizeRunning": "Estimating optimization",
+    "optimizeStopping": "Stopping optimization",
+    "optimizeDone": "Optimization estimate complete",
+    "optimizeStopped": "Optimization stopped",
+    "optimizeError": "Optimization failed",
+    "optimizePreparing": "Preparing optimization",
+    "optimizeCounts": "processed {{processed}}/{{total}}, applicable {{applicable}}, blocked {{blocked}}",
     "viewOCRSettings": "OCR settings",
+    "viewOptimize": "Open Optimize",
+    "stopOptimize": "Stop",
     "dismiss": "Dismiss",
     "ocrLockedTooltip": "Stop OCR first",
+    "optimizeLockedTooltip": "Stop optimization first",
     "ocrLockedAction": "OCR is running. Stop OCR before changing the catalog."
   },
   "toast": {
@@ -930,6 +941,7 @@
     "partialApplyDesc": "Applicable items will be written; {{count}} blocked items will be skipped.",
     "blockedReason": {
       "optimizer_tool_missing": "Missing required tool: {{tool}}",
+      "optimizer_tool_timeout": "Optimization took too long for {{tool}}. Try a smaller image or optimize this animation manually.",
       "no_effective_savings": "Candidate output is not smaller than the original.",
       "operation_unsupported": "No automated optimization is available for this format.",
       "asset_not_found": "The previewed asset was not found.",

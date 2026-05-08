@@ -390,9 +390,20 @@
     "ocrError": "OCR 失敗",
     "ocrPreparing": "正在準備 OCR",
     "ocrCounts": "已處理 {{processed}}，完成 {{ready}}，失敗 {{failed}}，略過 {{skipped}}，快取 {{cacheHit}}",
+    "optimizeTitle": "最佳化活動",
+    "optimizeRunning": "正在估算最佳化",
+    "optimizeStopping": "正在停止最佳化",
+    "optimizeDone": "最佳化估算完成",
+    "optimizeStopped": "最佳化已停止",
+    "optimizeError": "最佳化失敗",
+    "optimizePreparing": "正在準備最佳化",
+    "optimizeCounts": "已處理 {{processed}}/{{total}}，可套用 {{applicable}}，阻擋 {{blocked}}",
     "viewOCRSettings": "OCR 設定",
+    "viewOptimize": "開啟最佳化",
+    "stopOptimize": "停止",
     "dismiss": "關閉",
     "ocrLockedTooltip": "請先停止 OCR",
+    "optimizeLockedTooltip": "請先停止最佳化",
     "ocrLockedAction": "OCR 執行中請先停止 OCR，再變更 catalog"
   },
   "toast": {
@@ -570,6 +581,7 @@
     "partialApplyDesc": "可套用的項目會正常寫入，{{count}} 個阻擋項目會略過。",
     "blockedReason": {
       "optimizer_tool_missing": "缺少必要工具：{{tool}}",
+      "optimizer_tool_timeout": "{{tool}} 最佳化耗時過久。請改用較小圖片，或手動最佳化這個動畫檔。",
       "no_effective_savings": "候選檔沒有比原檔更小",
       "operation_unsupported": "此格式目前沒有自動優化流程",
       "asset_not_found": "預覽中的素材不存在",

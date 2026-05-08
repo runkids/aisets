@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { projectScanIntentLabel } from "../projectScanIntent";
 import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "../queries";
@@ -20,6 +20,7 @@ import { fileName, formatBytes, primarySeverity } from "../ui";
 import type {
   Category,
   Operation,
+  EstimateStreamEvent,
   OptimizationEstimate,
   OptimizationOperation,
   PreviewBatch,
@@ -52,6 +53,7 @@ import { useElementHeight } from "../hooks/useElementHeight";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { cn } from "@/lib/cn";
 import { useToast } from "./ToastProvider";
+import type { OptimizeActivityAction } from "../optimizeActivity";
 import {
   AssetThumbnail,
   Badge,
@@ -78,6 +80,8 @@ type Props = {
   projectFilterId?: string;
   projectFilterName?: string;
   enabled?: boolean;
+  optimizeAbortRef?: RefObject<AbortController | null>;
+  onOptimizeActivity?: (action: OptimizeActivityAction) => void;
   onOpenAsset?: (id: string) => void;
 };
 
@@ -86,6 +90,8 @@ export function OptimizeView({
   projectFilterId,
   projectFilterName = "",
   enabled = true,
+  optimizeAbortRef,
+  onOptimizeActivity,
   onOpenAsset,
 }: Props) {
   const { t } = useTranslation();
@@ -338,7 +344,13 @@ export function OptimizeView({
     };
   }
 
-  async function estimateFor(assetIds: string[]) {
+  async function estimateFor(
+    assetIds: string[],
+    options: {
+      signal?: AbortSignal;
+      onEvent?: (event: EstimateStreamEvent) => void;
+    } = {},
+  ) {
     const key = estimateCacheKey(
       assetIds,
       replaceOriginal,
@@ -410,7 +422,8 @@ export function OptimizeView({
         }
         if (!flushTimer) flushTimer = setTimeout(flushPartial, 300);
       },
-      abortRef.current?.signal,
+      options.signal,
+      options.onEvent,
     );
     if (flushTimer) clearTimeout(flushTimer);
     persistEstimateOperationCache();
@@ -423,8 +436,7 @@ export function OptimizeView({
     return merged;
   }
 
-  async function runEstimate(assetIds?: string[]) {
-    const ids = assetIds ?? actionIds;
+  async function trackedEstimateFor(ids: string[]) {
     const fullKey = estimateCacheKey(
       ids,
       replaceOriginal,
@@ -435,19 +447,51 @@ export function OptimizeView({
     const wasCached = estimateCache.has(fullKey);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    if (optimizeAbortRef) optimizeAbortRef.current = ctrl;
+    try {
+      await estimateFor(ids, {
+        signal: ctrl.signal,
+        onEvent: (event) => {
+          if (event.type === "start") {
+            onOptimizeActivity?.({ type: "start", total: event.total });
+          } else if (event.type === "operation") {
+            onOptimizeActivity?.({
+              type: "operation",
+              operation: event.operation,
+            });
+          }
+        },
+      });
+      if (wasCached) toast.info(t("optimize.estimateCached"));
+      if (!wasCached) onOptimizeActivity?.({ type: "done" });
+    } catch (err) {
+      if (ctrl.signal.aborted) {
+        onOptimizeActivity?.({ type: "stopped" });
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        onOptimizeActivity?.({ type: "error", errorMessage: message });
+      }
+      throw err;
+    } finally {
+      if (abortRef.current === ctrl) abortRef.current = null;
+      if (optimizeAbortRef?.current === ctrl) optimizeAbortRef.current = null;
+    }
+  }
+
+  async function runEstimate(assetIds?: string[]) {
+    const ids = assetIds ?? actionIds;
     setWorking("estimate");
     setProgress(0);
     setError(null);
     try {
-      await estimateFor(ids);
+      await trackedEstimateFor(ids);
       setProgress(100);
-      if (wasCached) toast.info(t("optimize.estimateCached"));
     } catch (err) {
-      if (!ctrl.signal.aborted)
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
         setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setWorking(null);
-      abortRef.current = null;
     }
   }
 
@@ -457,7 +501,7 @@ export function OptimizeView({
     setError(null);
     try {
       setWorking("estimate");
-      await estimateFor(assetIds);
+      await trackedEstimateFor(assetIds);
       setWorking("preview");
       await runPreview(assetIds, { keepWorking: true });
     } catch (err) {
@@ -533,7 +577,7 @@ export function OptimizeView({
     setError(null);
     try {
       setWorking("estimate");
-      await estimateFor(ids);
+      await trackedEstimateFor(ids);
       setWorking("preview");
       await runPreview(ids, { keepWorking: true });
     } catch (err) {
@@ -592,6 +636,7 @@ export function OptimizeView({
   }
 
   function cancelOperation() {
+    if (working === "estimate") onOptimizeActivity?.({ type: "stopping" });
     abortRef.current?.abort();
     setWorking(null);
     setProgress(0);

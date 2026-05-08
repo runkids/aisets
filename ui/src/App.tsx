@@ -59,6 +59,11 @@ import {
   runOCRActivity,
 } from "./ocrActivity";
 import {
+  initialOptimizeActivityState,
+  isOptimizeActivityBusy,
+  optimizeActivityReducer,
+} from "./optimizeActivity";
+import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
   type ImageBackgroundMode,
@@ -138,6 +143,11 @@ export function App() {
   );
   const ocrActivityAbortRef = useRef<AbortController | null>(null);
   const ocrActivityRunRef = useRef<Promise<void> | null>(null);
+  const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
+    optimizeActivityReducer,
+    initialOptimizeActivityState,
+  );
+  const optimizeActivityAbortRef = useRef<AbortController | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("asset-studio-image-preview") !== "off";
@@ -317,7 +327,9 @@ export function App() {
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
-  const catalogActionsDisabled = working || ocrActivityBusy;
+  const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
+  const catalogActionsDisabled =
+    working || ocrActivityBusy || optimizeActivityBusy;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
   const ocrEnabled = settingsQuery.data?.settings.ocrEnabled ?? false;
@@ -364,7 +376,7 @@ export function App() {
     });
 
   function onAddProject(path: string, scanIntent: ProjectScanIntent) {
-    if (ocrActivityBusy) return;
+    if (ocrActivityBusy || optimizeActivityBusy) return;
     addProjectMutation.mutate(
       { path, scanIntent },
       {
@@ -379,7 +391,7 @@ export function App() {
 
   function onSwitchWorkspace(workspaceId: string) {
     if (workspaceId === activeWorkspaceId) return;
-    if (ocrActivityBusy) return;
+    if (ocrActivityBusy || optimizeActivityBusy) return;
     switchWorkspaceMutation.mutate(workspaceId, {
       onSuccess: (result) => {
         setSelectedProjectId("");
@@ -439,8 +451,22 @@ export function App() {
     });
   }
 
+  function onStopOptimizeActivity() {
+    if (!optimizeActivityAbortRef.current) return;
+    dispatchOptimizeActivity({ type: "stopping" });
+    optimizeActivityAbortRef.current.abort();
+  }
+
+  function onDismissOptimizeActivity() {
+    dispatchOptimizeActivity({ type: "dismiss" });
+  }
+
+  function onOpenOptimize() {
+    navigate(pathForMode("optimize"));
+  }
+
   function onRescan() {
-    if (ocrActivityBusy) return;
+    if (ocrActivityBusy || optimizeActivityBusy) return;
     clearEstimateCaches();
     setScanProgress(null);
     setScanProgressVisible(true);
@@ -450,7 +476,7 @@ export function App() {
   }
 
   function onFullScan() {
-    if (ocrActivityBusy) return;
+    if (ocrActivityBusy || optimizeActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
@@ -462,7 +488,7 @@ export function App() {
   }
 
   function onNearDuplicateScan() {
-    if (ocrActivityBusy) return;
+    if (ocrActivityBusy || optimizeActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
@@ -520,6 +546,10 @@ export function App() {
       toast.info(t("activity.ocrLockedAction"));
       return;
     }
+    if (optimizeActivityBusy) {
+      toast.info(t("activity.optimizeLockedTooltip"));
+      return;
+    }
     try {
       await applyPreviewMutation.mutateAsync({
         endpoint: preview.endpoint,
@@ -569,12 +599,16 @@ export function App() {
           catalogActionsDisabled={catalogActionsDisabled}
           scanProgress={scanProgressVisible ? scanProgress : null}
           ocrActivity={ocrActivity}
+          optimizeActivity={optimizeActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
           onRefresh={onRescan}
           onOpenCmdK={() => setCmdkOpen(true)}
           onStopOCR={onStopOCRActivity}
           onDismissOCR={onDismissOCRActivity}
           onOpenOCRSettings={onOpenOCRSettings}
+          onStopOptimize={onStopOptimizeActivity}
+          onDismissOptimize={onDismissOptimizeActivity}
+          onOpenOptimize={onOpenOptimize}
         />
       </div>
       <NavSidebar
@@ -586,7 +620,7 @@ export function App() {
         projects={projectSwitchProjects}
         selectedProjectId={effectiveSelectedProjectId}
         totalAssets={catalogSummary?.stats.totalFiles ?? 0}
-        workspaceSwitchDisabled={ocrActivityBusy}
+        workspaceSwitchDisabled={ocrActivityBusy || optimizeActivityBusy}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}
         onSelect={changeMode}
@@ -697,6 +731,8 @@ export function App() {
                 scanId={catalogSummary?.scanId}
                 projectFilterId={effectiveSelectedProjectId || undefined}
                 projectFilterName={selectedProject?.name ?? ""}
+                optimizeAbortRef={optimizeActivityAbortRef}
+                onOptimizeActivity={dispatchOptimizeActivity}
                 onOpenAsset={setDrawerId}
               />
             )
@@ -769,7 +805,9 @@ export function App() {
           disabledReason={
             ocrActivityBusy
               ? t("directoryPicker.addDisabledOcrBusy")
-              : undefined
+              : optimizeActivityBusy
+                ? t("activity.optimizeLockedTooltip")
+                : undefined
           }
           initialPath={directoryPickerInitialPath}
           onClose={() => setDirectoryPickerOpen(false)}
@@ -792,7 +830,11 @@ export function App() {
       {preview && (
         <PreviewModal
           preview={preview.value}
-          working={applyPreviewMutation.isPending || ocrActivityBusy}
+          working={
+            applyPreviewMutation.isPending ||
+            ocrActivityBusy ||
+            optimizeActivityBusy
+          }
           onCancel={() => setPreview(null)}
           onApply={onApplyPreview}
         />

@@ -24,6 +24,7 @@ import (
 	"asset-studio/internal/imageproc"
 	"asset-studio/internal/lint"
 	"asset-studio/internal/ocr"
+	"asset-studio/internal/optimize"
 	"asset-studio/internal/scanner"
 )
 
@@ -2016,5 +2017,25 @@ func mustWrite(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOptimizationEstimateCostPrioritizesLargeAnimationsLast(t *testing.T) {
+	smallStatic := scanner.AssetItem{
+		ID:    "png",
+		Bytes: 1_000_000,
+		Image: imageproc.Metadata{Width: 800, Height: 800, Pages: 1},
+	}
+	largeAnimation := scanner.AssetItem{
+		ID:    "gif",
+		Bytes: 24_000_000,
+		Image: imageproc.Metadata{Width: 3024, Height: 1786, Animated: true, Pages: 684},
+	}
+
+	smallCost := optimizationEstimateCost(smallStatic, optimize.Operation{Operation: "convert-avif"})
+	largeCost := optimizationEstimateCost(largeAnimation, optimize.Operation{Operation: "convert-webp"})
+
+	if largeCost <= smallCost {
+		t.Fatalf("large animated GIF cost %d should exceed static PNG cost %d", largeCost, smallCost)
 	}
 }

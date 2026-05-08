@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
@@ -199,6 +200,29 @@ func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, result)
 }
 
+func optimizationEstimateCost(item scanner.AssetItem, op optimize.Operation) int64 {
+	width := int64(item.Image.Width)
+	height := int64(item.Image.Height)
+	pixels := width * height
+	if pixels <= 0 {
+		pixels = max(item.Bytes/1024, 1)
+	}
+	pages := int64(item.Image.Pages)
+	if pages <= 0 {
+		pages = 1
+	}
+	if item.Image.Animated {
+		pixels *= pages
+	}
+	switch op.Operation {
+	case "convert-avif":
+		pixels *= 4
+	case "convert-webp", "webp-recompress":
+		pixels *= 2
+	}
+	return pixels + max(item.Bytes/1024, 1)
+}
+
 func (s *Server) handleOptimizationEstimateStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -235,15 +259,34 @@ func (s *Server) handleOptimizationEstimateStream(w http.ResponseWriter, r *http
 		g.items = append(g.items, item)
 	}
 
-	var work []optimize.ProjectOperation
+	type estimateWork struct {
+		operation optimize.ProjectOperation
+		cost      int64
+	}
+	var workItems []estimateWork
 	for _, g := range byProject {
+		itemsByID := make(map[string]scanner.AssetItem, len(g.items))
+		for _, item := range g.items {
+			itemsByID[item.ID] = item
+		}
 		ops := optimize.Plan(g.items, body.Request)
 		for _, op := range ops {
-			work = append(work, optimize.ProjectOperation{Project: g.project, Op: op})
+			item := itemsByID[op.AssetID]
+			workItems = append(workItems, estimateWork{
+				operation: optimize.ProjectOperation{Project: g.project, Op: op},
+				cost:      optimizationEstimateCost(item, op),
+			})
 		}
 	}
+	sort.SliceStable(workItems, func(i, j int) bool {
+		return workItems[i].cost < workItems[j].cost
+	})
+	work := make([]optimize.ProjectOperation, 0, len(workItems))
+	for _, item := range workItems {
+		work = append(work, item.operation)
+	}
 
-	sendNDJSON(w, map[string]any{"type": "start", "total": len(work)})
+	sendNDJSON(w, map[string]any{"type": "start", "total": len(work), "workers": body.Request.Workers})
 
 	req := body.Request
 	if req.AvifSpeed <= 0 {
