@@ -27,7 +27,7 @@ export function ImagePreview({
   src,
   alt = "",
   children,
-  delay = 1000,
+  delay = 1500,
   enabled = true,
 }: ImagePreviewProps) {
   const bgMode = useImageBackgroundMode();
@@ -94,14 +94,17 @@ export function ImagePreview({
         src &&
         createPortal(
           <div
-            className={cn(
-              "h-[400px] w-[480px] overflow-hidden rounded-g-lg border border-g-line-strong",
-              "shadow-g-pop pointer-events-none animate-[fadeIn_160ms_var(--g-ease)]",
-              imageBackgroundClassName(bgMode),
-            )}
+            className="w-[480px] overflow-hidden rounded-g-lg border border-g-line-strong bg-g-surface-2 p-1.5 shadow-g-pop pointer-events-none animate-[fadeIn_160ms_var(--g-ease)]"
             style={previewStyle}
           >
-            <img src={src} alt={alt} className="size-full object-contain" />
+            <div
+              className={cn(
+                "h-[400px] overflow-hidden rounded-g-md",
+                imageBackgroundClassName(bgMode),
+              )}
+            >
+              <img src={src} alt={alt} className="size-full object-contain" />
+            </div>
           </div>,
           document.body,
         )}
