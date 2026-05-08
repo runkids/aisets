@@ -9,15 +9,13 @@ import { optimizationBlockers, optimizationOperations } from "./optimizeTypes";
 
 export const estimateCache = new Map<string, OptimizationEstimate>();
 export const estimateOperationCache = new Map<string, OptimizationOperation>();
-const estimateOperationStorageKey = "asset-studio.optimize.estimates.v1";
-const estimateOperationCacheLimit = 3000;
-let estimateOperationCacheLoaded = false;
 
 export function estimateCacheKey(
   assetIds: string[],
   replaceOriginal: boolean,
   updateReferences: boolean,
   itemsById?: Map<string, AssetItem>,
+  quality = 80,
 ) {
   return JSON.stringify({
     ids: [...assetIds].sort().map((assetId) => {
@@ -28,6 +26,7 @@ export function estimateCacheKey(
     }),
     outputMode: replaceOriginal ? "replace" : "safeVariants",
     updateReferences: replaceOriginal && updateReferences,
+    quality,
   });
 }
 
@@ -35,6 +34,7 @@ export function estimateOperationCacheKey(
   item: AssetItem,
   replaceOriginal: boolean,
   updateReferences: boolean,
+  quality = 80,
 ) {
   return JSON.stringify({
     assetId: item.id,
@@ -43,41 +43,17 @@ export function estimateOperationCacheKey(
     bytes: item.bytes,
     outputMode: replaceOriginal ? "replace" : "safeVariants",
     updateReferences: replaceOriginal && updateReferences,
-    quality: 80,
+    quality,
     maxDimensionPx: 1200,
   });
 }
 
 export function ensureEstimateOperationCacheLoaded() {
-  if (estimateOperationCacheLoaded || typeof window === "undefined") return;
-  estimateOperationCacheLoaded = true;
-  try {
-    const raw = window.localStorage.getItem(estimateOperationStorageKey);
-    if (!raw) return;
-    const entries = JSON.parse(raw) as Array<[string, OptimizationOperation]>;
-    if (!Array.isArray(entries)) return;
-    for (const entry of entries.slice(-estimateOperationCacheLimit)) {
-      if (!Array.isArray(entry) || typeof entry[0] !== "string") continue;
-      estimateOperationCache.set(entry[0], entry[1]);
-    }
-  } catch {
-    estimateOperationCache.clear();
-  }
+  // in-memory only — no localStorage persistence
 }
 
 export function persistEstimateOperationCache() {
-  if (typeof window === "undefined") return;
-  try {
-    const entries = [...estimateOperationCache.entries()].slice(
-      -estimateOperationCacheLimit,
-    );
-    window.localStorage.setItem(
-      estimateOperationStorageKey,
-      JSON.stringify(entries),
-    );
-  } catch {
-    // localStorage may be unavailable or full; in-memory cache still works.
-  }
+  // in-memory only — no localStorage persistence
 }
 
 export function buildEstimateFromOperations(

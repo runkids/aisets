@@ -109,6 +109,49 @@ export const toolInstallCommands: Record<string, string> = {
   svgo: "npm install -g svgo",
 };
 
+export type EstimateStreamEvent =
+  | { type: "start"; total: number }
+  | { type: "operation"; operation: OptimizationOperation }
+  | { type: "error"; error: { code: string; message: string } }
+  | { type: "done"; total: number };
+
+export async function streamEstimate(
+  body: unknown,
+  onOperation: (op: OptimizationOperation) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch("/api/actions/optimization/estimate-stream", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      (errorBody as { error?: { message?: string } })?.error?.message ||
+        `HTTP ${response.status}`,
+    );
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as EstimateStreamEvent;
+      if (event.type === "error") throw new Error(event.error.message);
+      if (event.type === "operation") onOperation(event.operation);
+    }
+    if (done) break;
+  }
+}
+
 export const batchActionButtonClassName =
   "inline-flex min-h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]";
 

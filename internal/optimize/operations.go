@@ -17,7 +17,7 @@ var operationRules = []operationRule{
 	{SuggestionCode: "try_modern_photographic_format", Exts: []string{".png", ".jpg", ".jpeg"}, Operation: "convert-avif"},
 	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".png", ".jpg", ".jpeg"}, Operation: "convert-avif"},
 	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".webp"}, Operation: "webp-recompress"},
-	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".gif"}, Operation: "gif-optimize"},
+	{SuggestionCode: "review_compression_or_modern_format", Exts: []string{".gif"}, Operation: "convert-webp"},
 }
 
 func SuggestionOperation(suggestionCode, ext string) string {

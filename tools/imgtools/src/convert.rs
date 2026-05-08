@@ -10,6 +10,10 @@ pub fn run(
     speed: u8,
     resize: Option<u32>,
 ) -> Result<()> {
+    if format == "webp" && is_animated_gif(input) {
+        bail!("animated GIF cannot be converted to static WebP without losing animation");
+    }
+
     let mut img = image::open(input).with_context(|| format!("failed to open {input}"))?;
 
     if let Some(max_dim) = resize {
@@ -27,6 +31,24 @@ pub fn run(
         "jpeg" | "jpg" => encode_jpeg(&img, output, quality),
         _ => bail!("unsupported output format: {format}"),
     }
+}
+
+fn is_animated_gif(path: &str) -> bool {
+    use image::AnimationDecoder;
+    use image::codecs::gif::GifDecoder;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    if !path.to_lowercase().ends_with(".gif") {
+        return false;
+    }
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let Ok(decoder) = GifDecoder::new(BufReader::new(file)) else {
+        return false;
+    };
+    decoder.into_frames().take(2).count() > 1
 }
 
 fn encode_webp(img: &DynamicImage, output: &str, quality: u8) -> Result<()> {

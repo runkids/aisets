@@ -199,6 +199,67 @@ func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) handleOptimizationEstimateStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+
+	var body struct {
+		optimize.Request
+	}
+	if err := readJSON(r, &body); err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": map[string]string{"code": "bad_request", "message": err.Error()}})
+		return
+	}
+	items, err := s.selectOptimizationItems(r.Context(), body.Request.AssetIDs)
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": map[string]string{"code": "internal", "message": err.Error()}})
+		return
+	}
+
+	type projectGroup struct {
+		project scanner.Project
+		items   []scanner.AssetItem
+	}
+	byProject := map[string]*projectGroup{}
+	for _, item := range items {
+		g := byProject[item.ProjectID]
+		if g == nil {
+			project, err := s.projectByID(item.ProjectID)
+			if err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": map[string]string{"code": "project_not_found", "message": err.Error()}})
+				return
+			}
+			g = &projectGroup{project: project}
+			byProject[item.ProjectID] = g
+		}
+		g.items = append(g.items, item)
+	}
+
+	var work []optimize.ProjectOperation
+	for _, g := range byProject {
+		ops := optimize.Plan(g.items, body.Request)
+		for _, op := range ops {
+			work = append(work, optimize.ProjectOperation{Project: g.project, Op: op})
+		}
+	}
+
+	sendNDJSON(w, map[string]any{"type": "start", "total": len(work)})
+
+	req := body.Request
+	if req.AvifSpeed <= 0 {
+		req.AvifSpeed = 10
+	}
+	workers := req.Workers
+	if workers <= 0 {
+		workers = 1
+	}
+	optimize.StreamMeasureOperations(r.Context(), work, req, workers, func(op optimize.Operation) {
+		sendNDJSON(w, map[string]any{"type": "operation", "operation": op})
+	})
+
+	sendNDJSON(w, map[string]any{"type": "done", "total": len(work)})
+}
+
 func missingAssetIDs(ids []string, items []scanner.AssetItem) []string {
 	found := map[string]bool{}
 	for _, item := range items {

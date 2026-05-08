@@ -126,7 +126,7 @@ func TestCommandForCompressionVariants(t *testing.T) {
 		{"png conversion", "review_compression_or_modern_format", ".png", "a.png", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
 		{"jpeg conversion", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
 		{"webp recompress via size", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
-		{"gif recompress", "review_compression_or_modern_format", ".gif", "a.gif", `asset-studio-imgtools convert --format gif --quality 75 "a.gif" "a.gif"`},
+		{"gif to webp", "review_compression_or_modern_format", ".gif", "a.gif", `asset-studio-imgtools convert --format webp --quality 80 "a.gif" "a.webp"`},
 		{"webp recompress", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
 		{"unsupported modern format", "try_modern_photographic_format", ".svg", "a.svg", ""},
 		{"unknown code", "unknown", ".png", "a.png", ""},
@@ -224,17 +224,17 @@ func TestPlanUsesBuiltInOperationsForCommonFormats(t *testing.T) {
 	if ops[0].Operation != "webp-recompress" || ops[0].Tool != "asset-studio-imgtools" {
 		t.Fatalf("webp op = %#v", ops[0])
 	}
-	if ops[1].Operation != "gif-optimize" || ops[1].Tool != "asset-studio-imgtools" {
+	if ops[1].Operation != "convert-webp" || ops[1].Tool != "asset-studio-imgtools" {
 		t.Fatalf("gif op = %#v", ops[1])
 	}
-	for i, name := range []string{"webp-recompress", "gif-optimize"} {
+	for i, name := range []string{"webp-recompress", "convert-webp"} {
 		if ops[i].CanApply || ops[i].Available {
 			t.Fatalf("%s should be blocked when imgtools unavailable", name)
 		}
 	}
 
 	opsAvail := planWithTools(items, Request{}, func(string) bool { return true })
-	for i, name := range []string{"webp-recompress", "gif-optimize"} {
+	for i, name := range []string{"webp-recompress", "convert-webp"} {
 		if !opsAvail[i].CanApply || !opsAvail[i].Available {
 			t.Fatalf("%s should be available when imgtools present", name)
 		}
@@ -252,7 +252,7 @@ func TestPlanRoutesFormatsByRules(t *testing.T) {
 		{"png alpha → webp", "try_alpha_preserving_format", ".png", "convert-webp"},
 		{"jpeg large → avif", "review_compression_or_modern_format", ".jpeg", "convert-avif"},
 		{"webp large → recompress", "review_compression_or_modern_format", ".webp", "webp-recompress"},
-		{"gif large → gif", "review_compression_or_modern_format", ".gif", "gif-optimize"},
+		{"gif large → webp", "review_compression_or_modern_format", ".gif", "convert-webp"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

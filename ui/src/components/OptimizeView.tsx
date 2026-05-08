@@ -15,7 +15,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { projectScanIntentLabel } from "../projectScanIntent";
-import { useCatalogItemsInfiniteQuery } from "../queries";
+import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "../queries";
 import { fileName, formatBytes, primarySeverity } from "../ui";
 import type {
   Category,
@@ -32,6 +32,7 @@ import {
   operationLabels,
   optimizationOperations,
   postJSON,
+  streamEstimate,
   toolInstallCommands,
 } from "./optimizeTypes";
 import { OptimizeHelpPopover } from "./OptimizeHelpPopover";
@@ -89,6 +90,9 @@ export function OptimizeView({
 }: Props) {
   const { t } = useTranslation();
   const toast = useToast();
+  const settingsQuery = useSettingsQuery();
+  const quality =
+    settingsQuery.data?.settings?.optimizationDefaultQuality ?? 80;
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("");
   const [severity, setSeverity] = useState<Severity>("");
@@ -177,7 +181,12 @@ export function OptimizeView({
     for (const item of items) {
       if (operations.has(item.id)) continue;
       const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(item, replaceOriginal, updateReferences),
+        estimateOperationCacheKey(
+          item,
+          replaceOriginal,
+          updateReferences,
+          quality,
+        ),
       );
       if (operation) operations.set(item.id, operation);
     }
@@ -245,8 +254,14 @@ export function OptimizeView({
   const referencesInputId = "optimize-update-references";
   const currentEstimateKey = useMemo(
     () =>
-      estimateCacheKey(actionIds, replaceOriginal, updateReferences, itemsById),
-    [actionIds, replaceOriginal, updateReferences, itemsById],
+      estimateCacheKey(
+        actionIds,
+        replaceOriginal,
+        updateReferences,
+        itemsById,
+        quality,
+      ),
+    [actionIds, replaceOriginal, updateReferences, itemsById, quality],
   );
   function cachedEstimateFor(assetIds: string[]) {
     ensureEstimateOperationCacheLoaded();
@@ -255,7 +270,12 @@ export function OptimizeView({
       const item = itemsById.get(assetId);
       if (!item) return null;
       const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(item, replaceOriginal, updateReferences),
+        estimateOperationCacheKey(
+          item,
+          replaceOriginal,
+          updateReferences,
+          quality,
+        ),
       );
       if (!operation) return null;
       operations.push(operation);
@@ -285,6 +305,16 @@ export function OptimizeView({
     setPreview(null);
   }, [currentEstimateKey, actionIds, itemsById]);
 
+  const autoEstimateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!items.length || working || !itemsQuery.data) return;
+    const key = currentEstimateKey;
+    if (autoEstimateRef.current === key) return;
+    if (estimateCache.has(key)) return;
+    autoEstimateRef.current = key;
+    void runEstimate();
+  }, [items.length, working, currentEstimateKey, itemsQuery.data]);
+
   useInfiniteScrollSentinel({
     rootRef: scrollRef,
     sentinelRef,
@@ -309,7 +339,7 @@ export function OptimizeView({
       strategy: "conservative",
       outputMode: replaceOriginal ? "replace" : "safeVariants",
       updateReferences: replaceOriginal && updateReferences,
-      quality: 80,
+      quality,
       maxDimensionPx: 1200,
     };
   }
@@ -320,6 +350,7 @@ export function OptimizeView({
       replaceOriginal,
       updateReferences,
       itemsById,
+      quality,
     );
     const cached = estimateCache.get(key);
     if (cached) {
@@ -336,7 +367,12 @@ export function OptimizeView({
         continue;
       }
       const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(item, replaceOriginal, updateReferences),
+        estimateOperationCacheKey(
+          item,
+          replaceOriginal,
+          updateReferences,
+          quality,
+        ),
       );
       if (operation) {
         cachedOperations.push(operation);
@@ -354,22 +390,39 @@ export function OptimizeView({
       setEstimate(next);
       return next;
     }
-    const next = await postJSON<OptimizationEstimate>(
-      "/api/actions/optimization/estimate",
+    const streamedOps: OptimizationOperation[] = [];
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushPartial = () => {
+      flushTimer = null;
+      const allOps = [...cachedOperations, ...streamedOps];
+      setEstimate(buildEstimateFromOperations(assetIds, itemsById, allOps));
+      setProgress(Math.round((allOps.length / assetIds.length) * 100));
+    };
+    await streamEstimate(
       requestBody(missingIds),
+      (op) => {
+        streamedOps.push(op);
+        const item = itemsById.get(op.assetId);
+        if (item && op.estimatedBytes > 0) {
+          estimateOperationCache.set(
+            estimateOperationCacheKey(
+              item,
+              replaceOriginal,
+              updateReferences,
+              quality,
+            ),
+            op,
+          );
+        }
+        if (!flushTimer) flushTimer = setTimeout(flushPartial, 300);
+      },
+      abortRef.current?.signal,
     );
-    for (const operation of next.operations) {
-      const item = itemsById.get(operation.assetId);
-      if (!item) continue;
-      estimateOperationCache.set(
-        estimateOperationCacheKey(item, replaceOriginal, updateReferences),
-        operation,
-      );
-    }
+    if (flushTimer) clearTimeout(flushTimer);
     persistEstimateOperationCache();
     const merged = buildEstimateFromOperations(assetIds, itemsById, [
       ...cachedOperations,
-      ...next.operations,
+      ...streamedOps,
     ]);
     estimateCache.set(key, merged);
     setEstimate(merged);
@@ -383,6 +436,7 @@ export function OptimizeView({
       replaceOriginal,
       updateReferences,
       itemsById,
+      quality,
     );
     const wasCached = estimateCache.has(fullKey);
     const ctrl = new AbortController();
@@ -591,6 +645,11 @@ export function OptimizeView({
   const operationLabel = (id: string) =>
     t(`optimize.operationLabel.${id}`, {
       defaultValue: operationLabels[id] ?? id,
+    });
+  const blockedReasonLabel = (op: OptimizationOperation) =>
+    t(`optimize.blockedReason.${op.reasonCode}`, {
+      defaultValue: op.blockedReason || t("optimize.blocked"),
+      tool: op.tool,
     });
 
   return (
@@ -1184,15 +1243,27 @@ export function OptimizeView({
                             )}
                             <Badge tone="line">{operationLabel(op)}</Badge>
                           </div>
-                          <div className="mt-1 truncate text-g-caption text-g-ink-4">
-                            {planned?.tool
-                              ? `${planned.tool} ${
-                                  planned.available
-                                    ? t("optimize.ready")
-                                    : t("optimize.blocked")
-                                }`
-                              : projectScanIntentLabel(t, item.scanIntent)}
-                          </div>
+                          {planned && !planned.canApply ? (
+                            <Tooltip
+                              label={blockedReasonLabel(planned)}
+                              placement="top"
+                              contentClassName="max-w-[420px] whitespace-normal break-words"
+                            >
+                              <div className="mt-1 truncate text-g-caption text-g-amber">
+                                {blockedReasonLabel(planned)}
+                              </div>
+                            </Tooltip>
+                          ) : (
+                            <div className="mt-1 truncate text-g-caption text-g-ink-4">
+                              {planned?.tool
+                                ? `${planned.tool} ${
+                                    planned.available
+                                      ? t("optimize.ready")
+                                      : t("optimize.blocked")
+                                  }`
+                                : projectScanIntentLabel(t, item.scanIntent)}
+                            </div>
+                          )}
                         </div>
                         <div className="hidden min-w-0 min-[980px]:block">
                           <div className="font-g-mono text-g-ui text-g-ink">

@@ -1,6 +1,7 @@
 package optimize
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"asset-studio/internal/actions"
@@ -39,6 +41,8 @@ type Request struct {
 	UpdateReferences bool       `json:"updateReferences"`
 	Quality          int        `json:"quality"`
 	MaxDimensionPx   int        `json:"maxDimensionPx"`
+	AvifSpeed        int        `json:"avifSpeed"`
+	Workers          int        `json:"workers"`
 }
 
 type Operation struct {
@@ -276,6 +280,112 @@ func Preview(project scanner.Project, items []scanner.AssetItem, req Request) (a
 
 func EstimateOperations(project scanner.Project, ops []Operation, req Request) ([]Operation, []actions.Blocker) {
 	return measureOperations(project, ops, normalizeRequest(req), false, defaultToolChecker)
+}
+
+type ProjectOperation struct {
+	Project scanner.Project
+	Op      Operation
+}
+
+func StreamMeasureOperations(ctx context.Context, items []ProjectOperation, req Request, workers int, onResult func(Operation)) {
+	if workers <= 0 {
+		workers = 4
+	}
+	req = normalizeRequest(req)
+	hasTool := defaultToolChecker
+
+	jobs := make(chan ProjectOperation)
+	results := make(chan Operation, workers)
+	var wg sync.WaitGroup
+
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				results <- measureSingleOperation(j.Project, j.Op, req, hasTool)
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, item := range items {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- item:
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for op := range results {
+		onResult(op)
+	}
+}
+
+func measureSingleOperation(project scanner.Project, op Operation, req Request, hasTool toolChecker) Operation {
+	if !op.CanApply {
+		if op.EstimatedBytes == 0 {
+			op.EstimatedBytes = op.CurrentBytes
+		}
+		op.SavingsBytes = 0
+		return op
+	}
+	candidate, estimatedBytes, err := buildCandidate(project, op, req)
+	if err != nil {
+		op.CanApply = false
+		op.ReasonCode = actionErrorCode(err)
+		op.BlockedReason = err.Error()
+		if op.EstimatedBytes == 0 {
+			op.EstimatedBytes = op.CurrentBytes
+		}
+		op.SavingsBytes = 0
+		if op.Operation == "gif-optimize" {
+			gifFallbackToWebP(&op, hasTool)
+		}
+		return op
+	}
+	_ = os.Remove(candidate)
+	if estimatedBytes > 0 {
+		op.EstimatedBytes = estimatedBytes
+		op.SavingsBytes = max(0, op.CurrentBytes-estimatedBytes)
+	}
+	if op.SavingsBytes <= 0 {
+		op.CanApply = false
+		op.ReasonCode = "no_effective_savings"
+		op.BlockedReason = "Candidate output is not smaller than the original."
+		if op.Operation == "gif-optimize" {
+			gifTryWebPSingleOp(project, &op, req, hasTool)
+		}
+	}
+	return op
+}
+
+func gifTryWebPSingleOp(project scanner.Project, op *Operation, req Request, hasTool toolChecker) {
+	gifFallbackToWebP(op, hasTool)
+	if !hasTool("asset-studio-imgtools") {
+		return
+	}
+	candidate, fbBytes, err := buildCandidate(project, *op, req)
+	if err != nil || fbBytes >= op.CurrentBytes {
+		if candidate != "" {
+			_ = os.Remove(candidate)
+		}
+		return
+	}
+	_ = os.Remove(candidate)
+	op.EstimatedBytes = fbBytes
+	op.SavingsBytes = op.CurrentBytes - fbBytes
+	op.CanApply = true
+	op.Available = true
+	op.ReasonCode = ""
+	op.BlockedReason = ""
 }
 
 func measureOperations(project scanner.Project, ops []Operation, req Request, keepCandidates bool, hasTool toolChecker) ([]Operation, []actions.Blocker) {
@@ -593,7 +703,11 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 	quality := formatQuality(op, req.Quality)
 	args := []string{"convert", "--format", op.OutputFormat, "--quality", fmt.Sprintf("%d", quality)}
 	if op.Operation == "convert-avif" {
-		args = append(args, "--speed", "6")
+		speed := req.AvifSpeed
+		if speed <= 0 {
+			speed = 6
+		}
+		args = append(args, "--speed", fmt.Sprintf("%d", speed))
 	}
 	if op.Operation == "resize-variant" || op.Operation == "resize-replace" {
 		args = append(args, "--resize", fmt.Sprintf("%d", req.MaxDimensionPx))
