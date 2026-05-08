@@ -1,4 +1,6 @@
 mod convert;
+mod hash;
+mod probe;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -44,6 +46,45 @@ enum Command {
         /// Output file path
         output: String,
     },
+    /// Extract image metadata (format, dimensions, alpha, animation)
+    Probe {
+        /// Input file path
+        input: String,
+    },
+    /// Compute perceptual hash (DHash) of an image
+    Dhash {
+        /// Input file path
+        input: String,
+    },
+    /// Compute hamming distance between two hex hashes
+    Distance {
+        /// First hash (hex)
+        #[arg(long)]
+        hash1: String,
+        /// Second hash (hex)
+        #[arg(long)]
+        hash2: String,
+    },
+    /// Compute pixel-level visual distance between two images
+    VisualDistance {
+        /// First image path
+        input_a: String,
+        /// Second image path
+        input_b: String,
+        /// Flip second image horizontally before comparison
+        #[arg(long, default_value_t = false)]
+        flip_b: bool,
+    },
+    /// Generate a thumbnail
+    Thumbnail {
+        /// Max dimension (default 256)
+        #[arg(long, default_value_t = 256)]
+        size: u32,
+        /// Input file path
+        input: String,
+        /// Output file path
+        output: String,
+    },
     /// Print version
     Version,
 }
@@ -64,6 +105,19 @@ fn main() {
             input,
             output,
         } => resize(&input, &output, max_dimension),
+        Command::Probe { input } => probe::run(&input),
+        Command::Dhash { input } => hash::run_dhash(&input),
+        Command::Distance { hash1, hash2 } => hash::run_distance(&hash1, &hash2),
+        Command::VisualDistance {
+            input_a,
+            input_b,
+            flip_b,
+        } => hash::run_visual_distance(&input_a, &input_b, flip_b),
+        Command::Thumbnail {
+            size,
+            input,
+            output,
+        } => thumbnail(&input, &output, size),
         Command::Version => {
             println!("asset-studio-imgtools {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -87,6 +141,13 @@ fn resize(input: &str, output: &str, max_dimension: u32) -> anyhow::Result<()> {
         max_dimension,
         image::imageops::FilterType::Lanczos3,
     );
+    resized.save(output)?;
+    Ok(())
+}
+
+fn thumbnail(input: &str, output: &str, size: u32) -> anyhow::Result<()> {
+    let img = image::open(input)?;
+    let resized = img.resize(size, size, image::imageops::FilterType::CatmullRom);
     resized.save(output)?;
     Ok(())
 }
