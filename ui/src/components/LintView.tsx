@@ -8,6 +8,11 @@ import { Badge, EmptyState } from "./ui";
 type Props = {
   scanId?: number;
   projectFilterId?: string;
+  stats?: {
+    totalFiles: number;
+    usageNotApplicableFiles?: number;
+    lintFindings: number;
+  };
   enabled?: boolean;
   onOpenAsset?: (id: string) => void;
 };
@@ -24,6 +29,7 @@ const FINDING_HEIGHT = 110;
 export function LintView({
   scanId,
   projectFilterId,
+  stats,
   enabled = true,
   onOpenAsset,
 }: Props) {
@@ -86,6 +92,10 @@ export function LintView({
     estimateSize: () => FINDING_HEIGHT,
     overscan: 5,
   });
+  const lintNotApplicable =
+    (stats?.totalFiles ?? 0) > 0 &&
+    (stats?.lintFindings ?? 0) === 0 &&
+    (stats?.usageNotApplicableFiles ?? 0) === stats?.totalFiles;
 
   return (
     <div className="mx-auto flex h-full max-w-[1600px] flex-col px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
@@ -116,7 +126,16 @@ export function LintView({
       {lintQuery.isLoading && filtered.length === 0 ? (
         <EmptyState title={t("common.loading")} />
       ) : filtered.length === 0 ? (
-        <EmptyState title={t("lint.empty")} description={t("lint.emptyDesc")} />
+        <EmptyState
+          icon={lintNotApplicable ? <Info size={22} /> : undefined}
+          title={lintNotApplicable ? t("lint.notApplicable") : t("lint.empty")}
+          description={
+            lintNotApplicable
+              ? t("lint.notApplicableDesc")
+              : t("lint.emptyDesc")
+          }
+          tone="neutral"
+        />
       ) : (
         <div
           ref={scrollRef}

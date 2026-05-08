@@ -4,6 +4,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   CircleOff,
+  CircleSlash,
   Copy,
   LoaderCircle,
   Sparkles,
@@ -16,7 +17,10 @@ import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
-import { usageClassification } from "../projectScanIntent";
+import {
+  notApplicableUsageLabel,
+  usageClassification,
+} from "../projectScanIntent";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
@@ -96,12 +100,14 @@ export function BrowseList({
     const usage = usageClassification(item);
     const isUnused = usage === "unused";
     const isPossiblyUnused = usage === "possiblyUnused";
+    const isNotApplicable = usage === "notApplicable";
     const duplicate = hasDuplicates(item);
     const optimizable = item.optimizationRecommendations.length > 0;
     const statusLabels = [
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       isPossiblyUnused ? t("browse.flagPossiblyUnused") : "",
+      isNotApplicable ? notApplicableUsageLabel(t, item) : "",
       optimizable ? t("browse.flagOptimizable") : "",
       ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
@@ -196,6 +202,12 @@ export function BrowseList({
               {t("browse.flagPossiblyUnusedShort")}
             </span>
           )}
+          {isNotApplicable && (
+            <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-g-line bg-g-surface-2 px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-ink-3">
+              <CircleSlash size={10} />
+              {notApplicableUsageLabel(t, item, { short: true })}
+            </span>
+          )}
           {optimizable && (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-blue)_35%,transparent)] bg-g-blue-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-blue">
               <Sparkles size={10} />
@@ -208,7 +220,10 @@ export function BrowseList({
   }
 
   return (
-    <div ref={scrollRef} className="h-full overflow-auto scroll-thin">
+    <div
+      ref={scrollRef}
+      className="content-scroll h-full overflow-auto scroll-thin"
+    >
       <div
         className="overflow-clip rounded-g-md border border-g-line bg-g-surface"
         aria-label={t("browse.listAriaLabel")}

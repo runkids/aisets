@@ -8,7 +8,13 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CircleOff, Copy, LoaderCircle, Sparkles } from "lucide-react";
+import {
+  CircleOff,
+  CircleSlash,
+  Copy,
+  LoaderCircle,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
 import { imageBackgroundClassName } from "../imageBackground";
@@ -16,7 +22,10 @@ import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
-import { usageClassification } from "../projectScanIntent";
+import {
+  notApplicableUsageLabel,
+  usageClassification,
+} from "../projectScanIntent";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, Checkbox, ImagePreview, Tooltip } from "./ui";
@@ -53,6 +62,7 @@ const CARD_FLAG_CLASS_NAME =
 const CARD_FLAG_DUPLICATE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-amber)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-amber)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-amber)_78%,var(--g-ink)_22%)]`;
 const CARD_FLAG_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-red)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-red)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-red)_78%,var(--g-ink)_22%)]`;
 const CARD_FLAG_POSSIBLY_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-amber)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-amber)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-amber)_78%,var(--g-ink)_22%)]`;
+const CARD_FLAG_NOT_APPLICABLE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-g-line bg-g-surface-2 text-g-ink-3`;
 const CARD_FLAG_OPTIMIZE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-blue)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-blue)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-blue)_78%,var(--g-ink)_22%)]`;
 
 function useElementWidth<T extends HTMLElement>() {
@@ -164,12 +174,14 @@ export function BrowseGrid({
     const usage = usageClassification(item);
     const isUnused = usage === "unused";
     const isPossiblyUnused = usage === "possiblyUnused";
+    const isNotApplicable = usage === "notApplicable";
     const duplicate = hasDuplicates(item);
     const optimizable = item.optimizationRecommendations.length > 0;
     const statusLabels = [
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       isPossiblyUnused ? t("browse.flagPossiblyUnused") : "",
+      isNotApplicable ? notApplicableUsageLabel(t, item) : "",
       optimizable ? t("browse.flagOptimizable") : "",
       ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
@@ -214,7 +226,11 @@ export function BrowseGrid({
               loading="lazy"
               className="absolute inset-3 m-auto max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain"
             />
-            {(duplicate || isUnused || isPossiblyUnused || optimizable) && (
+            {(duplicate ||
+              isUnused ||
+              isPossiblyUnused ||
+              isNotApplicable ||
+              optimizable) && (
               <div
                 className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-44px)]"
                 aria-hidden="true"
@@ -235,6 +251,12 @@ export function BrowseGrid({
                   <span className={CARD_FLAG_POSSIBLY_UNUSED_CLASS_NAME}>
                     <CircleOff size={10} />
                     {t("browse.flagPossiblyUnused")}
+                  </span>
+                )}
+                {isNotApplicable && (
+                  <span className={CARD_FLAG_NOT_APPLICABLE_CLASS_NAME}>
+                    <CircleSlash size={10} />
+                    {notApplicableUsageLabel(t, item)}
                   </span>
                 )}
                 {optimizable && (
@@ -287,7 +309,10 @@ export function BrowseGrid({
   }
 
   return (
-    <div ref={scrollRef} className="h-full overflow-auto scroll-thin">
+    <div
+      ref={scrollRef}
+      className="content-scroll h-full overflow-auto scroll-thin"
+    >
       <section
         ref={gridRef}
         className="relative block w-full p-1 align-content-start"

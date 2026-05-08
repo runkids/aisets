@@ -64,7 +64,9 @@ export function AssetDrawerUsage({
     if (usage === "notApplicable") {
       return (
         <div className="rounded-g-md border border-g-line bg-g-surface-2 p-4 text-center font-g text-g-caption tracking-g-ui text-g-ink-3">
-          {t("assetDrawer.usageNotApplicable")}
+          {asset.scanIntent === "assetPack"
+            ? t("assetDrawer.usageAssetPack")
+            : t("assetDrawer.usageNotApplicable")}
         </div>
       );
     }

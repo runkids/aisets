@@ -11,7 +11,8 @@ import {
   Trash2,
   TrendingDown,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import {
@@ -40,6 +41,7 @@ import {
 } from "./ui";
 import { ComparePanel, useCompareTabs } from "./ComparePanel";
 import { toCompareAsset, type CompareMode } from "./compareTypes";
+import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
 import { FilterRail } from "./FilterRail";
@@ -80,12 +82,17 @@ export function DuplicatesView({
     customFilter: "",
   });
 
-  /* ── Data fetching (unchanged) ── */
+  const exactScrollRef = useRef<HTMLDivElement>(null);
+  const debouncedSearch = useDebouncedValue(search, 250);
+
+  /* ── Data fetching ── */
 
   const duplicateItemsQuery = useCatalogItemsInfiniteQuery(
     scanId,
     {
-      projectId: projectFilterId || undefined,
+      projectName: projectFilterId || railFilter.project || undefined,
+      ext: railFilter.ext || undefined,
+      q: debouncedSearch || undefined,
       status: "duplicate",
       sort: "path",
       limit: 200,
@@ -95,7 +102,12 @@ export function DuplicatesView({
   );
   const exactDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
     scanId,
-    { kind: "exact", limit: 200 },
+    {
+      kind: "exact",
+      projectName: railFilter.project || undefined,
+      ext: railFilter.ext || undefined,
+      limit: 200,
+    },
     enabled,
   );
   const nearDuplicatesQuery = useCatalogDuplicatesInfiniteQuery(
@@ -130,14 +142,20 @@ export function DuplicatesView({
     () => exactDuplicatesQuery.data?.pages.flatMap((page) => page.groups) ?? [],
     [exactDuplicatesQuery.data],
   );
-  const groups = useMemo(
-    () =>
-      exactDuplicateGroups.filter(
-        (group) =>
-          items.filter((item) => item.duplicateGroupId === group.id).length > 1,
-      ),
-    [exactDuplicateGroups, items],
-  );
+  const groups = useMemo(() => {
+    const groupCounts = new Map<string, number>();
+    for (const item of items) {
+      if (item.duplicateGroupId) {
+        groupCounts.set(
+          item.duplicateGroupId,
+          (groupCounts.get(item.duplicateGroupId) ?? 0) + 1,
+        );
+      }
+    }
+    return exactDuplicateGroups.filter(
+      (group) => (groupCounts.get(group.id) ?? 0) > 1,
+    );
+  }, [exactDuplicateGroups, items]);
   const nearDuplicatePairs = useMemo(
     () => nearDuplicatesQuery.data?.pages.flatMap((page) => page.pairs) ?? [],
     [nearDuplicatesQuery.data],
@@ -160,32 +178,41 @@ export function DuplicatesView({
     groups.length === 0 &&
     nearDuplicates.length === 0;
 
-  /* ── Auto pagination ── */
+  /* ── Scroll-triggered pagination ── */
 
-  useEffect(() => {
-    if (!hasMoreDuplicateItems || isFetchingMoreDuplicateItems) return;
-    void fetchNextDuplicateItemsPage();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const hasMoreData =
+    hasMoreDuplicateItems || hasMoreExactDuplicates || hasMoreNearDuplicates;
+  const isFetchingMore =
+    isFetchingMoreDuplicateItems ||
+    isFetchingMoreExactDuplicates ||
+    isFetchingMoreNearDuplicates;
+
+  const loadMorePages = useCallback(() => {
+    if (hasMoreDuplicateItems && !isFetchingMoreDuplicateItems)
+      void fetchNextDuplicateItemsPage();
+    if (hasMoreExactDuplicates && !isFetchingMoreExactDuplicates)
+      void fetchNextExactDuplicatesPage();
+    if (hasMoreNearDuplicates && !isFetchingMoreNearDuplicates)
+      void fetchNextNearDuplicatesPage();
   }, [
     fetchNextDuplicateItemsPage,
     hasMoreDuplicateItems,
     isFetchingMoreDuplicateItems,
-  ]);
-  useEffect(() => {
-    if (!hasMoreExactDuplicates || isFetchingMoreExactDuplicates) return;
-    void fetchNextExactDuplicatesPage();
-  }, [
     fetchNextExactDuplicatesPage,
     hasMoreExactDuplicates,
     isFetchingMoreExactDuplicates,
-  ]);
-  useEffect(() => {
-    if (!hasMoreNearDuplicates || isFetchingMoreNearDuplicates) return;
-    void fetchNextNearDuplicatesPage();
-  }, [
     fetchNextNearDuplicatesPage,
     hasMoreNearDuplicates,
     isFetchingMoreNearDuplicates,
   ]);
+
+  useInfiniteScrollSentinel({
+    rootRef: exactScrollRef,
+    sentinelRef: loadMoreRef,
+    enabled: hasMoreData && !isFetchingMore,
+    onLoadMore: loadMorePages,
+  });
 
   /* ── Computed views ── */
 
@@ -230,34 +257,14 @@ export function DuplicatesView({
     [items, selected],
   );
 
-  /* ── Search & filter ── */
-
-  const debouncedSearch = useDebouncedValue(search, 250);
-
-  const filteredGroups = useMemo(() => {
-    const q = debouncedSearch.toLowerCase().trim();
-    const ext = railFilter.ext;
-    const proj = railFilter.project;
-    if (!q && !ext && !proj) return groupViews;
-    return groupViews.filter((g) => {
-      if (ext && !g.members.some((m) => m.ext === ext)) return false;
-      if (proj && !g.members.some((m) => m.projectName === proj)) return false;
-      if (!q) return true;
-      return (
-        g.contentHash.toLowerCase().includes(q) ||
-        g.members.some(
-          (m) =>
-            m.repoPath.toLowerCase().includes(q) ||
-            fileName(m.repoPath).toLowerCase().includes(q),
-        )
-      );
-    });
-  }, [groupViews, debouncedSearch, railFilter]);
+  /* ── Search & filter (server-side via query params) ── */
 
   const groupedByExt = useMemo(() => {
-    if (railFilter.ext) return null;
-    const map = new Map<string, typeof filteredGroups>();
-    for (const g of filteredGroups) {
+    if (railFilter.ext) {
+      return [{ ext: railFilter.ext, groups: groupViews }];
+    }
+    const map = new Map<string, typeof groupViews>();
+    for (const g of groupViews) {
       const ext = g.members[0]?.ext || "";
       const list = map.get(ext) || [];
       list.push(g);
@@ -267,7 +274,34 @@ export function DuplicatesView({
     return Array.from(map.entries())
       .sort(([, a], [, b]) => b.length - a.length)
       .map(([ext, gs]) => ({ ext, groups: gs }));
-  }, [filteredGroups, railFilter.ext]);
+  }, [groupViews, railFilter.ext]);
+
+  type VRow = { group: (typeof groupViews)[number]; sectionExt?: string };
+
+  const virtualRows = useMemo<VRow[]>(() => {
+    if (groupedByExt) {
+      const rows: VRow[] = [];
+      for (const section of groupedByExt) {
+        for (let i = 0; i < section.groups.length; i++) {
+          rows.push({
+            group: section.groups[i],
+            sectionExt: i === 0 ? section.ext : undefined,
+          });
+        }
+      }
+      return rows;
+    }
+    return groupViews.map((g) => ({ group: g }));
+  }, [groupedByExt, groupViews]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library -- intentional virtual scroll for 900+ groups
+  const exactVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => exactScrollRef.current,
+    estimateSize: () => 280,
+    overscan: 6,
+  });
+  const exactVirtualItems = exactVirtualizer.getVirtualItems();
 
   /* ── Selection callbacks ── */
 
@@ -544,26 +578,39 @@ export function DuplicatesView({
 
   /* ── Render ── */
 
+  const exactFirstPage = exactDuplicatesQuery.data?.pages[0];
+  const itemsFirstPage = duplicateItemsQuery.data?.pages[0];
+  const nearFirstPage = nearDuplicatesQuery.data?.pages[0];
+
   return (
     <>
       <FilterRail
         items={items}
         filters={railFilter}
+        projectOptions={exactFirstPage?.facets.projects}
+        projectTotal={exactFirstPage?.facets.projectTotal}
+        extensionOptions={exactFirstPage?.facets.extensions}
+        extensionTotal={exactFirstPage?.facets.extensionTotal}
+        extensionHeading={t("duplicates.filterByExt")}
+        extensionAllLabel={t("duplicates.allGroups")}
         onFiltersChange={setRailFilter}
       />
-      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
+      <div
+        ref={exactScrollRef}
+        className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0"
+      >
         <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
           {/* ── Stats dashboard ── */}
           {!loading && (
             <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <StatCard
                 label={t("duplicates.statGroups")}
-                value={groupViews.length}
+                value={exactFirstPage?.total ?? groupViews.length}
                 icon={<Layers size={14} />}
               />
               <StatCard
                 label={t("duplicates.statFiles")}
-                value={groupViews.reduce((sum, g) => sum + g.members.length, 0)}
+                value={itemsFirstPage?.total ?? items.length}
                 icon={<Files size={14} />}
               />
               <StatCard
@@ -573,7 +620,7 @@ export function DuplicatesView({
               />
               <StatCard
                 label={t("duplicates.statSimilar")}
-                value={nearDuplicates.length}
+                value={nearFirstPage?.total ?? nearDuplicates.length}
                 icon={<Eye size={14} />}
               />
             </div>
@@ -593,12 +640,14 @@ export function DuplicatesView({
                 items={[
                   {
                     value: "exact",
-                    label: t("duplicates.exactTab", { count: groups.length }),
+                    label: t("duplicates.exactTab", {
+                      count: exactFirstPage?.total ?? groups.length,
+                    }),
                   },
                   {
                     value: "similar",
                     label: t("duplicates.similarTab", {
-                      count: nearDuplicates.length,
+                      count: nearFirstPage?.total ?? nearDuplicates.length,
                     }),
                   },
                 ]}
@@ -673,6 +722,36 @@ export function DuplicatesView({
                 </button>
               </div>
             )}
+
+            {tab === "exact" &&
+              groupViews.length > 0 &&
+              (() => {
+                const vis = exactVirtualItems;
+                const scrollTop = exactScrollRef.current?.scrollTop ?? 0;
+                let activeExt: string | undefined;
+                for (let i = vis.length - 1; i >= 0; i--) {
+                  const r = virtualRows[vis[i].index];
+                  if (r.sectionExt && vis[i].start <= scrollTop) {
+                    activeExt = r.sectionExt;
+                    break;
+                  }
+                }
+                if (!activeExt) activeExt = groupViews[0]?.members[0]?.ext;
+                if (!activeExt) return null;
+                const count =
+                  exactFirstPage?.facets.extensions?.find(
+                    (f) => f.id === activeExt,
+                  )?.count ?? groupViews.length;
+                return (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="font-g-mono text-g-ui font-[510] uppercase text-g-ink-3">
+                      {formatExt(activeExt)}
+                    </span>
+                    <Badge>{count}</Badge>
+                    <span className="h-px flex-1 bg-g-line" />
+                  </div>
+                );
+              })()}
           </div>
 
           {/* ── Content ── */}
@@ -680,30 +759,44 @@ export function DuplicatesView({
           {loading ? (
             <EmptyState title={t("common.loading")} />
           ) : tab === "exact" ? (
-            <div className="grid gap-4">
-              {groupedByExt &&
-                groupedByExt.map((section) => (
-                  <div key={section.ext} className="grid gap-4">
-                    <div className="flex items-center gap-2 pt-2">
-                      <span className="font-g-mono text-g-ui font-[510] uppercase text-g-ink-3">
-                        {formatExt(section.ext)}
-                      </span>
-                      <Badge>{section.groups.length}</Badge>
-                      <span className="h-px flex-1 bg-g-line" />
+            virtualRows.length === 0 ? (
+              <EmptyState
+                title={t("duplicates.noExact")}
+                description={t("duplicates.noExactDesc")}
+              />
+            ) : (
+              <div
+                className="relative w-full"
+                style={{ height: exactVirtualizer.getTotalSize() }}
+              >
+                {exactVirtualItems.map((vItem) => {
+                  const row = virtualRows[vItem.index];
+                  return (
+                    <div
+                      key={vItem.key}
+                      className="absolute left-0 top-0 w-full"
+                      style={{
+                        transform: `translateY(${vItem.start}px)`,
+                      }}
+                      ref={exactVirtualizer.measureElement}
+                      data-index={vItem.index}
+                    >
+                      <div className="pb-4">{renderGroupCard(row.group)}</div>
                     </div>
-                    {section.groups.map((group) => renderGroupCard(group))}
-                  </div>
-                ))}
-              {!groupedByExt &&
-                filteredGroups.map((group) => renderGroupCard(group))}
-              {filteredGroups.length === 0 && (
-                <EmptyState
-                  title={t("duplicates.noExact")}
-                  description={t("duplicates.noExactDesc")}
-                />
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )
           ) : null}
+
+          {hasMoreData && (
+            <div
+              ref={loadMoreRef}
+              className="flex items-center justify-center py-6 text-g-caption text-g-ink-4"
+            >
+              {isFetchingMore ? t("common.loading") : null}
+            </div>
+          )}
 
           {/* ── Similar tab ── */}
 

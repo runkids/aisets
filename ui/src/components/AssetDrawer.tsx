@@ -17,7 +17,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useSettingsQuery } from "../queries";
-import { canDeleteUnused, usageClassification } from "../projectScanIntent";
+import {
+  canDeleteUnused,
+  notApplicableUsageLabel,
+  usageClassification,
+} from "../projectScanIntent";
 import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
@@ -147,6 +151,7 @@ export function AssetDrawer({
   const usage = usageClassification(asset);
   const isUnused = usage === "unused";
   const isPossiblyUnused = usage === "possiblyUnused";
+  const isNotApplicable = usage === "notApplicable";
 
   const tabs = useMemo(() => {
     const items: TabItem<DrawerTab>[] = [
@@ -311,6 +316,7 @@ export function AssetDrawer({
                     asset.duplicates.length > 0 ||
                     asset.similar.length > 0 ||
                     isPossiblyUnused ||
+                    isNotApplicable ||
                     asset.optimizationRecommendations.length > 0 ||
                     ocrVisible) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -329,6 +335,15 @@ export function AssetDrawer({
                         >
                           <Badge tone="amber">
                             {t("assetDrawer.chipPossiblyUnused")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {isNotApplicable && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("usage")}
+                        >
+                          <Badge tone="line">
+                            {notApplicableUsageLabel(t, asset)}
                           </Badge>
                         </HeroBadgeButton>
                       )}

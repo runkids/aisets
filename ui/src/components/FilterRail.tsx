@@ -27,6 +27,8 @@ type FilterRailProps = {
   projectScopeName?: string;
   extensionOptions?: FilterOption[];
   extensionTotal?: number;
+  extensionHeading?: string;
+  extensionAllLabel?: string;
   customFilterOptions?: CustomFilterOption[];
   customFilterTotal?: number;
   ocrEnabled?: boolean;
@@ -52,6 +54,8 @@ export function FilterRail({
   projectScopeName,
   extensionOptions,
   extensionTotal,
+  extensionHeading,
+  extensionAllLabel,
   customFilterOptions,
   customFilterTotal,
   ocrEnabled = true,
@@ -98,10 +102,10 @@ export function FilterRail({
         ))}
       </RailSection>
 
-      <RailSection heading={t("filter.extension")}>
+      <RailSection heading={extensionHeading || t("filter.extension")}>
         <RailItem
           active={filters.ext === ""}
-          label={t("filter.allExtensions")}
+          label={extensionAllLabel || t("filter.allExtensions")}
           count={allExtensionsCount}
           onClick={() => onFiltersChange({ ...filters, ext: "" })}
         />

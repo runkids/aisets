@@ -613,6 +613,7 @@ export function App() {
               imagePreviewEnabled={imagePreviewEnabled}
               ocrEnabled={ocrEnabled}
               ocrFuzzySearch={ocrFuzzySearch}
+              stats={scopedStats}
               onAutoScrollDone={clearAutoScrollAssetId}
               onOpenAsset={setDrawerId}
             />
@@ -633,7 +634,7 @@ export function App() {
             catalogSummary.analysis.nearDuplicates === "notComputed" ? (
               <div
                 key="duplicates-not-computed"
-                className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+                className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
               >
                 <NotComputedState
                   title={
@@ -670,7 +671,7 @@ export function App() {
           ) : (
             <div
               key={mode}
-              className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+              className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
             >
               {mode === "precheck" ? (
                 <PreCheckView onOpenAsset={setDrawerId} />
@@ -701,6 +702,7 @@ export function App() {
                 <LintView
                   scanId={catalogSummary?.scanId}
                   projectFilterId={effectiveSelectedProjectId || undefined}
+                  stats={scopedStats}
                   onOpenAsset={setDrawerId}
                 />
               ) : null}
@@ -709,7 +711,7 @@ export function App() {
         </div>
       </section>
 
-      <ScrollToTop />
+      <ScrollToTop key={mode} />
 
       {drawerAsset && (
         <AssetDrawer
@@ -823,7 +825,7 @@ function NotComputedState({
 }) {
   return (
     <EmptyState
-      tone="info"
+      tone="neutral"
       title={title}
       description={description}
       action={

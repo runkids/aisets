@@ -68,6 +68,9 @@ export function AppTopbar({
       : progress
         ? t(`scanProgress.phase.${progress.phase}`)
         : t("scanProgress.starting");
+  const progressReasonLabel = progress?.reason
+    ? t(`scanProgress.reason.${progress.reason}`, { defaultValue: "" })
+    : "";
   const scanDropdownState = scanStatusOpen
     ? "translate-y-0 opacity-100"
     : "translate-y-1 opacity-0";
@@ -219,6 +222,11 @@ export function AppTopbar({
                     </span>
                   )}
                 </div>
+                {progressReasonLabel && (
+                  <p className="mt-2 text-g-caption leading-snug text-g-ink-3">
+                    {progressReasonLabel}
+                  </p>
+                )}
                 {(done || failed || (progress && progressTotal > 0)) && (
                   <span
                     className="mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"

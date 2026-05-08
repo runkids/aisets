@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { customFilterOptions } from "../customAssetFilters";
 import type { AssetItem, CustomAssetFilter } from "../types";
-import { applyBrowseFilters, normalizeBrowseStoredState } from "./BrowseView";
+import {
+  applyBrowseFilters,
+  normalizeBrowseStoredState,
+  resetBrowseFiltersForStatusChange,
+} from "./BrowseView";
 
 function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {
   return {
@@ -82,6 +86,17 @@ describe("normalizeBrowseStoredState", () => {
     });
   });
 
+  it("accepts not-applicable usage status from stored toolbar state", () => {
+    const result = normalizeBrowseStoredState(
+      {
+        statusFilter: "notApplicable",
+      },
+      defaultBrowseState,
+    );
+
+    expect(result.statusFilter).toBe("notApplicable");
+  });
+
   it("falls back for invalid values and keeps pinned route filters", () => {
     const result = normalizeBrowseStoredState(
       {
@@ -103,6 +118,24 @@ describe("normalizeBrowseStoredState", () => {
         ext: "",
         customFilter: "palette-filter",
       },
+    });
+  });
+});
+
+describe("resetBrowseFiltersForStatusChange", () => {
+  it("resets left rail filters to all when the status filter changes", () => {
+    expect(resetBrowseFiltersForStatusChange()).toEqual({
+      project: "",
+      ext: "",
+      customFilter: "",
+    });
+  });
+
+  it("keeps a locked project scope while clearing the other rail filters", () => {
+    expect(resetBrowseFiltersForStatusChange("workspace")).toEqual({
+      project: "workspace",
+      ext: "",
+      customFilter: "",
     });
   });
 });
@@ -225,6 +258,23 @@ describe("applyBrowseFilters", () => {
       "ocr-match",
       "path-only",
     ]);
+  });
+
+  it("filters not-applicable usage with backend policy fields", () => {
+    const items = [
+      makeItem({ id: "asset-pack", usageClassification: "notApplicable" }),
+      makeItem({ id: "safe-unused", usageClassification: "unused" }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: { project: "", ext: "", customFilter: "" },
+      searchQuery: "",
+      statusFilter: "notApplicable",
+      customFilters: [],
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual(["asset-pack"]);
   });
 
   it("keeps DB-backed duplicate rows when the list item only has a duplicate group id", () => {

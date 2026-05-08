@@ -30,8 +30,6 @@ const emptyIconVariants = cva("grid place-items-center rounded-g-pill", {
     },
     tone: {
       neutral: "bg-g-surface-2 text-g-ink-3",
-      info: "bg-g-info-soft text-g-info",
-      warning: "bg-g-amber-soft text-g-amber",
     },
   },
   defaultVariants: {
@@ -47,7 +45,7 @@ type EmptyStateProps = {
   action?: ReactNode;
   size?: "sm" | "md" | "lg";
   align?: "center" | "left";
-  tone?: "neutral" | "info" | "warning";
+  tone?: "neutral";
   className?: string;
 };
 

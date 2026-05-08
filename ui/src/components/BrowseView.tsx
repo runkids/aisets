@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   Check,
@@ -59,6 +60,7 @@ type StatusFilter =
   | ""
   | "unused"
   | "possiblyUnused"
+  | "notApplicable"
   | "duplicate"
   | "optimize"
   | "referenced";
@@ -79,6 +81,7 @@ const statusFilters: StatusFilter[] = [
   "",
   "unused",
   "possiblyUnused",
+  "notApplicable",
   "duplicate",
   "optimize",
   "referenced",
@@ -93,6 +96,12 @@ type Props = {
   scanId?: number;
   projectFilterId?: string;
   projectFilterName: string;
+  stats?: {
+    totalFiles: number;
+    unusedFiles: number;
+    possiblyUnusedFiles?: number;
+    usageNotApplicableFiles?: number;
+  };
   initialSearchQuery: string;
   initialFocusAssetId: string;
   imagePreviewEnabled: boolean;
@@ -205,12 +214,21 @@ function writeBrowseStoredState(state: BrowseStoredState) {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export function resetBrowseFiltersForStatusChange(
+  projectScopeName = "",
+): BrowseFilters {
+  return { project: projectScopeName, ext: "", customFilter: "" };
+}
+
 function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
   switch (status) {
     case "unused":
       return usageClassification(item) === "unused";
     case "possiblyUnused":
       return usageClassification(item) === "possiblyUnused";
+    case "notApplicable":
+      return usageClassification(item) === "notApplicable";
     case "duplicate":
       return Boolean(item.duplicateGroupId) || item.similar.length > 0;
     case "optimize":
@@ -227,6 +245,7 @@ function apiStatus(status: StatusFilter) {
   if (
     status === "unused" ||
     status === "possiblyUnused" ||
+    status === "notApplicable" ||
     status === "duplicate" ||
     status === "referenced"
   )
@@ -248,6 +267,52 @@ function hasEmptyOCRText(item: AssetItem): boolean {
       (!(item.ocr.normalizedText ?? item.ocr.text ?? "").trim() &&
         item.ocr.textStatus === "empty")),
   );
+}
+
+function browseEmptyCopy(
+  statusFilter: StatusFilter,
+  stats: Props["stats"] | undefined,
+  t: TFunction,
+) {
+  const hasAssets = (stats?.totalFiles ?? 0) > 0;
+  const safeUnused = stats?.unusedFiles ?? 0;
+  const possiblyUnused = stats?.possiblyUnusedFiles ?? 0;
+  const notApplicable = stats?.usageNotApplicableFiles ?? 0;
+
+  if (statusFilter === "unused" && hasAssets && safeUnused === 0) {
+    if (notApplicable > 0) {
+      return {
+        title: t("browse.unusedNotApplicableEmpty"),
+        description: t("browse.unusedNotApplicableDesc", {
+          count: notApplicable,
+        }),
+        tone: "neutral" as const,
+      };
+    }
+    if (possiblyUnused > 0) {
+      return {
+        title: t("browse.unusedAdvisoryEmpty"),
+        description: t("browse.unusedAdvisoryDesc", {
+          count: possiblyUnused,
+        }),
+        tone: "neutral" as const,
+      };
+    }
+  }
+
+  if (statusFilter === "notApplicable" && notApplicable > 0) {
+    return {
+      title: t("browse.notApplicableTitle"),
+      description: t("browse.notApplicableDesc", { count: notApplicable }),
+      tone: "neutral" as const,
+    };
+  }
+
+  return {
+    title: t("browse.empty"),
+    description: undefined,
+    tone: "neutral" as const,
+  };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -490,6 +555,7 @@ export function BrowseView({
   scanId,
   projectFilterId,
   projectFilterName,
+  stats,
   initialSearchQuery,
   initialFocusAssetId,
   imagePreviewEnabled,
@@ -633,6 +699,7 @@ export function BrowseView({
     clearFocusedAssetQuery();
     setSelectedFolder("");
     setExpandedFolders(new Set());
+    setFilters(resetBrowseFiltersForStatusChange(projectFilterName));
     setStatusFilter(next);
   }
 
@@ -823,6 +890,7 @@ export function BrowseView({
     catalogItemsQuery.isFetching && !catalogItemsQuery.isFetchingNextPage;
   const showInitialLoading =
     catalogItemsQuery.isLoading || (pending && items.length === 0);
+  const emptyCopy = browseEmptyCopy(statusFilter, stats, t);
 
   return (
     <>
@@ -929,19 +997,15 @@ export function BrowseView({
             </div>
           ) : items.length === 0 ? (
             <EmptyState
-              title={t("browse.empty")}
+              title={emptyCopy.title}
               description={
                 searchQuery.trim() && emptyOCRTextCount > 0
                   ? t("browse.emptyOCRTextHint", {
                       count: emptyOCRTextCount,
                     })
-                  : undefined
+                  : emptyCopy.description
               }
-              tone={
-                searchQuery.trim() && emptyOCRTextCount > 0
-                  ? "warning"
-                  : "neutral"
-              }
+              tone="neutral"
             />
           ) : view === "tree" ? (
             <div className="mt-1 flex min-h-0 flex-1 gap-4">

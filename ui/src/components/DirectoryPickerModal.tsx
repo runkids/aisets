@@ -260,7 +260,7 @@ export function DirectoryPickerModal({
               icon={<AlertTriangle size={22} />}
               title={t("directoryPicker.loadError")}
               description={directoryError}
-              tone="warning"
+              tone="neutral"
               action={
                 <Button
                   variant="secondary"
