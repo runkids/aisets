@@ -70,6 +70,7 @@ import type {
   ScanEvent,
 } from "./types";
 import { fileName, modeForPath, pathForMode, type Mode } from "./ui";
+import { clearEstimateCaches } from "./components/optimizeCache";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";
@@ -440,6 +441,7 @@ export function App() {
 
   function onRescan() {
     if (ocrActivityBusy) return;
+    clearEstimateCaches();
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(undefined, {

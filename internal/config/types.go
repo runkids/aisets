@@ -39,6 +39,8 @@ type AppSettings struct {
 	ExcludePatterns            []string                         `json:"excludePatterns"`
 	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent  `json:"excludePatternsByIntent"`
 	OptimizationDefaultQuality int                              `json:"optimizationDefaultQuality"`
+	OptimizationWorkers        int                              `json:"optimizationWorkers"`
+	OptimizationAvifSpeed      int                              `json:"optimizationAvifSpeed"`
 	OptimizationAutoApply      bool                             `json:"optimizationAutoApply"`
 	OptimizationThresholds     imageproc.OptimizationThresholds `json:"optimizationThresholds"`
 	CustomAssetFilters         []CustomAssetFilter              `json:"customAssetFilters"`
@@ -62,6 +64,8 @@ type SettingsUpdate struct {
 	ExcludePatterns            []string                          `json:"excludePatterns"`
 	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent   `json:"excludePatternsByIntent"`
 	OptimizationDefaultQuality *int                              `json:"optimizationDefaultQuality"`
+	OptimizationWorkers        *int                              `json:"optimizationWorkers"`
+	OptimizationAvifSpeed      *int                              `json:"optimizationAvifSpeed"`
 	OptimizationAutoApply      *bool                             `json:"optimizationAutoApply"`
 	OptimizationThresholds     *imageproc.OptimizationThresholds `json:"optimizationThresholds"`
 	CustomAssetFilters         []CustomAssetFilter               `json:"customAssetFilters"`

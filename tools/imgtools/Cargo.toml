@@ -8,6 +8,7 @@ description = "Image processing CLI for Asset Studio"
 clap = { version = "4", features = ["derive"] }
 image = { version = "0.25", features = ["gif", "jpeg", "png", "webp", "avif"] }
 webp = "0.3"
+libwebp-sys = "0.9"
 ravif = "0.13"
 rgb = "0.8"
 serde = { version = "1", features = ["derive"] }

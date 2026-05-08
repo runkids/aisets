@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const tessdataFast = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/"
@@ -63,6 +64,7 @@ func Runtime(ctx context.Context, root string, engine Engine) RuntimeStatus {
 		AvailableLanguages: packs,
 		Installed:          installed,
 		DataDir:            DataDir(root),
+		Platform:           runtime.GOOS,
 		EngineName:         engine.Name(),
 		EngineVersion:      engine.Version(),
 		EngineAvailable:    true,

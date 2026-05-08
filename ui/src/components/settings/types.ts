@@ -50,6 +50,8 @@ export type SettingsDraft = {
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;
+  optimizationWorkers: number;
+  optimizationAvifSpeed: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;
   customAssetFilters: CustomAssetFilter[];

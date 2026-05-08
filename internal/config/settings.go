@@ -83,6 +83,8 @@ func DefaultAppSettings() AppSettings {
 		ExcludePatterns:            []string{},
 		ExcludePatternsByIntent:    defaultExcludePatternsByIntent(),
 		OptimizationDefaultQuality: 80,
+		OptimizationWorkers:        1,
+		OptimizationAvifSpeed:      6,
 		OptimizationAutoApply:      false,
 		OptimizationThresholds:     imageproc.DefaultOptimizationThresholds(),
 		CustomAssetFilters:         []CustomAssetFilter{},
@@ -217,6 +219,12 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.OptimizationDefaultQuality != nil {
 		settings.OptimizationDefaultQuality = *update.OptimizationDefaultQuality
 	}
+	if update.OptimizationWorkers != nil {
+		settings.OptimizationWorkers = *update.OptimizationWorkers
+	}
+	if update.OptimizationAvifSpeed != nil {
+		settings.OptimizationAvifSpeed = *update.OptimizationAvifSpeed
+	}
 	if update.OptimizationAutoApply != nil {
 		settings.OptimizationAutoApply = *update.OptimizationAutoApply
 	}
@@ -269,6 +277,16 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if settings.OptimizationDefaultQuality < 0 || settings.OptimizationDefaultQuality > 100 {
 		return AppSettings{}, apierr.New("settings_quality_invalid", "optimization quality must be between 0 and 100")
+	}
+	if settings.OptimizationWorkers < 1 {
+		settings.OptimizationWorkers = 1
+	} else if settings.OptimizationWorkers > 4 {
+		settings.OptimizationWorkers = 4
+	}
+	if settings.OptimizationAvifSpeed < 1 {
+		settings.OptimizationAvifSpeed = 1
+	} else if settings.OptimizationAvifSpeed > 10 {
+		settings.OptimizationAvifSpeed = 10
 	}
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)

@@ -5,12 +5,12 @@ Excludes company-specific logic (owner/theme facets, @gorilla aliases, shared-as
 
 ## Architecture Decisions
 
-1. **Optimization**: recommendations + script generation only. No auto-execute (too risky for public users).
+1. **Optimization**: Go keeps settings, catalog, preview/apply, and API orchestration. Image transforms use the bundled Rust CLI `tools/imgtools` (`asset-studio-imgtools`) first; optional external tools are detected and user-enabled as supplemental backends. No silent auto-execute.
 2. **Merge duplicates**: keep existing preview/apply pattern. No batch streaming auto-merge.
 3. **Lint**: 7 universal rules only. No `duplicate-import` (requires monorepo context).
 4. **Facets**: `project` + `extension` + status filters. No `owner`/`theme`.
 5. **Pre-Check**: multipart upload (not base64). 10 files max, 20MB each.
-6. **Image conversion for estimates**: pure Go (minify/svg for SVG, goimagehash for sizing analysis). Script output targets `sharp` CLI commands user runs manually.
+6. **Image conversion for estimates**: Go still owns recommendation analysis and safety checks. Candidate generation uses `asset-studio-imgtools` for convert/resize when available, built-in Go handlers for supported fallbacks, and enabled external tools only where they provide better coverage.
 7. **Charts**: manual SVG to keep bundle small.
 
 ---
@@ -18,10 +18,10 @@ Excludes company-specific logic (owner/theme facets, @gorilla aliases, shared-as
 ## Dependency Graph
 
 ```
-Phase 1: Backend (Go)
+Phase 1: Backend (Go + Rust CLI)
   ├─ T1: Lint engine
   ├─ T2: Pre-Check upload API
-  └─ T3: Optimization estimate + script generation API
+  └─ T3: Optimization estimate + Rust imgtools integration API
 
 Phase 2: Frontend Foundation
   ├─ T4: FilterRail (project + ext + status)
@@ -110,23 +110,57 @@ type LintFinding struct {
 
 ---
 
-### T3 — Optimization Estimate + Script Generation
+### T3 — Optimization Estimate + Rust Imgtools Integration
 
-**Scope**: new `internal/optimizer/` + endpoints
+**Scope**: `internal/optimize/`, `internal/config/`, `internal/server/`, `tools/imgtools/`
+
+**Existing Rust CLI**:
+- Package: `tools/imgtools`
+- Binary: `asset-studio-imgtools`
+- Current commands:
+  - `asset-studio-imgtools convert --format webp --quality 80 input output`
+  - `asset-studio-imgtools convert --format png|jpeg|jpg|gif --quality 80 input output`
+  - `asset-studio-imgtools resize --max-dimension 2560 input output`
+  - `asset-studio-imgtools version`
 
 **Work**:
-- `POST /api/actions/optimization/estimate` — accepts `{ids: string[]}`, returns estimated savings per asset
-- Estimate logic (pure analysis, no file writes):
-  - SVG: run minify in-memory, compare sizes
-  - PNG opaque: estimate AVIF size (~40% of original)
-  - PNG alpha: estimate WebP size (~60% of original)
-  - GIF: estimate WebP size (~50% of original)
-  - JPEG >200KB: estimate AVIF size (~35% of original)
-  - Oversized (>1600px && >250KB): estimate resized size
-- `POST /api/actions/optimization/generate-script` — accepts `{ids: string[]}`, returns shell script string
-- Script uses `sharp` CLI or `cwebp`/`avifenc` commands
+- Add optimizer runtime detection:
+  - bundled Rust CLI: detected by configured path, repo dev path, or `PATH`
+  - external tools: `ffmpeg`, `cwebp`, `avifenc`, `gifsicle`, `svgo`, `magick`, `oxipng`
+- Extend settings contract:
+  - `AppSettings.optimizationExternalTools: Array<{ id, enabled }>`
+  - `SettingsInfo.optimizationToolRuntime: Array<{ id, detected, path?, enabled, operations }>`
+  - Unknown tool ids in `PATCH /api/settings` return a structured error.
+- Settings UI:
+  - Add Optimization → External Tools group.
+  - Show bundled `asset-studio-imgtools` status separately from optional external tools.
+  - Detected external tools remain disabled by default; users explicitly enable them.
+- Request generation:
+  - `/optimize` uses `optimizationDefaultQuality`.
+  - Resize uses `optimizationThresholds.maxDimensionPx`.
+  - Estimate/cache keys include quality, max dimension, bundled tool version/status, and enabled external tool ids.
+- Backend selection order:
+  - resize: `asset-studio-imgtools resize`, then `magick`, then built-in Go resize
+  - convert-webp/webp-recompress: `asset-studio-imgtools convert --format webp`, then `cwebp`, then `ffmpeg`
+  - gif-optimize: `asset-studio-imgtools convert --format gif`, then `gifsicle`, then `ffmpeg`, then built-in GIF re-encode
+  - svg-minify: `svgo`, then built-in SVG minify
+  - convert-avif: `avifenc`, then built-in Go AVIF while Rust CLI does not support AVIF
+  - png/jpeg recompress: `asset-studio-imgtools convert --format png|jpeg`, then built-in Go encoder
+- Keep preview/apply safety:
+  - Rust/external tools only write candidate files under temp paths.
+  - Go preview/apply still validates target paths, stale candidates, and reference updates.
+  - `optimizationAutoApply` remains a saved preference only; it must not modify files automatically in V1.
+- Script generation:
+  - Prefer `asset-studio-imgtools` commands when the operation is supported.
+  - Emit external-tool commands only for enabled external tools.
+  - Keep comments for unsupported/manual operations.
 
-**Acceptance**: estimate returns plausible savings; script is valid bash
+**Acceptance**:
+- `estimate` returns measured candidate savings when `asset-studio-imgtools` is present.
+- Missing Rust CLI falls back to supported Go handlers and reports runtime status.
+- Disabled external tools are never selected.
+- Enabled but missing external tools are visible as missing in estimate/runtime status.
+- Script output uses `asset-studio-imgtools` for supported operations.
 
 ---
 
@@ -286,7 +320,7 @@ type LintFinding struct {
 
 | After | Gate |
 |-------|------|
-| Phase 1 | `go test ./...` passes; new endpoints return correct JSON |
+| Phase 1 | `cargo test --manifest-path tools/imgtools/Cargo.toml`, `cargo build --release --manifest-path tools/imgtools/Cargo.toml`, `go test ./...`, and `go vet ./...` pass; new endpoints return correct JSON |
 | Phase 2 | `pnpm build` passes; components work with live data |
 | Phase 3 | All modes functional end-to-end |
 | Phase 4 | Feature parity confirmed; i18n complete |

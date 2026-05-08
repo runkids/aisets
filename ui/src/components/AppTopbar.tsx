@@ -128,7 +128,7 @@ export function AppTopbar({
           <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-g-md bg-g-surface shadow-g-sm">
             <img
               className="block size-full origin-center scale-[1.22]"
-              src="/brand/asset-studio-app-icon.png"
+              src="../../public/brand/asset-studio-app-icon.avif"
               alt=""
             />
           </div>

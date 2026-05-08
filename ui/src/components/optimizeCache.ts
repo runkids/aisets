@@ -9,6 +9,9 @@ import { optimizationBlockers, optimizationOperations } from "./optimizeTypes";
 
 export const estimateCache = new Map<string, OptimizationEstimate>();
 export const estimateOperationCache = new Map<string, OptimizationOperation>();
+const estimateStorageKey = "asset-studio.optimize.estimates.v2";
+const estimateCacheLimit = 3000;
+let estimateLoaded = false;
 
 export function estimateCacheKey(
   assetIds: string[],
@@ -48,12 +51,45 @@ export function estimateOperationCacheKey(
   });
 }
 
+export function clearEstimateCaches() {
+  estimateCache.clear();
+  estimateOperationCache.clear();
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(estimateStorageKey);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export function ensureEstimateOperationCacheLoaded() {
-  // in-memory only — no localStorage persistence
+  if (estimateLoaded || typeof window === "undefined") return;
+  estimateLoaded = true;
+  try {
+    const raw = window.sessionStorage.getItem(estimateStorageKey);
+    if (!raw) return;
+    const entries = JSON.parse(raw) as Array<[string, OptimizationOperation]>;
+    if (!Array.isArray(entries)) return;
+    for (const entry of entries.slice(-estimateCacheLimit)) {
+      if (!Array.isArray(entry) || typeof entry[0] !== "string") continue;
+      estimateOperationCache.set(entry[0], entry[1]);
+    }
+  } catch {
+    estimateOperationCache.clear();
+  }
 }
 
 export function persistEstimateOperationCache() {
-  // in-memory only — no localStorage persistence
+  if (typeof window === "undefined") return;
+  try {
+    const entries = [...estimateOperationCache.entries()].slice(
+      -estimateCacheLimit,
+    );
+    window.sessionStorage.setItem(estimateStorageKey, JSON.stringify(entries));
+  } catch {
+    // sessionStorage may be unavailable or full
+  }
 }
 
 export function buildEstimateFromOperations(

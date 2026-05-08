@@ -7,7 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
-	"runtime"
+	runtimepkg "runtime"
 	"strings"
 	"testing"
 )
@@ -36,6 +36,9 @@ func TestRuntimeInstallStateAndRemove(t *testing.T) {
 	runtime := Runtime(t.Context(), root, engine)
 	if runtime.Installed {
 		t.Fatalf("runtime installed before packs exist: %#v", runtime)
+	}
+	if runtime.Platform != runtimepkg.GOOS {
+		t.Fatalf("runtime platform = %q, want %q", runtime.Platform, runtimepkg.GOOS)
 	}
 	if len(runtime.AvailableLanguages) != len(languagePacks) {
 		t.Fatalf("available languages = %#v", runtime.AvailableLanguages)
@@ -127,7 +130,7 @@ func TestTesseractEngineGameLogoFixtures(t *testing.T) {
 }
 
 func TestTesseractEngineUsesBoundedFallbackWhenDefaultIsEmpty(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtimepkg.GOOS == "windows" {
 		t.Skip("fake tesseract script uses POSIX shell")
 	}
 	root := t.TempDir()

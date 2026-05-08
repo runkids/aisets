@@ -47,6 +47,7 @@ type ScanningSectionProps = {
   ocrRuntimeInstalled: boolean;
   ocrRuntimeEngineAvailable: boolean;
   ocrRuntimeEngineError: string;
+  ocrRuntimePlatform: string;
   updatePending: boolean;
   updateError: Error | null;
   catalogActions: ReactNode;
@@ -77,6 +78,7 @@ export function ScanningSection({
   ocrRuntimeInstalled,
   ocrRuntimeEngineAvailable,
   ocrRuntimeEngineError,
+  ocrRuntimePlatform,
   updatePending,
   updateError,
   catalogActions,
@@ -96,6 +98,15 @@ export function ScanningSection({
   const [excludeScope, setExcludeScope] = useState<
     "global" | ProjectScanIntent
   >("global");
+
+  const ocrEngineInstallHintKey =
+    ocrRuntimePlatform === "darwin"
+      ? "settings.ocrEngineInstallHintDarwin"
+      : ocrRuntimePlatform === "windows"
+        ? "settings.ocrEngineInstallHintWindows"
+        : ocrRuntimePlatform === "linux"
+          ? "settings.ocrEngineInstallHintLinux"
+          : "settings.ocrEngineInstallHintFallback";
 
   const excludeScopeOptions = [
     {
@@ -421,11 +432,16 @@ export function ScanningSection({
                   {t("settings.ocrCacheScopeHint")}
                 </p>
                 {ocrRuntimeEngineAvailable === false && (
-                  <p className="font-g text-g-caption tracking-g-ui text-g-red">
-                    {t("settings.ocrEngineUnavailable", {
-                      error: ocrRuntimeEngineError,
-                    })}
-                  </p>
+                  <div className="w-full rounded-g-md border border-g-red/40 bg-g-red/10 px-3 py-2 text-left font-g text-g-caption leading-[1.55] tracking-g-ui text-g-red">
+                    <p>
+                      {t("settings.ocrEngineUnavailable", {
+                        error: ocrRuntimeEngineError,
+                      })}
+                    </p>
+                    <p className="mt-1 font-g-mono text-g-chip tracking-g-mono">
+                      {t(ocrEngineInstallHintKey)}
+                    </p>
+                  </div>
                 )}
                 {ocrRuntimeInstalled &&
                   missingSelectedOCRLanguages.length > 0 && (

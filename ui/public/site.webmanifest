@@ -6,7 +6,7 @@
   "scope": ".",
   "icons": [
     {
-      "src": "/brand/asset-studio-app-icon.png",
+      "src": "./brand/asset-studio-app-icon.avif",
       "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any maskable"

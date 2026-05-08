@@ -501,6 +501,7 @@ export function SettingsView({
                 settings?.ocrRuntime.engineAvailable ?? false
               }
               ocrRuntimeEngineError={settings?.ocrRuntime.engineError ?? ""}
+              ocrRuntimePlatform={settings?.ocrRuntime.platform ?? ""}
               updatePending={updateMutation.isPending}
               updateError={updateMutation.error}
               catalogActions={settingActionsFor("catalogScanning")}

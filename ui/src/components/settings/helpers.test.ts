@@ -33,6 +33,8 @@ describe("settings draft helpers", () => {
         mixed: ["tmp/**"],
       },
       optimizationDefaultQuality: 80,
+      optimizationWorkers: 1,
+      optimizationAvifSpeed: 6,
       optimizationAutoApply: false,
       optimizationThresholds: {
         svgMinSavingsPercent: 10,
@@ -52,6 +54,7 @@ describe("settings draft helpers", () => {
         availableLanguages: [],
         installed: false,
         dataDir: "/tmp/ocr",
+        platform: "linux",
         engineName: "",
         engineVersion: "",
         engineAvailable: false,
@@ -97,6 +100,8 @@ describe("settings draft helpers", () => {
         mixed: ["custom-mixed/**"],
       },
       optimizationDefaultQuality: 42,
+      optimizationWorkers: 2,
+      optimizationAvifSpeed: 8,
       optimizationAutoApply: true,
       optimizationThresholds: {
         svgMinSavingsPercent: 25,
@@ -127,6 +132,7 @@ describe("settings draft helpers", () => {
         availableLanguages: [],
         installed: false,
         dataDir: "/tmp/ocr",
+        platform: "linux",
         engineName: "",
         engineVersion: "",
         engineAvailable: false,

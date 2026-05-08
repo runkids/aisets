@@ -127,6 +127,8 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       ]),
     ) as SettingsDraft["excludePatternsByIntentText"],
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
+    optimizationWorkers: settings?.optimizationWorkers ?? 1,
+    optimizationAvifSpeed: settings?.optimizationAvifSpeed ?? 6,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
     optimizationThresholds:
       settings?.optimizationThresholds ??
@@ -162,6 +164,8 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
       ]),
     ) as SettingsUpdate["excludePatternsByIntent"],
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
+    optimizationWorkers: draft.optimizationWorkers,
+    optimizationAvifSpeed: draft.optimizationAvifSpeed,
     optimizationAutoApply: draft.optimizationAutoApply,
     optimizationThresholds: draft.optimizationThresholds,
     customAssetFilters: draft.customAssetFilters,
@@ -210,6 +214,8 @@ export function resetSectionDraft(
       return {
         ...current,
         optimizationDefaultQuality: defaults.optimizationDefaultQuality,
+        optimizationWorkers: defaults.optimizationWorkers,
+        optimizationAvifSpeed: defaults.optimizationAvifSpeed,
         optimizationAutoApply: defaults.optimizationAutoApply,
         optimizationThresholds: defaults.optimizationThresholds,
       };

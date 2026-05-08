@@ -121,6 +121,7 @@ dependencies = [
  "anyhow",
  "clap",
  "image",
+ "libwebp-sys",
  "ravif",
  "rgb",
  "serde",

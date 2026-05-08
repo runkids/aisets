@@ -51,6 +51,10 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 - `unusedFiles` means safe delete-unused candidates only. Advisory or not-applicable counts belong in `possiblyUnusedFiles` and `usageNotApplicableFiles`. Asset packs skip reference-dependent analysis; library, mixed, and partial-coverage code projects can show "possibly unused" but must not enable delete-unused.
 - When project `scanIntent` changes, treat reference-dependent catalog state as stale and require a rescan before enabling unused/delete-unused behavior. Persist and compare scan-time intent where scan history or diff logic depends on unused transitions.
 
+### 2.3 Rust / imgtools CLI
+- **Rust imgtools changes require CLI integration tests.** Any behavior change under `tools/imgtools` must add or update deterministic Cargo tests that execute `asset-studio-imgtools` through the compiled binary. Cover successful JSON/file-output paths plus validation and error paths, because unit tests alone can miss Clap wiring, filesystem behavior, and serialization regressions.
+- **Rust imgtools verification must stay in CI.** Keep `.github/workflows/test.yaml`'s `imgtools-test` job in sync with local verification: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --manifest-path tools/imgtools/Cargo.toml`, and a release build. Otherwise Rust CLI regressions can ship while Go and UI checks still pass.
+
 ---
 
 ## 3. Commit & verification

@@ -56,6 +56,8 @@ export type AppSettings = {
   excludePatterns: string[];
   excludePatternsByIntent: ExcludePatternsByIntent;
   optimizationDefaultQuality: number;
+  optimizationWorkers: number;
+  optimizationAvifSpeed: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;
   customAssetFilters: CustomAssetFilter[];
@@ -134,6 +136,7 @@ export type OCRRuntime = {
   }>;
   installed: boolean;
   dataDir: string;
+  platform: string;
   engineName: string;
   engineVersion: string;
   engineAvailable: boolean;

@@ -93,6 +93,8 @@ export function OptimizeView({
   const settingsQuery = useSettingsQuery();
   const quality =
     settingsQuery.data?.settings?.optimizationDefaultQuality ?? 80;
+  const workers = settingsQuery.data?.settings?.optimizationWorkers ?? 1;
+  const avifSpeed = settingsQuery.data?.settings?.optimizationAvifSpeed ?? 6;
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("");
   const [severity, setSeverity] = useState<Severity>("");
@@ -268,7 +270,7 @@ export function OptimizeView({
     const operations: OptimizationOperation[] = [];
     for (const assetId of assetIds) {
       const item = itemsById.get(assetId);
-      if (!item) return null;
+      if (!item) continue;
       const operation = estimateOperationCache.get(
         estimateOperationCacheKey(
           item,
@@ -277,9 +279,9 @@ export function OptimizeView({
           quality,
         ),
       );
-      if (!operation) return null;
-      operations.push(operation);
+      if (operation) operations.push(operation);
     }
+    if (operations.length === 0) return null;
     return buildEstimateFromOperations(assetIds, itemsById, operations);
   }
 
@@ -304,16 +306,6 @@ export function OptimizeView({
     );
     setPreview(null);
   }, [currentEstimateKey, actionIds, itemsById]);
-
-  const autoEstimateRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!items.length || working || !itemsQuery.data) return;
-    const key = currentEstimateKey;
-    if (autoEstimateRef.current === key) return;
-    if (estimateCache.has(key)) return;
-    autoEstimateRef.current = key;
-    void runEstimate();
-  }, [items.length, working, currentEstimateKey, itemsQuery.data]);
 
   useInfiniteScrollSentinel({
     rootRef: scrollRef,
@@ -341,6 +333,8 @@ export function OptimizeView({
       updateReferences: replaceOriginal && updateReferences,
       quality,
       maxDimensionPx: 1200,
+      avifSpeed,
+      workers,
     };
   }
 

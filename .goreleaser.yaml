@@ -49,5 +49,7 @@ brews:
     homepage: https://github.com/runkids/asset-studio
     description: Local-first asset management studio
     license: MIT
+    dependencies:
+      - name: tesseract
     test: |
       system "#{bin}/asset-studio", "version"

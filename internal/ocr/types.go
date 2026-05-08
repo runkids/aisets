@@ -93,6 +93,7 @@ type RuntimeStatus struct {
 	AvailableLanguages []LanguagePack `json:"availableLanguages"`
 	Installed          bool           `json:"installed"`
 	DataDir            string         `json:"dataDir"`
+	Platform           string         `json:"platform"`
 	EngineName         string         `json:"engineName"`
 	EngineVersion      string         `json:"engineVersion"`
 	EngineAvailable    bool           `json:"engineAvailable"`

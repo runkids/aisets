@@ -7,7 +7,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS node-runtime
 FROM golang:${GO_VERSION}-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl git procps tini \
+    bash ca-certificates curl git procps tini tesseract-ocr \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/

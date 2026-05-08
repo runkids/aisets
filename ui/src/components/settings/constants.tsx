@@ -73,6 +73,8 @@ export const defaultSettings: SettingsUpdate = {
     ],
   },
   optimizationDefaultQuality: 80,
+  optimizationWorkers: 1,
+  optimizationAvifSpeed: 6,
   optimizationAutoApply: false,
   optimizationThresholds: {
     svgMinSavingsPercent: 10,

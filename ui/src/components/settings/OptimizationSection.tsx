@@ -99,6 +99,88 @@ export function OptimizationSection({
             </div>
           </FieldRow>
           <FieldRow
+            label={t("settings.workers")}
+            description={t("settings.workersHint")}
+            icon={<Sliders size={15} />}
+            align="start"
+          >
+            <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+              <div className="flex items-center gap-3">
+                <Range
+                  min={1}
+                  max={4}
+                  value={draft.optimizationWorkers}
+                  disabled={settingsLoading || updatePending}
+                  onChange={(event) =>
+                    onUpdateDraft((prev) => ({
+                      ...prev,
+                      optimizationWorkers: Number(event.target.value),
+                    }))
+                  }
+                  aria-label={t("settings.workers")}
+                />
+                <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                  {draft.optimizationWorkers}
+                </span>
+              </div>
+            </div>
+          </FieldRow>
+          <FieldRow
+            label={t("settings.avifSpeed")}
+            description={t("settings.avifSpeedHint")}
+            icon={<Sliders size={15} />}
+            align="start"
+          >
+            <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
+              <div className="flex items-center gap-3">
+                <Range
+                  min={1}
+                  max={10}
+                  value={draft.optimizationAvifSpeed}
+                  disabled={settingsLoading || updatePending}
+                  onChange={(event) =>
+                    onUpdateDraft((prev) => ({
+                      ...prev,
+                      optimizationAvifSpeed: Number(event.target.value),
+                    }))
+                  }
+                  aria-label={t("settings.avifSpeed")}
+                />
+                <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                  {draft.optimizationAvifSpeed}
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                {(
+                  [
+                    { label: t("settings.avifSpeedFast"), value: 10 },
+                    { label: t("settings.avifSpeedBalanced"), value: 6 },
+                    { label: t("settings.avifSpeedBest"), value: 1 },
+                  ] as const
+                ).map((preset) => (
+                  <Button
+                    key={preset.value}
+                    variant="chip"
+                    size="sm"
+                    data-active={
+                      draft.optimizationAvifSpeed === preset.value || undefined
+                    }
+                    disabled={settingsLoading || updatePending}
+                    onClick={() =>
+                      onUpdateDraft((prev) => ({
+                        ...prev,
+                        optimizationAvifSpeed: preset.value,
+                      }))
+                    }
+                    className="flex-1"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </FieldRow>
+          <FieldRow
             label={t("settings.autoApply")}
             description={t("settings.autoApplyHint")}
             icon={<Sliders size={15} />}
