@@ -15,6 +15,7 @@ export function hasDuplicates(item: AssetItem) {
 
 export type Mode =
   | "projects"
+  | "history"
   | "browse"
   | "duplicates"
   | "unused"
@@ -25,6 +26,7 @@ export type Mode =
 
 export const modes: Mode[] = [
   "projects",
+  "history",
   "browse",
   "duplicates",
   "unused",

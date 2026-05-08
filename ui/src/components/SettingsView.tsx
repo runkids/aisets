@@ -7,6 +7,7 @@ import { isOCRActivityBusy } from "../ocrActivity";
 import {
   useCatalogQuery,
   useAddWorkspaceMutation,
+  useClearScanHistoryMutation,
   useImportSettingsMutation,
   useInstallOCRMutation,
   useRemoveProjectMutation,
@@ -78,6 +79,7 @@ export function SettingsView({
   const catalogQuery = useCatalogQuery();
   const versionQuery = useVersionQuery();
   const addWorkspaceMutation = useAddWorkspaceMutation();
+  const clearScanHistoryMutation = useClearScanHistoryMutation();
   const importMutation = useImportSettingsMutation();
   const installOCRMutation = useInstallOCRMutation();
   const removeProjectMutation = useRemoveProjectMutation();
@@ -116,6 +118,7 @@ export function SettingsView({
   }
   const working =
     addWorkspaceMutation.isPending ||
+    clearScanHistoryMutation.isPending ||
     importMutation.isPending ||
     installOCRMutation.isPending ||
     removeProjectMutation.isPending ||
@@ -361,6 +364,19 @@ export function SettingsView({
     });
   }
 
+  function onClearScanHistory() {
+    clearScanHistoryMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(t("toast.scanHistoryCleared"));
+      },
+      onError: (error) => {
+        toast.error(errorMessage(error), {
+          title: t("toast.scanHistoryClearFailed"),
+        });
+      },
+    });
+  }
+
   function settingActionsFor(section: Section | "catalogScanning" | "ocr") {
     return (
       <SettingsActions
@@ -529,10 +545,12 @@ export function SettingsView({
               working={working}
               onExport={onExport}
               onImport={onImport}
+              onClearScanHistory={onClearScanHistory}
               onResetSettings={onResetAllSettings}
               onResetDatabase={onResetDatabase}
               onUpdateApp={onUpdateApp}
               updateAppPending={updateAppMutation.isPending}
+              clearScanHistoryPending={clearScanHistoryMutation.isPending}
               resetPending={resetMutation.isPending}
               importPending={importMutation.isPending}
             />

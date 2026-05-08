@@ -3,12 +3,12 @@ import {
   Filter,
   FolderKanban,
   FolderOpen,
+  Gauge,
   LoaderCircle,
   Recycle,
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -45,7 +45,7 @@ const MODE_ITEMS: ModeItem[] = [
   { id: "browse", labelKey: "nav.browse", icon: <FolderOpen size={14} /> },
   { id: "duplicates", labelKey: "nav.duplicates", icon: <Recycle size={14} /> },
   { id: "unused", labelKey: "nav.unused", icon: <Trash2 size={14} /> },
-  { id: "optimize", labelKey: "nav.optimize", icon: <Sparkles size={14} /> },
+  { id: "optimize", labelKey: "nav.optimize", icon: <Gauge size={14} /> },
   { id: "lint", labelKey: "nav.lint", icon: <FileWarning size={14} /> },
   { id: "precheck", labelKey: "nav.precheck", icon: <ShieldCheck size={14} /> },
   { id: "settings", labelKey: "nav.settings", icon: <Settings size={14} /> },
@@ -65,6 +65,7 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const debouncedQuery = useDebouncedValue(query, 180);
   const searchPending = query.trim() !== debouncedQuery.trim();
   const assetQuery = useCatalogItemsInfiniteQuery(
@@ -120,6 +121,15 @@ export function CommandPalette({
     results.modes.length + results.filters.length + results.assets.length;
   const activeItemIndex =
     totalItems === 0 ? 0 : Math.min(activeIndex, totalItems - 1);
+
+  useEffect(() => {
+    itemRefs.current.length = totalItems;
+  }, [totalItems]);
+
+  useEffect(() => {
+    if (!open || totalItems === 0) return;
+    itemRefs.current[activeItemIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeItemIndex, open, totalItems]);
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -224,6 +234,9 @@ export function CommandPalette({
                 {results.modes.map((mode, index) => (
                   <button
                     key={mode.id}
+                    ref={(node) => {
+                      itemRefs.current[index] = node;
+                    }}
                     type="button"
                     className={itemCls}
                     data-active={activeItemIndex === index || undefined}
@@ -252,6 +265,9 @@ export function CommandPalette({
                       return (
                         <button
                           key={filter.id}
+                          ref={(node) => {
+                            itemRefs.current[resultIndex] = node;
+                          }}
                           type="button"
                           className={itemCls}
                           data-active={
@@ -290,6 +306,9 @@ export function CommandPalette({
                   return (
                     <button
                       key={asset.id}
+                      ref={(node) => {
+                        itemRefs.current[resultIndex] = node;
+                      }}
                       type="button"
                       className={itemCls}
                       data-active={activeItemIndex === resultIndex || undefined}

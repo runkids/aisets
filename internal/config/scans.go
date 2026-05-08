@@ -185,6 +185,11 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 	return scanID, nil
 }
 
+func (s *Store) ClearScans() error {
+	_, err := s.db.Exec(`DELETE FROM scans`)
+	return err
+}
+
 func normalizeSnapshotItem(item scanner.AssetItem) scanner.AssetItem {
 	item.ScanIntent = scanner.NormalizeProjectScanIntent(item.ScanIntent)
 	if item.UsageClassification == "" {

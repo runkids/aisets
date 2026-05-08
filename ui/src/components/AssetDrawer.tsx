@@ -136,7 +136,9 @@ export function AssetDrawer({
   }, [closing, onClose]);
   const settingsQuery = useSettingsQuery();
   const ocrVisible = Boolean(
-    settingsQuery.data?.settings.ocrEnabled && asset.ocr,
+    settingsQuery.data?.settings.ocrEnabled &&
+    asset.ocr &&
+    asset.ocr.status === "ready",
   );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";

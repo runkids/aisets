@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearScanHistory,
   getCatalogDuplicates,
   getCatalogLint,
+  getScanDiff,
+  getScans,
   runOCR,
   scanCatalog,
   updateSettings,
@@ -180,6 +183,71 @@ describe("getCatalogLint", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/catalog/lint?scanId=7&projectId=project-a&severity=warning&limit=200&cursor=200",
       expect.objectContaining({
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    );
+  });
+});
+
+describe("scan history endpoints", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests the scan history endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ scans: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getScans();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/scans",
+      expect.objectContaining({
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    );
+  });
+
+  it("requests the explicit scan diff endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ summary: {}, added: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getScanDiff(1, 2);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/scans/diff?base=1&target=2",
+      expect.objectContaining({
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    );
+  });
+
+  it("requests the clear scan history endpoint with confirmation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await clearScanHistory();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/scans/clear",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ confirm: "CLEAR_SCAN_HISTORY" }),
         headers: {
           "content-type": "application/json",
         },

@@ -6,8 +6,8 @@ import {
   CircleOff,
   CircleSlash,
   Copy,
+  Gauge,
   LoaderCircle,
-  Sparkles,
   Square,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -210,7 +210,7 @@ export function BrowseList({
           )}
           {optimizable && (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-blue)_35%,transparent)] bg-g-blue-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-blue">
-              <Sparkles size={10} />
+              <Gauge size={10} />
               {t("browse.flagOptimizableShort")}
             </span>
           )}

@@ -18,6 +18,18 @@ describe("matchesOCRSearchText", () => {
     expect(matchesOCRSearchText("ERARZAN™S", "tarzan")).toBe(true);
   });
 
+  it("matches short game-logo words with one OCR character error", () => {
+    expect(matchesOCRSearchText("TREASURE BOWI", "bowl")).toBe(true);
+    expect(matchesOCRSearchText("TREASURE BOW", "bowl")).toBe(true);
+  });
+
+  it("rejects unrelated short game-logo words", () => {
+    expect(matchesOCRSearchText("MAYAN EMPIRE", "fire")).toBe(false);
+    expect(matchesOCRSearchText("Mahjong for 2 Players", "fire")).toBe(false);
+    expect(matchesOCRSearchText("FortuneTREE", "fire")).toBe(false);
+    expect(matchesOCRSearchText("FourCard Suit", "fire")).toBe(false);
+  });
+
   it("can disable fuzzy OCR matching", () => {
     expect(matchesOCRSearchText("ERARZAN™S", "tarzan", { fuzzy: false })).toBe(
       false,

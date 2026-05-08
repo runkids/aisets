@@ -29,6 +29,9 @@ func (s *Store) CatalogItemsWithOptimizationByIDs(scanID int64, ids []string) ([
 	if err := s.hydrateAssetOptimization(scanID, items); err != nil {
 		return nil, err
 	}
+	if err := s.hydrateAssetReferences(scanID, items); err != nil {
+		return nil, err
+	}
 	return items, nil
 }
 

@@ -221,6 +221,8 @@ export type AssetItem = {
     severity: "critical" | "warning" | "info";
     suggestionCode: string;
     suggestion: string;
+    estimatedBytes?: number;
+    savingsBytes?: number;
   }>;
   ocr?: {
     status: "pending" | "ready" | "failed" | "skipped";
@@ -272,6 +274,7 @@ export type DuplicateGroup = {
   hashAlgorithm: string;
   paths: string[];
   preferredPath: string;
+  members?: AssetItem[];
 };
 
 export type NearDuplicate = {
@@ -349,6 +352,9 @@ export type CatalogItemsPage = {
     projectTotal: number;
     extensions: Array<{ id: string; count: number }>;
     extensionTotal: number;
+    optimizationCategories: Array<{ id: string; count: number }>;
+    optimizationSeverities: Array<{ id: string; count: number }>;
+    operations: Array<{ id: string; count: number }>;
     customFilters: Array<{
       id: string;
       label: string;
@@ -436,6 +442,69 @@ export type ScanEvent =
     }
   | { type: "error"; error?: APIErrorBody["error"] };
 
+export type ScanSummary = {
+  id: number;
+  startedAt: string;
+  completedAt?: string;
+  status: string;
+  profile: ScanProfile;
+  projectCount: number;
+  totalFiles: number;
+  duplicateGroups: number;
+  duplicateFiles: number;
+  unusedFiles: number;
+  nearDuplicates: number;
+  cacheHits: number;
+  analysis: Catalog["analysis"];
+};
+
+export type ScanDiffSummary = {
+  added: number;
+  removed: number;
+  modified: number;
+  referenceChanged: number;
+  becameUnused: number;
+  noLongerUnused: number;
+  totalByteDelta: number;
+  optimizationSavingsDelta: number;
+  duplicateGroupsDelta: number;
+  nearDuplicatesDelta: number;
+};
+
+export type ScanAssetDiff = {
+  projectId: string;
+  projectName: string;
+  repoPath: string;
+  ext: string;
+  beforeBytes?: number;
+  afterBytes?: number;
+  beforeHash?: string;
+  afterHash?: string;
+  beforeUsedCount?: number;
+  afterUsedCount?: number;
+};
+
+export type UnusedTransition = {
+  projectId: string;
+  projectName: string;
+  repoPath: string;
+  ext: string;
+  direction: "becameUnused" | "noLongerUnused";
+  beforeUsedCount: number;
+  afterUsedCount: number;
+};
+
+export type ScanDiff = {
+  base: ScanSummary;
+  target: ScanSummary;
+  summary: ScanDiffSummary;
+  added: ScanAssetDiff[];
+  removed: ScanAssetDiff[];
+  modified: ScanAssetDiff[];
+  referenceChanges: ScanAssetDiff[];
+  unusedTransitions: UnusedTransition[];
+};
+
 export type OCRRunCounts = {
   queued: number;
   processed: number;
@@ -472,6 +541,7 @@ export type ActionPreview = {
   blockers: Array<{ file: string; line: number; code: string; reason: string }>;
   canApply: boolean;
   createdAt: string;
+  payload?: Record<string, unknown>;
 };
 
 export type APIErrorBody = {

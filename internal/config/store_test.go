@@ -614,6 +614,27 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
 		t.Fatalf("folder filtered page = %#v", page)
 	}
+	if err := store.UpsertOCRResult(ocr.Result{
+		ProjectID:      logo.ProjectID,
+		RepoPath:       logo.RepoPath,
+		ContentHash:    logo.ContentHash,
+		HashAlgorithm:  logo.HashAlgorithm,
+		EngineName:     "test-ocr",
+		EngineVersion:  "test",
+		SettingsHash:   ocr.SettingsHash(OCRSettingsFromApp(DefaultAppSettings())),
+		Status:         ocr.StatusReady,
+		Text:           "TREASURE BOWI",
+		NormalizedText: "treasure bowi",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Query: "BOWL", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("OCR fuzzy search page = %#v", page)
+	}
 }
 
 func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
@@ -673,6 +694,62 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != optimizable.ID || len(page.Items[0].Optimization) != 1 || page.Items[0].Optimization[0].ReasonCode != "large_asset" {
 		t.Fatalf("optimizable catalog page = %#v", page)
+	}
+}
+
+func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	webp := scanAsset(root, "p", "workspace", "src/photo.png", 1000, "photo", 1, 0)
+	webp.Image.Alpha = false
+	webp.Optimization = []scanner.OptimizationSuggestion{{
+		Category:       "format",
+		Severity:       "info",
+		ReasonCode:     "png_without_alpha",
+		SuggestionCode: "try_modern_photographic_format",
+		SavingsBytes:   400,
+	}}
+	resize := scanAsset(root, "p", "workspace", "src/hero.jpg", 2000, "hero", 1, 0)
+	resize.Optimization = []scanner.OptimizationSuggestion{{
+		Category:       "dimensions",
+		Severity:       "warning",
+		ReasonCode:     "image_dimensions_large",
+		SuggestionCode: "use_responsive_or_smaller_source",
+		SavingsBytes:   800,
+	}}
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-08T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{webp, resize},
+		Stats:       scanner.CatalogStats{TotalFiles: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.CatalogItems(CatalogItemQuery{
+		Status:               "optimizable",
+		OptimizationCategory: "format",
+		OptimizationSeverity: "info",
+		Operation:            "convert-avif",
+		Limit:                10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != webp.ID {
+		t.Fatalf("optimization-filtered page = %#v", page)
+	}
+	if len(page.Facets.Operations) == 0 || page.Facets.Operations[0].ID != "convert-avif" {
+		t.Fatalf("operation facets = %#v", page.Facets.Operations)
+	}
+	if len(page.Facets.OptimizationCategories) != 1 || page.Facets.OptimizationCategories[0].ID != "format" || len(page.Facets.OptimizationSeverities) != 1 || page.Facets.OptimizationSeverities[0].ID != "info" {
+		t.Fatalf("optimization facets = %#v", page.Facets)
 	}
 }
 
@@ -887,6 +964,16 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 		}
 		if paths := got.page.Groups[0].Paths; len(paths) != 2 || paths[0] != "src/logo-copy.png" || paths[1] != "src/logo.png" {
 			t.Fatalf("duplicate paths = %#v", paths)
+		}
+		members := got.page.Groups[0].Members
+		if len(members) != 2 || members[0].RepoPath != "src/logo-copy.png" || members[1].RepoPath != "src/logo.png" {
+			t.Fatalf("duplicate members = %#v", members)
+		}
+		if members[0].DuplicateGroupID == nil || *members[0].DuplicateGroupID != dupID {
+			t.Fatalf("duplicate member group id = %#v", members[0].DuplicateGroupID)
+		}
+		if members[0].PreferredDuplicatePath == nil || *members[0].PreferredDuplicatePath != "src/logo.png" {
+			t.Fatalf("duplicate member preferred path = %#v", members[0].PreferredDuplicatePath)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("CatalogDuplicates exact did not return with a single database connection")

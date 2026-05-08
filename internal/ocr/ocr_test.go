@@ -102,8 +102,13 @@ func TestTesseractEngineGameLogoFixtures(t *testing.T) {
 		path string
 		want string
 	}{
+		{filepath.Join("..", "..", "demo", "202605080012", "jdb", "0-121001.png"), "mahjong"},
+		{filepath.Join("..", "..", "demo", "202605080012", "jdb", "0-14080.png"), "fire"},
+		{filepath.Join("..", "..", "demo", "英", "对战", "PTG0086_二人雀神EN.png"), "mahjong"},
 		{filepath.Join("..", "..", "demo", "英", "百人", "PTG0008_豪车漂移EN.png"), "racing"},
 		{filepath.Join("..", "..", "demo", "英", "对战", "PTG0037_德州扑克EN.png"), "texas"},
+		{filepath.Join("..", "..", "demo", "英", "捕鱼", "PTG0056_3D捕鱼EN.png"), "fishing"},
+		{filepath.Join("..", "..", "demo", "英", "百人", "PTG0067_3D森林舞会EN.png"), "forest"},
 	}
 	for _, fixture := range fixtures {
 		t.Run(filepath.Base(fixture.path), func(t *testing.T) {

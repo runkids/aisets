@@ -116,34 +116,8 @@ func Apply(project scanner.Project, preview Preview) (ApplyResult, error) {
 	if !preview.CanApply {
 		return ApplyResult{}, apierr.New("preview_has_blockers", "preview has blockers")
 	}
-	for _, change := range preview.Changes {
-		abs, err := safeAbs(project.Path, change.File)
-		if err != nil {
-			return ApplyResult{}, err
-		}
-		bytes, err := os.ReadFile(abs)
-		if err != nil {
-			return ApplyResult{}, err
-		}
-		content := string(bytes)
-		if !strings.Contains(content, change.OldSpecifier) {
-			return ApplyResult{}, apierr.WithParams("preview_stale_missing_specifier", "preview is stale: missing old specifier", map[string]any{"file": change.File})
-		}
-	}
-
-	for _, change := range preview.Changes {
-		abs, err := safeAbs(project.Path, change.File)
-		if err != nil {
-			return ApplyResult{}, err
-		}
-		bytes, err := os.ReadFile(abs)
-		if err != nil {
-			return ApplyResult{}, err
-		}
-		next := strings.ReplaceAll(string(bytes), change.OldSpecifier, change.NewSpecifier)
-		if err := os.WriteFile(abs, []byte(next), 0o644); err != nil {
-			return ApplyResult{}, err
-		}
+	if err := ApplyReferenceChanges(project, preview.Changes); err != nil {
+		return ApplyResult{}, err
 	}
 
 	result := ApplyResult{AppliedAt: time.Now().UTC().Format(time.RFC3339), ChangedReferences: len(preview.Changes)}
@@ -181,6 +155,49 @@ func Apply(project scanner.Project, preview Preview) (ApplyResult, error) {
 		result.DeletedFiles++
 	}
 	return result, nil
+}
+
+func ReferenceChanges(project scanner.Project, item scanner.AssetItem, targetPath string) ([]Change, []Blocker) {
+	return referenceChanges(project, item, targetPath)
+}
+
+func ValidateReferenceChanges(project scanner.Project, changes []Change) error {
+	for _, change := range changes {
+		abs, err := safeAbs(project.Path, change.File)
+		if err != nil {
+			return err
+		}
+		bytes, err := os.ReadFile(abs)
+		if err != nil {
+			return err
+		}
+		content := string(bytes)
+		if !strings.Contains(content, change.OldSpecifier) {
+			return apierr.WithParams("preview_stale_missing_specifier", "preview is stale: missing old specifier", map[string]any{"file": change.File})
+		}
+	}
+	return nil
+}
+
+func ApplyReferenceChanges(project scanner.Project, changes []Change) error {
+	if err := ValidateReferenceChanges(project, changes); err != nil {
+		return err
+	}
+	for _, change := range changes {
+		abs, err := safeAbs(project.Path, change.File)
+		if err != nil {
+			return err
+		}
+		bytes, err := os.ReadFile(abs)
+		if err != nil {
+			return err
+		}
+		next := strings.ReplaceAll(string(bytes), change.OldSpecifier, change.NewSpecifier)
+		if err := os.WriteFile(abs, []byte(next), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func referenceChanges(project scanner.Project, item scanner.AssetItem, targetPath string) ([]Change, []Blocker) {

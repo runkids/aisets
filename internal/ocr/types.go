@@ -25,7 +25,7 @@ const (
 	DefaultConcurrency = 1
 	MaxConcurrency     = 2
 
-	MaxExtractionAttempts = 3
+	MaxExtractionAttempts = 4
 )
 
 var supportedLanguages = map[string]struct{}{

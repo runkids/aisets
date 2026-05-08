@@ -46,6 +46,7 @@ import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
 import { FilterRail } from "./FilterRail";
+import { buildDuplicateGroupViews } from "./duplicateGroupViews";
 
 type Props = {
   scanId?: number;
@@ -93,6 +94,7 @@ export function DuplicatesView({
   const duplicateItemsQuery = useCatalogItemsInfiniteQuery(
     scanId,
     {
+      projectName: effectiveProject,
       ext: railFilter.ext || undefined,
       q: debouncedSearch || undefined,
       status: "duplicate",
@@ -196,33 +198,10 @@ export function DuplicatesView({
 
   /* ── Computed views ── */
 
-  const itemsByGroup = useMemo(() => {
-    const map = new Map<string, AssetItem[]>();
-    for (const i of items) {
-      if (!i.duplicateGroupId) continue;
-      const list = map.get(i.duplicateGroupId);
-      if (list) list.push(i);
-      else map.set(i.duplicateGroupId, [i]);
-    }
-    return map;
-  }, [items]);
-
-  const groupViews = useMemo(() => {
-    return groups
-      .map((g) => {
-        const members = itemsByGroup.get(g.id) ?? [];
-        const totalBytes = members.reduce((s, m) => s + m.bytes, 0);
-        const savings = members
-          .filter((m) => m.repoPath !== g.preferredPath)
-          .reduce((s, m) => s + m.bytes, 0);
-        return { ...g, members, totalBytes, savings };
-      })
-      .sort((a, b) =>
-        sort === "size"
-          ? b.totalBytes - a.totalBytes
-          : b.members.length - a.members.length,
-      );
-  }, [groups, itemsByGroup, sort]);
+  const groupViews = useMemo(
+    () => buildDuplicateGroupViews(groups, items, sort, debouncedSearch),
+    [groups, items, sort, debouncedSearch],
+  );
 
   const totalSavings = useMemo(
     () => groupViews.reduce((sum, g) => sum + g.savings, 0),

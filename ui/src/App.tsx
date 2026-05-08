@@ -34,6 +34,7 @@ import { OptimizeView } from "./components/OptimizeView";
 import { PreCheckView } from "./components/PreCheckView";
 import { PreviewModal } from "./components/PreviewModal";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { ScanHistoryView } from "./components/ScanHistoryView";
 import { Button, EmptyState, NoticeStack, PromptDialog } from "./components/ui";
 import { SettingsView } from "./components/SettingsView";
 import { useToast } from "./components/ToastProvider";
@@ -676,6 +677,29 @@ export function App() {
               stats={scopedStats}
               onOpenAsset={setDrawerId}
             />
+          ) : mode === "optimize" ? (
+            catalogSummary?.analysis.optimization === "notComputed" ? (
+              <div
+                key="optimization-not-computed"
+                className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+              >
+                <NotComputedState
+                  title={t("catalog.notComputed.optimizationTitle")}
+                  description={t("catalog.notComputed.optimizationDesc")}
+                  action={t("catalog.notComputed.fullScan")}
+                  onAction={onFullScan}
+                />
+              </div>
+            ) : (
+              <OptimizeView
+                scanId={catalogSummary?.scanId}
+                projectFilterId={effectiveSelectedProjectId || undefined}
+                projectFilterName={selectedProject?.name ?? ""}
+                onOpenAsset={setDrawerId}
+              />
+            )
+          ) : mode === "history" ? (
+            <ScanHistoryView />
           ) : (
             <div
               key={mode}
@@ -691,21 +715,6 @@ export function App() {
                   onJump={changeMode}
                   onAddProject={() => setDirectoryPickerOpen(true)}
                 />
-              ) : mode === "optimize" ? (
-                catalogSummary?.analysis.optimization === "notComputed" ? (
-                  <NotComputedState
-                    title={t("catalog.notComputed.optimizationTitle")}
-                    description={t("catalog.notComputed.optimizationDesc")}
-                    action={t("catalog.notComputed.fullScan")}
-                    onAction={onFullScan}
-                  />
-                ) : (
-                  <OptimizeView
-                    scanId={catalogSummary?.scanId}
-                    projectFilterId={effectiveSelectedProjectId || undefined}
-                    onOpenAsset={setDrawerId}
-                  />
-                )
               ) : null}
             </div>
           )}

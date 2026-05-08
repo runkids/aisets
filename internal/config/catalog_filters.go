@@ -72,6 +72,24 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	categoryQuery := query
+	categoryQuery.OptimizationCategory = ""
+	categories, _, err := s.catalogOptimizationFacetCounts(scanID, categoryQuery, "o.category")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	severityQuery := query
+	severityQuery.OptimizationSeverity = ""
+	severities, _, err := s.catalogOptimizationFacetCounts(scanID, severityQuery, "o.severity")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	operationQuery := query
+	operationQuery.Operation = ""
+	operations, _, err := s.catalogOptimizationFacetCounts(scanID, operationQuery, optimizationOperationSQL("o.suggestion_code", "a.ext", "a.alpha"))
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -95,12 +113,15 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		})
 	}
 	return CatalogItemFacets{
-		Projects:          projects,
-		ProjectTotal:      projectTotal,
-		Extensions:        extensions,
-		ExtensionTotal:    extensionTotal,
-		CustomFilters:     customFilters,
-		CustomFilterTotal: customTotal,
+		Projects:               projects,
+		ProjectTotal:           projectTotal,
+		Extensions:             extensions,
+		ExtensionTotal:         extensionTotal,
+		OptimizationCategories: categories,
+		OptimizationSeverities: severities,
+		Operations:             operations,
+		CustomFilters:          customFilters,
+		CustomFilterTotal:      customTotal,
 	}, nil
 }
 
@@ -135,6 +156,36 @@ func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr st
 		}
 	}
 	return options, total, rows.Err()
+}
+
+func (s *Store) catalogOptimizationFacetCounts(scanID int64, query CatalogItemQuery, expr string) ([]CatalogFacetOption, int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(`
+		SELECT `+expr+` AS id, COUNT(DISTINCT a.asset_id)
+		FROM asset_snapshots a
+		JOIN optimization_snapshots o ON o.scan_id = a.scan_id AND o.asset_id = a.asset_id
+		`+where+`
+		GROUP BY id
+		ORDER BY COUNT(DISTINCT a.asset_id) DESC, id ASC
+	`, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	options := []CatalogFacetOption{}
+	for rows.Next() {
+		var option CatalogFacetOption
+		if err := rows.Scan(&option.ID, &option.Count); err != nil {
+			return nil, 0, err
+		}
+		if option.ID != "" {
+			options = append(options, option)
+		}
+	}
+	return options, 0, rows.Err()
 }
 
 func customFilterUsesOCR(filter CustomAssetFilter) bool {
@@ -330,10 +381,10 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND oq.repo_path = a.repo_path
 				AND oq.content_hash = a.content_hash
 				AND oq.hash_algorithm = a.hash_algorithm
-				AND (oq.normalized_text LIKE ? OR oq.text LIKE ?)
+				AND (oq.normalized_text LIKE ? OR oq.text LIKE ? OR ocr_search_match(COALESCE(oq.normalized_text, oq.text, ''), ?) = 1)
 		))`)
 		like := "%" + q + "%"
-		args = append(args, like, like, like, like)
+		args = append(args, like, like, like, like, q)
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":
@@ -357,6 +408,29 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 	case "nearDuplicate":
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM near_duplicate_snapshots n WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id))")
 	}
+	if category := strings.TrimSpace(query.OptimizationCategory); category != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM optimization_snapshots oc
+			WHERE oc.scan_id = a.scan_id AND oc.asset_id = a.asset_id AND oc.category = ?
+		)`)
+		args = append(args, category)
+	}
+	if severity := strings.TrimSpace(query.OptimizationSeverity); severity != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM optimization_snapshots os
+			WHERE os.scan_id = a.scan_id AND os.asset_id = a.asset_id AND os.severity = ?
+		)`)
+		args = append(args, severity)
+	}
+	if operation := strings.TrimSpace(query.Operation); operation != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM optimization_snapshots oo
+			WHERE oo.scan_id = a.scan_id
+				AND oo.asset_id = a.asset_id
+				AND `+optimizationOperationSQL("oo.suggestion_code", "a.ext", "a.alpha")+` = ?
+		)`)
+		args = append(args, operation)
+	}
 	if customFilterID := strings.TrimSpace(query.CustomFilterID); customFilterID != "" {
 		clause, filterArgs, err := s.customCatalogFilterSQL(customFilterID)
 		if err != nil {
@@ -368,4 +442,17 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		}
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
+}
+
+func optimizationOperationSQL(suggestionColumn, extColumn, alphaColumn string) string {
+	return `CASE
+		WHEN ` + suggestionColumn + ` = 'preview_svg_minify' THEN 'svg-minify'
+		WHEN ` + suggestionColumn + ` = 'use_responsive_or_smaller_source' THEN 'resize-variant'
+		WHEN ` + suggestionColumn + ` = 'try_modern_photographic_format' THEN 'convert-avif'
+		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.png' THEN 'convert-avif'
+		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) IN ('.jpg', '.jpeg') THEN 'convert-avif'
+		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.webp' THEN 'convert-avif'
+		WHEN ` + suggestionColumn + ` = 'review_compression_or_modern_format' AND LOWER(` + extColumn + `) = '.gif' THEN 'gif-optimize'
+		ELSE 'manual-review'
+	END`
 }

@@ -403,6 +403,26 @@ func TestScanHistoryRoutes(t *testing.T) {
 	if diff.Summary.Added != 1 || diff.Summary.Removed != 1 || diff.Summary.Modified != 1 {
 		t.Fatalf("diff body = %#v", diff)
 	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/scans/clear", bytes.NewReader([]byte(`{"confirm":"CLEAR_SCAN_HISTORY"}`)))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("clear scans = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/scans", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("scans after clear = %d %s", rec.Code, rec.Body.String())
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listBody); err != nil {
+		t.Fatal(err)
+	}
+	if len(listBody.Scans) != 0 {
+		t.Fatalf("scans after clear = %#v", listBody.Scans)
+	}
 }
 
 func TestCatalogLintRouteFiltersByProject(t *testing.T) {
@@ -1058,6 +1078,21 @@ func TestOCRRunReusesReadyResultByContentHash(t *testing.T) {
 	if page.Total != 1 || page.Items[0].RepoPath != item.RepoPath {
 		t.Fatalf("OCR search page = %#v", page)
 	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/catalog/items?q=sale", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog items OCR search = %d %s", rec.Code, rec.Body.String())
+	}
+	var apiPage struct {
+		Items []scanner.AssetItem `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &apiPage); err != nil {
+		t.Fatal(err)
+	}
+	if len(apiPage.Items) != 1 || apiPage.Items[0].OCR == nil || apiPage.Items[0].OCR.Status != ocr.StatusReady || apiPage.Items[0].OCR.Text != "SALE" {
+		t.Fatalf("API OCR search item = %#v", apiPage.Items)
+	}
 }
 
 func TestOCRRunDoesNotReuseStaleOrFailedHashResults(t *testing.T) {
@@ -1459,7 +1494,7 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/actions/optimization/generate-script", bytes.NewReader([]byte(`{"assetIds":[]}`)))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "cwebp") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "avifenc") {
 		t.Fatalf("generate script = %d %s", rec.Code, rec.Body.String())
 	}
 

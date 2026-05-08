@@ -31,18 +31,21 @@ type CatalogProjectStats struct {
 }
 
 type CatalogItemQuery struct {
-	ScanID         int64
-	AssetID        string
-	ProjectID      string
-	ProjectName    string
-	Ext            string
-	Folder         string
-	Query          string
-	Status         string
-	Sort           string
-	CustomFilterID string
-	Limit          int
-	Cursor         string
+	ScanID               int64
+	AssetID              string
+	ProjectID            string
+	ProjectName          string
+	Ext                  string
+	Folder               string
+	Query                string
+	Status               string
+	Sort                 string
+	CustomFilterID       string
+	OptimizationCategory string
+	OptimizationSeverity string
+	Operation            string
+	Limit                int
+	Cursor               string
 }
 
 type CatalogItemsPage struct {
@@ -65,12 +68,15 @@ type CatalogCustomFilterFacet struct {
 }
 
 type CatalogItemFacets struct {
-	Projects          []CatalogFacetOption       `json:"projects"`
-	ProjectTotal      int                        `json:"projectTotal"`
-	Extensions        []CatalogFacetOption       `json:"extensions"`
-	ExtensionTotal    int                        `json:"extensionTotal"`
-	CustomFilters     []CatalogCustomFilterFacet `json:"customFilters"`
-	CustomFilterTotal int                        `json:"customFilterTotal"`
+	Projects               []CatalogFacetOption       `json:"projects"`
+	ProjectTotal           int                        `json:"projectTotal"`
+	Extensions             []CatalogFacetOption       `json:"extensions"`
+	ExtensionTotal         int                        `json:"extensionTotal"`
+	OptimizationCategories []CatalogFacetOption       `json:"optimizationCategories"`
+	OptimizationSeverities []CatalogFacetOption       `json:"optimizationSeverities"`
+	Operations             []CatalogFacetOption       `json:"operations"`
+	CustomFilters          []CatalogCustomFilterFacet `json:"customFilters"`
+	CustomFilterTotal      int                        `json:"customFilterTotal"`
 }
 
 type CatalogFolderQuery struct {
@@ -116,13 +122,22 @@ type CatalogDuplicatesQuery struct {
 	Limit       int
 }
 
+type CatalogDuplicateGroup struct {
+	ID            string              `json:"id"`
+	ContentHash   string              `json:"contentHash"`
+	HashAlgorithm string              `json:"hashAlgorithm"`
+	Paths         []string            `json:"paths"`
+	PreferredPath string              `json:"preferredPath"`
+	Members       []scanner.AssetItem `json:"members"`
+}
+
 type CatalogDuplicatesPage struct {
-	Groups     []scanner.DuplicateGroup `json:"groups"`
-	Pairs      []scanner.NearDuplicate  `json:"pairs"`
-	Total      int                      `json:"total"`
-	TotalFiles int                      `json:"totalFiles"`
-	NextCursor string                   `json:"nextCursor,omitempty"`
-	Facets     CatalogDuplicatesFacets  `json:"facets"`
+	Groups     []CatalogDuplicateGroup `json:"groups"`
+	Pairs      []scanner.NearDuplicate `json:"pairs"`
+	Total      int                     `json:"total"`
+	TotalFiles int                     `json:"totalFiles"`
+	NextCursor string                  `json:"nextCursor,omitempty"`
+	Facets     CatalogDuplicatesFacets `json:"facets"`
 }
 
 type CatalogDuplicatesFacets struct {

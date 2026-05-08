@@ -3,6 +3,7 @@ import {
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -26,10 +27,12 @@ type AboutSectionProps = {
   working: boolean;
   onExport: () => void;
   onImport: (file: File) => Promise<void>;
+  onClearScanHistory: () => void;
   onResetSettings: () => Promise<void>;
   onResetDatabase: () => void;
   onUpdateApp: () => Promise<void>;
   updateAppPending: boolean;
+  clearScanHistoryPending: boolean;
   resetPending: boolean;
   importPending: boolean;
 };
@@ -40,15 +43,18 @@ export function AboutSection({
   working,
   onExport,
   onImport,
+  onClearScanHistory,
   onResetSettings,
   onResetDatabase,
   onUpdateApp,
   updateAppPending,
+  clearScanHistoryPending,
   resetPending,
   importPending,
 }: AboutSectionProps) {
   const { t } = useTranslation();
   const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
+  const [clearScanHistoryOpen, setClearScanHistoryOpen] = useState(false);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -225,6 +231,14 @@ export function AboutSection({
               <span className="hidden h-4 w-px bg-g-line min-[480px]:block" />
               <Button
                 variant="danger"
+                leadingIcon={<Trash2 size={15} />}
+                onClick={() => setClearScanHistoryOpen(true)}
+                disabled={working}
+              >
+                {t("settings.clearScanHistory")}
+              </Button>
+              <Button
+                variant="danger"
                 leadingIcon={<RotateCcw size={15} />}
                 onClick={() => setResetDatabaseOpen(true)}
                 disabled={working}
@@ -278,6 +292,17 @@ export function AboutSection({
         loading={resetPending}
         onConfirm={() => void handleResetSettings()}
         onCancel={() => setResetSettingsOpen(false)}
+      />
+      <ConfirmDialog
+        open={clearScanHistoryOpen}
+        variant="danger"
+        title={t("settings.clearScanHistory")}
+        message={t("settings.clearScanHistoryConfirm")}
+        confirmText={t("settings.clearScanHistory")}
+        cancelText={t("common.cancel")}
+        loading={clearScanHistoryPending}
+        onConfirm={onClearScanHistory}
+        onCancel={() => setClearScanHistoryOpen(false)}
       />
       <ConfirmDialog
         open={resetDatabaseOpen}

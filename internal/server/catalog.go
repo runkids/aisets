@@ -110,22 +110,33 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, err := s.store.CatalogItems(config.CatalogItemQuery{
-		ScanID:         scanID,
-		AssetID:        r.URL.Query().Get("assetId"),
-		ProjectID:      r.URL.Query().Get("projectId"),
-		ProjectName:    r.URL.Query().Get("projectName"),
-		Ext:            r.URL.Query().Get("ext"),
-		Folder:         r.URL.Query().Get("folder"),
-		Query:          r.URL.Query().Get("q"),
-		Status:         r.URL.Query().Get("status"),
-		Sort:           r.URL.Query().Get("sort"),
-		CustomFilterID: r.URL.Query().Get("customFilter"),
-		Limit:          limit,
-		Cursor:         r.URL.Query().Get("cursor"),
+		ScanID:               scanID,
+		AssetID:              r.URL.Query().Get("assetId"),
+		ProjectID:            r.URL.Query().Get("projectId"),
+		ProjectName:          r.URL.Query().Get("projectName"),
+		Ext:                  r.URL.Query().Get("ext"),
+		Folder:               r.URL.Query().Get("folder"),
+		Query:                r.URL.Query().Get("q"),
+		Status:               r.URL.Query().Get("status"),
+		Sort:                 r.URL.Query().Get("sort"),
+		CustomFilterID:       r.URL.Query().Get("customFilter"),
+		OptimizationCategory: r.URL.Query().Get("optimizationCategory"),
+		OptimizationSeverity: r.URL.Query().Get("optimizationSeverity"),
+		Operation:            r.URL.Query().Get("operation"),
+		Limit:                limit,
+		Cursor:               r.URL.Query().Get("cursor"),
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
+	}
+	if len(page.Items) > 0 {
+		catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: page.Items})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		page.Items = catalog.Items
 	}
 	writeJSON(w, http.StatusOK, page)
 }
@@ -171,6 +182,14 @@ func (s *Server) handleCatalogItem(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
+	}
+	catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: []scanner.AssetItem{detail.Item}})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if len(catalog.Items) > 0 {
+		detail.Item = catalog.Items[0]
 	}
 	writeJSON(w, http.StatusOK, detail)
 }
@@ -272,6 +291,26 @@ func (s *Server) handleScans(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"scans": scans})
+}
+
+func (s *Server) handleClearScans(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.Confirm != "CLEAR_SCAN_HISTORY" {
+		writeError(w, http.StatusBadRequest, apierr.New("clear_scan_history_confirmation_required", "clear scan history confirmation is required"))
+		return
+	}
+	if err := s.store.ClearScans(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.clearCatalog()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleScanSummary(w http.ResponseWriter, r *http.Request) {

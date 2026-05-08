@@ -10,11 +10,12 @@ export function matchesOCRSearchText(
   if (!normalizedQuery || !normalizedText) return false;
   if (normalizedText.includes(normalizedQuery)) return true;
   if (options.fuzzy === false) return false;
-  if (normalizedQuery.length < 5) return false;
+  if (normalizedQuery.length < 4) return false;
+  const maxDistance = normalizedQuery.length <= 4 ? 1 : 2;
 
   const tokens = normalizedText.match(ocrTokenPattern) ?? [];
   return tokens.some((token) => {
-    if (token.length < 4) return false;
+    if (token.length < 3) return false;
     if (Math.abs(token.length - normalizedQuery.length) > 2) return false;
     if (
       normalizedQuery.startsWith(token) ||
@@ -22,20 +23,30 @@ export function matchesOCRSearchText(
     ) {
       return true;
     }
+    if (normalizedQuery.length <= 4 && token[0] !== normalizedQuery[0]) {
+      return false;
+    }
     if (matchesOCRWindow(token, normalizedQuery)) {
       return true;
     }
-    return boundedEditDistance(token, normalizedQuery, 2) <= 2;
+    return (
+      boundedEditDistance(token, normalizedQuery, maxDistance) <= maxDistance
+    );
   });
 }
 
-function matchesOCRWindow(token: string, query: string): boolean {
+function matchesOCRWindow(
+  token: string,
+  query: string,
+  maxDistance = query.length <= 4 ? 1 : 2,
+): boolean {
   if (token.length <= query.length) return false;
   for (const size of [query.length - 1, query.length, query.length + 1]) {
-    if (size < 4 || size > token.length) continue;
+    if (size < 3 || size > token.length) continue;
     for (let start = 0; start <= token.length - size; start++) {
       const window = token.slice(start, start + size);
-      if (boundedEditDistance(window, query, 2) <= 2) {
+      if (query.length <= 4 && window[0] !== query[0]) continue;
+      if (boundedEditDistance(window, query, maxDistance) <= maxDistance) {
         return true;
       }
     }

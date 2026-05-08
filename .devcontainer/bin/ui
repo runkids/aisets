@@ -188,8 +188,11 @@ else
     if ! (cd /workspace/ui && CI=true "$PNPM_BIN" install --frozen-lockfile > "$LOGDIR/asset-studio-vite-deps.log" 2>&1); then
       printf "  %-12s failed to install deps (see %s/asset-studio-vite-deps.log)\n" "vite" "$LOGDIR" >&2
     else
-      (cd /workspace/ui && nohup "$PNPM_BIN" exec vite --host 0.0.0.0 --port "$VITE_PORT" --strictPort > "$LOGDIR/asset-studio-vite-dev.log" 2>&1 &
-       echo $! > "$PIDDIR/vite.pid")
+      (
+        cd /workspace/ui
+        nohup "$PNPM_BIN" exec vite --host 0.0.0.0 --port "$VITE_PORT" --strictPort > "$LOGDIR/asset-studio-vite-dev.log" 2>&1 &
+        echo $! > "$PIDDIR/vite.pid"
+      )
       for _ in $(seq 1 20); do
         is_port_open "$VITE_PORT" && break
         sleep 0.5

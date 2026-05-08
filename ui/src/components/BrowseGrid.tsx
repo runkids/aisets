@@ -12,8 +12,8 @@ import {
   CircleOff,
   CircleSlash,
   Copy,
+  Gauge,
   LoaderCircle,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
@@ -261,7 +261,7 @@ export function BrowseGrid({
                 )}
                 {optimizable && (
                   <span className={CARD_FLAG_OPTIMIZE_CLASS_NAME}>
-                    <Sparkles size={10} />
+                    <Gauge size={10} />
                     {t("browse.flagOptimizable")}
                   </span>
                 )}

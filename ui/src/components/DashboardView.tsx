@@ -3,7 +3,7 @@ import {
   Copy,
   FileImage,
   HardDrive,
-  Sparkles,
+  Images,
   Trash2,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -89,7 +89,7 @@ export function DashboardView({ catalog, onJump }: Props) {
           label={t("dashboard.optimizable")}
           value={optimizeCount}
           meta={t("dashboard.optimizeMeta")}
-          icon={<Sparkles size={14} />}
+          icon={<Images size={14} />}
           onClick={() => onJump("optimize")}
         />
       </section>
@@ -140,7 +140,7 @@ export function DashboardView({ catalog, onJump }: Props) {
         <Card>
           <CardBody padding="md">
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles size={14} />
+              <HardDrive size={14} />
               <h2 className="text-subheading font-[650]">
                 {t("dashboard.topLargest")}
               </h2>

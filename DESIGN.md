@@ -464,10 +464,12 @@ Canonical shared primitive: `Range` from `ui/src/components/ui/Range.tsx`.
 
 ### 5.10 Optimize Row `.opt-row`
 
-- Grid: `28px 64px 1fr 220px 140px` (checkbox / 64px thumb / text / chips / savings)
+- Grid: `28px 64px 1fr 180px 180px 140px` (checkbox / 64px thumb / path / operation / output / savings)
 - 6px radius, `--g-surface` bg, 1px `--g-line` border, 12px padding
 - Hover: `transform: translateX(2px)` + border `--g-line-strong`
 - Selected: same Neon Lime ring as `.acard`
+- Operation column: primary recommendation badge, severity badge, tool status chip
+- Output column: original format/size above estimated target format/size, mono 11px
 - Savings:
   - Original: mono 11px / Fog Grey, strikethrough
   - Target: mono 16px / 590 / `--g-green`
@@ -759,14 +761,13 @@ Canonical shared primitive: `Rail` / `RailSection` / `RailItem` from `ui/src/com
 
 ### 6.4 Optimize
 
-- Sticky frosted `.opt-filters-wrap` (z 4, blur 12px)
-- Category chips `.opt-filter-row` (大小 / 格式 / SVG / 尺寸 / 動畫), horizontally scrollable
-- Severity chips (嚴重 / 警告 / 建議), separated by 1px Charcoal vertical divider
-- `.opt-row` 5-column grid as in §5.10
-- `.opt-summary` 4-column KPI grid at top
-- `.opt-progress`: indeterminate uses `slide-right` keyframe; determinate fills with `--g-accent`
-- Skeleton shimmer for in-flight estimates
-- `.opt-bulkbar` is **bottom-sticky** (16px from bottom)
+- Page uses the standard data-view shell: Rail filter column + content column + sticky toolbar.
+- Rail sections: Project, Extension, Operation, Severity. Filters are server-side query params, not client-only filtering after loading every page.
+- `.opt-summary` 4-column KPI grid at top: processable items, original size, estimated savings, missing tools. Values must use API totals / estimates rather than loaded row count.
+- Sticky toolbar actions: Estimate, Preview, Generate Script, Apply. Apply remains disabled until a preview token exists.
+- `.opt-row` grid as in §5.10; each row shows thumbnail, path, source format/size, planned operation, estimated output, risk/tool badges, and checkbox.
+- Preview opens in a modal/drawer surface and lists candidate files, blocked items, and operation details. Conversion previews must not imply original deletion.
+- Fast-scan optimization-not-computed remains an empty state that points users to full scan or `scanAnalyses.optimization`.
 
 ### 6.5 Lint
 

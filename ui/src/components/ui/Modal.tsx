@@ -66,6 +66,13 @@ export function Modal({
                       <DialogDescription>{description}</DialogDescription>
                     </DialogPrimitive.Description>
                   )}
+                  {!description && (
+                    <DialogPrimitive.Description asChild>
+                      <DialogDescription className="sr-only">
+                        {title}
+                      </DialogDescription>
+                    </DialogPrimitive.Description>
+                  )}
                 </div>
                 <DialogPrimitive.Close asChild>
                   <IconButton aria-label={t("common.close")}>

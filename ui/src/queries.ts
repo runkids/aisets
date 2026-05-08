@@ -14,6 +14,7 @@ import {
   batchMergePreview,
   batchMovePreview,
   batchRenamePreview,
+  clearScanHistory,
   deleteUnusedPreview,
   getCatalog,
   getCatalogDuplicates,
@@ -21,6 +22,8 @@ import {
   getCatalogItemDetail,
   getCatalogItems,
   getCatalogLint,
+  getScanDiff,
+  getScans,
   getSettings,
   getVersionCheck,
   importSettings,
@@ -57,6 +60,7 @@ import type {
 } from "./types";
 
 export const catalogQueryKey = ["catalog"] as const;
+export const scansQueryKey = ["scans"] as const;
 export const settingsQueryKey = ["settings"] as const;
 export const versionQueryKey = ["version"] as const;
 
@@ -96,6 +100,13 @@ export const catalogKeys = {
     [...catalogQueryKey, "item", scanId ?? 0, assetId] as const,
 };
 
+export const scanKeys = {
+  all: scansQueryKey,
+  list: () => [...scansQueryKey, "list"] as const,
+  diff: (baseId: number | undefined, targetId: number | undefined) =>
+    [...scansQueryKey, "diff", baseId ?? 0, targetId ?? 0] as const,
+};
+
 type ScanMutationInput = {
   profile?: ScanProfile;
   analyses?: Partial<ScanAnalyses>;
@@ -112,6 +123,9 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
     status: params.status ?? "",
     sort: params.sort ?? "",
     customFilter: params.customFilter ?? "",
+    optimizationCategory: params.optimizationCategory ?? "",
+    optimizationSeverity: params.optimizationSeverity ?? "",
+    operation: params.operation ?? "",
     limit: params.limit ?? 100,
   };
 }
@@ -170,6 +184,24 @@ export function useCatalogSummaryQuery(workspaceId?: string) {
 }
 
 export const useCatalogQuery = useCatalogSummaryQuery;
+
+export function useScansQuery() {
+  return useQuery({
+    queryKey: scanKeys.list(),
+    queryFn: ({ signal }) => getScans({ signal }),
+  });
+}
+
+export function useScanDiffQuery(
+  baseId: number | undefined,
+  targetId: number | undefined,
+) {
+  return useQuery({
+    queryKey: scanKeys.diff(baseId, targetId),
+    queryFn: ({ signal }) => getScanDiff(baseId!, targetId!, { signal }),
+    enabled: baseId != null && targetId != null && baseId !== targetId,
+  });
+}
 
 export function useCatalogItemsInfiniteQuery(
   scanId: number | undefined,
@@ -302,7 +334,10 @@ export function useScanCatalogMutation(options?: {
         analyses: input?.analyses,
       }),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: scansQueryKey }),
+      ]);
     },
   });
 }
@@ -482,6 +517,20 @@ export function useResetDatabaseMutation() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
       await client.invalidateQueries({ queryKey: settingsQueryKey });
+    },
+  });
+}
+
+export function useClearScanHistoryMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: clearScanHistory,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: scansQueryKey }),
+        client.invalidateQueries({ queryKey: settingsQueryKey }),
+      ]);
     },
   });
 }

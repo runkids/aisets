@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode"
 
 	xdraw "golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
@@ -19,7 +20,7 @@ import (
 
 const (
 	DefaultEngineName             = "tesseract-cli"
-	assetStudioOCRPipelineVersion = "asset-studio-ocr-v2"
+	assetStudioOCRPipelineVersion = "asset-studio-ocr-v4"
 )
 
 type AvailabilityChecker interface {
@@ -76,6 +77,13 @@ func (e TesseractCLIEngine) Extract(ctx context.Context, path string, languages 
 
 	attempts := []ocrAttempt{
 		{Path: path, Mode: "default"},
+		{
+			Path:       path,
+			Mode:       "psm_8_teal_logo",
+			PSM:        "8",
+			Preprocess: preprocessTealLogoText,
+			Config:     []string{"-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"},
+		},
 		{Path: path, Mode: "psm_6_logo_light", PSM: "6", Preprocess: preprocessGameLogoText},
 		{Path: path, Mode: "psm_11", PSM: "11", Preprocess: preprocessFullImage},
 	}
@@ -98,7 +106,7 @@ func (e TesseractCLIEngine) Extract(ctx context.Context, path string, languages 
 				cleanup = remove
 			}
 		}
-		text, err := e.extractOnce(ctx, attemptPath, languages, attempt.PSM)
+		text, err := e.extractOnce(ctx, attemptPath, languages, attempt.PSM, attempt.Config...)
 		cleanup()
 		if err != nil && index == 0 {
 			return Extraction{}, err
@@ -113,7 +121,7 @@ func (e TesseractCLIEngine) Extract(ctx context.Context, path string, languages 
 		}
 		if index == 0 {
 			needsFallback = needsOCRFallback(text)
-			if !needsFallback {
+			if !needsFallback && !needsLogoOCRFallback(text) {
 				break
 			}
 		}
@@ -134,9 +142,10 @@ type ocrAttempt struct {
 	Mode       string
 	PSM        string
 	Preprocess func(string) (string, func(), error)
+	Config     []string
 }
 
-func (e TesseractCLIEngine) extractOnce(ctx context.Context, path string, languages []string, psm string) (string, error) {
+func (e TesseractCLIEngine) extractOnce(ctx context.Context, path string, languages []string, psm string, config ...string) (string, error) {
 	args := []string{
 		path,
 		"stdout",
@@ -148,6 +157,7 @@ func (e TesseractCLIEngine) extractOnce(ctx context.Context, path string, langua
 	if psm != "" {
 		args = append(args, "--psm", psm)
 	}
+	args = append(args, config...)
 	cmd := exec.CommandContext(ctx, e.binary(), args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -191,8 +201,32 @@ func needsOCRFallback(text string) bool {
 	return total < 8 || letters*2 < total
 }
 
+func needsLogoOCRFallback(text string) bool {
+	normalized := NormalizeText(text)
+	if normalized == "" {
+		return true
+	}
+	tokens := 0
+	inToken := false
+	for _, r := range normalized {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			if !inToken {
+				tokens++
+				inToken = true
+			}
+			continue
+		}
+		inToken = false
+	}
+	return tokens < 4
+}
+
 func preprocessGameLogoText(path string) (string, func(), error) {
 	return preprocessOCRImage(path, ocrCropGameLogoText, ocrThresholdBrightText)
+}
+
+func preprocessTealLogoText(path string) (string, func(), error) {
+	return preprocessTealOCRImage(path)
 }
 
 func preprocessFullImage(path string) (string, func(), error) {
@@ -256,6 +290,60 @@ func cropImage(img image.Image, rect image.Rectangle) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, rect.Dx(), rect.Dy()))
 	xdraw.Draw(dst, dst.Bounds(), img, rect.Min, xdraw.Src)
 	return dst
+}
+
+func preprocessTealOCRImage(path string) (string, func(), error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", nil, err
+	}
+	defer file.Close()
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return "", nil, err
+	}
+	bounds := img.Bounds()
+	rect := image.Rect(
+		bounds.Min.X+bounds.Dx()*10/100,
+		bounds.Min.Y+bounds.Dy()*48/100,
+		bounds.Min.X+bounds.Dx()*100/100,
+		bounds.Min.Y+bounds.Dy()*82/100,
+	)
+	source := cropImage(img, rect)
+	scale := 12
+	rgba := image.NewRGBA(image.Rect(0, 0, source.Bounds().Dx()*scale, source.Bounds().Dy()*scale))
+	xdraw.CatmullRom.Scale(rgba, rgba.Bounds(), source, source.Bounds(), xdraw.Over, nil)
+	dst := image.NewGray(rgba.Bounds())
+	for y := rgba.Bounds().Min.Y; y < rgba.Bounds().Max.Y; y++ {
+		for x := rgba.Bounds().Min.X; x < rgba.Bounds().Max.X; x++ {
+			r16, g16, b16, a16 := rgba.At(x, y).RGBA()
+			r := int(r16 >> 8)
+			g := int(g16 >> 8)
+			b := int(b16 >> 8)
+			a := int(a16 >> 8)
+			score := min(g, b) - r
+			if a > 20 && score > 30 && g > 70 && b > 70 {
+				dst.SetGray(x, y, color.Gray{Y: 0})
+			} else {
+				dst.SetGray(x, y, color.Gray{Y: 255})
+			}
+		}
+	}
+	temp, err := os.CreateTemp("", "asset-studio-ocr-*.png")
+	if err != nil {
+		return "", nil, err
+	}
+	tempPath := temp.Name()
+	if err := png.Encode(temp, dst); err != nil {
+		_ = temp.Close()
+		_ = os.Remove(tempPath)
+		return "", nil, err
+	}
+	if err := temp.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return "", nil, err
+	}
+	return tempPath, func() { _ = os.Remove(tempPath) }, nil
 }
 
 func binarizeForOCR(img *image.Gray, mode ocrThresholdMode) {

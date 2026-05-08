@@ -2,10 +2,11 @@ import {
   FileWarning,
   FolderKanban,
   FolderOpen,
+  Gauge,
+  History,
   Recycle,
   Settings,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
@@ -84,6 +85,11 @@ export function NavSidebar({
           icon: <FolderOpen size={18} />,
           badge: "total",
         },
+        {
+          id: "history",
+          label: t("nav.history"),
+          icon: <History size={18} />,
+        },
       ],
     },
     {
@@ -99,7 +105,7 @@ export function NavSidebar({
         {
           id: "optimize",
           label: t("nav.optimize"),
-          icon: <Sparkles size={18} />,
+          icon: <Gauge size={18} />,
           badge: "optimize",
           tone: "blue",
         },

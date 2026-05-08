@@ -15,7 +15,9 @@ import type {
   ProjectScanIntent,
   ProjectScanIntentDetection,
   ScanAnalyses,
+  ScanDiff,
   ScanEvent,
+  ScanSummary,
   ScanProfile,
   SettingsInfo,
   SettingsUpdate,
@@ -71,6 +73,29 @@ export function getCatalog(options?: { signal?: AbortSignal }) {
   return request<CatalogSummary>("/api/catalog", { signal: options?.signal });
 }
 
+export function getScans(options?: { signal?: AbortSignal }) {
+  return request<{ scans: ScanSummary[] }>("/api/scans", {
+    signal: options?.signal,
+  });
+}
+
+export function getScanDiff(
+  base: number,
+  target: number,
+  options?: { signal?: AbortSignal },
+) {
+  return request<ScanDiff>(`/api/scans/diff${queryString({ base, target })}`, {
+    signal: options?.signal,
+  });
+}
+
+export function clearScanHistory() {
+  return request<{ ok: boolean }>("/api/scans/clear", {
+    method: "POST",
+    body: JSON.stringify({ confirm: "CLEAR_SCAN_HISTORY" }),
+  });
+}
+
 export type CatalogItemsParams = {
   scanId?: number;
   assetId?: string;
@@ -82,6 +107,9 @@ export type CatalogItemsParams = {
   status?: string;
   sort?: string;
   customFilter?: string;
+  optimizationCategory?: string;
+  optimizationSeverity?: string;
+  operation?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -134,6 +162,9 @@ export function getCatalogItems(
       status: params.status,
       sort: params.sort,
       customFilter: params.customFilter,
+      optimizationCategory: params.optimizationCategory,
+      optimizationSeverity: params.optimizationSeverity,
+      operation: params.operation,
       limit: params.limit,
       cursor: params.cursor,
     })}`,
