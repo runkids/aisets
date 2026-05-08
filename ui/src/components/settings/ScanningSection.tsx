@@ -11,6 +11,8 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { errorMessage } from "../../i18n/index";
+import { projectScanIntentLabel } from "../../projectScanIntent";
+import type { ProjectScanIntent } from "../../types";
 import type { SettingsDraft, OCRLanguagePack } from "./types";
 import { scanProfileOptions } from "./constants";
 import { FieldRow } from "./FieldRow";
@@ -89,6 +91,28 @@ export function ScanningSection({
   const [ocrLimitsOpen, setOCRLimitsOpen] = useState(false);
   const [runOCRConfirmOpen, setRunOCRConfirmOpen] = useState(false);
   const [removeOCRConfirmOpen, setRemoveOCRConfirmOpen] = useState(false);
+  const [excludeScope, setExcludeScope] = useState<
+    "global" | ProjectScanIntent
+  >("global");
+
+  const excludeScopeOptions = [
+    {
+      value: "global",
+      label: t("settings.excludeScope.global"),
+      description: t("settings.excludeScope.globalHint"),
+    },
+    ...(["code", "assetPack", "library", "mixed"] as ProjectScanIntent[]).map(
+      (intent) => ({
+        value: intent,
+        label: projectScanIntentLabel(t, intent),
+        description: t(`settings.excludeScope.${intent}Hint`),
+      }),
+    ),
+  ];
+  const excludePatternsText =
+    excludeScope === "global"
+      ? draft.excludePatternsText
+      : draft.excludePatternsByIntentText[excludeScope];
 
   return (
     <>
@@ -189,20 +213,51 @@ export function ScanningSection({
               icon={<Sliders size={15} />}
               align="start"
             >
-              <Textarea
-                disabled={settingsLoading || updatePending}
-                value={draft.excludePatternsText}
-                onChange={(event) =>
-                  onUpdateDraft((prev) => ({
-                    ...prev,
-                    excludePatternsText: event.target.value,
-                  }))
-                }
-                placeholder={"node_modules\n.git\ndist/**"}
-                rows={6}
-                className="w-full min-[1200px]:w-[420px]"
-                textareaClassName="min-h-36 font-g-mono text-g-ui tracking-g-mono"
-              />
+              <div className="grid w-full gap-2 min-[1200px]:w-[420px]">
+                <Select
+                  value={excludeScope}
+                  options={excludeScopeOptions}
+                  onChange={(value) =>
+                    setExcludeScope(value as "global" | ProjectScanIntent)
+                  }
+                  aria-label={t("settings.excludeScopeLabel")}
+                />
+                <Textarea
+                  disabled={settingsLoading || updatePending}
+                  value={excludePatternsText}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    onUpdateDraft((prev) =>
+                      excludeScope === "global"
+                        ? { ...prev, excludePatternsText: value }
+                        : {
+                            ...prev,
+                            excludePatternsByIntentText: {
+                              ...prev.excludePatternsByIntentText,
+                              [excludeScope]: value,
+                            },
+                          },
+                    );
+                  }}
+                  placeholder={
+                    excludeScope === "global"
+                      ? "node_modules\n.git\ndist/**"
+                      : excludeScope === "assetPack"
+                        ? ""
+                        : "**/*.test.*\n**/*.spec.*\n**/*.stories.*"
+                  }
+                  rows={6}
+                  className="w-full"
+                  textareaClassName="min-h-36 font-g-mono text-g-ui tracking-g-mono"
+                />
+                <p className="font-g text-g-caption tracking-g-ui text-g-ink-3">
+                  {excludeScope === "global"
+                    ? t("settings.excludeScopeGlobalNote")
+                    : t("settings.excludeScopeIntentNote", {
+                        intent: projectScanIntentLabel(t, excludeScope),
+                      })}
+                </p>
+              </div>
             </FieldRow>
             {updateError && (
               <Notice tone="danger">{errorMessage(updateError)}</Notice>

@@ -48,6 +48,14 @@ func IntentAdjustedOptions(projects []Project, options ScanOptions) ScanOptions 
 	return options
 }
 
+func EffectiveExcludePatterns(project Project, options ScanOptions) []string {
+	intent := NormalizeProjectScanIntent(project.ScanIntent)
+	patterns := make([]string, 0, len(options.ExcludePatterns)+len(options.ExcludePatternsByIntent[intent]))
+	patterns = append(patterns, options.ExcludePatterns...)
+	patterns = append(patterns, options.ExcludePatternsByIntent[intent]...)
+	return patterns
+}
+
 func ProjectReferenceCoverage(ctx context.Context, project Project, excludePatterns []string) ReferenceCoverage {
 	switch NormalizeProjectScanIntent(project.ScanIntent) {
 	case ProjectScanIntentAssetPack:

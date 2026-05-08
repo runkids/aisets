@@ -95,6 +95,37 @@ func TestScanLibraryMarksZeroReferenceAssetsAdvisory(t *testing.T) {
 	}
 }
 
+func TestScanUsesIntentSpecificExcludePatterns(t *testing.T) {
+	root := t.TempDir()
+	codeRoot := filepath.Join(root, "code")
+	assetRoot := filepath.Join(root, "assets")
+	writePNG(t, filepath.Join(codeRoot, "src", "logo.png"), solidImage(2, 2, color.White))
+	mustWrite(t, filepath.Join(codeRoot, "src", "App.tsx"), `export function App() { return null }`)
+	mustWrite(t, filepath.Join(codeRoot, "src", "App.test.tsx"), `import logo from "./logo.png"`)
+	writePNG(t, filepath.Join(assetRoot, "icons", "skip.png"), solidImage(2, 2, color.Black))
+
+	options := FullScanOptions()
+	options.ExcludePatternsByIntent = ExcludePatternsByIntent{
+		ProjectScanIntentCode:      []string{"**/*.test.*"},
+		ProjectScanIntentAssetPack: []string{"icons/skip.png"},
+	}
+
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	catalog, err := s.ScanWithOptions(context.Background(), []Project{
+		{ID: "code", Name: "code", Path: codeRoot, ScanIntent: ProjectScanIntentCode},
+		{ID: "assets", Name: "assets", Path: assetRoot, ScanIntent: ProjectScanIntentAssetPack},
+	}, options, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Stats.TotalFiles != 1 || catalog.Items[0].RepoPath != "src/logo.png" {
+		t.Fatalf("items = %#v stats = %#v", catalog.Items, catalog.Stats)
+	}
+	if len(catalog.Items[0].UsedBy) != 0 || catalog.Items[0].UsageClassification != UsageUnused {
+		t.Fatalf("item policy = %#v", catalog.Items[0])
+	}
+}
+
 func TestProjectReferenceCoverageRequiresFrontendSignals(t *testing.T) {
 	frontend := t.TempDir()
 	mustWrite(t, filepath.Join(frontend, "src", "App.tsx"), `export function App() { return null }`)
@@ -319,7 +350,7 @@ func TestCollectCandidatesAndContentHashHonorContext(t *testing.T) {
 	writePNG(t, filepath.Join(root, "src", "asset.png"), solidImage(2, 2, color.White))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := collectCandidates(ctx, []Project{{ID: root, Name: "fixture", Path: root}}, nil); !errors.Is(err, context.Canceled) {
+	if _, err := collectCandidates(ctx, []Project{{ID: root, Name: "fixture", Path: root}}, ScanOptions{}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("collectCandidates canceled err = %v", err)
 	}
 	if _, err := contentHashFile(ctx, filepath.Join(root, "src", "asset.png")); !errors.Is(err, context.Canceled) {

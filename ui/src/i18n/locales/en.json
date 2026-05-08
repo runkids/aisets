@@ -268,7 +268,18 @@
       "optimizationHint": "Compute format and compression suggestions."
     },
     "excludePatterns": "Exclude patterns",
-    "excludePatternsHint": "One repo-relative pattern per line; commas also work, such as dist/** or tmp.",
+    "excludePatternsHint": "Choose Global rules or rules appended for one project type.",
+    "excludeScopeLabel": "Exclude pattern scope",
+    "excludeScope": {
+      "global": "Global",
+      "globalHint": "Applied to every project.",
+      "codeHint": "Added only for code projects.",
+      "assetPackHint": "Added only for asset packs.",
+      "libraryHint": "Added only for reusable libraries.",
+      "mixedHint": "Added only for mixed or uncertain projects."
+    },
+    "excludeScopeGlobalNote": "Global rules apply to every project before project-type rules are added.",
+    "excludeScopeIntentNote": "These rules are added only for {{intent}} projects. Global rules still apply first.",
     "ocrEnabled": "Use OCR in search and filters",
     "ocrEnabledHint": "Allow Browse, Custom Filters, and ⌘ P to use cached OCR text. This does not read images by itself.",
     "ocrLanguages": "OCR languages",

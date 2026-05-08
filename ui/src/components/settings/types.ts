@@ -3,6 +3,7 @@ import type { OCRActivityState } from "../../ocrActivity";
 import type {
   CustomAssetFilter,
   OptimizationThresholds,
+  ProjectScanIntent,
   ScanAnalyses,
   ScanProfile,
   SettingsInfo,
@@ -47,6 +48,7 @@ export type SettingsDraft = {
   ocrConcurrency: number;
   ocrFuzzySearch: boolean;
   excludePatternsText: string;
+  excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;

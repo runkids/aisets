@@ -64,7 +64,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 	projects = normalizeScanProjects(projects)
 	options = IntentAdjustedOptions(projects, options)
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
-	candidates, err := collectCandidates(ctx, projects, options.ExcludePatterns)
+	candidates, err := collectCandidates(ctx, projects, options)
 	if err != nil {
 		return Catalog{}, err
 	}
@@ -150,7 +150,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
 		refProjects := referenceProjects(projects)
 		refItems := referenceItems(items)
-		refs, err := buildReferenceMap(ctx, refProjects, refItems, options.ExcludePatterns, func(current, total int) {
+		refs, err := buildReferenceMap(ctx, refProjects, refItems, options, func(current, total int) {
 			notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
 		})
 		if err != nil {
@@ -198,7 +198,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint, Current: len(lintFindings), Total: len(lintFindings)})
 
-	classifyUsage(ctx, projects, items, options.ExcludePatterns, referencesComputed)
+	classifyUsage(ctx, projects, items, options, referencesComputed)
 	stats := usageStats(items)
 	dupFiles := 0
 	for i := range items {

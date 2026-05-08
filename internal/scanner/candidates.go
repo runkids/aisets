@@ -31,9 +31,10 @@ type fileCandidate struct {
 	info    os.FileInfo
 }
 
-func collectCandidates(ctx context.Context, projects []Project, excludePatterns []string) ([]fileCandidate, error) {
+func collectCandidates(ctx context.Context, projects []Project, options ScanOptions) ([]fileCandidate, error) {
 	var candidates []fileCandidate
 	for _, project := range projects {
+		excludePatterns := EffectiveExcludePatterns(project, options)
 		err := filepath.WalkDir(project.Path, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return nil

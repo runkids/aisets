@@ -13,6 +13,8 @@ import {
   customFilterOperatorsByField,
   defaultOCRLanguages,
   defaultSettings,
+  emptyExcludePatternsByIntent,
+  projectScanIntentValues,
   sectionMeta,
 } from "./constants";
 import type { Section, SettingsDraft } from "./types";
@@ -93,6 +95,10 @@ export function isStandaloneApp() {
 }
 
 export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
+  const excludePatternsByIntent =
+    settings?.excludePatternsByIntent ??
+    defaultSettings.excludePatternsByIntent ??
+    emptyExcludePatternsByIntent;
   return {
     workspaceName:
       settings?.workspaceName ?? defaultSettings.workspaceName ?? "",
@@ -114,6 +120,12 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     ocrConcurrency: settings?.ocrConcurrency ?? 1,
     ocrFuzzySearch: settings?.ocrFuzzySearch ?? true,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
+    excludePatternsByIntentText: Object.fromEntries(
+      projectScanIntentValues.map((intent) => [
+        intent,
+        (excludePatternsByIntent[intent] ?? []).join("\n"),
+      ]),
+    ) as SettingsDraft["excludePatternsByIntentText"],
     optimizationDefaultQuality: settings?.optimizationDefaultQuality ?? 80,
     optimizationAutoApply: settings?.optimizationAutoApply ?? false,
     optimizationThresholds:
@@ -124,6 +136,11 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
 }
 
 export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
+  const splitPatterns = (value: string) =>
+    value
+      .split(/[\n,]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
   return {
     workspaceName: draft.workspaceName,
     defaultProjectRoot: draft.defaultProjectRoot,
@@ -137,10 +154,13 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     ocrBatchSize: draft.ocrBatchSize,
     ocrConcurrency: draft.ocrConcurrency,
     ocrFuzzySearch: draft.ocrFuzzySearch,
-    excludePatterns: draft.excludePatternsText
-      .split(/[\n,]/)
-      .map((part) => part.trim())
-      .filter(Boolean),
+    excludePatterns: splitPatterns(draft.excludePatternsText),
+    excludePatternsByIntent: Object.fromEntries(
+      projectScanIntentValues.map((intent) => [
+        intent,
+        splitPatterns(draft.excludePatternsByIntentText[intent] ?? ""),
+      ]),
+    ) as SettingsUpdate["excludePatternsByIntent"],
     optimizationDefaultQuality: draft.optimizationDefaultQuality,
     optimizationAutoApply: draft.optimizationAutoApply,
     optimizationThresholds: draft.optimizationThresholds,

@@ -676,7 +676,18 @@
       "optimizationHint": "計算格式與壓縮建議"
     },
     "excludePatterns": "排除規則",
-    "excludePatternsHint": "每行一條排除規則，也可用逗號分隔，例如 dist/** 或 tmp",
+    "excludePatternsHint": "選擇 Global 規則，或只追加到特定專案類型的規則",
+    "excludeScopeLabel": "排除規則範圍",
+    "excludeScope": {
+      "global": "Global",
+      "globalHint": "套用到所有專案",
+      "codeHint": "只追加到程式碼專案",
+      "assetPackHint": "只追加到素材包",
+      "libraryHint": "只追加到可重用 library",
+      "mixedHint": "只追加到混合 / 不確定專案"
+    },
+    "excludeScopeGlobalNote": "Global 規則會先套用到所有專案，再追加該專案類型自己的規則。",
+    "excludeScopeIntentNote": "這些規則只會追加到「{{intent}}」專案；Global 規則仍會先套用。",
     "ocrEnabled": "在搜尋與篩選中使用 OCR",
     "ocrEnabledHint": "允許 Browse、自訂篩選器與 ⌘ P 使用已快取的 OCR 文字；這個開關本身不會讀取圖片",
     "ocrLanguages": "OCR 語言",

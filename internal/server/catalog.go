@@ -385,16 +385,18 @@ func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOpti
 		return scanner.Catalog{}, 0, err
 	}
 	options := scanner.NormalizeScanOptions(scanner.ScanOptions{
-		Profile:                settings.ScanProfile,
-		Analyses:               settings.ScanAnalyses,
-		ExcludePatterns:        settings.ExcludePatterns,
-		OptimizationThresholds: settings.OptimizationThresholds,
+		Profile:                 settings.ScanProfile,
+		Analyses:                settings.ScanAnalyses,
+		ExcludePatterns:         settings.ExcludePatterns,
+		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
+		OptimizationThresholds:  settings.OptimizationThresholds,
 	})
 	if override.Profile != "" || override.Analyses != (scanner.AnalysisOptions{}) {
 		options.Profile = override.Profile
 		options.Analyses = override.Analyses
 		options = scanner.NormalizeScanOptions(options)
 		options.ExcludePatterns = settings.ExcludePatterns
+		options.ExcludePatternsByIntent = settings.ExcludePatternsByIntent
 	}
 	catalog, err := s.scanner.ScanWithOptions(ctx, projects, options, progress)
 	if err != nil {
@@ -445,9 +447,10 @@ func (s *Server) analysisIncomplete(summary config.CatalogSummary) bool {
 	}
 	a := summary.Analysis
 	options := scanner.IntentAdjustedOptions(toScannerProjects(projects), scanner.ScanOptions{
-		Profile:         settings.ScanProfile,
-		Analyses:        settings.ScanAnalyses,
-		ExcludePatterns: settings.ExcludePatterns,
+		Profile:                 settings.ScanProfile,
+		Analyses:                settings.ScanAnalyses,
+		ExcludePatterns:         settings.ExcludePatterns,
+		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
 	})
 	want := options.Analyses
 	if want.References && a.References != scanner.AnalysisComputed {

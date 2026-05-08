@@ -40,7 +40,7 @@ func referenceItems(items []AssetItem) []AssetItem {
 	return out
 }
 
-func classifyUsage(ctx context.Context, projects []Project, items []AssetItem, excludePatterns []string, referencesComputed bool) {
+func classifyUsage(ctx context.Context, projects []Project, items []AssetItem, options ScanOptions, referencesComputed bool) {
 	type policy struct {
 		intent   ProjectScanIntent
 		coverage ReferenceCoverage
@@ -49,7 +49,7 @@ func classifyUsage(ctx context.Context, projects []Project, items []AssetItem, e
 	policies := map[string]policy{}
 	for _, project := range projects {
 		intent := NormalizeProjectScanIntent(project.ScanIntent)
-		coverage := ProjectReferenceCoverage(ctx, project, excludePatterns)
+		coverage := ProjectReferenceCoverage(ctx, project, EffectiveExcludePatterns(project, options))
 		policies[project.ID] = policy{
 			intent:   intent,
 			coverage: coverage,

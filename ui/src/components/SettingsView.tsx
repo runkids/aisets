@@ -315,6 +315,8 @@ export function SettingsView({
             ocrConcurrency: serverDraft.ocrConcurrency,
             ocrFuzzySearch: serverDraft.ocrFuzzySearch,
             excludePatternsText: serverDraft.excludePatternsText,
+            excludePatternsByIntentText:
+              serverDraft.excludePatternsByIntentText,
           };
         case "customFilters":
           return {

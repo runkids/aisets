@@ -17,6 +17,8 @@ export type Project = {
 
 export type ProjectScanIntent = "code" | "assetPack" | "library" | "mixed";
 
+export type ExcludePatternsByIntent = Record<ProjectScanIntent, string[]>;
+
 export type DetectionSuggestedScanIntent = ProjectScanIntent | "unknown";
 
 export type ReferenceCoverage = "supported" | "partial" | "notApplicable";
@@ -52,6 +54,7 @@ export type AppSettings = {
   ocrConcurrency: number;
   ocrFuzzySearch: boolean;
   excludePatterns: string[];
+  excludePatternsByIntent: ExcludePatternsByIntent;
   optimizationDefaultQuality: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;

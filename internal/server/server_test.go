@@ -301,8 +301,8 @@ func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
 	if err := store.AddProjects([]string{root}); err != nil {
 		t.Fatal(err)
 	}
-	patterns := []string{"**/*.fixture.*"}
-	if _, err := store.UpdateSettings(config.SettingsUpdate{ExcludePatterns: patterns}); err != nil {
+	patterns := scanner.ExcludePatternsByIntent{scanner.ProjectScanIntentCode: []string{"**/*.fixture.*"}}
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ExcludePatternsByIntent: patterns}); err != nil {
 		t.Fatal(err)
 	}
 	s, err := New(Options{Store: store, Version: "test"})

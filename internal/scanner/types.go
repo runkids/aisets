@@ -35,6 +35,8 @@ const (
 	ProjectScanIntentMixed     ProjectScanIntent = "mixed"
 )
 
+type ExcludePatternsByIntent map[ProjectScanIntent][]string
+
 type ReferenceCoverage string
 
 const (
@@ -83,10 +85,11 @@ type AnalysisOptions struct {
 }
 
 type ScanOptions struct {
-	Profile                ScanProfile                      `json:"profile"`
-	ExcludePatterns        []string                         `json:"excludePatterns,omitempty"`
-	Analyses               AnalysisOptions                  `json:"analyses"`
-	OptimizationThresholds imageproc.OptimizationThresholds `json:"optimizationThresholds,omitempty"`
+	Profile                 ScanProfile                      `json:"profile"`
+	ExcludePatterns         []string                         `json:"excludePatterns,omitempty"`
+	ExcludePatternsByIntent ExcludePatternsByIntent          `json:"excludePatternsByIntent,omitempty"`
+	Analyses                AnalysisOptions                  `json:"analyses"`
+	OptimizationThresholds  imageproc.OptimizationThresholds `json:"optimizationThresholds,omitempty"`
 }
 
 type CatalogAnalysis struct {

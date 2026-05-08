@@ -203,6 +203,12 @@ describe("updateSettings", () => {
           autoScanOnOpen: false,
           scanOnOpen: true,
           excludePatterns: ["dist"],
+          excludePatternsByIntent: {
+            code: ["**/*.test.*"],
+            assetPack: [],
+            library: ["**/*.test.*"],
+            mixed: ["**/*.test.*"],
+          },
           optimizationDefaultQuality: 72,
           optimizationAutoApply: false,
           databasePath: "/tmp/asset-studio.db",
@@ -217,6 +223,12 @@ describe("updateSettings", () => {
       workspaceName: "Team",
       scanOnOpen: true,
       excludePatterns: ["dist"],
+      excludePatternsByIntent: {
+        code: ["**/*.test.*"],
+        assetPack: [],
+        library: ["**/*.test.*"],
+        mixed: ["**/*.test.*"],
+      },
       optimizationDefaultQuality: 72,
     });
 
@@ -226,6 +238,12 @@ describe("updateSettings", () => {
         workspaceName: "Team",
         scanOnOpen: true,
         excludePatterns: ["dist"],
+        excludePatternsByIntent: {
+          code: ["**/*.test.*"],
+          assetPack: [],
+          library: ["**/*.test.*"],
+          mixed: ["**/*.test.*"],
+        },
         optimizationDefaultQuality: 72,
       }),
       headers: {

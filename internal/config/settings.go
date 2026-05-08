@@ -23,6 +23,48 @@ func defaultExcludePatterns() []string {
 	}
 }
 
+func defaultExcludePatternsByIntent() scanner.ExcludePatternsByIntent {
+	defaults := defaultExcludePatterns()
+	return scanner.ExcludePatternsByIntent{
+		scanner.ProjectScanIntentCode:      append([]string{}, defaults...),
+		scanner.ProjectScanIntentAssetPack: []string{},
+		scanner.ProjectScanIntentLibrary:   append([]string{}, defaults...),
+		scanner.ProjectScanIntentMixed:     append([]string{}, defaults...),
+	}
+}
+
+func emptyExcludePatternsByIntent() scanner.ExcludePatternsByIntent {
+	return scanner.ExcludePatternsByIntent{
+		scanner.ProjectScanIntentCode:      []string{},
+		scanner.ProjectScanIntentAssetPack: []string{},
+		scanner.ProjectScanIntentLibrary:   []string{},
+		scanner.ProjectScanIntentMixed:     []string{},
+	}
+}
+
+func normalizeExcludePatternsByIntent(patterns scanner.ExcludePatternsByIntent) scanner.ExcludePatternsByIntent {
+	out := emptyExcludePatternsByIntent()
+	for intent, values := range patterns {
+		normalizedIntent := scanner.NormalizeProjectScanIntent(intent)
+		out[normalizedIntent] = normalizePatterns(values)
+	}
+	return out
+}
+
+func equalPatterns(a, b []string) bool {
+	a = normalizePatterns(a)
+	b = normalizePatterns(b)
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func DefaultAppSettings() AppSettings {
 	return AppSettings{
 		WorkspaceName:              "Asset Studio",
@@ -38,7 +80,8 @@ func DefaultAppSettings() AppSettings {
 		OCRBatchSize:               ocr.DefaultBatchSize,
 		OCRConcurrency:             ocr.DefaultConcurrency,
 		OCRFuzzySearch:             true,
-		ExcludePatterns:            defaultExcludePatterns(),
+		ExcludePatterns:            []string{},
+		ExcludePatternsByIntent:    defaultExcludePatternsByIntent(),
 		OptimizationDefaultQuality: 80,
 		OptimizationAutoApply:      false,
 		OptimizationThresholds:     imageproc.DefaultOptimizationThresholds(),
@@ -92,6 +135,7 @@ func (s *Store) Settings() (AppSettings, error) {
 	if settings.ExcludePatterns == nil {
 		settings.ExcludePatterns = []string{}
 	}
+	settings.ExcludePatternsByIntent = normalizeExcludePatternsByIntent(settings.ExcludePatternsByIntent)
 	if settings.CustomAssetFilters == nil {
 		settings.CustomAssetFilters = []CustomAssetFilter{}
 	}
@@ -166,6 +210,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.ExcludePatterns != nil {
 		settings.ExcludePatterns = normalizePatterns(update.ExcludePatterns)
+	}
+	if update.ExcludePatternsByIntent != nil {
+		settings.ExcludePatternsByIntent = normalizeExcludePatternsByIntent(update.ExcludePatternsByIntent)
 	}
 	if update.OptimizationDefaultQuality != nil {
 		settings.OptimizationDefaultQuality = *update.OptimizationDefaultQuality
@@ -319,6 +366,16 @@ func (s *Store) ImportData(data ExportData) error {
 		}
 	}
 	if data.Settings != nil {
+		excludePatterns := data.Settings.ExcludePatterns
+		excludePatternsByIntent := data.Settings.ExcludePatternsByIntent
+		if excludePatternsByIntent == nil {
+			if equalPatterns(excludePatterns, defaultExcludePatterns()) {
+				excludePatterns = []string{}
+				excludePatternsByIntent = defaultExcludePatternsByIntent()
+			} else {
+				excludePatternsByIntent = emptyExcludePatternsByIntent()
+			}
+		}
 		update := SettingsUpdate{
 			WorkspaceName:              &data.Settings.WorkspaceName,
 			DefaultProjectRoot:         &data.Settings.DefaultProjectRoot,
@@ -330,7 +387,8 @@ func (s *Store) ImportData(data ExportData) error {
 			OCRBatchSize:               &data.Settings.OCRBatchSize,
 			OCRConcurrency:             &data.Settings.OCRConcurrency,
 			OCRFuzzySearch:             &data.Settings.OCRFuzzySearch,
-			ExcludePatterns:            data.Settings.ExcludePatterns,
+			ExcludePatterns:            excludePatterns,
+			ExcludePatternsByIntent:    excludePatternsByIntent,
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
 			OptimizationThresholds:     &data.Settings.OptimizationThresholds,

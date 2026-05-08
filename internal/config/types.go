@@ -37,6 +37,7 @@ type AppSettings struct {
 	OCRConcurrency             int                              `json:"ocrConcurrency"`
 	OCRFuzzySearch             bool                             `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string                         `json:"excludePatterns"`
+	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent  `json:"excludePatternsByIntent"`
 	OptimizationDefaultQuality int                              `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      bool                             `json:"optimizationAutoApply"`
 	OptimizationThresholds     imageproc.OptimizationThresholds `json:"optimizationThresholds"`
@@ -59,6 +60,7 @@ type SettingsUpdate struct {
 	OCRConcurrency             *int                              `json:"ocrConcurrency"`
 	OCRFuzzySearch             *bool                             `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string                          `json:"excludePatterns"`
+	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent   `json:"excludePatternsByIntent"`
 	OptimizationDefaultQuality *int                              `json:"optimizationDefaultQuality"`
 	OptimizationAutoApply      *bool                             `json:"optimizationAutoApply"`
 	OptimizationThresholds     *imageproc.OptimizationThresholds `json:"optimizationThresholds"`

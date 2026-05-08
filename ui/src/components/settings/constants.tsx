@@ -12,6 +12,8 @@ import {
 import type {
   CustomAssetFilterField,
   CustomAssetFilterOperator,
+  ExcludePatternsByIntent,
+  ProjectScanIntent,
   ScanProfile,
   SettingsUpdate,
 } from "../../types";
@@ -46,6 +48,30 @@ export const defaultSettings: SettingsUpdate = {
   ocrConcurrency: 1,
   ocrFuzzySearch: true,
   excludePatterns: [],
+  excludePatternsByIntent: {
+    code: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/__tests__/**",
+      "**/__mocks__/**",
+      "**/*.stories.*",
+    ],
+    assetPack: [],
+    library: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/__tests__/**",
+      "**/__mocks__/**",
+      "**/*.stories.*",
+    ],
+    mixed: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/__tests__/**",
+      "**/__mocks__/**",
+      "**/*.stories.*",
+    ],
+  },
   optimizationDefaultQuality: 80,
   optimizationAutoApply: false,
   optimizationThresholds: {
@@ -56,6 +82,20 @@ export const defaultSettings: SettingsUpdate = {
     pngAlphaCheckEnabled: true,
   },
   customAssetFilters: [],
+};
+
+export const projectScanIntentValues: ProjectScanIntent[] = [
+  "code",
+  "assetPack",
+  "library",
+  "mixed",
+];
+
+export const emptyExcludePatternsByIntent: ExcludePatternsByIntent = {
+  code: [],
+  assetPack: [],
+  library: [],
+  mixed: [],
 };
 
 export const scanProfileOptions: Array<{

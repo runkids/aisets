@@ -11,8 +11,9 @@ import (
 )
 
 type Project struct {
-	ID   string
-	Path string
+	ID              string
+	Path            string
+	ExcludePatterns []string
 }
 
 type Asset struct {
@@ -138,6 +139,8 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 func collectCodeCandidates(ctx context.Context, projects []Project, excludePatterns []string) ([]codeCandidate, error) {
 	var files []codeCandidate
 	for _, project := range projects {
+		projectExcludePatterns := append([]string{}, excludePatterns...)
+		projectExcludePatterns = append(projectExcludePatterns, project.ExcludePatterns...)
 		err := filepath.WalkDir(project.Path, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return nil
@@ -159,7 +162,7 @@ func collectCodeCandidates(ctx context.Context, projects []Project, excludePatte
 				return nil
 			}
 			repoFile = filepath.ToSlash(repoFile)
-			if MatchesAnyExcludePattern(excludePatterns, repoFile) {
+			if MatchesAnyExcludePattern(projectExcludePatterns, repoFile) {
 				return nil
 			}
 			files = append(files, codeCandidate{project: project, path: path, repo: repoFile})

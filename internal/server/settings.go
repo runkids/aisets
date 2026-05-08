@@ -60,7 +60,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if body.ActiveWorkspaceID != nil {
 		s.clearCatalog()
 	}
-	if body.OptimizationThresholds != nil {
+	if body.OptimizationThresholds != nil || body.ExcludePatterns != nil || body.ExcludePatternsByIntent != nil {
 		s.markCatalogStale()
 	}
 	if _, err := s.store.UpdateSettings(body); err != nil {

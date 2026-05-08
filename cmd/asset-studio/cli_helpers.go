@@ -38,9 +38,10 @@ func scanCatalogWithID(ctx context.Context, store *config.Store) (scanner.Catalo
 		return scanner.Catalog{}, 0, err
 	}
 	options := scanner.NormalizeScanOptions(scanner.ScanOptions{
-		Profile:         settings.ScanProfile,
-		Analyses:        settings.ScanAnalyses,
-		ExcludePatterns: settings.ExcludePatterns,
+		Profile:                 settings.ScanProfile,
+		Analyses:                settings.ScanAnalyses,
+		ExcludePatterns:         settings.ExcludePatterns,
+		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
 	})
 	catalog, err := scanner.NewWithCacheDir(config.CacheDir()).ScanWithOptions(ctx, toScannerProjects(store.Projects()), options, nil)
 	if err != nil {

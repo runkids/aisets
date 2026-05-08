@@ -241,12 +241,20 @@ func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
 		t.Fatalf("default project root = %q", settings.DefaultProjectRoot)
 	}
 	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
-	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(wantExcludePatterns, ",") {
-		t.Fatalf("default exclude patterns = %#v", settings.ExcludePatterns)
+	if len(settings.ExcludePatterns) != 0 {
+		t.Fatalf("default global exclude patterns = %#v", settings.ExcludePatterns)
+	}
+	for _, intent := range []scanner.ProjectScanIntent{scanner.ProjectScanIntentCode, scanner.ProjectScanIntentLibrary, scanner.ProjectScanIntentMixed} {
+		if strings.Join(settings.ExcludePatternsByIntent[intent], ",") != strings.Join(wantExcludePatterns, ",") {
+			t.Fatalf("default %s exclude patterns = %#v", intent, settings.ExcludePatternsByIntent[intent])
+		}
+	}
+	if len(settings.ExcludePatternsByIntent[scanner.ProjectScanIntentAssetPack]) != 0 {
+		t.Fatalf("asset pack exclude patterns = %#v", settings.ExcludePatternsByIntent[scanner.ProjectScanIntentAssetPack])
 	}
 }
 
-func TestStoreMigratesEmptyExcludePatternsToDefaultsOnce(t *testing.T) {
+func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T) {
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
@@ -267,7 +275,8 @@ func TestStoreMigratesEmptyExcludePatternsToDefaultsOnce(t *testing.T) {
 	if _, err := db.Exec(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":[]}`, nowUTC()); err != nil {
+	legacyDefaults := `["**/*.test.*","**/*.spec.*","**/__tests__/**","**/__mocks__/**","**/*.stories.*"]`
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":`+legacyDefaults+`}`, nowUTC()); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
@@ -283,8 +292,11 @@ func TestStoreMigratesEmptyExcludePatternsToDefaultsOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
-	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(wantExcludePatterns, ",") {
-		t.Fatalf("migrated exclude patterns = %#v", settings.ExcludePatterns)
+	if len(settings.ExcludePatterns) != 0 {
+		t.Fatalf("migrated global exclude patterns = %#v", settings.ExcludePatterns)
+	}
+	if strings.Join(settings.ExcludePatternsByIntent[scanner.ProjectScanIntentCode], ",") != strings.Join(wantExcludePatterns, ",") {
+		t.Fatalf("migrated code exclude patterns = %#v", settings.ExcludePatternsByIntent)
 	}
 	if _, err := store.UpdateSettings(SettingsUpdate{ExcludePatterns: []string{}}); err != nil {
 		t.Fatal(err)
@@ -307,6 +319,53 @@ func TestStoreMigratesEmptyExcludePatternsToDefaultsOnce(t *testing.T) {
 	}
 }
 
+func TestStoreDoesNotSplitCustomGlobalExcludePatterns(t *testing.T) {
+	root := t.TempDir()
+	dataHome := filepath.Join(root, "data")
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	dataDir := filepath.Join(dataHome, "asset-studio")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, 3, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":["dist/**"]}`, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(settings.ExcludePatterns) != 1 || settings.ExcludePatterns[0] != "dist/**" {
+		t.Fatalf("custom global exclude patterns = %#v", settings.ExcludePatterns)
+	}
+	for intent, patterns := range settings.ExcludePatternsByIntent {
+		if len(patterns) != 0 {
+			t.Fatalf("intent %s patterns = %#v, want empty", intent, patterns)
+		}
+	}
+}
+
 func TestStoreUpdatesSettings(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -322,6 +381,7 @@ func TestStoreUpdatesSettings(t *testing.T) {
 		WorkspaceName:              &name,
 		ScanOnOpen:                 &scanOnOpen,
 		ExcludePatterns:            []string{"dist", "dist", " tmp "},
+		ExcludePatternsByIntent:    scanner.ExcludePatternsByIntent{scanner.ProjectScanIntentCode: []string{"**/*.gen.*", "**/*.gen.*"}},
 		OptimizationDefaultQuality: &quality,
 	})
 	if err != nil {
@@ -332,6 +392,9 @@ func TestStoreUpdatesSettings(t *testing.T) {
 	}
 	if len(settings.ExcludePatterns) != 2 || settings.ExcludePatterns[0] != "dist" || settings.ExcludePatterns[1] != "tmp" {
 		t.Fatalf("exclude patterns = %#v", settings.ExcludePatterns)
+	}
+	if got := settings.ExcludePatternsByIntent[scanner.ProjectScanIntentCode]; len(got) != 1 || got[0] != "**/*.gen.*" {
+		t.Fatalf("intent exclude patterns = %#v", settings.ExcludePatternsByIntent)
 	}
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
