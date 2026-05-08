@@ -458,6 +458,8 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	icon.ModifiedUnix = 20
 	logo := scanAsset(root, "p", "workspace", "src/icons/logo.png", 12, "logo", 0, 0)
 	logo.ModifiedUnix = 5
+	logo.UsageClassification = scanner.UsageNotApplicable
+	logo.DeleteUnusedAllowed = false
 	carSVG := scanAsset(root, "p", "workspace", "src/car.svg", 30, "car-svg", 1, 0)
 	carSVG.ModifiedUnix = 40
 	if _, err := store.RecordScan(scanner.Catalog{
@@ -534,6 +536,13 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 	if folders.Total != 4 || len(folders.Folders) != 1 || folders.Folders[0].Path != "src/icons" || folders.Folders[0].Count != 1 {
 		t.Fatalf("child folders = %#v", folders)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Status: "notApplicable", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("not-applicable page = %#v", page)
 	}
 	page, err = store.CatalogItems(CatalogItemQuery{Folder: "src/icons", Limit: 10})
 	if err != nil {
@@ -651,6 +660,71 @@ func TestCatalogLintFiltersByProjectID(t *testing.T) {
 	}
 }
 
+func TestCatalogSummaryProjectStatsDuplicateGroups(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	dupA := "dup-a"
+	dupB := "dup-b"
+	a1 := scanAsset(root, "p1", "left", "src/a1.png", 10, "hashA", 0, 0)
+	a1.DuplicateGroupID = &dupA
+	a2 := scanAsset(root, "p1", "left", "src/a2.png", 10, "hashA", 0, 0)
+	a2.DuplicateGroupID = &dupA
+	b1 := scanAsset(root, "p1", "left", "src/b1.png", 20, "hashB", 0, 0)
+	b1.DuplicateGroupID = &dupB
+	b2 := scanAsset(root, "p2", "right", "src/b2.png", 20, "hashB", 0, 0)
+	b2.DuplicateGroupID = &dupB
+
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-08T00:00:00Z",
+		Projects: []scanner.Project{
+			{ID: "p1", Name: "left", Path: filepath.Join(root, "left")},
+			{ID: "p2", Name: "right", Path: filepath.Join(root, "right")},
+		},
+		Items: []scanner.AssetItem{a1, a2, b1, b2},
+		DuplicateGroups: []scanner.DuplicateGroup{
+			{ID: dupA, ContentHash: "hashA", HashAlgorithm: "blake3", Paths: []string{"src/a1.png", "src/a2.png"}, PreferredPath: "src/a1.png"},
+			{ID: dupB, ContentHash: "hashB", HashAlgorithm: "blake3", Paths: []string{"src/b1.png", "src/b2.png"}, PreferredPath: "src/b1.png"},
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 4, DuplicateGroups: 2, DuplicateFiles: 4},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := store.CatalogSummary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Stats.DuplicateGroups != 2 {
+		t.Fatalf("global DuplicateGroups = %d, want 2", summary.Stats.DuplicateGroups)
+	}
+	for _, ps := range summary.ProjectStats {
+		switch ps.ProjectID {
+		case "p1":
+			if ps.DuplicateGroups != 2 {
+				t.Fatalf("p1 DuplicateGroups = %d, want 2 (dup-a + dup-b)", ps.DuplicateGroups)
+			}
+			if ps.DuplicateFiles != 3 {
+				t.Fatalf("p1 DuplicateFiles = %d, want 3", ps.DuplicateFiles)
+			}
+		case "p2":
+			if ps.DuplicateGroups != 1 {
+				t.Fatalf("p2 DuplicateGroups = %d, want 1 (dup-b only)", ps.DuplicateGroups)
+			}
+			if ps.DuplicateFiles != 1 {
+				t.Fatalf("p2 DuplicateFiles = %d, want 1", ps.DuplicateFiles)
+			}
+		default:
+			t.Fatalf("unexpected project %s", ps.ProjectID)
+		}
+	}
+}
+
 func TestScanProjectIntentsMatchIncludesEmptyProjects(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -736,7 +810,7 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		page, err := store.CatalogDuplicates(0, "exact", "", 10)
+		page, err := store.CatalogDuplicates(CatalogDuplicatesQuery{Kind: "exact", Limit: 10})
 		done <- result{page: page, err: err}
 	}()
 

@@ -340,6 +340,8 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		clauses = append(clauses, "a.usage_classification = 'unused'")
 	case "possiblyUnused":
 		clauses = append(clauses, "a.usage_classification = 'possiblyUnused'")
+	case "notApplicable":
+		clauses = append(clauses, "a.usage_classification = 'notApplicable'")
 	case "referenced":
 		clauses = append(clauses, "a.usage_classification = 'referenced'")
 	case "duplicate":

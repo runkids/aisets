@@ -107,11 +107,28 @@ type CatalogItemDetail struct {
 	OCR          any                              `json:"ocr,omitempty"`
 }
 
+type CatalogDuplicatesQuery struct {
+	ScanID      int64
+	Kind        string
+	ProjectName string
+	Ext         string
+	Cursor      string
+	Limit       int
+}
+
 type CatalogDuplicatesPage struct {
 	Groups     []scanner.DuplicateGroup `json:"groups"`
 	Pairs      []scanner.NearDuplicate  `json:"pairs"`
 	Total      int                      `json:"total"`
 	NextCursor string                   `json:"nextCursor,omitempty"`
+	Facets     CatalogDuplicatesFacets  `json:"facets"`
+}
+
+type CatalogDuplicatesFacets struct {
+	Projects       []CatalogFacetOption `json:"projects"`
+	ProjectTotal   int                  `json:"projectTotal"`
+	Extensions     []CatalogFacetOption `json:"extensions"`
+	ExtensionTotal int                  `json:"extensionTotal"`
 }
 
 type CatalogLintQuery struct {

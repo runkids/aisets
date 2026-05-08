@@ -1,19 +1,22 @@
 package config
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"asset-studio/internal/scanner"
 )
 
-func (s *Store) CatalogDuplicates(scanID int64, kind, cursor string, limit int) (CatalogDuplicatesPage, error) {
-	scanID, err := s.resolveScanID(scanID)
+func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPage, error) {
+	scanID, err := s.resolveScanID(q.ScanID)
 	if err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
-	limit = normalizeCatalogLimit(limit)
-	offset := parseCursorOffset(cursor)
-	if kind == "near" {
+	limit := normalizeCatalogLimit(q.Limit)
+	offset := parseCursorOffset(q.Cursor)
+
+	if q.Kind == "near" {
 		var total int
 		if err := s.db.QueryRow(`SELECT COUNT(*) FROM near_duplicate_snapshots WHERE scan_id = ?`, scanID).Scan(&total); err != nil {
 			return CatalogDuplicatesPage{}, err
@@ -49,17 +52,25 @@ func (s *Store) CatalogDuplicates(scanID int64, kind, cursor string, limit int) 
 		}
 		return CatalogDuplicatesPage{Pairs: pairs, Groups: []scanner.DuplicateGroup{}, Total: total, NextCursor: next}, nil
 	}
+
+	filterJoin, filterWhere, filterArgs := s.duplicateGroupFilters(scanID, q.ProjectName, q.Ext)
+
 	var total int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM duplicate_group_snapshots WHERE scan_id = ?`, scanID).Scan(&total); err != nil {
+	countSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT g.group_id) FROM duplicate_group_snapshots g%s WHERE g.scan_id = ?%s`, filterJoin, filterWhere)
+	countArgs := append([]any{scanID}, filterArgs...)
+	if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
-	rows, err := s.db.Query(`
-		SELECT group_id, content_hash, hash_algorithm, preferred_path
-		FROM duplicate_group_snapshots
-		WHERE scan_id = ?
-		ORDER BY preferred_path ASC
+
+	selectSQL := fmt.Sprintf(`
+		SELECT DISTINCT g.group_id, g.content_hash, g.hash_algorithm, g.preferred_path
+		FROM duplicate_group_snapshots g%s
+		WHERE g.scan_id = ?%s
+		ORDER BY g.preferred_path ASC
 		LIMIT ? OFFSET ?
-	`, scanID, limit+1, offset)
+	`, filterJoin, filterWhere)
+	selectArgs := append([]any{scanID}, append(filterArgs, limit+1, offset)...)
+	rows, err := s.db.Query(selectSQL, selectArgs...)
 	if err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
@@ -91,7 +102,101 @@ func (s *Store) CatalogDuplicates(scanID int64, kind, cursor string, limit int) 
 		}
 		groups[i].Paths = paths
 	}
-	return CatalogDuplicatesPage{Groups: groups, Pairs: []scanner.NearDuplicate{}, Total: total, NextCursor: next}, nil
+
+	var facets CatalogDuplicatesFacets
+	if offset == 0 {
+		facets, err = s.duplicateGroupFacets(scanID, q.ProjectName, q.Ext)
+		if err != nil {
+			return CatalogDuplicatesPage{}, err
+		}
+	}
+	return CatalogDuplicatesPage{Groups: groups, Pairs: []scanner.NearDuplicate{}, Total: total, NextCursor: next, Facets: facets}, nil
+}
+
+func (s *Store) duplicateGroupFilters(scanID int64, projectName, ext string) (join, where string, args []any) {
+	if projectName == "" && ext == "" {
+		return "", "", nil
+	}
+	var conds []string
+	join = `
+		JOIN duplicate_group_assets d ON d.scan_id = g.scan_id AND d.group_id = g.group_id
+		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id`
+	if projectName != "" {
+		conds = append(conds, " AND a.project_name = ?")
+		args = append(args, projectName)
+	}
+	if ext != "" {
+		conds = append(conds, " AND a.ext = ?")
+		args = append(args, ext)
+	}
+	where = strings.Join(conds, "")
+	return join, where, args
+}
+
+func (s *Store) duplicateGroupFacets(scanID int64, projectName, ext string) (CatalogDuplicatesFacets, error) {
+	var facets CatalogDuplicatesFacets
+
+	projOpts, projTotal, err := s.dupFacetCounts(scanID, "a.project_name", "", ext)
+	if err != nil {
+		return facets, err
+	}
+	facets.Projects = projOpts
+	facets.ProjectTotal = projTotal
+
+	extOpts, extTotal, err := s.dupFacetCounts(scanID, "a.ext", projectName, "")
+	if err != nil {
+		return facets, err
+	}
+	facets.Extensions = extOpts
+	facets.ExtensionTotal = extTotal
+
+	return facets, nil
+}
+
+func (s *Store) dupFacetCounts(scanID int64, groupByExpr, projectName, ext string) ([]CatalogFacetOption, int, error) {
+	where := "WHERE d.scan_id = ?"
+	args := []any{scanID}
+	if projectName != "" {
+		where += " AND a.project_name = ?"
+		args = append(args, projectName)
+	}
+	if ext != "" {
+		where += " AND a.ext = ?"
+		args = append(args, ext)
+	}
+
+	var total int
+	totalSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT d.group_id)
+		FROM duplicate_group_assets d
+		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
+		%s`, where)
+	if err := s.db.QueryRow(totalSQL, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	facetSQL := fmt.Sprintf(`SELECT %s, COUNT(DISTINCT d.group_id)
+		FROM duplicate_group_assets d
+		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
+		%s
+		GROUP BY %s
+		ORDER BY COUNT(DISTINCT d.group_id) DESC, %s ASC`, groupByExpr, where, groupByExpr, groupByExpr)
+	rows, err := s.db.Query(facetSQL, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var opts []CatalogFacetOption
+	for rows.Next() {
+		var opt CatalogFacetOption
+		if err := rows.Scan(&opt.ID, &opt.Count); err != nil {
+			return nil, 0, err
+		}
+		opts = append(opts, opt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return opts, total, nil
 }
 
 func (s *Store) duplicateGroupPaths(scanID int64, groupID string) ([]string, error) {

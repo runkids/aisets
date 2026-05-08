@@ -190,7 +190,14 @@ func (s *Server) handleCatalogDuplicates(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	page, err := s.store.CatalogDuplicates(scanID, r.URL.Query().Get("kind"), r.URL.Query().Get("cursor"), limit)
+	page, err := s.store.CatalogDuplicates(config.CatalogDuplicatesQuery{
+		ScanID:      scanID,
+		Kind:        r.URL.Query().Get("kind"),
+		ProjectName: r.URL.Query().Get("projectName"),
+		Ext:         r.URL.Query().Get("ext"),
+		Cursor:      r.URL.Query().Get("cursor"),
+		Limit:       limit,
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
