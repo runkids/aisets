@@ -110,7 +110,7 @@
     "selectStartDesc": "输入路径后按「前往」，或使用默认目录开始浏览"
   },
   "preview": {
-    "canApplyDesc": "此操作可套用。请确认变更后再写入文件",
+    "canApplyDesc": "此操作可套用请确认变更后再写入文件",
     "blockedDesc": "此操作有阻塞项，需先处理后才能套用",
     "apply": "应用变更",
     "noChanges": "没有可预览的文件变更"
@@ -137,7 +137,19 @@
     "unused": "未使用",
     "duplicate": "重复",
     "optimizable": "可优化",
-    "referenced": "已引用"
+    "referenced": "已引用",
+    "possiblyUnused": "可能未使用",
+    "notApplicable": "素材包",
+    "helpTitle": "状态说明",
+    "help": {
+      "unused": "代码里完全找不到这张图的引用，可以放心清理，删除前会先让你预览",
+      "possiblyUnused": "扫描没找到引用，但因为是共用素材库、混合项目、或扫描覆盖不完整，无法确定真的没人用，建议人工确认再删",
+      "notApplicable": "素材包本来就不会被代码引用，所以不列入「未使用」判断",
+      "duplicate": "这张图跟其他文件长得一样或非常相似，可以考虑只保留一份",
+      "optimizable": "这张图的文件大小或格式可以更好，压缩后能省空间",
+      "referenced": "代码里有找到至少一处引用，确定有在使用"
+    },
+    "helpIntro": "每张素材会根据代码引用状况自动标上状态，帮你快速判断哪些可以清理，这些标签只影响建议，你随时可以手动操作任何文件"
   },
   "error": {
     "catalogLoad": "Catalog 加载失败",
@@ -189,20 +201,20 @@
     "workspace_icon_invalid": "工作区图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL",
     "workspace_not_found": "找不到工作区",
     "workspace_last_required": "至少需要保留一个工作区",
-    "settings_svg_savings_invalid": "SVG 最小节省百分比必须介于 0 到 100。",
-    "settings_max_dimension_invalid": "最大尺寸不可为负数。",
-    "settings_file_size_warning_invalid": "文件大小警告阈值不可为负数。",
-    "settings_file_size_critical_invalid": "文件大小严重阈值不可为负数。",
-    "settings_file_size_critical_below_warning": "严重阈值必须大于或等于警告阈值。",
-    "scan_not_found": "找不到扫描记录。",
-    "scan_id_required": "需要扫描 ID。",
-    "scan_id_invalid": "扫描 ID 不正确。",
-    "empty_selection": "未选取任何素材。",
-    "asset_ids_required": "至少需要选取一个素材。",
-    "target_already_exists": "目标文件已存在。",
-    "target_path_required": "需要指定目标路径。",
-    "preview_has_blockers": "预览有未解决的阻挡项。",
-    "project_icon_invalid": "项目图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL。"
+    "settings_svg_savings_invalid": "SVG 最小节省百分比必须介于 0 到 100",
+    "settings_max_dimension_invalid": "最大尺寸不可为负数",
+    "settings_file_size_warning_invalid": "文件大小警告阈值不可为负数",
+    "settings_file_size_critical_invalid": "文件大小严重阈值不可为负数",
+    "settings_file_size_critical_below_warning": "严重阈值必须大于或等于警告阈值",
+    "scan_not_found": "找不到扫描记录",
+    "scan_id_required": "需要扫描 ID",
+    "scan_id_invalid": "扫描 ID 不正确",
+    "empty_selection": "未选取任何素材",
+    "asset_ids_required": "至少需要选取一个素材",
+    "target_already_exists": "目标文件已存在",
+    "target_path_required": "需要指定目标路径",
+    "preview_has_blockers": "预览有未解决的阻挡项",
+    "project_icon_invalid": "项目图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL"
   },
   "topbar": {
     "totalLabel": "{{projects}} 个项目 · {{assets}} 个素材",
@@ -230,7 +242,7 @@
     "viewOCRSettings": "OCR 设置",
     "dismiss": "关闭",
     "ocrLockedTooltip": "请先停止 OCR",
-    "ocrLockedAction": "OCR 正在运行。请先停止 OCR，再变更 catalog。"
+    "ocrLockedAction": "OCR 正在运行请先停止 OCR，再变更 catalog"
   },
   "toast": {
     "projectAdded": "已新增项目：{{path}}",
@@ -260,16 +272,16 @@
   },
   "optimization": {
     "reason": {
-      "image_dimensions_large": "图片尺寸超过常见网页显示大小。",
-      "asset_file_large": "文件过大可能拖慢页面加载速度。",
-      "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 压缩效果更好。",
-      "svg_can_minify": "SVG 可在不影响引用的情况下进行压缩。"
+      "image_dimensions_large": "图片尺寸超过常见网页显示大小",
+      "asset_file_large": "文件过大可能拖慢页面加载速度",
+      "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 压缩效果更好",
+      "svg_can_minify": "SVG 可在不影响引用的情况下进行压缩"
     },
     "suggestion": {
-      "use_responsive_or_smaller_source": "考虑使用响应式变体或较小的源图片。",
-      "review_compression_or_modern_format": "检查压缩设置或尝试现代图片格式。",
-      "try_modern_photographic_format": "对非透明位图尝试照片格式。",
-      "preview_svg_minify": "应用前先预览压缩后的 SVG 输出。"
+      "use_responsive_or_smaller_source": "考虑使用响应式变体或较小的源图片",
+      "review_compression_or_modern_format": "检查压缩设置或尝试现代图片格式",
+      "try_modern_photographic_format": "对非透明位图尝试照片格式",
+      "preview_svg_minify": "应用前先预览压缩后的 SVG 输出"
     }
   },
   "sort": {
@@ -279,16 +291,16 @@
   "duplicates": {
     "title": "重复素材",
     "groupsCount": "{{count}} 个群組",
-    "description": "散落在不同路径的相同文件。合并後保留一份並重寫引用",
+    "description": "散落在不同路径的相同文件合并後保留一份並重寫引用",
     "exactTab": "完全相同（{{count}}）",
     "similarTab": "相似（{{count}}）",
     "canSave": "约可节省 {{size}}",
     "keep": "保留",
     "flipped": "翻转",
     "noExact": "没有找到完全相同的重复素材",
-    "noExactDesc": "所有扫描的素材都是独一无二的。",
+    "noExactDesc": "所有扫描的素材都是独一无二的",
     "noSimilar": "没有检测到相似素材",
-    "noSimilarDesc": "此次扫描未检测到视觉上相似的素材。",
+    "noSimilarDesc": "此次扫描未检测到视觉上相似的素材",
     "expandGroup": "展开分组",
     "collapseGroup": "折叠分组",
     "statGroups": "分组",
@@ -302,7 +314,7 @@
     "overlayMode": "叠加",
     "overlayOpacity": "叠加透明度",
     "mergeConfirmTitle": "合并 {{count}} 个重复文件",
-    "mergeConfirmBody": "移除 {{count}} 个重复副本（{{size}}），并更新 {{refs}} 个引用指向首选路径。"
+    "mergeConfirmBody": "移除 {{count}} 个重复副本（{{size}}），并更新 {{refs}} 个引用指向首选路径"
   },
   "compare": {
     "side": "并排",
@@ -389,7 +401,7 @@
     "description": "可能影響性能或可访问性的代码層級使用模式",
     "searchPlaceholder": "依文件或規則筛选...",
     "empty": "没有 lint 发现匹配当前筛选",
-    "emptyDesc": "试试调整搜索条件或严重程度筛选。"
+    "emptyDesc": "试试调整搜索条件或严重程度筛选"
   },
   "commandPalette": {
     "placeholder": "搜索素材或切換页面...",
@@ -426,29 +438,29 @@
     "nearDistance": "相似度 {{pct}}%",
     "nearDistanceFlipped": "相似度 {{pct}}% · 翻转",
     "verdictReason": {
-      "ok": "未检测到冲突。",
-      "exactMatch": "目录中已存在内容完全相同的素材。",
-      "nearMatch": "存在视觉相似的素材，建议添加前先确认。",
-      "criticalOpt": "素材有严重的优化建议。",
-      "naming": "文件名有风格问题。"
+      "ok": "未检测到冲突",
+      "exactMatch": "目录中已存在内容完全相同的素材",
+      "nearMatch": "存在视觉相似的素材，建议添加前先确认",
+      "criticalOpt": "素材有严重的优化建议",
+      "naming": "文件名有风格问题"
     },
     "optReason": {
-      "image_dimensions_large": "图片尺寸对 UI 素材而言异常大。",
-      "asset_file_large": "文件大小偏大，可能影响加载性能。",
-      "png_without_alpha": "无透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 获得更好的压缩。",
-      "svg_can_minify": "SVG 可进行压缩以缩小文件大小。"
+      "image_dimensions_large": "图片尺寸对 UI 素材而言异常大",
+      "asset_file_large": "文件大小偏大，可能影响加载性能",
+      "png_without_alpha": "无透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 获得更好的压缩",
+      "svg_can_minify": "SVG 可进行压缩以缩小文件大小"
     },
     "optSuggestion": {
-      "use_responsive_or_smaller_source": "建议使用响应式图片或较小的源文件。",
-      "review_compression_or_modern_format": "检查压缩设置，或转换为现代格式。",
-      "try_modern_photographic_format": "尝试使用摄影格式处理非透明的位图图片。",
-      "preview_svg_minify": "预览 SVG 压缩结果以确认是否有视觉差异。"
+      "use_responsive_or_smaller_source": "建议使用响应式图片或较小的源文件",
+      "review_compression_or_modern_format": "检查压缩设置，或转换为现代格式",
+      "try_modern_photographic_format": "尝试使用摄影格式处理非透明的位图图片",
+      "preview_svg_minify": "预览 SVG 压缩结果以确认是否有视觉差异"
     },
     "namingIssue": {
-      "contains_spaces": "文件名含有空格，建议使用连字符或下划线。",
-      "uppercase_letters": "文件名含有大写字母，建议使用小写。",
-      "special_chars": "文件名含有特殊字符，可能导致 URL 或路径问题。",
-      "leading_punctuation": "文件名以标点符号开头。"
+      "contains_spaces": "文件名含有空格，建议使用连字符或下划线",
+      "uppercase_letters": "文件名含有大写字母，建议使用小写",
+      "special_chars": "文件名含有特殊字符，可能导致 URL 或路径问题",
+      "leading_punctuation": "文件名以标点符号开头"
     }
   },
   "assetDrawer": {
@@ -484,7 +496,7 @@
     "workspaceDesc": "设置这个本地工作区名称，以及新增项目时的起始文件夹",
     "workspaceName": "工作区名称",
     "defaultRoot": "新增项目起始路径",
-    "defaultRootHint": "只作为“新增项目”文件夹选择器的初始位置。留空时会从 server 当前工作目录开始",
+    "defaultRootHint": "只作为“新增项目”文件夹选择器的初始位置留空时会从 server 当前工作目录开始",
     "defaultRootPlaceholder": "使用 server 当前工作目录",
     "defaultRootCurrentPath": "当前 server 工作目录：{{path}}",
     "autoScan": "打开后自动扫描",
@@ -515,27 +527,27 @@
     "scanProfileHint": "默认使用 Full，会执行所有分析；大型工作区可改用 Fast",
     "scanProfile": {
       "fast": "Fast",
-      "fastHint": "遍历文件、读取图片 metadata，并建立 exact duplicates。",
+      "fastHint": "遍历文件、读取图片 metadata，并建立 exact duplicates",
       "full": "Full",
-      "fullHint": "额外计算 references、near duplicates 与 optimization 建议。",
+      "fullHint": "额外计算 references、near duplicates 与 optimization 建议",
       "custom": "Custom",
-      "customHint": "自行选择要执行的高成本分析。"
+      "customHint": "自行选择要执行的高成本分析"
     },
     "scanAnalysesLabel": "自定义分析",
     "scanAnalysesHint": "跳过的分析会显示为 not computed，而不是 0 条",
     "scanAnalyses": {
       "references": "References",
-      "referencesHint": "找出代码引用与未使用素材。",
+      "referencesHint": "找出代码引用与未使用素材",
       "nearDuplicates": "Near duplicates",
-      "nearDuplicatesHint": "比对 perceptual hash 找出视觉相似文件。",
+      "nearDuplicatesHint": "比对 perceptual hash 找出视觉相似文件",
       "optimization": "Optimization",
-      "optimizationHint": "计算格式与压缩建议。"
+      "optimizationHint": "计算格式与压缩建议"
     },
     "excludePatterns": "排除规则",
     "excludePatternsHint": "每行一条排除规则，也可用逗号分隔，例如 dist/** 或 tmp",
     "customFilters": "自定义筛选器",
     "customFiltersDesc": "基于路径与素材元数据保存的浏览筛选器",
-    "customFiltersHint": "分组之间是 OR；同一分组内的规则是 AND。OCR 规则只会匹配已缓存的本机 OCR 结果",
+    "customFiltersHint": "分组之间是 OR；同一分组内的规则是 ANDOCR 规则只会匹配已缓存的本机 OCR 结果",
     "customFilterOCRDisabled": "OCR 已关闭",
     "customFilterName": "筛选器名称",
     "customFilterEnabled": "启用",
@@ -609,17 +621,17 @@
     "autoApply": "自动套用优化",
     "autoApplyHint": "当前只保存偏好，不会自动修改文件",
     "thresholdsHeading": "检测阈值",
-    "thresholdsDesc": "调整何时报告优化建议。更改将在下次扫描时生效。",
+    "thresholdsDesc": "调整何时报告优化建议更改将在下次扫描时生效",
     "svgMinSavings": "SVG 最低节省比例",
-    "svgMinSavingsHint": "仅在压缩可节省至少此百分比时标记 SVG 文件。",
+    "svgMinSavingsHint": "仅在压缩可节省至少此百分比时标记 SVG 文件",
     "maxDimension": "图片最大尺寸",
-    "maxDimensionHint": "当图片宽度或高度超过此像素值时标记。",
+    "maxDimensionHint": "当图片宽度或高度超过此像素值时标记",
     "fileSizeWarning": "文件大小警告",
-    "fileSizeWarningHint": "当文件大小超过此值时报告警告。",
+    "fileSizeWarningHint": "当文件大小超过此值时报告警告",
     "fileSizeCritical": "文件大小严重",
-    "fileSizeCriticalHint": "超过此值时升级为严重等级。",
+    "fileSizeCriticalHint": "超过此值时升级为严重等级",
     "pngAlphaCheck": "PNG 无透明度检查",
-    "pngAlphaCheckHint": "为不使用透明度的 PNG 文件建议替代格式。",
+    "pngAlphaCheckHint": "为不使用透明度的 PNG 文件建议替代格式",
     "hotkeysDesc": "本地 UI 可用的键盘快捷键",
     "hotkeyGeneral": "通用",
     "hotkeyNavigation": "导航",
@@ -638,7 +650,7 @@
     "upToDateAction": "已是最新版",
     "versionDevHint": "DEV mode 会使用模拟更新，方便测试 UI 流程",
     "updateDevSuccess": "DEV mode 更新已模拟完成",
-    "updateSuccess": "已更新至 {{version}}。请重新启动 Asset Studio 后使用新版",
+    "updateSuccess": "已更新至 {{version}}请重新启动 Asset Studio 后使用新版",
     "updateAlreadyCurrent": "Asset Studio 已是最新版",
     "updateFailed": "更新失败",
     "installApp": "安装 App",
@@ -648,7 +660,7 @@
     "installInstalled": "Asset Studio 已经以 App 形式安装",
     "installAccepted": "Asset Studio 已安装",
     "installDismissed": "已取消安装",
-    "installManualHint": "请使用浏览器菜单安装此网站。macOS Safari 可选择“文件 > 添加到 Dock”",
+    "installManualHint": "请使用浏览器菜单安装此网站macOS Safari 可选择“文件 > 添加到 Dock”",
     "save": "保存",
     "reset": "重置",
     "resetSettings": "重置设置",
@@ -690,23 +702,23 @@
   "catalog": {
     "notComputed": {
       "referencesTitle": "References 尚未计算",
-      "referencesDesc": "Fast scan 会跳过 reference analysis，因此本次扫描无法判断 unused assets。",
+      "referencesDesc": "Fast scan 会跳过 reference analysis，因此本次扫描无法判断 unused assets",
       "nearTitle": "Near duplicates 尚未计算",
-      "nearDesc": "Fast scan 只保留 exact duplicate 数据。执行 full scan 后才能比对视觉相似素材。",
+      "nearDesc": "Fast scan 只保留 exact duplicate 数据执行 full scan 后才能比对视觉相似素材",
       "optimizationTitle": "Optimization 尚未计算",
-      "optimizationDesc": "Fast scan 会跳过格式与压缩建议。执行 full scan 后才能查看可优化素材。",
+      "optimizationDesc": "Fast scan 会跳过格式与压缩建议执行 full scan 后才能查看可优化素材",
       "fullScan": "执行 full scan",
       "nearSkippedTitle": "已自动跳过近似重复分析",
-      "nearSkippedDesc": "目前有 {{count}} 个素材。近似重复比对为 O(n²) 运算，已自动跳过以避免过长扫描时间。你仍可手动执行。",
+      "nearSkippedDesc": "目前有 {{count}} 个素材近似重复比对为 O(n²) 运算，已自动跳过以避免过长扫描时间你仍可手动执行",
       "nearSkippedAction": "执行近似重复分析"
     }
   },
   "unused": {
     "title": "未使用",
-    "description": "上次扫描中找不到代码引用的素材。删除前请先检查",
+    "description": "上次扫描中找不到代码引用的素材删除前请先检查",
     "total": "总计：{{size}}",
     "empty": "没有找到未使用素材",
-    "emptyDesc": "所有扫描的素材都有代码引用。",
+    "emptyDesc": "所有扫描的素材都有代码引用",
     "statFiles": "未使用文件",
     "statSize": "总大小",
     "statTopExt": "最多类型",

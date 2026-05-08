@@ -116,7 +116,7 @@
     "selectStart": "Select a starting directory",
     "selectStartDesc": "Enter a path and press \"Go\", or start browsing from the default directory.",
     "projectType": "Project type",
-    "projectTypeHint": "Choose how Asset Studio should interpret references and unused files.",
+    "projectTypeHint": "This controls whether zero references can count as unused; duplicates and optimization still run independently.",
     "detectingIntent": "Detecting project type",
     "detectedIntent": "Suggested: {{intent}}",
     "detectIntentFailed": "Could not detect a project type. Choose one manually.",
@@ -149,10 +149,22 @@
     "scanningDesc": "Updating asset catalog…",
     "all": "All",
     "unused": "Unused",
-    "possiblyUnused": "Possibly unused",
+    "possiblyUnused": "Possibly Unused",
+    "notApplicable": "Asset Pack",
     "duplicate": "Duplicate",
     "optimizable": "Optimizable",
-    "referenced": "Referenced"
+    "referenced": "Referenced",
+    "notApplicableHelp": "Usually an asset pack: assets may be used outside this repo, so zero code references are not used to decide unused status. Scans with reference analysis disabled also appear here.",
+    "helpTitle": "Status labels",
+    "help": {
+      "unused": "No code references found — safe to clean up. You'll see a delete preview before anything is removed.",
+      "possiblyUnused": "No references found, but this is a shared library, mixed project, or has incomplete scan coverage — so we can't be sure it's truly unused. Check manually before deleting.",
+      "notApplicable": "Asset packs aren't referenced by code — that's normal. They're excluded from unused checks.",
+      "duplicate": "This file is identical or visually very similar to another — consider keeping just one copy.",
+      "optimizable": "This file can be smaller or in a better format. Compressing it would save space.",
+      "referenced": "Found at least one code reference — this asset is in use."
+    },
+    "helpIntro": "Each asset is automatically labeled based on its code references, helping you spot what's safe to clean up. These labels only affect suggestions — you can always act on any file manually."
   },
   "scanProgress": {
     "starting": "Starting scan",
@@ -165,24 +177,29 @@
       "nearDuplicates": "Comparing similar assets",
       "lint": "Running asset rules",
       "persisting": "Saving scan results"
+    },
+    "reason": {
+      "skippedByUser": "This analysis was disabled by the current scan profile.",
+      "skippedByThreshold": "This analysis was skipped to avoid long scan time.",
+      "notApplicable": "Skipped because this project type does not use code-reference analysis."
     }
   },
   "projectIntent": {
     "code": {
-      "label": "Code project",
-      "description": "Scan code references, unused files, and applicable lint findings."
+      "label": "Code Project",
+      "description": "Best for website or app repos. Asset Studio scans supported code references and only marks zero-reference assets as cleanup-safe when coverage is complete."
     },
     "assetPack": {
-      "label": "Asset pack",
-      "description": "Skip code references and unused checks; focus on duplicates, metadata, optimization, and organization."
+      "label": "Asset Pack",
+      "description": "Best for image, icon, or art packs. Unused is not checked because assets may be consumed outside this repo; duplicates, metadata, optimization, and organization still run."
     },
     "library": {
-      "label": "Reusable library",
-      "description": "Scan internal references but treat unused as advisory because consumers may live outside this repo."
+      "label": "Shared Asset Library",
+      "description": "Best for libraries imported by other projects. Internal references are scanned, but zero-reference assets are only possible unused and need review."
     },
     "mixed": {
-      "label": "Mixed / not sure",
-      "description": "Scan conservatively and treat zero-reference assets as review candidates."
+      "label": "Mixed / Not Sure",
+      "description": "Choose this when unsure. Asset Studio scans conservatively: zero-reference assets become possible unused, not cleanup suggestions."
     }
   },
   "settings": {
@@ -691,6 +708,8 @@
     "searchPlaceholder": "Search path or hash…",
     "filterExtension": "Extension",
     "allExtensions": "All extensions",
+    "filterByExt": "Type",
+    "allGroups": "All groups",
     "sideBySideMode": "Side by side",
     "overlayMode": "Overlay",
     "overlayOpacity": "Overlay opacity",
@@ -762,12 +781,22 @@
   "browse": {
     "empty": "No assets match the current filters",
     "emptyOCRTextHint": "{{count}} images finished OCR with no recognized text, so visible image text may not be searchable yet.",
+    "unusedNotApplicableEmpty": "No cleanup-safe unused assets",
+    "unusedNotApplicableDesc": "{{count}} assets are in asset packs or scans without checked references. Zero references are not deletion evidence, so they are not included in unused cleanup suggestions.",
+    "unusedAdvisoryEmpty": "No cleanup-safe unused assets",
+    "unusedAdvisoryDesc": "{{count}} assets are only possibly unused because reference coverage is advisory. Review manually; they are not suggested as unused cleanup.",
+    "notApplicableTitle": "Unused Not Applicable",
+    "notApplicableDesc": "These {{count}} assets are not checked for unused status. Most are asset packs; scans with reference analysis disabled also appear here.",
     "flagDuplicate": "Duplicate",
     "flagUnused": "Unused",
-    "flagPossiblyUnused": "Possibly unused",
+    "flagPossiblyUnused": "Possibly Unused",
+    "flagNotApplicable": "Not Applicable",
+    "flagUsageNotChecked": "Refs Not Analyzed",
     "flagOptimizable": "Optimize",
     "flagUnusedShort": "Unused",
     "flagPossiblyUnusedShort": "Possible",
+    "flagNotApplicableShort": "Not Checked",
+    "flagUsageNotCheckedShort": "No Refs",
     "flagOptimizableShort": "Opt",
     "gridAriaLabel": "Asset grid",
     "listAriaLabel": "Asset list",
@@ -785,7 +814,9 @@
     "description": "Code-level usage patterns that may affect performance or accessibility.",
     "searchPlaceholder": "Filter by file or rule...",
     "empty": "No lint findings match your filter.",
-    "emptyDesc": "Try adjusting the search or severity filter."
+    "emptyDesc": "Try adjusting the search or severity filter.",
+    "notApplicable": "Code-usage lint is not applicable",
+    "notApplicableDesc": "This project type skips reference-dependent lint. Use duplicates, optimization, metadata, and filters to review asset quality."
   },
   "commandPalette": {
     "placeholder": "Search anything — assets, pages, paths…",
@@ -800,7 +831,7 @@
     "title": "Pre-Check",
     "sub": "Drop image files to check for duplicates, naming issues, and optimization opportunities before adding to a project.",
     "uploading": "Analyzing…",
-    "dropPrompt": "Drop images here or click to select",
+    "dropPrompt": "Drop or paste images here, or click to select",
     "supportedFormats": "PNG, JPG, GIF, WebP, AVIF, SVG · up to 64 MB total",
     "emptyTitle": "No analyses yet",
     "emptySub": "Upload images above to see verdicts.",
@@ -872,14 +903,16 @@
     "tabOptimize": "Optimize",
     "tabOCR": "OCR",
     "chipUnused": "Unused",
-    "chipPossiblyUnused": "Possibly unused",
+    "chipPossiblyUnused": "Possibly Unused",
+    "chipUsageNotApplicable": "Unused Not Checked",
     "chipDuplicate": "Duplicate",
     "chipSimilar": "Similar",
     "chipOptimizable": "Optimizable",
     "chipOCR": "OCR",
     "usageEmpty": "No code references found. This asset is a deletion candidate.",
-    "usagePossiblyUnused": "No references found, but coverage is advisory for this project. Review manually; delete-unused is disabled.",
-    "usageNotApplicable": "Unused detection is disabled for this project type because files may be consumed outside this repository.",
+    "usagePossiblyUnused": "No references were found, but this project's reference coverage is partial or external consumers may exist. Review manually; this is not included in unused cleanup suggestions.",
+    "usageAssetPack": "This file belongs to an Asset pack project. Asset packs are meant for other projects or manual selection, so no code references is normal. Asset Studio does not mark it as unused or include it in cleanup suggestions.",
+    "usageNotApplicable": "This scan did not run usable reference analysis, so Asset Studio cannot decide whether this file is unused. It is not included in unused cleanup suggestions.",
     "copyAll": "Copy all",
     "openInEditor": "Open in {{editor}}",
     "exactDuplicates": "Exact Duplicates",

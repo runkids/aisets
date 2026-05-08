@@ -58,7 +58,7 @@
     "copyGitRm": "複製 git rm",
     "deleteSelected": "刪除所選項目",
     "batchDeleteConfirmTitle": "刪除 {{count}} 個檔案",
-    "batchDeleteConfirmBody": "即將永久刪除 {{count}} 個檔案（{{size}}）。此操作無法復原",
+    "batchDeleteConfirmBody": "即將永久刪除 {{count}} 個檔案（{{size}}）此操作無法復原",
     "batchDeleteSuccess": "已刪除 {{count}} 個檔案",
     "batchDeletePartial": "已刪除 {{succeeded}} / {{total}} 個檔案（{{failed}} 個失敗）",
     "batchMove": "搬移",
@@ -116,7 +116,7 @@
     "selectStart": "選擇起始目錄",
     "selectStartDesc": "輸入路徑後按「前往」，或使用預設目錄開始瀏覽",
     "projectType": "專案類型",
-    "projectTypeHint": "選擇 Asset Studio 應如何判讀引用與未使用檔案",
+    "projectTypeHint": "這會決定「零引用」能不能當成未使用；不影響重複與最佳化檢查",
     "detectingIntent": "正在偵測專案類型",
     "detectedIntent": "建議：{{intent}}",
     "detectIntentFailed": "無法偵測專案類型，請手動選擇",
@@ -124,7 +124,7 @@
     "addDisabledOcrBusy": "OCR 作業進行中，完成後即可加入"
   },
   "preview": {
-    "canApplyDesc": "這次操作可套用。請確認變更後再寫入檔案",
+    "canApplyDesc": "這次操作可套用請確認變更後再寫入檔案",
     "blockedDesc": "這次操作有阻擋項目，需先處理後才能套用",
     "apply": "套用變更",
     "noChanges": "沒有可預覽的檔案變更"
@@ -150,9 +150,21 @@
     "all": "全部",
     "unused": "未使用",
     "possiblyUnused": "可能未使用",
+    "notApplicable": "素材包",
     "duplicate": "重複",
     "optimizable": "可最佳化",
-    "referenced": "已引用"
+    "referenced": "已引用",
+    "notApplicableHelp": "多半是素材包：素材可能在 repo 外被使用，所以不會用「沒有程式碼引用」判斷未使用若這次掃描停用引用分析，也會放在這裡",
+    "helpTitle": "狀態說明",
+    "help": {
+      "unused": "程式碼裡完全找不到這張圖的引用，可以安心清理，刪除前會先讓你預覽",
+      "possiblyUnused": "掃描沒找到引用，但因為是共用素材庫、混合專案、或掃描覆蓋不完整，無法確定真的沒人用，建議人工確認再刪",
+      "notApplicable": "素材包本來就不會被程式碼引用，所以不列入「未使用」判斷",
+      "duplicate": "這張圖跟其他檔案長得一樣或非常相似，可以考慮只保留一份",
+      "optimizable": "這張圖的檔案大小或格式可以更好，壓縮後能省空間",
+      "referenced": "程式碼裡有找到至少一處引用，確定有在使用"
+    },
+    "helpIntro": "每張素材會根據程式碼引用狀況自動標上狀態，幫你快速判斷哪些可以清理，這些標籤只影響建議，你隨時可以手動操作任何檔案"
   },
   "scanProgress": {
     "starting": "準備開始掃描",
@@ -165,24 +177,29 @@
       "nearDuplicates": "比對相似素材中",
       "lint": "執行素材規則中",
       "persisting": "儲存掃描結果中"
+    },
+    "reason": {
+      "skippedByUser": "目前掃描設定已停用此分析",
+      "skippedByThreshold": "為避免掃描時間過長，已跳過此分析",
+      "notApplicable": "此專案類型不使用程式碼引用分析，因此已略過"
     }
   },
   "projectIntent": {
     "code": {
       "label": "程式碼專案",
-      "description": "掃描程式碼引用、未使用檔案與適用的 lint 發現"
+      "description": "適合網站或 App repo；會解析支援的程式碼引用，只有覆蓋完整且零引用時才列為可清理的未使用素材"
     },
     "assetPack": {
       "label": "素材包",
-      "description": "跳過程式碼引用與未使用檢查，專注於重複、 metadata、最佳化與整理"
+      "description": "適合純圖片、圖示或美術素材包；不判斷未使用，因為素材可能在 repo 外被使用，只檢查重複、metadata、最佳化與整理"
     },
     "library": {
-      "label": "可重用 library",
-      "description": "掃描內部引用，但因外部 consumer 可能存在，未使用只作為參考"
+      "label": "共用素材庫",
+      "description": "適合會被其他專案匯入的 library；會掃描 repo 內引用，但零引用只標為可能未使用，需人工確認"
     },
     "mixed": {
       "label": "混合 / 不確定",
-      "description": "保守掃描，將零引用素材視為待人工確認"
+      "description": "不確定時選這個；會保守掃描，零引用只列為可能未使用，不會自動列入清理建議"
     }
   },
   "error": {
@@ -237,7 +254,7 @@
     "settings_ocr_concurrency_invalid": "OCR v1 的併發數必須是 1",
     "ocr_disabled": "請先啟用並儲存 OCR 設定",
     "ocr_not_installed": "請先安裝 OCR 語言包",
-    "ocr_engine_unavailable": "OCR 引擎無法使用。請先安裝 Tesseract 指令列工具後再試",
+    "ocr_engine_unavailable": "OCR 引擎無法使用請先安裝 Tesseract 指令列工具後再試",
     "ocr_install_failed": "OCR 語言包下載失敗",
     "ocr_remove_failed": "OCR 語言包移除失敗",
     "project_name_empty": "專案名稱不可為空",
@@ -246,20 +263,20 @@
     "workspace_icon_invalid": "工作區圖片必須是 512 KB 以內的 PNG、JPEG、GIF 或 WebP data URL",
     "workspace_not_found": "找不到工作區",
     "workspace_last_required": "至少需要保留一個工作區",
-    "settings_svg_savings_invalid": "SVG 最小節省百分比必須介於 0 到 100。",
-    "settings_max_dimension_invalid": "最大尺寸不可為負數。",
-    "settings_file_size_warning_invalid": "檔案大小警告門檻不可為負數。",
-    "settings_file_size_critical_invalid": "檔案大小嚴重門檻不可為負數。",
-    "settings_file_size_critical_below_warning": "嚴重門檻必須大於或等於警告門檻。",
-    "scan_not_found": "找不到掃描紀錄。",
-    "scan_id_required": "需要掃描 ID。",
-    "scan_id_invalid": "掃描 ID 不正確。",
-    "empty_selection": "未選取任何素材。",
-    "asset_ids_required": "至少需要選取一個素材。",
-    "target_already_exists": "目標檔案已存在。",
-    "target_path_required": "需要指定目標路徑。",
-    "preview_has_blockers": "預覽有未解決的阻擋項目。",
-    "project_icon_invalid": "專案圖片必須是 512 KB 以內的 PNG、JPEG、GIF 或 WebP data URL。"
+    "settings_svg_savings_invalid": "SVG 最小節省百分比必須介於 0 到 100",
+    "settings_max_dimension_invalid": "最大尺寸不可為負數",
+    "settings_file_size_warning_invalid": "檔案大小警告門檻不可為負數",
+    "settings_file_size_critical_invalid": "檔案大小嚴重門檻不可為負數",
+    "settings_file_size_critical_below_warning": "嚴重門檻必須大於或等於警告門檻",
+    "scan_not_found": "找不到掃描紀錄",
+    "scan_id_required": "需要掃描 ID",
+    "scan_id_invalid": "掃描 ID 不正確",
+    "empty_selection": "未選取任何素材",
+    "asset_ids_required": "至少需要選取一個素材",
+    "target_already_exists": "目標檔案已存在",
+    "target_path_required": "需要指定目標路徑",
+    "preview_has_blockers": "預覽有未解決的阻擋項目",
+    "project_icon_invalid": "專案圖片必須是 512 KB 以內的 PNG、JPEG、GIF 或 WebP data URL"
   },
   "topbar": {
     "totalLabel": "{{projects}} 個專案 · {{assets}} 個素材",
@@ -287,7 +304,7 @@
     "viewOCRSettings": "OCR 設定",
     "dismiss": "關閉",
     "ocrLockedTooltip": "請先停止 OCR",
-    "ocrLockedAction": "OCR 執行中。請先停止 OCR，再變更 catalog。"
+    "ocrLockedAction": "OCR 執行中請先停止 OCR，再變更 catalog"
   },
   "toast": {
     "projectAdded": "已新增專案：{{path}}",
@@ -317,16 +334,16 @@
   },
   "optimization": {
     "reason": {
-      "image_dimensions_large": "圖片尺寸超過常見的網頁顯示大小。",
-      "asset_file_large": "檔案過大可能拖慢頁面載入速度。",
-      "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 壓縮效果更好。",
-      "svg_can_minify": "SVG 可在不影響引用的情況下進行壓縮。"
+      "image_dimensions_large": "圖片尺寸超過常見的網頁顯示大小",
+      "asset_file_large": "檔案過大可能拖慢頁面載入速度",
+      "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 壓縮效果更好",
+      "svg_can_minify": "SVG 可在不影響引用的情況下進行壓縮"
     },
     "suggestion": {
-      "use_responsive_or_smaller_source": "考慮使用響應式變體或較小的來源圖片。",
-      "review_compression_or_modern_format": "檢視壓縮設定或嘗試現代圖片格式。",
-      "try_modern_photographic_format": "對非透明點陣圖嘗試照片格式。",
-      "preview_svg_minify": "套用前先預覽壓縮後的 SVG 輸出。"
+      "use_responsive_or_smaller_source": "考慮使用響應式變體或較小的來源圖片",
+      "review_compression_or_modern_format": "檢視壓縮設定或嘗試現代圖片格式",
+      "try_modern_photographic_format": "對非透明點陣圖嘗試照片格式",
+      "preview_svg_minify": "套用前先預覽壓縮後的 SVG 輸出"
     }
   },
   "sort": {
@@ -336,16 +353,16 @@
   "duplicates": {
     "title": "重複素材",
     "groupsCount": "{{count}} 個群組",
-    "description": "散落在不同路徑的相同檔案。合併後保留一份並重寫引用",
+    "description": "散落在不同路徑的相同檔案合併後保留一份並重寫引用",
     "exactTab": "完全相同（{{count}}）",
     "similarTab": "相似（{{count}}）",
     "canSave": "約可節省 {{size}}",
     "keep": "保留",
     "flipped": "翻轉",
     "noExact": "沒有找到完全相同的重複素材",
-    "noExactDesc": "所有掃描的素材都是獨一無二的。",
+    "noExactDesc": "所有掃描的素材都是獨一無二的",
     "noSimilar": "沒有偵測到相似素材",
-    "noSimilarDesc": "此次掃描未偵測到視覺上相似的素材。",
+    "noSimilarDesc": "此次掃描未偵測到視覺上相似的素材",
     "expandGroup": "展開分組",
     "collapseGroup": "摺疊分組",
     "statGroups": "分組",
@@ -355,11 +372,13 @@
     "searchPlaceholder": "搜尋路徑或雜湊…",
     "filterExtension": "副檔名",
     "allExtensions": "所有副檔名",
+    "filterByExt": "類型",
+    "allGroups": "所有分組",
     "sideBySideMode": "並排",
     "overlayMode": "疊加",
     "overlayOpacity": "疊加透明度",
     "mergeConfirmTitle": "合併 {{count}} 個重複檔案",
-    "mergeConfirmBody": "移除 {{count}} 個重複副本（{{size}}），並更新 {{refs}} 個引用指向保留路徑。"
+    "mergeConfirmBody": "移除 {{count}} 個重複副本（{{size}}），並更新 {{refs}} 個引用指向保留路徑"
   },
   "compare": {
     "side": "並排",
@@ -426,12 +445,22 @@
   "browse": {
     "empty": "沒有素材符合目前篩選",
     "emptyOCRTextHint": "{{count}} 張圖片已完成 OCR 但沒有辨識出文字，因此輸入圖片上的字不一定會命中",
+    "unusedNotApplicableEmpty": "沒有可安全清理的未使用素材",
+    "unusedNotApplicableDesc": "目前有 {{count}} 個素材不適合用零引用判斷未使用；多半是素材包，或這次掃描停用引用分析，因此未列入未使用清理建議",
+    "unusedAdvisoryEmpty": "沒有可安全清理的未使用素材",
+    "unusedAdvisoryDesc": "目前有 {{count}} 個素材只是可能未使用；引用覆蓋仍是參考性，需人工確認，不會列入清理建議",
+    "notApplicableTitle": "未使用不適用",
+    "notApplicableDesc": "這 {{count}} 個素材不會做未使用判斷多半是素材包；若這次掃描停用引用分析，也會出現在這裡",
     "flagDuplicate": "重複",
     "flagUnused": "未使用",
     "flagPossiblyUnused": "可能未使用",
+    "flagNotApplicable": "不適用",
+    "flagUsageNotChecked": "引用未分析",
     "flagOptimizable": "可最佳化",
     "flagUnusedShort": "未使用",
     "flagPossiblyUnusedShort": "可能未用",
+    "flagNotApplicableShort": "不適用",
+    "flagUsageNotCheckedShort": "引用未分析",
     "flagOptimizableShort": "最佳化",
     "gridAriaLabel": "素材格狀檢視",
     "listAriaLabel": "素材清單檢視",
@@ -449,7 +478,9 @@
     "description": "可能影響效能或可及性的程式碼層級使用模式",
     "searchPlaceholder": "依檔案或規則篩選...",
     "empty": "沒有 lint 發現符合目前篩選",
-    "emptyDesc": "試試調整搜尋條件或嚴重程度篩選。"
+    "emptyDesc": "試試調整搜尋條件或嚴重程度篩選",
+    "notApplicable": "Code-usage lint 不適用",
+    "notApplicableDesc": "此專案類型會略過依賴引用的 lint請改用重複、最佳化、metadata 與篩選檢查素材品質"
   },
   "commandPalette": {
     "placeholder": "搜尋任何項目 — 素材、頁面、路徑…",
@@ -464,7 +495,7 @@
     "title": "預檢",
     "sub": "加入專案前，拖放圖片以檢查重複、命名問題與最佳化機會",
     "uploading": "分析中…",
-    "dropPrompt": "將圖片拖到這裡，或點擊選擇",
+    "dropPrompt": "將圖片拖曳或貼上到這裡，或點擊選擇",
     "supportedFormats": "PNG、JPG、GIF、WebP、AVIF、SVG · 總計最多 64 MB",
     "emptyTitle": "尚無分析",
     "emptySub": "上傳圖片後即可查看判定",
@@ -487,29 +518,29 @@
     "nearDistance": "相似度 {{pct}}%",
     "nearDistanceFlipped": "相似度 {{pct}}% · 翻轉",
     "verdictReason": {
-      "ok": "未偵測到衝突。",
-      "exactMatch": "目錄中已存在內容完全相同的素材。",
-      "nearMatch": "存在視覺相似的素材，建議加入前先確認。",
-      "criticalOpt": "素材有嚴重的最佳化建議。",
-      "naming": "檔名有風格問題。"
+      "ok": "未偵測到衝突",
+      "exactMatch": "目錄中已存在內容完全相同的素材",
+      "nearMatch": "存在視覺相似的素材，建議加入前先確認",
+      "criticalOpt": "素材有嚴重的最佳化建議",
+      "naming": "檔名有風格問題"
     },
     "optReason": {
-      "image_dimensions_large": "圖片尺寸對 UI 素材而言異常大。",
-      "asset_file_large": "檔案大小偏大，可能影響載入效能。",
-      "png_without_alpha": "無透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 獲得更好的壓縮。",
-      "svg_can_minify": "SVG 可進行壓縮以縮小檔案大小。"
+      "image_dimensions_large": "圖片尺寸對 UI 素材而言異常大",
+      "asset_file_large": "檔案大小偏大，可能影響載入效能",
+      "png_without_alpha": "無透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 獲得更好的壓縮",
+      "svg_can_minify": "SVG 可進行壓縮以縮小檔案大小"
     },
     "optSuggestion": {
-      "use_responsive_or_smaller_source": "建議使用響應式圖片或較小的來源檔。",
-      "review_compression_or_modern_format": "檢查壓縮設定，或轉換為現代格式。",
-      "try_modern_photographic_format": "嘗試使用攝影格式處理非透明的點陣圖片。",
-      "preview_svg_minify": "預覽 SVG 壓縮結果以確認是否有視覺差異。"
+      "use_responsive_or_smaller_source": "建議使用響應式圖片或較小的來源檔",
+      "review_compression_or_modern_format": "檢查壓縮設定，或轉換為現代格式",
+      "try_modern_photographic_format": "嘗試使用攝影格式處理非透明的點陣圖片",
+      "preview_svg_minify": "預覽 SVG 壓縮結果以確認是否有視覺差異"
     },
     "namingIssue": {
-      "contains_spaces": "檔名含有空格，建議使用連字號或底線。",
-      "uppercase_letters": "檔名含有大寫字母，建議使用小寫。",
-      "special_chars": "檔名含有特殊字元，可能導致 URL 或路徑問題。",
-      "leading_punctuation": "檔名以標點符號開頭。"
+      "contains_spaces": "檔名含有空格，建議使用連字號或底線",
+      "uppercase_letters": "檔名含有大寫字母，建議使用小寫",
+      "special_chars": "檔名含有特殊字元，可能導致 URL 或路徑問題",
+      "leading_punctuation": "檔名以標點符號開頭"
     }
   },
   "assetDrawer": {
@@ -537,13 +568,15 @@
     "tabOCR": "OCR",
     "chipUnused": "未使用",
     "chipPossiblyUnused": "可能未使用",
+    "chipUsageNotApplicable": "不判斷未使用",
     "chipDuplicate": "重複",
     "chipSimilar": "相似",
     "chipOptimizable": "可最佳化",
     "chipOCR": "OCR",
-    "usageEmpty": "未找到程式碼引用。此素材為刪除候選",
-    "usagePossiblyUnused": "未找到引用，但此專案的引用覆蓋只作為參考。請人工確認；delete-unused 已停用",
-    "usageNotApplicable": "此專案類型停用未使用偵測，因為檔案可能在 repo 外被消費",
+    "usageEmpty": "未找到程式碼引用此素材為刪除候選",
+    "usagePossiblyUnused": "目前沒找到引用，但此專案的引用覆蓋不完整或可能有外部使用者請人工確認；不會列入未使用清理建議",
+    "usageAssetPack": "這個檔案來自「素材包」專案素材包本來就是給其他專案或人工挑選使用；沒有程式碼引用是正常現象，所以 Asset Studio 不會把它判定為未使用，也不會列入清理建議",
+    "usageNotApplicable": "這次掃描沒有執行可用的引用分析，因此不能判斷此檔案是否未使用；它不會列入未使用清理建議",
     "copyAll": "複製全部",
     "openInEditor": "在 {{editor}} 中開啟",
     "exactDuplicates": "完全重複",
@@ -591,7 +624,7 @@
     "workspaceDesc": "設定這個本機工作區名稱，以及新增專案時的起始資料夾",
     "workspaceName": "工作區名稱",
     "defaultRoot": "新增專案起始路徑",
-    "defaultRootHint": "只作為「新增專案」資料夾選擇器的初始位置。留空時會從 server 目前工作目錄開始",
+    "defaultRootHint": "只作為「新增專案」資料夾選擇器的初始位置留空時會從 server 目前工作目錄開始",
     "defaultRootPlaceholder": "使用 server 目前工作目錄",
     "defaultRootCurrentPath": "目前 server 工作目錄：{{path}}",
     "autoScan": "開啟後自動掃描",
@@ -624,21 +657,21 @@
     "scanProfileHint": "預設使用 Full，會執行所有分析；大型工作區可改用 Fast",
     "scanProfile": {
       "fast": "Fast",
-      "fastHint": "走訪檔案、讀取圖片 metadata，並建立 exact duplicates。",
+      "fastHint": "走訪檔案、讀取圖片 metadata，並建立 exact duplicates",
       "full": "Full",
-      "fullHint": "額外計算 references、near duplicates 與 optimization 建議。",
+      "fullHint": "額外計算 references、near duplicates 與 optimization 建議",
       "custom": "Custom",
-      "customHint": "自行選擇要執行的高成本分析。"
+      "customHint": "自行選擇要執行的高成本分析"
     },
     "scanAnalysesLabel": "自訂分析",
     "scanAnalysesHint": "略過的分析會顯示為 not computed，而不是 0 筆",
     "scanAnalyses": {
       "references": "References",
-      "referencesHint": "找出程式碼引用與未使用素材。",
+      "referencesHint": "找出程式碼引用與未使用素材",
       "nearDuplicates": "Near duplicates",
-      "nearDuplicatesHint": "比對 perceptual hash 找出視覺相似檔案。",
+      "nearDuplicatesHint": "比對 perceptual hash 找出視覺相似檔案",
       "optimization": "Optimization",
-      "optimizationHint": "計算格式與壓縮建議。"
+      "optimizationHint": "計算格式與壓縮建議"
     },
     "excludePatterns": "排除規則",
     "excludePatternsHint": "每行一條排除規則，也可用逗號分隔，例如 dist/** 或 tmp",
@@ -673,13 +706,13 @@
     "ocrLimitsEdit": "設定",
     "ocrLimitsHelpTitle": "OCR 進階設定",
     "ocrLimitsHelpDesc": "這些設定會影響 OCR 執行成本與搜尋容錯",
-    "ocrLimitsKeepDefaults": "不確定時建議保留預設值。OCR 仍會分批在背景續跑，不會在 Browse 或搜尋輸入時即時辨識",
+    "ocrLimitsKeepDefaults": "不確定時建議保留預設值OCR 仍會分批在背景續跑，不會在 Browse 或搜尋輸入時即時辨識",
     "ocrMaxPixels": "OCR 最大像素",
-    "ocrMaxPixelsHint": "單張圖片超過這個像素數會略過，避免大截圖或超大圖讓 OCR 跑太久。2000000 約等於 2 百萬像素",
+    "ocrMaxPixelsHint": "單張圖片超過這個像素數會略過，避免大截圖或超大圖讓 OCR 跑太久2000000 約等於 2 百萬像素",
     "ocrBatchSize": "OCR 批次大小",
-    "ocrBatchSizeHint": "每批要處理的圖片數量。數字越大越快跑完，但執行時 CPU 負載也可能更明顯",
+    "ocrBatchSizeHint": "每批要處理的圖片數量數字越大越快跑完，但執行時 CPU 負載也可能更明顯",
     "ocrConcurrency": "並行處理數",
-    "ocrConcurrencyHint": "同時跑幾張圖片。1 最穩；2 較快但 CPU 負載較高。為了保護效能，目前最多 2",
+    "ocrConcurrencyHint": "同時跑幾張圖片1 最穩；2 較快但 CPU 負載較高為了保護效能，目前最多 2",
     "ocrGroupPerformance": "效能",
     "ocrGroupSearch": "搜尋行為",
     "ocrMaxPixelsSuffix": "px",
@@ -687,9 +720,9 @@
     "ocrBatchSizeDefault": "預設：25",
     "ocrConcurrencyDefault": "預設：1",
     "ocrFuzzySearch": "OCR 搜尋容錯",
-    "ocrFuzzySearchHint": "允許搜尋命中 OCR 常見的少字、多字或髒字，例如 ERARZAN 仍可被 tarzan 找到。關閉後只做精準文字包含比對",
+    "ocrFuzzySearchHint": "允許搜尋命中 OCR 常見的少字、多字或髒字，例如 ERARZAN 仍可被 tarzan 找到關閉後只做精準文字包含比對",
     "ocrRuntime": "OCR 快取",
-    "ocrRuntimeHint": "先安裝本機語言包，再為目前 catalog 建立 OCR 快取。圖片不會上傳",
+    "ocrRuntimeHint": "先安裝本機語言包，再為目前 catalog 建立 OCR 快取圖片不會上傳",
     "ocrInstall": "安裝語言包",
     "ocrInstalling": "安裝中...",
     "ocrRemove": "移除語言包",
@@ -700,7 +733,7 @@
     "ocrStopping": "停止中...",
     "ocrInstalled": "OCR 語言包已安裝在本機",
     "ocrNotInstalled": "尚未安裝 OCR 語言包",
-    "ocrCacheScopeHint": "OCR cache 只存在本機。會依 project、路徑、內容雜湊、語言與引擎版本重用；移除 OCR 會清除所有 cache",
+    "ocrCacheScopeHint": "OCR cache 只存在本機會依 project、路徑、內容雜湊、語言與引擎版本重用；移除 OCR 會清除所有 cache",
     "ocrEngineUnavailable": "OCR 引擎無法使用：{{error}}",
     "ocrInstallSuccess": "OCR 語言包已安裝",
     "ocrInstallFailed": "OCR 安裝失敗",
@@ -721,7 +754,7 @@
     "ocrRunConfirmSearch": "完成的 OCR 文字會出現在 Browse、自訂篩選器與 ⌘ P 搜尋；不會用於 cleanup 或刪除判斷",
     "ocrRunConfirmAction": "開始 OCR",
     "ocrRemoveConfirmTitle": "移除 OCR",
-    "ocrRemoveConfirmMessage": "這會移除所有已安裝語言包，並清除所有 workspace/project 的 OCR cache。圖片檔不會被刪除，但之後需要重新建立 OCR 才能搜尋圖片文字",
+    "ocrRemoveConfirmMessage": "這會移除所有已安裝語言包，並清除所有 workspace/project 的 OCR cache圖片檔不會被刪除，但之後需要重新建立 OCR 才能搜尋圖片文字",
     "ocrRemoveConfirmAction": "移除並清除 cache",
     "ocrSkipReason": {
       "ocr_missing_hash": "缺少內容雜湊",
@@ -736,7 +769,7 @@
     "notInstalled": "未安裝",
     "customFilters": "自訂篩選器",
     "customFiltersDesc": "依路徑與素材中繼資料保存的瀏覽篩選器",
-    "customFiltersHint": "群組之間是 OR；同一群組內的規則是 AND。OCR 規則只會比對已快取的本機 OCR 結果",
+    "customFiltersHint": "群組之間是 OR；同一群組內的規則是 ANDOCR 規則只會比對已快取的本機 OCR 結果",
     "customFilterOCRDisabled": "OCR 已關閉",
     "customFilterName": "篩選器名稱",
     "customFilterEnabled": "啟用",
@@ -835,17 +868,17 @@
     "autoApply": "自動套用最佳化",
     "autoApplyHint": "目前只保存偏好，不會自動修改檔案",
     "thresholdsHeading": "偵測閾值",
-    "thresholdsDesc": "調整何時報告最佳化建議。變更將在下次掃描時生效。",
+    "thresholdsDesc": "調整何時報告最佳化建議變更將在下次掃描時生效",
     "svgMinSavings": "SVG 最低節省比例",
-    "svgMinSavingsHint": "僅在壓縮可節省至少此百分比時標記 SVG 檔案。",
+    "svgMinSavingsHint": "僅在壓縮可節省至少此百分比時標記 SVG 檔案",
     "maxDimension": "圖片最大尺寸",
-    "maxDimensionHint": "當圖片寬度或高度超過此像素值時標記。",
+    "maxDimensionHint": "當圖片寬度或高度超過此像素值時標記",
     "fileSizeWarning": "檔案大小警告",
-    "fileSizeWarningHint": "當檔案大小超過此值時報告警告。",
+    "fileSizeWarningHint": "當檔案大小超過此值時報告警告",
     "fileSizeCritical": "檔案大小嚴重",
-    "fileSizeCriticalHint": "超過此值時升級為嚴重等級。",
+    "fileSizeCriticalHint": "超過此值時升級為嚴重等級",
     "pngAlphaCheck": "PNG 無透明度檢查",
-    "pngAlphaCheckHint": "為不使用透明度的 PNG 檔案建議替代格式。",
+    "pngAlphaCheckHint": "為不使用透明度的 PNG 檔案建議替代格式",
     "hotkeysDesc": "本機 UI 可用的鍵盤快捷鍵",
     "hotkeyGeneral": "一般",
     "hotkeyNavigation": "導覽",
@@ -864,7 +897,7 @@
     "upToDateAction": "已是最新版",
     "versionDevHint": "DEV mode 會使用模擬更新，方便測試 UI 流程",
     "updateDevSuccess": "DEV mode 更新已模擬完成",
-    "updateSuccess": "已更新至 {{version}}。請重新啟動 Asset Studio 後使用新版",
+    "updateSuccess": "已更新至 {{version}}請重新啟動 Asset Studio 後使用新版",
     "updateAlreadyCurrent": "Asset Studio 已是最新版",
     "updateFailed": "更新失敗",
     "installApp": "安裝 App",
@@ -874,7 +907,7 @@
     "installInstalled": "Asset Studio 已經以 App 形式安裝",
     "installAccepted": "Asset Studio 已安裝",
     "installDismissed": "已取消安裝",
-    "installManualHint": "請使用瀏覽器選單安裝此網站。macOS Safari 可選擇「檔案 > 加入 Dock」",
+    "installManualHint": "請使用瀏覽器選單安裝此網站macOS Safari 可選擇「檔案 > 加入 Dock」",
     "save": "儲存",
     "reset": "重設",
     "resetSettings": "重設設定",
@@ -916,23 +949,23 @@
   "catalog": {
     "notComputed": {
       "referencesTitle": "References 尚未計算",
-      "referencesDesc": "Fast scan 會略過 reference analysis，因此這次掃描無法判斷 unused assets。",
+      "referencesDesc": "Fast scan 會略過 reference analysis，因此這次掃描無法判斷 unused assets",
       "nearTitle": "Near duplicates 尚未計算",
-      "nearDesc": "Fast scan 只保留 exact duplicate 資料。執行 full scan 後才能比對視覺相似素材。",
+      "nearDesc": "Fast scan 只保留 exact duplicate 資料執行 full scan 後才能比對視覺相似素材",
       "optimizationTitle": "Optimization 尚未計算",
-      "optimizationDesc": "Fast scan 會略過格式與壓縮建議。執行 full scan 後才能檢視可最佳化素材。",
+      "optimizationDesc": "Fast scan 會略過格式與壓縮建議執行 full scan 後才能檢視可最佳化素材",
       "fullScan": "執行 full scan",
       "nearSkippedTitle": "已自動跳過近似重複分析",
-      "nearSkippedDesc": "目前有 {{count}} 個素材。近似重複比對為 O(n²) 運算，已自動跳過以避免過長掃描時間。你仍可手動執行。",
+      "nearSkippedDesc": "目前有 {{count}} 個素材近似重複比對為 O(n²) 運算，已自動跳過以避免過長掃描時間你仍可手動執行",
       "nearSkippedAction": "執行近似重複分析"
     }
   },
   "unused": {
     "title": "未使用",
-    "description": "上次掃描中找不到程式碼引用的素材。刪除前請先檢查",
+    "description": "上次掃描中找不到程式碼引用的素材刪除前請先檢查",
     "total": "總計：{{size}}",
     "empty": "沒有找到未使用素材",
-    "emptyDesc": "所有掃描的素材都有程式碼引用。",
+    "emptyDesc": "所有掃描的素材都有程式碼引用",
     "statFiles": "未使用檔案",
     "statSize": "總大小",
     "statTopExt": "最多類型",
