@@ -1,6 +1,8 @@
+import { Popover } from "radix-ui";
 import {
   ArrowDownAZ,
   CheckSquare,
+  CircleHelp,
   Grid3X3,
   List,
   Moon,
@@ -10,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
 import { Button, Select, TextInput, type SegmentedControlItem } from "./ui";
 import {
@@ -25,6 +28,7 @@ type StatusFilter =
   | ""
   | "unused"
   | "possiblyUnused"
+  | "notApplicable"
   | "duplicate"
   | "optimize"
   | "referenced";
@@ -99,9 +103,42 @@ export function BrowseToolbar({
     { value: "" as const, label: t("status.all") },
     { value: "unused" as const, label: t("status.unused") },
     { value: "possiblyUnused" as const, label: t("status.possiblyUnused") },
+    { value: "notApplicable" as const, label: t("status.notApplicable") },
     { value: "duplicate" as const, label: t("status.duplicate") },
     { value: "optimize" as const, label: t("status.optimizable") },
     { value: "referenced" as const, label: t("status.referenced") },
+  ];
+  const statusHelpItems = [
+    {
+      label: t("status.unused"),
+      description: t("status.help.unused"),
+      dot: "bg-g-red",
+    },
+    {
+      label: t("status.possiblyUnused"),
+      description: t("status.help.possiblyUnused"),
+      dot: "bg-g-amber",
+    },
+    {
+      label: t("status.notApplicable"),
+      description: t("status.help.notApplicable"),
+      dot: "bg-g-ink-4",
+    },
+    {
+      label: t("status.duplicate"),
+      description: t("status.help.duplicate"),
+      dot: "bg-g-purple",
+    },
+    {
+      label: t("status.optimizable"),
+      description: t("status.help.optimizable"),
+      dot: "bg-g-blue",
+    },
+    {
+      label: t("status.referenced"),
+      description: t("status.help.referenced"),
+      dot: "bg-g-green",
+    },
   ];
   const sortItems = [
     { value: "name", label: t("toolbar.sortName") },
@@ -178,12 +215,83 @@ export function BrowseToolbar({
         </Button>
       </div>
 
-      <BrowseStatusBar
-        value={statusFilter}
-        items={statusItems}
-        onChange={onStatusFilterChange}
-        ariaLabel={t("toolbar.statusFilter")}
-      />
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <BrowseStatusBar
+            value={statusFilter}
+            items={statusItems}
+            onChange={onStatusFilterChange}
+            ariaLabel={t("toolbar.statusFilter")}
+          />
+        </div>
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className="ml-auto inline-flex h-g-btn-md shrink-0 cursor-pointer items-center justify-center self-center rounded-g-sm px-1.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+              aria-label={t("status.helpTitle")}
+            >
+              <CircleHelp size={15} aria-hidden="true" />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="top"
+              align="end"
+              sideOffset={8}
+              collisionPadding={16}
+              className={cn(
+                "z-[200] w-[480px] rounded-g-lg border border-g-line-strong bg-g-canvas shadow-g-pop",
+                "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+              )}
+            >
+              <div className="flex items-center justify-between border-b border-g-line px-3.5 py-2.5">
+                <h3 className="font-g text-g-ui font-[590] text-g-ink">
+                  {t("status.helpTitle")}
+                </h3>
+                <Popover.Close asChild>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-g-sm p-0.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+                    aria-label="Close"
+                  >
+                    <X size={14} />
+                  </button>
+                </Popover.Close>
+              </div>
+
+              <div className="max-h-[min(420px,60vh)] overflow-y-auto scroll-thin px-3.5 py-3">
+                <p className="mb-3 font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
+                  {t("status.helpIntro")}
+                </p>
+                <dl className="grid gap-2.5">
+                  {statusHelpItems.map((item) => (
+                    <div
+                      key={item.label}
+                      className="grid grid-cols-[8px_1fr] items-start gap-x-2.5 gap-y-0.5"
+                    >
+                      <span
+                        className={cn(
+                          "mt-[5px] h-2 w-2 shrink-0 rounded-full",
+                          item.dot,
+                        )}
+                        aria-hidden="true"
+                      />
+                      <dt className="font-g text-g-caption font-[590] text-g-ink">
+                        {item.label}
+                      </dt>
+                      <span aria-hidden="true" />
+                      <dd className="font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
+                        {item.description}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      </div>
     </div>
   );
 }
