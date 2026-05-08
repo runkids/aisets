@@ -188,6 +188,13 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Collapsible via grid-rows** | Animated expand/collapse uses `grid-rows-[0fr]` → `grid-rows-[1fr]` with `overflow-hidden` inner div. Add `motion-reduce:transition-none`. |
 | **Upload results accumulate** | Multi-batch upload flows append to existing results via ref + `setResults(prev => [...prev, ...incoming])`. Clear button resets all. |
 | **Module-level state cache** | Views that unmount on route change use module-level `let _state` + `useEffect` sync to persist data across navigations. Cleared on page refresh. |
+| **Virtual scroll: no fixed height** | `useVirtualizer` items must NOT set `height: vItem.size` on wrappers — it clips content when images load. Use only `transform: translateY(...)` + `measureElement` ref. |
+| **Sticky headers in virtual lists** | `position: sticky` doesn't work on absolute-positioned virtual items. Render a sticky indicator in the toolbar div that reads the current section from visible virtual items. |
+| **`content-scroll` on the real scroller** | Put `content-scroll` on the element with `scrollHeight > clientHeight`, not a non-scrolling wrapper. `ScrollToTop` picks the overflowing one. |
+| **Server-side filtering** | FilterRail filters → API query params (re-fetch), not client-side `useMemo` on loaded data. Lazy-loaded data is partial. |
+| **API totals, not loaded counts** | StatCards, Tabs, FilterRail use `query.data.pages[0].total` / `.facets`. Never `items.length` during lazy loading. |
+| **Lazy load via sentinel** | Use `useInfiniteScrollSentinel`, not `useEffect` auto-pagination. |
+| **Facets match the view's unit** | DuplicatesView shows groups → facets must count groups (from duplicates API), not files (from items API). Use `project_name` not `project_id` for display. |
 
 ---
 
