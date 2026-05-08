@@ -87,18 +87,14 @@ func MergePreview(project scanner.Project, item scanner.AssetItem, preferredPath
 }
 
 func DeleteUnusedPreview(item scanner.AssetItem) Preview {
-	canApply := item.DeleteUnusedAllowed || (item.UsageClassification == "" && len(item.UsedBy) == 0)
+	canApply := item.DeleteUnusedAllowed && item.UsageClassification == scanner.UsageUnused
 	blockers := []Blocker{}
 	if !canApply {
-		code := "asset_still_referenced"
-		reason := "Asset has references and is not safe to delete."
-		switch item.UsageClassification {
-		case scanner.UsageNotApplicable:
-			code = "unused_not_applicable"
-			reason = "Unused detection is not applicable for this project."
-		case scanner.UsagePossiblyUnused:
-			code = "unused_advisory_only"
-			reason = "Reference coverage is advisory, so delete-unused is disabled."
+		code := "delete_unused_requires_supported_references"
+		reason := "Delete-unused requires supported reference coverage."
+		if item.UsageClassification == scanner.UsageReferenced || len(item.UsedBy) > 0 {
+			code = "asset_still_referenced"
+			reason = "Asset has references and is not safe to delete."
 		}
 		blockers = append(blockers, blocker(item.RepoPath, 0, code, reason))
 	}

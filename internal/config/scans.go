@@ -42,6 +42,20 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		return 0, err
 	}
 
+	projectStmt, err := tx.Prepare(`
+		INSERT INTO scan_project_snapshots (scan_id, project_id, scan_intent)
+		VALUES (?, ?, ?)
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer projectStmt.Close()
+	for _, project := range catalog.Projects {
+		if _, err = projectStmt.Exec(scanID, project.ID, scanner.NormalizeProjectScanIntent(project.ScanIntent)); err != nil {
+			return 0, err
+		}
+	}
+
 	assetStmt, err := tx.Prepare(`
 		INSERT INTO asset_snapshots (
 			scan_id, asset_id, project_id, project_name, repo_path, file_name, local_path, ext,
@@ -177,7 +191,7 @@ func normalizeSnapshotItem(item scanner.AssetItem) scanner.AssetItem {
 		if len(item.UsedBy) > 0 {
 			item.UsageClassification = scanner.UsageReferenced
 		} else {
-			item.UsageClassification = scanner.UsageUnused
+			item.UsageClassification = scanner.UsageNotApplicable
 		}
 	}
 	if item.LintApplicability == "" {
@@ -185,6 +199,8 @@ func normalizeSnapshotItem(item scanner.AssetItem) scanner.AssetItem {
 	}
 	if item.UsageClassification == scanner.UsageUnused {
 		item.DeleteUnusedAllowed = true
+	} else {
+		item.DeleteUnusedAllowed = false
 	}
 	return item
 }

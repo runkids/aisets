@@ -3,9 +3,8 @@ import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  intentSelectOptions,
   projectScanIntentDescription,
-  projectScanIntentLabel,
-  projectScanIntents,
 } from "../projectScanIntent";
 import type { Project, ProjectScanIntent } from "../types";
 import { Button, Modal, Select, TextInput } from "./ui";
@@ -60,11 +59,7 @@ function ProjectDialogContent({
     iconImage !== defaultIconImage ||
     scanIntent !== defaultScanIntent;
   const canSubmit = trimmedName.length > 0 && changed;
-  const intentOptions = projectScanIntents.map((intent) => ({
-    value: intent,
-    label: projectScanIntentLabel(t, intent),
-    description: projectScanIntentDescription(t, intent),
-  }));
+  const intentOptions = intentSelectOptions(t);
 
   async function onFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

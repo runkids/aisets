@@ -119,7 +119,9 @@
     "projectTypeHint": "Choose how Asset Studio should interpret references and unused files.",
     "detectingIntent": "Detecting project type",
     "detectedIntent": "Suggested: {{intent}}",
-    "detectIntentFailed": "Could not detect a project type. Choose one manually."
+    "detectIntentFailed": "Could not detect a project type. Choose one manually.",
+    "adding": "Adding…",
+    "addDisabledOcrBusy": "OCR is running. You can add after it finishes."
   },
   "preview": {
     "canApplyDesc": "This operation can be applied. Please review the changes before writing to files.",

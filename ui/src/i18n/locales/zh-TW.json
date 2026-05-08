@@ -119,7 +119,9 @@
     "projectTypeHint": "選擇 Asset Studio 應如何判讀引用與未使用檔案",
     "detectingIntent": "正在偵測專案類型",
     "detectedIntent": "建議：{{intent}}",
-    "detectIntentFailed": "無法偵測專案類型，請手動選擇"
+    "detectIntentFailed": "無法偵測專案類型，請手動選擇",
+    "adding": "加入中…",
+    "addDisabledOcrBusy": "OCR 作業進行中，完成後即可加入"
   },
   "preview": {
     "canApplyDesc": "這次操作可套用。請確認變更後再寫入檔案",

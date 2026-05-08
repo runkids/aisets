@@ -35,6 +35,14 @@ export function projectScanIntentDescription(
   return t(`projectIntent.${intent || "code"}.description`);
 }
 
+export function intentSelectOptions(t: TFunction) {
+  return projectScanIntents.map((intent) => ({
+    value: intent,
+    label: projectScanIntentLabel(t, intent),
+    description: projectScanIntentDescription(t, intent),
+  }));
+}
+
 export function usageClassification(item: AssetItem) {
   if (item.usageClassification) return item.usageClassification;
   return item.usedBy.length > 0 ? "referenced" : "unused";

@@ -426,12 +426,18 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 }
 
 func (s *Server) analysisIncomplete(summary config.CatalogSummary) bool {
+	projects := s.store.Projects()
+	if len(projects) > 0 {
+		if match, err := s.store.ScanProjectIntentsMatch(summary.ScanID, projects); err == nil && !match {
+			return true
+		}
+	}
 	settings, err := s.store.Settings()
 	if err != nil {
 		return false
 	}
 	a := summary.Analysis
-	options := scanner.IntentAdjustedOptions(toScannerProjects(s.store.Projects()), scanner.ScanOptions{
+	options := scanner.IntentAdjustedOptions(toScannerProjects(projects), scanner.ScanOptions{
 		Profile:         settings.ScanProfile,
 		Analyses:        settings.ScanAnalyses,
 		ExcludePatterns: settings.ExcludePatterns,

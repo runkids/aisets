@@ -1,28 +1,43 @@
 import {
   AlertTriangle,
+  CheckCircle2,
   ChevronLeft,
   Folder,
   FolderOpen,
+  FolderRoot,
   HardDrive,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { detectProjectScanIntent } from "../api";
 import { errorMessage } from "../i18n/index";
 import {
+  intentSelectOptions,
   normalizeProjectScanIntent,
   projectScanIntentDescription,
   projectScanIntentLabel,
-  projectScanIntents,
 } from "../projectScanIntent";
 import { useDirectoryListingQuery } from "../queries";
 import type { ProjectScanIntent, ProjectScanIntentDetection } from "../types";
-import { Button, EmptyState, Modal, Select, TextInput } from "./ui";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Modal,
+  Select,
+  TextInput,
+  Tooltip,
+} from "./ui";
+
+const dirRowClass =
+  "grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3";
 
 type Props = {
   open: boolean;
   working: boolean;
+  disabledReason?: string;
   initialPath?: string;
   onClose: () => void;
   onSelect: (path: string, scanIntent: ProjectScanIntent) => void;
@@ -31,6 +46,7 @@ type Props = {
 export function DirectoryPickerModal({
   open,
   working,
+  disabledReason,
   initialPath = "",
   onClose,
   onSelect,
@@ -52,15 +68,7 @@ export function DirectoryPickerModal({
     ? errorMessage(listingQuery.error)
     : "";
 
-  const intentOptions = useMemo(
-    () =>
-      projectScanIntents.map((intent) => ({
-        value: intent,
-        label: projectScanIntentLabel(t, intent),
-        description: projectScanIntentDescription(t, intent),
-      })),
-    [t],
-  );
+  const intentOptions = useMemo(() => intentSelectOptions(t), [t]);
 
   useEffect(() => {
     if (!open || !listing?.path) return;
@@ -130,20 +138,36 @@ export function DirectoryPickerModal({
       bodyClassName="flex flex-col overflow-hidden"
       footer={
         <>
-          <div className="min-w-0 truncate text-g-body text-g-ink-4">
-            {currentPath || t("directoryPicker.defaultDir")}
+          <div className="flex min-w-0 items-center gap-1.5 text-g-ink-4">
+            <FolderRoot size={14} className="shrink-0" aria-hidden="true" />
+            <code className="min-w-0 truncate bg-transparent p-0 font-g-mono text-[11px] tracking-g-mono">
+              {currentPath || t("directoryPicker.defaultDir")}
+            </code>
           </div>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex shrink-0 gap-2">
             <Button variant="secondary" onClick={resetAndClose}>
               {t("common.cancel")}
             </Button>
-            <Button
-              variant="primary"
-              disabled={!listing?.path || working}
-              onClick={selectCurrent}
-            >
-              {t("directoryPicker.addDir")}
-            </Button>
+            <Tooltip label={disabledReason} disabled={!disabledReason}>
+              <span className="inline-flex">
+                <Button
+                  variant="primary"
+                  disabled={!listing?.path || working || !!disabledReason}
+                  onClick={selectCurrent}
+                >
+                  {working && (
+                    <Loader2
+                      size={14}
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {working
+                    ? t("directoryPicker.adding")
+                    : t("directoryPicker.addDir")}
+                </Button>
+              </span>
+            </Tooltip>
           </div>
         </>
       }
@@ -191,21 +215,32 @@ export function DirectoryPickerModal({
                   {t("directoryPicker.detectingIntent")}
                 </span>
               ) : detection ? (
-                <span>
-                  {t("directoryPicker.detectedIntent", {
-                    intent: projectScanIntentLabel(
+                <span className="inline-flex items-center gap-1.5">
+                  <Badge tone="green" className="gap-1">
+                    <CheckCircle2 size={10} aria-hidden="true" />
+                    {t("directoryPicker.detectedIntent", {
+                      intent: projectScanIntentLabel(
+                        t,
+                        normalizeProjectScanIntent(
+                          detection.suggestedScanIntent,
+                        ),
+                      ),
+                    })}
+                  </Badge>
+                  <span className="text-g-ink-4">
+                    {projectScanIntentDescription(
                       t,
                       normalizeProjectScanIntent(detection.suggestedScanIntent),
-                    ),
-                  })}
-                  {" · "}
-                  {projectScanIntentDescription(
-                    t,
-                    normalizeProjectScanIntent(detection.suggestedScanIntent),
-                  )}
+                    )}
+                  </span>
                 </span>
               ) : detectionError ? (
-                <span>{t("directoryPicker.detectIntentFailed")}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Badge tone="amber" className="gap-1">
+                    <AlertTriangle size={10} aria-hidden="true" />
+                    {t("directoryPicker.detectIntentFailed")}
+                  </Badge>
+                </span>
               ) : (
                 <span>{projectScanIntentDescription(t, scanIntent)}</span>
               )}
@@ -225,16 +260,27 @@ export function DirectoryPickerModal({
               icon={<AlertTriangle size={22} />}
               title={t("directoryPicker.loadError")}
               description={directoryError}
+              tone="warning"
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => listingQuery.refetch()}
+                >
+                  <RefreshCw size={14} aria-hidden="true" />
+                  {t("common.retry")}
+                </Button>
+              }
             />
           ) : listing ? (
             <div
-              className="flex flex-col gap-0.5 p-1.5 overflow-y-auto flex-1"
+              className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-1.5"
               role="list"
             >
               {listing.parent && (
                 <button
                   type="button"
-                  className="grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3"
+                  className={dirRowClass}
                   onClick={() => go(listing.parent)}
                 >
                   <ChevronLeft size={18} />
@@ -246,7 +292,7 @@ export function DirectoryPickerModal({
                 <button
                   key={dir.path}
                   type="button"
-                  className="grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3"
+                  className={dirRowClass}
                   onClick={() => go(dir.path)}
                 >
                   <Folder size={18} />

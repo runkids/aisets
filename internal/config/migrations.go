@@ -71,6 +71,12 @@ func (s *Store) migrate() error {
 			near_duplicates INTEGER NOT NULL DEFAULT 0,
 			cache_hits INTEGER NOT NULL DEFAULT 0
 		)`,
+		`CREATE TABLE IF NOT EXISTS scan_project_snapshots (
+			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+			project_id TEXT NOT NULL,
+			scan_intent TEXT NOT NULL DEFAULT 'code',
+			PRIMARY KEY (scan_id, project_id)
+		)`,
 		`CREATE TABLE IF NOT EXISTS asset_snapshots (
 			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
 			asset_id TEXT NOT NULL,
@@ -224,6 +230,7 @@ func (s *Store) migrate() error {
 			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, engine_name, engine_version, settings_hash)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_scans_completed_at ON scans(completed_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_scan_project_snapshots_scan ON scan_project_snapshots(scan_id, project_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_project_path ON asset_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_hash ON asset_snapshots(hash_algorithm, content_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,

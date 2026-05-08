@@ -154,7 +154,7 @@ func TestMergeAndDeleteApply(t *testing.T) {
 		t.Fatalf("updated content = %s", content)
 	}
 
-	unused := scanner.AssetItem{ProjectID: root, RepoPath: "src/a.png"}
+	unused := scanner.AssetItem{ProjectID: root, RepoPath: "src/a.png", UsageClassification: scanner.UsageUnused, DeleteUnusedAllowed: true}
 	deletePreview := DeleteUnusedPreview(unused)
 	result, err = Apply(project, deletePreview)
 	if err != nil {
@@ -165,10 +165,72 @@ func TestMergeAndDeleteApply(t *testing.T) {
 	}
 }
 
-func TestDeleteUnusedPreviewKeepsUsedAssetsBlocked(t *testing.T) {
-	preview := DeleteUnusedPreview(scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", UsedBy: []string{"src/App.tsx"}})
-	if preview.CanApply || len(preview.Deletes) != 1 || preview.Type != "delete-unused" {
-		t.Fatalf("delete preview = %#v", preview)
+func TestDeleteUnusedPreviewPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		item        scanner.AssetItem
+		canApply    bool
+		blockerCode string
+	}{
+		{
+			name: "asset pack is blocked",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "icons/a.png", ScanIntent: scanner.ProjectScanIntentAssetPack,
+				UsageClassification: scanner.UsageNotApplicable, LintApplicability: scanner.LintNotApplicable},
+			blockerCode: "delete_unused_requires_supported_references",
+		},
+		{
+			name: "library advisory is blocked",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", ScanIntent: scanner.ProjectScanIntentLibrary,
+				UsageClassification: scanner.UsagePossiblyUnused, LintApplicability: scanner.LintAdvisory},
+			blockerCode: "delete_unused_requires_supported_references",
+		},
+		{
+			name: "mixed advisory is blocked",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", ScanIntent: scanner.ProjectScanIntentMixed,
+				UsageClassification: scanner.UsagePossiblyUnused, LintApplicability: scanner.LintAdvisory},
+			blockerCode: "delete_unused_requires_supported_references",
+		},
+		{
+			name: "partial coverage code is blocked",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", ScanIntent: scanner.ProjectScanIntentCode,
+				UsageClassification: scanner.UsagePossiblyUnused, LintApplicability: scanner.LintAdvisory},
+			blockerCode: "delete_unused_requires_supported_references",
+		},
+		{
+			name:        "legacy missing classification is blocked",
+			item:        scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png"},
+			blockerCode: "delete_unused_requires_supported_references",
+		},
+		{
+			name: "referenced asset is blocked",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", UsageClassification: scanner.UsageReferenced,
+				UsedBy: []string{"src/App.tsx"}},
+			blockerCode: "asset_still_referenced",
+		},
+		{
+			name: "supported code unused is allowed",
+			item: scanner.AssetItem{ProjectID: "p", RepoPath: "src/a.png", ScanIntent: scanner.ProjectScanIntentCode,
+				UsageClassification: scanner.UsageUnused, DeleteUnusedAllowed: true, LintApplicability: scanner.LintApplicable},
+			canApply: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preview := DeleteUnusedPreview(tt.item)
+			if preview.CanApply != tt.canApply || len(preview.Deletes) != 1 || preview.Type != "delete-unused" {
+				t.Fatalf("delete preview = %#v", preview)
+			}
+			if tt.blockerCode == "" {
+				if len(preview.Blockers) != 0 {
+					t.Fatalf("blockers = %#v", preview.Blockers)
+				}
+				return
+			}
+			if len(preview.Blockers) != 1 || preview.Blockers[0].Code != tt.blockerCode {
+				t.Fatalf("blockers = %#v, want %s", preview.Blockers, tt.blockerCode)
+			}
+		})
 	}
 }
 

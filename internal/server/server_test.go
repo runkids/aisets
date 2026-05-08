@@ -168,6 +168,123 @@ func TestProjectScanIntentAPIs(t *testing.T) {
 	}
 }
 
+func TestDeleteUnusedPreviewRouteUsesPersistedPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		intent      scanner.ProjectScanIntent
+		writeCode   bool
+		canApply    bool
+		blockerCode string
+	}{
+		{name: "asset pack blocked", intent: scanner.ProjectScanIntentAssetPack, blockerCode: "delete_unused_requires_supported_references"},
+		{name: "supported code allowed", intent: scanner.ProjectScanIntentCode, writeCode: true, canApply: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+			t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+			project := filepath.Join(root, "project")
+			writePNG(t, filepath.Join(project, "src", "logo.png"))
+			if tt.writeCode {
+				mustWrite(t, filepath.Join(project, "src", "App.tsx"), `export function App() { return null }`)
+			}
+			store, err := config.OpenStore()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			if err := store.AddProjectsWithIntent([]string{project}, tt.intent); err != nil {
+				t.Fatal(err)
+			}
+			s, err := New(Options{Store: store, Version: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			assetID := catalogAssetID(t, s)
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/api/actions/delete-unused/preview", strings.NewReader(`{"assetId":"`+assetID+`"}`))
+			s.handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("delete preview = %d %s", rec.Code, rec.Body.String())
+			}
+			var body struct {
+				Preview struct {
+					CanApply bool `json:"canApply"`
+					Blockers []struct {
+						Code string `json:"code"`
+					} `json:"blockers"`
+				} `json:"preview"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Preview.CanApply != tt.canApply {
+				t.Fatalf("canApply = %v, want %v; body = %s", body.Preview.CanApply, tt.canApply, rec.Body.String())
+			}
+			if tt.blockerCode != "" && (len(body.Preview.Blockers) != 1 || body.Preview.Blockers[0].Code != tt.blockerCode) {
+				t.Fatalf("blockers = %#v, want %s", body.Preview.Blockers, tt.blockerCode)
+			}
+		})
+	}
+}
+
+func TestCatalogRescansWhenScanIntentSnapshotIsStale(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "empty-project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjectsWithIntent([]string{project}, scanner.ProjectScanIntentCode); err != nil {
+		t.Fatal(err)
+	}
+	projects := store.Projects()
+	oldScanID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects: []scanner.Project{{
+			ID:         projects[0].ID,
+			Name:       projects[0].Name,
+			Path:       projects[0].Path,
+			ScanIntent: scanner.ProjectScanIntentCode,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RenameProject(projects[0].ID, projects[0].Name, "", scanner.ProjectScanIntentAssetPack); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+	}
+	var summary struct {
+		ScanID int64 `json:"scanId"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.ScanID <= oldScanID {
+		t.Fatalf("scanID = %d, want newer than stale scan %d", summary.ScanID, oldScanID)
+	}
+}
+
 func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
@@ -343,23 +460,31 @@ func TestCatalogLintRouteFiltersByProject(t *testing.T) {
 func serverScanAsset(root, repoPath string, bytes int64, hash string, usedCount int) scanner.AssetItem {
 	usedBy := make([]string, 0, usedCount)
 	refs := make([]scanner.AssetReference, 0, usedCount)
+	usage := scanner.UsageUnused
+	deleteAllowed := true
+	if usedCount > 0 {
+		usage = scanner.UsageReferenced
+		deleteAllowed = false
+	}
 	for i := 0; i < usedCount; i++ {
 		usedBy = append(usedBy, "src/App.tsx")
 		refs = append(refs, scanner.AssetReference{File: "src/App.tsx", Line: i + 1, Specifier: repoPath, Kind: "string"})
 	}
 	return scanner.AssetItem{
-		ID:            "p:" + repoPath,
-		ProjectID:     "p",
-		ProjectName:   "fixture",
-		RepoPath:      repoPath,
-		LocalPath:     filepath.Join(root, repoPath),
-		Ext:           filepath.Ext(repoPath),
-		Bytes:         bytes,
-		ContentHash:   hash,
-		HashAlgorithm: "blake3",
-		Image:         imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
-		UsedBy:        usedBy,
-		References:    refs,
+		ID:                  "p:" + repoPath,
+		ProjectID:           "p",
+		ProjectName:         "fixture",
+		RepoPath:            repoPath,
+		LocalPath:           filepath.Join(root, repoPath),
+		Ext:                 filepath.Ext(repoPath),
+		Bytes:               bytes,
+		ContentHash:         hash,
+		HashAlgorithm:       "blake3",
+		Image:               imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
+		UsedBy:              usedBy,
+		References:          refs,
+		UsageClassification: usage,
+		DeleteUnusedAllowed: deleteAllowed,
 	}
 }
 

@@ -751,7 +751,12 @@ export function App() {
       {directoryPickerOpen && (
         <DirectoryPickerModal
           open={directoryPickerOpen}
-          working={addProjectMutation.isPending || ocrActivityBusy}
+          working={addProjectMutation.isPending}
+          disabledReason={
+            ocrActivityBusy
+              ? t("directoryPicker.addDisabledOcrBusy")
+              : undefined
+          }
           initialPath={directoryPickerInitialPath}
           onClose={() => setDirectoryPickerOpen(false)}
           onSelect={onAddProject}

@@ -95,6 +95,22 @@ func TestScanLibraryMarksZeroReferenceAssetsAdvisory(t *testing.T) {
 	}
 }
 
+func TestProjectReferenceCoverageRequiresFrontendSignals(t *testing.T) {
+	frontend := t.TempDir()
+	mustWrite(t, filepath.Join(frontend, "src", "App.tsx"), `export function App() { return null }`)
+	if got := ProjectReferenceCoverage(context.Background(), Project{ID: "frontend", Path: frontend, ScanIntent: ProjectScanIntentCode}, nil); got != ReferenceCoverageSupported {
+		t.Fatalf("frontend coverage = %s, want %s", got, ReferenceCoverageSupported)
+	}
+
+	backendTemplates := t.TempDir()
+	mustWrite(t, filepath.Join(backendTemplates, "go.mod"), "module fixture\n")
+	mustWrite(t, filepath.Join(backendTemplates, "templates", "index.html"), `<img src="/logo.png">`)
+	mustWrite(t, filepath.Join(backendTemplates, "templates", "app.js"), `console.log("fixture")`)
+	if got := ProjectReferenceCoverage(context.Background(), Project{ID: "backend", Path: backendTemplates, ScanIntent: ProjectScanIntentCode}, nil); got != ReferenceCoveragePartial {
+		t.Fatalf("backend template coverage = %s, want %s", got, ReferenceCoveragePartial)
+	}
+}
+
 func TestScanMarksVitePublicAbsoluteReferencesUsed(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "ui", "public", "favicon.png"), solidImage(2, 2, color.White))

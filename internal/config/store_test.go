@@ -651,6 +651,55 @@ func TestCatalogLintFiltersByProjectID(t *testing.T) {
 	}
 }
 
+func TestScanProjectIntentsMatchIncludesEmptyProjects(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	projectPath := filepath.Join(root, "empty-project")
+	if err := os.Mkdir(projectPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddProjectsWithIntent([]string{projectPath}, scanner.ProjectScanIntentCode); err != nil {
+		t.Fatal(err)
+	}
+	projects := store.Projects()
+	scanID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects: []scanner.Project{{
+			ID:         projects[0].ID,
+			Name:       projects[0].Name,
+			Path:       projects[0].Path,
+			ScanIntent: scanner.ProjectScanIntentCode,
+		}},
+		Stats: scanner.CatalogStats{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	match, err := store.ScanProjectIntentsMatch(scanID, projects)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !match {
+		t.Fatal("scan project intents did not match recorded code intent")
+	}
+	if err := store.RenameProject(projects[0].ID, projects[0].Name, "", scanner.ProjectScanIntentAssetPack); err != nil {
+		t.Fatal(err)
+	}
+	match, err = store.ScanProjectIntentsMatch(scanID, store.Projects())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if match {
+		t.Fatal("scan project intents matched after intent changed")
+	}
+}
+
 func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -1193,25 +1242,33 @@ func TestExportImportAndResetData(t *testing.T) {
 func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash string, usedCount int, savings int64) scanner.AssetItem {
 	usedBy := make([]string, 0, usedCount)
 	refs := make([]scanner.AssetReference, 0, usedCount)
+	usage := scanner.UsageUnused
+	deleteAllowed := true
+	if usedCount > 0 {
+		usage = scanner.UsageReferenced
+		deleteAllowed = false
+	}
 	for i := 0; i < usedCount; i++ {
 		file := "src/ref.tsx"
 		usedBy = append(usedBy, file)
 		refs = append(refs, scanner.AssetReference{File: file, Line: i + 1, Specifier: repoPath, Kind: "string"})
 	}
 	return scanner.AssetItem{
-		ID:            projectID + ":" + repoPath,
-		ProjectID:     projectID,
-		ProjectName:   projectName,
-		RepoPath:      repoPath,
-		LocalPath:     filepath.Join(root, repoPath),
-		Ext:           filepath.Ext(repoPath),
-		Bytes:         bytes,
-		ModifiedUnix:  bytes,
-		ContentHash:   hash,
-		HashAlgorithm: "blake3",
-		Image:         imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
-		UsedBy:        usedBy,
-		References:    refs,
+		ID:                  projectID + ":" + repoPath,
+		ProjectID:           projectID,
+		ProjectName:         projectName,
+		RepoPath:            repoPath,
+		LocalPath:           filepath.Join(root, repoPath),
+		Ext:                 filepath.Ext(repoPath),
+		Bytes:               bytes,
+		ModifiedUnix:        bytes,
+		ContentHash:         hash,
+		HashAlgorithm:       "blake3",
+		Image:               imageproc.Metadata{Format: strings.TrimPrefix(filepath.Ext(repoPath), "."), Width: 1, Height: 1, Pages: 1},
+		UsedBy:              usedBy,
+		References:          refs,
+		UsageClassification: usage,
+		DeleteUnusedAllowed: deleteAllowed,
 		Optimization: []scanner.OptimizationSuggestion{{
 			Category:       "size",
 			Severity:       "warning",

@@ -25,6 +25,7 @@ type CatalogProjectStats struct {
 	UsageNotApplicableFiles int    `json:"usageNotApplicableFiles"`
 	ReferencedFiles         int    `json:"referencedFiles"`
 	DuplicateFiles          int    `json:"duplicateFiles"`
+	DuplicateGroups         int    `json:"duplicateGroups"`
 	OptimizableFiles        int    `json:"optimizableFiles"`
 	LintFindings            int    `json:"lintFindings"`
 }

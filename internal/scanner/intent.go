@@ -74,14 +74,27 @@ func projectLintApplicability(coverage ReferenceCoverage, intent ProjectScanInte
 	return LintAdvisory
 }
 
-var supportedReferenceExts = map[string]bool{
+var frontendReferenceManifestNames = map[string]bool{
+	"angular.json": true, "astro.config.js": true, "astro.config.mjs": true, "astro.config.ts": true,
+	"next.config.js": true, "next.config.ts": true, "nuxt.config.js": true, "nuxt.config.ts": true,
+	"remix.config.js": true, "remix.config.ts": true, "svelte.config.js": true, "svelte.config.ts": true,
+	"vite.config.js": true, "vite.config.ts": true, "vue.config.js": true,
+}
+
+var frontendReferenceExts = map[string]bool{
 	".css": true, ".html": true, ".js": true, ".jsx": true, ".mjs": true,
 	".scss": true, ".ts": true, ".tsx": true, ".vue": true,
 }
 
+var frontendComponentExts = map[string]bool{
+	".jsx": true, ".tsx": true, ".vue": true, ".svelte": true,
+}
+
 func hasSupportedReferenceSignals(ctx context.Context, root string, excludePatterns []string) bool {
 	seen := 0
-	found := false
+	frontendManifest := false
+	frontendSource := false
+	frontendComponent := false
 	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -107,13 +120,23 @@ func hasSupportedReferenceSignals(ctx context.Context, root string, excludePatte
 		if matchesAnyExcludePattern(excludePatterns, repoPath) {
 			return nil
 		}
-		if supportedReferenceExts[strings.ToLower(filepath.Ext(path))] {
-			found = true
+		name := strings.ToLower(entry.Name())
+		if frontendReferenceManifestNames[name] {
+			frontendManifest = true
+		}
+		ext := strings.ToLower(filepath.Ext(path))
+		if frontendReferenceExts[ext] {
+			frontendSource = true
+		}
+		if frontendComponentExts[ext] {
+			frontendComponent = true
+		}
+		if frontendComponent || (frontendManifest && frontendSource) {
 			return filepath.SkipAll
 		}
 		return nil
 	})
-	return found
+	return frontendComponent || (frontendManifest && frontendSource)
 }
 
 func matchesAnyExcludePattern(patterns []string, repoPath string) bool {

@@ -67,6 +67,39 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 	}, nil
 }
 
+func (s *Store) ScanProjectIntentsMatch(scanID int64, projects []Project) (bool, error) {
+	rows, err := s.db.Query(`
+		SELECT project_id, scan_intent
+		FROM scan_project_snapshots
+		WHERE scan_id = ?
+	`, scanID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	intents := map[string]scanner.ProjectScanIntent{}
+	for rows.Next() {
+		var projectID string
+		var intent scanner.ProjectScanIntent
+		if err := rows.Scan(&projectID, &intent); err != nil {
+			return false, err
+		}
+		intents[projectID] = scanner.NormalizeProjectScanIntent(intent)
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	if len(intents) != len(projects) {
+		return false, nil
+	}
+	for _, project := range projects {
+		if intents[project.ID] != scanner.NormalizeProjectScanIntent(project.ScanIntent) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func (s *Store) catalogLintFindingsCount(scanID int64) (int, error) {
 	var count int
 	if err := s.db.QueryRow(`
@@ -113,6 +146,30 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 		stats[stat.ProjectID] = stat
 	}
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	dupGroupRows, err := s.db.Query(`
+		SELECT project_id, COUNT(DISTINCT group_id)
+		FROM duplicate_group_assets
+		WHERE scan_id = ?
+		GROUP BY project_id
+	`, scanID)
+	if err != nil {
+		return nil, err
+	}
+	defer dupGroupRows.Close()
+	for dupGroupRows.Next() {
+		var projectID string
+		var count int
+		if err := dupGroupRows.Scan(&projectID, &count); err != nil {
+			return nil, err
+		}
+		stat := stats[projectID]
+		stat.ProjectID = projectID
+		stat.DuplicateGroups = count
+		stats[projectID] = stat
+	}
+	if err := dupGroupRows.Err(); err != nil {
 		return nil, err
 	}
 	lintRows, err := s.db.Query(`
