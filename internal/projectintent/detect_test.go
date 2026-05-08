@@ -23,6 +23,19 @@ func TestDetectAssetPack(t *testing.T) {
 	}
 }
 
+func TestDetectHonorsPlainFilenameExcludePattern(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "icons", "asset-studio-logo.png"), "png")
+
+	detection, err := Detect(context.Background(), root, []string{"asset-studio-logo.png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.Counts.SampledFiles != 0 || detection.SuggestedScanIntent != SuggestedScanIntentUnknown {
+		t.Fatalf("detection = %#v, want excluded file to be ignored", detection)
+	}
+}
+
 func TestDetectFrontendCodeProject(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "package.json"), `{"dependencies":{"vite":"latest"}}`)

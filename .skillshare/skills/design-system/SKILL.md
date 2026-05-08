@@ -197,6 +197,13 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Facets match the view's unit** | DuplicatesView shows groups → facets must count groups (from duplicates API), not files (from items API). Use `project_name` not `project_id` for display. |
 | **Query key normalizers** | Adding a filter param to `CatalogXxxParams` → also add it to `normalizeCatalogXxxParams` in `queries.ts`. Omitting it means the React Query cache key won't change, silently returning stale data. |
 | **Cross-filter facets** | FilterRail facets use cross-filter: project facets computed with ext filter (project cleared), vice versa. Backend facet function accepts both params, clears the "self" dimension. |
+| **Toolbar controls: 32px height** | All toolbar filter controls — TextInput, Tabs, Select — use `h-g-btn-md` (32px). TextInput uses `variant="search"`. Never use custom styled buttons for filters — use the project's `Tabs` or `SegmentedControl` components. |
+| **FilterRail on every data view** | Every data-heavy page (Browse, Duplicates, Lint) must have a `Rail` + `RailSection` + `RailItem` sidebar. Use the existing `FilterRail` component or compose from Rail primitives. Each rail filter must trigger an API re-fetch (server-side), not client-side filtering. |
+| **FilterRail labels must be translated** | RailItem labels for machine IDs (ruleId, status codes) must use `t(\`ns.${id}.name\`, { defaultValue: id })`. Never display raw kebab-case IDs to users. |
+| **Fragment pattern for FilterRail views** | Views with a FilterRail sidebar render as `<> <Rail/> <div content-scroll/> </>`. App.tsx must NOT wrap them in the shared scroll div — move them to a separate branch like DuplicatesView. |
+| **Virtualizer: call `measure()` on collapse** | When collapsible groups change the virtual row count, cached `estimateSize` results become stale (old finding sizes applied to header indices). Call `virtualizer.measure()` via `useEffect` keyed on row count + collapsed size to force re-estimation. |
+| **Sticky toolbar: translucent backdrop** | Sticky toolbars use `bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px]` — not opaque `bg-g-canvas`. Match the BrowseToolbar pattern. |
+| **i18n: extract args from English fallback** | When backend embeds dynamic values (KB, paths) in message strings but doesn't persist structured args, use a frontend `extractArgs(finding)` helper with regex to parse values from the English message before passing to `t()`. |
 
 ---
 

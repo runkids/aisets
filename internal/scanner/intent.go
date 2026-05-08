@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"asset-studio/internal/references"
 )
 
 func NormalizeProjectScanIntent(intent ProjectScanIntent) ProjectScanIntent {
@@ -125,7 +127,7 @@ func hasSupportedReferenceSignals(ctx context.Context, root string, excludePatte
 			return nil
 		}
 		repoPath = filepath.ToSlash(repoPath)
-		if matchesAnyExcludePattern(excludePatterns, repoPath) {
+		if references.MatchesAnyExcludePattern(excludePatterns, repoPath) {
 			return nil
 		}
 		name := strings.ToLower(entry.Name())
@@ -145,25 +147,4 @@ func hasSupportedReferenceSignals(ctx context.Context, root string, excludePatte
 		return nil
 	})
 	return frontendComponent || (frontendManifest && frontendSource)
-}
-
-func matchesAnyExcludePattern(patterns []string, repoPath string) bool {
-	for _, pattern := range patterns {
-		if pattern == "" {
-			continue
-		}
-		if ok, _ := filepath.Match(pattern, repoPath); ok {
-			return true
-		}
-		if strings.HasPrefix(pattern, "**/") {
-			if ok, _ := filepath.Match(strings.TrimPrefix(pattern, "**/"), filepath.Base(repoPath)); ok {
-				return true
-			}
-		}
-		prefix := strings.TrimSuffix(pattern, "/**")
-		if prefix != pattern && strings.HasPrefix(repoPath, prefix+"/") {
-			return true
-		}
-	}
-	return false
 }

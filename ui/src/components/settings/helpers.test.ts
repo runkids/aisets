@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { draftFromSettings, updateFromDraft } from "./helpers";
+import {
+  draftFromSettings,
+  resetSectionDraft,
+  updateFromDraft,
+} from "./helpers";
 
 describe("settings draft helpers", () => {
   it("round-trips global and project-type exclude patterns", () => {
@@ -64,5 +68,96 @@ describe("settings draft helpers", () => {
       library: ["fixtures/**"],
       mixed: ["tmp/**"],
     });
+  });
+
+  it("resets section drafts to product defaults instead of saved values", () => {
+    const draft = draftFromSettings({
+      workspaceName: "Custom Workspace",
+      activeWorkspaceId: "default",
+      defaultProjectRoot: "/tmp/assets",
+      autoScanOnOpen: true,
+      scanOnOpen: true,
+      scanProfile: "fast",
+      scanAnalyses: {
+        references: false,
+        nearDuplicates: false,
+        optimization: false,
+      },
+      ocrEnabled: true,
+      ocrLanguages: ["eng", "chi_tra"],
+      ocrMaxPixels: 999,
+      ocrBatchSize: 9,
+      ocrConcurrency: 2,
+      ocrFuzzySearch: false,
+      excludePatterns: ["asset-studio-logo.png"],
+      excludePatternsByIntent: {
+        code: ["custom-code/**"],
+        assetPack: ["custom-assets/**"],
+        library: ["custom-library/**"],
+        mixed: ["custom-mixed/**"],
+      },
+      optimizationDefaultQuality: 42,
+      optimizationAutoApply: true,
+      optimizationThresholds: {
+        svgMinSavingsPercent: 25,
+        maxDimensionPx: 1024,
+        fileSizeWarningKB: 10,
+        fileSizeCriticalKB: 20,
+        pngAlphaCheckEnabled: false,
+      },
+      customAssetFilters: [
+        {
+          id: "custom",
+          name: "Custom",
+          enabled: true,
+          groups: [
+            {
+              clauses: [{ field: "path", operator: "contains", value: "logo" }],
+            },
+          ],
+        },
+      ],
+      preferredEditor: "vscode",
+      workspaces: [],
+      projects: [],
+      databasePath: "/tmp/asset-studio.db",
+      dataDir: "/tmp/data",
+      cacheDir: "/tmp/cache",
+      ocrRuntime: {
+        availableLanguages: [],
+        installed: false,
+        dataDir: "/tmp/ocr",
+        engineName: "",
+        engineVersion: "",
+        engineAvailable: false,
+      },
+    });
+
+    const workspace = resetSectionDraft(draft, "workspace");
+    expect(workspace.workspaceName).toBe("Asset Studio");
+    expect(workspace.defaultProjectRoot).toBe("");
+
+    const scanning = resetSectionDraft(draft, "scanning");
+    expect(scanning.scanProfile).toBe("full");
+    expect(scanning.excludePatternsText).toBe("");
+    expect(scanning.excludePatternsByIntentText.code).toContain("**/*.test.*");
+    expect(scanning.excludePatternsByIntentText.assetPack).toBe("");
+    expect(scanning.ocrEnabled).toBe(true);
+    expect(scanning.ocrLanguages).toEqual(["eng", "chi_tra"]);
+
+    const ocr = resetSectionDraft(draft, "ocr");
+    expect(ocr.ocrEnabled).toBe(false);
+    expect(ocr.ocrLanguages).toEqual(["eng"]);
+    expect(ocr.ocrMaxPixels).toBe(2_000_000);
+    expect(ocr.scanProfile).toBe("fast");
+    expect(ocr.excludePatternsText).toBe("asset-studio-logo.png");
+
+    const customFilters = resetSectionDraft(draft, "customFilters");
+    expect(customFilters.customAssetFilters).toEqual([]);
+
+    const optimization = resetSectionDraft(draft, "optimization");
+    expect(optimization.optimizationDefaultQuality).toBe(80);
+    expect(optimization.optimizationAutoApply).toBe(false);
+    expect(optimization.optimizationThresholds.maxDimensionPx).toBe(2560);
   });
 });

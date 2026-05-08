@@ -133,15 +133,26 @@ type CatalogDuplicatesFacets struct {
 }
 
 type CatalogLintQuery struct {
-	ScanID    int64
-	ProjectID string
-	Severity  string
-	Limit     int
-	Cursor    string
+	ScanID      int64
+	ProjectID   string
+	ProjectName string
+	Severity    string
+	RuleID      string
+	Query       string
+	Limit       int
+	Cursor      string
+}
+
+type CatalogLintFacets struct {
+	Projects     []CatalogFacetOption `json:"projects"`
+	ProjectTotal int                  `json:"projectTotal"`
+	Severities   []CatalogFacetOption `json:"severities"`
+	Rules        []CatalogFacetOption `json:"rules"`
 }
 
 type CatalogLintPage struct {
-	Items      []lint.Finding `json:"items"`
-	Total      int            `json:"total"`
-	NextCursor string         `json:"nextCursor,omitempty"`
+	Items      []lint.Finding    `json:"items"`
+	Total      int               `json:"total"`
+	NextCursor string            `json:"nextCursor,omitempty"`
+	Facets     CatalogLintFacets `json:"facets"`
 }

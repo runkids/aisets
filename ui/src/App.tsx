@@ -668,6 +668,14 @@ export function App() {
                 onOpenAsset={setDrawerId}
               />
             )
+          ) : mode === "lint" ? (
+            <LintView
+              scanId={catalogSummary?.scanId}
+              projectFilterId={effectiveSelectedProjectId || undefined}
+              projectFilterName={selectedProject?.name ?? ""}
+              stats={scopedStats}
+              onOpenAsset={setDrawerId}
+            />
           ) : (
             <div
               key={mode}
@@ -698,13 +706,6 @@ export function App() {
                     onOpenAsset={setDrawerId}
                   />
                 )
-              ) : mode === "lint" ? (
-                <LintView
-                  scanId={catalogSummary?.scanId}
-                  projectFilterId={effectiveSelectedProjectId || undefined}
-                  stats={scopedStats}
-                  onOpenAsset={setDrawerId}
-                />
               ) : null}
             </div>
           )}

@@ -190,6 +190,20 @@ func MatchExcludePattern(pattern, repoPath string) bool {
 	if pattern == "" || repoPath == "" {
 		return false
 	}
+	pattern = strings.Trim(pattern, "/")
+	if pattern == "" {
+		return false
+	}
+	if !strings.Contains(pattern, "/") {
+		if ok, _ := filepath.Match(pattern, pathpkg.Base(repoPath)); ok {
+			return true
+		}
+		for _, part := range strings.Split(repoPath, "/") {
+			if part == pattern {
+				return true
+			}
+		}
+	}
 	patternParts := splitPathPattern(pattern)
 	pathParts := splitPathPattern(repoPath)
 	return matchPathParts(patternParts, pathParts)

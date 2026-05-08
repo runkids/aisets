@@ -38,6 +38,7 @@ import {
   StatCard,
   Tabs,
   TextInput,
+  TextInputClearButton,
 } from "./ui";
 import { ComparePanel, useCompareTabs } from "./ComparePanel";
 import { toCompareAsset, type CompareMode } from "./compareTypes";
@@ -649,6 +650,14 @@ export function DuplicatesView({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   icon={<Search size={14} />}
+                  suffix={
+                    search ? (
+                      <TextInputClearButton
+                        label={t("toolbar.clearSearch")}
+                        onClick={() => setSearch("")}
+                      />
+                    ) : undefined
+                  }
                   className="min-w-0 flex-[1_1_180px]"
                 />
               )}

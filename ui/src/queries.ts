@@ -128,7 +128,10 @@ function normalizeCatalogDuplicatesParams(params: CatalogDuplicatesParams) {
 function normalizeCatalogLintParams(params: CatalogLintParams) {
   return {
     projectId: params.projectId ?? "",
+    projectName: params.projectName ?? "",
     severity: params.severity ?? "",
+    ruleId: params.ruleId ?? "",
+    q: params.q ?? "",
     limit: params.limit ?? 100,
   };
 }

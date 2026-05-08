@@ -256,12 +256,13 @@ func TestScanSkipsHeavyDirectories(t *testing.T) {
 func TestScanWithProgressHonorsExcludePatterns(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "src", "assets", "logo.png"), solidImage(2, 2, color.White))
+	writePNG(t, filepath.Join(root, "ui", "public", "brand", "asset-studio-logo.png"), solidImage(2, 2, color.White))
 	writePNG(t, filepath.Join(root, "src", "__mocks__", "mock.png"), solidImage(2, 2, color.Black))
 	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./assets/logo.png"`)
 	mustWrite(t, filepath.Join(root, "src", "views", "BrowseView.test.ts"), `const fixture = "src/assets/logo.png"`)
 
 	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
-	catalog, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, []string{"**/*.test.*", "**/__mocks__/**"}, nil)
+	catalog, err := s.ScanWithProgress(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, []string{"**/*.test.*", "**/__mocks__/**", "asset-studio-logo.png"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -102,6 +102,9 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 	}
 	counts := ocrCounts{}
 	candidates := []scanner.AssetItem{}
+	pendingDuplicates := map[string][]scanner.AssetItem{}
+	inFlightHashes := map[string]struct{}{}
+	readyByHash := map[string]ocr.Result{}
 	workCount := 0
 	hasMore := false
 	for _, rawItem := range catalog.Items {
@@ -142,24 +145,45 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if ok {
 			if shouldRefreshOCRResult(result) {
-				candidates = append(candidates, item)
-				counts.Queued++
-				if !computedHash {
-					workCount++
+				if !queueOCRCandidate(item, computedHash, ocrSettings.BatchSize, &workCount, &hasMore, &counts, &candidates, inFlightHashes, pendingDuplicates) {
+					break
 				}
 				continue
+			}
+			if result.Status == ocr.StatusReady {
+				readyByHash[ocrContentKey(item)] = result
 			}
 			counts.CacheHit++
 			continue
 		}
-		if workCount >= ocrSettings.BatchSize && !computedHash {
-			hasMore = true
-			break
+		key := ocrContentKey(item)
+		if result, ok := readyByHash[key]; ok && !shouldRefreshOCRResult(result) {
+			if err := s.store.UpsertOCRResult(copyOCRResultForItem(result, item)); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
+				return
+			}
+			counts.CacheHit++
+			continue
 		}
-		candidates = append(candidates, item)
-		counts.Queued++
-		if !computedHash {
-			workCount++
+		if result, ok, err := s.store.OCRResultForContentHash(item.ContentHash, item.HashAlgorithm, ocrSettings, s.ocrEngine.Name(), s.ocrEngine.Version()); err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_cache_failed")})
+			return
+		} else if ok && !shouldRefreshOCRResult(result) {
+			if err := s.store.UpsertOCRResult(copyOCRResultForItem(result, item)); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
+				return
+			}
+			readyByHash[key] = result
+			counts.CacheHit++
+			continue
+		}
+		if _, ok := inFlightHashes[key]; ok {
+			pendingDuplicates[key] = append(pendingDuplicates[key], item)
+			counts.CacheHit++
+			continue
+		}
+		if !queueOCRCandidate(item, computedHash, ocrSettings.BatchSize, &workCount, &hasMore, &counts, &candidates, inFlightHashes, pendingDuplicates) {
+			break
 		}
 	}
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
@@ -211,6 +235,12 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
 			return
 		}
+		for _, duplicate := range pendingDuplicates[ocrContentKey(work.item)] {
+			if err := s.store.UpsertOCRResult(copyOCRResultForItem(result, duplicate)); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
+				return
+			}
+		}
 		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": result.Status, "counts": counts})
 	}
 	if err := r.Context().Err(); err != nil {
@@ -218,6 +248,36 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts, "hasMore": hasMore})
+}
+
+func queueOCRCandidate(
+	item scanner.AssetItem,
+	hashComputed bool,
+	batchSize int,
+	workCount *int,
+	hasMore *bool,
+	counts *ocrCounts,
+	candidates *[]scanner.AssetItem,
+	inFlightHashes map[string]struct{},
+	pendingDuplicates map[string][]scanner.AssetItem,
+) bool {
+	key := ocrContentKey(item)
+	if _, ok := inFlightHashes[key]; ok {
+		pendingDuplicates[key] = append(pendingDuplicates[key], item)
+		counts.CacheHit++
+		return true
+	}
+	if *workCount >= batchSize && !hashComputed {
+		*hasMore = true
+		return false
+	}
+	*candidates = append(*candidates, item)
+	counts.Queued++
+	inFlightHashes[key] = struct{}{}
+	if !hashComputed {
+		(*workCount)++
+	}
+	return true
 }
 
 func (s *Server) extractOCRResult(ctx context.Context, item scanner.AssetItem, installed []string, ocrSettings ocr.Settings) ocr.Result {
@@ -253,6 +313,23 @@ func (s *Server) extractOCRResult(ctx context.Context, item scanner.AssetItem, i
 		}
 		result.ErrorMessage = err.Error()
 	}
+	return result
+}
+
+func ocrContentKey(item scanner.AssetItem) string {
+	if item.ContentHash == "" || item.HashAlgorithm == "" {
+		return ""
+	}
+	return item.HashAlgorithm + "\x00" + item.ContentHash
+}
+
+func copyOCRResultForItem(result ocr.Result, item scanner.AssetItem) ocr.Result {
+	result.ProjectID = item.ProjectID
+	result.RepoPath = item.RepoPath
+	result.ContentHash = item.ContentHash
+	result.HashAlgorithm = item.HashAlgorithm
+	result.UpdatedAt = ""
+	ocr.FinalizeResult(&result)
 	return result
 }
 

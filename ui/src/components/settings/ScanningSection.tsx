@@ -49,7 +49,8 @@ type ScanningSectionProps = {
   ocrRuntimeEngineError: string;
   updatePending: boolean;
   updateError: Error | null;
-  settingActions: ReactNode;
+  catalogActions: ReactNode;
+  ocrActions: ReactNode;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
   onInstallOCR: () => void;
   onRemoveOCR: () => void;
@@ -78,7 +79,8 @@ export function ScanningSection({
   ocrRuntimeEngineError,
   updatePending,
   updateError,
-  settingActions,
+  catalogActions,
+  ocrActions,
   onUpdateDraft,
   onInstallOCR,
   onRemoveOCR,
@@ -239,13 +241,6 @@ export function ScanningSection({
                           },
                     );
                   }}
-                  placeholder={
-                    excludeScope === "global"
-                      ? "node_modules\n.git\ndist/**"
-                      : excludeScope === "assetPack"
-                        ? ""
-                        : "**/*.test.*\n**/*.spec.*\n**/*.stories.*"
-                  }
                   rows={6}
                   className="w-full"
                   textareaClassName="min-h-36 font-g-mono text-g-ui tracking-g-mono"
@@ -262,7 +257,7 @@ export function ScanningSection({
             {updateError && (
               <Notice tone="danger">{errorMessage(updateError)}</Notice>
             )}
-            {settingActions}
+            {catalogActions}
           </div>
         </Card>
         <Card
@@ -458,7 +453,7 @@ export function ScanningSection({
             {updateError && (
               <Notice tone="danger">{errorMessage(updateError)}</Notice>
             )}
-            {settingActions}
+            {ocrActions}
           </div>
         </Card>
       </div>

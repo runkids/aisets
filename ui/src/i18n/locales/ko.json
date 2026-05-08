@@ -128,7 +128,9 @@
     "noResults": "결과 없음",
     "none": "(없음)",
     "retry": "다시 시도",
-    "yes": "예"
+    "yes": "예",
+    "expand": "펼치기",
+    "collapse": "접기"
   },
   "status": {
     "scanning": "스캔 중",
@@ -413,7 +415,18 @@
     "description": "성능 또는 접근성에 영향을 줄 수 있는 코드 수준 사용 패턴.",
     "searchPlaceholder": "파일 또는 규칙으로 필터...",
     "empty": "현재 필터와 일치하는 lint 발견이 없습니다.",
-    "emptyDesc": "검색 조건 또는 심각도 필터를 조정해 보세요."
+    "emptyDesc": "검색 조건 또는 심각도 필터를 조정해 보세요.",
+    "statTotal": "전체 발견",
+    "healthBar": "Lint 심각도 분포",
+    "groupBy": "그룹 기준",
+    "byFile": "파일별",
+    "byRule": "규칙별",
+    "fileCount": "{{count}}개 파일",
+    "allClear": "문제 없음",
+    "allClearDesc": "lint 문제가 발견되지 않았습니다. 에셋 사용 상태가 양호합니다.",
+    "severityFilter": "심각도",
+    "ruleFilter": "규칙",
+    "allRules": "모든 규칙"
   },
   "commandPalette": {
     "placeholder": "에셋 검색 또는 페이지 이동...",

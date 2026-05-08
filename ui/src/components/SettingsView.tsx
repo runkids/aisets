@@ -35,6 +35,7 @@ import {
   draftFromSettings,
   updateFromDraft,
   ocrProgressLabel,
+  resetSectionDraft,
 } from "./settings/helpers";
 import { SettingsActions } from "./settings/FieldRow";
 import { WorkspaceSection } from "./settings/WorkspaceSection";
@@ -291,49 +292,17 @@ export function SettingsView({
     toast.success(t("toast.settingsReset"));
   }
 
-  function onResetSectionDraft(section: Section) {
-    const serverDraft = draftFromSettings(settingsQuery.data?.settings);
-    updateDraft((current) => {
-      switch (section) {
-        case "workspace":
-          return {
-            ...current,
-            workspaceName: serverDraft.workspaceName,
-            defaultProjectRoot: serverDraft.defaultProjectRoot,
-          };
-        case "scanning":
-          return {
-            ...current,
-            autoScanOnOpen: serverDraft.autoScanOnOpen,
-            scanOnOpen: serverDraft.scanOnOpen,
-            scanProfile: serverDraft.scanProfile,
-            scanAnalyses: serverDraft.scanAnalyses,
-            ocrEnabled: serverDraft.ocrEnabled,
-            ocrLanguages: serverDraft.ocrLanguages,
-            ocrMaxPixels: serverDraft.ocrMaxPixels,
-            ocrBatchSize: serverDraft.ocrBatchSize,
-            ocrConcurrency: serverDraft.ocrConcurrency,
-            ocrFuzzySearch: serverDraft.ocrFuzzySearch,
-            excludePatternsText: serverDraft.excludePatternsText,
-            excludePatternsByIntentText:
-              serverDraft.excludePatternsByIntentText,
-          };
-        case "customFilters":
-          return {
-            ...current,
-            customAssetFilters: serverDraft.customAssetFilters,
-          };
-        case "optimization":
-          return {
-            ...current,
-            optimizationDefaultQuality: serverDraft.optimizationDefaultQuality,
-            optimizationAutoApply: serverDraft.optimizationAutoApply,
-            optimizationThresholds: serverDraft.optimizationThresholds,
-          };
-        default:
-          return serverDraft;
-      }
-    });
+  function onResetSectionDraft(section: Section | "catalogScanning" | "ocr") {
+    updateDraft((current) => resetSectionDraft(current, section));
+    toast.success(
+      t(
+        section === "catalogScanning" || section === "scanning"
+          ? "toast.settingsCatalogScanningReset"
+          : section === "ocr"
+            ? "toast.settingsOcrReset"
+            : "toast.settingsSectionReset",
+      ),
+    );
   }
 
   async function onExport() {
@@ -392,7 +361,7 @@ export function SettingsView({
     });
   }
 
-  function settingActionsFor(section: Section) {
+  function settingActionsFor(section: Section | "catalogScanning" | "ocr") {
     return (
       <SettingsActions
         disabled={settingsActionDisabled}
@@ -518,7 +487,8 @@ export function SettingsView({
               ocrRuntimeEngineError={settings?.ocrRuntime.engineError ?? ""}
               updatePending={updateMutation.isPending}
               updateError={updateMutation.error}
-              settingActions={settingActionsFor("scanning")}
+              catalogActions={settingActionsFor("catalogScanning")}
+              ocrActions={settingActionsFor("ocr")}
               onUpdateDraft={updateDraft}
               onInstallOCR={onInstallOCR}
               onRemoveOCR={onRemoveOCR}

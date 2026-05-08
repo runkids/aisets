@@ -128,7 +128,9 @@
     "noResults": "没有結果",
     "none": "（無）",
     "retry": "重试",
-    "yes": "是"
+    "yes": "是",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "status": {
     "scanning": "正在扫描",
@@ -401,7 +403,18 @@
     "description": "可能影響性能或可访问性的代码層級使用模式",
     "searchPlaceholder": "依文件或規則筛选...",
     "empty": "没有 lint 发现匹配当前筛选",
-    "emptyDesc": "试试调整搜索条件或严重程度筛选"
+    "emptyDesc": "试试调整搜索条件或严重程度筛选",
+    "statTotal": "发现总数",
+    "healthBar": "Lint 严重程度分布",
+    "groupBy": "分组方式",
+    "byFile": "按文件",
+    "byRule": "按规则",
+    "fileCount": "{{count}} 个文件",
+    "allClear": "全部通过",
+    "allClearDesc": "未检测到 lint 问题，资源使用状况良好。",
+    "severityFilter": "严重程度",
+    "ruleFilter": "规则",
+    "allRules": "所有规则"
   },
   "commandPalette": {
     "placeholder": "搜索素材或切換页面...",

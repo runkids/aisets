@@ -35,7 +35,12 @@ export { StackedBar, type StackedBarSegment } from "./StackedBar";
 export { StatCard } from "./StatCard";
 export { Switch } from "./Switch";
 export { Tabs, type TabItem } from "./Tabs";
-export { TextInput, TextInputButton, Textarea } from "./TextInput";
+export {
+  TextInput,
+  TextInputButton,
+  TextInputClearButton,
+  Textarea,
+} from "./TextInput";
 export { Toast, toastVariants } from "./Toast";
 export { Tooltip } from "./Tooltip";
 export { ZoomableImage } from "./ZoomableImage";

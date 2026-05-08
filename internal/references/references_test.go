@@ -126,6 +126,21 @@ func TestBuildMapWithProgressExcludesMatchedCodeFiles(t *testing.T) {
 	}
 }
 
+func TestMatchExcludePatternTreatsPlainFileNameAsAnyDepth(t *testing.T) {
+	if !MatchExcludePattern("asset-studio-logo.png", "ui/public/brand/asset-studio-logo.png") {
+		t.Fatal("plain filename pattern should match the same file at any depth")
+	}
+	if MatchExcludePattern("asset-studio-logo.png", "ui/public/brand/asset-studio-logo@2x.png") {
+		t.Fatal("plain filename pattern should not partially match other filenames")
+	}
+	if !MatchExcludePattern("/demo/", "packages/demo/logo.png") {
+		t.Fatal("slash-wrapped plain pattern should match a path segment")
+	}
+	if MatchExcludePattern("/demo/", "logo.png") {
+		t.Fatal("slash-wrapped plain pattern should not match when the segment is outside the project-relative path")
+	}
+}
+
 func TestReferenceHelperFunctions(t *testing.T) {
 	exts := CodeExtensions()
 	if !exts[".tsx"] || !exts[".css"] {

@@ -6,6 +6,7 @@ import type {
 } from "react";
 import { forwardRef } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const labelClassName =
@@ -87,6 +88,30 @@ const textInputButtonVariants = cva(
 
 type ShellVariants = VariantProps<typeof textInputShellVariants>;
 type ButtonVariants = VariantProps<typeof textInputButtonVariants>;
+
+type TextInputClearButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+};
+
+function TextInputClearButton({
+  label,
+  className,
+  ...props
+}: TextInputClearButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className={cn(
+        "inline-flex shrink-0 cursor-pointer rounded-full p-0.5 text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink",
+        className,
+      )}
+      {...props}
+    >
+      <X size={14} aria-hidden="true" />
+    </button>
+  );
+}
 
 type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> &
   ShellVariants & {
@@ -245,11 +270,13 @@ function TextInputButton({
 export {
   TextInput,
   TextInputButton,
+  TextInputClearButton,
   Textarea,
   textInputShellVariants,
   textInputButtonVariants,
   type TextInputProps,
   type TextInputButtonProps,
+  type TextInputClearButtonProps,
   type TextareaProps,
 };
 /* eslint-enable react-refresh/only-export-components */

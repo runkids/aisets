@@ -1435,3 +1435,135 @@ func assertRowCount(t *testing.T, store *Store, table string, want int) {
 		t.Fatalf("%s rows = %d, want %d", table, got, want)
 	}
 }
+
+func TestCatalogLintFacetsAndFilters(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	a1 := scanAsset(root, "p1", "a1", "src/hero.png", 5000, "h1", 0, 0)
+	a1.Optimization = nil
+	a2 := scanAsset(root, "p1", "a2", "src/icon.svg", 200, "h2", 0, 0)
+	a2.Optimization = nil
+
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-08T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p1", Name: "proj", Path: filepath.Join(root, "proj")}},
+		Items:       []scanner.AssetItem{a1, a2},
+		LintFindings: []lint.Finding{
+			{RuleID: "missing-lazy-loading", Severity: "warning", File: "src/Hero.tsx", Line: 10, AssetID: a1.ID},
+			{RuleID: "missing-dimensions", Severity: "warning", File: "src/Hero.tsx", Line: 10, AssetID: a1.ID},
+			{RuleID: "large-inline-import", Severity: "critical", File: "src/utils.ts", Line: 3, AssetID: a1.ID},
+			{RuleID: "svg-as-img", Severity: "info", File: "src/Icon.tsx", Line: 5, AssetID: a2.ID},
+			{RuleID: "no-responsive-image", Severity: "info", File: "src/Gallery.tsx", Line: 20, AssetID: a1.ID},
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 2, LintFindings: 5},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("all findings with facets", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 5 {
+			t.Fatalf("total = %d, want 5", page.Total)
+		}
+		sevMap := facetMap(page.Facets.Severities)
+		if sevMap["critical"] != 1 || sevMap["warning"] != 2 || sevMap["info"] != 2 {
+			t.Fatalf("severity facets = %v", page.Facets.Severities)
+		}
+		ruleMap := facetMap(page.Facets.Rules)
+		if len(ruleMap) != 5 {
+			t.Fatalf("rule facets = %v, want 5 rules", page.Facets.Rules)
+		}
+	})
+
+	t.Run("filter by severity", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Severity: "warning", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 2 {
+			t.Fatalf("total = %d, want 2", page.Total)
+		}
+		for _, item := range page.Items {
+			if item.Severity != "warning" {
+				t.Fatalf("unexpected severity %s", item.Severity)
+			}
+		}
+		sevMap := facetMap(page.Facets.Severities)
+		if sevMap["critical"] != 1 || sevMap["warning"] != 2 || sevMap["info"] != 2 {
+			t.Fatalf("cross-filter severity facets should show all severities: %v", page.Facets.Severities)
+		}
+	})
+
+	t.Run("filter by ruleId", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{RuleID: "missing-lazy-loading", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 1 {
+			t.Fatalf("total = %d, want 1", page.Total)
+		}
+		if page.Items[0].RuleID != "missing-lazy-loading" {
+			t.Fatalf("ruleId = %s", page.Items[0].RuleID)
+		}
+	})
+
+	t.Run("search by filename", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Query: "Hero", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 2 {
+			t.Fatalf("total = %d, want 2", page.Total)
+		}
+	})
+
+	t.Run("search by ruleId text", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Query: "inline", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 1 {
+			t.Fatalf("total = %d, want 1", page.Total)
+		}
+	})
+
+	t.Run("combined severity + search", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Severity: "warning", Query: "Hero", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 2 {
+			t.Fatalf("total = %d, want 2", page.Total)
+		}
+	})
+
+	t.Run("empty result", func(t *testing.T) {
+		page, err := store.CatalogLint(CatalogLintQuery{Query: "nonexistent", Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != 0 || len(page.Items) != 0 {
+			t.Fatalf("expected empty, got total=%d items=%d", page.Total, len(page.Items))
+		}
+		if page.Facets.Severities == nil || page.Facets.Rules == nil {
+			t.Fatal("facets should be empty slices, not nil")
+		}
+	})
+}
+
+func facetMap(facets []CatalogFacetOption) map[string]int {
+	m := make(map[string]int, len(facets))
+	for _, f := range facets {
+		m[f.ID] = f.Count
+	}
+	return m
+}

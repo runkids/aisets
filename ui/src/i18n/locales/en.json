@@ -144,7 +144,9 @@
     "noResults": "No results",
     "none": "(none)",
     "retry": "Retry",
-    "yes": "Yes"
+    "yes": "Yes",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "status": {
     "scanning": "Scanning",
@@ -268,7 +270,7 @@
       "optimizationHint": "Compute format and compression suggestions."
     },
     "excludePatterns": "Exclude patterns",
-    "excludePatternsHint": "Choose Global rules or rules appended for one project type.",
+    "excludePatternsHint": "Patterns are project-relative. Choose Global rules or rules appended for one project type.",
     "excludeScopeLabel": "Exclude pattern scope",
     "excludeScope": {
       "global": "Global",
@@ -278,8 +280,8 @@
       "libraryHint": "Added only for reusable libraries.",
       "mixedHint": "Added only for mixed or uncertain projects."
     },
-    "excludeScopeGlobalNote": "Global rules apply to every project before project-type rules are added.",
-    "excludeScopeIntentNote": "These rules are added only for {{intent}} projects. Global rules still apply first.",
+    "excludeScopeGlobalNote": "Global rules apply to every project before project-type rules are added. A plain filename matches that file at any folder depth.",
+    "excludeScopeIntentNote": "These rules are added only for {{intent}} projects. Global rules still apply first. A plain filename matches that file at any folder depth.",
     "ocrEnabled": "Use OCR in search and filters",
     "ocrEnabledHint": "Allow Browse, Custom Filters, and ⌘ P to use cached OCR text. This does not read images by itself.",
     "ocrLanguages": "OCR languages",
@@ -664,6 +666,10 @@
     "settingsSaved": "Settings saved",
     "settingsSaveFailed": "Settings save failed",
     "settingsReset": "Settings reset",
+    "settingsSectionReset": "Reset. Save to apply.",
+    "settingsScanningReset": "Reset. Save to apply.",
+    "settingsCatalogScanningReset": "Catalog scan reset. Save to apply.",
+    "settingsOcrReset": "OCR reset. Save to apply.",
     "settingsResetFailed": "Settings reset failed",
     "databaseReset": "Database reset",
     "databaseResetFailed": "Database reset failed"
@@ -829,7 +835,62 @@
     "empty": "No lint findings match your filter.",
     "emptyDesc": "Try adjusting the search or severity filter.",
     "notApplicable": "Code-usage lint is not applicable",
-    "notApplicableDesc": "This project type skips reference-dependent lint. Use duplicates, optimization, metadata, and filters to review asset quality."
+    "notApplicableDesc": "This project type skips reference-dependent lint. Use duplicates, optimization, metadata, and filters to review asset quality.",
+    "statTotal": "Total Findings",
+    "healthBar": "Lint severity distribution",
+    "groupBy": "Group findings by",
+    "byFile": "By File",
+    "byRule": "By Rule",
+    "fileCount": "{{count}} files",
+    "allClear": "All clear",
+    "allClearDesc": "No lint findings detected. Your asset usage looks healthy.",
+    "severityFilter": "Severity",
+    "ruleFilter": "Rule",
+    "allRules": "All Rules",
+    "collapseAll": "Collapse all",
+    "expandAll": "Expand all",
+    "rule": {
+      "missing-lazy-loading": {
+        "name": "Missing lazy loading",
+        "message": "<img> loads a large image without a loading attribute, which may affect scroll performance.",
+        "suggestion": "Add loading=\"lazy\" for below-fold images, or loading=\"eager\" / fetchpriority=\"high\" for critical above-fold images."
+      },
+      "missing-dimensions": {
+        "name": "Missing dimensions",
+        "message": "<img> lacks explicit width/height or aspect ratio, which may cause layout shift (CLS).",
+        "suggestion": "Add width/height attributes, or provide both width and height/aspect-ratio via Tailwind/CSS."
+      },
+      "large-inline-import": {
+        "name": "Large inline import",
+        "message": "Importing {{kb}}KB asset as raw/inline may bloat the JS bundle.",
+        "suggestion": "Use a standard URL import instead. Only use ?raw/?inline for very small SVG/icons."
+      },
+      "no-responsive-image": {
+        "name": "No responsive image",
+        "message": "Large raster image ({{kb}}KB) without srcset may waste bandwidth on small screens.",
+        "suggestion": "Provide multiple sizes via srcset for content images, or compress the source for fixed-size UI images."
+      },
+      "svg-as-img": {
+        "name": "SVG as img",
+        "message": "SVG loaded via <img> cannot be styled with CSS or animated interactively.",
+        "suggestion": "Keep <img> for static SVGs. Switch to inline SVG or a component when you need CSS color control or animation."
+      },
+      "img-as-background": {
+        "name": "Image as background",
+        "message": "Large decorative image (alt=\"\") loaded via <img>. Consider whether it needs to occupy the DOM.",
+        "suggestion": "Use CSS background/pseudo-elements for pure decoration. Keep <img alt=\"\"> if you need sizing or loading behavior."
+      },
+      "bg-content-image": {
+        "name": "Background content image",
+        "message": "Large raster image ({{kb}}KB) loaded via CSS background-image cannot use lazy loading.",
+        "suggestion": "Use <img> with loading=\"lazy\" for content images. For visual backgrounds, compress/convert the source or add a preload strategy."
+      },
+      "duplicate-asset": {
+        "name": "Duplicate asset",
+        "message": "Identical copy exists at {{path}}.",
+        "suggestion": "Remove this copy and update references to use the preferred path."
+      }
+    }
   },
   "commandPalette": {
     "placeholder": "Search anything — assets, pages, paths…",

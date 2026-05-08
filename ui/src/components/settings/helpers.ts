@@ -168,6 +168,56 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
   };
 }
 
+export function resetSectionDraft(
+  current: SettingsDraft,
+  section: Section | "catalogScanning" | "ocr",
+): SettingsDraft {
+  const defaults = draftFromSettings();
+  switch (section) {
+    case "workspace":
+      return {
+        ...current,
+        workspaceName: defaults.workspaceName,
+        defaultProjectRoot: defaults.defaultProjectRoot,
+      };
+    case "scanning":
+    case "catalogScanning":
+      return {
+        ...current,
+        autoScanOnOpen: defaults.autoScanOnOpen,
+        scanOnOpen: defaults.scanOnOpen,
+        scanProfile: defaults.scanProfile,
+        scanAnalyses: defaults.scanAnalyses,
+        excludePatternsText: defaults.excludePatternsText,
+        excludePatternsByIntentText: defaults.excludePatternsByIntentText,
+      };
+    case "ocr":
+      return {
+        ...current,
+        ocrEnabled: defaults.ocrEnabled,
+        ocrLanguages: defaults.ocrLanguages,
+        ocrMaxPixels: defaults.ocrMaxPixels,
+        ocrBatchSize: defaults.ocrBatchSize,
+        ocrConcurrency: defaults.ocrConcurrency,
+        ocrFuzzySearch: defaults.ocrFuzzySearch,
+      };
+    case "customFilters":
+      return {
+        ...current,
+        customAssetFilters: defaults.customAssetFilters,
+      };
+    case "optimization":
+      return {
+        ...current,
+        optimizationDefaultQuality: defaults.optimizationDefaultQuality,
+        optimizationAutoApply: defaults.optimizationAutoApply,
+        optimizationThresholds: defaults.optimizationThresholds,
+      };
+    default:
+      return defaults;
+  }
+}
+
 export function ocrLanguageLabel(
   language: string,
   t: ReturnType<typeof useTranslation>["t"],

@@ -144,7 +144,9 @@
     "noResults": "沒有結果",
     "none": "（無）",
     "retry": "重試",
-    "yes": "是"
+    "yes": "是",
+    "expand": "展開",
+    "collapse": "收合"
   },
   "status": {
     "scanning": "正在掃描",
@@ -317,6 +319,10 @@
     "settingsSaved": "設定已儲存",
     "settingsSaveFailed": "設定儲存失敗",
     "settingsReset": "設定已重設",
+    "settingsSectionReset": "已重設，儲存後套用",
+    "settingsScanningReset": "已重設，儲存後套用",
+    "settingsCatalogScanningReset": "Catalog 掃描已重設，儲存後套用",
+    "settingsOcrReset": "OCR 已重設，儲存後套用",
     "settingsResetFailed": "設定重設失敗",
     "databaseReset": "資料庫已重設",
     "databaseResetFailed": "資料庫重設失敗"
@@ -482,7 +488,62 @@
     "empty": "沒有 lint 發現符合目前篩選",
     "emptyDesc": "試試調整搜尋條件或嚴重程度篩選",
     "notApplicable": "Code-usage lint 不適用",
-    "notApplicableDesc": "此專案類型會略過依賴引用的 lint請改用重複、最佳化、metadata 與篩選檢查素材品質"
+    "notApplicableDesc": "此專案類型會略過依賴引用的 lint請改用重複、最佳化、metadata 與篩選檢查素材品質",
+    "statTotal": "發現總數",
+    "healthBar": "Lint 嚴重程度分佈",
+    "groupBy": "分組方式",
+    "byFile": "依檔案",
+    "byRule": "依規則",
+    "fileCount": "{{count}} 個檔案",
+    "allClear": "全部通過",
+    "allClearDesc": "未偵測到 lint 問題，素材使用狀況良好。",
+    "severityFilter": "嚴重程度",
+    "ruleFilter": "規則",
+    "allRules": "所有規則",
+    "collapseAll": "全部收合",
+    "expandAll": "全部展開",
+    "rule": {
+      "missing-lazy-loading": {
+        "name": "缺少 lazy loading",
+        "message": "<img> 載入大型圖片但未設定 loading 屬性，可能影響捲動效能。",
+        "suggestion": "為 below-fold 圖片加上 loading=\"lazy\"，或為重要的 above-fold 圖片設定 loading=\"eager\" / fetchpriority=\"high\"。"
+      },
+      "missing-dimensions": {
+        "name": "缺少尺寸",
+        "message": "<img> 缺少明確的 width/height 或 aspect ratio，可能造成版面偏移 (CLS)。",
+        "suggestion": "加上 width/height 屬性，或透過 Tailwind/CSS 同時提供 width 和 height/aspect-ratio。"
+      },
+      "large-inline-import": {
+        "name": "大型 inline 匯入",
+        "message": "以 raw/inline 方式匯入 {{kb}}KB 素材，可能導致 JS bundle 膨脹。",
+        "suggestion": "改用標準 URL import。僅對極小的 SVG/icon 使用 ?raw/?inline。"
+      },
+      "no-responsive-image": {
+        "name": "無響應式圖片",
+        "message": "大型點陣圖 ({{kb}}KB) 未使用 srcset，在小螢幕上可能浪費頻寬。",
+        "suggestion": "為內容圖片提供多尺寸 srcset，或壓縮固定尺寸的 UI 圖片。"
+      },
+      "svg-as-img": {
+        "name": "SVG 作為 img",
+        "message": "透過 <img> 載入的 SVG 無法使用 CSS 修改樣式或互動動畫。",
+        "suggestion": "靜態 SVG 可繼續使用 <img>。需要 CSS 控制顏色或動畫時，改用 inline SVG 或元件。"
+      },
+      "img-as-background": {
+        "name": "img 作為背景",
+        "message": "大型裝飾圖片 (alt=\"\") 透過 <img> 載入。考慮是否需要佔用 DOM。",
+        "suggestion": "純裝飾用途改用 CSS background/pseudo-elements。若需要尺寸或 loading 行為則保留 <img alt=\"\">。"
+      },
+      "bg-content-image": {
+        "name": "背景內容圖片",
+        "message": "大型點陣圖 ({{kb}}KB) 透過 CSS background-image 載入，無法使用 lazy loading。",
+        "suggestion": "內容圖片改用 <img> 搭配 loading=\"lazy\"。視覺背景則壓縮/轉換原始檔或加入 preload 策略。"
+      },
+      "duplicate-asset": {
+        "name": "重複素材",
+        "message": "與 {{path}} 為完全相同的副本。",
+        "suggestion": "移除此副本並更新引用至建議路徑。"
+      }
+    }
   },
   "commandPalette": {
     "placeholder": "搜尋任何項目 — 素材、頁面、路徑…",
@@ -676,7 +737,7 @@
       "optimizationHint": "計算格式與壓縮建議"
     },
     "excludePatterns": "排除規則",
-    "excludePatternsHint": "選擇 Global 規則，或只追加到特定專案類型的規則",
+    "excludePatternsHint": "規則以專案根目錄為基準；選擇 Global，或只追加到特定專案類型",
     "excludeScopeLabel": "排除規則範圍",
     "excludeScope": {
       "global": "Global",
@@ -686,8 +747,8 @@
       "libraryHint": "只追加到可重用 library",
       "mixedHint": "只追加到混合 / 不確定專案"
     },
-    "excludeScopeGlobalNote": "Global 規則會先套用到所有專案，再追加該專案類型自己的規則。",
-    "excludeScopeIntentNote": "這些規則只會追加到「{{intent}}」專案；Global 規則仍會先套用。",
+    "excludeScopeGlobalNote": "Global 規則會先套用到所有專案，再追加該專案類型自己的規則。單純檔名會匹配任何資料夾底下的同名檔案。",
+    "excludeScopeIntentNote": "這些規則只會追加到「{{intent}}」專案；Global 規則仍會先套用。單純檔名會匹配任何資料夾底下的同名檔案。",
     "ocrEnabled": "在搜尋與篩選中使用 OCR",
     "ocrEnabledHint": "允許 Browse、自訂篩選器與 ⌘ P 使用已快取的 OCR 文字；這個開關本身不會讀取圖片",
     "ocrLanguages": "OCR 語言",

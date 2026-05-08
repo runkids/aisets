@@ -35,6 +35,7 @@ import {
   StatCard,
   Tabs,
   TextInput,
+  TextInputClearButton,
   type DropdownMenuItem,
   type StackedBarSegment,
 } from "./ui";
@@ -497,6 +498,14 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("projects.searchProjectsPlaceholder")}
+              suffix={
+                query ? (
+                  <TextInputClearButton
+                    label={t("toolbar.clearSearch")}
+                    onClick={() => setQuery("")}
+                  />
+                ) : undefined
+              }
               className="w-full max-w-[420px]"
               inputClassName="font-g text-g-ui tracking-g-ui"
             />

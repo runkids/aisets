@@ -115,6 +115,47 @@ func (s *Store) OCRResultForItem(item scanner.AssetItem, settings ocr.Settings, 
 	return result, ok, nil
 }
 
+func (s *Store) OCRResultForContentHash(contentHash, hashAlgorithm string, settings ocr.Settings, engineName, engineVersion string) (ocr.Result, bool, error) {
+	if contentHash == "" || hashAlgorithm == "" {
+		return ocr.Result{}, false, nil
+	}
+	settingsHash := ocr.SettingsHash(settings)
+	row := s.db.QueryRow(`
+		SELECT project_id, repo_path, status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
+			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
+		FROM ocr_results
+		WHERE content_hash = ? AND hash_algorithm = ?
+			AND engine_name = ? AND engine_version = ? AND settings_hash = ?
+			AND status = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, contentHash, hashAlgorithm, engineName, engineVersion, settingsHash, ocr.StatusReady)
+	result := ocr.Result{
+		ContentHash:   contentHash,
+		HashAlgorithm: hashAlgorithm,
+		EngineName:    engineName,
+		EngineVersion: engineVersion,
+		SettingsHash:  settingsHash,
+	}
+	var languagesRaw, scriptsRaw string
+	var confidence sql.NullFloat64
+	err := row.Scan(&result.ProjectID, &result.RepoPath, &result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence, &result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return ocr.Result{}, false, nil
+	}
+	if err != nil {
+		return ocr.Result{}, false, err
+	}
+	if confidence.Valid {
+		value := confidence.Float64
+		result.Confidence = &value
+	}
+	_ = json.Unmarshal([]byte(languagesRaw), &result.Languages)
+	_ = json.Unmarshal([]byte(scriptsRaw), &result.Scripts)
+	ocr.FinalizeResult(&result)
+	return result, true, nil
+}
+
 func (s *Store) RemoveOCRResults() error {
 	_, err := s.db.Exec(`DELETE FROM ocr_results`)
 	return err

@@ -19,7 +19,7 @@ import { cn } from "@/lib/cn";
 import { useCatalogItemsInfiniteQuery } from "../queries";
 import { useDebouncedValue } from "../useDebouncedValue";
 import { fileName, type Mode } from "../ui";
-import { AssetThumbnail, Keycap, TextInput } from "./ui";
+import { AssetThumbnail, Keycap, TextInput, TextInputClearButton } from "./ui";
 import { DialogOverlay, DialogSurface, DialogViewport } from "./ui/DialogShell";
 
 type Props = {
@@ -188,7 +188,21 @@ export function CommandPalette({
                   variant="command"
                   type="text"
                   icon={<Search size={16} aria-hidden="true" />}
-                  suffix={<Keycap>Esc</Keycap>}
+                  suffix={
+                    <span className="inline-flex items-center gap-1.5">
+                      {query && (
+                        <TextInputClearButton
+                          label={t("toolbar.clearSearch")}
+                          onClick={() => {
+                            setQuery("");
+                            setActiveIndex(0);
+                            inputRef.current?.focus();
+                          }}
+                        />
+                      )}
+                      <Keycap>Esc</Keycap>
+                    </span>
+                  }
                   value={query}
                   onChange={(event) => {
                     setQuery(event.target.value);

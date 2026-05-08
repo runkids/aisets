@@ -5,7 +5,6 @@ import {
   Search,
   Square,
   Terminal,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +19,7 @@ import {
   IconButton,
   Modal,
   Notice,
+  TextInputClearButton,
 } from "./ui";
 
 type Props = {
@@ -215,13 +215,10 @@ export function OptimizeView({
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button
-                type="button"
-                className="grid size-5 place-items-center rounded-full text-g-ink-4 hover:bg-g-surface-2 hover:text-g-ink"
+              <TextInputClearButton
+                label={t("toolbar.clearSearch")}
                 onClick={() => setSearch("")}
-              >
-                <X size={14} />
-              </button>
+              />
             )}
           </div>
           <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5 [scrollbar-color:var(--g-line-strong)_transparent]">

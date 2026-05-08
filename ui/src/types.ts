@@ -377,6 +377,12 @@ export type CatalogLintPage = {
   items: LintFinding[];
   total: number;
   nextCursor?: string;
+  facets: {
+    projects: Array<{ id: string; count: number }>;
+    projectTotal: number;
+    severities: Array<{ id: string; count: number }>;
+    rules: Array<{ id: string; count: number }>;
+  };
 };
 
 export type CatalogFolderNode = {

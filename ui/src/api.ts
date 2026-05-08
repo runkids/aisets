@@ -98,7 +98,10 @@ export type CatalogDuplicatesParams = {
 export type CatalogLintParams = {
   scanId?: number;
   projectId?: string;
+  projectName?: string;
   severity?: string;
+  ruleId?: string;
+  q?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -163,7 +166,10 @@ export function getCatalogLint(
     `/api/catalog/lint${queryString({
       scanId: params.scanId,
       projectId: params.projectId,
+      projectName: params.projectName,
       severity: params.severity,
+      ruleId: params.ruleId,
+      q: params.q,
       limit: params.limit,
       cursor: params.cursor,
     })}`,

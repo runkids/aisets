@@ -128,7 +128,9 @@
     "noResults": "結果なし",
     "none": "（なし）",
     "retry": "再試行",
-    "yes": "はい"
+    "yes": "はい",
+    "expand": "展開",
+    "collapse": "折りたたむ"
   },
   "status": {
     "scanning": "スキャン中",
@@ -401,7 +403,18 @@
     "description": "パフォーマンスまたはアクセシビリティに影響する可能性があるコードレベルの利用パターン。",
     "searchPlaceholder": "ファイルまたはルールで絞り込み...",
     "empty": "現在のフィルターに一致する lint 検出はありません。",
-    "emptyDesc": "検索条件または重大度フィルターを調整してみてください。"
+    "emptyDesc": "検索条件または重大度フィルターを調整してみてください。",
+    "statTotal": "検出総数",
+    "healthBar": "Lint 重要度分布",
+    "groupBy": "グループ化",
+    "byFile": "ファイル別",
+    "byRule": "ルール別",
+    "fileCount": "{{count}} ファイル",
+    "allClear": "問題なし",
+    "allClearDesc": "lint の問題は検出されませんでした。アセットの使用状況は良好です。",
+    "severityFilter": "重要度",
+    "ruleFilter": "ルール",
+    "allRules": "すべてのルール"
   },
   "commandPalette": {
     "placeholder": "アセット検索またはページ移動...",

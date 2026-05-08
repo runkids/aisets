@@ -14,7 +14,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
-import { Button, Select, TextInput, type SegmentedControlItem } from "./ui";
+import {
+  Button,
+  Select,
+  TextInput,
+  TextInputClearButton,
+  type SegmentedControlItem,
+} from "./ui";
 import {
   BrowseIconToggleGroup,
   BrowseSizeToggleGroup,
@@ -156,14 +162,10 @@ export function BrowseToolbar({
           suffix={
             <span className="inline-flex items-center gap-1">
               {searchQuery && (
-                <button
-                  type="button"
-                  aria-label={t("toolbar.clearSearch")}
-                  className="inline-flex shrink-0 cursor-pointer rounded-full p-0.5 text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink"
+                <TextInputClearButton
+                  label={t("toolbar.clearSearch")}
                   onClick={() => onSearchChange("")}
-                >
-                  <X size={14} />
-                </button>
+                />
               )}
               <ArrowDownAZ size={14} aria-hidden="true" />
             </span>
