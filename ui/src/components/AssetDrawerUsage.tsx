@@ -2,7 +2,8 @@ import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileCode } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { AssetReference } from "../types";
+import { usageClassification } from "../projectScanIntent";
+import type { AssetItem, AssetReference } from "../types";
 import { Badge, CopyButton, Tooltip } from "./ui";
 
 const EDITOR_SCHEMES: Record<string, (path: string, line: number) => string> = {
@@ -26,12 +27,14 @@ const EDITOR_SCHEMES: Record<string, (path: string, line: number) => string> = {
 };
 
 type Props = {
+  asset: AssetItem;
   references: AssetReference[];
   preferredEditor: string;
   rootPath?: string;
 };
 
 export function AssetDrawerUsage({
+  asset,
   references,
   preferredEditor,
   rootPath = "",
@@ -57,6 +60,21 @@ export function AssetDrawerUsage({
     .join("\n");
 
   if (references.length === 0) {
+    const usage = usageClassification(asset);
+    if (usage === "notApplicable") {
+      return (
+        <div className="rounded-g-md border border-g-line bg-g-surface-2 p-4 text-center font-g text-g-caption tracking-g-ui text-g-ink-3">
+          {t("assetDrawer.usageNotApplicable")}
+        </div>
+      );
+    }
+    if (usage === "possiblyUnused") {
+      return (
+        <div className="rounded-g-md border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft p-4 text-center font-g text-g-caption tracking-g-ui text-g-amber">
+          {t("assetDrawer.usagePossiblyUnused")}
+        </div>
+      );
+    }
     return (
       <div className="rounded-g-md border border-g-line bg-g-red/8 p-4 text-center text-g-caption text-g-red">
         {t("assetDrawer.usageEmpty")}

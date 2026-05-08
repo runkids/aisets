@@ -98,6 +98,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/workspaces/rename", s.handleRenameWorkspace)
 	s.mux.HandleFunc("POST /api/workspaces/remove", s.handleRemoveWorkspace)
 	s.mux.HandleFunc("POST /api/projects/add", s.handleAddProject)
+	s.mux.HandleFunc("POST /api/projects/detect-scan-intent", s.handleDetectProjectScanIntent)
 	s.mux.HandleFunc("POST /api/projects/remove", s.handleRemoveProject)
 	s.mux.HandleFunc("POST /api/projects/rename", s.handleRenameProject)
 	s.mux.HandleFunc("GET /api/fs/directories", s.handleDirectories)

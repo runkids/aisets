@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
+	"asset-studio/internal/projectintent"
 	"asset-studio/internal/scanner"
 )
 
@@ -18,6 +20,8 @@ func cmdProjects(args []string, jsonOut bool) error {
 		switch args[0] {
 		case "add":
 			return cmdProjectsAdd(args[1:], jsonOut)
+		case "detect-intent":
+			return cmdProjectsDetectIntent(args[1:], jsonOut)
 		case "rename":
 			return cmdProjectsRename(args[1:], jsonOut)
 		case "remove":
@@ -49,7 +53,9 @@ func cmdProjects(args []string, jsonOut bool) error {
 }
 
 func cmdProjectsAdd(args []string, jsonOut bool) error {
+	args, scanIntentValue := stripStringFlag(args, "--scan-intent", string(scanner.ProjectScanIntentCode))
 	fs := newFlagSet("projects add", jsonOut)
+	scanIntent := fs.String("scan-intent", scanIntentValue, "project scan intent: code, assetPack, library, or mixed")
 	if err := parseFlagSet(fs, args); err != nil {
 		return err
 	}
@@ -59,7 +65,7 @@ func cmdProjectsAdd(args []string, jsonOut bool) error {
 	}
 	defer store.Close()
 
-	if err := store.AddProjects(fs.Args()); err != nil {
+	if err := store.AddProjectsWithIntent(fs.Args(), scanner.ProjectScanIntent(*scanIntent)); err != nil {
 		return err
 	}
 	projects := store.Projects()
@@ -67,6 +73,56 @@ func cmdProjectsAdd(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "projects": projects})
 	}
 	fmt.Printf("Imported projects: %d\n", len(projects))
+	return nil
+}
+
+func stripStringFlag(args []string, name, fallback string) ([]string, string) {
+	out := make([]string, 0, len(args))
+	value := fallback
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == name && i+1 < len(args) {
+			value = args[i+1]
+			i++
+			continue
+		}
+		if strings.HasPrefix(arg, name+"=") {
+			value = strings.TrimPrefix(arg, name+"=")
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out, value
+}
+
+func cmdProjectsDetectIntent(args []string, jsonOut bool) error {
+	fs := newFlagSet("projects detect-intent", jsonOut)
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return apierr.WithParams("projects_detect_intent_args", "projects detect-intent expects exactly one path", map[string]any{"args": fs.Args()})
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	settings, err := store.Settings()
+	if err != nil {
+		return err
+	}
+	detection, err := projectintent.Detect(context.Background(), fs.Arg(0), settings.ExcludePatterns)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "detection": detection})
+	}
+	fmt.Printf("Suggested: %s (%s)\n", detection.SuggestedScanIntent, detection.Confidence)
+	for _, item := range detection.Evidence {
+		fmt.Printf("- %s\n", item)
+	}
 	return nil
 }
 
@@ -371,7 +427,7 @@ func stripJSONFlag(args []string) ([]string, bool) {
 func toScannerProjects(projects []config.Project) []scanner.Project {
 	out := make([]scanner.Project, 0, len(projects))
 	for _, project := range projects {
-		out = append(out, scanner.Project{ID: project.ID, WorkspaceID: project.WorkspaceID, Name: project.Name, Path: project.Path, CreatedAt: project.CreatedAt})
+		out = append(out, scanner.Project{ID: project.ID, WorkspaceID: project.WorkspaceID, Name: project.Name, Path: project.Path, ScanIntent: project.ScanIntent, CreatedAt: project.CreatedAt})
 	}
 	return out
 }

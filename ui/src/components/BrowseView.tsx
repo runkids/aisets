@@ -39,6 +39,7 @@ import { BatchPreviewModal } from "./BatchPreviewModal";
 import { RenameRuleModal } from "./RenameRuleModal";
 import { DirectoryPickerModal } from "./DirectoryPickerModal";
 import { matchesOCRSearchText } from "../ocrSearch";
+import { usageClassification } from "../projectScanIntent";
 import type {
   AssetItem,
   CatalogFolderNode,
@@ -54,7 +55,13 @@ import { useImageBackgroundControls } from "../imageBackground";
 import { FilterRail } from "./FilterRail";
 import { EmptyState } from "./ui";
 
-type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
+type StatusFilter =
+  | ""
+  | "unused"
+  | "possiblyUnused"
+  | "duplicate"
+  | "optimize"
+  | "referenced";
 type BrowseFilters = { project: string; ext: string; customFilter: string };
 type BrowseStoredState = {
   filters: BrowseFilters;
@@ -71,6 +78,7 @@ const gridSizes: BrowseStoredState["gridSize"][] = ["s", "m", "l"];
 const statusFilters: StatusFilter[] = [
   "",
   "unused",
+  "possiblyUnused",
   "duplicate",
   "optimize",
   "referenced",
@@ -200,7 +208,9 @@ function writeBrowseStoredState(state: BrowseStoredState) {
 function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
   switch (status) {
     case "unused":
-      return item.usedBy.length === 0;
+      return usageClassification(item) === "unused";
+    case "possiblyUnused":
+      return usageClassification(item) === "possiblyUnused";
     case "duplicate":
       return Boolean(item.duplicateGroupId) || item.similar.length > 0;
     case "optimize":
@@ -214,7 +224,12 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
 
 function apiStatus(status: StatusFilter) {
   if (status === "optimize") return "optimizable";
-  if (status === "unused" || status === "duplicate" || status === "referenced")
+  if (
+    status === "unused" ||
+    status === "possiblyUnused" ||
+    status === "duplicate" ||
+    status === "referenced"
+  )
     return status;
   return "";
 }

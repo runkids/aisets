@@ -28,6 +28,53 @@ pnpm run dev
 The Go server runs on `127.0.0.1:19520` by default. Use `--port` to bind a
 different port. Vite proxies `/api` to it.
 
+## 專案類型
+
+新增專案時，Asset Studio 會請你選一個「專案類型」。這會影響它怎麼判斷
+「未使用」、「Lint」和「是否可以安全刪除」。
+
+Asset Studio 會先根據資料夾內容給一個建議，你也可以自己改。選好的類型會
+顯示在專案卡片和設定頁的專案列表上。如果之後改了專案類型，請重新掃描，
+因為原本的未使用與 Lint 結果可能已經不適合用。
+
+### 我該選哪個？
+
+| 類型 | 適合選這個的情況 | Asset Studio 會怎麼做 |
+|------|------------------|------------------------|
+| 程式碼專案 | 這是一個 app 或網站，圖片、icon、SVG 主要在同一個 repo 的程式碼裡使用。 | 會檢查哪些素材被程式碼引用，也會找出可以安全預覽刪除的未使用素材。 |
+| 素材包 | 這是一包素材，例如 icon pack、設計輸出、圖片資料夾、sprite、vendor assets。 | 不會把「沒有被程式碼引用」當成問題，因為這些素材本來就可能被別的地方使用。 |
+| 可重用 library | 這是一個會被其他專案引用的 package、component library 或 shared assets。 | 會顯示可能沒用到的檔案，但不會直接判定可以安全刪。 |
+| 混合 / 不確定 | 這個資料夾內容很混雜，或你不確定素材是在哪裡被使用。 | 採保守判斷：可以協助你檢查，但不會輕易開放安全刪除。 |
+
+### 哪些畫面會有差異？
+
+| 畫面 | 會有什麼差異 |
+|------|--------------|
+| 新增專案 | 選完資料夾後會出現「專案類型」。Asset Studio 會自動建議一個類型，但你可以手動改。 |
+| 專案卡片 | 卡片上會顯示類型 badge，例如「素材包」或「程式碼專案」。 |
+| 設定頁的專案列表 | 可以看到並編輯專案類型。改完後請重新掃描。 |
+| 瀏覽素材 | 「未使用」只代表可以安全進入 delete-unused preview 的項目；不安全的項目會顯示為「可能未使用」或不顯示未使用狀態。 |
+| 素材 drawer | Usage 區塊會說明是「未使用」、「可能未使用」或「不適用」，delete-unused 按鈕也會跟著啟用或停用。 |
+| 未使用 / 清理相關流程 | 素材包不會被整包列成未使用。Library、Mixed 只會提供人工確認用的「可能未使用」。 |
+| Lint | 程式碼專案才是正式適用；素材包會跳過引用相關 Lint；Library、Mixed 僅供參考。 |
+| 掃描進度 | 如果某些分析因專案類型被跳過，進度會顯示原因，例如素材包會跳過 references。 |
+
+重複素材、相似素材、圖片 metadata、最佳化建議、預檢上傳這類不依賴程式碼引用
+的功能，通常不會因專案類型而改變。
+
+### 哪些操作會被限制？
+
+| 類型 | 未使用狀態 | Delete-unused | Lint |
+|------|------------|---------------|------|
+| 程式碼專案 | 可顯示真正的「未使用」。 | 可用，但仍會先產生 preview，不會直接刪。 | 適用。 |
+| 素材包 | 不適用；不會把整包素材當成未使用。 | 停用。 | 不適用，會跳過引用相關 Lint。 |
+| 可重用 library | 只會顯示「可能未使用」。 | 停用。 | 僅供參考。 |
+| 混合 / 不確定 | 只會顯示「可能未使用」。 | 通常停用。 | 僅供參考。 |
+
+重點是：不要把「沒有找到引用」直接等同於「可以刪除」。只有畫面標示為
+「未使用」且 delete-unused action 可用時，才代表 Asset Studio 認為可以進入
+安全刪除預覽流程。
+
 ## Devcontainer
 
 ```bash
@@ -48,7 +95,8 @@ asset-studio ui once [projectPaths...] [--port PORT]
 asset-studio ui stop [--port PORT]
 asset-studio version [--json]
 asset-studio projects [--json]
-asset-studio projects add [projectPaths...] [--json]
+asset-studio projects add [projectPaths...] [--scan-intent code|assetPack|library|mixed] [--json]
+asset-studio projects detect-intent projectPath [--json]
 asset-studio projects rename --id ID --name NAME [--json]
 asset-studio projects remove --id ID [--json]
 asset-studio settings get [--json]

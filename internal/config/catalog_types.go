@@ -17,13 +17,16 @@ type CatalogSummary struct {
 }
 
 type CatalogProjectStats struct {
-	ProjectID        string `json:"projectId"`
-	TotalFiles       int    `json:"totalFiles"`
-	TotalBytes       int64  `json:"totalBytes"`
-	UnusedFiles      int    `json:"unusedFiles"`
-	DuplicateFiles   int    `json:"duplicateFiles"`
-	OptimizableFiles int    `json:"optimizableFiles"`
-	LintFindings     int    `json:"lintFindings"`
+	ProjectID               string `json:"projectId"`
+	TotalFiles              int    `json:"totalFiles"`
+	TotalBytes              int64  `json:"totalBytes"`
+	UnusedFiles             int    `json:"unusedFiles"`
+	PossiblyUnusedFiles     int    `json:"possiblyUnusedFiles"`
+	UsageNotApplicableFiles int    `json:"usageNotApplicableFiles"`
+	ReferencedFiles         int    `json:"referencedFiles"`
+	DuplicateFiles          int    `json:"duplicateFiles"`
+	OptimizableFiles        int    `json:"optimizableFiles"`
+	LintFindings            int    `json:"lintFindings"`
 }
 
 type CatalogItemQuery struct {

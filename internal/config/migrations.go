@@ -43,6 +43,7 @@ func (s *Store) migrate() error {
 			name TEXT NOT NULL,
 			path TEXT NOT NULL,
 			icon_image TEXT NOT NULL DEFAULT '',
+			scan_intent TEXT NOT NULL DEFAULT 'code',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT,
@@ -92,6 +93,10 @@ func (s *Store) migrate() error {
 			dhash TEXT,
 			dhash_flipped TEXT,
 			used_count INTEGER NOT NULL DEFAULT 0,
+			scan_intent TEXT NOT NULL DEFAULT 'code',
+			usage_classification TEXT NOT NULL DEFAULT 'notApplicable',
+			delete_unused_allowed INTEGER NOT NULL DEFAULT 0,
+			lint_applicability TEXT NOT NULL DEFAULT 'advisory',
 			PRIMARY KEY (scan_id, asset_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS reference_snapshots (
@@ -236,6 +241,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateProjectsIconSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateProjectsScanIntentSchema(); err != nil {
+		return err
+	}
 	if err := s.migrateWorkspacesIconSchema(); err != nil {
 		return err
 	}
@@ -314,6 +322,20 @@ func (s *Store) migrateScanPerformanceSchema() error {
 	}
 	if !assetColumns["modified_unix"] {
 		if _, err := s.db.Exec(`ALTER TABLE asset_snapshots ADD COLUMN modified_unix INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	assetStatements := map[string]string{
+		"scan_intent":           `ALTER TABLE asset_snapshots ADD COLUMN scan_intent TEXT NOT NULL DEFAULT 'code'`,
+		"usage_classification":  `ALTER TABLE asset_snapshots ADD COLUMN usage_classification TEXT NOT NULL DEFAULT 'notApplicable'`,
+		"delete_unused_allowed": `ALTER TABLE asset_snapshots ADD COLUMN delete_unused_allowed INTEGER NOT NULL DEFAULT 0`,
+		"lint_applicability":    `ALTER TABLE asset_snapshots ADD COLUMN lint_applicability TEXT NOT NULL DEFAULT 'advisory'`,
+	}
+	for column, statement := range assetStatements {
+		if assetColumns[column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement); err != nil {
 			return err
 		}
 	}
@@ -467,6 +489,7 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 			name TEXT NOT NULL,
 			path TEXT NOT NULL,
 			icon_image TEXT NOT NULL DEFAULT '',
+			scan_intent TEXT NOT NULL DEFAULT 'code',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			deleted_at TEXT,
@@ -476,8 +499,8 @@ func (s *Store) migrateProjectsWorkspaceSchema() error {
 		return err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO projects (id, workspace_id, name, path, icon_image, created_at, updated_at, deleted_at)
-		SELECT id, 'default', name, path, '', created_at, updated_at, deleted_at
+		INSERT INTO projects (id, workspace_id, name, path, icon_image, scan_intent, created_at, updated_at, deleted_at)
+		SELECT id, 'default', name, path, '', 'code', created_at, updated_at, deleted_at
 		FROM projects_legacy
 	`); err != nil {
 		return err
@@ -497,6 +520,18 @@ func (s *Store) migrateProjectsIconSchema() error {
 		return nil
 	}
 	_, err = s.db.Exec(`ALTER TABLE projects ADD COLUMN icon_image TEXT NOT NULL DEFAULT ''`)
+	return err
+}
+
+func (s *Store) migrateProjectsScanIntentSchema() error {
+	columns, err := s.tableColumns("projects")
+	if err != nil {
+		return err
+	}
+	if columns["scan_intent"] {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE projects ADD COLUMN scan_intent TEXT NOT NULL DEFAULT 'code'`)
 	return err
 }
 

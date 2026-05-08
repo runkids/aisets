@@ -110,12 +110,21 @@ func TestCmdProjectsAddListAndScanJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	added := captureStdout(t, func() {
-		if err := cmdProjects([]string{"add", project, "--json"}, false); err != nil {
+	detected := captureStdout(t, func() {
+		if err := cmdProjects([]string{"detect-intent", project, "--json"}, false); err != nil {
 			t.Fatal(err)
 		}
 	})
-	if !strings.Contains(added, `"ok": true`) || !strings.Contains(added, project) {
+	if !strings.Contains(detected, `"detection"`) {
+		t.Fatalf("projects detect-intent json = %s", detected)
+	}
+
+	added := captureStdout(t, func() {
+		if err := cmdProjects([]string{"add", project, "--scan-intent", "assetPack", "--json"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(added, `"ok": true`) || !strings.Contains(added, project) || !strings.Contains(added, `"scanIntent": "assetPack"`) {
 		t.Fatalf("projects add json = %s", added)
 	}
 

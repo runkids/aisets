@@ -175,9 +175,9 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return "a.bytes <= ?", []any{value}, nil
 	case "status":
 		if value == "unused" {
-			return "a.used_count = 0", nil, nil
+			return "a.usage_classification = 'unused'", nil, nil
 		}
-		return "a.used_count > 0", nil, nil
+		return "a.usage_classification = 'referenced'", nil, nil
 	case "duplicate":
 		return booleanExistsSQL("EXISTS (SELECT 1 FROM duplicate_group_assets d3 WHERE d3.scan_id = a.scan_id AND d3.asset_id = a.asset_id)", value), nil, nil
 	case "nearDuplicate":
@@ -337,9 +337,11 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":
-		clauses = append(clauses, "a.used_count = 0")
+		clauses = append(clauses, "a.usage_classification = 'unused'")
+	case "possiblyUnused":
+		clauses = append(clauses, "a.usage_classification = 'possiblyUnused'")
 	case "referenced":
-		clauses = append(clauses, "a.used_count > 0")
+		clauses = append(clauses, "a.usage_classification = 'referenced'")
 	case "duplicate":
 		clauses = append(clauses, `(EXISTS (
 			SELECT 1 FROM duplicate_group_assets d2

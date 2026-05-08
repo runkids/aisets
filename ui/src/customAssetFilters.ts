@@ -3,6 +3,7 @@ import type {
   CustomAssetFilter,
   CustomAssetFilterField,
 } from "./types";
+import { usageClassification } from "./projectScanIntent";
 
 export type CustomFilterOption = {
   id: string;
@@ -124,8 +125,9 @@ function matchesClause(
     }
     case "status":
       if (clause.operator !== "is") return false;
-      if (value === "unused") return item.usedBy.length === 0;
-      if (value === "referenced") return item.usedBy.length > 0;
+      if (value === "unused") return usageClassification(item) === "unused";
+      if (value === "referenced")
+        return usageClassification(item) === "referenced";
       return false;
     case "duplicate":
       return (

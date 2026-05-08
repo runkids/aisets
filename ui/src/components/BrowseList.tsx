@@ -16,6 +16,7 @@ import type { AssetItem } from "../types";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { ocrStatusLabel } from "../ocrStatus";
+import { usageClassification } from "../projectScanIntent";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
@@ -92,12 +93,15 @@ export function BrowseList({
   function renderRow(item: AssetItem, style?: CSSProperties) {
     const isActive = activeAssetId === item.id;
     const isSelected = selected.has(item.id);
-    const isUnused = item.usedBy.length === 0;
+    const usage = usageClassification(item);
+    const isUnused = usage === "unused";
+    const isPossiblyUnused = usage === "possiblyUnused";
     const duplicate = hasDuplicates(item);
     const optimizable = item.optimizationRecommendations.length > 0;
     const statusLabels = [
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
+      isPossiblyUnused ? t("browse.flagPossiblyUnused") : "",
       optimizable ? t("browse.flagOptimizable") : "",
       ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
@@ -184,6 +188,12 @@ export function BrowseList({
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-red)_35%,transparent)] bg-g-red-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-red">
               <CircleOff size={10} />
               {t("browse.flagUnusedShort")}
+            </span>
+          )}
+          {isPossiblyUnused && (
+            <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
+              <CircleOff size={10} />
+              {t("browse.flagPossiblyUnusedShort")}
             </span>
           )}
           {optimizable && (

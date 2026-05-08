@@ -6,18 +6,26 @@ import {
   HardDrive,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { detectProjectScanIntent } from "../api";
 import { errorMessage } from "../i18n/index";
+import {
+  normalizeProjectScanIntent,
+  projectScanIntentDescription,
+  projectScanIntentLabel,
+  projectScanIntents,
+} from "../projectScanIntent";
 import { useDirectoryListingQuery } from "../queries";
-import { Button, EmptyState, Modal, TextInput } from "./ui";
+import type { ProjectScanIntent, ProjectScanIntentDetection } from "../types";
+import { Button, EmptyState, Modal, Select, TextInput } from "./ui";
 
 type Props = {
   open: boolean;
   working: boolean;
   initialPath?: string;
   onClose: () => void;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, scanIntent: ProjectScanIntent) => void;
 };
 
 export function DirectoryPickerModal({
@@ -30,6 +38,12 @@ export function DirectoryPickerModal({
   const { t } = useTranslation();
   const [path, setPath] = useState("");
   const [draftPath, setDraftPath] = useState("");
+  const [scanIntent, setScanIntent] = useState<ProjectScanIntent>("code");
+  const [detection, setDetection] = useState<ProjectScanIntentDetection | null>(
+    null,
+  );
+  const [detecting, setDetecting] = useState(false);
+  const [detectionError, setDetectionError] = useState("");
   const activePath = path || initialPath;
   const listingQuery = useDirectoryListingQuery(activePath, open);
   const listing = listingQuery.data;
@@ -38,18 +52,64 @@ export function DirectoryPickerModal({
     ? errorMessage(listingQuery.error)
     : "";
 
+  const intentOptions = useMemo(
+    () =>
+      projectScanIntents.map((intent) => ({
+        value: intent,
+        label: projectScanIntentLabel(t, intent),
+        description: projectScanIntentDescription(t, intent),
+      })),
+    [t],
+  );
+
+  useEffect(() => {
+    if (!open || !listing?.path) return;
+    let cancelled = false;
+    void Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        setDetecting(true);
+        setDetectionError("");
+        return detectProjectScanIntent(listing.path);
+      })
+      .then((result) => {
+        if (cancelled || !result) return;
+        setDetection(result.detection);
+        setScanIntent(
+          result.detection.confidence === "low"
+            ? "mixed"
+            : normalizeProjectScanIntent(result.detection.suggestedScanIntent),
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setDetection(null);
+        setScanIntent("mixed");
+        setDetectionError(errorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setDetecting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.path, open]);
+
   if (!open) return null;
 
   function resetAndClose() {
     setPath("");
     setDraftPath("");
+    setDetection(null);
+    setDetectionError("");
+    setScanIntent("code");
     onClose();
   }
 
   function selectCurrent() {
     setPath("");
     setDraftPath("");
-    onSelect(currentPath);
+    onSelect(currentPath, scanIntent);
   }
 
   function go(target: string) {
@@ -66,6 +126,8 @@ export function DirectoryPickerModal({
       title={t("directoryPicker.title")}
       description={t("directoryPicker.description")}
       onClose={resetAndClose}
+      bodyPadding="none"
+      bodyClassName="flex flex-col overflow-hidden"
       footer={
         <>
           <div className="min-w-0 truncate text-g-body text-g-ink-4">
@@ -86,24 +148,72 @@ export function DirectoryPickerModal({
         </>
       }
     >
-      <div className="flex flex-col gap-3 min-h-[320px]">
-        <div className="flex gap-2 items-center">
-          <TextInput
-            icon={<HardDrive size={16} />}
-            value={draftPath || currentPath}
-            onChange={(event) => setDraftPath(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submitDraft();
-            }}
-            placeholder={t("directoryPicker.pathPlaceholder")}
-            aria-label={t("directoryPicker.pathLabel")}
-          />
-          <Button variant="secondary" onClick={submitDraft}>
-            {t("directoryPicker.go")}
-          </Button>
+      <div className="flex min-h-[420px] flex-1 flex-col">
+        <div className="z-[30] flex shrink-0 flex-col gap-3 border-b border-g-line bg-g-surface px-5 pb-3">
+          <div className="flex gap-2 items-center">
+            <TextInput
+              icon={<HardDrive size={16} />}
+              value={draftPath || currentPath}
+              onChange={(event) => setDraftPath(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitDraft();
+              }}
+              placeholder={t("directoryPicker.pathPlaceholder")}
+              aria-label={t("directoryPicker.pathLabel")}
+            />
+            <Button variant="secondary" onClick={submitDraft}>
+              {t("directoryPicker.go")}
+            </Button>
+          </div>
+
+          <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-g text-g-ui font-[590] tracking-g-ui text-g-ink">
+                  {t("directoryPicker.projectType")}
+                </p>
+                <p className="mt-0.5 font-g text-g-caption tracking-g-ui text-g-ink-3">
+                  {t("directoryPicker.projectTypeHint")}
+                </p>
+              </div>
+              <Select
+                value={scanIntent}
+                options={intentOptions}
+                onChange={(value) => setScanIntent(value as ProjectScanIntent)}
+                aria-label={t("directoryPicker.projectType")}
+                className="w-full sm:w-[240px]"
+              />
+            </div>
+            <div className="mt-2 font-g text-g-caption tracking-g-ui text-g-ink-3">
+              {detecting ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" />
+                  {t("directoryPicker.detectingIntent")}
+                </span>
+              ) : detection ? (
+                <span>
+                  {t("directoryPicker.detectedIntent", {
+                    intent: projectScanIntentLabel(
+                      t,
+                      normalizeProjectScanIntent(detection.suggestedScanIntent),
+                    ),
+                  })}
+                  {" · "}
+                  {projectScanIntentDescription(
+                    t,
+                    normalizeProjectScanIntent(detection.suggestedScanIntent),
+                  )}
+                </span>
+              ) : detectionError ? (
+                <span>{t("directoryPicker.detectIntentFailed")}</span>
+              ) : (
+                <span>{projectScanIntentDescription(t, scanIntent)}</span>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 bg-g-canvas border border-g-line rounded-g-md shadow-g-inset overflow-hidden min-h-[280px] flex flex-col">
+        <div className="mx-5 mb-5 mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-g-md border border-g-line bg-g-canvas shadow-g-inset">
           {listingQuery.isPending ? (
             <EmptyState
               icon={<Loader2 className="animate-spin" size={22} />}

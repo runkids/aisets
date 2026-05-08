@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { canDeleteUnused } from "../projectScanIntent";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
 import { AssetThumbnail, Badge, Button } from "./ui";
@@ -68,7 +69,7 @@ export function AssetCard({ item, onRename, onDelete }: Props) {
           >
             {t("action.rename")}
           </Button>
-          {item.usedBy.length === 0 && (
+          {canDeleteUnused(item) && (
             <Button
               size="sm"
               variant="danger"

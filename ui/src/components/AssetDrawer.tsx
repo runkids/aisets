@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useSettingsQuery } from "../queries";
+import { canDeleteUnused, usageClassification } from "../projectScanIntent";
 import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
@@ -143,7 +144,9 @@ export function AssetDrawer({
   const similarCount =
     (duplicateItems.length || asset.duplicates.length) +
     (similarItems.length || asset.similar.length);
-  const isUnused = asset.references.length === 0;
+  const usage = usageClassification(asset);
+  const isUnused = usage === "unused";
+  const isPossiblyUnused = usage === "possiblyUnused";
 
   const tabs = useMemo(() => {
     const items: TabItem<DrawerTab>[] = [
@@ -307,6 +310,7 @@ export function AssetDrawer({
                   {(isUnused ||
                     asset.duplicates.length > 0 ||
                     asset.similar.length > 0 ||
+                    isPossiblyUnused ||
                     asset.optimizationRecommendations.length > 0 ||
                     ocrVisible) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -316,6 +320,15 @@ export function AssetDrawer({
                         >
                           <Badge tone="red">
                             {t("assetDrawer.chipUnused")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {isPossiblyUnused && (
+                        <HeroBadgeButton
+                          onClick={() => handleTabChange("usage")}
+                        >
+                          <Badge tone="amber">
+                            {t("assetDrawer.chipPossiblyUnused")}
                           </Badge>
                         </HeroBadgeButton>
                       )}
@@ -411,7 +424,7 @@ export function AssetDrawer({
                     </IconButton>
                   </Tooltip>
                 )}
-                {onDelete && asset.usedBy.length === 0 && (
+                {onDelete && canDeleteUnused(asset) && (
                   <Tooltip label={t("action.delete")}>
                     <IconButton
                       size="sm"
@@ -460,6 +473,7 @@ export function AssetDrawer({
               {tab === "overview" && <AssetDrawerOverview asset={asset} />}
               {tab === "usage" && (
                 <AssetDrawerUsage
+                  asset={asset}
                   references={asset.references}
                   preferredEditor={preferredEditor}
                   rootPath={projectRoot(asset.localPath, asset.repoPath)}

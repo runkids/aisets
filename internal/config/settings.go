@@ -292,6 +292,7 @@ func (s *Store) ImportData(data ExportData) error {
 		if strings.TrimSpace(project.Path) == "" {
 			continue
 		}
+		project.ScanIntent = scanner.NormalizeProjectScanIntent(project.ScanIntent)
 		workspaceID := project.WorkspaceID
 		if workspaceID == "" {
 			workspaceID = s.activeWorkspaceID()
@@ -300,14 +301,10 @@ func (s *Store) ImportData(data ExportData) error {
 		projectsByWorkspace[workspaceID] = append(projectsByWorkspace[workspaceID], project)
 	}
 	for workspaceID, projects := range projectsByWorkspace {
-		paths := make([]string, 0, len(projects))
 		for _, project := range projects {
-			paths = append(paths, project.Path)
-		}
-		if err := s.AddProjectsToWorkspace(workspaceID, paths); err != nil {
-			return err
-		}
-		for _, project := range projects {
+			if err := s.AddProjectsToWorkspaceWithIntent(workspaceID, []string{project.Path}, project.ScanIntent); err != nil {
+				return err
+			}
 			name := strings.TrimSpace(project.Name)
 			if name == "" {
 				continue
@@ -316,7 +313,7 @@ func (s *Store) ImportData(data ExportData) error {
 			if err != nil {
 				return err
 			}
-			if err := s.RenameProject(projectID(workspaceID, abs), name, project.IconImage); err != nil {
+			if err := s.RenameProject(projectID(workspaceID, abs), name, project.IconImage, project.ScanIntent); err != nil {
 				return err
 			}
 		}

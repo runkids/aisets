@@ -39,21 +39,31 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 	if err != nil {
 		return CatalogSummary{}, err
 	}
+	stats := scanner.CatalogStats{
+		TotalFiles:      scan.TotalFiles,
+		DuplicateGroups: scan.DuplicateGroups,
+		DuplicateFiles:  scan.DuplicateFiles,
+		UnusedFiles:     scan.UnusedFiles,
+		NearDuplicates:  scan.NearDuplicates,
+		LintFindings:    lintFindings,
+		CacheHits:       scan.CacheHits,
+	}
+	if len(projectStats) > 0 {
+		stats.UnusedFiles = 0
+		for _, projectStat := range projectStats {
+			stats.UnusedFiles += projectStat.UnusedFiles
+			stats.PossiblyUnusedFiles += projectStat.PossiblyUnusedFiles
+			stats.UsageNotApplicableFiles += projectStat.UsageNotApplicableFiles
+			stats.ReferencedFiles += projectStat.ReferencedFiles
+		}
+	}
 	return CatalogSummary{
 		ScanID:       scan.ID,
 		GeneratedAt:  scan.CompletedAt,
 		Projects:     projects,
 		ProjectStats: projectStats,
-		Stats: scanner.CatalogStats{
-			TotalFiles:      scan.TotalFiles,
-			DuplicateGroups: scan.DuplicateGroups,
-			DuplicateFiles:  scan.DuplicateFiles,
-			UnusedFiles:     scan.UnusedFiles,
-			NearDuplicates:  scan.NearDuplicates,
-			LintFindings:    lintFindings,
-			CacheHits:       scan.CacheHits,
-		},
-		Analysis: scan.Analysis,
+		Stats:        stats,
+		Analysis:     scan.Analysis,
 	}, nil
 }
 
@@ -75,7 +85,10 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 		SELECT a.project_id,
 			COUNT(*),
 			COALESCE(SUM(a.bytes), 0),
-			COALESCE(SUM(CASE WHEN a.used_count = 0 THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN a.usage_classification = 'unused' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN a.usage_classification = 'possiblyUnused' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN a.usage_classification = 'notApplicable' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN a.usage_classification = 'referenced' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN EXISTS (
 				SELECT 1 FROM duplicate_group_assets d
 				WHERE d.scan_id = a.scan_id AND d.asset_id = a.asset_id
@@ -94,7 +107,7 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 	defer rows.Close()
 	for rows.Next() {
 		var stat CatalogProjectStats
-		if err := rows.Scan(&stat.ProjectID, &stat.TotalFiles, &stat.TotalBytes, &stat.UnusedFiles, &stat.DuplicateFiles, &stat.OptimizableFiles); err != nil {
+		if err := rows.Scan(&stat.ProjectID, &stat.TotalFiles, &stat.TotalBytes, &stat.UnusedFiles, &stat.PossiblyUnusedFiles, &stat.UsageNotApplicableFiles, &stat.ReferencedFiles, &stat.DuplicateFiles, &stat.OptimizableFiles); err != nil {
 			return nil, err
 		}
 		stats[stat.ProjectID] = stat

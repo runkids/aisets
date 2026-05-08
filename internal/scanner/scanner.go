@@ -12,6 +12,7 @@ import (
 
 	catalogcache "asset-studio/internal/cache"
 	"asset-studio/internal/imageproc"
+	"asset-studio/internal/lint"
 )
 
 type Scanner struct {
@@ -60,7 +61,8 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 }
 
 func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, options ScanOptions, progress ProgressFunc) (Catalog, error) {
-	options = NormalizeScanOptions(options)
+	projects = normalizeScanProjects(projects)
+	options = IntentAdjustedOptions(projects, options)
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
 	candidates, err := collectCandidates(ctx, projects, options.ExcludePatterns)
 	if err != nil {
@@ -75,6 +77,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 	const nearDupThreshold = 10_000
 	if options.Profile != ScanProfileCustom && len(candidates) >= nearDupThreshold && options.Analyses.NearDuplicates {
 		options.Analyses.NearDuplicates = false
+		options.Profile = ScanProfileCustom
 	}
 	sizeCounts := map[int64]int{}
 	for _, candidate := range candidates {
@@ -142,9 +145,12 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		return items[i].RepoPath < items[j].RepoPath
 	})
 
-	if options.Analyses.References {
+	referencesComputed := options.Analyses.References && !ReferencesNotApplicable(projects)
+	if referencesComputed {
 		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences})
-		refs, err := buildReferenceMap(ctx, projects, items, options.ExcludePatterns, func(current, total int) {
+		refProjects := referenceProjects(projects)
+		refItems := referenceItems(items)
+		refs, err := buildReferenceMap(ctx, refProjects, refItems, options.ExcludePatterns, func(current, total int) {
 			notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, Current: current, Total: total})
 		})
 		if err != nil {
@@ -155,7 +161,13 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 			items[i].UsedBy = uniqueReferenceFiles(items[i].References)
 		}
 	} else {
-		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, State: AnalysisNotComputed})
+		reason := AnalysisSkipByUser
+		message := ""
+		if ReferencesNotApplicable(projects) {
+			reason = AnalysisSkipNotApplicable
+			message = "Skipped references — project marked as asset pack."
+		}
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseReferences, State: AnalysisNotComputed, Reason: reason, Message: message})
 	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseDuplicates})
 	dups := markDuplicates(items)
@@ -172,15 +184,24 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, State: AnalysisNotComputed})
 	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint})
-	lintFindings := runLint(projects, items)
+	lintFindings := []lint.Finding{}
+	if referencesComputed {
+		lintFindings = runLint(referenceProjects(projects), referenceItems(items))
+	} else {
+		reason := AnalysisSkipByUser
+		message := ""
+		if ReferencesNotApplicable(projects) {
+			reason = AnalysisSkipNotApplicable
+			message = "Skipped lint — project marked as asset pack."
+		}
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint, State: AnalysisNotComputed, Reason: reason, Message: message})
+	}
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint, Current: len(lintFindings), Total: len(lintFindings)})
 
-	unused := 0
+	classifyUsage(ctx, projects, items, options.ExcludePatterns, referencesComputed)
+	stats := usageStats(items)
 	dupFiles := 0
 	for i := range items {
-		if options.Analyses.References && len(items[i].UsedBy) == 0 {
-			unused++
-		}
 		if items[i].DuplicateGroupID != nil {
 			dupFiles++
 		}
@@ -193,13 +214,16 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		NearDuplicates:  near,
 		LintFindings:    lintFindings,
 		Stats: CatalogStats{
-			TotalFiles:      len(items),
-			DuplicateGroups: len(dups),
-			DuplicateFiles:  dupFiles,
-			UnusedFiles:     unused,
-			NearDuplicates:  len(near),
-			LintFindings:    len(lintFindings),
-			CacheHits:       cacheHits,
+			TotalFiles:              len(items),
+			DuplicateGroups:         len(dups),
+			DuplicateFiles:          dupFiles,
+			UnusedFiles:             stats.unused,
+			PossiblyUnusedFiles:     stats.possiblyUnused,
+			UsageNotApplicableFiles: stats.notApplicable,
+			ReferencedFiles:         stats.referenced,
+			NearDuplicates:          len(near),
+			LintFindings:            len(lintFindings),
+			CacheHits:               cacheHits,
 		},
 		Analysis: AnalysisFromOptions(options),
 	}
@@ -245,6 +269,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 		URL:           "/api/assets/" + stableID(candidate.project.ID+":"+candidate.repo),
 		ThumbnailURL:  "/api/thumbs/" + stableID(candidate.project.ID+":"+candidate.repo),
 		HashAlgorithm: contentHashAlgorithm,
+		ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
 	}
 	if record, ok := s.cache.Get(cacheKey, info.Size(), info.ModTime().UnixNano()); ok {
 		item.ContentHash = record.ContentHash

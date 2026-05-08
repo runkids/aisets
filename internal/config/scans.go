@@ -46,9 +46,10 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		INSERT INTO asset_snapshots (
 			scan_id, asset_id, project_id, project_name, repo_path, file_name, local_path, ext,
 			bytes, modified_unix, content_hash, hash_algorithm, format, width, height, animated,
-			alpha, pages, dhash, dhash_flipped, used_count
+			alpha, pages, dhash, dhash_flipped, used_count, scan_intent, usage_classification,
+			delete_unused_allowed, lint_applicability
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return 0, err
@@ -74,11 +75,13 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 	}
 	defer optStmt.Close()
 	for _, item := range catalog.Items {
+		item = normalizeSnapshotItem(item)
 		usedCount := len(item.UsedBy)
 		if _, err = assetStmt.Exec(scanID, item.ID, item.ProjectID, item.ProjectName, item.RepoPath, assetFileName(item.RepoPath), item.LocalPath, item.Ext,
 			item.Bytes, item.ModifiedUnix, item.ContentHash, item.HashAlgorithm, item.Image.Format, item.Image.Width,
 			item.Image.Height, boolInt(item.Image.Animated), boolInt(item.Image.Alpha), item.Image.Pages,
-			item.DHash, item.DHashFlipped, usedCount); err != nil {
+			item.DHash, item.DHashFlipped, usedCount, item.ScanIntent, item.UsageClassification,
+			boolInt(item.DeleteUnusedAllowed), item.LintApplicability); err != nil {
 			return 0, err
 		}
 		for _, ref := range item.References {
@@ -168,6 +171,24 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 	return scanID, nil
 }
 
+func normalizeSnapshotItem(item scanner.AssetItem) scanner.AssetItem {
+	item.ScanIntent = scanner.NormalizeProjectScanIntent(item.ScanIntent)
+	if item.UsageClassification == "" {
+		if len(item.UsedBy) > 0 {
+			item.UsageClassification = scanner.UsageReferenced
+		} else {
+			item.UsageClassification = scanner.UsageUnused
+		}
+	}
+	if item.LintApplicability == "" {
+		item.LintApplicability = scanner.LintApplicable
+	}
+	if item.UsageClassification == scanner.UsageUnused {
+		item.DeleteUnusedAllowed = true
+	}
+	return item
+}
+
 func assetFileName(repoPath string) string {
 	index := strings.LastIndex(repoPath, "/")
 	if index < 0 || index == len(repoPath)-1 {
@@ -228,13 +249,14 @@ func scanSummaryFromRows(row scanSummaryScanner) (ScanSummary, error) {
 }
 
 type scanAssetSnapshot struct {
-	ProjectID   string
-	ProjectName string
-	RepoPath    string
-	Ext         string
-	Bytes       int64
-	ContentHash string
-	UsedCount   int
+	ProjectID           string
+	ProjectName         string
+	RepoPath            string
+	Ext                 string
+	Bytes               int64
+	ContentHash         string
+	UsedCount           int
+	UsageClassification scanner.UsageClassification
 }
 
 func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
@@ -289,10 +311,10 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 		if before.UsedCount != after.UsedCount {
 			diff.ReferenceChanges = append(diff.ReferenceChanges, beforeAfterDiff(before, after))
 		}
-		if before.UsedCount > 0 && after.UsedCount == 0 {
+		if before.UsageClassification == scanner.UsageReferenced && after.UsageClassification == scanner.UsageUnused {
 			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "becameUnused", before.UsedCount, after.UsedCount))
 		}
-		if before.UsedCount == 0 && after.UsedCount > 0 {
+		if before.UsageClassification == scanner.UsageUnused && after.UsageClassification == scanner.UsageReferenced {
 			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "noLongerUnused", before.UsedCount, after.UsedCount))
 		}
 	}
@@ -335,7 +357,8 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 
 func (s *Store) scanAssets(scanID int64) (map[string]scanAssetSnapshot, error) {
 	rows, err := s.db.Query(`
-		SELECT project_id, project_name, repo_path, ext, bytes, COALESCE(content_hash, ''), used_count
+		SELECT project_id, project_name, repo_path, ext, bytes, COALESCE(content_hash, ''), used_count,
+			COALESCE(usage_classification, 'notApplicable')
 		FROM asset_snapshots
 		WHERE scan_id = ?
 	`, scanID)
@@ -346,7 +369,7 @@ func (s *Store) scanAssets(scanID int64) (map[string]scanAssetSnapshot, error) {
 	out := map[string]scanAssetSnapshot{}
 	for rows.Next() {
 		var asset scanAssetSnapshot
-		if err := rows.Scan(&asset.ProjectID, &asset.ProjectName, &asset.RepoPath, &asset.Ext, &asset.Bytes, &asset.ContentHash, &asset.UsedCount); err != nil {
+		if err := rows.Scan(&asset.ProjectID, &asset.ProjectName, &asset.RepoPath, &asset.Ext, &asset.Bytes, &asset.ContentHash, &asset.UsedCount, &asset.UsageClassification); err != nil {
 			return nil, err
 		}
 		out[scanAssetKey(asset.ProjectID, asset.RepoPath)] = asset

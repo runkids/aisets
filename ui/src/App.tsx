@@ -62,7 +62,12 @@ import {
   normalizeImageBackgroundMode,
   type ImageBackgroundMode,
 } from "./imageBackground";
-import type { ActionPreview, AssetItem, ScanEvent } from "./types";
+import type {
+  ActionPreview,
+  AssetItem,
+  ProjectScanIntent,
+  ScanEvent,
+} from "./types";
 import { fileName, modeForPath, pathForMode, type Mode } from "./ui";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
@@ -356,15 +361,18 @@ export function App() {
       children: errorMessage(addProjectMutation.error),
     });
 
-  function onAddProject(path: string) {
+  function onAddProject(path: string, scanIntent: ProjectScanIntent) {
     if (ocrActivityBusy) return;
-    addProjectMutation.mutate(path, {
-      onSuccess: () => {
-        setDirectoryPickerOpen(false);
-        toast.success(t("toast.projectAdded", { path }));
+    addProjectMutation.mutate(
+      { path, scanIntent },
+      {
+        onSuccess: () => {
+          setDirectoryPickerOpen(false);
+          toast.success(t("toast.projectAdded", { path }));
+        },
+        onError: (e) => toast.error(errorMessage(e)),
       },
-      onError: (e) => toast.error(errorMessage(e)),
-    });
+    );
   }
 
   function onSwitchWorkspace(workspaceId: string) {
@@ -521,15 +529,6 @@ export function App() {
     }
   }
 
-  function openAssetIdFromPalette(id: string) {
-    const params = new URLSearchParams({ asset: id });
-    setAutoScrollAssetId(id);
-    navigate({
-      pathname: pathForMode("browse"),
-      search: `?${params.toString()}`,
-    });
-  }
-
   function openAssetFromPalette(asset: AssetItem) {
     const params = new URLSearchParams({
       asset: asset.id,
@@ -674,7 +673,7 @@ export function App() {
               className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
             >
               {mode === "precheck" ? (
-                <PreCheckView onOpenAsset={openAssetIdFromPalette} />
+                <PreCheckView onOpenAsset={setDrawerId} />
               ) : catalogSummary == null &&
                 !catalogQuery.isLoading ? null : mode === "projects" &&
                 catalogSummary ? (

@@ -73,10 +73,11 @@ export function Select({
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
           className={cn(
-            "z-[60] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
+            "z-[140] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
           )}
           position="popper"
           sideOffset={6}
+          collisionPadding={12}
         >
           <SelectPrimitive.Viewport className="flex flex-col gap-1">
             {options.map((option) => (

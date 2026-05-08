@@ -12,6 +12,8 @@ import type {
   ExportData,
   OCRRunEvent,
   Project,
+  ProjectScanIntent,
+  ProjectScanIntentDetection,
   ScanAnalyses,
   ScanEvent,
   ScanProfile,
@@ -373,11 +375,24 @@ export function removeOCR(languages: string[] = []) {
   });
 }
 
-export function addProject(path: string) {
+export function addProject(
+  path: string,
+  scanIntent: ProjectScanIntent = "code",
+) {
   return request<{ projects: Project[] }>("/api/projects/add", {
     method: "POST",
-    body: JSON.stringify({ path }),
+    body: JSON.stringify({ path, scanIntent }),
   });
+}
+
+export function detectProjectScanIntent(path: string) {
+  return request<{ detection: ProjectScanIntentDetection }>(
+    "/api/projects/detect-scan-intent",
+    {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    },
+  );
 }
 
 export function removeProject(id: string) {
@@ -415,10 +430,15 @@ export function removeWorkspace(id: string) {
   });
 }
 
-export function renameProject(id: string, name: string, iconImage = "") {
+export function renameProject(
+  id: string,
+  name: string,
+  iconImage = "",
+  scanIntent: ProjectScanIntent = "code",
+) {
   return request<{ projects: Project[] }>("/api/projects/rename", {
     method: "POST",
-    body: JSON.stringify({ id, name, iconImage }),
+    body: JSON.stringify({ id, name, iconImage, scanIntent }),
   });
 }
 

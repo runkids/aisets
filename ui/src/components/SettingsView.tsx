@@ -22,7 +22,7 @@ import {
   useVersionQuery,
   useDirectoryListingQuery,
 } from "../queries";
-import type { ExportData } from "../types";
+import type { ExportData, ProjectScanIntent } from "../types";
 import { Rail, RailItem, RailSection } from "./ui";
 import { useToast } from "./ToastProvider";
 import type {
@@ -251,10 +251,19 @@ export function SettingsView({
 
   function onRenameProject(
     projectId: string,
-    value: { name: string; iconImage: string },
+    value: {
+      name: string;
+      iconImage: string;
+      scanIntent: ProjectScanIntent;
+    },
   ) {
     renameProjectMutation.mutate(
-      { id: projectId, name: value.name, iconImage: value.iconImage },
+      {
+        id: projectId,
+        name: value.name,
+        iconImage: value.iconImage,
+        scanIntent: value.scanIntent,
+      },
       {
         onSuccess: () => {
           toast.success(t("projects.renameSuccess", { name: value.name }));

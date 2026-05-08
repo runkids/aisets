@@ -2,13 +2,19 @@ import { Upload, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Project } from "../types";
-import { Button, Modal, TextInput } from "./ui";
+import {
+  projectScanIntentDescription,
+  projectScanIntentLabel,
+  projectScanIntents,
+} from "../projectScanIntent";
+import type { Project, ProjectScanIntent } from "../types";
+import { Button, Modal, Select, TextInput } from "./ui";
 import { ProjectAvatar } from "./ProjectAvatar";
 
 type ProjectDialogValue = {
   name: string;
   iconImage: string;
+  scanIntent: ProjectScanIntent;
 };
 
 type ProjectDialogProps = {
@@ -41,13 +47,24 @@ function ProjectDialogContent({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const defaultName = project?.name ?? "";
   const defaultIconImage = project?.iconImage ?? "";
+  const defaultScanIntent = project?.scanIntent ?? "code";
   const [name, setName] = useState(defaultName);
   const [iconImage, setIconImage] = useState(defaultIconImage);
+  const [scanIntent, setScanIntent] =
+    useState<ProjectScanIntent>(defaultScanIntent);
   const [error, setError] = useState("");
 
   const trimmedName = name.trim();
-  const changed = trimmedName !== defaultName || iconImage !== defaultIconImage;
+  const changed =
+    trimmedName !== defaultName ||
+    iconImage !== defaultIconImage ||
+    scanIntent !== defaultScanIntent;
   const canSubmit = trimmedName.length > 0 && changed;
+  const intentOptions = projectScanIntents.map((intent) => ({
+    value: intent,
+    label: projectScanIntentLabel(t, intent),
+    description: projectScanIntentDescription(t, intent),
+  }));
 
   async function onFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -71,7 +88,7 @@ function ProjectDialogContent({
 
   function submit() {
     if (!canSubmit) return;
-    onConfirm({ name: trimmedName, iconImage });
+    onConfirm({ name: trimmedName, iconImage, scanIntent });
   }
 
   return (
@@ -160,6 +177,20 @@ function ProjectDialogContent({
           autoFocus
           disabled={loading}
         />
+        <div>
+          <p className="mb-1.5 font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+            {t("projects.projectType")}
+          </p>
+          <Select
+            value={scanIntent}
+            options={intentOptions}
+            onChange={(value) => setScanIntent(value as ProjectScanIntent)}
+            aria-label={t("projects.projectType")}
+          />
+          <p className="mt-1.5 font-g text-g-caption tracking-g-ui text-g-ink-3">
+            {projectScanIntentDescription(t, scanIntent)}
+          </p>
+        </div>
       </div>
     </Modal>
   );

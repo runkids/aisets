@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { fileName, formatBytes } from "../ui";
 import {
+  AssetThumbnail,
   Badge,
   Button,
   Card,
@@ -408,6 +409,7 @@ function PreCheckCard({
         result.exactMatches.map((m) => (
           <MatchRow
             key={m.assetId}
+            assetId={m.assetId}
             repoPath={m.repoPath}
             projectName={m.projectName}
             onClick={onOpenAsset ? () => onOpenAsset(m.assetId) : undefined}
@@ -425,6 +427,7 @@ function PreCheckCard({
         result.nearMatches.map((m) => (
           <MatchRow
             key={m.assetId}
+            assetId={m.assetId}
             repoPath={m.repoPath}
             projectName={m.projectName}
             trailing={
@@ -622,11 +625,13 @@ function CollapsibleSection({
 }
 
 function MatchRow({
+  assetId,
   repoPath,
   projectName,
   trailing,
   onClick,
 }: {
+  assetId?: string;
   repoPath: string;
   projectName: string;
   trailing?: string;
@@ -639,7 +644,14 @@ function MatchRow({
 
   const contents = (
     <>
-      <span className="min-w-20 text-g-chip text-g-ink-4">{projectName}</span>
+      {assetId && (
+        <AssetThumbnail
+          src={`/api/thumbs/${assetId}`}
+          size="sm"
+          alt={repoPath}
+        />
+      )}
+      <span className="min-w-16 text-g-chip text-g-ink-4">{projectName}</span>
       <span className="min-w-0 flex-1 truncate font-g-mono text-g-caption text-g-ink">
         {repoPath}
       </span>

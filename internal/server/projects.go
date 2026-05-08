@@ -10,6 +10,7 @@ import (
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
+	"asset-studio/internal/projectintent"
 	"asset-studio/internal/scanner"
 )
 
@@ -79,6 +80,9 @@ func directoryAccessError(err error, path string) apierr.Error {
 }
 
 func projectPathError(err error, path string) apierr.Error {
+	if coded, ok := err.(apierr.Error); ok {
+		return coded
+	}
 	params := map[string]any{"path": path}
 	var pathErr *config.PathError
 	if errors.As(err, &pathErr) {
@@ -103,17 +107,39 @@ func projectErrorStatus(err error) int {
 
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
 	var body struct {
+		Path       string                    `json:"path"`
+		ScanIntent scanner.ProjectScanIntent `json:"scanIntent"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.store.AddProjectsWithIntent([]string{body.Path}, body.ScanIntent); err != nil {
+		writeError(w, http.StatusBadRequest, projectPathError(err, body.Path))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"projects": s.store.Projects()})
+}
+
+func (s *Server) handleDetectProjectScanIntent(w http.ResponseWriter, r *http.Request) {
+	var body struct {
 		Path string `json:"path"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.store.AddProjects([]string{body.Path}); err != nil {
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	detection, err := projectintent.Detect(r.Context(), body.Path, settings.ExcludePatterns)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, projectPathError(err, body.Path))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"projects": s.store.Projects()})
+	writeJSON(w, http.StatusOK, map[string]any{"detection": detection})
 }
 
 func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
@@ -134,15 +160,16 @@ func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRenameProject(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		IconImage string `json:"iconImage"`
+		ID         string                    `json:"id"`
+		Name       string                    `json:"name"`
+		IconImage  string                    `json:"iconImage"`
+		ScanIntent scanner.ProjectScanIntent `json:"scanIntent"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.store.RenameProject(body.ID, body.Name, body.IconImage); err != nil {
+	if err := s.store.RenameProject(body.ID, body.Name, body.IconImage, body.ScanIntent); err != nil {
 		writeError(w, projectErrorStatus(err), err)
 		return
 	}
@@ -162,7 +189,7 @@ func (s *Server) projectByID(id string) (scanner.Project, error) {
 func toScannerProjects(projects []config.Project) []scanner.Project {
 	out := make([]scanner.Project, 0, len(projects))
 	for _, project := range projects {
-		out = append(out, scanner.Project{ID: project.ID, WorkspaceID: project.WorkspaceID, Name: project.Name, Path: project.Path, CreatedAt: project.CreatedAt})
+		out = append(out, scanner.Project{ID: project.ID, WorkspaceID: project.WorkspaceID, Name: project.Name, Path: project.Path, ScanIntent: project.ScanIntent, CreatedAt: project.CreatedAt})
 	}
 	return out
 }

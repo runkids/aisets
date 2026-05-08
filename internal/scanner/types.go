@@ -26,11 +26,54 @@ const (
 	ScanProfileCustom ScanProfile = "custom"
 )
 
+type ProjectScanIntent string
+
+const (
+	ProjectScanIntentCode      ProjectScanIntent = "code"
+	ProjectScanIntentAssetPack ProjectScanIntent = "assetPack"
+	ProjectScanIntentLibrary   ProjectScanIntent = "library"
+	ProjectScanIntentMixed     ProjectScanIntent = "mixed"
+)
+
+type ReferenceCoverage string
+
+const (
+	ReferenceCoverageSupported     ReferenceCoverage = "supported"
+	ReferenceCoveragePartial       ReferenceCoverage = "partial"
+	ReferenceCoverageNotApplicable ReferenceCoverage = "notApplicable"
+)
+
 type AnalysisState string
 
 const (
 	AnalysisComputed    AnalysisState = "computed"
 	AnalysisNotComputed AnalysisState = "notComputed"
+)
+
+type AnalysisSkipReason string
+
+const (
+	AnalysisSkipNone          AnalysisSkipReason = ""
+	AnalysisSkipByUser        AnalysisSkipReason = "skippedByUser"
+	AnalysisSkipByThreshold   AnalysisSkipReason = "skippedByThreshold"
+	AnalysisSkipNotApplicable AnalysisSkipReason = "notApplicable"
+)
+
+type UsageClassification string
+
+const (
+	UsageReferenced     UsageClassification = "referenced"
+	UsageUnused         UsageClassification = "unused"
+	UsagePossiblyUnused UsageClassification = "possiblyUnused"
+	UsageNotApplicable  UsageClassification = "notApplicable"
+)
+
+type LintApplicability string
+
+const (
+	LintApplicable    LintApplicability = "applicable"
+	LintAdvisory      LintApplicability = "advisory"
+	LintNotApplicable LintApplicability = "notApplicable"
 )
 
 type AnalysisOptions struct {
@@ -53,21 +96,23 @@ type CatalogAnalysis struct {
 }
 
 type ScanProgress struct {
-	Phase   ScanPhase     `json:"phase"`
-	Current int           `json:"current,omitempty"`
-	Total   int           `json:"total,omitempty"`
-	Message string        `json:"message,omitempty"`
-	State   AnalysisState `json:"state,omitempty"`
+	Phase   ScanPhase          `json:"phase"`
+	Current int                `json:"current,omitempty"`
+	Total   int                `json:"total,omitempty"`
+	Message string             `json:"message,omitempty"`
+	State   AnalysisState      `json:"state,omitempty"`
+	Reason  AnalysisSkipReason `json:"reason,omitempty"`
 }
 
 type ProgressFunc func(ScanProgress)
 
 type Project struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspaceId,omitempty"`
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	CreatedAt   string `json:"createdAt,omitempty"`
+	ID          string            `json:"id"`
+	WorkspaceID string            `json:"workspaceId,omitempty"`
+	Name        string            `json:"name"`
+	Path        string            `json:"path"`
+	ScanIntent  ProjectScanIntent `json:"scanIntent"`
+	CreatedAt   string            `json:"createdAt,omitempty"`
 }
 
 type Catalog struct {
@@ -83,13 +128,16 @@ type Catalog struct {
 }
 
 type CatalogStats struct {
-	TotalFiles      int `json:"totalFiles"`
-	DuplicateGroups int `json:"duplicateGroups"`
-	DuplicateFiles  int `json:"duplicateFiles"`
-	UnusedFiles     int `json:"unusedFiles"`
-	NearDuplicates  int `json:"nearDuplicates"`
-	LintFindings    int `json:"lintFindings"`
-	CacheHits       int `json:"cacheHits"`
+	TotalFiles              int `json:"totalFiles"`
+	DuplicateGroups         int `json:"duplicateGroups"`
+	DuplicateFiles          int `json:"duplicateFiles"`
+	UnusedFiles             int `json:"unusedFiles"`
+	PossiblyUnusedFiles     int `json:"possiblyUnusedFiles"`
+	UsageNotApplicableFiles int `json:"usageNotApplicableFiles"`
+	ReferencedFiles         int `json:"referencedFiles"`
+	NearDuplicates          int `json:"nearDuplicates"`
+	LintFindings            int `json:"lintFindings"`
+	CacheHits               int `json:"cacheHits"`
 }
 
 type AssetItem struct {
@@ -116,6 +164,10 @@ type AssetItem struct {
 	PreferredDuplicatePath *string                  `json:"preferredDuplicatePath"`
 	Optimization           []OptimizationSuggestion `json:"optimizationRecommendations"`
 	OCR                    *ocr.Result              `json:"ocr,omitempty"`
+	ScanIntent             ProjectScanIntent        `json:"scanIntent"`
+	UsageClassification    UsageClassification      `json:"usageClassification"`
+	DeleteUnusedAllowed    bool                     `json:"deleteUnusedAllowed"`
+	LintApplicability      LintApplicability        `json:"lintApplicability"`
 }
 
 type AssetReference struct {

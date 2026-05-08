@@ -238,6 +238,8 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			"current": event.Current,
 			"total":   event.Total,
 			"message": event.Message,
+			"state":   event.State,
+			"reason":  event.Reason,
 		})
 	}
 	options, err := s.scanOptionsFromRequest(r)
@@ -429,7 +431,12 @@ func (s *Server) analysisIncomplete(summary config.CatalogSummary) bool {
 		return false
 	}
 	a := summary.Analysis
-	want := settings.ScanAnalyses
+	options := scanner.IntentAdjustedOptions(toScannerProjects(s.store.Projects()), scanner.ScanOptions{
+		Profile:         settings.ScanProfile,
+		Analyses:        settings.ScanAnalyses,
+		ExcludePatterns: settings.ExcludePatterns,
+	})
+	want := options.Analyses
 	if want.References && a.References != scanner.AnalysisComputed {
 		return true
 	}

@@ -11,7 +11,30 @@ export type Project = {
   name: string;
   path: string;
   iconImage?: string;
+  scanIntent?: ProjectScanIntent;
   createdAt?: string;
+};
+
+export type ProjectScanIntent = "code" | "assetPack" | "library" | "mixed";
+
+export type DetectionSuggestedScanIntent = ProjectScanIntent | "unknown";
+
+export type ReferenceCoverage = "supported" | "partial" | "notApplicable";
+
+export type ProjectScanIntentDetection = {
+  suggestedScanIntent: DetectionSuggestedScanIntent;
+  confidence: "low" | "medium" | "high";
+  referenceCoverage: ReferenceCoverage;
+  evidence: string[];
+  counts: {
+    assetFiles: number;
+    codeFiles: number;
+    manifestFiles: number;
+    docFiles: number;
+    totalFiles: number;
+    sampledFiles: number;
+    sampleLimited: boolean;
+  };
 };
 
 export type AppSettings = {
@@ -212,6 +235,14 @@ export type AssetItem = {
     attempts?: number;
     updatedAt?: string;
   };
+  scanIntent?: ProjectScanIntent;
+  usageClassification?:
+    | "referenced"
+    | "unused"
+    | "possiblyUnused"
+    | "notApplicable";
+  deleteUnusedAllowed?: boolean;
+  lintApplicability?: "applicable" | "advisory" | "notApplicable";
 };
 
 export type OptimizationRecommendation =
@@ -270,6 +301,9 @@ export type Catalog = {
     totalFiles: number;
     totalBytes: number;
     unusedFiles: number;
+    possiblyUnusedFiles?: number;
+    usageNotApplicableFiles?: number;
+    referencedFiles?: number;
     duplicateFiles: number;
     optimizableFiles: number;
     lintFindings: number;
@@ -283,6 +317,9 @@ export type Catalog = {
     duplicateGroups: number;
     duplicateFiles: number;
     unusedFiles: number;
+    possiblyUnusedFiles?: number;
+    usageNotApplicableFiles?: number;
+    referencedFiles?: number;
     nearDuplicates: number;
     lintFindings: number;
     cacheHits: number;

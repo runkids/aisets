@@ -60,6 +60,41 @@ func TestScanCatalogDuplicatesAndUnused(t *testing.T) {
 	}
 }
 
+func TestScanAssetPackMarksUsageNotApplicable(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "icons", "logo.png"), solidImage(2, 2, color.White))
+
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	catalog, err := s.Scan(context.Background(), []Project{{ID: root, Name: "assets", Path: root, ScanIntent: ProjectScanIntentAssetPack}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Analysis.References != AnalysisNotComputed || catalog.Stats.UnusedFiles != 0 || catalog.Stats.UsageNotApplicableFiles != 1 {
+		t.Fatalf("catalog analysis/stats = %#v %#v", catalog.Analysis, catalog.Stats)
+	}
+	if got := catalog.Items[0]; got.UsageClassification != UsageNotApplicable || got.DeleteUnusedAllowed || got.LintApplicability != LintNotApplicable {
+		t.Fatalf("item policy = %#v", got)
+	}
+}
+
+func TestScanLibraryMarksZeroReferenceAssetsAdvisory(t *testing.T) {
+	root := t.TempDir()
+	writePNG(t, filepath.Join(root, "src", "logo.png"), solidImage(2, 2, color.White))
+	mustWrite(t, filepath.Join(root, "src", "index.ts"), `export const x = 1`)
+
+	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
+	catalog, err := s.Scan(context.Background(), []Project{{ID: root, Name: "library", Path: root, ScanIntent: ProjectScanIntentLibrary}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Stats.UnusedFiles != 0 || catalog.Stats.PossiblyUnusedFiles != 1 {
+		t.Fatalf("stats = %#v", catalog.Stats)
+	}
+	if got := catalog.Items[0]; got.UsageClassification != UsagePossiblyUnused || got.DeleteUnusedAllowed {
+		t.Fatalf("item policy = %#v", got)
+	}
+}
+
 func TestScanMarksVitePublicAbsoluteReferencesUsed(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "ui", "public", "favicon.png"), solidImage(2, 2, color.White))

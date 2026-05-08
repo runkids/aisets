@@ -2,7 +2,8 @@ import { ArrowLeftRight, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import type { Project, Workspace } from "../../types";
+import { projectScanIntentLabel } from "../../projectScanIntent";
+import type { Project, ProjectScanIntent, Workspace } from "../../types";
 import { Badge, Button, Card, ConfirmDialog } from "../ui";
 import { ProjectAvatar } from "../ProjectAvatar";
 import { ProjectDialog } from "../ProjectDialog";
@@ -26,7 +27,7 @@ type ProjectsSectionProps = {
   working: boolean;
   onRenameProject: (
     projectId: string,
-    value: { name: string; iconImage: string },
+    value: { name: string; iconImage: string; scanIntent: ProjectScanIntent },
   ) => void;
   onRemoveProject: (projectId: string) => void;
   onSwitchWorkspace: (workspaceId: string) => void;
@@ -54,7 +55,11 @@ export function ProjectsSection({
     (project) => project.id === removeProjectId,
   );
 
-  function handleRenameProject(value: { name: string; iconImage: string }) {
+  function handleRenameProject(value: {
+    name: string;
+    iconImage: string;
+    scanIntent: ProjectScanIntent;
+  }) {
     if (!projectBeingRenamed) return;
     onRenameProject(projectBeingRenamed.id, value);
     setRenameProjectId(null);
@@ -178,6 +183,15 @@ export function ProjectsSection({
                                       })}
                                     </Badge>
                                   )}
+                                  <Badge
+                                    tone="line"
+                                    className={projectAssetsBadgeClass}
+                                  >
+                                    {projectScanIntentLabel(
+                                      t,
+                                      project.scanIntent,
+                                    )}
+                                  </Badge>
                                 </div>
                                 <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
                                   {project.path}

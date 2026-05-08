@@ -48,6 +48,7 @@ import type {
 import type {
   ExportData,
   OCRRunEvent,
+  ProjectScanIntent,
   RenameRules,
   ScanAnalyses,
   ScanEvent,
@@ -338,8 +339,14 @@ export function useRemoveOCRMutation() {
 export function useAddProjectMutation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (path: string) => {
-      await addProject(path);
+    mutationFn: async ({
+      path,
+      scanIntent,
+    }: {
+      path: string;
+      scanIntent: ProjectScanIntent;
+    }) => {
+      await addProject(path, scanIntent);
       return scanCatalog();
     },
     onSuccess: async () => {
@@ -494,11 +501,13 @@ export function useRenameProjectMutation() {
       id,
       name,
       iconImage,
+      scanIntent,
     }: {
       id: string;
       name: string;
       iconImage?: string;
-    }) => renameProject(id, name, iconImage),
+      scanIntent: ProjectScanIntent;
+    }) => renameProject(id, name, iconImage, scanIntent),
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: catalogQueryKey }),

@@ -45,8 +45,40 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 	}
 	defer reopened.Close()
 	projects := reopened.Projects()
-	if len(projects) != 1 || projects[0].Path != project || projects[0].CreatedAt == "" {
+	if len(projects) != 1 || projects[0].Path != project || projects[0].CreatedAt == "" || projects[0].ScanIntent != scanner.ProjectScanIntentCode {
 		t.Fatalf("projects = %#v", projects)
+	}
+}
+
+func TestStorePreservesProjectScanIntent(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "assets")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjectsWithIntent([]string{project}, scanner.ProjectScanIntentAssetPack); err != nil {
+		t.Fatal(err)
+	}
+	projects := store.Projects()
+	if len(projects) != 1 || projects[0].ScanIntent != scanner.ProjectScanIntentAssetPack {
+		t.Fatalf("projects = %#v", projects)
+	}
+	if err := store.RenameProject(projects[0].ID, "Library", "", scanner.ProjectScanIntentLibrary); err != nil {
+		t.Fatal(err)
+	}
+	projects = store.Projects()
+	if projects[0].ScanIntent != scanner.ProjectScanIntentLibrary {
+		t.Fatalf("renamed project = %#v", projects[0])
+	}
+	if err := store.AddProjectsWithIntent([]string{project}, scanner.ProjectScanIntent("bad")); err == nil || apierr.From(err, "").Code != "project_scan_intent_invalid" {
+		t.Fatalf("invalid intent err = %T %[1]v", err)
 	}
 }
 

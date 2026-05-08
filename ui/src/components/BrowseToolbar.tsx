@@ -21,7 +21,13 @@ import {
 export type ViewMode = "grid" | "list" | "tree";
 export type SortMode = "name" | "size" | "recent";
 
-type StatusFilter = "" | "unused" | "duplicate" | "optimize" | "referenced";
+type StatusFilter =
+  | ""
+  | "unused"
+  | "possiblyUnused"
+  | "duplicate"
+  | "optimize"
+  | "referenced";
 
 type BrowseToolbarProps = {
   view: ViewMode;
@@ -92,6 +98,7 @@ export function BrowseToolbar({
   const statusItems = [
     { value: "" as const, label: t("status.all") },
     { value: "unused" as const, label: t("status.unused") },
+    { value: "possiblyUnused" as const, label: t("status.possiblyUnused") },
     { value: "duplicate" as const, label: t("status.duplicate") },
     { value: "optimize" as const, label: t("status.optimizable") },
     { value: "referenced" as const, label: t("status.referenced") },

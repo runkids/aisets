@@ -132,6 +132,42 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	}
 }
 
+func TestProjectScanIntentAPIs(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
+	assetPack := filepath.Join(root, "icons")
+	if err := os.Mkdir(assetPack, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePNG(t, filepath.Join(assetPack, "logo.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload, _ := json.Marshal(map[string]string{"path": assetPack})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/detect-scan-intent", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"suggestedScanIntent":"assetPack"`) {
+		t.Fatalf("detect = %d %s", rec.Code, rec.Body.String())
+	}
+
+	payload, _ = json.Marshal(map[string]string{"path": assetPack, "scanIntent": "assetPack"})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/projects/add", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"scanIntent":"assetPack"`) {
+		t.Fatalf("add = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))

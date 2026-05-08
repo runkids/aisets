@@ -13,12 +13,13 @@ type Workspace struct {
 }
 
 type Project struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspaceId"`
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	IconImage   string `json:"iconImage,omitempty"`
-	CreatedAt   string `json:"createdAt,omitempty"`
+	ID          string                    `json:"id"`
+	WorkspaceID string                    `json:"workspaceId"`
+	Name        string                    `json:"name"`
+	Path        string                    `json:"path"`
+	IconImage   string                    `json:"iconImage,omitempty"`
+	ScanIntent  scanner.ProjectScanIntent `json:"scanIntent"`
+	CreatedAt   string                    `json:"createdAt,omitempty"`
 }
 
 type AppSettings struct {
