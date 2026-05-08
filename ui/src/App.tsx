@@ -630,6 +630,44 @@ export function App() {
               onStopOCR={onStopOCRActivity}
               onDismissOCR={onDismissOCRActivity}
             />
+          ) : mode === "duplicates" && catalogSummary ? (
+            catalogSummary.analysis.nearDuplicates === "notComputed" ? (
+              <div
+                key="duplicates-not-computed"
+                className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
+              >
+                <NotComputedState
+                  title={
+                    catalogSummary.stats.totalFiles >= 10_000
+                      ? t("catalog.notComputed.nearSkippedTitle")
+                      : t("catalog.notComputed.nearTitle")
+                  }
+                  description={
+                    catalogSummary.stats.totalFiles >= 10_000
+                      ? t("catalog.notComputed.nearSkippedDesc", {
+                          count: catalogSummary.stats.totalFiles,
+                        })
+                      : t("catalog.notComputed.nearDesc")
+                  }
+                  action={
+                    catalogSummary.stats.totalFiles >= 10_000
+                      ? t("catalog.notComputed.nearSkippedAction")
+                      : t("catalog.notComputed.fullScan")
+                  }
+                  onAction={
+                    catalogSummary.stats.totalFiles >= 10_000
+                      ? onNearDuplicateScan
+                      : onFullScan
+                  }
+                />
+              </div>
+            ) : (
+              <DuplicatesView
+                scanId={catalogSummary.scanId}
+                projectFilterId={effectiveSelectedProjectId || undefined}
+                onOpenAsset={setDrawerId}
+              />
+            )
           ) : (
             <div
               key={mode}
@@ -645,39 +683,6 @@ export function App() {
                   onJump={changeMode}
                   onAddProject={() => setDirectoryPickerOpen(true)}
                 />
-              ) : mode === "duplicates" && catalogSummary ? (
-                catalogSummary.analysis.nearDuplicates === "notComputed" ? (
-                  <NotComputedState
-                    title={
-                      catalogSummary.stats.totalFiles >= 10_000
-                        ? t("catalog.notComputed.nearSkippedTitle")
-                        : t("catalog.notComputed.nearTitle")
-                    }
-                    description={
-                      catalogSummary.stats.totalFiles >= 10_000
-                        ? t("catalog.notComputed.nearSkippedDesc", {
-                            count: catalogSummary.stats.totalFiles,
-                          })
-                        : t("catalog.notComputed.nearDesc")
-                    }
-                    action={
-                      catalogSummary.stats.totalFiles >= 10_000
-                        ? t("catalog.notComputed.nearSkippedAction")
-                        : t("catalog.notComputed.fullScan")
-                    }
-                    onAction={
-                      catalogSummary.stats.totalFiles >= 10_000
-                        ? onNearDuplicateScan
-                        : onFullScan
-                    }
-                  />
-                ) : (
-                  <DuplicatesView
-                    scanId={catalogSummary.scanId}
-                    projectFilterId={effectiveSelectedProjectId || undefined}
-                    onOpenAsset={setDrawerId}
-                  />
-                )
               ) : mode === "optimize" ? (
                 catalogSummary?.analysis.optimization === "notComputed" ? (
                   <NotComputedState

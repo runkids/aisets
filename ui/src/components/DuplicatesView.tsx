@@ -34,7 +34,6 @@ import {
   CopyButton,
   EmptyState,
   Modal,
-  Select,
   StatCard,
   Tabs,
   TextInput,
@@ -43,6 +42,7 @@ import { ComparePanel, useCompareTabs } from "./ComparePanel";
 import { toCompareAsset, type CompareMode } from "./compareTypes";
 import { BatchConfirmModal } from "./BatchConfirmModal";
 import { BatchPreviewModal } from "./BatchPreviewModal";
+import { FilterRail } from "./FilterRail";
 
 type Props = {
   scanId?: number;
@@ -74,7 +74,11 @@ export function DuplicatesView({
   const [pathsCopied, setPathsCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [search, setSearch] = useState("");
-  const [extFilter, setExtFilter] = useState("__all__");
+  const [railFilter, setRailFilter] = useState({
+    project: "",
+    ext: "",
+    customFilter: "",
+  });
 
   /* ── Data fetching (unchanged) ── */
 
@@ -230,19 +234,14 @@ export function DuplicatesView({
 
   const debouncedSearch = useDebouncedValue(search, 250);
 
-  const uniqueExts = useMemo(() => {
-    const exts = new Set(
-      groupViews.flatMap((g) => g.members.map((m) => m.ext)),
-    );
-    return Array.from(exts).sort();
-  }, [groupViews]);
-
   const filteredGroups = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim();
-    const ext = extFilter === "__all__" ? "" : extFilter;
-    if (!q && !ext) return groupViews;
+    const ext = railFilter.ext;
+    const proj = railFilter.project;
+    if (!q && !ext && !proj) return groupViews;
     return groupViews.filter((g) => {
       if (ext && !g.members.some((m) => m.ext === ext)) return false;
+      if (proj && !g.members.some((m) => m.projectName === proj)) return false;
       if (!q) return true;
       return (
         g.contentHash.toLowerCase().includes(q) ||
@@ -253,10 +252,10 @@ export function DuplicatesView({
         )
       );
     });
-  }, [groupViews, debouncedSearch, extFilter]);
+  }, [groupViews, debouncedSearch, railFilter]);
 
   const groupedByExt = useMemo(() => {
-    if (extFilter !== "__all__") return null;
+    if (railFilter.ext) return null;
     const map = new Map<string, typeof filteredGroups>();
     for (const g of filteredGroups) {
       const ext = g.members[0]?.ext || "";
@@ -268,7 +267,7 @@ export function DuplicatesView({
     return Array.from(map.entries())
       .sort(([, a], [, b]) => b.length - a.length)
       .map(([ext, gs]) => ({ ext, groups: gs }));
-  }, [filteredGroups, extFilter]);
+  }, [filteredGroups, railFilter.ext]);
 
   /* ── Selection callbacks ── */
 
@@ -546,255 +545,257 @@ export function DuplicatesView({
   /* ── Render ── */
 
   return (
-    <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
-      {/* ── Stats dashboard ── */}
-      {!loading && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatCard
-            label={t("duplicates.statGroups")}
-            value={groupViews.length}
-            icon={<Layers size={14} />}
-          />
-          <StatCard
-            label={t("duplicates.statFiles")}
-            value={groupViews.reduce((sum, g) => sum + g.members.length, 0)}
-            icon={<Files size={14} />}
-          />
-          <StatCard
-            label={t("duplicates.statSavings")}
-            value={formatBytes(totalSavings)}
-            icon={<TrendingDown size={14} />}
-          />
-          <StatCard
-            label={t("duplicates.statSimilar")}
-            value={nearDuplicates.length}
-            icon={<Eye size={14} />}
-          />
-        </div>
-      )}
-
-      {/* ── Sticky filter + action bar ── */}
-      <div className="sticky top-0 z-10 bg-g-canvas pb-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Tabs
-            value={tab}
-            ariaLabel={t("duplicates.title")}
-            onChange={(v) => {
-              setTab(v);
-              setSelected(new Set());
-              setBulkMode(false);
-            }}
-            items={[
-              {
-                value: "exact",
-                label: t("duplicates.exactTab", { count: groups.length }),
-              },
-              {
-                value: "similar",
-                label: t("duplicates.similarTab", {
-                  count: nearDuplicates.length,
-                }),
-              },
-            ]}
-          />
-          {tab === "exact" && (
-            <Tabs
-              value={sort}
-              ariaLabel={t("sort.byCount")}
-              onChange={setSort}
-              items={[
-                { value: "members", label: t("sort.byCount") },
-                { value: "size", label: t("sort.bySize") },
-              ]}
-            />
+    <>
+      <FilterRail
+        items={items}
+        filters={railFilter}
+        onFiltersChange={setRailFilter}
+      />
+      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
+        <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
+          {/* ── Stats dashboard ── */}
+          {!loading && (
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatCard
+                label={t("duplicates.statGroups")}
+                value={groupViews.length}
+                icon={<Layers size={14} />}
+              />
+              <StatCard
+                label={t("duplicates.statFiles")}
+                value={groupViews.reduce((sum, g) => sum + g.members.length, 0)}
+                icon={<Files size={14} />}
+              />
+              <StatCard
+                label={t("duplicates.statSavings")}
+                value={formatBytes(totalSavings)}
+                icon={<TrendingDown size={14} />}
+              />
+              <StatCard
+                label={t("duplicates.statSimilar")}
+                value={nearDuplicates.length}
+                icon={<Eye size={14} />}
+              />
+            </div>
           )}
-          {tab === "exact" && (
-            <TextInput
-              variant="search"
-              placeholder={t("duplicates.searchPlaceholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={14} />}
-              className="min-w-0 flex-[1_1_180px]"
-            />
-          )}
-          {tab === "exact" && uniqueExts.length > 1 && (
-            <Select
-              value={extFilter}
-              aria-label={t("duplicates.filterExtension")}
-              size="md"
-              className="w-[140px] shrink-0"
-              options={[
-                { value: "__all__", label: t("duplicates.allExtensions") },
-                ...uniqueExts.map((ext) => ({
-                  value: ext,
-                  label: formatExt(ext),
-                })),
-              ]}
-              onChange={setExtFilter}
-            />
-          )}
-          {tab === "exact" && (
-            <Button
-              variant={bulkMode ? "primary" : "secondary"}
-              size="md"
-              leadingIcon={<CheckSquare size={14} />}
-              onClick={toggleBulkMode}
-              className="shrink-0"
-            >
-              {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
-            </Button>
-          )}
-        </div>
 
-        {bulkMode && selected.size > 0 && (
-          <div className="mt-2 flex min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
-            <span className="inline-flex min-h-[34px] items-center px-2.5 font-g-mono text-g-body text-g-ink-2">
-              {t("selection.summary", {
-                count: selected.size,
-                size: formatBytes(selectedBytes),
-              })}
-            </span>
-            <span className="flex-1" />
-            <button type="button" className={ACTION_BTN} onClick={copyPaths}>
-              {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
-              {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
-            </button>
-            <button
-              type="button"
-              className={ACTION_BTN}
-              onClick={handleMergePreview}
-              disabled={batchMergePreviewMut.isPending}
-            >
-              <GitMerge size={14} />
-              {t("action.merge")}
-            </button>
-            <button
-              type="button"
-              className={ACTION_BTN}
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 size={14} />
-              {t("action.deleteSelected")}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Content ── */}
-
-      {loading ? (
-        <EmptyState title={t("common.loading")} />
-      ) : tab === "exact" ? (
-        <div className="grid gap-4">
-          {groupedByExt &&
-            groupedByExt.map((section) => (
-              <div key={section.ext} className="grid gap-4">
-                <div className="flex items-center gap-2 pt-2">
-                  <span className="font-g-mono text-g-ui font-[510] uppercase text-g-ink-3">
-                    {formatExt(section.ext)}
-                  </span>
-                  <Badge>{section.groups.length}</Badge>
-                  <span className="h-px flex-1 bg-g-line" />
-                </div>
-                {section.groups.map((group) => renderGroupCard(group))}
-              </div>
-            ))}
-          {!groupedByExt &&
-            filteredGroups.map((group) => renderGroupCard(group))}
-          {filteredGroups.length === 0 && (
-            <EmptyState
-              title={t("duplicates.noExact")}
-              description={t("duplicates.noExactDesc")}
-            />
-          )}
-        </div>
-      ) : null}
-
-      {/* ── Similar tab ── */}
-
-      {!loading && tab === "similar" && (
-        <div className="grid gap-4">
-          {nearDuplicates.map((nd) => {
-            const left = itemById.get(nd.leftId);
-            const right = itemById.get(nd.rightId);
-            if (!left || !right) return null;
-            return (
-              <SimilarPairCard key={nd.id} nd={nd} left={left} right={right} />
-            );
-          })}
-          {nearDuplicates.length === 0 && (
-            <EmptyState
-              title={t("duplicates.noSimilar")}
-              description={t("duplicates.noSimilarDesc")}
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── Delete confirmation ── */}
-      {showDeleteConfirm && (
-        <BatchConfirmModal
-          count={selected.size}
-          sizeLabel={formatBytes(selectedBytes)}
-          working={batchDeleteMut.isPending}
-          onCancel={() => setShowDeleteConfirm(false)}
-          onConfirm={handleBatchDelete}
-        />
-      )}
-
-      {/* ── Merge confirmation ── */}
-      {mergePreview &&
-        ((mergePreview.preview.blockers?.length ?? 0) > 0 ? (
-          <BatchPreviewModal
-            title={t("action.merge")}
-            moves={mergePreview.preview.moves ?? []}
-            changes={mergePreview.preview.changes ?? []}
-            blockers={mergePreview.preview.blockers ?? []}
-            canApply={mergePreview.preview.canApply}
-            working={batchApplyMut.isPending}
-            onCancel={() => setMergePreview(null)}
-            onApply={handleMergeApply}
-          />
-        ) : (
-          <Modal
-            title={t("duplicates.mergeConfirmTitle", {
-              count: selected.size,
-            })}
-            onClose={() => setMergePreview(null)}
-            size="sm"
-            footer={
-              <div className="flex justify-end gap-2">
+          {/* ── Sticky filter + action bar ── */}
+          <div className="sticky top-0 z-10 bg-g-canvas pb-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Tabs
+                value={tab}
+                ariaLabel={t("duplicates.title")}
+                onChange={(v) => {
+                  setTab(v);
+                  setSelected(new Set());
+                  setBulkMode(false);
+                }}
+                items={[
+                  {
+                    value: "exact",
+                    label: t("duplicates.exactTab", { count: groups.length }),
+                  },
+                  {
+                    value: "similar",
+                    label: t("duplicates.similarTab", {
+                      count: nearDuplicates.length,
+                    }),
+                  },
+                ]}
+              />
+              {tab === "exact" && (
+                <Tabs
+                  value={sort}
+                  ariaLabel={t("sort.byCount")}
+                  onChange={setSort}
+                  items={[
+                    { value: "members", label: t("sort.byCount") },
+                    { value: "size", label: t("sort.bySize") },
+                  ]}
+                />
+              )}
+              {tab === "exact" && (
+                <TextInput
+                  variant="search"
+                  placeholder={t("duplicates.searchPlaceholder")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  icon={<Search size={14} />}
+                  className="min-w-0 flex-[1_1_180px]"
+                />
+              )}
+              {tab === "exact" && (
                 <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setMergePreview(null)}
-                  disabled={batchApplyMut.isPending}
+                  variant={bulkMode ? "primary" : "secondary"}
+                  size="md"
+                  leadingIcon={<CheckSquare size={14} />}
+                  onClick={toggleBulkMode}
+                  className="shrink-0"
                 >
-                  {t("common.cancel")}
+                  {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
                 </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leadingIcon={<GitMerge size={12} />}
-                  onClick={handleMergeApply}
-                  disabled={batchApplyMut.isPending}
+              )}
+            </div>
+
+            {bulkMode && selected.size > 0 && (
+              <div className="mt-2 flex min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
+                <span className="inline-flex min-h-[34px] items-center px-2.5 font-g-mono text-g-body text-g-ink-2">
+                  {t("selection.summary", {
+                    count: selected.size,
+                    size: formatBytes(selectedBytes),
+                  })}
+                </span>
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  className={ACTION_BTN}
+                  onClick={copyPaths}
                 >
+                  {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
+                </button>
+                <button
+                  type="button"
+                  className={ACTION_BTN}
+                  onClick={handleMergePreview}
+                  disabled={batchMergePreviewMut.isPending}
+                >
+                  <GitMerge size={14} />
                   {t("action.merge")}
-                </Button>
+                </button>
+                <button
+                  type="button"
+                  className={ACTION_BTN}
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 size={14} />
+                  {t("action.deleteSelected")}
+                </button>
               </div>
-            }
-          >
-            <p className="text-g-body text-g-ink-2">
-              {t("duplicates.mergeConfirmBody", {
-                count: selected.size,
-                size: formatBytes(selectedBytes),
-                refs: mergePreview.preview.changes?.length ?? 0,
+            )}
+          </div>
+
+          {/* ── Content ── */}
+
+          {loading ? (
+            <EmptyState title={t("common.loading")} />
+          ) : tab === "exact" ? (
+            <div className="grid gap-4">
+              {groupedByExt &&
+                groupedByExt.map((section) => (
+                  <div key={section.ext} className="grid gap-4">
+                    <div className="flex items-center gap-2 pt-2">
+                      <span className="font-g-mono text-g-ui font-[510] uppercase text-g-ink-3">
+                        {formatExt(section.ext)}
+                      </span>
+                      <Badge>{section.groups.length}</Badge>
+                      <span className="h-px flex-1 bg-g-line" />
+                    </div>
+                    {section.groups.map((group) => renderGroupCard(group))}
+                  </div>
+                ))}
+              {!groupedByExt &&
+                filteredGroups.map((group) => renderGroupCard(group))}
+              {filteredGroups.length === 0 && (
+                <EmptyState
+                  title={t("duplicates.noExact")}
+                  description={t("duplicates.noExactDesc")}
+                />
+              )}
+            </div>
+          ) : null}
+
+          {/* ── Similar tab ── */}
+
+          {!loading && tab === "similar" && (
+            <div className="grid gap-4">
+              {nearDuplicates.map((nd) => {
+                const left = itemById.get(nd.leftId);
+                const right = itemById.get(nd.rightId);
+                if (!left || !right) return null;
+                return (
+                  <SimilarPairCard
+                    key={nd.id}
+                    nd={nd}
+                    left={left}
+                    right={right}
+                  />
+                );
               })}
-            </p>
-          </Modal>
-        ))}
-    </div>
+              {nearDuplicates.length === 0 && (
+                <EmptyState
+                  title={t("duplicates.noSimilar")}
+                  description={t("duplicates.noSimilarDesc")}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ── Delete confirmation ── */}
+          {showDeleteConfirm && (
+            <BatchConfirmModal
+              count={selected.size}
+              sizeLabel={formatBytes(selectedBytes)}
+              working={batchDeleteMut.isPending}
+              onCancel={() => setShowDeleteConfirm(false)}
+              onConfirm={handleBatchDelete}
+            />
+          )}
+
+          {/* ── Merge confirmation ── */}
+          {mergePreview &&
+            ((mergePreview.preview.blockers?.length ?? 0) > 0 ? (
+              <BatchPreviewModal
+                title={t("action.merge")}
+                moves={mergePreview.preview.moves ?? []}
+                changes={mergePreview.preview.changes ?? []}
+                blockers={mergePreview.preview.blockers ?? []}
+                canApply={mergePreview.preview.canApply}
+                working={batchApplyMut.isPending}
+                onCancel={() => setMergePreview(null)}
+                onApply={handleMergeApply}
+              />
+            ) : (
+              <Modal
+                title={t("duplicates.mergeConfirmTitle", {
+                  count: selected.size,
+                })}
+                onClose={() => setMergePreview(null)}
+                size="sm"
+                footer={
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setMergePreview(null)}
+                      disabled={batchApplyMut.isPending}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leadingIcon={<GitMerge size={12} />}
+                      onClick={handleMergeApply}
+                      disabled={batchApplyMut.isPending}
+                    >
+                      {t("action.merge")}
+                    </Button>
+                  </div>
+                }
+              >
+                <p className="text-g-body text-g-ink-2">
+                  {t("duplicates.mergeConfirmBody", {
+                    count: selected.size,
+                    size: formatBytes(selectedBytes),
+                    refs: mergePreview.preview.changes?.length ?? 0,
+                  })}
+                </p>
+              </Modal>
+            ))}
+        </div>
+      </div>
+    </>
   );
 }
 
