@@ -10,6 +10,8 @@
     "system": "System",
     "settings": "Settings",
     "footer": "Scan local projects and safely preview changes",
+    "footerProjects": "projects",
+    "footerAssets": "assets",
     "lint": "Lint",
     "tools": "Tools",
     "precheck": "Pre-Check",

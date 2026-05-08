@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   FileWarning,
   FolderKanban,
   FolderOpen,
@@ -11,6 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
 import type { Mode } from "../ui";
+import { useVersionQuery } from "../queries";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 
 type Badges = {
@@ -56,6 +56,8 @@ export function NavSidebar({
   onSelect,
 }: Props) {
   const { t } = useTranslation();
+  const versionQuery = useVersionQuery();
+  const version = versionQuery.data?.currentVersion ?? "";
 
   const groups: Array<{
     title: string;
@@ -189,9 +191,27 @@ export function NavSidebar({
         ))}
       </nav>
 
-      <div className="order-3 flex items-center gap-2.5 rounded-g-md border border-g-line bg-g-surface p-3 text-[12px] text-g-ink-3 shadow-g-sm max-[960px]:justify-center">
-        <BarChart3 size={16} />
-        <span className="max-[960px]:hidden">{t("nav.footer")}</span>
+      <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2.5 shadow-g-sm max-[960px]:items-center max-[960px]:px-2 max-[960px]:py-2">
+        <div className="flex items-center justify-between">
+          <span className="text-g-caption font-g-display font-[590] text-g-ink-3 max-[960px]:text-g-chip">
+            <span className="max-[960px]:hidden">Asset Studio</span>
+            <span className="hidden max-[960px]:inline">AS</span>
+          </span>
+          {version && (
+            <span className="font-g-mono text-g-chip text-g-ink-4 max-[960px]:hidden">
+              v{version}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 text-g-chip text-g-ink-4 max-[960px]:hidden">
+          <span className="tabular-nums">
+            {badges.projects} {t("nav.footerProjects")}
+          </span>
+          <span className="text-g-ink-5">·</span>
+          <span className="tabular-nums">
+            {totalAssets.toLocaleString()} {t("nav.footerAssets")}
+          </span>
+        </div>
       </div>
     </aside>
   );

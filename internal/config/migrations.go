@@ -356,6 +356,7 @@ func (s *Store) migrateScanPerformanceSchema() error {
 		`CREATE INDEX IF NOT EXISTS idx_references_scan_asset ON reference_snapshots(scan_id, asset_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_optimization_scan_asset ON optimization_snapshots(scan_id, asset_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_duplicate_assets_scan_asset ON duplicate_group_assets(scan_id, asset_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_scan_asset_proj_ext ON asset_snapshots(scan_id, asset_id, project_name, ext)`,
 		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_left ON near_duplicate_snapshots(scan_id, left_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_right ON near_duplicate_snapshots(scan_id, right_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_lint_snapshots_scan_severity ON lint_snapshots(scan_id, severity)`,

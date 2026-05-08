@@ -8,6 +8,8 @@
     "unused": "未使用",
     "optimize": "可最佳化",
     "footer": "掃描本機專案並安全預覽變更",
+    "footerProjects": "專案",
+    "footerAssets": "素材",
     "lint": "Lint",
     "tools": "工具",
     "precheck": "預檢",
