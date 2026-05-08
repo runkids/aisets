@@ -1,6 +1,5 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use image::DynamicImage;
-use std::ffi::CStr;
 use std::fs;
 use std::path::Path;
 
@@ -90,14 +89,7 @@ fn encode_animated_gif_as_webp(
         LoopCount::Finite(count) => count.get().min(i32::MAX as u32) as i32,
     };
 
-    let mut config = libwebp_sys::WebPConfig::new()
-        .map_err(|_| anyhow!("failed to initialize animated WebP encoder config"))?;
-    config.quality = quality as f32;
-    config.thread_level = 1;
-    config.alpha_compression = 1;
-
-    let mut encoder = AnimatedWebPEncoder::new(target_w, target_h, &config)?;
-    let mut timestamp_ms = 0i32;
+    let mut encoder = AnimatedWebPEncoder::new(target_w, target_h, quality, loop_count)?;
     let mut frame_count = 0usize;
 
     for frame in decoder.into_frames() {
@@ -109,8 +101,7 @@ fn encode_animated_gif_as_webp(
                 .resize_exact(target_w, target_h, image::imageops::FilterType::Lanczos3)
                 .to_rgba8();
         }
-        encoder.add_frame(rgba.as_raw(), timestamp_ms)?;
-        timestamp_ms = timestamp_ms.saturating_add(delay_ms);
+        encoder.add_frame(rgba, delay_ms)?;
         frame_count += 1;
     }
 
@@ -118,7 +109,7 @@ fn encode_animated_gif_as_webp(
         bail!("animated GIF has no frames");
     }
 
-    encoder.write(output, timestamp_ms, loop_count)
+    encoder.write(output)
 }
 
 fn frame_delay_ms(delay: image::Delay) -> i32 {
@@ -143,121 +134,131 @@ fn fit_dimensions(width: u32, height: u32, max_dimension: Option<u32>) -> (u32, 
     (target_w, target_h)
 }
 
+struct AnimatedFrameChunk {
+    bytes: Vec<u8>,
+    x: u32,
+    y: u32,
+    duration_ms: i32,
+}
+
 struct AnimatedWebPEncoder {
-    encoder: *mut libwebp_sys::WebPAnimEncoder,
     width: u32,
     height: u32,
+    quality: u8,
+    loop_count: i32,
+    previous: Vec<u8>,
+    chunks: Vec<AnimatedFrameChunk>,
 }
 
 impl AnimatedWebPEncoder {
-    fn new(width: u32, height: u32, config: &libwebp_sys::WebPConfig) -> Result<Self> {
-        if unsafe { libwebp_sys::WebPValidateConfig(config) } == 0 {
-            bail!("invalid animated WebP encoder config");
+    fn new(width: u32, height: u32, quality: u8, loop_count: i32) -> Result<Self> {
+        if width == 0 || height == 0 {
+            bail!("animated WebP dimensions must be non-zero");
         }
-
-        let mux_abi = unsafe { libwebp_sys::WebPGetMuxABIVersion() };
-        let mut options = std::mem::MaybeUninit::<libwebp_sys::WebPAnimEncoderOptions>::uninit();
-        let ok = unsafe {
-            libwebp_sys::WebPAnimEncoderOptionsInitInternal(options.as_mut_ptr(), mux_abi)
-        };
-        if ok == 0 {
-            bail!("failed to initialize animated WebP encoder options");
-        }
-        let encoder = unsafe {
-            libwebp_sys::WebPAnimEncoderNewInternal(
-                width as i32,
-                height as i32,
-                options.as_ptr(),
-                mux_abi,
-            )
-        };
-        if encoder.is_null() {
-            bail!("failed to create animated WebP encoder");
-        }
+        let pixels = width as usize * height as usize * 4;
         Ok(Self {
-            encoder,
             width,
             height,
+            quality,
+            loop_count,
+            previous: vec![0; pixels],
+            chunks: Vec::new(),
         })
     }
 
-    fn add_frame(&mut self, rgba: &[u8], timestamp_ms: i32) -> Result<()> {
-        let expected = self.width as usize * self.height as usize * 4;
-        if rgba.len() < expected {
-            bail!("frame buffer is too small for animated WebP encoding");
-        }
-        let mut picture = libwebp_sys::WebPPicture::new()
-            .map_err(|_| anyhow!("failed to initialize animated WebP frame"))?;
-        picture.use_argb = 1;
-        picture.width = self.width as i32;
-        picture.height = self.height as i32;
-        let imported = unsafe {
-            libwebp_sys::WebPPictureImportRGBA(&mut picture, rgba.as_ptr(), (self.width * 4) as i32)
+    fn add_frame(&mut self, rgba: image::RgbaImage, duration_ms: i32) -> Result<()> {
+        let current = rgba.into_raw();
+        let bounds = changed_bounds(&self.previous, &current, self.width, self.height);
+        let Some((x, y, width, height)) = bounds else {
+            if let Some(last) = self.chunks.last_mut() {
+                last.duration_ms = last.duration_ms.saturating_add(duration_ms);
+            } else {
+                self.push_chunk(vec![0, 0, 0, 0], 0, 0, 1, 1, duration_ms)?;
+            }
+            self.previous = current;
+            return Ok(());
         };
-        if imported == 0 {
-            unsafe { libwebp_sys::WebPPictureFree(&mut picture) };
-            bail!("failed to import GIF frame for animated WebP encoding");
-        }
 
-        let added = unsafe {
-            libwebp_sys::WebPAnimEncoderAdd(
-                self.encoder,
-                &mut picture,
-                timestamp_ms,
-                std::ptr::null(),
-            )
-        };
-        let error_code = picture.error_code;
-        unsafe { libwebp_sys::WebPPictureFree(&mut picture) };
-        if added == 0 {
-            bail!("animated WebP frame encode failed: {error_code:?}");
-        }
+        let crop = crop_rgba(&current, self.width, x, y, width, height);
+        self.push_chunk(crop, x, y, width, height, duration_ms)?;
+        self.previous = current;
         Ok(())
     }
 
-    fn write(&mut self, output: &str, final_timestamp_ms: i32, loop_count: i32) -> Result<()> {
-        unsafe {
-            libwebp_sys::WebPAnimEncoderAdd(
-                self.encoder,
-                std::ptr::null_mut(),
-                final_timestamp_ms,
-                std::ptr::null(),
-            );
+    fn push_chunk(
+        &mut self,
+        rgba: Vec<u8>,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        duration_ms: i32,
+    ) -> Result<()> {
+        let encoded = webp::Encoder::from_rgba(&rgba, width, height).encode(self.quality as f32);
+        self.chunks.push(AnimatedFrameChunk {
+            bytes: encoded.to_vec(),
+            x,
+            y,
+            duration_ms,
+        });
+        Ok(())
+    }
+
+    fn write(&self, output: &str) -> Result<()> {
+        if self.chunks.is_empty() {
+            bail!("animated GIF has no encodable frames");
         }
 
-        let mut data = libwebp_sys::WebPData::default();
-        let assembled = unsafe { libwebp_sys::WebPAnimEncoderAssemble(self.encoder, &mut data) };
-        if assembled == 0 {
-            let err = animated_webp_error(self.encoder);
-            bail!("animated WebP assemble failed: {err}");
-        }
-
-        let mux_abi = unsafe { libwebp_sys::WebPGetMuxABIVersion() };
-        let mux = unsafe { libwebp_sys::WebPMuxCreateInternal(&data, 1, mux_abi) };
+        let mux = libwebp_sys::WebPMuxNew();
         if mux.is_null() {
-            unsafe { libwebp_sys::WebPDataClear(&mut data) };
             bail!("failed to create animated WebP mux");
+        }
+
+        let result = self.write_mux(mux, output);
+        unsafe { libwebp_sys::WebPMuxDelete(mux) };
+        result
+    }
+
+    fn write_mux(&self, mux: *mut libwebp_sys::WebPMux, output: &str) -> Result<()> {
+        let canvas_error = unsafe {
+            libwebp_sys::WebPMuxSetCanvasSize(mux, self.width as i32, self.height as i32)
+        };
+        if canvas_error != libwebp_sys::WebPMuxError::WEBP_MUX_OK {
+            bail!("failed to set animated WebP canvas size: {canvas_error:?}");
         }
 
         let params = libwebp_sys::WebPMuxAnimParams {
             bgcolor: 0,
-            loop_count,
+            loop_count: self.loop_count,
         };
         let mux_error = unsafe { libwebp_sys::WebPMuxSetAnimationParams(mux, &params) };
         if mux_error != libwebp_sys::WebPMuxError::WEBP_MUX_OK {
-            unsafe {
-                libwebp_sys::WebPMuxDelete(mux);
-                libwebp_sys::WebPDataClear(&mut data);
-            }
             bail!("failed to set animated WebP loop count: {mux_error:?}");
+        }
+
+        for chunk in &self.chunks {
+            let data = libwebp_sys::WebPData {
+                bytes: chunk.bytes.as_ptr(),
+                size: chunk.bytes.len(),
+            };
+            let frame = libwebp_sys::WebPMuxFrameInfo {
+                bitstream: data,
+                x_offset: chunk.x as i32,
+                y_offset: chunk.y as i32,
+                duration: chunk.duration_ms,
+                id: libwebp_sys::WebPChunkId::WEBP_CHUNK_ANMF,
+                dispose_method: libwebp_sys::WebPMuxAnimDispose::WEBP_MUX_DISPOSE_NONE,
+                blend_method: libwebp_sys::WebPMuxAnimBlend::WEBP_MUX_NO_BLEND,
+                pad: [0],
+            };
+            let mux_error = unsafe { libwebp_sys::WebPMuxPushFrame(mux, &frame, 1) };
+            if mux_error != libwebp_sys::WebPMuxError::WEBP_MUX_OK {
+                bail!("failed to add animated WebP frame: {mux_error:?}");
+            }
         }
 
         let mut muxed = libwebp_sys::WebPData::default();
         let mux_error = unsafe { libwebp_sys::WebPMuxAssemble(mux, &mut muxed) };
-        unsafe {
-            libwebp_sys::WebPMuxDelete(mux);
-            libwebp_sys::WebPDataClear(&mut data);
-        }
         if mux_error != libwebp_sys::WebPMuxError::WEBP_MUX_OK {
             bail!("failed to assemble animated WebP mux: {mux_error:?}");
         }
@@ -270,22 +271,46 @@ impl AnimatedWebPEncoder {
     }
 }
 
-impl Drop for AnimatedWebPEncoder {
-    fn drop(&mut self) {
-        if !self.encoder.is_null() {
-            unsafe { libwebp_sys::WebPAnimEncoderDelete(self.encoder) };
+fn changed_bounds(
+    previous: &[u8],
+    current: &[u8],
+    width: u32,
+    height: u32,
+) -> Option<(u32, u32, u32, u32)> {
+    let mut min_x = width;
+    let mut min_y = height;
+    let mut max_x = 0;
+    let mut max_y = 0;
+    for y in 0..height {
+        for x in 0..width {
+            let index = ((y * width + x) * 4) as usize;
+            if previous[index..index + 4] != current[index..index + 4] {
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x + 1);
+                max_y = max_y.max(y + 1);
+            }
         }
     }
+    if min_x == width {
+        return None;
+    }
+
+    // WebP animation frame offsets must be even. Expand the changed rectangle
+    // instead of shifting it so every changed pixel remains covered.
+    min_x -= min_x % 2;
+    min_y -= min_y % 2;
+    Some((min_x, min_y, max_x - min_x, max_y - min_y))
 }
 
-fn animated_webp_error(encoder: *mut libwebp_sys::WebPAnimEncoder) -> String {
-    let ptr = unsafe { libwebp_sys::WebPAnimEncoderGetError(encoder) };
-    if ptr.is_null() {
-        return "unknown error".into();
+fn crop_rgba(source: &[u8], source_width: u32, x: u32, y: u32, width: u32, height: u32) -> Vec<u8> {
+    let mut out = Vec::with_capacity(width as usize * height as usize * 4);
+    let row_bytes = width as usize * 4;
+    for row in y..y + height {
+        let start = ((row * source_width + x) * 4) as usize;
+        out.extend_from_slice(&source[start..start + row_bytes]);
     }
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+    out
 }
 
 fn encode_avif(img: &DynamicImage, output: &str, quality: u8, speed: u8) -> Result<()> {
