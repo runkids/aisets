@@ -50,6 +50,7 @@
     "delete": "삭제",
     "merge": "병합",
     "copyPath": "경로 복사",
+    "copyFileName": "파일명 복사",
     "openFile": "파일 열기",
     "clear": "지우기",
     "select": "선택",
@@ -311,9 +312,10 @@
     "scan_id_invalid": "스캔 ID가 잘못되었습니다.",
     "empty_selection": "선택된 에셋이 없습니다.",
     "asset_ids_required": "하나 이상의 에셋을 선택해야 합니다.",
-    "target_already_exists": "대상 파일이 이미 존재합니다.",
+    "target_already_exists": "대상 파일이 이미 존재합니다: {{targetPath}}",
     "target_path_required": "대상 경로가 필요합니다.",
-    "preview_has_blockers": "미리보기에 해결되지 않은 차단 항목이 있습니다.",
+    "preview_stale_missing_candidate": "미리보기가 만료되었습니다. 후보 파일이 제거되었습니다",
+    "preview_has_blockers": "일부 항목을 적용할 수 없습니다",
     "project_icon_invalid": "프로젝트 이미지는 512KB 이하의 PNG, JPEG, GIF 또는 WebP data URL이어야 합니다."
   },
   "topbar": {
@@ -493,6 +495,9 @@
     "optimizing": "준비 중…",
     "applyOptimization": "최적화 적용",
     "applySuccess": "{{count}}개 에셋 최적화 완료, {{savings}} 절약",
+    "applyFailed": "최적화 실패",
+    "applyAllSkipped": "{{count}}개 항목 모두 이미 최적화되었습니다",
+    "applySkipped": "{{count}}개 건너뜀 (이미 최적화됨)",
     "estimateCached": "캐시에서 추정 결과를 불러왔습니다",
     "optimizationComplete": "최적화가 적용되었습니다",
     "replaceOriginal": "원본 대체",
@@ -520,7 +525,8 @@
       "asset_not_found": "미리보기 대상 에셋을 찾을 수 없습니다.",
       "replace_requires_code_project": "변환된 원본 대체는 코드 프로젝트에서만 안전하게 실행할 수 있습니다.",
       "replace_requires_reference_update": "이 파일에는 참조가 있습니다. 원본을 삭제하기 전에 참조를 업데이트해야 합니다.",
-      "reference_update_blocked": "일부 참조를 안전하게 업데이트할 수 없습니다."
+      "reference_update_blocked": "일부 참조를 안전하게 업데이트할 수 없습니다.",
+      "target_already_exists": "이미 최적화됨 — 대상 파일이 존재합니다"
     },
     "preview": "미리보기",
     "script": "Script",

@@ -50,6 +50,7 @@
     "delete": "删除",
     "merge": "合并",
     "copyPath": "复制路径",
+    "copyFileName": "复制文件名",
     "openFile": "打开文件",
     "clear": "清除",
     "select": "选择",
@@ -299,9 +300,10 @@
     "scan_id_invalid": "扫描 ID 不正确",
     "empty_selection": "未选取任何素材",
     "asset_ids_required": "至少需要选取一个素材",
-    "target_already_exists": "目标文件已存在",
+    "target_already_exists": "目标文件已存在：{{targetPath}}",
     "target_path_required": "需要指定目标路径",
-    "preview_has_blockers": "预览有未解决的阻挡项",
+    "preview_stale_missing_candidate": "预览已过时，候选文件已被移除",
+    "preview_has_blockers": "部分项目无法套用",
     "project_icon_invalid": "项目图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL"
   },
   "topbar": {
@@ -481,6 +483,9 @@
     "optimizing": "准备中…",
     "applyOptimization": "套用优化",
     "applySuccess": "已优化 {{count}} 个素材，节省 {{savings}}",
+    "applyFailed": "优化失败",
+    "applyAllSkipped": "全部 {{count}} 个项目已优化过",
+    "applySkipped": "{{count}} 个已跳过（已优化）",
     "estimateCached": "估算结果已从缓存载入",
     "optimizationComplete": "优化已套用",
     "replaceOriginal": "取代旧文件",
@@ -508,7 +513,8 @@
       "asset_not_found": "预览中的素材不存在",
       "replace_requires_code_project": "只有代码项目能安全取代转档后的原文件",
       "replace_requires_reference_update": "此文件有引用；取代旧文件前必须更新引用",
-      "reference_update_blocked": "有引用无法安全更新"
+      "reference_update_blocked": "有引用无法安全更新",
+      "target_already_exists": "已优化过，目标文件已存在"
     },
     "preview": "预览",
     "script": "脚本",

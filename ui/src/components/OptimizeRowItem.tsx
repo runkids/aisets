@@ -65,20 +65,20 @@ export function OptimizeRowItem({
   return (
     <div
       className={cn(
-        "grid min-h-[84px] items-center gap-2 border-b border-g-line border-l-[3px] pl-4 pr-3 py-2.5 transition-[background,border-color,box-shadow] duration-[120ms] ease-g last:border-b-0 hover:bg-g-surface-2",
-        sev === "critical"
-          ? "border-l-g-red"
-          : sev === "warning"
-            ? "border-l-g-amber"
-            : sev === "info"
-              ? "border-l-g-blue"
-              : "border-l-transparent",
+        "grid min-h-[84px] items-center gap-2 border-b border-g-line border-l-[3px] pl-4 pr-3 py-2.5 transition-[background,border-color] duration-[120ms] ease-g last:border-b-0 hover:bg-g-surface-2",
+        isSelected && !rowBlocked
+          ? "border-l-g-active-bg"
+          : sev === "critical"
+            ? "border-l-g-red"
+            : sev === "warning"
+              ? "border-l-g-amber"
+              : sev === "info"
+                ? "border-l-g-blue"
+                : "border-l-transparent",
         bulkMode
           ? "grid-cols-[40px_minmax(0,1fr)] min-[980px]:grid-cols-[40px_minmax(0,1.2fr)_minmax(140px,1fr)_200px_150px]"
           : "grid-cols-[minmax(0,1fr)] min-[980px]:grid-cols-[minmax(0,1.2fr)_minmax(140px,1fr)_200px_150px]",
-        isSelected &&
-          !rowBlocked &&
-          "bg-g-surface-2 shadow-[inset_4px_0_0_var(--g-active-bg)]",
+        isSelected && !rowBlocked && "bg-g-surface-2",
         rowBlocked && "bg-g-surface-2 opacity-[0.72] hover:bg-g-surface-2",
         bulkMode && rowBlocked && "cursor-not-allowed",
       )}
@@ -243,7 +243,9 @@ export function OptimizeRowItem({
       {/* Source → Target column */}
       <div className="hidden min-w-0 min-[980px]:block">
         <div className="font-g-mono text-g-ui text-g-ink">
-          {hasEstimate ? (
+          {rowBlocked ? (
+            formatBytes(item.bytes)
+          ) : hasEstimate ? (
             <>
               {formatBytes(item.bytes)} →{" "}
               <span className="font-[590]">{formatBytes(estimated)}</span>
@@ -254,7 +256,7 @@ export function OptimizeRowItem({
             t("optimize.pendingEstimate")
           )}
         </div>
-        {hasEstimate && item.bytes > 0 && (
+        {hasEstimate && !rowBlocked && item.bytes > 0 && (
           <div className="mt-1.5 flex h-[5px] overflow-hidden rounded-g-pill bg-g-surface-3">
             <div
               className="rounded-g-pill bg-g-green transition-[width] duration-300 ease-g"

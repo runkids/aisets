@@ -554,6 +554,18 @@ func measureSingleOperation(project scanner.Project, op Operation, req Request, 
 		op.SavingsBytes = 0
 		return op
 	}
+	if op.TargetPath != op.RepoPath {
+		if targetAbs, err := safeAbs(project.Path, op.TargetPath); err == nil {
+			if _, err := os.Stat(targetAbs); err == nil {
+				op.CanApply = false
+				op.ReasonCode = "target_already_exists"
+				op.BlockedReason = fmt.Sprintf("Target file already exists: %s", op.TargetPath)
+				op.EstimatedBytes = op.CurrentBytes
+				op.SavingsBytes = 0
+				return op
+			}
+		}
+	}
 	candidate, estimatedBytes, err := buildCandidate(project, op, req)
 	if err != nil {
 		op.CanApply = false
@@ -787,7 +799,8 @@ func Apply(project scanner.Project, preview actions.Preview) (actions.ApplyResul
 		}
 		if op.TargetPath != op.RepoPath {
 			if _, err := os.Stat(targetAbs); err == nil {
-				return actions.ApplyResult{}, apierr.WithParams("target_already_exists", "target already exists", map[string]any{"targetPath": op.TargetPath})
+				result.SkippedFiles++
+				continue
 			}
 		}
 		if err := os.MkdirAll(filepath.Dir(targetAbs), 0o755); err != nil {
@@ -814,7 +827,7 @@ func Apply(project scanner.Project, preview actions.Preview) (actions.ApplyResul
 		}
 		result.MovedFiles++
 	}
-	if result.MovedFiles == 0 {
+	if result.MovedFiles == 0 && result.SkippedFiles == 0 {
 		return actions.ApplyResult{}, apierr.New("preview_has_blockers", "preview has blockers")
 	}
 	if err := actions.ApplyReferenceChanges(project, preview.Changes); err != nil {

@@ -46,6 +46,7 @@ import {
   streamEstimate,
   toolInstallCommands,
 } from "./optimizeTypes";
+import { errorMessage } from "../i18n";
 import { OptimizeHelpPopover } from "./OptimizeHelpPopover";
 import { OptimizePreviewModal } from "./OptimizePreviewModal";
 import { OptimizeScriptModal } from "./OptimizeScriptModal";
@@ -835,30 +836,53 @@ export function OptimizeView({
         0,
       );
       const { tokens } = preview;
+      let totalSkipped = 0;
       for (let i = 0; i < tokens.length; i++) {
         if (ctrl.signal.aborted) break;
-        await postJSON(
+        const res = await postJSON<{
+          result: { skippedFiles?: number };
+        }>(
           "/api/actions/optimization/apply",
           { token: tokens[i] },
           ctrl.signal,
         );
+        totalSkipped += res.result?.skippedFiles ?? 0;
         setProgress(((i + 1) / tokens.length) * 100);
       }
       if (ctrl.signal.aborted) return;
-      toast.success(
-        t("optimize.applySuccess", {
-          count: appliedOps.length,
-          savings: formatBytes(totalSaved),
-        }),
-        { title: t("optimize.optimizationComplete") },
-      );
+      if (totalSkipped > 0 && totalSkipped >= appliedOps.length) {
+        toast.info(
+          t("optimize.applyAllSkipped", {
+            count: totalSkipped,
+            defaultValue: "All {{count}} items were already optimized",
+          }),
+          { title: t("optimize.optimizationComplete") },
+        );
+      } else {
+        const appliedCount = appliedOps.length - totalSkipped;
+        toast.success(
+          t("optimize.applySuccess", {
+            count: appliedCount,
+            savings: formatBytes(totalSaved),
+          }) +
+            (totalSkipped > 0
+              ? ` · ${t("optimize.applySkipped", { count: totalSkipped, defaultValue: "{{count}} skipped (already optimized)" })}`
+              : ""),
+          { title: t("optimize.optimizationComplete") },
+        );
+      }
       setPreview(null);
       setBulkMode(false);
       setSelected(new Set());
       void itemsQuery.refetch();
     } catch (err) {
-      if (!ctrl.signal.aborted)
-        setError(err instanceof Error ? err.message : String(err));
+      if (!ctrl.signal.aborted) {
+        setPreview(null);
+        setBulkMode(false);
+        setSelected(new Set());
+        toast.error(errorMessage(err), { title: t("optimize.applyFailed") });
+        void itemsQuery.refetch();
+      }
     } finally {
       setWorking(null);
       abortRef.current = null;
@@ -1449,7 +1473,7 @@ export function OptimizeView({
             <Notice
               tone="danger"
               className="mb-3"
-              title={t("error.requestFailed", { status: "" })}
+              title={t("optimize.applyFailed")}
             >
               {error}
             </Notice>

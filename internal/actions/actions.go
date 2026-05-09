@@ -42,6 +42,7 @@ type ApplyResult struct {
 	ChangedReferences int    `json:"changedReferences"`
 	DeletedFiles      int    `json:"deletedFiles"`
 	MovedFiles        int    `json:"movedFiles"`
+	SkippedFiles      int    `json:"skippedFiles,omitempty"`
 }
 
 func RenamePreview(project scanner.Project, item scanner.AssetItem, targetPath string) (Preview, error) {

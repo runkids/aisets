@@ -1,4 +1,5 @@
 import type { ActionPreview, AssetItem } from "../types";
+import { APIError } from "../api";
 
 export type Operation =
   | ""
@@ -175,7 +176,11 @@ export async function postJSON<T>(
   });
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody?.error?.message || `HTTP ${res.status}`);
+    const e = errorBody?.error;
+    if (e?.code) {
+      throw new APIError(e.code, e.message || `HTTP ${res.status}`, e.params);
+    }
+    throw new Error(e?.message || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

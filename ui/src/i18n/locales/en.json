@@ -52,6 +52,7 @@
     "delete": "Delete",
     "merge": "Merge",
     "copyPath": "Copy Path",
+    "copyFileName": "Copy Filename",
     "openFile": "Open File",
     "clear": "Clear",
     "select": "Select",
@@ -846,8 +847,9 @@
     "scan_id_invalid": "Scan ID is invalid.",
     "empty_selection": "No assets selected.",
     "asset_ids_required": "At least one asset must be selected.",
-    "target_already_exists": "Target file already exists.",
+    "target_already_exists": "Target file already exists: {{targetPath}}",
     "target_path_required": "Target path is required.",
+    "preview_stale_missing_candidate": "Preview is stale — the optimization candidate has been removed",
     "preview_has_blockers": "Preview has unresolved blockers.",
     "project_icon_invalid": "Project image must be a PNG, JPEG, GIF, or WebP data URL under 512 KB."
   },
@@ -1046,6 +1048,9 @@
     "optimizing": "Preparing…",
     "applyOptimization": "Apply Optimization",
     "applySuccess": "{{count}} assets optimized, saving {{savings}}",
+    "applyFailed": "Optimization failed",
+    "applyAllSkipped": "All {{count}} items were already optimized",
+    "applySkipped": "{{count}} skipped (already optimized)",
     "estimateCached": "Estimate loaded from cache",
     "optimizationComplete": "Optimization applied",
     "replaceOriginal": "Replace original",
@@ -1074,7 +1079,8 @@
       "asset_not_found": "The previewed asset was not found.",
       "replace_requires_code_project": "Only code projects can safely replace converted originals.",
       "replace_requires_reference_update": "This file has references; update references before deleting the original.",
-      "reference_update_blocked": "One or more references cannot be safely updated."
+      "reference_update_blocked": "One or more references cannot be safely updated.",
+      "target_already_exists": "Already optimized — target file exists."
     },
     "preview": "Preview",
     "script": "Script",
