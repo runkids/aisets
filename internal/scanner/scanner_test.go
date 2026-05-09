@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNewReturnsUsableScanner(t *testing.T) {
@@ -322,6 +324,139 @@ func TestScanUsesPersistentCacheAndNearDuplicates(t *testing.T) {
 	}
 }
 
+func TestScanInvalidatesCacheWhenContentChangesWithPreservedStat(t *testing.T) {
+	root := t.TempDir()
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	assetPath := filepath.Join(root, "src", "asset.png")
+	peerPath := filepath.Join(root, "src", "peer.png")
+	mtime := time.Unix(1_700_000_000, 0)
+	project := []Project{{ID: root, Name: "fixture", Path: root}}
+
+	writeUncompressedPNG(t, assetPath, solidImage(8, 8, color.NRGBA{R: 255, A: 255}))
+	writeUncompressedPNG(t, peerPath, solidImage(8, 8, color.NRGBA{R: 255, A: 255}))
+	if err := os.Chtimes(assetPath, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(peerPath, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	originalInfo, err := os.Stat(assetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := NewWithCacheDir(cacheDir)
+	first, err := s.Scan(context.Background(), project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstItem := mustCatalogItem(t, first, "src/asset.png")
+	firstPeer := mustCatalogItem(t, first, "src/peer.png")
+	if firstItem.ContentHash == "" || firstItem.ContentHash != firstPeer.ContentHash {
+		t.Fatalf("initial duplicate content hashes = %q peer = %q", firstItem.ContentHash, firstPeer.ContentHash)
+	}
+	if first.Stats.DuplicateGroups != 1 {
+		t.Fatalf("initial duplicate groups = %d, want 1", first.Stats.DuplicateGroups)
+	}
+
+	writeUncompressedPNG(t, assetPath, solidImage(8, 8, color.NRGBA{B: 255, A: 255}))
+	if err := os.Chtimes(assetPath, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	changedInfo, err := os.Stat(assetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changedInfo.Size() != originalInfo.Size() || !changedInfo.ModTime().Equal(originalInfo.ModTime()) {
+		t.Fatalf("test fixture must preserve size and mtime: before=(%d,%s) after=(%d,%s)", originalInfo.Size(), originalInfo.ModTime(), changedInfo.Size(), changedInfo.ModTime())
+	}
+
+	second, err := s.Scan(context.Background(), project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondItem := mustCatalogItem(t, second, "src/asset.png")
+	secondPeer := mustCatalogItem(t, second, "src/peer.png")
+	if secondItem.ContentHash == firstItem.ContentHash {
+		t.Fatalf("content hash stayed stale after same-size same-mtime content change: %q", secondItem.ContentHash)
+	}
+	if secondItem.ContentHash == secondPeer.ContentHash || second.Stats.DuplicateGroups != 0 {
+		t.Fatalf("stale duplicate state after content change: asset=%q peer=%q duplicateGroups=%d cacheHits=%d", secondItem.ContentHash, secondPeer.ContentHash, second.Stats.DuplicateGroups, second.Stats.CacheHits)
+	}
+}
+
+func TestThumbnailCacheInvalidatesWhenAssetContentChangesWithPreservedStat(t *testing.T) {
+	root := t.TempDir()
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	assetPath := filepath.Join(root, "src", "thumb.png")
+	project := []Project{{ID: root, Name: "fixture", Path: root}}
+	mtime := time.Unix(1_700_000_000, 0)
+
+	writeUncompressedPNG(t, assetPath, solidImage(8, 8, color.NRGBA{R: 255, A: 255}))
+	if err := os.Chtimes(assetPath, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	originalInfo, err := os.Stat(assetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewWithCacheDir(cacheDir)
+	first, err := s.Scan(context.Background(), project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstThumb, err := s.Thumbnail(context.Background(), first, first.Items[0].ID, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstBytes, err := os.ReadFile(firstThumb.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writeUncompressedPNG(t, assetPath, solidImage(8, 8, color.NRGBA{B: 255, A: 255}))
+	if err := os.Chtimes(assetPath, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	changedInfo, err := os.Stat(assetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changedInfo.Size() != originalInfo.Size() || !changedInfo.ModTime().Equal(originalInfo.ModTime()) {
+		t.Fatalf("test fixture must preserve size and mtime: before=(%d,%s) after=(%d,%s)", originalInfo.Size(), originalInfo.ModTime(), changedInfo.Size(), changedInfo.ModTime())
+	}
+	second, err := s.Scan(context.Background(), project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Items[0].ThumbnailURL == first.Items[0].ThumbnailURL {
+		t.Fatalf("thumbnail URL version stayed stale: before=%q after=%q", first.Items[0].ThumbnailURL, second.Items[0].ThumbnailURL)
+	}
+	secondThumb, err := s.Thumbnail(context.Background(), second, second.Items[0].ID, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondBytes, err := os.ReadFile(secondThumb.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if bytes.Equal(firstBytes, secondBytes) {
+		t.Fatalf("thumbnail cache reused stale content: first=%s second=%s secondCacheHit=%v", firstThumb.Path, secondThumb.Path, secondThumb.CacheHit)
+	}
+}
+
+func mustCatalogItem(t *testing.T, catalog Catalog, repoPath string) AssetItem {
+	t.Helper()
+	for _, item := range catalog.Items {
+		if item.RepoPath == repoPath {
+			return item
+		}
+	}
+	t.Fatalf("catalog item %q not found in %#v", repoPath, catalog.Items)
+	return AssetItem{}
+}
+
 func TestThumbnailAndHelperErrorPaths(t *testing.T) {
 	root := t.TempDir()
 	assetPath := filepath.Join(root, "src", "thumb.png")
@@ -397,6 +532,16 @@ func mustWriteBytes(t *testing.T, path string, content []byte) {
 
 func writePNG(t *testing.T, path string, img image.Image) {
 	t.Helper()
+	writePNGWithEncoder(t, path, img, png.Encoder{})
+}
+
+func writeUncompressedPNG(t *testing.T, path string, img image.Image) {
+	t.Helper()
+	writePNGWithEncoder(t, path, img, png.Encoder{CompressionLevel: png.NoCompression})
+}
+
+func writePNGWithEncoder(t *testing.T, path string, img image.Image, encoder png.Encoder) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +550,7 @@ func writePNG(t *testing.T, path string, img image.Image) {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	if err := png.Encode(file, img); err != nil {
+	if err := encoder.Encode(file, img); err != nil {
 		t.Fatal(err)
 	}
 }

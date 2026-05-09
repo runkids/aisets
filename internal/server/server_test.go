@@ -57,7 +57,8 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
-	writePNG(t, filepath.Join(root, "src", "logo.png"))
+	logoPath := filepath.Join(root, "src", "logo.png")
+	writePNG(t, logoPath)
 	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./logo.png"`)
 
 	store, err := config.OpenStore()
@@ -102,6 +103,7 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 		t.Fatalf("catalog items = %#v", items)
 	}
 	id := items[0].ID
+	writeSolidPNG(t, logoPath, color.NRGBA{B: 255, A: 255})
 
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/scan", nil)
@@ -109,6 +111,14 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK || rec.Header().Get("content-type") != "application/x-ndjson; charset=utf-8" || !strings.Contains(body, `"type":"start"`) || !strings.Contains(body, `"type":"progress"`) || !strings.Contains(body, `"phase":"metadata"`) || !strings.Contains(body, `"phase":"persisting"`) || !strings.Contains(body, `"type":"done"`) {
 		t.Fatalf("scan = %d %s", rec.Code, body)
+	}
+
+	rescannedItems := catalogItemsForTest(t, s)
+	if len(rescannedItems) != 1 || rescannedItems[0].ID != id {
+		t.Fatalf("rescanned catalog items = %#v", rescannedItems)
+	}
+	if rescannedItems[0].ThumbnailURL == items[0].ThumbnailURL || !strings.Contains(rescannedItems[0].ThumbnailURL, "?v=") {
+		t.Fatalf("thumbnail url should change after rescan: before=%q after=%q", items[0].ThumbnailURL, rescannedItems[0].ThumbnailURL)
 	}
 
 	rec = httptest.NewRecorder()
@@ -1861,6 +1871,27 @@ func writePNG(t *testing.T, path string) {
 	for y := 0; y < 8; y++ {
 		for x := 0; x < 8; x++ {
 			img.Set(x, y, color.NRGBA{R: uint8(x * 20), G: uint8(y * 20), B: 100, A: 255})
+		}
+	}
+	if err := png.Encode(file, img); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeSolidPNG(t *testing.T, path string, c color.NRGBA) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			img.Set(x, y, c)
 		}
 	}
 	if err := png.Encode(file, img); err != nil {

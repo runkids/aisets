@@ -79,11 +79,6 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		options.Analyses.NearDuplicates = false
 		options.Profile = ScanProfileCustom
 	}
-	sizeCounts := map[int64]int{}
-	for _, candidate := range candidates {
-		sizeCounts[candidate.info.Size()]++
-	}
-
 	thresholds := options.OptimizationThresholds
 	thresholdsHash := thresholds.Hash()
 
@@ -102,7 +97,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				item, hit, err := s.buildItem(ctx, job.candidate, sizeCounts[job.candidate.info.Size()] > 1, options.Analyses.NearDuplicates, options.Analyses.Optimization, thresholds, thresholdsHash)
+				item, hit, err := s.buildItem(ctx, job.candidate, options.Analyses.NearDuplicates, options.Analyses.Optimization, thresholds, thresholdsHash)
 				results <- scanResult{index: job.index, item: item, cacheHit: hit, err: err}
 			}
 		}()
@@ -242,23 +237,34 @@ func (s *Scanner) Thumbnail(ctx context.Context, catalog Catalog, id string, siz
 		if cacheDir == "thumbs" {
 			cacheDir = filepath.Join(os.TempDir(), "aisets", "thumbs")
 		}
-		key := item.ThumbnailURL
-		if key == "" {
-			key = imageproc.CacheKey(item.ProjectID, item.RepoPath, item.Bytes, 0)
+		contentHash := item.ContentHash
+		if contentHash == "" {
+			sum, err := contentHashFile(ctx, item.LocalPath)
+			if err != nil {
+				return imageproc.ThumbnailResult{}, err
+			}
+			contentHash = sum
 		}
+		key := item.ProjectID + "\x00" + item.RepoPath + "\x00" + contentHash
 		return imageproc.Thumbnail(item.LocalPath, cacheDir, key, size)
 	}
 	return imageproc.ThumbnailResult{}, os.ErrNotExist
 }
 
-func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsSHA, needsDHash, needsOptimization bool, thresholds imageproc.OptimizationThresholds, thresholdsHash string) (AssetItem, bool, error) {
+func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsDHash, needsOptimization bool, thresholds imageproc.OptimizationThresholds, thresholdsHash string) (AssetItem, bool, error) {
 	if ctx.Err() != nil {
 		return AssetItem{}, false, ctx.Err()
 	}
 	info := candidate.info
+	contentHash, err := contentHashFile(ctx, candidate.path)
+	if err != nil {
+		return AssetItem{}, false, err
+	}
 	cacheKey := imageproc.CacheKey(candidate.project.ID, candidate.repo, info.Size(), info.ModTime().UnixNano())
+	assetID := stableID(candidate.project.ID + ":" + candidate.repo)
+	assetVersion := "?v=" + contentHash
 	item := AssetItem{
-		ID:            stableID(candidate.project.ID + ":" + candidate.repo),
+		ID:            assetID,
 		ProjectID:     candidate.project.ID,
 		ProjectName:   candidate.project.Name,
 		RepoPath:      candidate.repo,
@@ -266,13 +272,14 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 		Ext:           strings.ToLower(filepath.Ext(candidate.path)),
 		Bytes:         info.Size(),
 		ModifiedUnix:  info.ModTime().Unix(),
-		URL:           "/api/assets/" + stableID(candidate.project.ID+":"+candidate.repo),
-		ThumbnailURL:  "/api/thumbs/" + stableID(candidate.project.ID+":"+candidate.repo),
+		ContentHash:   contentHash,
+		URL:           "/api/assets/" + assetID + assetVersion,
+		ThumbnailURL:  "/api/thumbs/" + assetID + assetVersion,
 		HashAlgorithm: contentHashAlgorithm,
 		ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
 	}
-	if record, ok := s.cache.Get(cacheKey, info.Size(), info.ModTime().UnixNano()); ok {
-		item.ContentHash = record.ContentHash
+	if record, ok := s.cache.Get(cacheKey, info.Size(), info.ModTime().UnixNano()); ok && record.ContentHash == contentHash {
+		item.ContentHash = contentHash
 		if record.HashAlgorithm != "" {
 			item.HashAlgorithm = record.HashAlgorithm
 		}
@@ -283,16 +290,6 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 		}
 		if needsOptimization && record.ThresholdsHash == thresholdsHash {
 			item.Optimization = toScannerOptimization(record.Optimization)
-		}
-		if needsSHA && item.ContentHash == "" {
-			sum, err := contentHashFile(ctx, candidate.path)
-			if err != nil {
-				return AssetItem{}, false, err
-			}
-			item.ContentHash = sum
-			record.ContentHash = sum
-			record.HashAlgorithm = contentHashAlgorithm
-			_ = s.cache.Set(cacheKey, record)
 		}
 		if needsDHash && item.DHash == "" {
 			hashes, _ := imageproc.DHash(candidate.path)
@@ -323,13 +320,6 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsS
 	if needsOptimization {
 		optimization = imageproc.EstimateOptimization(candidate.path, meta, info.Size(), thresholds)
 		item.Optimization = toScannerOptimization(optimization)
-	}
-	if needsSHA {
-		sum, err := contentHashFile(ctx, candidate.path)
-		if err != nil {
-			return AssetItem{}, false, err
-		}
-		item.ContentHash = sum
 	}
 	_ = s.cache.Set(cacheKey, catalogcache.Record{
 		ProjectID:      candidate.project.ID,
