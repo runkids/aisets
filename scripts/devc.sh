@@ -38,12 +38,14 @@ parse_port_flag() {
         local api_port="${2:?--port requires a value}"
         export AISETS_PORT="$api_port"
         export AISETS_UI_PORT="$(( api_port - 19520 + 5174 ))"
+        export COMPOSE_PROJECT_NAME="aisets_devcontainer_${api_port}"
         shift 2
         ;;
       --port=*)
         local api_port="${1#--port=}"
         export AISETS_PORT="$api_port"
         export AISETS_UI_PORT="$(( api_port - 19520 + 5174 ))"
+        export COMPOSE_PROJECT_NAME="aisets_devcontainer_${api_port}"
         shift
         ;;
       *) shift ;;
