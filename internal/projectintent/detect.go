@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/references"
-	"asset-studio/internal/scanner"
+	"aisets/internal/references"
+	"aisets/internal/scanner"
 )
 
 const maxSampleFiles = 2000
@@ -57,11 +57,6 @@ type signals struct {
 	sourceDir          bool
 	docsDir            bool
 	manifestAssetFiles bool
-}
-
-var skipDirs = map[string]bool{
-	".git": true, ".next": true, ".cache": true, "build": true, "coverage": true,
-	"dist": true, "node_modules": true, "target": true, "tmp": true,
 }
 
 var assetExts = map[string]bool{
@@ -116,10 +111,13 @@ func Detect(ctx context.Context, root string, excludePatterns []string) (Detecti
 		}
 		name := entry.Name()
 		if entry.IsDir() {
-			lower := strings.ToLower(name)
-			if skipDirs[lower] {
-				return filepath.SkipDir
+			if path != abs {
+				repoDir, err := filepath.Rel(abs, path)
+				if err == nil && references.MatchesAnyExcludeDirectory(excludePatterns, filepath.ToSlash(repoDir)) {
+					return filepath.SkipDir
+				}
 			}
+			lower := strings.ToLower(name)
 			switch lower {
 			case "assets", "images", "icons", "sprites", "videos", "media":
 				sig.assetFolder = true

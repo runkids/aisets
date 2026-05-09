@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 type Preview struct {

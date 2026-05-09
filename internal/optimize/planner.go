@@ -15,11 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/imgtools"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/apierr"
+	"aisets/internal/imageproc"
+	"aisets/internal/imgtools"
+	"aisets/internal/scanner"
 
 	minify "github.com/tdewolff/minify/v2"
 	minifysvg "github.com/tdewolff/minify/v2/svg"

@@ -3,7 +3,7 @@ package config
 import (
 	"strconv"
 
-	"asset-studio/internal/scanner"
+	"aisets/internal/scanner"
 )
 
 const catalogAssetSelectColumns = `

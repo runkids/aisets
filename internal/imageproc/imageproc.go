@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"asset-studio/internal/imgtools"
+	"aisets/internal/imgtools"
 	"github.com/corona10/goimagehash"
 	_ "github.com/gen2brain/avif"
 	"github.com/srwiley/oksvg"

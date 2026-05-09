@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"asset-studio/internal/scanner"
+	"aisets/internal/scanner"
 )
 
 func TestRenamePreviewApply(t *testing.T) {

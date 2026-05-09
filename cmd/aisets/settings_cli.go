@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
 )
 
 type cliSettingsInfo struct {

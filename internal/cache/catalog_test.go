@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"asset-studio/internal/imageproc"
+	"aisets/internal/imageproc"
 )
 
 func TestStoreHitMissInvalidationAndRestart(t *testing.T) {

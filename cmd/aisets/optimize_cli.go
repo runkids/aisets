@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/optimize"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/optimize"
 )
 
 func cmdOptimize(args []string, jsonOut bool) error {

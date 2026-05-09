@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"asset-studio/internal/apierr"
+	"aisets/internal/apierr"
 )
 
 var customFilterIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"asset-studio/internal/lint"
+	"aisets/internal/lint"
 )
 
 func runLint(projects []Project, items []AssetItem) []lint.Finding {

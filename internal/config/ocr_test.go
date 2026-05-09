@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"asset-studio/internal/ocr"
+	"aisets/internal/ocr"
 )
 
 func TestOCRResultForContentHashReusesOnlyReadyResults(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"asset-studio/internal/references"
+	"aisets/internal/references"
 )
 
 func buildReferenceMap(ctx context.Context, projects []Project, items []AssetItem, options ScanOptions, progress func(current, total int)) (map[string][]AssetReference, error) {

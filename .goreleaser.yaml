@@ -36,7 +36,7 @@ checksum:
 release:
   github:
     owner: runkids
-    name: asset-studio
+    name: aisets
   extra_files:
     - glob: ./aisets-ui-dist.tar.gz
 

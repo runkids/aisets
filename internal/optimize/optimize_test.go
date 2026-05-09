@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/imageproc"
+	"aisets/internal/scanner"
 )
 
 func TestComputeAggregatesOptimizableItems(t *testing.T) {

@@ -1,8 +1,8 @@
 package scanner
 
 import (
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/lint"
+	"aisets/internal/imageproc"
+	"aisets/internal/lint"
 )
 
 func toScannerOptimization(in []imageproc.Optimization) []OptimizationSuggestion {

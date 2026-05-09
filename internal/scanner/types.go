@@ -1,9 +1,9 @@
 package scanner
 
 import (
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/lint"
-	"asset-studio/internal/ocr"
+	"aisets/internal/imageproc"
+	"aisets/internal/lint"
+	"aisets/internal/ocr"
 )
 
 type ScanPhase string

@@ -19,13 +19,13 @@ import (
 	"sync"
 	"testing"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/lint"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/optimize"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/imageproc"
+	"aisets/internal/lint"
+	"aisets/internal/ocr"
+	"aisets/internal/optimize"
+	"aisets/internal/scanner"
 )
 
 func TestAPIVersionAndUpdateDevMode(t *testing.T) {

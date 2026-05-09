@@ -1,8 +1,8 @@
 package config
 
 import (
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/scanner"
+	"aisets/internal/imageproc"
+	"aisets/internal/scanner"
 )
 
 type Workspace struct {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"asset-studio/internal/apierr"
+	"aisets/internal/apierr"
 )
 
 var version = "dev"

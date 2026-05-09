@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"sort"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/optimize"
-	"asset-studio/internal/precheck"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/apierr"
+	"aisets/internal/imageproc"
+	"aisets/internal/optimize"
+	"aisets/internal/precheck"
+	"aisets/internal/scanner"
 )
 
 func (s *Server) handleOptimizationPreview(w http.ResponseWriter, r *http.Request) {

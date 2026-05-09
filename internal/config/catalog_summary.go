@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) LatestScan() (ScanSummary, error) {

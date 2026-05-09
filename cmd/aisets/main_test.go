@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"asset-studio/internal/config"
-	"asset-studio/internal/scanner"
+	"aisets/internal/config"
+	"aisets/internal/scanner"
 )
 
 func TestMainWithoutArgsPrintsUsage(t *testing.T) {

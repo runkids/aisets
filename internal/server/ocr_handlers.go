@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 type ocrCounts struct {

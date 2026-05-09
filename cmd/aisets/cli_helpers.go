@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/scanner"
 )
 
 func newFlagSet(name string, jsonOut bool) *flag.FlagSet {

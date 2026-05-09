@@ -9,11 +9,11 @@ import (
 	"os"
 	"strconv"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 func scanErrorStatus(err error) int {
@@ -304,11 +304,18 @@ func (s *Server) handleScanStatus(w http.ResponseWriter, _ *http.Request) {
 	running := s.scanRunning
 	progress := s.scanProgress
 	s.scanMu.Unlock()
+	var scanID int64
+	if !running {
+		if scan, err := s.store.LatestScan(); err == nil {
+			scanID = scan.ID
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"running": running,
 		"phase":   progress.Phase,
 		"current": progress.Current,
 		"total":   progress.Total,
+		"scanId":  scanID,
 	})
 }
 

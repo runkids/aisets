@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"asset-studio/internal/imageproc"
+	"aisets/internal/imageproc"
 )
 
 type Store struct {

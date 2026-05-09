@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {

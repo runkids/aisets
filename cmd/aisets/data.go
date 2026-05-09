@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/projectintent"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/projectintent"
+	"aisets/internal/scanner"
 )
 
 func cmdProjects(args []string, jsonOut bool) error {

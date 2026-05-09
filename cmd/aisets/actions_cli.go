@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
+	"aisets/internal/actions"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
 )
 
 func cmdActions(args []string, jsonOut bool) error {

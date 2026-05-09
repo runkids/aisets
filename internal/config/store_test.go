@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/lint"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/imageproc"
+	"aisets/internal/lint"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 func TestStoreProjectsPersistInSQLite(t *testing.T) {
@@ -241,7 +241,7 @@ func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
 		t.Fatalf("default project root = %q", settings.DefaultProjectRoot)
 	}
 	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
-	if len(settings.ExcludePatterns) != 0 {
+	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(defaultGlobalExcludePatterns(), ",") {
 		t.Fatalf("default global exclude patterns = %#v", settings.ExcludePatterns)
 	}
 	for _, intent := range []scanner.ProjectScanIntent{scanner.ProjectScanIntentCode, scanner.ProjectScanIntentLibrary, scanner.ProjectScanIntentMixed} {
@@ -292,7 +292,7 @@ func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T)
 		t.Fatal(err)
 	}
 	wantExcludePatterns := []string{"**/*.test.*", "**/*.spec.*", "**/__tests__/**", "**/__mocks__/**", "**/*.stories.*"}
-	if len(settings.ExcludePatterns) != 0 {
+	if strings.Join(settings.ExcludePatterns, ",") != strings.Join(defaultGlobalExcludePatterns(), ",") {
 		t.Fatalf("migrated global exclude patterns = %#v", settings.ExcludePatterns)
 	}
 	if strings.Join(settings.ExcludePatternsByIntent[scanner.ProjectScanIntentCode], ",") != strings.Join(wantExcludePatterns, ",") {

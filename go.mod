@@ -1,4 +1,4 @@
-module asset-studio
+module aisets
 
 go 1.25.5
 

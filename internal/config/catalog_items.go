@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strconv"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {

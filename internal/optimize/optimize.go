@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"asset-studio/internal/scanner"
+	"aisets/internal/scanner"
 )
 
 // Estimate aggregates optimization recommendations across the given items.

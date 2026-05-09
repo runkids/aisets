@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 func (s *Server) handleBatchDelete(w http.ResponseWriter, r *http.Request) {

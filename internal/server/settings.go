@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/http"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/optimize"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/imageproc"
+	"aisets/internal/ocr"
+	"aisets/internal/optimize"
 )
 
 func settingsErrorStatus(err error) int {

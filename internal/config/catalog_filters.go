@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/optimize"
+	"aisets/internal/apierr"
+	"aisets/internal/optimize"
 )
 
 func (s *Store) customCatalogFilterSQL(id string) (string, []any, error) {

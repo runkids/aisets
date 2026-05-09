@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"asset-studio/internal/apierr"
+	"aisets/internal/apierr"
 )
 
 const defaultWorkspaceID = "default"

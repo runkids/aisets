@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"asset-studio/internal/apierr"
-	versionpkg "asset-studio/internal/version"
+	"aisets/internal/apierr"
+	versionpkg "aisets/internal/version"
 )
 
 func cmdUpdate(args []string, jsonOut bool) error {

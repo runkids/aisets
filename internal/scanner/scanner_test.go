@@ -237,13 +237,15 @@ func TestScanWithProgressReportsPhases(t *testing.T) {
 	}
 }
 
-func TestScanSkipsHeavyDirectories(t *testing.T) {
+func TestScanSkipsExcludedDirectories(t *testing.T) {
 	root := t.TempDir()
 	writePNG(t, filepath.Join(root, "node_modules", "ignored.png"), solidImage(2, 2, color.Black))
 	writePNG(t, filepath.Join(root, "src", "kept.png"), solidImage(2, 2, color.White))
 
 	s := NewWithCacheDir(filepath.Join(t.TempDir(), "cache"))
-	catalog, err := s.Scan(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}})
+	options := FullScanOptions()
+	options.ExcludePatterns = []string{"node_modules"}
+	catalog, err := s.ScanWithOptions(context.Background(), []Project{{ID: root, Name: "fixture", Path: root}}, options, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,6 +278,33 @@ func TestScanWithProgressHonorsExcludePatterns(t *testing.T) {
 	}
 	if len(catalog.Items[0].UsedBy) != 1 || catalog.Items[0].UsedBy[0] != "src/App.tsx" {
 		t.Fatalf("usedBy = %#v, want only src/App.tsx", catalog.Items[0].UsedBy)
+	}
+}
+
+func TestMarkNearDuplicatesUsesIndexedCandidates(t *testing.T) {
+	items := []AssetItem{
+		{ID: "a", RepoPath: "a.png", DHash: "0000000000000000", ContentHash: "same"},
+		{ID: "b", RepoPath: "b.png", DHash: "ffffffffffffffff", DHashFlipped: "000000000000001f"},
+		{ID: "c", RepoPath: "c.png", DHash: "0000000000000001", ContentHash: "same"},
+	}
+	var events []ScanProgress
+	near, err := markNearDuplicates(context.Background(), items, func(event ScanProgress) {
+		events = append(events, event)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(near) != 1 {
+		t.Fatalf("near duplicates = %#v, want one", near)
+	}
+	if near[0].LeftID != "a" || near[0].RightID != "b" || !near[0].Flipped || near[0].Distance != 5 {
+		t.Fatalf("near duplicate = %#v", near[0])
+	}
+	if len(items[0].Similar) != 1 || items[0].Similar[0] != "b" || len(items[1].Similar) != 1 || items[1].Similar[0] != "a" || len(items[2].Similar) != 0 {
+		t.Fatalf("similar links = %#v %#v %#v", items[0].Similar, items[1].Similar, items[2].Similar)
+	}
+	if len(events) != len(items) || events[len(events)-1].Current != len(items) || events[len(events)-1].Total != len(items) {
+		t.Fatalf("progress events = %#v", events)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/references"
+	"aisets/internal/references"
 )
 
 var imageExts = map[string]bool{
@@ -17,11 +17,6 @@ var imageExts = map[string]bool{
 	".png":  true,
 	".svg":  true,
 	".webp": true,
-}
-
-var skipDirs = map[string]bool{
-	".git": true, ".next": true, ".nuxt": true, ".turbo": true, "build": true,
-	"coverage": true, "dist": true, "node_modules": true, "storybook-static": true,
 }
 
 type fileCandidate struct {
@@ -43,8 +38,11 @@ func collectCandidates(ctx context.Context, projects []Project, options ScanOpti
 				return ctx.Err()
 			}
 			if entry.IsDir() {
-				if skipDirs[entry.Name()] {
-					return filepath.SkipDir
+				if path != project.Path {
+					repoDir, err := filepath.Rel(project.Path, path)
+					if err == nil && references.MatchesAnyExcludeDirectory(excludePatterns, filepath.ToSlash(repoDir)) {
+						return filepath.SkipDir
+					}
 				}
 				return nil
 			}

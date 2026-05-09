@@ -52,11 +52,6 @@ var codeExts = map[string]bool{
 	".yaml": true, ".yml": true, ".toml": true,
 }
 
-var skipDirs = map[string]bool{
-	".git": true, ".next": true, ".nuxt": true, ".turbo": true, "build": true,
-	"coverage": true, "dist": true, "node_modules": true, "storybook-static": true,
-}
-
 var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\}|[*{}])?[^'"\x60]*\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'"\x60]*)?)['"\x60]`)
 var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
 
@@ -149,8 +144,11 @@ func collectCodeCandidates(ctx context.Context, projects []Project, excludePatte
 				return ctx.Err()
 			}
 			if entry.IsDir() {
-				if skipDirs[entry.Name()] {
-					return filepath.SkipDir
+				if path != project.Path {
+					repoDir, err := filepath.Rel(project.Path, path)
+					if err == nil && MatchesAnyExcludeDirectory(projectExcludePatterns, filepath.ToSlash(repoDir)) {
+						return filepath.SkipDir
+					}
 				}
 				return nil
 			}
@@ -178,6 +176,19 @@ func collectCodeCandidates(ctx context.Context, projects []Project, excludePatte
 func MatchesAnyExcludePattern(patterns []string, repoPath string) bool {
 	for _, pattern := range patterns {
 		if MatchExcludePattern(pattern, repoPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func MatchesAnyExcludeDirectory(patterns []string, repoPath string) bool {
+	repoPath = strings.Trim(strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(repoPath)), "./"), "/")
+	if repoPath == "" || repoPath == "." {
+		return false
+	}
+	for _, pattern := range patterns {
+		if MatchExcludePattern(pattern, repoPath) || MatchExcludePattern(pattern, repoPath+"/__aisets_dir_probe__") {
 			return true
 		}
 	}

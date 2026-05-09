@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/apierr"
+	"aisets/internal/apierr"
 )
 
 func normalizeBasePath(path string) string {

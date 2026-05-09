@@ -1,8 +1,8 @@
 package config
 
 import (
-	"asset-studio/internal/lint"
-	"asset-studio/internal/scanner"
+	"aisets/internal/lint"
+	"aisets/internal/scanner"
 )
 
 const catalogItemsLimitMax = 200

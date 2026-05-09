@@ -3,8 +3,8 @@ package optimize
 import (
 	"os/exec"
 
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/imgtools"
+	"aisets/internal/imageproc"
+	"aisets/internal/imgtools"
 )
 
 type ToolRuntime struct {

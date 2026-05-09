@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) Projects() []Project {

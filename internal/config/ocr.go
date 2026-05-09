@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 func ocrKey(projectID, repoPath string) string {

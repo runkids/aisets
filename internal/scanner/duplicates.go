@@ -2,10 +2,12 @@ package scanner
 
 import (
 	"context"
+	"math/bits"
 	"sort"
+	"strconv"
 	"strings"
 
-	"asset-studio/internal/imageproc"
+	"aisets/internal/imageproc"
 )
 
 func markDuplicates(items []AssetItem) []DuplicateGroup {
@@ -62,46 +64,127 @@ func preferredScore(item AssetItem) int {
 	return refs - depth*10 - length
 }
 
+type nearDuplicateCandidate struct {
+	distance int
+	flipped  bool
+}
+
+type nearHashIndex struct {
+	root *nearHashNode
+}
+
+type nearHashNode struct {
+	hash     uint64
+	index    int
+	children map[int]*nearHashNode
+}
+
+func (idx *nearHashIndex) insert(hash uint64, itemIndex int) {
+	if idx.root == nil {
+		idx.root = &nearHashNode{hash: hash, index: itemIndex}
+		return
+	}
+	node := idx.root
+	for {
+		distance := hammingDistance(hash, node.hash)
+		if node.children == nil {
+			node.children = map[int]*nearHashNode{}
+		}
+		child := node.children[distance]
+		if child == nil {
+			node.children[distance] = &nearHashNode{hash: hash, index: itemIndex}
+			return
+		}
+		node = child
+	}
+}
+
+func (idx nearHashIndex) query(hash uint64, threshold int, visit func(index int, distance int)) {
+	queryNearHashNode(idx.root, hash, threshold, visit)
+}
+
+func queryNearHashNode(node *nearHashNode, hash uint64, threshold int, visit func(index int, distance int)) {
+	if node == nil {
+		return
+	}
+	distance := hammingDistance(hash, node.hash)
+	if distance <= threshold {
+		visit(node.index, distance)
+	}
+	low := distance - threshold
+	if low < 0 {
+		low = 0
+	}
+	high := distance + threshold
+	for childDistance, child := range node.children {
+		if childDistance >= low && childDistance <= high {
+			queryNearHashNode(child, hash, threshold, visit)
+		}
+	}
+}
+
+func parseDHash(hash string) (uint64, bool) {
+	value, err := strconv.ParseUint(hash, 16, 64)
+	return value, err == nil
+}
+
+func hammingDistance(a, b uint64) int {
+	return bits.OnesCount64(a ^ b)
+}
+
 func markNearDuplicates(ctx context.Context, items []AssetItem, progress ProgressFunc) ([]NearDuplicate, error) {
 	const threshold = 5
 	var out []NearDuplicate
-	for i := 0; i < len(items); i++ {
+	index := nearHashIndex{}
+	for current := 0; current < len(items); current++ {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if items[i].DHash == "" {
-			notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: i + 1, Total: len(items)})
+		currentHash, hasCurrentHash := parseDHash(items[current].DHash)
+		flippedHash, hasFlippedHash := parseDHash(items[current].DHashFlipped)
+		if !hasCurrentHash && !hasFlippedHash {
+			notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items)})
 			continue
 		}
-		for j := i + 1; j < len(items); j++ {
-			if items[j].DHash == "" || items[i].ContentHash != "" && items[i].ContentHash == items[j].ContentHash {
-				continue
-			}
-			distance, ok := imageproc.DistanceHex(items[i].DHash, items[j].DHash)
-			flipped := false
-			if items[j].DHashFlipped != "" {
-				if flipDistance, flipOK := imageproc.DistanceHex(items[i].DHash, items[j].DHashFlipped); flipOK && (!ok || flipDistance < distance) {
-					distance = flipDistance
-					ok = true
-					flipped = true
-				}
-			}
-			if !ok || distance > threshold || !imageproc.IsVisualMatch(items[i].LocalPath, items[j].LocalPath, flipped) {
-				continue
-			}
-			items[i].Similar = append(items[i].Similar, items[j].ID)
-			items[j].Similar = append(items[j].Similar, items[i].ID)
-			out = append(out, NearDuplicate{
-				ID:        "near-" + stableID(items[i].ID+":"+items[j].ID),
-				LeftID:    items[i].ID,
-				RightID:   items[j].ID,
-				LeftPath:  items[i].RepoPath,
-				RightPath: items[j].RepoPath,
-				Distance:  distance,
-				Flipped:   flipped,
+
+		candidates := map[int]nearDuplicateCandidate{}
+		if hasCurrentHash {
+			index.query(currentHash, threshold, func(index int, distance int) {
+				candidates[index] = nearDuplicateCandidate{distance: distance}
 			})
 		}
-		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: i + 1, Total: len(items)})
+		if hasFlippedHash {
+			index.query(flippedHash, threshold, func(index int, distance int) {
+				candidate, exists := candidates[index]
+				if !exists || distance < candidate.distance {
+					candidates[index] = nearDuplicateCandidate{distance: distance, flipped: true}
+				}
+			})
+		}
+
+		for previous, candidate := range candidates {
+			if items[previous].ContentHash != "" && items[previous].ContentHash == items[current].ContentHash {
+				continue
+			}
+			if !imageproc.IsVisualMatch(items[previous].LocalPath, items[current].LocalPath, candidate.flipped) {
+				continue
+			}
+			items[previous].Similar = append(items[previous].Similar, items[current].ID)
+			items[current].Similar = append(items[current].Similar, items[previous].ID)
+			out = append(out, NearDuplicate{
+				ID:        "near-" + stableID(items[previous].ID+":"+items[current].ID),
+				LeftID:    items[previous].ID,
+				RightID:   items[current].ID,
+				LeftPath:  items[previous].RepoPath,
+				RightPath: items[current].RepoPath,
+				Distance:  candidate.distance,
+				Flipped:   candidate.flipped,
+			})
+		}
+		if hasCurrentHash {
+			index.insert(currentHash, current)
+		}
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].LeftPath != out[j].LeftPath {

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"asset-studio/internal/config"
-	"asset-studio/internal/server"
-	"asset-studio/internal/uidist"
+	"aisets/internal/config"
+	"aisets/internal/server"
+	"aisets/internal/uidist"
 )
 
 const (

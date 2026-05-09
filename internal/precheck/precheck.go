@@ -10,8 +10,8 @@ import (
 
 	"github.com/zeebo/blake3"
 
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/scanner"
+	"aisets/internal/imageproc"
+	"aisets/internal/scanner"
 )
 
 const (

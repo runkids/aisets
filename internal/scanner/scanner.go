@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	catalogcache "asset-studio/internal/cache"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/lint"
+	catalogcache "aisets/internal/cache"
+	"aisets/internal/imageproc"
+	"aisets/internal/lint"
 )
 
 type Scanner struct {

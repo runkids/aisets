@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"asset-studio/internal/lint"
+	"aisets/internal/lint"
 )
 
 func (s *Store) CatalogLint(query CatalogLintQuery) (CatalogLintPage, error) {

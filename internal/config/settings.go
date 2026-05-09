@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/apierr"
+	"aisets/internal/imageproc"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 func defaultGlobalExcludePatterns() []string {

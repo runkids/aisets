@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/config"
-	"asset-studio/internal/version"
+	"aisets/internal/config"
+	"aisets/internal/version"
 )
 
 const AssetName = "aisets-ui-dist.tar.gz"

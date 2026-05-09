@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"asset-studio/internal/scanner"
+	"aisets/internal/scanner"
 )
 
 func TestDetectAssetPack(t *testing.T) {

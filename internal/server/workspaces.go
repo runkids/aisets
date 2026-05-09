@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
 )
 
 func workspaceErrorStatus(err error) int {

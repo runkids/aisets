@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"asset-studio/internal/apierr"
-	"asset-studio/internal/config"
-	"asset-studio/internal/precheck"
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/precheck"
 )
 
 func cmdPreCheck(args []string, jsonOut bool) error {

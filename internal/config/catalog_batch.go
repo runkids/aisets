@@ -1,8 +1,8 @@
 package config
 
 import (
-	"asset-studio/internal/optimize"
-	"asset-studio/internal/scanner"
+	"aisets/internal/optimize"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) CatalogItemsByIDs(scanID int64, ids []string) ([]scanner.AssetItem, error) {

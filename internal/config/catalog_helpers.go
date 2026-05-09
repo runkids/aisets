@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"asset-studio/internal/scanner"
+	"aisets/internal/scanner"
 )
 
 func (s *Store) resolveScanID(scanID int64) (int64, error) {

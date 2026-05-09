@@ -263,6 +263,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateExcludePatternsByIntent(); err != nil {
 		return err
 	}
+	if err := s.migrateDefaultGlobalExcludePatterns(); err != nil {
+		return err
+	}
 	if err := s.migrateOCRResultsSchema(); err != nil {
 		return err
 	}
@@ -678,6 +681,50 @@ func (s *Store) migrateAppSettingsSchema() error {
 		}
 	}
 	if _, err := tx.Exec(`DROP TABLE app_settings_legacy`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) migrateDefaultGlobalExcludePatterns() error {
+	const version = 7
+	var applied int
+	err := s.db.QueryRow(`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&applied)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	var raw string
+	err = s.db.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if raw != "" {
+		settings := DefaultAppSettings()
+		if err := json.Unmarshal([]byte(raw), &settings); err != nil {
+			return err
+		}
+		if len(settings.ExcludePatterns) == 0 {
+			settings.ExcludePatterns = defaultGlobalExcludePatterns()
+			normalized, err := json.Marshal(settings)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`UPDATE app_settings SET value = ?, updated_at = ? WHERE key = ?`, string(normalized), nowUTC(), "app"); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, nowUTC()); err != nil {
 		return err
 	}
 	return tx.Commit()

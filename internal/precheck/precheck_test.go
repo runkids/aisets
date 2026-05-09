@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"asset-studio/internal/imageproc"
-	"asset-studio/internal/scanner"
+	"aisets/internal/imageproc"
+	"aisets/internal/scanner"
 )
 
 func TestAnalyzeReportsExactMatchNamingIssuesAndDuplicateVerdict(t *testing.T) {

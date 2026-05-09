@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"asset-studio/internal/actions"
-	"asset-studio/internal/config"
-	"asset-studio/internal/ocr"
-	"asset-studio/internal/scanner"
+	"aisets/internal/actions"
+	"aisets/internal/config"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 type Options struct {

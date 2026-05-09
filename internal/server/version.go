@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	versionpkg "asset-studio/internal/version"
+	versionpkg "aisets/internal/version"
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {

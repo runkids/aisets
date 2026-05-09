@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"asset-studio/internal/references"
+	"aisets/internal/references"
 )
 
 func NormalizeProjectScanIntent(intent ProjectScanIntent) ProjectScanIntent {
@@ -113,8 +113,11 @@ func hasSupportedReferenceSignals(ctx context.Context, root string, excludePatte
 			return ctx.Err()
 		}
 		if entry.IsDir() {
-			if skipDirs[entry.Name()] {
-				return filepath.SkipDir
+			if path != root {
+				repoDir, err := filepath.Rel(root, path)
+				if err == nil && references.MatchesAnyExcludeDirectory(excludePatterns, filepath.ToSlash(repoDir)) {
+					return filepath.SkipDir
+				}
 			}
 			return nil
 		}
