@@ -51,44 +51,44 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	providerName := settings.LLMProvider
 	modelName := settings.LLMVisionModel
 
-	counts := aiTagCounts{}
-	candidates := []scanner.AssetItem{}
-	inFlightHashes := map[string]struct{}{}
-	pendingDuplicates := map[string][]scanner.AssetItem{}
-	readyByHash := map[string]aitag.Result{}
-
+	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
 	for _, rawItem := range catalog.Items {
 		item := rawItem
 		if !eligibleForAITag(item) {
-			counts.Skipped++
 			continue
 		}
 		if item.ContentHash == "" || item.HashAlgorithm == "" {
 			sum, algorithm, err := scanner.ContentHash(r.Context(), item.LocalPath)
 			if err != nil {
-				counts.Skipped++
 				continue
 			}
 			item.ContentHash = sum
 			item.HashAlgorithm = algorithm
 		}
+		eligible = append(eligible, item)
+	}
 
-		key := aiTagContentKey(item)
+	cachedResults, err := s.store.AITagResults(eligible, providerName, modelName)
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
+		return
+	}
 
-		// Check per-item cache
-		items := []scanner.AssetItem{item}
-		cached, err := s.store.AITagResults(items, providerName, modelName)
-		if err != nil {
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
-			return
-		}
-		if result, ok := cached[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == aitag.StatusReady {
+	counts := aiTagCounts{Skipped: len(catalog.Items) - len(eligible)}
+	candidates := []scanner.AssetItem{}
+	inFlightHashes := map[string]struct{}{}
+	pendingDuplicates := map[string][]scanner.AssetItem{}
+	readyByHash := map[string]aitag.Result{}
+
+	for _, item := range eligible {
+		key := contentHashKey(item)
+
+		if result, ok := cachedResults[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == aitag.StatusReady {
 			readyByHash[key] = result
 			counts.CacheHit++
 			continue
 		}
 
-		// Check content-hash dedup from earlier in this run
 		if result, ok := readyByHash[key]; ok {
 			copied := copyAITagResultForItem(result, item)
 			if err := s.store.UpsertAITagResult(copied); err != nil {
@@ -149,7 +149,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Copy result to pending duplicates
-		key := aiTagContentKey(item)
+		key := contentHashKey(item)
 		for _, dup := range pendingDuplicates[key] {
 			copied := copyAITagResultForItem(result, dup)
 			if err := s.store.UpsertAITagResult(copied); err != nil {
@@ -248,12 +248,6 @@ func eligibleForAITag(item scanner.AssetItem) bool {
 	return true
 }
 
-func aiTagContentKey(item scanner.AssetItem) string {
-	if item.ContentHash == "" || item.HashAlgorithm == "" {
-		return ""
-	}
-	return item.HashAlgorithm + "\x00" + item.ContentHash
-}
 
 func copyAITagResultForItem(result aitag.Result, item scanner.AssetItem) aitag.Result {
 	result.ProjectID = item.ProjectID

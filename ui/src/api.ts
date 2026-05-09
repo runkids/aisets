@@ -261,9 +261,13 @@ function throwAPIError(error: APIErrorBody["error"] | undefined) {
   throw new APIError("scan_failed", "scan failed");
 }
 
-function throwOCRAPIError(error: APIErrorBody["error"] | undefined) {
+function throwRunError(
+  error: APIErrorBody["error"] | undefined,
+  fallbackCode: string,
+  fallbackMessage: string,
+) {
   if (error?.code) throw new APIError(error.code, error.message, error.params);
-  throw new APIError("ocr_failed", "OCR failed");
+  throw new APIError(fallbackCode, fallbackMessage);
 }
 
 function parseScanLine(
@@ -394,7 +398,7 @@ function parseOCRLine(
   if (!line.trim()) return null;
   const event = JSON.parse(line) as OCRRunEvent;
   onEvent?.(event);
-  if (event.type === "error") throwOCRAPIError(event.error);
+  if (event.type === "error") throwRunError(event.error, "ocr_failed", "OCR failed");
   return event;
 }
 
@@ -431,11 +435,8 @@ function parseAITagLine(
   if (!line.trim()) return null;
   const event = JSON.parse(line) as AITagRunEvent;
   onEvent?.(event);
-  if (event.type === "error") {
-    if (event.error?.code)
-      throw new APIError(event.error.code, event.error.message, event.error.params);
-    throw new APIError("aitag_failed", "AI tagging failed");
-  }
+  if (event.type === "error")
+    throwRunError(event.error, "aitag_failed", "AI tagging failed");
   return event;
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/optimize"
 )
@@ -265,6 +266,7 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery) ([
 	if err != nil {
 		return nil, 0, err
 	}
+	facetArgs := append([]any{aitag.StatusReady}, args...)
 	rows, err := s.db.Query(`
 		SELECT ait.category AS id, COUNT(DISTINCT a.asset_id)
 		FROM asset_snapshots a
@@ -272,11 +274,11 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery) ([
 			AND ait.repo_path = a.repo_path
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
-			AND ait.status = 'ready'
+			AND ait.status = ?
 		`+where+`
 		GROUP BY id
 		ORDER BY COUNT(DISTINCT a.asset_id) DESC, id ASC
-	`, args...)
+	`, facetArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -496,11 +498,11 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait2.repo_path = a.repo_path
 				AND ait2.content_hash = a.content_hash
 				AND ait2.hash_algorithm = a.hash_algorithm
-				AND ait2.status = 'ready'
+				AND ait2.status = ?
 				AND (ait2.tags_json LIKE ? OR ait2.description LIKE ?)
 		))`)
 		like := "%" + q + "%"
-		args = append(args, like, like, like, like, q, like, like)
+		args = append(args, like, like, like, like, q, aitag.StatusReady, like, like)
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":
@@ -571,10 +573,10 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait.repo_path = a.repo_path
 				AND ait.content_hash = a.content_hash
 				AND ait.hash_algorithm = a.hash_algorithm
-				AND ait.status = 'ready'
+				AND ait.status = ?
 				AND ait.category = ?
 		)`)
-		args = append(args, aiCategory)
+		args = append(args, aitag.StatusReady, aiCategory)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

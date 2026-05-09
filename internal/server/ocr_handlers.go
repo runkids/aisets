@@ -151,12 +151,12 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if result.Status == ocr.StatusReady {
-				readyByHash[ocrContentKey(item)] = result
+				readyByHash[contentHashKey(item)] = result
 			}
 			counts.CacheHit++
 			continue
 		}
-		key := ocrContentKey(item)
+		key := contentHashKey(item)
 		if result, ok := readyByHash[key]; ok && !shouldRefreshOCRResult(result) {
 			if err := s.store.UpsertOCRResult(copyOCRResultForItem(result, item)); err != nil {
 				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
@@ -235,7 +235,7 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
 			return
 		}
-		for _, duplicate := range pendingDuplicates[ocrContentKey(work.item)] {
+		for _, duplicate := range pendingDuplicates[contentHashKey(work.item)] {
 			if err := s.store.UpsertOCRResult(copyOCRResultForItem(result, duplicate)); err != nil {
 				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "ocr_persist_failed"), "counts": counts})
 				return
@@ -261,7 +261,7 @@ func queueOCRCandidate(
 	inFlightHashes map[string]struct{},
 	pendingDuplicates map[string][]scanner.AssetItem,
 ) bool {
-	key := ocrContentKey(item)
+	key := contentHashKey(item)
 	if _, ok := inFlightHashes[key]; ok {
 		pendingDuplicates[key] = append(pendingDuplicates[key], item)
 		counts.CacheHit++
@@ -316,7 +316,7 @@ func (s *Server) extractOCRResult(ctx context.Context, item scanner.AssetItem, i
 	return result
 }
 
-func ocrContentKey(item scanner.AssetItem) string {
+func contentHashKey(item scanner.AssetItem) string {
 	if item.ContentHash == "" || item.HashAlgorithm == "" {
 		return ""
 	}

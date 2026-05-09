@@ -132,12 +132,17 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(page.Items) > 0 {
+		settings, err := s.store.Settings()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 		catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: page.Items})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
-		catalog, err = s.enrichCatalogAITag(catalog)
+		catalog, err = s.enrichCatalogAITag(catalog, settings)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
@@ -189,12 +194,17 @@ func (s *Server) handleCatalogItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: []scanner.AssetItem{detail.Item}})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	catalog, err = s.enrichCatalogAITag(catalog)
+	catalog, err = s.enrichCatalogAITag(catalog, settings)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -685,11 +695,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 	return catalog, nil
 }
 
-func (s *Server) enrichCatalogAITag(catalog scanner.Catalog) (scanner.Catalog, error) {
-	settings, err := s.store.Settings()
-	if err != nil {
-		return scanner.Catalog{}, err
-	}
+func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.AppSettings) (scanner.Catalog, error) {
 	if settings.LLMProvider == "" || settings.LLMVisionModel == "" {
 		return catalog, nil
 	}
