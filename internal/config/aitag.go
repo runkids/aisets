@@ -87,6 +87,11 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 	return out, nil
 }
 
+func (s *Store) RemoveAITagResults() error {
+	_, err := s.db.Exec(`DELETE FROM ai_tags`)
+	return err
+}
+
 // AITagResultForContentHash finds an existing ready AI tag for the same content hash,
 // used for deduplication (same image content across different paths).
 func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerName, modelName string) (aitag.Result, bool, error) {

@@ -27,6 +27,7 @@ import {
   usageClassification,
 } from "../projectScanIntent";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
+import { AITagBadge } from "./AITagBadge";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, Checkbox, ImagePreview, Tooltip } from "./ui";
 
@@ -50,11 +51,11 @@ type BrowseGridProps = {
 
 const SIZE_CONFIG: Record<
   BrowseGridProps["gridSize"],
-  { min: number; gap: number; meta: number; thumbRatio: number }
+  { min: number; gap: number; meta: number; thumbHeight: number }
 > = {
-  s: { min: 140, gap: 8, meta: 68, thumbRatio: 1 },
-  m: { min: 200, gap: 12, meta: 84, thumbRatio: 3 / 4 },
-  l: { min: 300, gap: 16, meta: 96, thumbRatio: 2 / 3 },
+  s: { min: 140, gap: 8, meta: 68, thumbHeight: 140 },
+  m: { min: 200, gap: 12, meta: 100, thumbHeight: 180 },
+  l: { min: 300, gap: 16, meta: 112, thumbHeight: 220 },
 };
 const CARD_HOVER_BLEED = 12;
 const CARD_FLAG_CLASS_NAME =
@@ -119,7 +120,7 @@ export function BrowseGrid({
     gridWidth > 0
       ? (gridWidth - cfg.gap * (columnCount - 1)) / columnCount
       : cfg.min;
-  const rowHeight = Math.ceil(cardWidth * cfg.thumbRatio + cfg.meta + cfg.gap);
+  const rowHeight = Math.ceil(cfg.thumbHeight + cfg.meta + cfg.gap);
   const rows = useMemo(
     () =>
       Array.from({ length: rowCount }, (_, rowIndex) =>
@@ -220,12 +221,7 @@ export function BrowseGrid({
               imageBackgroundClassName(bgMode),
             )}
             style={{
-              aspectRatio:
-                cfg.thumbRatio === 1
-                  ? "1"
-                  : cfg.thumbRatio === 3 / 4
-                    ? "4/3"
-                    : "3/2",
+              height: `${cfg.thumbHeight}px`,
             }}
           >
             <img
@@ -304,18 +300,24 @@ export function BrowseGrid({
               {item.repoPath}
             </div>
           </Tooltip>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <Badge tone="line">{formatExt(item.ext)}</Badge>
-            <OCRStatusBadge item={item} enabled={ocrEnabled} />
-            <Badge>{formatBytes(item.bytes)}</Badge>
+          <div className="mt-1.5 flex items-center gap-1 font-g-mono text-[10px] tracking-[-0.01em] text-g-ink-3">
+            <span className="uppercase">{formatExt(item.ext)}</span>
+            <span className="text-g-ink-4">·</span>
+            <span>{formatBytes(item.bytes)}</span>
             <Tooltip label={referenceLabel} placement="top">
-              <span className="ml-auto inline-flex">
-                <Badge tone={isUnused ? "red" : "line"}>
-                  {item.usedBy.length}↗
-                </Badge>
+              <span className={cn("ml-auto", isUnused && "text-g-red")}>
+                {item.usedBy.length}↗
               </span>
             </Tooltip>
           </div>
+          {gridSize !== "s" &&
+          ((ocrEnabled && item.ocr?.status === "ready") ||
+            item.aiTag?.status === "ready") ? (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <OCRStatusBadge item={item} enabled={ocrEnabled} />
+              <AITagBadge item={item} />
+            </div>
+          ) : null}
         </div>
       </button>
     );

@@ -71,6 +71,14 @@ func (s *Server) handleOCRRemove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"packs": packs, "runtime": ocr.Runtime(r.Context(), config.DataDir(), s.ocrEngine)})
 }
 
+func (s *Server) handleOCRClear(w http.ResponseWriter, _ *http.Request) {
+	if err := s.store.RemoveOCRResults(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("cache-control", "no-store")

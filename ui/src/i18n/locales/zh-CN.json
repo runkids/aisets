@@ -336,7 +336,18 @@
     "dismiss": "关闭",
     "ocrLockedTooltip": "请先停止 OCR",
     "scanLockedTooltip": "请等待扫描完成",
-    "ocrLockedAction": "OCR 正在运行请先停止 OCR，再变更 catalog"
+    "ocrLockedAction": "OCR 正在运行请先停止 OCR，再变更 catalog",
+    "aiTagTitle": "AI 标记",
+    "aiTagSaving": "正在保存设置",
+    "aiTagRunning": "AI 标记进行中",
+    "aiTagStopping": "正在停止 AI 标记",
+    "aiTagDone": "AI 标记已完成",
+    "aiTagStopped": "AI 标记已停止",
+    "aiTagError": "AI 标记失败",
+    "aiTagPreparing": "正在准备 AI 标记",
+    "aiTagCounts": "已处理 {{processed}}，完成 {{ready}}，失败 {{failed}}，跳过 {{skipped}}，缓存 {{cacheHit}}",
+    "viewAISettings": "AI 设置",
+    "aiTagLockedTooltip": "请先停止 AI 标记"
   },
   "toast": {
     "projectAdded": "已新增项目：{{path}}",
@@ -606,6 +617,7 @@
   "filter": {
     "countLabel": "{{label}}（{{count}}）",
     "clear": "清除",
+    "all": "全部",
     "project": "项目",
     "extension": "副文件名",
     "customFilters": "自定义筛选器",
@@ -684,7 +696,9 @@
     "customFilters": "自定义筛选器",
     "assets": "素材",
     "ariaLabel": "命令面板",
-    "searchAriaLabel": "搜索命令与素材"
+    "searchAriaLabel": "搜索命令与素材",
+    "ocrMatch": "命中 OCR 文字",
+    "aiMatch": "命中 AI 标记"
   },
   "precheck": {
     "title": "预检",
@@ -1129,7 +1143,22 @@
     "llmTestConnection": "测试连接",
     "llmSelectModel": "选择模型",
     "llmRefreshModels": "刷新模型列表",
-    "llmStatus": "状态"
+    "llmVisionModelHint": "推荐：gemma4:e4b（轻量）、qwen3-vl（高质量）、llama3.2-vision（平衡）",
+    "llmEmbedModelHint": "推荐：nomic-embed-text（标准）、mxbai-embed-large（高质量）",
+    "llmStatus": "状态",
+    "aiTagGroup": "AI 标记",
+    "aiTagDescription": "使用视觉模型自动为所有素材生成分类、标签和描述",
+    "aiTagRun": "执行 AI 标记",
+    "aiTagStop": "停止",
+    "aiTagStopping": "停止中…",
+    "aiTagSaving": "保存设置中…",
+    "aiTagDone": "完成（{{ready}} 已标记、{{skipped}} 已跳过、{{cacheHit}} 缓存命中）",
+    "aiTagStopped": "已停止",
+    "aiTagFailed": "AI 标记失败",
+    "aiTagDismiss": "关闭",
+    "aiTagRunSuccess": "AI 标记完成",
+    "aiTagRunStopped": "AI 标记已停止",
+    "aiTagRunFailed": "AI 标记失败"
   },
   "catalog": {
     "notComputed": {
@@ -1220,7 +1249,13 @@
     "removeDialogConfirm": "移除"
   },
   "filterRail": {
-    "aiCategory": "分类"
+    "aiCategory": "分类",
+    "allCategories": "全部分类",
+    "aiStatus": "AI / OCR",
+    "ocrReady": "已识别 (OCR)",
+    "ocrPending": "未识别 (OCR)",
+    "aiTagReady": "已标记 (AI)",
+    "aiTagPending": "未标记 (AI)"
   },
   "drawer": {
     "tab": {

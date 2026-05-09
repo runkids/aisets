@@ -336,7 +336,18 @@
     "dismiss": "閉じる",
     "ocrLockedTooltip": "先に OCR を停止してください",
     "scanLockedTooltip": "スキャン完了までお待ちください",
-    "ocrLockedAction": "OCR 実行中です。catalog を変更する前に OCR を停止してください"
+    "ocrLockedAction": "OCR 実行中です。catalog を変更する前に OCR を停止してください",
+    "aiTagTitle": "AI タグ付け",
+    "aiTagSaving": "設定を保存中",
+    "aiTagRunning": "AI タグ付け実行中",
+    "aiTagStopping": "AI タグ付けを停止中",
+    "aiTagDone": "AI タグ付け完了",
+    "aiTagStopped": "AI タグ付け停止済み",
+    "aiTagError": "AI タグ付け失敗",
+    "aiTagPreparing": "AI タグ付けを準備中",
+    "aiTagCounts": "処理済み {{processed}}、完了 {{ready}}、失敗 {{failed}}、スキップ {{skipped}}、キャッシュ {{cacheHit}}",
+    "viewAISettings": "AI 設定",
+    "aiTagLockedTooltip": "先に AI タグ付けを停止してください"
   },
   "toast": {
     "projectAdded": "プロジェクトを追加しました：{{path}}",
@@ -606,6 +617,7 @@
   "filter": {
     "countLabel": "{{label}}（{{count}}）",
     "clear": "クリア",
+    "all": "すべて",
     "project": "プロジェクト",
     "extension": "拡張子",
     "customFilters": "カスタムフィルター",
@@ -684,7 +696,9 @@
     "customFilters": "カスタムフィルター",
     "assets": "アセット",
     "ariaLabel": "コマンドパレット",
-    "searchAriaLabel": "コマンドとアセットを検索"
+    "searchAriaLabel": "コマンドとアセットを検索",
+    "ocrMatch": "OCR テキスト一致",
+    "aiMatch": "AI タグ一致"
   },
   "precheck": {
     "title": "プリチェック",
@@ -1129,7 +1143,22 @@
     "llmTestConnection": "接続テスト",
     "llmSelectModel": "モデルを選択",
     "llmRefreshModels": "モデルリストを更新",
-    "llmStatus": "ステータス"
+    "llmVisionModelHint": "推奨：gemma4:e4b（軽量）、qwen3-vl（高品質）、llama3.2-vision（バランス）",
+    "llmEmbedModelHint": "推奨：nomic-embed-text（標準）、mxbai-embed-large（高品質）",
+    "llmStatus": "ステータス",
+    "aiTagGroup": "AI タグ付け",
+    "aiTagDescription": "ビジョンモデルを使用してすべてのアセットにカテゴリ、タグ、説明を自動生成します",
+    "aiTagRun": "AI タグ付けを実行",
+    "aiTagStop": "停止",
+    "aiTagStopping": "停止中…",
+    "aiTagSaving": "設定を保存中…",
+    "aiTagDone": "完了（{{ready}} 件タグ付け、{{skipped}} 件スキップ、{{cacheHit}} 件キャッシュ）",
+    "aiTagStopped": "停止済み",
+    "aiTagFailed": "AI タグ付けに失敗",
+    "aiTagDismiss": "閉じる",
+    "aiTagRunSuccess": "AI タグ付け完了",
+    "aiTagRunStopped": "AI タグ付けを停止しました",
+    "aiTagRunFailed": "AI タグ付けに失敗しました"
   },
   "catalog": {
     "notComputed": {
@@ -1220,7 +1249,13 @@
     "removeDialogConfirm": "削除"
   },
   "filterRail": {
-    "aiCategory": "カテゴリ"
+    "aiCategory": "カテゴリ",
+    "allCategories": "すべてのカテゴリ",
+    "aiStatus": "AI / OCR",
+    "ocrReady": "OCR 完了",
+    "ocrPending": "OCR 未処理",
+    "aiTagReady": "AI タグ済み",
+    "aiTagPending": "AI 未処理"
   },
   "drawer": {
     "tab": {

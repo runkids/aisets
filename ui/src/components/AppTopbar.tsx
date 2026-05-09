@@ -5,8 +5,16 @@ import {
   ScanText,
   Search,
 } from "lucide-react";
+import { AiChipIcon } from "./ui/AiChipIcon";
 import { useTranslation } from "react-i18next";
 import type { ScanEvent } from "../types";
+import {
+  aiTagActivityProgressPercent,
+  canDismissAITagActivity,
+  isAITagActivityBusy,
+  isAITagActivityVisible,
+  type AITagActivityState,
+} from "../aiTagActivity";
 import {
   canDismissOptimizeActivity,
   isOptimizeActivityBusy,
@@ -30,6 +38,7 @@ type Props = {
   catalogActionsDisabled?: boolean;
   scanProgress?: ScanEvent | null;
   ocrActivity: OCRActivityState;
+  aiTagActivity: AITagActivityState;
   optimizeActivity: OptimizeActivityState;
   onAddProject: () => void;
   onRefresh: () => void;
@@ -37,6 +46,9 @@ type Props = {
   onStopOCR: () => void;
   onDismissOCR: () => void;
   onOpenOCRSettings: () => void;
+  onStopAITag: () => void;
+  onDismissAITag: () => void;
+  onOpenAISettings: () => void;
   onStopOptimize: () => void;
   onDismissOptimize: () => void;
   onOpenOptimize: () => void;
@@ -47,6 +59,7 @@ export function AppTopbar({
   catalogActionsDisabled = working,
   scanProgress,
   ocrActivity,
+  aiTagActivity,
   optimizeActivity,
   onAddProject,
   onRefresh,
@@ -54,6 +67,9 @@ export function AppTopbar({
   onStopOCR,
   onDismissOCR,
   onOpenOCRSettings,
+  onStopAITag,
+  onDismissAITag,
+  onOpenAISettings,
   onStopOptimize,
   onDismissOptimize,
   onOpenOptimize,
@@ -103,11 +119,34 @@ export function AppTopbar({
         blocked: optimizeActivity.counts.blocked,
       })
     : t("activity.optimizePreparing");
+  const aiTagVisible = isAITagActivityVisible(aiTagActivity);
+  const aiTagBusy = isAITagActivityBusy(aiTagActivity);
+  const aiTagStatusLabels: Record<string, string> = {
+    saving: t("activity.aiTagSaving"),
+    running: t("activity.aiTagRunning"),
+    stopping: t("activity.aiTagStopping"),
+    done: t("activity.aiTagDone"),
+    stopped: t("activity.aiTagStopped"),
+    error: t("activity.aiTagError"),
+  };
+  const aiTagStatusLabel =
+    aiTagStatusLabels[aiTagActivity.phase] ?? t("activity.aiTagTitle");
+  const aiTagCounts = aiTagActivity.counts
+    ? t("activity.aiTagCounts", {
+        processed: aiTagActivity.counts.processed,
+        ready: aiTagActivity.counts.ready,
+        failed: aiTagActivity.counts.failed,
+        skipped: aiTagActivity.counts.skipped,
+        cacheHit: aiTagActivity.counts.cacheHit,
+      })
+    : t("activity.aiTagPreparing");
   const catalogActionTooltip = ocrBusy
     ? t("activity.ocrLockedTooltip")
-    : optimizeBusy
-      ? t("activity.optimizeLockedTooltip")
-      : undefined;
+    : aiTagBusy
+      ? t("activity.aiTagLockedTooltip")
+      : optimizeBusy
+        ? t("activity.optimizeLockedTooltip")
+        : undefined;
 
   function onScanClick() {
     onRefresh();
@@ -231,6 +270,40 @@ export function AppTopbar({
                 : undefined
             }
             onDismiss={onDismissOptimize}
+          />
+        )}
+        {aiTagVisible && (
+          <ActivityDropdown
+            icon={<AiChipIcon size={16} />}
+            ariaLabel={t("activity.aiTagTitle")}
+            busy={aiTagBusy}
+            done={aiTagActivity.phase === "done"}
+            failed={aiTagActivity.phase === "error"}
+            stopped={aiTagActivity.phase === "stopped"}
+            canDismiss={canDismissAITagActivity(aiTagActivity)}
+            statusLabel={aiTagStatusLabel}
+            countsLabel={aiTagCounts}
+            errorMessage={aiTagActivity.errorMessage}
+            progressPercent={aiTagActivityProgressPercent(aiTagActivity)}
+            primaryAction={{
+              label: t("activity.viewAISettings"),
+              onClick: onOpenAISettings,
+            }}
+            stopButton={
+              aiTagBusy
+                ? {
+                    label:
+                      aiTagActivity.phase === "stopping"
+                        ? t("settings.aiTagStopping")
+                        : t("settings.aiTagStop"),
+                    onClick: onStopAITag,
+                    disabled:
+                      aiTagActivity.phase === "saving" ||
+                      aiTagActivity.phase === "stopping",
+                  }
+                : undefined
+            }
+            onDismiss={onDismissAITag}
           />
         )}
         {ocrVisible && (

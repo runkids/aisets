@@ -16,6 +16,8 @@ import {
   batchMovePreview,
   batchRenamePreview,
   checkLLMHealth,
+  clearAITagCache,
+  clearOCRCache,
   clearScanHistory,
   deleteUnusedPreview,
   fetchLLMModels,
@@ -133,6 +135,7 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
     optimizationSeverity: params.optimizationSeverity ?? "",
     operation: params.operation ?? "",
     aiCategory: params.aiCategory ?? "",
+    aiOcrStatus: params.aiOcrStatus ?? "",
     limit: params.limit ?? 100,
   };
 }
@@ -559,6 +562,26 @@ export function useClearScanHistoryMutation() {
         client.invalidateQueries({ queryKey: scansQueryKey }),
         client.invalidateQueries({ queryKey: settingsQueryKey }),
       ]);
+    },
+  });
+}
+
+export function useClearOCRCacheMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: clearOCRCache,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useClearAITagCacheMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: clearAITagCache,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
     },
   });
 }

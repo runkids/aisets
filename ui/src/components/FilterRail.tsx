@@ -18,6 +18,7 @@ type FilterState = {
   ext: string;
   customFilter: string;
   aiCategory: string;
+  aiOcrStatus: string;
 };
 
 type FilterRailProps = {
@@ -34,7 +35,11 @@ type FilterRailProps = {
   customFilterTotal?: number;
   aiCategoryOptions?: FilterOption[];
   aiCategoryTotal?: number;
+  ocrReadyCount?: number;
+  aiTagReadyCount?: number;
+  totalCount?: number;
   ocrEnabled?: boolean;
+  aiEnabled?: boolean;
   onFiltersChange: (filters: FilterState) => void;
 };
 
@@ -63,7 +68,11 @@ export function FilterRail({
   customFilterTotal,
   aiCategoryOptions,
   aiCategoryTotal,
+  ocrReadyCount,
+  aiTagReadyCount,
+  totalCount,
   ocrEnabled = true,
+  aiEnabled = false,
   onFiltersChange,
 }: FilterRailProps) {
   const { t } = useTranslation();
@@ -109,26 +118,6 @@ export function FilterRail({
           />
         ))}
       </RailSection>
-
-      {(aiCategoryOptions?.length ?? 0) > 0 && (
-        <RailSection heading={t("filterRail.aiCategory")}>
-          <RailItem
-            active={filters.aiCategory === ""}
-            label={t("filter.all")}
-            count={aiCategoryTotal ?? 0}
-            onClick={() => onFiltersChange({ ...filters, aiCategory: "" })}
-          />
-          {(aiCategoryOptions ?? []).map((option) => (
-            <RailItem
-              key={option.id}
-              active={filters.aiCategory === option.id}
-              label={option.id}
-              count={option.count}
-              onClick={() => toggle("aiCategory", option.id)}
-            />
-          ))}
-        </RailSection>
-      )}
 
       <RailSection heading={extensionHeading || t("filter.extension")}>
         <RailItem
@@ -189,6 +178,57 @@ export function FilterRail({
           })}
         </RailSection>
       )}
+
+      {ocrEnabled || aiEnabled ? (
+        <RailSection heading={t("filterRail.aiStatus")}>
+          <RailItem
+            active={filters.aiOcrStatus === ""}
+            label={t("filter.all")}
+            count={totalCount ?? 0}
+            onClick={() => onFiltersChange({ ...filters, aiOcrStatus: "" })}
+          />
+          {ocrEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "ocrReady"}
+              label={t("filterRail.ocrReady")}
+              count={ocrReadyCount ?? 0}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "ocrReady" })
+              }
+            />
+          )}
+          {aiEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "aiTagReady"}
+              label={t("filterRail.aiTagReady")}
+              count={aiTagReadyCount ?? 0}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "aiTagReady" })
+              }
+            />
+          )}
+          {ocrEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "ocrPending"}
+              label={t("filterRail.ocrPending")}
+              count={(totalCount ?? 0) - (ocrReadyCount ?? 0)}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "ocrPending" })
+              }
+            />
+          )}
+          {aiEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "aiTagPending"}
+              label={t("filterRail.aiTagPending")}
+              count={(totalCount ?? 0) - (aiTagReadyCount ?? 0)}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "aiTagPending" })
+              }
+            />
+          )}
+        </RailSection>
+      ) : null}
     </Rail>
   );
 }

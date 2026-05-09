@@ -116,7 +116,7 @@ func TestOpenAICompatChatWithVision(t *testing.T) {
 			{
 				Role:    "user",
 				Content: "describe this",
-				Images:  []string{"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="},
+				Images:  []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="},
 			},
 		},
 	})

@@ -54,7 +54,13 @@ function customFilter(id: string, value: string): CustomAssetFilter {
 }
 
 const defaultBrowseState = {
-  filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+  filters: {
+    project: "",
+    ext: "",
+    customFilter: "",
+    aiCategory: "",
+    aiOcrStatus: "",
+  },
   view: "grid" as const,
   gridSize: "m" as const,
   searchQuery: "",
@@ -82,6 +88,7 @@ describe("normalizeBrowseStoredState", () => {
         ext: ".png",
         customFilter: "icons",
         aiCategory: "",
+        aiOcrStatus: "",
       },
       view: "list",
       gridSize: "l",
@@ -123,6 +130,7 @@ describe("normalizeBrowseStoredState", () => {
         ext: "",
         customFilter: "palette-filter",
         aiCategory: "",
+        aiOcrStatus: "",
       },
     });
   });
@@ -135,6 +143,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       ext: "",
       customFilter: "",
       aiCategory: "",
+      aiOcrStatus: "",
     });
   });
 
@@ -144,6 +153,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       ext: "",
       customFilter: "",
       aiCategory: "",
+      aiOcrStatus: "",
     });
   });
 });
@@ -194,6 +204,7 @@ describe("applyBrowseFilters", () => {
         ext: ".png",
         customFilter: "icons",
         aiCategory: "",
+        aiOcrStatus: "",
       },
       searchQuery: "home",
       statusFilter: "referenced",
@@ -221,6 +232,7 @@ describe("applyBrowseFilters", () => {
         ext: ".png",
         customFilter: "icons",
         aiCategory: "",
+        aiOcrStatus: "",
       },
       searchQuery: "",
       statusFilter: "",
@@ -266,7 +278,13 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+        aiOcrStatus: "",
+      },
       searchQuery: "sale",
       statusFilter: "",
       customFilters: [],
@@ -286,7 +304,13 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+        aiOcrStatus: "",
+      },
       searchQuery: "",
       statusFilter: "notApplicable",
       customFilters: [],
@@ -303,7 +327,13 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+        aiOcrStatus: "",
+      },
       searchQuery: "",
       statusFilter: "duplicate",
       customFilters: [],
@@ -328,7 +358,13 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+        aiOcrStatus: "",
+      },
       searchQuery: "sale",
       statusFilter: "",
       customFilters: [],
@@ -363,7 +399,13 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+        aiOcrStatus: "",
+      },
       searchQuery: "party",
       statusFilter: "",
       customFilters: [],
@@ -375,7 +417,13 @@ describe("applyBrowseFilters", () => {
     expect(
       applyBrowseFilters({
         items,
-        filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
+        filters: {
+          project: "",
+          ext: "",
+          customFilter: "",
+          aiCategory: "",
+          aiOcrStatus: "",
+        },
         searchQuery: "party",
         statusFilter: "",
         customFilters: [],

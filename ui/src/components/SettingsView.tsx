@@ -7,6 +7,8 @@ import { isOCRActivityBusy } from "../ocrActivity";
 import {
   useCatalogQuery,
   useAddWorkspaceMutation,
+  useClearAITagCacheMutation,
+  useClearOCRCacheMutation,
   useClearScanHistoryMutation,
   useImportSettingsMutation,
   useInstallOCRMutation,
@@ -54,6 +56,7 @@ export function SettingsView({
   imagePreviewEnabled,
   imageBackgroundMode,
   ocrActivity,
+  aiTagActivity,
   scanWorking = false,
   onThemeChange,
   onImagePreviewEnabledChange,
@@ -61,6 +64,9 @@ export function SettingsView({
   onStartOCR,
   onStopOCR,
   onDismissOCR,
+  onStartAITag,
+  onStopAITag,
+  onDismissAITag,
   onAddProject,
 }: SettingsViewProps) {
   const { t } = useTranslation();
@@ -83,6 +89,8 @@ export function SettingsView({
   const versionQuery = useVersionQuery();
   const addWorkspaceMutation = useAddWorkspaceMutation();
   const clearScanHistoryMutation = useClearScanHistoryMutation();
+  const clearOCRCacheMutation = useClearOCRCacheMutation();
+  const clearAITagCacheMutation = useClearAITagCacheMutation();
   const importMutation = useImportSettingsMutation();
   const installOCRMutation = useInstallOCRMutation();
   const removeProjectMutation = useRemoveProjectMutation();
@@ -407,6 +415,22 @@ export function SettingsView({
     });
   }
 
+  function onClearOCRCache() {
+    clearOCRCacheMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(t("toast.ocrCacheCleared"));
+      },
+    });
+  }
+
+  function onClearAITagCache() {
+    clearAITagCacheMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(t("toast.aiTagCacheCleared"));
+      },
+    });
+  }
+
   function settingActionsFor(
     section: Section | "catalogScanning" | "ocr",
     extraDisabled = false,
@@ -558,8 +582,12 @@ export function SettingsView({
               draft={draft}
               settings={settings}
               working={working}
+              aiTagActivity={aiTagActivity}
               settingActions={settingActionsFor("ai")}
               onUpdateDraft={updateDraft}
+              onStartAITag={() => onStartAITag(() => onSaveSettings())}
+              onStopAITag={onStopAITag}
+              onDismissAITag={onDismissAITag}
             />
           )}
 
@@ -601,11 +629,15 @@ export function SettingsView({
               onExport={onExport}
               onImport={onImport}
               onClearScanHistory={onClearScanHistory}
+              onClearOCRCache={onClearOCRCache}
+              onClearAITagCache={onClearAITagCache}
               onResetSettings={onResetAllSettings}
               onResetDatabase={onResetDatabase}
               onUpdateApp={onUpdateApp}
               updateAppPending={updateAppMutation.isPending}
               clearScanHistoryPending={clearScanHistoryMutation.isPending}
+              clearOCRCachePending={clearOCRCacheMutation.isPending}
+              clearAITagCachePending={clearAITagCacheMutation.isPending}
               resetPending={resetMutation.isPending}
               importPending={importMutation.isPending}
             />

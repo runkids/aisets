@@ -1,6 +1,9 @@
-import { BrainCircuit, RefreshCw } from "lucide-react";
+import { LoaderCircle, Play, RefreshCw, Square, Tags } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { AITagActivityState } from "../../aiTagActivity";
+import { isAITagActivityBusy } from "../../aiTagActivity";
+import { AiChipIcon } from "../ui/AiChipIcon";
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
 import { Button, Card, IconButton, Select, TextInput } from "../ui";
@@ -11,23 +14,40 @@ type AISectionProps = {
   draft: SettingsDraft;
   settings?: SettingsInfo;
   working: boolean;
+  aiTagActivity: AITagActivityState;
   settingActions: ReactNode;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
+  onStartAITag: () => void;
+  onStopAITag: () => void;
+  onDismissAITag: () => void;
 };
 
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  ollama: "http://localhost:11434",
-  "openai-compat": "http://localhost:1234/v1",
-};
+function deriveHost(endpoint: string | undefined): string {
+  try {
+    return new URL(endpoint ?? "http://localhost").hostname;
+  } catch {
+    return "localhost";
+  }
+}
 
 export function AISection({
   draft,
   settings,
   working,
+  aiTagActivity,
   settingActions,
   onUpdateDraft,
+  onStartAITag,
+  onStopAITag,
+  onDismissAITag,
 }: AISectionProps) {
   const { t } = useTranslation();
+
+  const host = deriveHost(settings?.llmEndpoint);
+  const defaultEndpoints: Record<string, string> = {
+    ollama: `http://${host}:11434`,
+    "openai-compat": `http://${host}:1234/v1`,
+  };
 
   const providerEnabled = draft.llmProvider !== "";
   const modelsQuery = useLLMModelsQuery(providerEnabled);
@@ -60,7 +80,7 @@ export function AISection({
     onUpdateDraft((current) => ({
       ...current,
       llmProvider: value,
-      llmEndpoint: DEFAULT_ENDPOINTS[value] ?? current.llmEndpoint,
+      llmEndpoint: defaultEndpoints[value] ?? current.llmEndpoint,
       llmVisionModel: "",
       llmEmbedModel: "",
     }));
@@ -77,7 +97,7 @@ export function AISection({
         padding="none"
       >
         <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
-          <BrainCircuit size={15} className="shrink-0 text-g-ink-3" />
+          <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
           <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
             {t("settings.section.ai")}
           </span>
@@ -89,6 +109,7 @@ export function AISection({
               options={providerOptions}
               onChange={handleProviderChange}
               aria-label={t("settings.llmProvider")}
+              className="min-w-[400px]"
             />
           </FieldRow>
 
@@ -104,12 +125,15 @@ export function AISection({
                     }))
                   }
                   aria-label={t("settings.llmEndpoint")}
-                  className="w-full min-w-[280px]"
+                  className="w-full min-w-[400px]"
                 />
               </FieldRow>
 
-              <FieldRow label={t("settings.llmVisionModel")}>
-                <div className="flex items-center gap-1.5 min-w-[280px]">
+              <FieldRow
+                label={t("settings.llmVisionModel")}
+                description={t("settings.llmVisionModelHint")}
+              >
+                <div className="flex items-center gap-1.5 min-w-[400px]">
                   <Select
                     value={draft.llmVisionModel}
                     options={modelOptions}
@@ -133,8 +157,11 @@ export function AISection({
                 </div>
               </FieldRow>
 
-              <FieldRow label={t("settings.llmEmbedModel")}>
-                <div className="flex items-center gap-1.5 min-w-[280px]">
+              <FieldRow
+                label={t("settings.llmEmbedModel")}
+                description={t("settings.llmEmbedModelHint")}
+              >
+                <div className="flex items-center gap-1.5 min-w-[400px]">
                   <Select
                     value={draft.llmEmbedModel}
                     options={modelOptions}
@@ -159,7 +186,7 @@ export function AISection({
               </FieldRow>
 
               <FieldRow label={t("settings.llmStatus")}>
-                <div className="flex items-center gap-3 min-w-[280px]">
+                <div className="flex items-center gap-3 min-w-[400px]">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span
                       className={`size-2 shrink-0 rounded-full ${isConnected ? "bg-g-green" : "bg-g-red"}`}
@@ -181,11 +208,110 @@ export function AISection({
               </FieldRow>
             </>
           )}
-        </div>
-        <div className="border-t border-g-line px-6 py-2 md:px-8 md:py-3">
           {settingActions}
         </div>
       </Card>
+
+      {providerEnabled && (
+        <Card
+          className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          padding="none"
+        >
+          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+            <Tags size={15} className="shrink-0 text-g-ink-3" />
+            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+              {t("settings.aiTagGroup")}
+            </span>
+          </div>
+          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+            <FieldRow
+              label={t("settings.aiTagGroup")}
+              description={t("settings.aiTagDescription")}
+              icon={<Tags size={15} />}
+              align="start"
+            >
+              <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
+                <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
+                  {isAITagActivityBusy(aiTagActivity) ? (
+                    <Button
+                      variant="secondary"
+                      leadingIcon={
+                        aiTagActivity.phase === "stopping" ? (
+                          <LoaderCircle
+                            size={14}
+                            className="animate-[icon-spin_900ms_linear_infinite]"
+                          />
+                        ) : (
+                          <Square size={14} />
+                        )
+                      }
+                      onClick={onStopAITag}
+                      disabled={aiTagActivity.phase === "stopping"}
+                    >
+                      {aiTagActivity.phase === "stopping"
+                        ? t("settings.aiTagStopping")
+                        : t("settings.aiTagStop")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      leadingIcon={<Play size={14} />}
+                      disabled={working || draft.llmVisionModel === ""}
+                      onClick={onStartAITag}
+                    >
+                      {t("settings.aiTagRun")}
+                    </Button>
+                  )}
+                </div>
+                {aiTagActivity.phase !== "idle" && (
+                  <AITagProgressText activity={aiTagActivity} />
+                )}
+              </div>
+            </FieldRow>
+          </div>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function aiTagProgressLabel(
+  activity: AITagActivityState,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  const counts = activity.counts;
+  switch (activity.phase) {
+    case "saving":
+      return t("settings.aiTagSaving");
+    case "running":
+    case "stopping":
+      return counts
+        ? `${counts.processed}/${counts.queued + counts.cacheHit + counts.skipped}`
+        : t("settings.aiTagSaving");
+    case "done":
+      return t("settings.aiTagDone", {
+        ready: counts?.ready ?? 0,
+        skipped: counts?.skipped ?? 0,
+        cacheHit: counts?.cacheHit ?? 0,
+      });
+    case "stopped":
+      return t("settings.aiTagStopped");
+    case "error":
+      return activity.errorMessage ?? t("settings.aiTagFailed");
+    default:
+      return "";
+  }
+}
+
+function AITagProgressText({ activity }: { activity: AITagActivityState }) {
+  const { t } = useTranslation();
+  const busy = isAITagActivityBusy(activity);
+  const label = aiTagProgressLabel(activity, t);
+
+  return (
+    <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+      {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
+      {label}
+    </p>
   );
 }

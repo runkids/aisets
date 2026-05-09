@@ -413,6 +413,13 @@ export function AssetDrawer({
                           </Badge>
                         </HeroBadgeButton>
                       )}
+                      {aiTagVisible && asset.aiTag && (
+                        <HeroBadgeButton onClick={() => handleTabChange("ai")}>
+                          <Badge tone="purple">
+                            {asset.aiTag.category || t("drawer.tab.ai")}
+                          </Badge>
+                        </HeroBadgeButton>
+                      )}
                     </div>
                   )}
                 </div>

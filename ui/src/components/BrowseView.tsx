@@ -8,7 +8,6 @@ import {
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
-  BrainCircuit,
   Check,
   ChevronDown,
   ChevronRight,
@@ -31,10 +30,8 @@ import {
   useBatchApplyMutation,
   useCatalogFoldersQuery,
   useCatalogItemsInfiniteQuery,
-  useRunAITagMutation,
   useSettingsQuery,
 } from "../queries";
-import type { AITagRunCounts } from "../types";
 import {
   batchExport,
   type BatchPreviewResponse,
@@ -76,6 +73,7 @@ type BrowseFilters = {
   ext: string;
   customFilter: string;
   aiCategory: string;
+  aiOcrStatus: string;
 };
 type BrowseStoredState = {
   filters: BrowseFilters;
@@ -135,6 +133,7 @@ function defaultBrowseStoredState(
       ext: "",
       customFilter: initialCustomFilterId,
       aiCategory: "",
+      aiOcrStatus: "",
     },
     view: "grid",
     gridSize: "m",
@@ -180,6 +179,10 @@ export function normalizeBrowseStoredState(
     aiCategory: stringOrDefault(
       rawFilters.aiCategory,
       defaults.filters.aiCategory,
+    ),
+    aiOcrStatus: stringOrDefault(
+      rawFilters.aiOcrStatus,
+      defaults.filters.aiOcrStatus,
     ),
   };
 
@@ -241,6 +244,7 @@ export function resetBrowseFiltersForStatusChange(
     ext: "",
     customFilter: "",
     aiCategory: "",
+    aiOcrStatus: "",
   };
 }
 
@@ -644,20 +648,6 @@ export function BrowseView({
   const batchApplyMut = useBatchApplyMutation();
 
   const settingsQuery = useSettingsQuery();
-  const llmConfigured = Boolean(
-    settingsQuery.data?.settings.llmProvider &&
-    settingsQuery.data?.settings.llmVisionModel,
-  );
-  const [aiTagProgress, setAITagProgress] = useState<AITagRunCounts | null>(
-    null,
-  );
-  const aiTagMutation = useRunAITagMutation({
-    onEvent: (event) => {
-      if ("counts" in event && event.counts != null)
-        setAITagProgress(event.counts);
-    },
-  });
-  const aiTagRunning = aiTagMutation.isPending;
 
   const activeSelectedFolder = view === "tree" ? selectedFolder : "";
   const folderQueryBase = useMemo<TreeQueryBase>(
@@ -699,6 +689,7 @@ export function BrowseView({
       sort: apiSort(sortMode) || undefined,
       customFilter: filters.customFilter || undefined,
       aiCategory: filters.aiCategory || undefined,
+      aiOcrStatus: filters.aiOcrStatus || undefined,
       folder: activeSelectedFolder || undefined,
       limit: 100,
     }),
@@ -706,6 +697,7 @@ export function BrowseView({
       activeSelectedFolder,
       debouncedSearchQuery,
       filters.aiCategory,
+      filters.aiOcrStatus,
       filters.customFilter,
       filters.ext,
       filters.project,
@@ -788,6 +780,7 @@ export function BrowseView({
         ext: "",
         customFilter: "",
         aiCategory: "",
+        aiOcrStatus: "",
       });
       setSearchQuery(initialSearchQuery);
       setStatusFilter("");
@@ -845,6 +838,18 @@ export function BrowseView({
     }),
     [facets?.aiCategories, facets?.aiCategoryTotal],
   );
+
+  const aiCategorySelectOptions = useMemo(() => {
+    const cats = aiCategoryFacet.options;
+    if (!cats || cats.length === 0) return [];
+    return [
+      {
+        value: "",
+        label: t("filterRail.allCategories"),
+      },
+      ...cats.map((o) => ({ value: o.id, label: `${o.id} (${o.count})` })),
+    ];
+  }, [aiCategoryFacet, t]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -983,7 +988,11 @@ export function BrowseView({
         }
         aiCategoryOptions={aiCategoryFacet.options}
         aiCategoryTotal={aiCategoryFacet.total}
+        ocrReadyCount={facets?.ocrReadyCount}
+        aiTagReadyCount={facets?.aiTagReadyCount}
+        totalCount={facets?.projectTotal}
         ocrEnabled={ocrEnabled}
+        aiEnabled={Boolean(settingsQuery.data?.settings.llmProvider)}
         onFiltersChange={handleFiltersChange}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
@@ -995,6 +1004,8 @@ export function BrowseView({
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             sortMode={sortMode}
+            aiCategory={filters.aiCategory}
+            aiCategoryOptions={aiCategorySelectOptions}
             bulkMode={bulkMode}
             onViewChange={setView}
             onGridSizeChange={setGridSize}
@@ -1002,40 +1013,11 @@ export function BrowseView({
             onSearchChange={handleSearchChange}
             onStatusFilterChange={handleStatusFilterChange}
             onSortChange={handleSortChange}
+            onAICategoryChange={(v) =>
+              handleFiltersChange({ ...filters, aiCategory: v })
+            }
             onBulkToggle={toggleBulkMode}
           />
-
-          {llmConfigured && (
-            <div className="flex items-center gap-2 py-1">
-              <Tooltip
-                label={
-                  aiTagRunning ? t("browse.aiTagRunning") : t("browse.runAITag")
-                }
-              >
-                <Button
-                  variant="secondary"
-                  size="md"
-                  leadingIcon={<BrainCircuit size={14} />}
-                  disabled={aiTagRunning}
-                  onClick={() => {
-                    setAITagProgress(null);
-                    aiTagMutation.mutate(undefined);
-                  }}
-                >
-                  {aiTagRunning && aiTagProgress
-                    ? t("browse.aiTagProgress", {
-                        processed: aiTagProgress.processed,
-                        queued: aiTagProgress.queued,
-                        ready: aiTagProgress.ready,
-                        failed: aiTagProgress.failed,
-                        skipped: aiTagProgress.skipped,
-                        cacheHit: aiTagProgress.cacheHit,
-                      })
-                    : t("browse.runAITag")}
-                </Button>
-              </Tooltip>
-            </div>
-          )}
 
           {bulkMode && selected.size > 0 && (
             <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">

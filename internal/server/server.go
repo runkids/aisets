@@ -126,6 +126,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/scan/status", s.handleScanStatus)
 	s.mux.HandleFunc("POST /api/ocr/install", s.handleOCRInstall)
 	s.mux.HandleFunc("POST /api/ocr/remove", s.handleOCRRemove)
+	s.mux.HandleFunc("POST /api/ocr/clear", s.handleOCRClear)
 	s.mux.HandleFunc("POST /api/ocr/run", s.handleOCRRun)
 	s.mux.HandleFunc("GET /api/scans", s.handleScans)
 	s.mux.HandleFunc("POST /api/scans/clear", s.handleClearScans)
@@ -158,6 +159,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/llm/models", s.handleLLMModels)
 	s.mux.HandleFunc("POST /api/llm/health", s.handleLLMHealth)
 	s.mux.HandleFunc("POST /api/ai/tag/run", s.handleAITagRun)
+	s.mux.HandleFunc("POST /api/ai/tag/clear", s.handleAITagClear)
 	if s.uiDistDir != "" {
 		s.mux.Handle("/", spaHandlerFromDisk(s.uiDistDir, s.basePath))
 	} else {

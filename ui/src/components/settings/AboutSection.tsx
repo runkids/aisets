@@ -28,11 +28,15 @@ type AboutSectionProps = {
   onExport: () => void;
   onImport: (file: File) => Promise<void>;
   onClearScanHistory: () => void;
+  onClearOCRCache: () => void;
+  onClearAITagCache: () => void;
   onResetSettings: () => Promise<void>;
   onResetDatabase: () => void;
   onUpdateApp: () => Promise<void>;
   updateAppPending: boolean;
   clearScanHistoryPending: boolean;
+  clearOCRCachePending: boolean;
+  clearAITagCachePending: boolean;
   resetPending: boolean;
   importPending: boolean;
 };
@@ -44,17 +48,23 @@ export function AboutSection({
   onExport,
   onImport,
   onClearScanHistory,
+  onClearOCRCache,
+  onClearAITagCache,
   onResetSettings,
   onResetDatabase,
   onUpdateApp,
   updateAppPending,
   clearScanHistoryPending,
+  clearOCRCachePending,
+  clearAITagCachePending,
   resetPending,
   importPending,
 }: AboutSectionProps) {
   const { t } = useTranslation();
   const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
   const [clearScanHistoryOpen, setClearScanHistoryOpen] = useState(false);
+  const [clearOCRCacheOpen, setClearOCRCacheOpen] = useState(false);
+  const [clearAITagCacheOpen, setClearAITagCacheOpen] = useState(false);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -267,6 +277,48 @@ export function AboutSection({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                      {t("settings.clearOCRCache")}
+                    </span>
+                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {t("settings.clearOCRCacheHint")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    leadingIcon={<Trash2 size={13} />}
+                    onClick={() => setClearOCRCacheOpen(true)}
+                    disabled={working}
+                    className="shrink-0 self-start"
+                  >
+                    {t("settings.clearOCRCache")}
+                  </Button>
+                </div>
+                <div className="border-t border-g-red-soft/50" />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                      {t("settings.clearAITagCache")}
+                    </span>
+                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {t("settings.clearAITagCacheHint")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    leadingIcon={<Trash2 size={13} />}
+                    onClick={() => setClearAITagCacheOpen(true)}
+                    disabled={working}
+                    className="shrink-0 self-start"
+                  >
+                    {t("settings.clearAITagCache")}
+                  </Button>
+                </div>
+                <div className="border-t border-g-red-soft/50" />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
                       {t("settings.resetDatabase")}
                     </span>
                     <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
@@ -343,6 +395,28 @@ export function AboutSection({
         loading={clearScanHistoryPending}
         onConfirm={onClearScanHistory}
         onCancel={() => setClearScanHistoryOpen(false)}
+      />
+      <ConfirmDialog
+        open={clearOCRCacheOpen}
+        variant="danger"
+        title={t("settings.clearOCRCache")}
+        message={t("settings.clearOCRCacheConfirm")}
+        confirmText={t("settings.clearOCRCache")}
+        cancelText={t("common.cancel")}
+        loading={clearOCRCachePending}
+        onConfirm={onClearOCRCache}
+        onCancel={() => setClearOCRCacheOpen(false)}
+      />
+      <ConfirmDialog
+        open={clearAITagCacheOpen}
+        variant="danger"
+        title={t("settings.clearAITagCache")}
+        message={t("settings.clearAITagCacheConfirm")}
+        confirmText={t("settings.clearAITagCache")}
+        cancelText={t("common.cancel")}
+        loading={clearAITagCachePending}
+        onConfirm={onClearAITagCache}
+        onCancel={() => setClearAITagCacheOpen(false)}
       />
       <ConfirmDialog
         open={resetDatabaseOpen}

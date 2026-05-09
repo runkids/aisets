@@ -1,4 +1,5 @@
 import type { ImageBackgroundMode } from "../../imageBackground";
+import type { AITagActivityState } from "../../aiTagActivity";
 import type { OCRActivityState } from "../../ocrActivity";
 import type {
   CustomAssetFilter,
@@ -18,6 +19,7 @@ export type SettingsViewProps = {
   imagePreviewEnabled: boolean;
   imageBackgroundMode: ImageBackgroundMode;
   ocrActivity: OCRActivityState;
+  aiTagActivity: AITagActivityState;
   scanWorking?: boolean;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
@@ -25,6 +27,9 @@ export type SettingsViewProps = {
   onStartOCR: (saveSettings: () => Promise<void>) => void;
   onStopOCR: () => void;
   onDismissOCR: () => void;
+  onStartAITag: (saveSettings: () => Promise<void>) => void;
+  onStopAITag: () => void;
+  onDismissAITag: () => void;
   onAddProject?: () => void;
 };
 

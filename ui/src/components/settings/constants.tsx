@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import {
-  BrainCircuit,
   Filter,
   FolderKanban,
   Info,
@@ -10,6 +9,7 @@ import {
   Settings2,
   Sliders,
 } from "lucide-react";
+import { AiChipIcon } from "../ui/AiChipIcon";
 import type {
   CustomAssetFilterField,
   CustomAssetFilterOperator,
@@ -27,7 +27,7 @@ export const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "theme", icon: <Paintbrush size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
-  { id: "ai", icon: <BrainCircuit size={15} /> },
+  { id: "ai", icon: <AiChipIcon size={15} /> },
   { id: "customFilters", icon: <Filter size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },

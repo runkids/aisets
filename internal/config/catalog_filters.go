@@ -110,6 +110,14 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	ocrReadyCount, err := s.catalogOCRReadyCount(scanID, query)
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	aiTagReadyCount, err := s.catalogAITagReadyCount(scanID, query)
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -147,6 +155,8 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		CustomFilterTotal:        customTotal,
 		AICategories:             aiCategories,
 		AICategoryTotal:          aiCategoryTotal,
+		OCRReadyCount:            ocrReadyCount,
+		AITagReadyCount:          aiTagReadyCount,
 	}, nil
 }
 
@@ -296,6 +306,44 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery) ([
 		}
 	}
 	return options, total, rows.Err()
+}
+
+func (s *Store) catalogOCRReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return 0, err
+	}
+	facetArgs := append([]any{"ready"}, args...)
+	var count int
+	err = s.rdb.QueryRow(`
+		SELECT COUNT(DISTINCT a.asset_id)
+		FROM asset_snapshots a
+		JOIN ocr_results ocr ON ocr.project_id = a.project_id
+			AND ocr.repo_path = a.repo_path
+			AND ocr.content_hash = a.content_hash
+			AND ocr.hash_algorithm = a.hash_algorithm
+			AND ocr.status = ?
+		`+where, facetArgs...).Scan(&count)
+	return count, err
+}
+
+func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return 0, err
+	}
+	facetArgs := append([]any{aitag.StatusReady}, args...)
+	var count int
+	err = s.rdb.QueryRow(`
+		SELECT COUNT(DISTINCT a.asset_id)
+		FROM asset_snapshots a
+		JOIN ai_tags ait ON ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+			AND ait.status = ?
+		`+where, facetArgs...).Scan(&count)
+	return count, err
 }
 
 func customFilterUsesOCR(filter CustomAssetFilter) bool {
@@ -577,6 +625,38 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait.category = ?
 		)`)
 		args = append(args, aitag.StatusReady, aiCategory)
+	}
+	switch query.AIOcrStatus {
+	case "ocrReady":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM ocr_results ocr
+			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
+				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
+				AND ocr.status = 'ready'
+		)`)
+	case "ocrPending":
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM ocr_results ocr
+			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
+				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
+				AND ocr.status = 'ready'
+		)`)
+	case "aiTagReady":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM ai_tags ait2
+			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
+				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
+				AND ait2.status = ?
+		)`)
+		args = append(args, aitag.StatusReady)
+	case "aiTagPending":
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM ai_tags ait2
+			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
+				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
+				AND ait2.status = ?
+		)`)
+		args = append(args, aitag.StatusReady)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

@@ -11,9 +11,43 @@ import (
 
 	"aisets/internal/aitag"
 	"aisets/internal/apierr"
+	"aisets/internal/imageproc"
 	"aisets/internal/llm"
 	"aisets/internal/scanner"
 )
+
+func prepareImageForVLM(localPath, ext string) (string, error) {
+	ext = strings.ToLower(ext)
+	switch ext {
+	case ".avif", ".svg":
+		pngData, err := imageproc.ImageToPNG(localPath, 512)
+		if err != nil {
+			return "", err
+		}
+		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngData), nil
+	default:
+		data, err := os.ReadFile(localPath)
+		if err != nil {
+			return "", err
+		}
+		return "data:" + extToMIME(ext) + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+	}
+}
+
+func extToMIME(ext string) string {
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	default:
+		return "image/png"
+	}
+}
 
 type aiTagCounts struct {
 	Queued    int `json:"queued"`
@@ -175,7 +209,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Status:        aitag.StatusReady,
 	}
 
-	data, err := os.ReadFile(item.LocalPath)
+	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext)
 	if err != nil {
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_read_failed"
@@ -183,15 +217,13 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		return result
 	}
 
-	b64 := base64.StdEncoding.EncodeToString(data)
-
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
 		Model: modelName,
 		Messages: []llm.ChatMessage{{
 			Role:    "user",
 			Content: aitag.TagPrompt,
-			Images:  []string{b64},
+			Images:  []string{dataURI},
 		}},
 	})
 	result.DurationMs = time.Since(start).Milliseconds()
@@ -248,6 +280,14 @@ func eligibleForAITag(item scanner.AssetItem) bool {
 	return true
 }
 
+
+func (s *Server) handleAITagClear(w http.ResponseWriter, _ *http.Request) {
+	if err := s.store.RemoveAITagResults(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
 
 func copyAITagResultForItem(result aitag.Result, item scanner.AssetItem) aitag.Result {
 	result.ProjectID = item.ProjectID

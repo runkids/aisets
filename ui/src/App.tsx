@@ -56,7 +56,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { APIError, runOCR } from "./api";
+import { APIError, runOCR, runAITagging } from "./api";
 import { errorMessage } from "./i18n/index";
 import {
   initialOCRActivityState,
@@ -69,6 +69,12 @@ import {
   isOptimizeActivityBusy,
   optimizeActivityReducer,
 } from "./optimizeActivity";
+import {
+  initialAITagActivityState,
+  isAITagActivityBusy,
+  aiTagActivityReducer,
+  runAITagActivity,
+} from "./aiTagActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -170,6 +176,12 @@ export function App() {
   );
   const ocrActivityAbortRef = useRef<AbortController | null>(null);
   const ocrActivityRunRef = useRef<Promise<void> | null>(null);
+  const [aiTagActivity, dispatchAITagActivity] = useReducer(
+    aiTagActivityReducer,
+    initialAITagActivityState,
+  );
+  const aiTagActivityAbortRef = useRef<AbortController | null>(null);
+  const aiTagActivityRunRef = useRef<Promise<void> | null>(null);
   const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
     optimizeActivityReducer,
     initialOptimizeActivityState,
@@ -422,6 +434,7 @@ export function App() {
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
+  const aiTagActivityBusy = isAITagActivityBusy(aiTagActivity);
   const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
   const catalogActionsDisabled =
     working || ocrActivityBusy || optimizeActivityBusy;
@@ -570,6 +583,35 @@ export function App() {
 
   function onDismissOCRActivity() {
     dispatchOCRActivity({ type: "dismiss" });
+  }
+
+  function onStartAITagActivity(saveSettings: () => Promise<void>) {
+    if (aiTagActivityRunRef.current) return;
+
+    const run = (async () => {
+      const result = await runAITagActivity({
+        abortRef: aiTagActivityAbortRef,
+        dispatch: dispatchAITagActivity,
+        saveSettings,
+        run: ({ signal, onEvent }) => runAITagging({ signal, onEvent }),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+    })().finally(() => {
+      aiTagActivityRunRef.current = null;
+    });
+
+    aiTagActivityRunRef.current = run;
+  }
+
+  function onStopAITagActivity() {
+    if (!aiTagActivityAbortRef.current) return;
+    dispatchAITagActivity({ type: "stopping" });
+    aiTagActivityAbortRef.current.abort();
+  }
+
+  function onDismissAITagActivity() {
+    dispatchAITagActivity({ type: "dismiss" });
   }
 
   function onOpenOCRSettings() {
@@ -734,6 +776,7 @@ export function App() {
           catalogActionsDisabled={catalogActionsDisabled}
           scanProgress={displayedScanProgress}
           ocrActivity={ocrActivity}
+          aiTagActivity={aiTagActivity}
           optimizeActivity={optimizeActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
           onRefresh={onRescan}
@@ -741,6 +784,14 @@ export function App() {
           onStopOCR={onStopOCRActivity}
           onDismissOCR={onDismissOCRActivity}
           onOpenOCRSettings={onOpenOCRSettings}
+          onStopAITag={onStopAITagActivity}
+          onDismissAITag={onDismissAITagActivity}
+          onOpenAISettings={() => {
+            navigate({
+              pathname: pathForMode("settings"),
+              search: "?section=ai",
+            });
+          }}
           onStopOptimize={onStopOptimizeActivity}
           onDismissOptimize={onDismissOptimizeActivity}
           onOpenOptimize={onOpenOptimize}
@@ -798,6 +849,7 @@ export function App() {
               imagePreviewEnabled={imagePreviewEnabled}
               imageBackgroundMode={imageBackgroundMode}
               ocrActivity={ocrActivity}
+              aiTagActivity={aiTagActivity}
               scanWorking={backendScanRunning || scanMutation.isPending}
               onThemeChange={setTheme}
               onImagePreviewEnabledChange={setImagePreviewEnabled}
@@ -805,6 +857,9 @@ export function App() {
               onStartOCR={onStartOCRActivity}
               onStopOCR={onStopOCRActivity}
               onDismissOCR={onDismissOCRActivity}
+              onStartAITag={onStartAITagActivity}
+              onStopAITag={onStopAITagActivity}
+              onDismissAITag={onDismissAITagActivity}
               onAddProject={() => setDirectoryPickerOpen(true)}
             />
           ) : mode === "duplicates" && catalogSummary ? (

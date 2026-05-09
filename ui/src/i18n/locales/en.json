@@ -749,6 +749,12 @@
     "clearScanHistory": "Clear Scan History",
     "clearScanHistoryHint": "Removes scan history and catalog snapshots. Projects, settings, and files stay intact.",
     "clearScanHistoryConfirm": "Clear scan history and the current catalog snapshot? Projects, settings, files, and OCR cache stay intact, but Browse and analysis views will be empty until the next scan.",
+    "clearOCRCache": "Clear OCR Cache",
+    "clearOCRCacheHint": "Removes all OCR recognition results. Run OCR again to re-process.",
+    "clearOCRCacheConfirm": "Clear all OCR recognition results? This cannot be undone. You will need to run OCR again to restore them.",
+    "clearAITagCache": "Clear AI Tag Cache",
+    "clearAITagCacheHint": "Removes all AI tags, categories, and descriptions. Run AI tagging again to re-analyze.",
+    "clearAITagCacheConfirm": "Clear all AI tag results? This cannot be undone. You will need to run AI tagging again to restore them.",
     "resetDatabase": "Reset Database",
     "resetDatabaseHint": "Deletes all projects, scans, labels, notes, tasks, and action history. This cannot be undone.",
     "resetConfirm": "Reset the local Aisets database? This removes projects, scans, labels, notes, tasks, and action history.",
@@ -791,7 +797,22 @@
     "llmTestConnection": "Test Connection",
     "llmSelectModel": "Select a model",
     "llmRefreshModels": "Refresh model list",
-    "llmStatus": "Status"
+    "llmVisionModelHint": "Recommended: gemma4:e4b (lightweight), qwen3-vl (quality), llama3.2-vision (balanced)",
+    "llmEmbedModelHint": "Recommended: nomic-embed-text (standard), mxbai-embed-large (quality)",
+    "llmStatus": "Status",
+    "aiTagGroup": "AI Tagging",
+    "aiTagDescription": "Automatically generate categories, tags, and descriptions for all assets using the vision model",
+    "aiTagRun": "Run AI Tagging",
+    "aiTagStop": "Stop",
+    "aiTagStopping": "Stopping…",
+    "aiTagSaving": "Saving settings…",
+    "aiTagDone": "Done ({{ready}} tagged, {{skipped}} skipped, {{cacheHit}} cache hits)",
+    "aiTagStopped": "Stopped",
+    "aiTagFailed": "AI tagging failed",
+    "aiTagDismiss": "Dismiss",
+    "aiTagRunSuccess": "AI tagging complete",
+    "aiTagRunStopped": "AI tagging stopped",
+    "aiTagRunFailed": "AI tagging failed"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",
@@ -910,7 +931,18 @@
     "ocrLockedTooltip": "Stop OCR first",
     "optimizeLockedTooltip": "Stop optimization first",
     "scanLockedTooltip": "Wait for the scan to finish",
-    "ocrLockedAction": "OCR is running. Stop OCR before changing the catalog."
+    "ocrLockedAction": "OCR is running. Stop OCR before changing the catalog.",
+    "aiTagTitle": "AI Tagging",
+    "aiTagSaving": "Saving settings",
+    "aiTagRunning": "AI tagging in progress",
+    "aiTagStopping": "Stopping AI tagging",
+    "aiTagDone": "AI tagging complete",
+    "aiTagStopped": "AI tagging stopped",
+    "aiTagError": "AI tagging failed",
+    "aiTagPreparing": "Preparing AI tagging",
+    "aiTagCounts": "Processed {{processed}}, ready {{ready}}, failed {{failed}}, skipped {{skipped}}, cache {{cacheHit}}",
+    "viewAISettings": "AI Settings",
+    "aiTagLockedTooltip": "Stop AI tagging first"
   },
   "toast": {
     "projectAdded": "Project added: {{path}}",
@@ -930,6 +962,8 @@
     "settingsResetFailed": "Settings reset failed",
     "scanHistoryCleared": "Scan history cleared",
     "scanHistoryClearFailed": "Scan history clear failed",
+    "ocrCacheCleared": "OCR cache cleared",
+    "aiTagCacheCleared": "AI tag cache cleared",
     "databaseReset": "Database reset",
     "databaseResetFailed": "Database reset failed"
   },
@@ -1191,6 +1225,7 @@
   "filter": {
     "countLabel": "{{label}} ({{count}})",
     "clear": "Clear",
+    "all": "All",
     "project": "Project",
     "extension": "Extension",
     "customFilters": "Custom Filters",
@@ -1326,6 +1361,7 @@
     "customFilters": "Custom Filters",
     "assets": "Assets",
     "ocrMatch": "Matched OCR text",
+    "aiMatch": "Matched AI tag",
     "ariaLabel": "Command palette",
     "searchAriaLabel": "Search commands and assets"
   },
@@ -1558,7 +1594,13 @@
     "removeDialogConfirm": "Remove"
   },
   "filterRail": {
-    "aiCategory": "Category"
+    "aiCategory": "Category",
+    "allCategories": "All categories",
+    "aiStatus": "AI / OCR",
+    "ocrReady": "OCR done",
+    "ocrPending": "OCR pending",
+    "aiTagReady": "AI tagged",
+    "aiTagPending": "AI pending"
   },
   "drawer": {
     "tab": {

@@ -46,6 +46,7 @@ type CatalogItemQuery struct {
 	OptimizationSeverity string
 	Operation            string
 	AICategory           string
+	AIOcrStatus          string
 	Limit                int
 	Cursor               string
 }
@@ -84,6 +85,8 @@ type CatalogItemFacets struct {
 	CustomFilterTotal        int                        `json:"customFilterTotal"`
 	AICategories             []CatalogFacetOption       `json:"aiCategories"`
 	AICategoryTotal          int                        `json:"aiCategoryTotal"`
+	OCRReadyCount            int                        `json:"ocrReadyCount"`
+	AITagReadyCount          int                        `json:"aiTagReadyCount"`
 }
 
 type CatalogFolderQuery struct {

@@ -83,6 +83,7 @@ export function DuplicatesView({
     ext: "",
     customFilter: "",
     aiCategory: "",
+    aiOcrStatus: "",
   });
 
   const exactScrollRef = useRef<HTMLDivElement>(null);

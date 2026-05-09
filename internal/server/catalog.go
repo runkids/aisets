@@ -124,6 +124,7 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		OptimizationSeverity: r.URL.Query().Get("optimizationSeverity"),
 		Operation:            r.URL.Query().Get("operation"),
 		AICategory:           r.URL.Query().Get("aiCategory"),
+		AIOcrStatus:          r.URL.Query().Get("aiOcrStatus"),
 		Limit:                limit,
 		Cursor:               r.URL.Query().Get("cursor"),
 	})

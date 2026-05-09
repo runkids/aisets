@@ -455,6 +455,8 @@ export type CatalogItemsPage = {
     customFilterTotal: number;
     aiCategories: Array<{ id: string; count: number }>;
     aiCategoryTotal: number;
+    ocrReadyCount: number;
+    aiTagReadyCount: number;
   };
 };
 

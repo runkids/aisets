@@ -101,6 +101,14 @@ export function clearScanHistory() {
   });
 }
 
+export function clearOCRCache() {
+  return request<{ ok: boolean }>("/api/ocr/clear", { method: "POST" });
+}
+
+export function clearAITagCache() {
+  return request<{ ok: boolean }>("/api/ai/tag/clear", { method: "POST" });
+}
+
 export type CatalogItemsParams = {
   scanId?: number;
   assetId?: string;
@@ -116,6 +124,7 @@ export type CatalogItemsParams = {
   optimizationSeverity?: string;
   operation?: string;
   aiCategory?: string;
+  aiOcrStatus?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -172,6 +181,7 @@ export function getCatalogItems(
       optimizationSeverity: params.optimizationSeverity,
       operation: params.operation,
       aiCategory: params.aiCategory,
+      aiOcrStatus: params.aiOcrStatus,
       limit: params.limit,
       cursor: params.cursor,
     })}`,

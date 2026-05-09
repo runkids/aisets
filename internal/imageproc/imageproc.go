@@ -729,6 +729,29 @@ func parseSVGLength(value string) int {
 	return int(math.Round(f))
 }
 
+func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
+	var img image.Image
+	var err error
+	if strings.EqualFold(filepath.Ext(path), ".svg") {
+		img, err = rasterizeSVG(path, svgMaxSize)
+	} else {
+		f, ferr := os.Open(path)
+		if ferr != nil {
+			return nil, ferr
+		}
+		defer f.Close()
+		img, _, err = image.Decode(f)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("decode %s: %w", filepath.Base(path), err)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, fmt.Errorf("encode png: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 func safeCacheName(key string) string {
 	sum := blake3.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:])

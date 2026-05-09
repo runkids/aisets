@@ -34,7 +34,11 @@ type Props = {
 };
 
 type ModeItem = { id: Mode; labelKey: string; icon: ReactNode };
-type AssetResult = { asset: AssetItem; matchedOCR: boolean };
+type AssetResult = {
+  asset: AssetItem;
+  matchedOCR: boolean;
+  matchedAI: boolean;
+};
 
 const MODE_ITEMS: ModeItem[] = [
   {
@@ -112,6 +116,7 @@ export function CommandPalette({
       .map((asset) => ({
         asset,
         matchedOCR: ocrEnabled && asset.ocr?.status === "ready",
+        matchedAI: asset.aiTag?.status === "ready",
       }))
       .slice(0, 8);
     return { modes, filters, assets: matched };
@@ -326,8 +331,17 @@ export function CommandPalette({
                           {fileName(asset.repoPath)}
                         </span>
                         <span className="overflow-hidden text-current opacity-[0.62] font-g-mono text-[11px] tracking-[-0.015em] text-ellipsis whitespace-nowrap">
-                          {result.matchedOCR
-                            ? t("commandPalette.ocrMatch")
+                          {result.matchedOCR || result.matchedAI
+                            ? [
+                                result.matchedOCR
+                                  ? t("commandPalette.ocrMatch")
+                                  : null,
+                                result.matchedAI
+                                  ? t("commandPalette.aiMatch")
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")
                             : asset.repoPath}
                         </span>
                       </span>

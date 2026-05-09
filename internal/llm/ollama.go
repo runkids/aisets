@@ -95,9 +95,25 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
+	msgs := make([]ChatMessage, len(req.Messages))
+	for i, m := range req.Messages {
+		msgs[i] = m
+		if len(m.Images) > 0 {
+			stripped := make([]string, len(m.Images))
+			for j, img := range m.Images {
+				if idx := strings.Index(img, ";base64,"); idx >= 0 {
+					stripped[j] = img[idx+8:]
+				} else {
+					stripped[j] = img
+				}
+			}
+			msgs[i].Images = stripped
+		}
+	}
+
 	body := ollamaChatRequest{
 		Model:    req.Model,
-		Messages: req.Messages,
+		Messages: msgs,
 		Stream:   false,
 	}
 	b, err := json.Marshal(body)

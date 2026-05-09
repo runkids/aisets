@@ -47,6 +47,8 @@ type BrowseToolbarProps = {
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
+  aiCategory: string;
+  aiCategoryOptions: Array<{ value: string; label: string }>;
   bulkMode: boolean;
   onViewChange: (view: ViewMode) => void;
   onGridSizeChange: (size: "s" | "m" | "l") => void;
@@ -54,6 +56,7 @@ type BrowseToolbarProps = {
   onSearchChange: (query: string) => void;
   onStatusFilterChange: (status: StatusFilter) => void;
   onSortChange: (sort: SortMode) => void;
+  onAICategoryChange: (category: string) => void;
   onBulkToggle: () => void;
 };
 
@@ -64,6 +67,8 @@ export function BrowseToolbar({
   searchQuery,
   statusFilter,
   sortMode,
+  aiCategory,
+  aiCategoryOptions,
   bulkMode,
   onViewChange,
   onGridSizeChange,
@@ -71,6 +76,7 @@ export function BrowseToolbar({
   onSearchChange,
   onStatusFilterChange,
   onSortChange,
+  onAICategoryChange,
   onBulkToggle,
 }: BrowseToolbarProps) {
   const { t } = useTranslation();
@@ -191,6 +197,36 @@ export function BrowseToolbar({
           className="w-36 flex-none"
         />
 
+        {aiCategoryOptions.length > 0 && (
+          <Select
+            value={aiCategory}
+            options={aiCategoryOptions}
+            onChange={onAICategoryChange}
+            aria-label={t("filterRail.aiCategory")}
+            className="w-36 flex-none"
+          />
+        )}
+
+        <Button
+          variant={bulkMode ? "primary" : "secondary"}
+          size="md"
+          leadingIcon={<CheckSquare size={14} />}
+          onClick={onBulkToggle}
+        >
+          {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+        </Button>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <BrowseStatusBar
+            value={statusFilter}
+            items={statusItems}
+            onChange={onStatusFilterChange}
+            ariaLabel={t("toolbar.statusFilter")}
+          />
+        </div>
+
         <BrowseIconToggleGroup
           value={view}
           items={viewItems}
@@ -214,25 +250,6 @@ export function BrowseToolbar({
           ariaLabel={t("toolbar.backgroundMode")}
         />
 
-        <Button
-          variant={bulkMode ? "primary" : "secondary"}
-          size="md"
-          leadingIcon={<CheckSquare size={14} />}
-          onClick={onBulkToggle}
-        >
-          {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
-        </Button>
-      </div>
-
-      <div className="flex min-w-0 items-center gap-1.5">
-        <div className="min-w-0 flex-1">
-          <BrowseStatusBar
-            value={statusFilter}
-            items={statusItems}
-            onChange={onStatusFilterChange}
-            ariaLabel={t("toolbar.statusFilter")}
-          />
-        </div>
         <Popover.Root>
           <Popover.Trigger asChild>
             <button

@@ -421,7 +421,18 @@
     "ocrLockedTooltip": "請先停止 OCR",
     "optimizeLockedTooltip": "請先停止最佳化",
     "scanLockedTooltip": "請等待掃描完成",
-    "ocrLockedAction": "OCR 執行中請先停止 OCR，再變更 catalog"
+    "ocrLockedAction": "OCR 執行中請先停止 OCR，再變更 catalog",
+    "aiTagTitle": "AI 標記活動",
+    "aiTagSaving": "正在儲存設定",
+    "aiTagRunning": "AI 標記執行中",
+    "aiTagStopping": "正在停止 AI 標記",
+    "aiTagDone": "AI 標記已完成",
+    "aiTagStopped": "AI 標記已停止",
+    "aiTagError": "AI 標記失敗",
+    "aiTagPreparing": "正在準備 AI 標記",
+    "aiTagCounts": "已處理 {{processed}}，完成 {{ready}}，失敗 {{failed}}，略過 {{skipped}}，快取 {{cacheHit}}",
+    "viewAISettings": "AI 設定",
+    "aiTagLockedTooltip": "請先停止 AI 標記"
   },
   "toast": {
     "projectAdded": "已新增專案：{{path}}",
@@ -441,6 +452,8 @@
     "settingsResetFailed": "設定重設失敗",
     "scanHistoryCleared": "掃描歷史已清除",
     "scanHistoryClearFailed": "掃描歷史清除失敗",
+    "ocrCacheCleared": "OCR 快取已清除",
+    "aiTagCacheCleared": "AI 標記快取已清除",
     "databaseReset": "資料庫已重設",
     "databaseResetFailed": "資料庫重設失敗"
   },
@@ -701,6 +714,7 @@
   "filter": {
     "countLabel": "{{label}}（{{count}}）",
     "clear": "清除",
+    "all": "全部",
     "project": "專案",
     "extension": "副檔名",
     "customFilters": "自訂篩選器",
@@ -836,6 +850,7 @@
     "customFilters": "自訂篩選器",
     "assets": "素材",
     "ocrMatch": "命中 OCR 文字",
+    "aiMatch": "命中 AI 標記",
     "ariaLabel": "指令面板",
     "searchAriaLabel": "搜尋指令與素材"
   },
@@ -1429,6 +1444,12 @@
     "clearScanHistory": "清除掃描歷史",
     "clearScanHistoryHint": "移除掃描歷史與 catalog 快照，專案、設定與檔案會保留",
     "clearScanHistoryConfirm": "清除掃描歷史與目前 catalog 快照？專案、設定、檔案與 OCR cache 會保留，但 Browse 與分析頁會空白直到下次掃描",
+    "clearOCRCache": "清除 OCR 快取",
+    "clearOCRCacheHint": "移除所有 OCR 辨識結果，下次執行 OCR 會重新辨識",
+    "clearOCRCacheConfirm": "確定要清除所有 OCR 辨識結果？此操作無法復原，需重新執行 OCR 才能恢復",
+    "clearAITagCache": "清除 AI 標記快取",
+    "clearAITagCacheHint": "移除所有 AI 標記、分類與描述，下次執行 AI 標記會重新分析",
+    "clearAITagCacheConfirm": "確定要清除所有 AI 標記結果？此操作無法復原，需重新執行 AI 標記才能恢復",
     "resetDatabase": "重設資料庫",
     "resetDatabaseHint": "刪除所有專案、掃描、標籤、筆記、任務與操作紀錄，此操作無法復原",
     "resetConfirm": "重設本機 Aisets 資料庫？這會移除專案、掃描、標籤、筆記、任務與操作紀錄",
@@ -1471,7 +1492,22 @@
     "llmTestConnection": "測試連線",
     "llmSelectModel": "選擇模型",
     "llmRefreshModels": "重新整理模型列表",
-    "llmStatus": "狀態"
+    "llmVisionModelHint": "推薦：gemma4:e4b（輕量）、qwen3-vl（高品質）、llama3.2-vision（平衡）",
+    "llmEmbedModelHint": "推薦：nomic-embed-text（標準）、mxbai-embed-large（高品質）",
+    "llmStatus": "狀態",
+    "aiTagGroup": "AI 標記",
+    "aiTagDescription": "使用視覺模型自動為所有素材產生分類、標籤和描述",
+    "aiTagRun": "執行 AI 標記",
+    "aiTagStop": "停止",
+    "aiTagStopping": "停止中…",
+    "aiTagSaving": "儲存設定中…",
+    "aiTagDone": "完成（{{ready}} 已標記、{{skipped}} 已略過、{{cacheHit}} 快取命中）",
+    "aiTagStopped": "已停止",
+    "aiTagFailed": "AI 標記失敗",
+    "aiTagDismiss": "關閉",
+    "aiTagRunSuccess": "AI 標記完成",
+    "aiTagRunStopped": "AI 標記已停止",
+    "aiTagRunFailed": "AI 標記失敗"
   },
   "catalog": {
     "notComputed": {
@@ -1578,7 +1614,13 @@
     "removeDialogConfirm": "移除"
   },
   "filterRail": {
-    "aiCategory": "分類"
+    "aiCategory": "分類",
+    "allCategories": "全部分類",
+    "aiStatus": "AI / OCR",
+    "ocrReady": "已辨識 (OCR)",
+    "ocrPending": "未辨識 (OCR)",
+    "aiTagReady": "已標記 (AI)",
+    "aiTagPending": "未標記 (AI)"
   },
   "drawer": {
     "tab": {

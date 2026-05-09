@@ -127,7 +127,7 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 			for _, img := range m.Images {
 				parts = append(parts, openAIContentPart{
 					Type:     "image_url",
-					ImageURL: &openAIImageURLPart{URL: "data:image/png;base64," + img},
+					ImageURL: &openAIImageURLPart{URL: img},
 				})
 			}
 			msgs[i] = openAIChatMessage{Role: m.Role, Content: parts}

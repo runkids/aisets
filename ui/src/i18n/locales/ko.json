@@ -348,7 +348,18 @@
     "dismiss": "닫기",
     "ocrLockedTooltip": "먼저 OCR을 중지하세요",
     "scanLockedTooltip": "스캔이 완료될 때까지 기다리세요",
-    "ocrLockedAction": "OCR이 실행 중입니다. catalog를 변경하기 전에 OCR을 중지하세요."
+    "ocrLockedAction": "OCR이 실행 중입니다. catalog를 변경하기 전에 OCR을 중지하세요.",
+    "aiTagTitle": "AI 태그",
+    "aiTagSaving": "설정 저장 중",
+    "aiTagRunning": "AI 태그 진행 중",
+    "aiTagStopping": "AI 태그 중지 중",
+    "aiTagDone": "AI 태그 완료",
+    "aiTagStopped": "AI 태그 중지됨",
+    "aiTagError": "AI 태그 실패",
+    "aiTagPreparing": "AI 태그 준비 중",
+    "aiTagCounts": "처리됨 {{processed}}, 완료 {{ready}}, 실패 {{failed}}, 건너뜀 {{skipped}}, 캐시 {{cacheHit}}",
+    "viewAISettings": "AI 설정",
+    "aiTagLockedTooltip": "먼저 AI 태그를 중지하세요"
   },
   "toast": {
     "projectAdded": "프로젝트 추가됨: {{path}}",
@@ -618,6 +629,7 @@
   "filter": {
     "countLabel": "{{label}} ({{count}})",
     "clear": "지우기",
+    "all": "전체",
     "project": "프로젝트",
     "extension": "확장자",
     "customFilters": "사용자 지정 필터",
@@ -696,7 +708,9 @@
     "customFilters": "사용자 지정 필터",
     "assets": "에셋",
     "ariaLabel": "명령 팔레트",
-    "searchAriaLabel": "명령과 에셋 검색"
+    "searchAriaLabel": "명령과 에셋 검색",
+    "ocrMatch": "OCR 텍스트 일치",
+    "aiMatch": "AI 태그 일치"
   },
   "precheck": {
     "title": "사전 점검",
@@ -1134,7 +1148,22 @@
     "llmTestConnection": "연결 테스트",
     "llmSelectModel": "모델 선택",
     "llmRefreshModels": "모델 목록 새로고침",
-    "llmStatus": "상태"
+    "llmVisionModelHint": "추천: gemma4:e4b (경량), qwen3-vl (고품질), llama3.2-vision (균형)",
+    "llmEmbedModelHint": "추천: nomic-embed-text (표준), mxbai-embed-large (고품질)",
+    "llmStatus": "상태",
+    "aiTagGroup": "AI 태그",
+    "aiTagDescription": "비전 모델을 사용하여 모든 자산에 카테고리, 태그 및 설명을 자동으로 생성합니다",
+    "aiTagRun": "AI 태그 실행",
+    "aiTagStop": "중지",
+    "aiTagStopping": "중지 중…",
+    "aiTagSaving": "설정 저장 중…",
+    "aiTagDone": "완료 ({{ready}}개 태그, {{skipped}}개 건너뜀, {{cacheHit}}개 캐시)",
+    "aiTagStopped": "중지됨",
+    "aiTagFailed": "AI 태그 실패",
+    "aiTagDismiss": "닫기",
+    "aiTagRunSuccess": "AI 태그 완료",
+    "aiTagRunStopped": "AI 태그가 중지되었습니다",
+    "aiTagRunFailed": "AI 태그 실패"
   },
   "catalog": {
     "notComputed": {
@@ -1225,7 +1254,13 @@
     "removeDialogConfirm": "제거"
   },
   "filterRail": {
-    "aiCategory": "카테고리"
+    "aiCategory": "카테고리",
+    "allCategories": "모든 카테고리",
+    "aiStatus": "AI / OCR",
+    "ocrReady": "OCR 완료",
+    "ocrPending": "OCR 대기",
+    "aiTagReady": "AI 태그됨",
+    "aiTagPending": "AI 대기"
   },
   "drawer": {
     "tab": {
