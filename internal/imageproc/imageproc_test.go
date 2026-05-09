@@ -72,6 +72,28 @@ func TestProbePNGJPEGGIFSVGWebPAVIFAndCorrupt(t *testing.T) {
 	}
 }
 
+func TestProbeGIFCountsFramesAndTransparencyFromContainer(t *testing.T) {
+	root := t.TempDir()
+	gifPath := filepath.Join(root, "transparent.gif")
+	palette := []color.Color{color.NRGBA{A: 0}, color.NRGBA{R: 255, A: 255}}
+	frame1 := image.NewPaletted(image.Rect(0, 0, 3, 2), palette)
+	frame2 := image.NewPaletted(image.Rect(0, 0, 3, 2), palette)
+	frame2.SetColorIndex(1, 1, 1)
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, &gif.GIF{Image: []*image.Paletted{frame1, frame2}, Delay: []int{1, 1}}); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteBytes(t, gifPath, buf.Bytes())
+
+	meta, err := Probe(gifPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.Format != "gif" || meta.Width != 3 || meta.Height != 2 || meta.Pages != 2 || !meta.Animated || !meta.Alpha {
+		t.Fatalf("Probe(gif) = %#v", meta)
+	}
+}
+
 func TestDHashAndMirroredHash(t *testing.T) {
 	root := t.TempDir()
 	original := filepath.Join(root, "original.png")

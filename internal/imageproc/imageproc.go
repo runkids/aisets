@@ -2,6 +2,7 @@ package imageproc
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -131,13 +132,13 @@ func Probe(path string) (Metadata, error) {
 		return meta, err
 	}
 
+	if ext == ".gif" {
+		return probeGIF(path)
+	}
+
 	var meta Metadata
 	if err := runImgtoolsJSON(&meta, "probe", path); err == nil {
 		return meta, nil
-	}
-
-	if ext == ".gif" {
-		return probeGIF(path)
 	}
 
 	file, err := os.Open(path)
@@ -391,18 +392,124 @@ func probeGIF(path string) (Metadata, error) {
 		return Metadata{Format: "gif", ErrorCode: "image_open_failed", Error: err.Error()}, err
 	}
 	defer file.Close()
-	g, err := gif.DecodeAll(file)
+	meta, err := probeGIFMetadata(file)
 	if err != nil {
-		return Metadata{Format: "gif", ErrorCode: "image_probe_failed", Error: err.Error()}, err
-	}
-	meta := Metadata{Format: "gif", Pages: len(g.Image), Animated: len(g.Image) > 1}
-	if len(g.Image) > 0 {
-		bounds := g.Image[0].Bounds()
-		meta.Width = bounds.Dx()
-		meta.Height = bounds.Dy()
-		meta.Alpha = imageHasAlpha(g.Image[0])
+		meta.ErrorCode = "image_probe_failed"
+		meta.Error = err.Error()
+		return meta, err
 	}
 	return meta, nil
+}
+
+func probeGIFMetadata(r io.Reader) (Metadata, error) {
+	var header [13]byte
+	if _, err := io.ReadFull(r, header[:]); err != nil {
+		return Metadata{Format: "gif"}, err
+	}
+	if string(header[:3]) != "GIF" || (string(header[3:6]) != "87a" && string(header[3:6]) != "89a") {
+		return Metadata{Format: "gif"}, errors.New("not a gif image")
+	}
+	meta := Metadata{
+		Format: "gif",
+		Width:  int(binary.LittleEndian.Uint16(header[6:8])),
+		Height: int(binary.LittleEndian.Uint16(header[8:10])),
+	}
+	if header[10]&0x80 != 0 {
+		if err := skipBytes(r, gifColorTableBytes(header[10])); err != nil {
+			return meta, err
+		}
+	}
+	for {
+		block, err := readByte(r)
+		if err != nil {
+			return meta, err
+		}
+		switch block {
+		case 0x2c:
+			if err := readGIFImageBlock(r, &meta); err != nil {
+				return meta, err
+			}
+		case 0x21:
+			if err := readGIFExtensionBlock(r, &meta); err != nil {
+				return meta, err
+			}
+		case 0x3b:
+			meta.Animated = meta.Pages > 1
+			return meta, nil
+		default:
+			return meta, fmt.Errorf("unknown gif block 0x%02x", block)
+		}
+	}
+}
+
+func readGIFImageBlock(r io.Reader, meta *Metadata) error {
+	var descriptor [9]byte
+	if _, err := io.ReadFull(r, descriptor[:]); err != nil {
+		return err
+	}
+	meta.Pages++
+	if descriptor[8]&0x80 != 0 {
+		if err := skipBytes(r, gifColorTableBytes(descriptor[8])); err != nil {
+			return err
+		}
+	}
+	if _, err := readByte(r); err != nil {
+		return err
+	}
+	return skipGIFSubBlocks(r)
+}
+
+func readGIFExtensionBlock(r io.Reader, meta *Metadata) error {
+	label, err := readByte(r)
+	if err != nil {
+		return err
+	}
+	for {
+		size, err := readByte(r)
+		if err != nil {
+			return err
+		}
+		if size == 0 {
+			return nil
+		}
+		data := make([]byte, int(size))
+		if _, err := io.ReadFull(r, data); err != nil {
+			return err
+		}
+		if label == 0xf9 && len(data) > 0 && data[0]&0x01 != 0 {
+			meta.Alpha = true
+		}
+	}
+}
+
+func skipGIFSubBlocks(r io.Reader) error {
+	for {
+		size, err := readByte(r)
+		if err != nil {
+			return err
+		}
+		if size == 0 {
+			return nil
+		}
+		if err := skipBytes(r, int(size)); err != nil {
+			return err
+		}
+	}
+}
+
+func gifColorTableBytes(packed byte) int {
+	return 3 * (1 << ((packed & 0x07) + 1))
+}
+
+func readByte(r io.Reader) (byte, error) {
+	var b [1]byte
+	_, err := io.ReadFull(r, b[:])
+	return b[0], err
+}
+
+func skipBytes(r io.Reader, n int) error {
+	_, err := io.CopyN(io.Discard, r, int64(n))
+	return err
 }
 
 func probeSVG(path string) (Metadata, error) {
