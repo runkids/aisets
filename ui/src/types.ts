@@ -311,6 +311,16 @@ export type AssetItem = {
     attempts?: number;
     updatedAt?: string;
   };
+  aiTag?: {
+    status: "pending" | "ready" | "failed" | "skipped";
+    category?: string;
+    tags?: string[];
+    description?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    durationMs?: number;
+    updatedAt?: string;
+  };
   scanIntent?: ProjectScanIntent;
   usageClassification?:
     | "referenced"
@@ -443,6 +453,8 @@ export type CatalogItemsPage = {
       usesOCR: boolean;
     }>;
     customFilterTotal: number;
+    aiCategories: Array<{ id: string; count: number }>;
+    aiCategoryTotal: number;
   };
 };
 
@@ -607,6 +619,27 @@ export type OCRRunEvent =
     }
   | { type: "done"; counts: OCRRunCounts; hasMore?: boolean }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: OCRRunCounts };
+
+export type AITagRunCounts = {
+  queued: number;
+  processed: number;
+  ready: number;
+  failed: number;
+  skipped: number;
+  cacheHit: number;
+};
+
+export type AITagRunEvent =
+  | { type: "start"; counts: AITagRunCounts }
+  | {
+      type: "progress";
+      assetId: string;
+      repoPath: string;
+      status: string;
+      counts: AITagRunCounts;
+    }
+  | { type: "done"; counts: AITagRunCounts }
+  | { type: "error"; error?: APIErrorBody["error"]; counts?: AITagRunCounts };
 
 export type ActionPreview = {
   id: string;

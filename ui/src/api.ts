@@ -13,6 +13,7 @@ import type {
   ExportData,
   LLMModel,
   LLMRuntime,
+  AITagRunEvent,
   OCRRunEvent,
   Project,
   ProjectScanIntent,
@@ -114,6 +115,7 @@ export type CatalogItemsParams = {
   optimizationCategory?: string;
   optimizationSeverity?: string;
   operation?: string;
+  aiCategory?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -169,6 +171,7 @@ export function getCatalogItems(
       optimizationCategory: params.optimizationCategory,
       optimizationSeverity: params.optimizationSeverity,
       operation: params.operation,
+      aiCategory: params.aiCategory,
       limit: params.limit,
       cursor: params.cursor,
     })}`,
@@ -417,6 +420,53 @@ export async function runOCR(options?: {
     response,
     parseLine: (line) => parseOCRLine(line, options?.onEvent),
     isDone: isOCRDone,
+    fallbackDone: null,
+  });
+}
+
+function parseAITagLine(
+  line: string,
+  onEvent?: (event: AITagRunEvent) => void,
+): AITagRunEvent | null {
+  if (!line.trim()) return null;
+  const event = JSON.parse(line) as AITagRunEvent;
+  onEvent?.(event);
+  if (event.type === "error") {
+    if (event.error?.code)
+      throw new APIError(event.error.code, event.error.message, event.error.params);
+    throw new APIError("aitag_failed", "AI tagging failed");
+  }
+  return event;
+}
+
+function isAITagDone(
+  event: AITagRunEvent,
+): event is Extract<AITagRunEvent, { type: "done" }> {
+  return event.type === "done";
+}
+
+export async function runAITagging(options?: {
+  onEvent?: (event: AITagRunEvent) => void;
+  signal?: AbortSignal;
+}) {
+  const response = await fetch(`${basePath}/api/ai/tag/run`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code)
+      throw new APIError(error.code, error.message, error.params);
+    throw new APIError("http_error", `HTTP ${response.status}`, {
+      status: response.status,
+    });
+  }
+  return streamNDJSON<AITagRunEvent, Extract<AITagRunEvent, { type: "done" }>>({
+    response,
+    parseLine: (line) => parseAITagLine(line, options?.onEvent),
+    isDone: isAITagDone,
     fallbackDone: null,
   });
 }

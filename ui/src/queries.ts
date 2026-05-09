@@ -40,6 +40,7 @@ import {
   renameProject,
   renameWorkspace,
   resetDatabase,
+  runAITagging,
   runOCR,
   scanCatalog,
   switchWorkspace,
@@ -53,6 +54,7 @@ import type {
   CatalogLintParams,
 } from "./api";
 import type {
+  AITagRunEvent,
   ExportData,
   OCRRunEvent,
   ProjectScanIntent,
@@ -130,6 +132,7 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
     optimizationCategory: params.optimizationCategory ?? "",
     optimizationSeverity: params.optimizationSeverity ?? "",
     operation: params.operation ?? "",
+    aiCategory: params.aiCategory ?? "",
     limit: params.limit ?? 100,
   };
 }
@@ -364,6 +367,19 @@ export function useRunOCRMutation(options?: {
   return useMutation({
     mutationFn: (signal?: AbortSignal) =>
       runOCR({ onEvent: options?.onEvent, signal }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useRunAITagMutation(options?: {
+  onEvent?: (event: AITagRunEvent) => void;
+}) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (signal?: AbortSignal) =>
+      runAITagging({ onEvent: options?.onEvent, signal }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },
