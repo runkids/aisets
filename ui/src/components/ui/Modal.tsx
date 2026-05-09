@@ -28,6 +28,7 @@ type ModalProps = {
   bodyPadding?: ModalBodyPadding;
   className?: string;
   bodyClassName?: string;
+  closable?: boolean;
 };
 
 export function Modal({
@@ -40,11 +41,15 @@ export function Modal({
   bodyPadding = "md",
   className,
   bodyClassName,
+  closable = true,
 }: ModalProps) {
   const { t } = useTranslation();
 
   return (
-    <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
+    <DialogPrimitive.Root
+      open
+      onOpenChange={(o) => !o && closable && onClose()}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay asChild>
           <DialogOverlay />
@@ -54,6 +59,8 @@ export function Modal({
             asChild
             aria-label={title}
             onOpenAutoFocus={(e) => e.preventDefault()}
+            onEscapeKeyDown={closable ? undefined : (e) => e.preventDefault()}
+            onInteractOutside={closable ? undefined : (e) => e.preventDefault()}
           >
             <DialogSurface size={size} className={className}>
               <DialogHeader>
@@ -74,11 +81,13 @@ export function Modal({
                     </DialogPrimitive.Description>
                   )}
                 </div>
-                <DialogPrimitive.Close asChild>
-                  <IconButton aria-label={t("common.close")}>
-                    <X size={18} />
-                  </IconButton>
-                </DialogPrimitive.Close>
+                {closable && (
+                  <DialogPrimitive.Close asChild>
+                    <IconButton aria-label={t("common.close")}>
+                      <X size={18} />
+                    </IconButton>
+                  </DialogPrimitive.Close>
+                )}
               </DialogHeader>
               <DialogBody padding={bodyPadding} className={cn(bodyClassName)}>
                 {children}

@@ -162,6 +162,7 @@ export function DirectoryPickerModal({
       title={t(titleKey)}
       description={t("directoryPicker.description")}
       onClose={resetAndClose}
+      closable={!working}
       bodyPadding="none"
       bodyClassName="flex flex-col overflow-hidden"
       footer={
@@ -173,7 +174,11 @@ export function DirectoryPickerModal({
             </code>
           </div>
           <div className="ml-auto flex shrink-0 gap-2">
-            <Button variant="secondary" onClick={resetAndClose}>
+            <Button
+              variant="secondary"
+              onClick={resetAndClose}
+              disabled={working}
+            >
               {t("common.cancel")}
             </Button>
             <Tooltip label={disabledReason} disabled={!disabledReason}>
