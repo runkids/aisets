@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -203,7 +204,7 @@ func DefaultAppSettings() AppSettings {
 		CustomAssetFilters:         []CustomAssetFilter{},
 		PreferredEditor:            "vscode",
 		LLMProvider:                "",
-		LLMEndpoint:                "http://localhost:11434",
+		LLMEndpoint:                defaultLLMEndpoint(),
 		LLMVisionModel:             "",
 		LLMEmbedModel:              "",
 	}
@@ -223,6 +224,13 @@ func normalizeOCRSettings(settings AppSettings) AppSettings {
 	settings.OCRBatchSize = ocrSettings.BatchSize
 	settings.OCRConcurrency = ocrSettings.Concurrency
 	return settings
+}
+
+func defaultLLMEndpoint() string {
+	if v := os.Getenv("AISETS_LLM_ENDPOINT"); v != "" {
+		return normalizeLLMEndpoint(v)
+	}
+	return "http://localhost:11434"
 }
 
 func normalizeLLMEndpoint(endpoint string) string {
