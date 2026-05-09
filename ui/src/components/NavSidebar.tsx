@@ -39,6 +39,7 @@ type Props = {
   lastScanAt?: string;
   lastScanStartedAt?: string;
   workspaceSwitchDisabled?: boolean;
+  workspaceSwitchDisabledTooltip?: string;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelect: (mode: Mode) => void;
@@ -84,6 +85,7 @@ export function NavSidebar({
   lastScanAt,
   lastScanStartedAt,
   workspaceSwitchDisabled = false,
+  workspaceSwitchDisabledTooltip,
   onSelectWorkspace,
   onSelectProject,
   onSelect,
@@ -185,6 +187,7 @@ export function NavSidebar({
           selectedProjectId={selectedProjectId}
           totalAssets={totalAssets}
           workspaceSwitchDisabled={workspaceSwitchDisabled}
+          workspaceSwitchDisabledTooltip={workspaceSwitchDisabledTooltip}
           onSelectWorkspace={onSelectWorkspace}
           onSelectProject={onSelectProject}
         />

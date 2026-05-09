@@ -420,6 +420,7 @@
     "dismiss": "關閉",
     "ocrLockedTooltip": "請先停止 OCR",
     "optimizeLockedTooltip": "請先停止最佳化",
+    "scanLockedTooltip": "請等待掃描完成",
     "ocrLockedAction": "OCR 執行中請先停止 OCR，再變更 catalog"
   },
   "toast": {

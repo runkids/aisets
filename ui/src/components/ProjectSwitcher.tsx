@@ -19,6 +19,7 @@ type Props = {
   selectedProjectId: string;
   totalAssets: number;
   workspaceSwitchDisabled?: boolean;
+  workspaceSwitchDisabledTooltip?: string;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
 };
@@ -127,6 +128,7 @@ export function ProjectSwitcher({
   selectedProjectId,
   totalAssets,
   workspaceSwitchDisabled = false,
+  workspaceSwitchDisabledTooltip,
   onSelectWorkspace,
   onSelectProject,
 }: Props) {
@@ -280,7 +282,10 @@ export function ProjectSwitcher({
             return (
               <Tooltip
                 key={workspace.id}
-                label={t("activity.ocrLockedTooltip")}
+                label={
+                  workspaceSwitchDisabledTooltip ??
+                  t("activity.ocrLockedTooltip")
+                }
                 placement="right"
               >
                 <span className="block">{workspaceButton}</span>

@@ -119,6 +119,7 @@ type Project struct {
 }
 
 type Catalog struct {
+	StartedAt       string           `json:"startedAt,omitempty"`
 	GeneratedAt     string           `json:"generatedAt"`
 	ScanID          int64            `json:"scanId,omitempty"`
 	Projects        []Project        `json:"projects"`

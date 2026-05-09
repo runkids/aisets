@@ -895,6 +895,7 @@
     "dismiss": "Dismiss",
     "ocrLockedTooltip": "Stop OCR first",
     "optimizeLockedTooltip": "Stop optimization first",
+    "scanLockedTooltip": "Wait for the scan to finish",
     "ocrLockedAction": "OCR is running. Stop OCR before changing the catalog."
   },
   "toast": {

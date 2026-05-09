@@ -57,15 +57,18 @@ func (s *Store) recordScanHeader(catalog scanner.Catalog) (int64, error) {
 		}
 	}()
 
-	now := nowUTC()
+	startedAt := catalog.StartedAt
+	if startedAt == "" {
+		startedAt = catalog.GeneratedAt
+	}
 	result, err := tx.Exec(`
 		INSERT INTO scans (
 			started_at, completed_at, status, scan_profile, references_state,
 			near_duplicates_state, optimization_state, project_count, total_files,
 			duplicate_groups, duplicate_files, unused_files, near_duplicates, cache_hits
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, catalog.GeneratedAt, now, "recording", scanProfileForCatalog(catalog), catalog.Analysis.References,
+		VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, startedAt, "recording", scanProfileForCatalog(catalog), catalog.Analysis.References,
 		catalog.Analysis.NearDuplicates, catalog.Analysis.Optimization, len(catalog.Projects), catalog.Stats.TotalFiles,
 		catalog.Stats.DuplicateGroups, catalog.Stats.DuplicateFiles, catalog.Stats.UnusedFiles,
 		catalog.Stats.NearDuplicates, catalog.Stats.CacheHits)
@@ -327,7 +330,7 @@ func (s *Store) finalizeScan(scanID int64, analysis scanner.CatalogAnalysis) err
 	if err = pruneOldScansTx(tx, 10); err != nil {
 		return err
 	}
-	_, err = tx.Exec(`UPDATE scans SET status = 'completed' WHERE id = ?`, scanID)
+	_, err = tx.Exec(`UPDATE scans SET status = 'completed', completed_at = ? WHERE id = ?`, nowUTC(), scanID)
 	if err != nil {
 		return err
 	}

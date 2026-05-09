@@ -335,6 +335,7 @@
     "viewOCRSettings": "OCR 设置",
     "dismiss": "关闭",
     "ocrLockedTooltip": "请先停止 OCR",
+    "scanLockedTooltip": "请等待扫描完成",
     "ocrLockedAction": "OCR 正在运行请先停止 OCR，再变更 catalog"
   },
   "toast": {

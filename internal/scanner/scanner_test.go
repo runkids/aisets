@@ -36,6 +36,17 @@ func TestScanCatalogDuplicatesAndUnused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	startedAt, err := time.Parse(time.RFC3339, catalog.StartedAt)
+	if err != nil {
+		t.Fatalf("startedAt = %q, want RFC3339 timestamp: %v", catalog.StartedAt, err)
+	}
+	generatedAt, err := time.Parse(time.RFC3339, catalog.GeneratedAt)
+	if err != nil {
+		t.Fatalf("generatedAt = %q, want RFC3339 timestamp: %v", catalog.GeneratedAt, err)
+	}
+	if generatedAt.Before(startedAt) {
+		t.Fatalf("generatedAt %s is before startedAt %s", catalog.GeneratedAt, catalog.StartedAt)
+	}
 	if catalog.Stats.TotalFiles != 3 {
 		t.Fatalf("total files = %d, want 3", catalog.Stats.TotalFiles)
 	}

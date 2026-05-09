@@ -485,6 +485,50 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 	assertRowCount(t, store, "near_duplicate_snapshots", 1)
 }
 
+func TestRecordScanPreservesScanStartForDuration(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	startedAt := time.Now().UTC().Add(-2 * time.Minute).Format(time.RFC3339)
+	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	scanID, err := store.RecordScan(scanner.Catalog{
+		StartedAt:   startedAt,
+		GeneratedAt: generatedAt,
+		Analysis: scanner.CatalogAnalysis{
+			References:     scanner.AnalysisComputed,
+			NearDuplicates: scanner.AnalysisComputed,
+			Optimization:   scanner.AnalysisComputed,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := store.Scan(scanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.StartedAt != startedAt {
+		t.Fatalf("startedAt = %q, want %q", summary.StartedAt, startedAt)
+	}
+	completedAt, err := time.Parse(time.RFC3339, summary.CompletedAt)
+	if err != nil {
+		t.Fatalf("completedAt = %q, want RFC3339 timestamp: %v", summary.CompletedAt, err)
+	}
+	started, err := time.Parse(time.RFC3339, summary.StartedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completedAt.Sub(started) < 90*time.Second {
+		t.Fatalf("scan duration = %s, want it to include scan time since %s", completedAt.Sub(started), startedAt)
+	}
+}
+
 func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))

@@ -12,6 +12,8 @@ export {
   supportedLanguages,
 } from "./languageOptions";
 
+const supportedLngs = ["en", "zh-TW", "zh-CN", "ja", "ko"];
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -23,6 +25,7 @@ i18n
       ja: { translation: ja },
       ko: { translation: ko },
     },
+    supportedLngs,
     fallbackLng: "en",
     interpolation: { escapeValue: false },
     detection: {

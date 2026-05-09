@@ -415,16 +415,25 @@ export function App() {
       : scanProgressVisible
         ? scanProgress
         : null;
+  const scanBusy = scanMutation.isPending || backendScanRunning;
   const working =
     catalogQuery.isFetching ||
-    scanMutation.isPending ||
-    backendScanRunning ||
+    scanBusy ||
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
   const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
   const catalogActionsDisabled =
     working || ocrActivityBusy || optimizeActivityBusy;
+  const workspaceSwitchDisabled =
+    scanBusy || ocrActivityBusy || optimizeActivityBusy;
+  const workspaceSwitchDisabledTooltip = scanBusy
+    ? t("activity.scanLockedTooltip")
+    : ocrActivityBusy
+      ? t("activity.ocrLockedTooltip")
+      : optimizeActivityBusy
+        ? t("activity.optimizeLockedTooltip")
+        : undefined;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
   const ocrEnabled = settingsQuery.data?.settings.ocrEnabled ?? false;
@@ -748,7 +757,8 @@ export function App() {
         totalAssets={catalogSummary?.stats.totalFiles ?? 0}
         lastScanAt={catalogSummary?.generatedAt}
         lastScanStartedAt={catalogSummary?.startedAt}
-        workspaceSwitchDisabled={ocrActivityBusy || optimizeActivityBusy}
+        workspaceSwitchDisabled={workspaceSwitchDisabled}
+        workspaceSwitchDisabledTooltip={workspaceSwitchDisabledTooltip}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}
         onSelect={changeMode}

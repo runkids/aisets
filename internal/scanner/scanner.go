@@ -61,6 +61,7 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, projects []Project, excl
 }
 
 func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, options ScanOptions, progress ProgressFunc) (Catalog, error) {
+	startedAt := time.Now().UTC().Format(time.RFC3339)
 	projects = normalizeScanProjects(projects)
 	options = IntentAdjustedOptions(projects, options)
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseCollecting})
@@ -206,6 +207,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 		}
 	}
 	catalog := Catalog{
+		StartedAt:       startedAt,
 		GeneratedAt:     time.Now().UTC().Format(time.RFC3339),
 		Projects:        projects,
 		Items:           items,

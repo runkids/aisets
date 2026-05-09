@@ -347,6 +347,7 @@
     "viewOCRSettings": "OCR 설정",
     "dismiss": "닫기",
     "ocrLockedTooltip": "먼저 OCR을 중지하세요",
+    "scanLockedTooltip": "스캔이 완료될 때까지 기다리세요",
     "ocrLockedAction": "OCR이 실행 중입니다. catalog를 변경하기 전에 OCR을 중지하세요."
   },
   "toast": {
