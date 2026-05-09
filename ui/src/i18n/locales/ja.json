@@ -764,6 +764,7 @@
       "projects": "プロジェクト",
       "theme": "外観",
       "scanning": "スキャン",
+      "ai": "AI",
       "customFilters": "カスタムフィルター",
       "optimization": "最適化",
       "hotkeys": "ショートカット",
@@ -1110,7 +1111,20 @@
     "workspaceIconReadError": "この画像を読み取れませんでした",
     "removeWorkspace": "ワークスペースを削除",
     "removeWorkspaceConfirm": "{{name}} を削除しますか？プロジェクトファイルはディスクに残りますが、このワークスペースと追跡中のプロジェクト一覧は削除されます",
-    "removeWorkspaceSuccess": "ワークスペース {{name}} を削除しました"
+    "removeWorkspaceSuccess": "ワークスペース {{name}} を削除しました",
+    "llmProvider": "プロバイダー",
+    "llmEndpoint": "エンドポイント",
+    "llmVisionModel": "ビジョンモデル",
+    "llmEmbedModel": "埋め込みモデル",
+    "llmProviderDisabled": "無効",
+    "llmProviderOllama": "Ollama",
+    "llmProviderOpenAICompat": "LM Studio（OpenAI互換）",
+    "llmConnected": "接続済み（{{count}}個のモデルが利用可能）",
+    "llmDisconnected": "未接続",
+    "llmTestConnection": "接続テスト",
+    "llmSelectModel": "モデルを選択",
+    "llmRefreshModels": "モデルリストを更新",
+    "llmStatus": "ステータス"
   },
   "catalog": {
     "notComputed": {

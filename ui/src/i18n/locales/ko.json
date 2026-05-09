@@ -776,6 +776,7 @@
       "projects": "프로젝트",
       "theme": "외관",
       "scanning": "스캔",
+      "ai": "AI",
       "customFilters": "사용자 지정 필터",
       "optimization": "최적화",
       "hotkeys": "단축키",
@@ -1115,7 +1116,20 @@
     "updateWorkspaceSuccess": "{{name}} 워크스페이스를 업데이트했습니다",
     "removeWorkspace": "워크스페이스 삭제",
     "removeWorkspaceConfirm": "{{name}}을(를) 삭제할까요? 프로젝트 파일은 디스크에 남지만 이 워크스페이스와 추적 중인 프로젝트 목록은 제거됩니다.",
-    "removeWorkspaceSuccess": "{{name}} 워크스페이스를 삭제했습니다"
+    "removeWorkspaceSuccess": "{{name}} 워크스페이스를 삭제했습니다",
+    "llmProvider": "제공자",
+    "llmEndpoint": "엔드포인트",
+    "llmVisionModel": "비전 모델",
+    "llmEmbedModel": "임베딩 모델",
+    "llmProviderDisabled": "비활성화",
+    "llmProviderOllama": "Ollama",
+    "llmProviderOpenAICompat": "LM Studio (OpenAI 호환)",
+    "llmConnected": "연결됨 ({{count}}개 모델 사용 가능)",
+    "llmDisconnected": "연결 안 됨",
+    "llmTestConnection": "연결 테스트",
+    "llmSelectModel": "모델 선택",
+    "llmRefreshModels": "모델 목록 새로고침",
+    "llmStatus": "상태"
   },
   "catalog": {
     "notComputed": {

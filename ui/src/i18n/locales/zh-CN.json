@@ -764,6 +764,7 @@
       "projects": "项目",
       "theme": "外观",
       "scanning": "扫描",
+      "ai": "AI",
       "customFilters": "自定义筛选器",
       "optimization": "优化",
       "hotkeys": "快捷键",
@@ -1110,7 +1111,20 @@
     "workspaceIconReadError": "无法读取这张图片",
     "removeWorkspace": "删除工作区",
     "removeWorkspaceConfirm": "要删除 {{name}} 吗？项目文件会保留在磁盘上，但此工作区与追踪项目列表会被移除",
-    "removeWorkspaceSuccess": "已删除工作区 {{name}}"
+    "removeWorkspaceSuccess": "已删除工作区 {{name}}",
+    "llmProvider": "提供者",
+    "llmEndpoint": "端点",
+    "llmVisionModel": "视觉模型",
+    "llmEmbedModel": "嵌入模型",
+    "llmProviderDisabled": "停用",
+    "llmProviderOllama": "Ollama",
+    "llmProviderOpenAICompat": "LM Studio（OpenAI 兼容）",
+    "llmConnected": "已连接（{{count}} 个模型可用）",
+    "llmDisconnected": "未连接",
+    "llmTestConnection": "测试连接",
+    "llmSelectModel": "选择模型",
+    "llmRefreshModels": "刷新模型列表",
+    "llmStatus": "状态"
   },
   "catalog": {
     "notComputed": {

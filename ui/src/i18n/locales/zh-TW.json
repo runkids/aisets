@@ -964,6 +964,7 @@
       "projects": "專案",
       "theme": "外觀",
       "scanning": "掃描",
+      "ai": "AI",
       "customFilters": "自訂篩選器",
       "optimization": "最佳化",
       "hotkeys": "快捷鍵",
@@ -1452,7 +1453,20 @@
     "workspaceIconReadError": "無法讀取這張圖片",
     "removeWorkspace": "刪除工作區",
     "removeWorkspaceConfirm": "要刪除 {{name}} 嗎？專案檔案會保留在磁碟上，但此工作區與追蹤專案清單會被移除",
-    "removeWorkspaceSuccess": "已刪除工作區 {{name}}"
+    "removeWorkspaceSuccess": "已刪除工作區 {{name}}",
+    "llmProvider": "提供者",
+    "llmEndpoint": "端點",
+    "llmVisionModel": "視覺模型",
+    "llmEmbedModel": "嵌入模型",
+    "llmProviderDisabled": "停用",
+    "llmProviderOllama": "Ollama",
+    "llmProviderOpenAICompat": "LM Studio（OpenAI 相容）",
+    "llmConnected": "已連線（{{count}} 個模型可用）",
+    "llmDisconnected": "未連線",
+    "llmTestConnection": "測試連線",
+    "llmSelectModel": "選擇模型",
+    "llmRefreshModels": "重新整理模型列表",
+    "llmStatus": "狀態"
   },
   "catalog": {
     "notComputed": {

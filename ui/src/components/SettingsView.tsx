@@ -46,6 +46,7 @@ import { ScanningSection } from "./settings/ScanningSection";
 import { CustomFiltersSection } from "./settings/CustomFiltersSection";
 import { OptimizationSection } from "./settings/OptimizationSection";
 import { AboutSection } from "./settings/AboutSection";
+import { AISection } from "./settings/AISection";
 import { HotkeysSection } from "./settings/HotkeysSection";
 
 export function SettingsView({
@@ -549,6 +550,16 @@ export function SettingsView({
               onStopOCR={onStopOCR}
               installOCRPending={installOCRMutation.isPending}
               removeOCRPending={removeOCRMutation.isPending}
+            />
+          )}
+
+          {activeSection === "ai" && (
+            <AISection
+              draft={draft}
+              settings={settings}
+              working={working}
+              settingActions={settingActionsFor("ai")}
+              onUpdateDraft={updateDraft}
             />
           )}
 
