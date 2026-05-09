@@ -31,6 +31,7 @@ export {
   type SegmentedControlItem,
 } from "./SegmentedControl";
 export { Select } from "./Select";
+export { ScanProgressContent } from "./ScanProgressContent";
 export { StackedBar, type StackedBarSegment } from "./StackedBar";
 export { StatCard } from "./StatCard";
 export { Switch } from "./Switch";

@@ -34,7 +34,13 @@ import { PreCheckView } from "./components/PreCheckView";
 import { PreviewModal } from "./components/PreviewModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { ScanHistoryView } from "./components/ScanHistoryView";
-import { Button, EmptyState, NoticeStack, PromptDialog } from "./components/ui";
+import {
+  Button,
+  EmptyState,
+  NoticeStack,
+  PromptDialog,
+  ScanProgressContent,
+} from "./components/ui";
 import { SettingsView } from "./components/SettingsView";
 import { useToast } from "./components/ToastProvider";
 import {
@@ -50,7 +56,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { runOCR } from "./api";
+import { APIError, runOCR } from "./api";
 import { errorMessage } from "./i18n/index";
 import {
   initialOCRActivityState,
@@ -233,6 +239,9 @@ export function App() {
           phase: status.phase,
           current: status.current,
           total: status.total,
+          message: status.message,
+          state: status.state,
+          reason: status.reason,
         });
         setScanProgressVisible(true);
       });
@@ -292,6 +301,7 @@ export function App() {
   useEffect(() => {
     if (scanMutation.isPending) return undefined;
     if (!scanProgressVisible) return undefined;
+    if (scanProgress?.type === "progress") return undefined;
 
     const dismissDelay =
       scanProgress?.type === "error"
@@ -374,16 +384,41 @@ export function App() {
     if (autoScanStartedRef.current || !settings || !catalogSummary) return;
     if (!settings.scanOnOpen) return;
     if (catalogSummary.projects.length === 0) return;
+    if (scanStatusQuery.data?.running) return;
 
     autoScanStartedRef.current = true;
     scanMutation.mutate(undefined, {
-      onError: (error) => toast.error(errorMessage(error)),
+      onError: (error) => {
+        if (!isScanAlreadyRunningError(error)) toast.error(errorMessage(error));
+      },
     });
-  }, [catalogSummary, scanMutation, settingsQuery.data?.settings, toast]);
+  }, [
+    catalogSummary,
+    scanMutation,
+    scanStatusQuery.data?.running,
+    settingsQuery.data?.settings,
+    toast,
+  ]);
 
+  const backendScanRunning = scanStatusQuery.data?.running ?? false;
+  const displayedScanProgress: ScanEvent | null =
+    backendScanRunning && scanStatusQuery.data
+      ? {
+          type: "progress",
+          phase: scanStatusQuery.data.phase,
+          current: scanStatusQuery.data.current,
+          total: scanStatusQuery.data.total,
+          message: scanStatusQuery.data.message,
+          state: scanStatusQuery.data.state,
+          reason: scanStatusQuery.data.reason,
+        }
+      : scanProgressVisible
+        ? scanProgress
+        : null;
   const working =
     catalogQuery.isFetching ||
     scanMutation.isPending ||
+    backendScanRunning ||
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
@@ -420,7 +455,7 @@ export function App() {
       title: t("error.catalogLoad"),
       children: errorMessage(catalogQuery.error),
     });
-  if (scanMutation.error)
+  if (scanMutation.error && !isScanAlreadyRunningError(scanMutation.error))
     notices.push({
       id: "scan-error",
       tone: "danger",
@@ -436,20 +471,35 @@ export function App() {
     });
 
   function onAddProject(path: string, scanIntent: ProjectScanIntent) {
-    if (ocrActivityBusy || optimizeActivityBusy) return;
+    if (backendScanRunning || ocrActivityBusy || optimizeActivityBusy) return;
     addProjectMutation.mutate(
       { path, scanIntent },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          const addResult = result.result;
+          const projectPath = addResult?.project.path ?? path;
           setDirectoryPickerOpen(false);
-          toast.success(t("toast.projectAdded", { path }));
+          if (addResult?.status === "existing") {
+            toast.info(t("toast.projectAlreadyExists", { path: projectPath }));
+            return;
+          }
+          toast.success(
+            t(
+              addResult?.status === "restored"
+                ? "toast.projectRestored"
+                : "toast.projectAdded",
+              { path: projectPath },
+            ),
+          );
           clearEstimateCaches();
           setScanProgress(null);
           setScanProgressVisible(true);
           scanMutation.mutate(
             { profile: "fast" },
             {
-              onError: (e) => toast.error(errorMessage(e)),
+              onError: (e) => {
+                if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
+              },
             },
           );
         },
@@ -536,29 +586,33 @@ export function App() {
   }
 
   function onRescan() {
-    if (ocrActivityBusy || optimizeActivityBusy) return;
+    if (backendScanRunning || ocrActivityBusy || optimizeActivityBusy) return;
     clearEstimateCaches();
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(undefined, {
-      onError: (e) => toast.error(errorMessage(e)),
+      onError: (e) => {
+        if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
+      },
     });
   }
 
   function onFullScan() {
-    if (ocrActivityBusy || optimizeActivityBusy) return;
+    if (backendScanRunning || ocrActivityBusy || optimizeActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
       { profile: "full" },
       {
-        onError: (e) => toast.error(errorMessage(e)),
+        onError: (e) => {
+          if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
+        },
       },
     );
   }
 
   function onNearDuplicateScan() {
-    if (ocrActivityBusy || optimizeActivityBusy) return;
+    if (backendScanRunning || ocrActivityBusy || optimizeActivityBusy) return;
     setScanProgress(null);
     setScanProgressVisible(true);
     scanMutation.mutate(
@@ -571,7 +625,9 @@ export function App() {
         },
       },
       {
-        onError: (e) => toast.error(errorMessage(e)),
+        onError: (e) => {
+          if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
+        },
       },
     );
   }
@@ -667,7 +723,7 @@ export function App() {
         <AppTopbar
           working={working}
           catalogActionsDisabled={catalogActionsDisabled}
-          scanProgress={scanProgressVisible ? scanProgress : null}
+          scanProgress={displayedScanProgress}
           ocrActivity={ocrActivity}
           optimizeActivity={optimizeActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
@@ -731,6 +787,7 @@ export function App() {
               imagePreviewEnabled={imagePreviewEnabled}
               imageBackgroundMode={imageBackgroundMode}
               ocrActivity={ocrActivity}
+              scanWorking={backendScanRunning || scanMutation.isPending}
               onThemeChange={setTheme}
               onImagePreviewEnabledChange={setImagePreviewEnabled}
               onImageBackgroundModeChange={setImageBackgroundMode}
@@ -745,30 +802,34 @@ export function App() {
                 key="duplicates-not-computed"
                 className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
               >
-                <NotComputedState
-                  title={
-                    catalogSummary.stats.totalFiles >= 10_000
-                      ? t("catalog.notComputed.nearSkippedTitle")
-                      : t("catalog.notComputed.nearTitle")
-                  }
-                  description={
-                    catalogSummary.stats.totalFiles >= 10_000
-                      ? t("catalog.notComputed.nearSkippedDesc", {
-                          count: catalogSummary.stats.totalFiles,
-                        })
-                      : t("catalog.notComputed.nearDesc")
-                  }
-                  action={
-                    catalogSummary.stats.totalFiles >= 10_000
-                      ? t("catalog.notComputed.nearSkippedAction")
-                      : t("catalog.notComputed.fullScan")
-                  }
-                  onAction={
-                    catalogSummary.stats.totalFiles >= 10_000
-                      ? onNearDuplicateScan
-                      : onFullScan
-                  }
-                />
+                {displayedScanProgress ? (
+                  <ScanProgressState scanProgress={displayedScanProgress} />
+                ) : (
+                  <NotComputedState
+                    title={
+                      catalogSummary.stats.totalFiles >= 10_000
+                        ? t("catalog.notComputed.nearSkippedTitle")
+                        : t("catalog.notComputed.nearTitle")
+                    }
+                    description={
+                      catalogSummary.stats.totalFiles >= 10_000
+                        ? t("catalog.notComputed.nearSkippedDesc", {
+                            count: catalogSummary.stats.totalFiles,
+                          })
+                        : t("catalog.notComputed.nearDesc")
+                    }
+                    action={
+                      catalogSummary.stats.totalFiles >= 10_000
+                        ? t("catalog.notComputed.nearSkippedAction")
+                        : t("catalog.notComputed.fullScan")
+                    }
+                    onAction={
+                      catalogSummary.stats.totalFiles >= 10_000
+                        ? onNearDuplicateScan
+                        : onFullScan
+                    }
+                  />
+                )}
               </div>
             ) : (
               <DuplicatesView
@@ -791,12 +852,16 @@ export function App() {
                 key="optimization-not-computed"
                 className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pt-0 max-[768px]:pb-8"
               >
-                <NotComputedState
-                  title={t("catalog.notComputed.optimizationTitle")}
-                  description={t("catalog.notComputed.optimizationDesc")}
-                  action={t("catalog.notComputed.fullScan")}
-                  onAction={onFullScan}
-                />
+                {displayedScanProgress ? (
+                  <ScanProgressState scanProgress={displayedScanProgress} />
+                ) : (
+                  <NotComputedState
+                    title={t("catalog.notComputed.optimizationTitle")}
+                    description={t("catalog.notComputed.optimizationDesc")}
+                    action={t("catalog.notComputed.fullScan")}
+                    onAction={onFullScan}
+                  />
+                )}
               </div>
             ) : (
               <OptimizeView
@@ -823,7 +888,7 @@ export function App() {
               ) : mode === "projects" ? (
                 <ProjectsView
                   catalog={catalogSummary ?? emptyCatalogSummary}
-                  scanProgress={scanProgressVisible ? scanProgress : null}
+                  scanProgress={displayedScanProgress}
                   onJump={changeMode}
                   onAddProject={() => setDirectoryPickerOpen(true)}
                 />
@@ -876,13 +941,15 @@ export function App() {
       {directoryPickerOpen && (
         <DirectoryPickerModal
           open={directoryPickerOpen}
-          working={addProjectMutation.isPending}
+          working={addProjectMutation.isPending || backendScanRunning}
           disabledReason={
-            ocrActivityBusy
-              ? t("directoryPicker.addDisabledOcrBusy")
-              : optimizeActivityBusy
-                ? t("activity.optimizeLockedTooltip")
-                : undefined
+            backendScanRunning
+              ? t("error.scan_already_running")
+              : ocrActivityBusy
+                ? t("directoryPicker.addDisabledOcrBusy")
+                : optimizeActivityBusy
+                  ? t("activity.optimizeLockedTooltip")
+                  : undefined
           }
           initialPath={directoryPickerInitialPath}
           onClose={() => setDirectoryPickerOpen(false)}
@@ -939,6 +1006,22 @@ export function App() {
   );
 }
 
+function isScanAlreadyRunningError(error: unknown) {
+  return error instanceof APIError && error.code === "scan_already_running";
+}
+
+function ScanProgressState({ scanProgress }: { scanProgress: ScanEvent }) {
+  if (scanProgress.type !== "progress") return null;
+  return (
+    <div className="flex flex-1 items-center justify-center px-6 py-20">
+      <ScanProgressContent
+        scanProgress={scanProgress}
+        className="w-full max-w-md"
+      />
+    </div>
+  );
+}
+
 function NotComputedState({
   title,
   description,
@@ -947,8 +1030,8 @@ function NotComputedState({
 }: {
   title: string;
   description: string;
-  action: string;
-  onAction: () => void;
+  action?: string;
+  onAction?: () => void;
 }) {
   return (
     <EmptyState
@@ -956,9 +1039,11 @@ function NotComputedState({
       title={title}
       description={description}
       action={
-        <Button variant="secondary" onClick={onAction}>
-          {action}
-        </Button>
+        action && onAction ? (
+          <Button variant="secondary" onClick={onAction}>
+            {action}
+          </Button>
+        ) : undefined
       }
     />
   );

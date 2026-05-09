@@ -39,6 +39,7 @@ import {
   TextInputClearButton,
   type DropdownMenuItem,
   type StackedBarSegment,
+  ScanProgressContent,
 } from "./ui";
 import { useToast } from "./ToastProvider";
 import { ProjectAvatar } from "./ProjectAvatar";
@@ -460,23 +461,10 @@ export function ProjectsView({
           </div>
         </div>
         {scanProgress && scanProgress.type !== "done" ? (
-          <div className="flex items-center gap-2 text-g-caption text-g-ink-2">
-            <Loader2
-              size={14}
-              className="shrink-0 animate-spin text-g-accent"
-            />
-            <span className="font-[510]">
-              {scanProgress.type === "progress"
-                ? t(`scanProgress.phase.${scanProgress.phase}`)
-                : t("scanProgress.starting")}
-            </span>
-            {scanProgress.type === "progress" &&
-              (scanProgress.total ?? 0) > 0 && (
-                <span className="font-g-mono tabular-nums text-g-ink-3">
-                  {scanProgress.current ?? 0}/{scanProgress.total}
-                </span>
-              )}
-          </div>
+          <ScanProgressContent
+            scanProgress={scanProgress}
+            className="min-w-0 sm:max-w-[52%]"
+          />
         ) : (
           <div className="flex items-center gap-1.5 text-g-caption text-g-ink-4">
             <span className="size-1.5 rounded-g-pill bg-g-green" />
