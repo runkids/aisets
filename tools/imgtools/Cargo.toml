@@ -1,8 +1,8 @@
 [package]
-name = "asset-studio-imgtools"
+name = "aisets-imgtools"
 version = "0.1.0"
 edition = "2024"
-description = "Image processing CLI for Asset Studio"
+description = "Image processing CLI for Aisets"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

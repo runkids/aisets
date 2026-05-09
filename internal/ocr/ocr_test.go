@@ -82,10 +82,10 @@ func TestSettingsHashAndScriptDetection(t *testing.T) {
 }
 
 func TestTesseractEngineFixtureSmoke(t *testing.T) {
-	root := os.Getenv("ASSET_STUDIO_OCR_TEST_DATA_ROOT")
-	imagePath := os.Getenv("ASSET_STUDIO_OCR_TEST_IMAGE")
+	root := os.Getenv("AISETS_OCR_TEST_DATA_ROOT")
+	imagePath := os.Getenv("AISETS_OCR_TEST_IMAGE")
 	if root == "" || imagePath == "" {
-		t.Skip("set ASSET_STUDIO_OCR_TEST_DATA_ROOT and ASSET_STUDIO_OCR_TEST_IMAGE to run engine smoke test")
+		t.Skip("set AISETS_OCR_TEST_DATA_ROOT and AISETS_OCR_TEST_IMAGE to run engine smoke test")
 	}
 	result, err := NewDefaultEngine(root).Extract(t.Context(), imagePath, []string{"eng"})
 	if err != nil {
@@ -97,9 +97,9 @@ func TestTesseractEngineFixtureSmoke(t *testing.T) {
 }
 
 func TestTesseractEngineGameLogoFixtures(t *testing.T) {
-	root := os.Getenv("ASSET_STUDIO_OCR_TEST_DATA_ROOT")
+	root := os.Getenv("AISETS_OCR_TEST_DATA_ROOT")
 	if root == "" {
-		t.Skip("set ASSET_STUDIO_OCR_TEST_DATA_ROOT to run game logo OCR fixture tests")
+		t.Skip("set AISETS_OCR_TEST_DATA_ROOT to run game logo OCR fixture tests")
 	}
 	fixtures := []struct {
 		path string

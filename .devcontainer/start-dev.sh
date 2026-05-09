@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cat > /etc/profile.d/asset-studio-path.sh << 'PROFILE_EOF'
+cat > /etc/profile.d/aisets-path.sh << 'PROFILE_EOF'
 case ":$PATH:" in
   *:/usr/local/go/bin:*) ;;
   *) export PATH="/go/bin:/usr/local/go/bin:$PATH" ;;
@@ -20,6 +20,6 @@ echo "  ui stop                  # stop API + Vite"
 
 if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/19520" 2>/dev/null; then
   echo "▸ Starting dev servers ..."
-  nohup /workspace/.devcontainer/bin/ui --no-open /workspace > /tmp/asset-studio-autostart.log 2>&1 &
+  nohup /workspace/.devcontainer/bin/ui --no-open /workspace > /tmp/aisets-autostart.log 2>&1 &
   disown
 fi

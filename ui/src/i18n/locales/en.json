@@ -18,7 +18,7 @@
     "tools": "Tools",
     "precheck": "Pre-Check",
     "brandTag": "Local asset ops",
-    "navigationAria": "Asset Studio navigation",
+    "navigationAria": "Aisets navigation",
     "projects": "Projects"
   },
   "mode": {
@@ -104,7 +104,7 @@
     "optimizeMeta": "Format, size & compression suggestions",
     "projects": "Projects",
     "noProjects": "No projects added yet",
-    "noProjectsDesc": "Add a project folder and Asset Studio will scan assets, references, and duplicate files.",
+    "noProjectsDesc": "Add a project folder and Aisets will scan assets, references, and duplicate files.",
     "byFormat": "By Format",
     "noAssets": "No assets",
     "topLargest": "Top 5 Largest",
@@ -123,7 +123,7 @@
     "categoryAria": "Diff category",
     "searchPlaceholder": "Search path, project, or format…",
     "sameScanTitle": "Choose two different scans",
-    "sameScanDesc": "Base and target must be different before Asset Studio can compare them.",
+    "sameScanDesc": "Base and target must be different before Aisets can compare them.",
     "diffError": "Could not load scan diff",
     "noChanges": "No changes between these scans",
     "noChangesTitle": "No asset changes detected",
@@ -192,10 +192,10 @@
   },
   "directoryPicker": {
     "title": "Select Project Directory",
-    "description": "Showing directories available to the environment running Asset Studio.",
+    "description": "Showing directories available to the environment running Aisets.",
     "defaultDir": "Default directory",
     "addDir": "Add This Directory",
-    "pathPlaceholder": "Enter an absolute path the Asset Studio server can access",
+    "pathPlaceholder": "Enter an absolute path the Aisets server can access",
     "pathLabel": "Directory path",
     "go": "Go",
     "loading": "Loading directory",
@@ -287,7 +287,7 @@
   "projectIntent": {
     "code": {
       "label": "Code Project",
-      "description": "Best for website or app repos. Asset Studio scans supported code references and only marks zero-reference assets as cleanup-safe when coverage is complete."
+      "description": "Best for website or app repos. Aisets scans supported code references and only marks zero-reference assets as cleanup-safe when coverage is complete."
     },
     "assetPack": {
       "label": "Asset Pack",
@@ -299,7 +299,7 @@
     },
     "mixed": {
       "label": "Mixed / Not Sure",
-      "description": "Choose this when unsure. Asset Studio scans conservatively: zero-reference assets become possible unused, not cleanup suggestions."
+      "description": "Choose this when unsure. Aisets scans conservatively: zero-reference assets become possible unused, not cleanup suggestions."
     }
   },
   "settings": {
@@ -326,7 +326,7 @@
     "noProjectsInWorkspace": "No projects in this workspace.",
     "projectAssets": "{{count}} assets",
     "appearance": "Appearance",
-    "appearanceDesc": "Choose how Asset Studio looks on this machine.",
+    "appearanceDesc": "Choose how Aisets looks on this machine.",
     "displayGroup": "Display",
     "assetViewingGroup": "Asset Viewing",
     "language": "Language",
@@ -344,7 +344,7 @@
     "catalogGroup": "Catalog",
     "ocrGroup": "Text Recognition (OCR)",
     "scanOnOpen": "Scan when opening a workspace",
-    "scanOnOpenHint": "After Asset Studio starts and projects load, automatically rescan the catalog once.",
+    "scanOnOpenHint": "After Aisets starts and projects load, automatically rescan the catalog once.",
     "scanProfileLabel": "Scan profile",
     "scanProfileHint": "Full is the default and runs every analysis; use Fast for large workspaces.",
     "scanProfile": {
@@ -441,7 +441,7 @@
     "ocrEngineInstallHintDarwin": "Install Tesseract with: brew install tesseract",
     "ocrEngineInstallHintLinux": "Install Tesseract with your package manager, for example: sudo apt-get install tesseract-ocr",
     "ocrEngineInstallHintWindows": "Install Tesseract with: winget install --id UB-Mannheim.TesseractOCR --exact",
-    "ocrEngineInstallHintFallback": "Install the Tesseract command-line tool, then restart Asset Studio.",
+    "ocrEngineInstallHintFallback": "Install the Tesseract command-line tool, then restart Aisets.",
     "ocrInstallSuccess": "OCR language packs installed.",
     "ocrInstallFailed": "OCR install failed",
     "ocrRemoveSuccess": "OCR language packs removed.",
@@ -454,7 +454,7 @@
     "ocrProgressWithSkipReason": "processed {{processed}}, ready {{ready}}, failed {{failed}}, skipped {{skipped}}, cache {{cacheHit}}; top skip reason: {{skipReason}} ({{skipReasonCount}})",
     "ocrMissingSelectedLanguages": "Install selected language packs first: {{languages}}.",
     "ocrRunConfirmTitle": "Run OCR",
-    "ocrRunConfirmIntro": "Asset Studio will build or refresh OCR text for the current catalog.",
+    "ocrRunConfirmIntro": "Aisets will build or refresh OCR text for the current catalog.",
     "ocrRunConfirmLocal": "Images stay on this machine and are processed locally.",
     "ocrRunConfirmBatch": "It runs in batches of {{batchSize}} so the UI remains responsive; Run OCR keeps going until no eligible images remain.",
     "ocrRunConfirmSettings": "Current OCR settings are saved first. Newly selected languages make older OCR cache stale and will be reprocessed.",
@@ -722,15 +722,15 @@
     "upToDateAction": "Up to date",
     "versionDevHint": "DEV mode uses a simulated update so the UI flow can be tested.",
     "updateDevSuccess": "DEV mode update simulated.",
-    "updateSuccess": "Updated to {{version}}. Restart Asset Studio to use it.",
-    "updateAlreadyCurrent": "Asset Studio is already up to date.",
+    "updateSuccess": "Updated to {{version}}. Restart Aisets to use it.",
+    "updateAlreadyCurrent": "Aisets is already up to date.",
     "updateFailed": "Update failed",
     "installApp": "Install app",
-    "installAppHint": "Add Asset Studio as a standalone app from this browser.",
+    "installAppHint": "Add Aisets as a standalone app from this browser.",
     "installAppAction": "Install App",
     "installInstalledAction": "Installed",
-    "installInstalled": "Asset Studio is already installed as an app.",
-    "installAccepted": "Asset Studio was installed.",
+    "installInstalled": "Aisets is already installed as an app.",
+    "installAccepted": "Aisets was installed.",
     "installDismissed": "Install was dismissed.",
     "installManualHint": "Use the browser menu to install this site. On macOS Safari, choose File > Add to Dock.",
     "save": "Save",
@@ -738,7 +738,7 @@
     "resetSettings": "Reset Settings",
     "resetSettingsConfirm": "Reset all app settings to defaults and uninstall OCR language packs? Projects, scans, and files stay intact, but startup preferences, optimization defaults, custom filters, and installed OCR data will be removed.",
     "data": "Data",
-    "dataDesc": "Export, import, or reset local Asset Studio state.",
+    "dataDesc": "Export, import, or reset local Aisets state.",
     "export": "Export",
     "import": "Import",
     "dangerZone": "Danger Zone",
@@ -747,7 +747,7 @@
     "clearScanHistoryConfirm": "Clear scan history and the current catalog snapshot? Projects, settings, files, and OCR cache stay intact, but Browse and analysis views will be empty until the next scan.",
     "resetDatabase": "Reset Database",
     "resetDatabaseHint": "Deletes all projects, scans, labels, notes, tasks, and action history. This cannot be undone.",
-    "resetConfirm": "Reset the local Asset Studio database? This removes projects, scans, labels, notes, tasks, and action history.",
+    "resetConfirm": "Reset the local Aisets database? This removes projects, scans, labels, notes, tasks, and action history.",
     "storage": "Storage",
     "storageDesc": "Current local storage paths used by the API server.",
     "databasePath": "Database",
@@ -1056,7 +1056,7 @@
     "replaceOriginal": "Replace original",
     "updateReferences": "Update references",
     "estimatePromptTitle": "Estimate this batch first?",
-    "estimatePromptDesc": "These {{count}} items have not been estimated yet. Asset Studio will calculate candidate output sizes before opening the optimization preview.",
+    "estimatePromptDesc": "These {{count}} items have not been estimated yet. Aisets will calculate candidate output sizes before opening the optimization preview.",
     "estimateThenPreview": "Estimate then preview",
     "selectionLockedDesc": "Selection is locked during estimate and preview so items cannot be added or removed mid-run.",
     "replaceMode": "Replace original",
@@ -1370,8 +1370,8 @@
     "chipOCR": "OCR",
     "usageEmpty": "No code references found. This asset is a deletion candidate.",
     "usagePossiblyUnused": "No references were found, but this project's reference coverage is partial or external consumers may exist. Review manually; this is not included in unused cleanup suggestions.",
-    "usageAssetPack": "This file belongs to an Asset pack project. Asset packs are meant for other projects or manual selection, so no code references is normal. Asset Studio does not mark it as unused or include it in cleanup suggestions.",
-    "usageNotApplicable": "This scan did not run usable reference analysis, so Asset Studio cannot decide whether this file is unused. It is not included in unused cleanup suggestions.",
+    "usageAssetPack": "This file belongs to an Asset pack project. Asset packs are meant for other projects or manual selection, so no code references is normal. Aisets does not mark it as unused or include it in cleanup suggestions.",
+    "usageNotApplicable": "This scan did not run usable reference analysis, so Aisets cannot decide whether this file is unused. It is not included in unused cleanup suggestions.",
     "copyAll": "Copy all",
     "openInEditor": "Open in {{editor}}",
     "exactDuplicates": "Exact Duplicates",
@@ -1459,7 +1459,7 @@
     "apply": "Apply Rename"
   },
   "projects": {
-    "workspaceName": "Asset Studio",
+    "workspaceName": "Aisets",
     "workspace": "Workspace",
     "lastCompletedScan": "Last completed scan",
     "projects": "Projects",

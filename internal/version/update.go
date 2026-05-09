@@ -58,18 +58,18 @@ func Check(ctx context.Context, currentVersion string) (CheckResult, error) {
 			LatestVersion:   "0.1.1-dev",
 			UpdateAvailable: true,
 			DevMode:         true,
-			UpgradeCommand:  "asset-studio update",
+			UpgradeCommand:  "aisets update",
 		}, nil
 	}
 	latest, err := FetchLatestVersion(ctx)
 	if err != nil {
-		return CheckResult{CurrentVersion: currentVersion, UpgradeCommand: "asset-studio update"}, nil
+		return CheckResult{CurrentVersion: currentVersion, UpgradeCommand: "aisets update"}, nil
 	}
 	return CheckResult{
 		CurrentVersion:  currentVersion,
 		LatestVersion:   latest,
 		UpdateAvailable: compareVersions(currentVersion, latest),
-		UpgradeCommand:  "asset-studio update",
+		UpgradeCommand:  "aisets update",
 	}, nil
 }
 
@@ -109,7 +109,7 @@ func Upgrade(ctx context.Context, opts UpgradeOptions) (UpgradeResult, error) {
 	if err := downloadAndReplaceBinary(ctx, latest, execPath); err != nil {
 		return UpgradeResult{CurrentVersion: currentVersion, LatestVersion: latest, Message: "Update failed"}, err
 	}
-	return UpgradeResult{CurrentVersion: currentVersion, LatestVersion: latest, Updated: true, Message: "Updated. Restart Asset Studio to use the new version."}, nil
+	return UpgradeResult{CurrentVersion: currentVersion, LatestVersion: latest, Updated: true, Message: "Updated. Restart Aisets to use the new version."}, nil
 }
 
 func FetchLatestVersion(ctx context.Context) (string, error) {
@@ -146,7 +146,7 @@ func BuildBinaryAssetName(ver, goos, goarch string) string {
 	if goos == "windows" {
 		format = "zip"
 	}
-	return fmt.Sprintf("asset-studio_%s_%s_%s.%s", normalizeVersion(ver), goos, goarch, format)
+	return fmt.Sprintf("aisets_%s_%s_%s.%s", normalizeVersion(ver), goos, goarch, format)
 }
 
 func BuildBinaryDownloadURL(ver, goos, goarch string) string {
@@ -227,7 +227,7 @@ func downloadAndReplaceBinary(ctx context.Context, ver, destPath string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download update: %s", resp.Status)
 	}
-	tmpArchive, err := os.CreateTemp("", "asset-studio-update-*")
+	tmpArchive, err := os.CreateTemp("", "aisets-update-*")
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func extractBinary(name string, r io.ReaderAt, goos string) (string, error) {
 			return "", err
 		}
 		for _, file := range zr.File {
-			if filepath.Base(file.Name) != "asset-studio.exe" {
+			if filepath.Base(file.Name) != "aisets.exe" {
 				continue
 			}
 			rc, err := file.Open()
@@ -319,7 +319,7 @@ func extractBinary(name string, r io.ReaderAt, goos string) (string, error) {
 			defer rc.Close()
 			return writeTempBinary(rc)
 		}
-		return "", fmt.Errorf("asset-studio.exe not found in archive")
+		return "", fmt.Errorf("aisets.exe not found in archive")
 	}
 	gz, err := gzip.NewReader(io.NewSectionReader(r, 0, 1<<63-1))
 	if err != nil {
@@ -330,19 +330,19 @@ func extractBinary(name string, r io.ReaderAt, goos string) (string, error) {
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			return "", fmt.Errorf("asset-studio not found in archive")
+			return "", fmt.Errorf("aisets not found in archive")
 		}
 		if err != nil {
 			return "", err
 		}
-		if header.Typeflag == tar.TypeReg && filepath.Base(header.Name) == "asset-studio" {
+		if header.Typeflag == tar.TypeReg && filepath.Base(header.Name) == "aisets" {
 			return writeTempBinary(tr)
 		}
 	}
 }
 
 func writeTempBinary(r io.Reader) (string, error) {
-	file, err := os.CreateTemp("", "asset-studio-bin-*")
+	file, err := os.CreateTemp("", "aisets-bin-*")
 	if err != nil {
 		return "", err
 	}

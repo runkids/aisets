@@ -610,7 +610,7 @@ func (s *Store) migrateWorkspacesIconSchema() error {
 }
 
 func (s *Store) ensureDefaultWorkspace() error {
-	name := "Asset Studio"
+	name := "Aisets"
 	var raw string
 	if err := s.db.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw); err == nil && raw != "" {
 		var settings AppSettings

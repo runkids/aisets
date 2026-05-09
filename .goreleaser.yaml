@@ -1,14 +1,14 @@
 version: 2
-project_name: asset-studio
+project_name: aisets
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: asset-studio
-    main: ./cmd/asset-studio
-    binary: asset-studio
+  - id: aisets
+    main: ./cmd/aisets
+    binary: aisets
     env:
       - CGO_ENABLED=0
     goos:
@@ -31,17 +31,17 @@ archives:
 checksum:
   name_template: checksums.txt
   extra_files:
-    - glob: ./asset-studio-ui-dist.tar.gz
+    - glob: ./aisets-ui-dist.tar.gz
 
 release:
   github:
     owner: runkids
     name: asset-studio
   extra_files:
-    - glob: ./asset-studio-ui-dist.tar.gz
+    - glob: ./aisets-ui-dist.tar.gz
 
 brews:
-  - name: asset-studio
+  - name: aisets
     repository:
       owner: runkids
       name: homebrew-tap
@@ -52,4 +52,4 @@ brews:
     dependencies:
       - name: tesseract
     test: |
-      system "#{bin}/asset-studio", "version"
+      system "#{bin}/aisets", "version"

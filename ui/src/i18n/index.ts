@@ -28,7 +28,7 @@ i18n
     detection: {
       order: ["localStorage", "navigator"],
       caches: ["localStorage"],
-      lookupLocalStorage: "asset-studio-lang",
+      lookupLocalStorage: "aisets-lang",
     },
   });
 

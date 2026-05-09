@@ -1,16 +1,16 @@
 {
-  "name": "Asset Studio Dev",
+  "name": "Aisets Dev",
   "dockerComposeFile": "docker-compose.yml",
-  "service": "asset-studio-devcontainer",
+  "service": "aisets-devcontainer",
   "workspaceFolder": "/workspace",
   "forwardPorts": [5174, 19520],
   "portsAttributes": {
-    "5174": { "label": "Asset Studio UI" },
-    "19520": { "label": "Asset Studio API" }
+    "5174": { "label": "Aisets UI" },
+    "19520": { "label": "Aisets API" }
   },
   "remoteEnv": {
     "PATH": "/workspace/.devcontainer/bin:/usr/local/bin:${containerEnv:PATH}",
-    "ASSET_STUDIO_UI_HOST": "0.0.0.0"
+    "AISETS_UI_HOST": "0.0.0.0"
   },
   "postCreateCommand": ".devcontainer/setup.sh",
   "postStartCommand": ".devcontainer/start-dev.sh",

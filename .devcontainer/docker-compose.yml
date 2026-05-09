@@ -1,7 +1,7 @@
-name: asset_studio_devcontainer
+name: aisets_devcontainer
 
 services:
-  asset-studio-devcontainer:
+  aisets-devcontainer:
     build:
       context: ..
       dockerfile: docker/sandbox/Dockerfile
@@ -10,7 +10,7 @@ services:
     environment:
       HOME: /home/developer
       GOCACHE: /go/build-cache
-      ASSET_STUDIO_UI_HOST: 0.0.0.0
+      AISETS_UI_HOST: 0.0.0.0
     ports:
       - "5174:5174"
       - "19520:19520"

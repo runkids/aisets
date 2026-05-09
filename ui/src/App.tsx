@@ -81,13 +81,13 @@ type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
-const IMAGE_BACKGROUND_STORAGE_KEY = "asset-studio-image-background";
-const BROWSE_STATE_STORAGE_KEY = "asset-studio-browse-state";
+const IMAGE_BACKGROUND_STORAGE_KEY = "aisets-image-background";
+const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
 const SCAN_ERROR_DISMISS_MS = 3500;
 
 function storedThemePreference(): ThemePreference {
-  const stored = window.localStorage.getItem("asset-studio-theme");
+  const stored = window.localStorage.getItem("aisets-theme");
   return stored === "light" || stored === "dark" || stored === "system"
     ? stored
     : "dark";
@@ -152,7 +152,7 @@ export function App() {
   const optimizeActivityAbortRef = useRef<AbortController | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
-    return window.localStorage.getItem("asset-studio-image-preview") !== "off";
+    return window.localStorage.getItem("aisets-image-preview") !== "off";
   });
   const [imageBackgroundMode, setImageBackgroundMode] =
     useState<ImageBackgroundMode>(storedImageBackgroundMode);
@@ -208,7 +208,7 @@ export function App() {
     };
 
     applyTheme();
-    window.localStorage.setItem("asset-studio-theme", theme);
+    window.localStorage.setItem("aisets-theme", theme);
 
     if (theme !== "system") return undefined;
 
@@ -219,7 +219,7 @@ export function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
-      "asset-studio-image-preview",
+      "aisets-image-preview",
       imagePreviewEnabled ? "on" : "off",
     );
   }, [imagePreviewEnabled]);
@@ -851,10 +851,10 @@ export function App() {
 
   if (mode === "unused") {
     try {
-      const raw = localStorage.getItem("asset-studio-browse-state");
+      const raw = localStorage.getItem("aisets-browse-state");
       const state = raw ? JSON.parse(raw) : {};
       state.statusFilter = "unused";
-      localStorage.setItem("asset-studio-browse-state", JSON.stringify(state));
+      localStorage.setItem("aisets-browse-state", JSON.stringify(state));
     } catch {
       /* ignore */
     }

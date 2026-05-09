@@ -1,8 +1,8 @@
 param(
-  [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\Asset Studio"),
+  [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\Aisets"),
   [switch]$SkipOcrEngine,
   [switch]$InstallOcrEngine,
-  [string]$Repo = $(if ($env:ASSET_STUDIO_REPO) { $env:ASSET_STUDIO_REPO } else { "runkids/asset-studio" })
+  [string]$Repo = $(if ($env:AISETS_REPO) { $env:AISETS_REPO } else { "runkids/asset-studio" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +11,7 @@ if ($SkipOcrEngine -and $InstallOcrEngine) {
   throw "Use only one of -SkipOcrEngine or -InstallOcrEngine."
 }
 
-$BinaryName = "asset-studio"
+$BinaryName = "aisets"
 $ExeName = "$BinaryName.exe"
 
 function Add-DirectoryToUserPath {

@@ -116,7 +116,7 @@ func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.ActiveWorkspaceID != defaultWorkspaceID || settings.WorkspaceName != "Asset Studio" {
+	if settings.ActiveWorkspaceID != defaultWorkspaceID || settings.WorkspaceName != "Aisets" {
 		t.Fatalf("settings after switch = %#v", settings)
 	}
 	if projects := store.Projects(); len(projects) != 1 || projects[0].WorkspaceID != defaultWorkspaceID || projects[0].ID != project {
@@ -128,7 +128,7 @@ func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
 	if err := store.RenameWorkspace(workspace.ID, "Client Assets", "data:image/webp;base64,bmV3LWljb24="); err != nil {
 		t.Fatal(err)
 	}
-	if workspaces := store.Workspaces(); len(workspaces) != 2 || workspaces[0].Name != "Asset Studio" || workspaces[1].Name != "Client Assets" || workspaces[1].IconImage == workspace.IconImage {
+	if workspaces := store.Workspaces(); len(workspaces) != 2 || workspaces[0].Name != "Aisets" || workspaces[1].Name != "Client Assets" || workspaces[1].IconImage == workspace.IconImage {
 		t.Fatalf("renamed workspaces = %#v", workspaces)
 	}
 	if err := store.RemoveWorkspace(workspace.ID); err != nil {
@@ -188,11 +188,11 @@ func TestStoreMigratesLegacySettingsValueJSON(t *testing.T) {
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
-	dataDir := filepath.Join(dataHome, "asset-studio")
+	dataDir := filepath.Join(dataHome, "aisets")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "aisets.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,11 +258,11 @@ func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T)
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
-	dataDir := filepath.Join(dataHome, "asset-studio")
+	dataDir := filepath.Join(dataHome, "aisets")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "aisets.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T)
 		t.Fatal(err)
 	}
 	legacyDefaults := `["**/*.test.*","**/*.spec.*","**/__tests__/**","**/__mocks__/**","**/*.stories.*"]`
-	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":`+legacyDefaults+`}`, nowUTC()); err != nil {
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Aisets","excludePatterns":`+legacyDefaults+`}`, nowUTC()); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
@@ -323,11 +323,11 @@ func TestStoreDoesNotSplitCustomGlobalExcludePatterns(t *testing.T) {
 	root := t.TempDir()
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
-	dataDir := filepath.Join(dataHome, "asset-studio")
+	dataDir := filepath.Join(dataHome, "aisets")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, "asset-studio.db"))
+	db, err := sql.Open("sqlite", filepath.Join(dataDir, "aisets.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestStoreDoesNotSplitCustomGlobalExcludePatterns(t *testing.T) {
 	if _, err := db.Exec(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Asset Studio","excludePatterns":["dist/**"]}`, nowUTC()); err != nil {
+	if _, err := db.Exec(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`, "app", `{"workspaceName":"Aisets","excludePatterns":["dist/**"]}`, nowUTC()); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
@@ -1091,10 +1091,10 @@ func TestDataAndCacheDirsHonorXDG(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 
-	if got := DataDir(); got != filepath.Join(root, "data", "asset-studio") {
+	if got := DataDir(); got != filepath.Join(root, "data", "aisets") {
 		t.Fatalf("DataDir() = %q", got)
 	}
-	if got := CacheDir(); got != filepath.Join(root, "cache", "asset-studio") {
+	if got := CacheDir(); got != filepath.Join(root, "cache", "aisets") {
 		t.Fatalf("CacheDir() = %q", got)
 	}
 }
@@ -1488,7 +1488,7 @@ func TestExportImportAndResetData(t *testing.T) {
 	}
 	if s, err := store.Settings(); err != nil {
 		t.Fatal(err)
-	} else if s.WorkspaceName != "Asset Studio" || s.ActiveWorkspaceID != "default" {
+	} else if s.WorkspaceName != "Aisets" || s.ActiveWorkspaceID != "default" {
 		t.Fatalf("settings after reset = %#v", s)
 	}
 	if err := store.ImportData(exported); err != nil {

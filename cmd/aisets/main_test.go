@@ -22,11 +22,11 @@ import (
 
 func TestMainWithoutArgsPrintsUsage(t *testing.T) {
 	oldArgs := os.Args
-	os.Args = []string{"asset-studio"}
+	os.Args = []string{"aisets"}
 	t.Cleanup(func() { os.Args = oldArgs })
 
 	stderr := captureStderr(t, main)
-	if !strings.Contains(stderr, "Usage:") || !strings.Contains(stderr, "asset-studio ui") {
+	if !strings.Contains(stderr, "Usage:") || !strings.Contains(stderr, "aisets ui") {
 		t.Fatalf("usage stderr = %q", stderr)
 	}
 }
@@ -657,7 +657,7 @@ func TestCmdUIRejectsInvalidFlags(t *testing.T) {
 }
 
 func TestParseUIOptionsAcceptsFlagsAfterProjects(t *testing.T) {
-	t.Setenv("ASSET_STUDIO_UI_BASE_PATH", "/env-studio")
+	t.Setenv("AISETS_UI_BASE_PATH", "/env-studio")
 	opts, err := parseUIOptions([]string{
 		"/workspace/a",
 		"--port", "20555",
@@ -814,7 +814,7 @@ func TestUIPortAndLogHelpers(t *testing.T) {
 	if err := logFile.Close(); err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(root, "cache", "asset-studio", "ui.log")
+	want := filepath.Join(root, "cache", "aisets", "ui.log")
 	if name != want {
 		t.Fatalf("log path = %q, want %q", name, want)
 	}
@@ -832,12 +832,12 @@ func TestUIPortAndLogHelpers(t *testing.T) {
 }
 
 func TestExitWithErrorWritesJSONAndExits(t *testing.T) {
-	if os.Getenv("ASSET_STUDIO_EXIT_WITH_ERROR_SUBPROCESS") == "1" {
+	if os.Getenv("AISETS_EXIT_WITH_ERROR_SUBPROCESS") == "1" {
 		exitWithError("scan", errors.New("boom"), true)
 		return
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=TestExitWithErrorWritesJSONAndExits")
-	cmd.Env = append(os.Environ(), "ASSET_STUDIO_EXIT_WITH_ERROR_SUBPROCESS=1")
+	cmd.Env = append(os.Environ(), "AISETS_EXIT_WITH_ERROR_SUBPROCESS=1")
 	out, err := cmd.Output()
 	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 1 {
 		t.Fatalf("exitWithError subprocess err = %T %[1]v", err)
@@ -934,11 +934,11 @@ func TestOpenUIWindowDefaultsToBrowser(t *testing.T) {
 }
 
 func TestEnvironmentAndUIDistHelpers(t *testing.T) {
-	if got := envOrDefault("ASSET_STUDIO_TEST_MISSING", "fallback"); got != "fallback" {
+	if got := envOrDefault("AISETS_TEST_MISSING", "fallback"); got != "fallback" {
 		t.Fatalf("env fallback = %q", got)
 	}
-	t.Setenv("ASSET_STUDIO_TEST_VALUE", "configured")
-	if got := envOrDefault("ASSET_STUDIO_TEST_VALUE", "fallback"); got != "configured" {
+	t.Setenv("AISETS_TEST_VALUE", "configured")
+	if got := envOrDefault("AISETS_TEST_VALUE", "fallback"); got != "configured" {
 		t.Fatalf("env configured = %q", got)
 	}
 

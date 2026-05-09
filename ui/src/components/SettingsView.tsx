@@ -334,7 +334,7 @@ export function SettingsView({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `asset-studio-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `aisets-export-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }

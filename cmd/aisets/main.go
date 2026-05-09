@@ -78,37 +78,37 @@ func run(rawArgs []string) int {
 
 func usageText() string {
 	return `Usage:
-  asset-studio ui [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--app] [--no-open]
-  asset-studio ui once [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--no-open]
-  asset-studio ui stop [--host HOST] [--port PORT]
-  asset-studio projects [--json]
-  asset-studio projects add [projectPaths...] [--json]
-  asset-studio projects rename --id ID --name NAME [--json]
-  asset-studio projects remove --id ID [--json]
-  asset-studio settings get [--json]
-  asset-studio settings export [--output file.json] [--json]
-  asset-studio settings import file.json [--json]
-  asset-studio settings reset-database --confirm RESET [--json]
-  asset-studio update [--dry-run] [--force] [--json]
-  asset-studio scan [projectPaths...] [--json]
-  asset-studio catalog items [--limit N] [--cursor C] [--project-id ID] [--q TEXT] [--status STATUS] [--sort SORT] [--json]
-  asset-studio catalog item --id ID [--json]
-  asset-studio scans list [--json]
-  asset-studio scans diff --base ID --target ID [--json]
-  asset-studio optimize estimate [assetIds...] [--json]
-  asset-studio optimize script [assetIds...] [--json]
-  asset-studio pre-check [filePaths...] [--json]
-  asset-studio actions rename preview --asset-id ID --target-path PATH [--json]
-  asset-studio actions merge-duplicates preview --asset-id ID --preferred-path PATH [--json]
-  asset-studio actions delete-unused preview --asset-id ID [--json]
-  asset-studio actions apply --preview preview.json [--json]
-  asset-studio version [--json]
+  aisets ui [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--app] [--no-open]
+  aisets ui once [projectPaths...] [--host HOST] [--port PORT] [--base-path PATH] [--no-open]
+  aisets ui stop [--host HOST] [--port PORT]
+  aisets projects [--json]
+  aisets projects add [projectPaths...] [--json]
+  aisets projects rename --id ID --name NAME [--json]
+  aisets projects remove --id ID [--json]
+  aisets settings get [--json]
+  aisets settings export [--output file.json] [--json]
+  aisets settings import file.json [--json]
+  aisets settings reset-database --confirm RESET [--json]
+  aisets update [--dry-run] [--force] [--json]
+  aisets scan [projectPaths...] [--json]
+  aisets catalog items [--limit N] [--cursor C] [--project-id ID] [--q TEXT] [--status STATUS] [--sort SORT] [--json]
+  aisets catalog item --id ID [--json]
+  aisets scans list [--json]
+  aisets scans diff --base ID --target ID [--json]
+  aisets optimize estimate [assetIds...] [--json]
+  aisets optimize script [assetIds...] [--json]
+  aisets pre-check [filePaths...] [--json]
+  aisets actions rename preview --asset-id ID --target-path PATH [--json]
+  aisets actions merge-duplicates preview --asset-id ID --preferred-path PATH [--json]
+  aisets actions delete-unused preview --asset-id ID [--json]
+  aisets actions apply --preview preview.json [--json]
+  aisets version [--json]
 
 Commands:
   ui         Start or reuse the localhost UI in the background
   projects   List, add, rename, or remove imported projects
   settings   Inspect, export, import, or reset local state
-  update     Update the Asset Studio CLI binary
+  update     Update the Aisets CLI binary
   scan       Scan projects and print catalog summary or JSON
   catalog    Query the latest scan catalog
   scans      List scan history or compare completed scans
@@ -118,9 +118,9 @@ Commands:
   version    Print version
 
 UI:
-  asset-studio ui starts a background server and opens a browser.
-  asset-studio ui once runs the same server in the foreground.
-  asset-studio ui stop stops a background UI server for the selected port.
+  aisets ui starts a background server and opens a browser.
+  aisets ui once runs the same server in the foreground.
+  aisets ui stop stops a background UI server for the selected port.
   --app opens a desktop-style app window when the browser supports it.
   --port defaults to 19520. --base-path supports reverse proxy hosting.`
 }
@@ -153,7 +153,7 @@ func writeCLIError(command string, err error, jsonOut bool) {
 			"error": apierr.From(err, command+"_failed"),
 		})
 	} else {
-		fmt.Fprintf(os.Stderr, "asset-studio %s: %v\n", command, err)
+		fmt.Fprintf(os.Stderr, "aisets %s: %v\n", command, err)
 	}
 }
 

@@ -9,7 +9,7 @@ import { optimizationBlockers, optimizationOperations } from "./optimizeTypes";
 
 export const estimateCache = new Map<string, OptimizationEstimate>();
 export const estimateOperationCache = new Map<string, OptimizationOperation>();
-const estimateStorageKey = "asset-studio.optimize.estimates.v2";
+const estimateStorageKey = "aisets.optimize.estimates.v2";
 const estimateCacheLimit = 3000;
 let estimateLoaded = false;
 
@@ -47,6 +47,7 @@ export function estimateOperationCacheKey(
   maxDimensionPx = 1200,
   strategyHash = "",
   enabledTools: string[] = [],
+  formatOverride?: string,
 ) {
   return JSON.stringify({
     assetId: item.id,
@@ -59,6 +60,7 @@ export function estimateOperationCacheKey(
     maxDimensionPx,
     strategyHash,
     enabledTools: [...enabledTools].sort(),
+    ...(formatOverride && formatOverride !== "auto" && { formatOverride }),
   });
 }
 

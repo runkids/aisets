@@ -131,7 +131,7 @@ export const defaultOptimizationStrategies: OptimizationStrategy[] = [
 ];
 
 export const defaultSettings: SettingsUpdate = {
-  workspaceName: "Asset Studio",
+  workspaceName: "Aisets",
   defaultProjectRoot: "",
   autoScanOnOpen: false,
   scanOnOpen: false,

@@ -1,4 +1,4 @@
-BINARY ?= bin/asset-studio
+BINARY ?= bin/aisets
 IMGTOOLS_DIR = tools/imgtools
 
 .PHONY: help build test fmt vet check devc devc-up devc-down devc-restart devc-reset devc-status ui-install ui-build ui-dev build-all imgtools imgtools-test
@@ -16,7 +16,7 @@ help:
 
 build:
 	mkdir -p $(dir $(BINARY))
-	go build -o $(BINARY) ./cmd/asset-studio
+	go build -o $(BINARY) ./cmd/aisets
 
 test:
 	go test ./...
@@ -63,11 +63,11 @@ imgtools:
 
 imgtools-install: imgtools
 	mkdir -p $(dir $(BINARY))
-	cp $(IMGTOOLS_DIR)/target/release/asset-studio-imgtools $(dir $(BINARY))
+	cp $(IMGTOOLS_DIR)/target/release/aisets-imgtools $(dir $(BINARY))
 
 imgtools-embed: imgtools
 	mkdir -p internal/imgtools/bin
-	cp $(IMGTOOLS_DIR)/target/release/asset-studio-imgtools internal/imgtools/bin/
+	cp $(IMGTOOLS_DIR)/target/release/aisets-imgtools internal/imgtools/bin/
 
 imgtools-test:
 	cargo test --manifest-path $(IMGTOOLS_DIR)/Cargo.toml
@@ -75,6 +75,6 @@ imgtools-test:
 
 build-embed: ui-build imgtools-embed
 	mkdir -p $(dir $(BINARY))
-	go build -tags embed_imgtools -o $(BINARY) ./cmd/asset-studio
+	go build -tags embed_imgtools -o $(BINARY) ./cmd/aisets
 
 build-all: ui-build build imgtools-install

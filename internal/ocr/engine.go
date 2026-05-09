@@ -20,7 +20,7 @@ import (
 
 const (
 	DefaultEngineName             = "tesseract-cli"
-	assetStudioOCRPipelineVersion = "asset-studio-ocr-v4"
+	assetStudioOCRPipelineVersion = "aisets-ocr-v4"
 )
 
 type AvailabilityChecker interface {
@@ -269,7 +269,7 @@ func preprocessOCRImage(path string, cropMode ocrCropMode, thresholdMode ocrThre
 	dst := image.NewGray(image.Rect(0, 0, source.Bounds().Dx()*scale, source.Bounds().Dy()*scale))
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), source, source.Bounds(), xdraw.Over, nil)
 	binarizeForOCR(dst, thresholdMode)
-	temp, err := os.CreateTemp("", "asset-studio-ocr-*.png")
+	temp, err := os.CreateTemp("", "aisets-ocr-*.png")
 	if err != nil {
 		return "", nil, err
 	}
@@ -329,7 +329,7 @@ func preprocessTealOCRImage(path string) (string, func(), error) {
 			}
 		}
 	}
-	temp, err := os.CreateTemp("", "asset-studio-ocr-*.png")
+	temp, err := os.CreateTemp("", "aisets-ocr-*.png")
 	if err != nil {
 		return "", nil, err
 	}

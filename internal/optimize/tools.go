@@ -40,7 +40,7 @@ func ToolRuntimeStatus(settings []imageproc.OptimizationExternalTool) []ToolRunt
 func imgtoolsRuntime() ToolRuntime {
 	path, err := imgtools.Binary()
 	return ToolRuntime{
-		ID:       "asset-studio-imgtools",
+		ID:       "aisets-imgtools",
 		Detected: err == nil && path != "",
 		Path:     path,
 		Enabled:  true,

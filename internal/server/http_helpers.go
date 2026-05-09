@@ -71,9 +71,9 @@ func sendNDJSON(w http.ResponseWriter, value any) {
 func uiPlaceholderHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	_, _ = fmt.Fprint(w, `<!doctype html>
-<html><head><meta charset="utf-8"><title>Asset Studio</title></head>
+<html><head><meta charset="utf-8"><title>Aisets</title></head>
 <body style="font-family:system-ui;margin:48px;line-height:1.5">
-<h1>Asset Studio dev server is running</h1>
+<h1>Aisets dev server is running</h1>
 <p>Run <code>cd ui && pnpm run dev</code>, then open the Vite URL. Vite proxies <code>/api</code> to this Go server.</p>
 </body></html>`)
 }

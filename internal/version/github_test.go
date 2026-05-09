@@ -3,16 +3,16 @@ package version
 import "testing"
 
 func TestBuildReleaseAssetURLs(t *testing.T) {
-	if got := BuildUIDistURL("1.2.3"); got != "https://github.com/runkids/asset-studio/releases/download/v1.2.3/asset-studio-ui-dist.tar.gz" {
+	if got := BuildUIDistURL("1.2.3"); got != "https://github.com/runkids/aisets/releases/download/v1.2.3/aisets-ui-dist.tar.gz" {
 		t.Fatalf("BuildUIDistURL() = %q", got)
 	}
-	if got := BuildChecksumsURL("1.2.3"); got != "https://github.com/runkids/asset-studio/releases/download/v1.2.3/checksums.txt" {
+	if got := BuildChecksumsURL("1.2.3"); got != "https://github.com/runkids/aisets/releases/download/v1.2.3/checksums.txt" {
 		t.Fatalf("BuildChecksumsURL() = %q", got)
 	}
-	if got := BuildBinaryAssetName("v1.2.3", "darwin", "arm64"); got != "asset-studio_1.2.3_darwin_arm64.tar.gz" {
+	if got := BuildBinaryAssetName("v1.2.3", "darwin", "arm64"); got != "aisets_1.2.3_darwin_arm64.tar.gz" {
 		t.Fatalf("BuildBinaryAssetName() = %q", got)
 	}
-	if got := BuildBinaryDownloadURL("1.2.3", "windows", "amd64"); got != "https://github.com/runkids/asset-studio/releases/download/v1.2.3/asset-studio_1.2.3_windows_amd64.zip" {
+	if got := BuildBinaryDownloadURL("1.2.3", "windows", "amd64"); got != "https://github.com/runkids/aisets/releases/download/v1.2.3/aisets_1.2.3_windows_amd64.zip" {
 		t.Fatalf("BuildBinaryDownloadURL() = %q", got)
 	}
 }

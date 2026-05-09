@@ -493,7 +493,7 @@ func mustWriteBytes(t *testing.T, path string, content []byte) {
 func findImgtoolsBinary(t *testing.T) string {
 	t.Helper()
 	candidates := []string{
-		filepath.Join("..", "..", "bin", "asset-studio-imgtools"),
+		filepath.Join("..", "..", "bin", "aisets-imgtools"),
 	}
 	for _, c := range candidates {
 		abs, err := filepath.Abs(c)
@@ -506,12 +506,12 @@ func findImgtoolsBinary(t *testing.T) string {
 			}
 		}
 	}
-	if p, err := exec.LookPath("asset-studio-imgtools"); err == nil {
+	if p, err := exec.LookPath("aisets-imgtools"); err == nil {
 		if err := exec.Command(p, "version").Run(); err == nil {
 			return p
 		}
 	}
-	t.Skip("asset-studio-imgtools binary not available or not executable")
+	t.Skip("aisets-imgtools binary not available or not executable")
 	return ""
 }
 

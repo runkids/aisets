@@ -106,7 +106,7 @@ export function highlightBashLine(line: string): React.ReactNode {
 }
 
 export const toolInstallCommands: Record<string, string> = {
-  "asset-studio-imgtools": "Bundled with Asset Studio",
+  "aisets-imgtools": "Bundled with Aisets",
   svgo: "npm install -g svgo",
 };
 

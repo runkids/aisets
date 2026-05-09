@@ -20,7 +20,7 @@ impl TempDir {
             .expect("system clock should be after unix epoch")
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "asset-studio-imgtools-test-{}-{nanos}-{id}",
+            "aisets-imgtools-test-{}-{nanos}-{id}",
             std::process::id()
         ));
         fs::create_dir_all(&path).expect("create temp dir");
@@ -39,7 +39,7 @@ impl Drop for TempDir {
 }
 
 fn imgtools() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_asset-studio-imgtools"))
+    Command::new(env!("CARGO_BIN_EXE_aisets-imgtools"))
 }
 
 fn run(args: &[&str]) -> Output {
@@ -92,7 +92,7 @@ fn write_animated_gif(path: &Path) {
 fn version_prints_package_name_and_version() {
     let stdout = assert_success(run(&["version"]));
 
-    assert_eq!(stdout.trim(), "asset-studio-imgtools 0.1.0");
+    assert_eq!(stdout.trim(), "aisets-imgtools 0.1.0");
 }
 
 #[test]

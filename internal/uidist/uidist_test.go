@@ -17,7 +17,7 @@ import (
 func TestCacheDirIsCachedAndClearCache(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", root)
-	wantDir := filepath.Join(root, "asset-studio", "ui", "1.2.3")
+	wantDir := filepath.Join(root, "aisets", "ui", "1.2.3")
 	if got := CacheDir("1.2.3"); got != wantDir {
 		t.Fatalf("CacheDir() = %q, want %q", got, wantDir)
 	}

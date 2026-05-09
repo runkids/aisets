@@ -1,4 +1,4 @@
-# Asset Studio — Project Instructions
+# Aisets — Project Instructions
 
 > Project-level context for Claude Code. Loaded automatically on every session in this repo.
 
@@ -6,7 +6,7 @@
 
 ## 1. What this project is
 
-Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in a codebase: scan, detect duplicates, find unused, optimize, lint. The UI is a Vite + React + TypeScript + Tailwind/CVA application under `ui/` consumed by the Go binary under `cmd/` + `internal/`.
+Aisets is a Go-backed local web tool for auditing image / asset hygiene in a codebase: scan, detect duplicates, find unused, optimize, lint. The UI is a Vite + React + TypeScript + Tailwind/CVA application under `ui/` consumed by the Go binary under `cmd/` + `internal/`.
 
 | Layer | Tech | Path |
 |-------|------|------|
@@ -53,7 +53,7 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 - When project `scanIntent` changes, treat reference-dependent catalog state as stale and require a rescan before enabling unused/delete-unused behavior. Persist and compare scan-time intent where scan history or diff logic depends on unused transitions.
 
 ### 2.3 Rust / imgtools CLI
-- **Rust imgtools changes require CLI integration tests.** Any behavior change under `tools/imgtools` must add or update deterministic Cargo tests that execute `asset-studio-imgtools` through the compiled binary. Cover successful JSON/file-output paths plus validation and error paths, because unit tests alone can miss Clap wiring, filesystem behavior, and serialization regressions.
+- **Rust imgtools changes require CLI integration tests.** Any behavior change under `tools/imgtools` must add or update deterministic Cargo tests that execute `aisets-imgtools` through the compiled binary. Cover successful JSON/file-output paths plus validation and error paths, because unit tests alone can miss Clap wiring, filesystem behavior, and serialization regressions.
 - **Rust imgtools verification must stay in CI.** Keep `.github/workflows/test.yaml`'s `imgtools-test` job in sync with local verification: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --manifest-path tools/imgtools/Cargo.toml`, and a release build. Otherwise Rust CLI regressions can ship while Go and UI checks still pass.
 
 ---
@@ -74,7 +74,7 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
   - Add or update Go tests for every changed behavior under `cmd/` or `internal/`
   - Inside the devcontainer, pass `go test ./...`, `go vet ./...`, and `mkdir -p tmp && go test ./... -coverprofile=tmp/backend-coverage.out`
   - Inspect `go tool cover -func=tmp/backend-coverage.out` for newly added or modified backend functions and avoid untested logic regressions
-- CLI / server changes must be smoke-tested inside the devcontainer with the project CLI or `go run ./cmd/asset-studio ...` command that matches the changed behavior.
+- CLI / server changes must be smoke-tested inside the devcontainer with the project CLI or `go run ./cmd/aisets ...` command that matches the changed behavior.
 - CI must mirror local verification via `.github/workflows/test.yaml`. The release workflow must depend on that reusable test workflow before publishing artifacts.
 - Use pnpm for JavaScript tooling inside the devcontainer. Root `package.json` and `pnpm-lock.yaml` are intentional repo-level dev tooling for Husky + lint-staged; app/runtime UI dependencies stay under `ui/`.
 - Never `--no-verify`.

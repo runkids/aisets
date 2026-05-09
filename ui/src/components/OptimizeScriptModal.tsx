@@ -40,7 +40,7 @@ export function OptimizeScriptModal({ data, onClose }: Props) {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = "asset-studio-optimize.sh";
+              a.download = "aisets-optimize.sh";
               document.body.appendChild(a);
               a.click();
               a.remove();

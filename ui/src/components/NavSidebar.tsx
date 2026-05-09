@@ -215,7 +215,7 @@ export function NavSidebar({
       <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2.5 shadow-g-sm max-[960px]:items-center max-[960px]:px-2 max-[960px]:py-2">
         <div className="flex items-center justify-between">
           <span className="text-g-caption font-g-display font-[590] text-g-ink-3 max-[960px]:text-g-chip">
-            <span className="max-[960px]:hidden">Asset Studio</span>
+            <span className="max-[960px]:hidden">Aisets</span>
             <span className="hidden max-[960px]:inline">AS</span>
           </span>
           {version && (

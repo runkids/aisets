@@ -1,4 +1,4 @@
-const CACHE_NAME = "asset-studio-shell-v1";
+const CACHE_NAME = "aisets-shell-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());

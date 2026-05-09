@@ -15,31 +15,31 @@ type Store struct {
 
 func DataDir() string {
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-		return filepath.Join(xdg, "asset-studio")
+		return filepath.Join(xdg, "aisets")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".asset-studio-data"
+		return ".aisets-data"
 	}
-	return filepath.Join(home, ".local", "share", "asset-studio")
+	return filepath.Join(home, ".local", "share", "aisets")
 }
 
 func CacheDir() string {
 	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
-		return filepath.Join(xdg, "asset-studio")
+		return filepath.Join(xdg, "aisets")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".asset-studio-cache"
+		return ".aisets-cache"
 	}
-	return filepath.Join(home, ".cache", "asset-studio")
+	return filepath.Join(home, ".cache", "aisets")
 }
 
 func OpenStore() (*Store, error) {
 	if err := os.MkdirAll(DataDir(), 0o755); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(DataDir(), "asset-studio.db")
+	path := filepath.Join(DataDir(), "aisets.db")
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err

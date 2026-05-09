@@ -57,7 +57,7 @@ func cmdUI(args []string, jsonModes ...bool) error {
 		if jsonOut {
 			return writeJSON(os.Stdout, map[string]any{"ok": true, "url": url, "status": "running"})
 		}
-		fmt.Fprintf(os.Stderr, "Asset Studio UI already running: %s\n", url)
+		fmt.Fprintf(os.Stderr, "Aisets UI already running: %s\n", url)
 		if !opts.noOpen {
 			_ = openUIWindow(url, opts.appWindow)
 		}
@@ -107,7 +107,7 @@ func cmdUIOnce(args []string, _ bool) error {
 
 	url := uiURL(opts)
 	srv.SetOnReady(func() {
-		fmt.Fprintf(os.Stderr, "Asset Studio UI: %s\n", url)
+		fmt.Fprintf(os.Stderr, "Aisets UI: %s\n", url)
 		if !opts.noOpen {
 			_ = openBrowser(url)
 		}
@@ -137,9 +137,9 @@ func cmdUIStop(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "status": status, "url": uiURL(opts)})
 	}
 	if stopped {
-		fmt.Fprintf(os.Stderr, "Asset Studio UI stopped: %s\n", uiURL(opts))
+		fmt.Fprintf(os.Stderr, "Aisets UI stopped: %s\n", uiURL(opts))
 	} else {
-		fmt.Fprintf(os.Stderr, "Asset Studio UI is not running: %s\n", uiURL(opts))
+		fmt.Fprintf(os.Stderr, "Aisets UI is not running: %s\n", uiURL(opts))
 	}
 	return nil
 }
@@ -155,7 +155,7 @@ func parseUIOptions(args []string) (uiOptions, error) {
 	opts := uiOptions{
 		host:     defaultUIHost,
 		port:     defaultUIPort,
-		basePath: envOrDefault("ASSET_STUDIO_UI_BASE_PATH", ""),
+		basePath: envOrDefault("AISETS_UI_BASE_PATH", ""),
 	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -266,14 +266,14 @@ func startUIInBackground(opts uiOptions, jsonOut bool) error {
 		if jsonOut {
 			return writeJSON(os.Stdout, map[string]any{"ok": true, "url": url, "pid": pid})
 		}
-		fmt.Fprintf(os.Stderr, "Asset Studio UI: %s\n", url)
+		fmt.Fprintf(os.Stderr, "Aisets UI: %s\n", url)
 		return nil
 	}
 
 	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "url": url, "pid": pid, "log": logFile.Name(), "status": "starting"})
 	}
-	fmt.Fprintf(os.Stderr, "Asset Studio UI starting in background: %s\nLog: %s\n", url, logFile.Name())
+	fmt.Fprintf(os.Stderr, "Aisets UI starting in background: %s\nLog: %s\n", url, logFile.Name())
 	return nil
 }
 

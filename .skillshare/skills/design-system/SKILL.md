@@ -1,7 +1,7 @@
 ---
 name: design-system
 description: >
-  Asset Studio UI design system — token usage, CVA component patterns, Tailwind co-location rules,
+  Aisets UI design system — token usage, CVA component patterns, Tailwind co-location rules,
   and pre-delivery checklist. Use this skill whenever editing ANY file under ui/src/, including .tsx,
   .ts, and style files. Also use when creating new UI components, modifying existing ones, changing
   colors/spacing/typography, adding animations, or touching anything visual. Even simple one-line
@@ -12,7 +12,7 @@ globs:
   - "ui/src/styles/**"
 ---
 
-# Asset Studio Design System
+# Aisets Design System
 
 ## Why this skill exists
 

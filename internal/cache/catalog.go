@@ -44,7 +44,7 @@ func Open(dir string) (*Store, error) {
 		if err != nil {
 			return nil, err
 		}
-		dir = filepath.Join(cacheDir, "asset-studio", "catalog")
+		dir = filepath.Join(cacheDir, "aisets", "catalog")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err

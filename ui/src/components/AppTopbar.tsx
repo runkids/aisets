@@ -146,18 +146,18 @@ export function AppTopbar({
     <header className="relative z-10 flex h-[60px] min-w-0 shrink-0 items-center justify-between gap-2.5 bg-transparent px-5 max-[480px]:px-3">
       <div className="relative z-10 flex min-w-0 flex-1 basis-0 items-center pr-4">
         <div className="flex w-[220px] shrink-0 items-center gap-3 max-[960px]:w-[52px] max-[960px]:justify-center max-[960px]:gap-0">
-          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-g-md bg-g-surface shadow-g-sm">
+          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black shadow-g-sm">
             <img
-              className="block size-full origin-center scale-[1.22]"
-              src="../../public/brand/asset-studio-app-icon.avif"
+              className="block size-full"
+              src="../../public/brand/aisets-app-icon.avif"
               alt=""
             />
           </div>
           <div className="min-w-0 max-[960px]:hidden">
-            <div className="truncate font-g-display text-[15px] font-[590] leading-[1.1] tracking-[-0.013em] text-g-ink">
-              Asset Studio
+            <div className="truncate font-g-display text-[17px] font-[620] leading-[1.1] tracking-[-0.02em] text-g-ink">
+              Aisets
             </div>
-            <div className="mt-0.5 truncate text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3">
+            <div className="mt-[3px] truncate text-[9.5px] font-[510] uppercase tracking-[0.08em] text-g-ink-4">
               {t("nav.brandTag")}
             </div>
           </div>

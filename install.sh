@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="${ASSET_STUDIO_REPO:-runkids/asset-studio}"
-BINARY_NAME="asset-studio"
+REPO="${AISETS_REPO:-runkids/asset-studio}"
+BINARY_NAME="aisets"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 INSTALL_OCR_ENGINE="${INSTALL_OCR_ENGINE:-ask}"
 
@@ -114,7 +114,7 @@ install_tesseract() {
 }
 
 release_json="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")" || {
-  echo "No GitHub release found for ${REPO}. Create the GitHub repo and publish a release first, or set ASSET_STUDIO_REPO=owner/name for a different repo." >&2
+  echo "No GitHub release found for ${REPO}. Create the GitHub repo and publish a release first, or set AISETS_REPO=owner/name for a different repo." >&2
   exit 1
 }
 latest="$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"

@@ -4,5 +4,5 @@ package imgtools
 
 import _ "embed"
 
-//go:embed bin/asset-studio-imgtools
+//go:embed bin/aisets-imgtools
 var embeddedBinary []byte

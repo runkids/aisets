@@ -127,10 +127,10 @@ func TestBuildMapWithProgressExcludesMatchedCodeFiles(t *testing.T) {
 }
 
 func TestMatchExcludePatternTreatsPlainFileNameAsAnyDepth(t *testing.T) {
-	if !MatchExcludePattern("asset-studio-logo.png", "ui/public/brand/asset-studio-logo.png") {
+	if !MatchExcludePattern("aisets-logo.png", "ui/public/brand/aisets-logo.png") {
 		t.Fatal("plain filename pattern should match the same file at any depth")
 	}
-	if MatchExcludePattern("asset-studio-logo.png", "ui/public/brand/asset-studio-logo@2x.png") {
+	if MatchExcludePattern("aisets-logo.png", "ui/public/brand/aisets-logo@2x.png") {
 		t.Fatal("plain filename pattern should not partially match other filenames")
 	}
 	if !MatchExcludePattern("/demo/", "packages/demo/logo.png") {

@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-const binaryName = "asset-studio-imgtools"
+const binaryName = "aisets-imgtools"
 
 var (
 	resolveMu    sync.Mutex
@@ -88,7 +88,7 @@ func extractToCache() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(cacheDir, "asset-studio")
+	dir := filepath.Join(cacheDir, "aisets")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

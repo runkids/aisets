@@ -1,12 +1,12 @@
 {
-  "name": "Asset Studio",
-  "short_name": "Asset Studio",
+  "name": "Aisets",
+  "short_name": "Aisets",
   "description": "Local asset hygiene workspace for multi-project image cleanup.",
   "start_url": ".",
   "scope": ".",
   "icons": [
     {
-      "src": "./brand/asset-studio-app-icon.avif",
+      "src": "./favicon-256.png",
       "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any maskable"

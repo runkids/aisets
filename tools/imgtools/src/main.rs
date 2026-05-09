@@ -6,10 +6,7 @@ use clap::{Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
-#[command(
-    name = "asset-studio-imgtools",
-    about = "Image processing CLI for Asset Studio"
-)]
+#[command(name = "aisets-imgtools", about = "Image processing CLI for Aisets")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -119,7 +116,7 @@ fn main() {
             output,
         } => thumbnail(&input, &output, size),
         Command::Version => {
-            println!("asset-studio-imgtools {}", env!("CARGO_PKG_VERSION"));
+            println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
     };

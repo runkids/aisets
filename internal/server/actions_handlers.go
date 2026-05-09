@@ -394,7 +394,7 @@ func analyzeUpload(ctx context.Context, header *multipart.FileHeader, catalog sc
 		return precheck.Result{}, apierr.New("upload_open_failed", "failed to open upload")
 	}
 	defer src.Close()
-	tmp, err := os.CreateTemp("", "asset-studio-precheck-*"+filepath.Ext(header.Filename))
+	tmp, err := os.CreateTemp("", "aisets-precheck-*"+filepath.Ext(header.Filename))
 	if err != nil {
 		return precheck.Result{}, apierr.New("upload_tempfile_failed", "failed to allocate temp file")
 	}

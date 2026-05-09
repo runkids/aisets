@@ -1495,7 +1495,7 @@ func TestActionPreviewApplyOptimizationBulkAndPreCheckRoutes(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/actions/optimization/generate-script", bytes.NewReader([]byte(`{"assetIds":[]}`)))
 	s.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "asset-studio-imgtools") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"format":"bash"`) || !strings.Contains(rec.Body.String(), "aisets-imgtools") {
 		t.Fatalf("generate script = %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -1675,7 +1675,7 @@ func TestServerHelpersBasePathAndUIHandlers(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	uiPlaceholderHandler(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Asset Studio dev server") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Aisets dev server") {
 		t.Fatalf("placeholder = %d %s", rec.Code, rec.Body.String())
 	}
 

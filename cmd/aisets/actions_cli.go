@@ -190,7 +190,7 @@ func cmdActionApply(args []string, jsonOut bool) error {
 	fmt.Printf("Moved files: %d\n", result.MovedFiles)
 	fmt.Printf("Deleted files: %d\n", result.DeletedFiles)
 	if scanErr != nil {
-		fmt.Fprintf(os.Stderr, "asset-studio actions: post-apply scan failed: %v\n", scanErr)
+		fmt.Fprintf(os.Stderr, "aisets actions: post-apply scan failed: %v\n", scanErr)
 	}
 	return nil
 }

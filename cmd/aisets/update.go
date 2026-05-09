@@ -33,16 +33,16 @@ func cmdUpdate(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "update": result})
 	}
 	if result.DevMode {
-		fmt.Fprintf(os.Stderr, "Asset Studio update simulated in DEV mode: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
+		fmt.Fprintf(os.Stderr, "Aisets update simulated in DEV mode: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
 		return nil
 	}
 	if result.DryRun {
-		fmt.Fprintf(os.Stderr, "Asset Studio update available: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
+		fmt.Fprintf(os.Stderr, "Aisets update available: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
 		return nil
 	}
 	if result.Updated {
-		fmt.Fprintf(os.Stderr, "Asset Studio updated: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
-		fmt.Fprintln(os.Stderr, "Restart Asset Studio to use the new version.")
+		fmt.Fprintf(os.Stderr, "Aisets updated: %s -> %s\n", result.CurrentVersion, result.LatestVersion)
+		fmt.Fprintln(os.Stderr, "Restart Aisets to use the new version.")
 		return nil
 	}
 	fmt.Fprintln(os.Stderr, result.Message)

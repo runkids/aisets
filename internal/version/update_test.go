@@ -135,7 +135,7 @@ func buildTestArchive(t *testing.T, content []byte) []byte {
 	var buf bytes.Buffer
 	if runtime.GOOS == "windows" {
 		zw := zip.NewWriter(&buf)
-		w, err := zw.Create("asset-studio.exe")
+		w, err := zw.Create("aisets.exe")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func buildTestArchive(t *testing.T, content []byte) []byte {
 	}
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
-	if err := tw.WriteHeader(&tar.Header{Name: "asset-studio", Mode: 0o755, Size: int64(len(content))}); err != nil {
+	if err := tw.WriteHeader(&tar.Header{Name: "aisets", Mode: 0o755, Size: int64(len(content))}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tw.Write(content); err != nil {
@@ -166,7 +166,7 @@ func buildTestArchive(t *testing.T, content []byte) []byte {
 
 func executableName() string {
 	if runtime.GOOS == "windows" {
-		return "asset-studio.exe"
+		return "aisets.exe"
 	}
-	return "asset-studio"
+	return "aisets"
 }

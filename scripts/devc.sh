@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$PROJECT_ROOT/.devcontainer/docker-compose.yml"
-SERVICE="asset-studio-devcontainer"
+SERVICE="aisets-devcontainer"
 
 usage() {
   echo "Usage: $(basename "$0") <command>"

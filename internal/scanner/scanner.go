@@ -31,7 +31,7 @@ type scanResult struct {
 func New() *Scanner {
 	cacheDir := ""
 	if userCache, err := os.UserCacheDir(); err == nil {
-		cacheDir = filepath.Join(userCache, "asset-studio")
+		cacheDir = filepath.Join(userCache, "aisets")
 	}
 	return NewWithCacheDir(cacheDir)
 }
@@ -45,7 +45,7 @@ func NewWithCacheDir(cacheDir string) *Scanner {
 	}
 	store, err = catalogcache.Open(storeDir)
 	if err != nil {
-		store, _ = catalogcache.Open(filepath.Join(os.TempDir(), "asset-studio", "catalog"))
+		store, _ = catalogcache.Open(filepath.Join(os.TempDir(), "aisets", "catalog"))
 	}
 	return &Scanner{cache: store, cacheDir: cacheDir}
 }
@@ -240,7 +240,7 @@ func (s *Scanner) Thumbnail(ctx context.Context, catalog Catalog, id string, siz
 		}
 		cacheDir := filepath.Join(s.cacheDir, "thumbs")
 		if cacheDir == "thumbs" {
-			cacheDir = filepath.Join(os.TempDir(), "asset-studio", "thumbs")
+			cacheDir = filepath.Join(os.TempDir(), "aisets", "thumbs")
 		}
 		key := item.ThumbnailURL
 		if key == "" {

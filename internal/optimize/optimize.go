@@ -109,7 +109,7 @@ func GenerateScript(items []scanner.AssetItem, req Request) string {
 	req = normalizeRequest(req)
 	var b strings.Builder
 	b.WriteString("#!/usr/bin/env bash\n")
-	b.WriteString("# asset-studio: optimization script\n")
+	b.WriteString("# aisets: optimization script\n")
 	b.WriteString("# Review each command before running.\n")
 	b.WriteString("# Commands are generated from the active optimization settings.\n")
 	b.WriteString("set -euo pipefail\n\n")
@@ -149,7 +149,7 @@ func GenerateScript(items []scanner.AssetItem, req Request) string {
 	if count == 0 {
 		b.WriteString("# No optimizable items in selection.\n")
 	}
-	b.WriteString("echo \"asset-studio: optimization script complete.\"\n")
+	b.WriteString("echo \"aisets: optimization script complete.\"\n")
 	return b.String()
 }
 
@@ -169,13 +169,13 @@ func commandForOperation(op Operation, path string, req Request) string {
 		if maxDimension <= 0 {
 			maxDimension = 1200
 		}
-		return fmt.Sprintf("asset-studio-imgtools resize --max-dimension %d %s %s", maxDimension, q, out)
+		return fmt.Sprintf("aisets-imgtools resize --max-dimension %d %s %s", maxDimension, q, out)
 	case "convert-avif", "convert-webp", "webp-recompress", "gif-optimize", "png-recompress", "jpeg-recompress":
-		if op.Tool != "" && op.Tool != "asset-studio-imgtools" {
+		if op.Tool != "" && op.Tool != "aisets-imgtools" {
 			return externalCommandForOperation(op, path, target, req)
 		}
 		args := []string{
-			"asset-studio-imgtools",
+			"aisets-imgtools",
 			"convert",
 			"--format",
 			op.OutputFormat,

@@ -16,7 +16,7 @@ import (
 	"asset-studio/internal/version"
 )
 
-const AssetName = "asset-studio-ui-dist.tar.gz"
+const AssetName = "aisets-ui-dist.tar.gz"
 
 func CacheDir(ver string) string {
 	return filepath.Join(config.CacheDir(), "ui", ver)
@@ -44,7 +44,7 @@ func Download(ver string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download UI dist: %s", resp.Status)
 	}
-	tmp, err := os.CreateTemp("", "asset-studio-ui-*.tar.gz")
+	tmp, err := os.CreateTemp("", "aisets-ui-*.tar.gz")
 	if err != nil {
 		return err
 	}

@@ -155,7 +155,7 @@ func validateOptimizationStrategies(strategies []imageproc.OptimizationStrategy)
 
 func DefaultAppSettings() AppSettings {
 	return AppSettings{
-		WorkspaceName:              "Asset Studio",
+		WorkspaceName:              "Aisets",
 		ActiveWorkspaceID:          defaultWorkspaceID,
 		DefaultProjectRoot:         "",
 		AutoScanOnOpen:             false,

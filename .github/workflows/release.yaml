@@ -39,7 +39,7 @@ jobs:
           pnpm run build
 
       - name: Package UI dist
-        run: tar czf asset-studio-ui-dist.tar.gz -C ui/dist .
+        run: tar czf aisets-ui-dist.tar.gz -C ui/dist .
 
       - uses: goreleaser/goreleaser-action@v6
         with:

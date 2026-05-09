@@ -25,9 +25,9 @@ func TestDetectAssetPack(t *testing.T) {
 
 func TestDetectHonorsPlainFilenameExcludePattern(t *testing.T) {
 	root := t.TempDir()
-	mustWrite(t, filepath.Join(root, "icons", "asset-studio-logo.png"), "png")
+	mustWrite(t, filepath.Join(root, "icons", "aisets-logo.png"), "png")
 
-	detection, err := Detect(context.Background(), root, []string{"asset-studio-logo.png"})
+	detection, err := Detect(context.Background(), root, []string{"aisets-logo.png"})
 	if err != nil {
 		t.Fatal(err)
 	}

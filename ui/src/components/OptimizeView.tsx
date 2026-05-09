@@ -151,10 +151,10 @@ export function OptimizeView({
   );
   const runtimeTools = settings?.optimizationToolRuntime ?? [];
   const imgtoolsRuntime = runtimeTools.find(
-    (tool) => tool.id === "asset-studio-imgtools",
+    (tool) => tool.id === "aisets-imgtools",
   );
   const enabledRuntimeTools = runtimeTools.filter(
-    (tool) => tool.enabled && tool.id !== "asset-studio-imgtools",
+    (tool) => tool.enabled && tool.id !== "aisets-imgtools",
   );
   const missingEnabledRuntimeTools = enabledRuntimeTools.filter(
     (tool) => !tool.detected,
@@ -265,6 +265,7 @@ export function OptimizeView({
         maxDimensionPx,
         strategyHash,
         enabledToolIds,
+        formatOverrides.get(item.id),
       ),
     [
       replaceOriginal,
@@ -273,6 +274,7 @@ export function OptimizeView({
       maxDimensionPx,
       strategyHash,
       enabledToolIds,
+      formatOverrides,
     ],
   );
 
@@ -973,6 +975,7 @@ export function OptimizeView({
         else next.set(itemId, format);
         return next;
       });
+      estimateCache.clear();
     },
     [],
   );

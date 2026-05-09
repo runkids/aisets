@@ -8,7 +8,7 @@ import {
 describe("settings draft helpers", () => {
   it("round-trips global and project-type exclude patterns", () => {
     const draft = draftFromSettings({
-      workspaceName: "Asset Studio",
+      workspaceName: "Aisets",
       activeWorkspaceId: "default",
       defaultProjectRoot: "",
       autoScanOnOpen: false,
@@ -49,7 +49,7 @@ describe("settings draft helpers", () => {
       preferredEditor: "vscode",
       workspaces: [],
       projects: [],
-      databasePath: "/tmp/asset-studio.db",
+      databasePath: "/tmp/aisets.db",
       dataDir: "/tmp/data",
       cacheDir: "/tmp/cache",
       ocrRuntime: {
@@ -96,7 +96,7 @@ describe("settings draft helpers", () => {
       ocrBatchSize: 9,
       ocrConcurrency: 2,
       ocrFuzzySearch: false,
-      excludePatterns: ["asset-studio-logo.png"],
+      excludePatterns: ["aisets-logo.png"],
       excludePatternsByIntent: {
         code: ["custom-code/**"],
         assetPack: ["custom-assets/**"],
@@ -140,7 +140,7 @@ describe("settings draft helpers", () => {
       preferredEditor: "vscode",
       workspaces: [],
       projects: [],
-      databasePath: "/tmp/asset-studio.db",
+      databasePath: "/tmp/aisets.db",
       dataDir: "/tmp/data",
       cacheDir: "/tmp/cache",
       ocrRuntime: {
@@ -157,7 +157,7 @@ describe("settings draft helpers", () => {
     });
 
     const workspace = resetSectionDraft(draft, "workspace");
-    expect(workspace.workspaceName).toBe("Asset Studio");
+    expect(workspace.workspaceName).toBe("Aisets");
     expect(workspace.defaultProjectRoot).toBe("");
 
     const scanning = resetSectionDraft(draft, "scanning");
@@ -173,7 +173,7 @@ describe("settings draft helpers", () => {
     expect(ocr.ocrLanguages).toEqual(["eng"]);
     expect(ocr.ocrMaxPixels).toBe(2_000_000);
     expect(ocr.scanProfile).toBe("fast");
-    expect(ocr.excludePatternsText).toBe("asset-studio-logo.png");
+    expect(ocr.excludePatternsText).toBe("aisets-logo.png");
 
     const customFilters = resetSectionDraft(draft, "customFilters");
     expect(customFilters.customAssetFilters).toEqual([]);

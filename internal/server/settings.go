@@ -82,7 +82,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettingsExport(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("content-disposition", `attachment; filename="asset-studio-export.json"`)
+	w.Header().Set("content-disposition", `attachment; filename="aisets-export.json"`)
 	writeJSON(w, http.StatusOK, s.store.ExportData())
 }
 

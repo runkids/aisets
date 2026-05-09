@@ -76,7 +76,7 @@ type BrowseStoredState = {
   sortMode: SortMode;
 };
 
-const BROWSE_STATE_STORAGE_KEY = "asset-studio-browse-state";
+const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const viewModes: ViewMode[] = ["grid", "list", "tree"];
 const gridSizes: BrowseStoredState["gridSize"][] = ["s", "m", "l"];
 const statusFilters: StatusFilter[] = [

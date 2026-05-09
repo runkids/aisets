@@ -279,7 +279,7 @@ describe("updateSettings", () => {
           },
           optimizationDefaultQuality: 72,
           optimizationAutoApply: false,
-          databasePath: "/tmp/asset-studio.db",
+          databasePath: "/tmp/aisets.db",
           dataDir: "/tmp/data",
           cacheDir: "/tmp/cache",
         },

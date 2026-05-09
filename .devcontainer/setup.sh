@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "${HOME:-}" != "/home/developer" ]] || [ ! -d /workspace ] || [ ! -f /workspace/go.mod ]; then
-  echo "Refusing to run: expected asset-studio devcontainer context." >&2
+  echo "Refusing to run: expected aisets devcontainer context." >&2
   exit 1
 fi
 
@@ -12,7 +12,7 @@ cd /workspace
 echo "▸ Building imgtools (Rust) ..."
 make imgtools-install
 
-echo "▸ Building asset-studio binary ..."
+echo "▸ Building aisets binary ..."
 make build
 
 echo "▸ Installing UI dependencies ..."

@@ -1,16 +1,16 @@
-# Asset Studio — Feature Port Plan
+# Aisets — Feature Port Plan
 
 Port design from internal `asset-duplicate-check` to public `asset-studio`.
 Excludes company-specific logic (owner/theme facets, @gorilla aliases, shared-assets priority, Docker compose, batch auto-execute).
 
 ## Architecture Decisions
 
-1. **Optimization**: Go keeps settings, catalog, preview/apply, and API orchestration. Image transforms use the bundled Rust CLI `tools/imgtools` (`asset-studio-imgtools`) first; optional external tools are detected and user-enabled as supplemental backends. No silent auto-execute.
+1. **Optimization**: Go keeps settings, catalog, preview/apply, and API orchestration. Image transforms use the bundled Rust CLI `tools/imgtools` (`aisets-imgtools`) first; optional external tools are detected and user-enabled as supplemental backends. No silent auto-execute.
 2. **Merge duplicates**: keep existing preview/apply pattern. No batch streaming auto-merge.
 3. **Lint**: 7 universal rules only. No `duplicate-import` (requires monorepo context).
 4. **Facets**: `project` + `extension` + status filters. No `owner`/`theme`.
 5. **Pre-Check**: multipart upload (not base64). 10 files max, 20MB each.
-6. **Image conversion for estimates**: Go still owns recommendation analysis and safety checks. Candidate generation uses `asset-studio-imgtools` for convert/resize when available, built-in Go handlers for supported fallbacks, and enabled external tools only where they provide better coverage.
+6. **Image conversion for estimates**: Go still owns recommendation analysis and safety checks. Candidate generation uses `aisets-imgtools` for convert/resize when available, built-in Go handlers for supported fallbacks, and enabled external tools only where they provide better coverage.
 7. **Charts**: manual SVG to keep bundle small.
 
 ---
@@ -116,12 +116,12 @@ type LintFinding struct {
 
 **Existing Rust CLI**:
 - Package: `tools/imgtools`
-- Binary: `asset-studio-imgtools`
+- Binary: `aisets-imgtools`
 - Current commands:
-  - `asset-studio-imgtools convert --format webp --quality 80 input output`
-  - `asset-studio-imgtools convert --format png|jpeg|jpg|gif --quality 80 input output`
-  - `asset-studio-imgtools resize --max-dimension 2560 input output`
-  - `asset-studio-imgtools version`
+  - `aisets-imgtools convert --format webp --quality 80 input output`
+  - `aisets-imgtools convert --format png|jpeg|jpg|gif --quality 80 input output`
+  - `aisets-imgtools resize --max-dimension 2560 input output`
+  - `aisets-imgtools version`
 
 **Work**:
 - Add optimizer runtime detection:
@@ -133,34 +133,34 @@ type LintFinding struct {
   - Unknown tool ids in `PATCH /api/settings` return a structured error.
 - Settings UI:
   - Add Optimization → External Tools group.
-  - Show bundled `asset-studio-imgtools` status separately from optional external tools.
+  - Show bundled `aisets-imgtools` status separately from optional external tools.
   - Detected external tools remain disabled by default; users explicitly enable them.
 - Request generation:
   - `/optimize` uses `optimizationDefaultQuality`.
   - Resize uses `optimizationThresholds.maxDimensionPx`.
   - Estimate/cache keys include quality, max dimension, bundled tool version/status, and enabled external tool ids.
 - Backend selection order:
-  - resize: `asset-studio-imgtools resize`, then `magick`, then built-in Go resize
-  - convert-webp/webp-recompress: `asset-studio-imgtools convert --format webp`, then `cwebp`, then `ffmpeg`
-  - gif-optimize: `asset-studio-imgtools convert --format gif`, then `gifsicle`, then `ffmpeg`, then built-in GIF re-encode
+  - resize: `aisets-imgtools resize`, then `magick`, then built-in Go resize
+  - convert-webp/webp-recompress: `aisets-imgtools convert --format webp`, then `cwebp`, then `ffmpeg`
+  - gif-optimize: `aisets-imgtools convert --format gif`, then `gifsicle`, then `ffmpeg`, then built-in GIF re-encode
   - svg-minify: `svgo`, then built-in SVG minify
   - convert-avif: `avifenc`, then built-in Go AVIF while Rust CLI does not support AVIF
-  - png/jpeg recompress: `asset-studio-imgtools convert --format png|jpeg`, then built-in Go encoder
+  - png/jpeg recompress: `aisets-imgtools convert --format png|jpeg`, then built-in Go encoder
 - Keep preview/apply safety:
   - Rust/external tools only write candidate files under temp paths.
   - Go preview/apply still validates target paths, stale candidates, and reference updates.
   - `optimizationAutoApply` remains a saved preference only; it must not modify files automatically in V1.
 - Script generation:
-  - Prefer `asset-studio-imgtools` commands when the operation is supported.
+  - Prefer `aisets-imgtools` commands when the operation is supported.
   - Emit external-tool commands only for enabled external tools.
   - Keep comments for unsupported/manual operations.
 
 **Acceptance**:
-- `estimate` returns measured candidate savings when `asset-studio-imgtools` is present.
+- `estimate` returns measured candidate savings when `aisets-imgtools` is present.
 - Missing Rust CLI falls back to supported Go handlers and reports runtime status.
 - Disabled external tools are never selected.
 - Enabled but missing external tools are visible as missing in estimate/runtime status.
-- Script output uses `asset-studio-imgtools` for supported operations.
+- Script output uses `aisets-imgtools` for supported operations.
 
 ---
 

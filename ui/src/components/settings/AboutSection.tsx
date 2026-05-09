@@ -123,20 +123,29 @@ export function AboutSection({
         <div className="px-6 pt-5 pb-2 md:px-8">
           <div className="flex flex-col gap-3 min-[1200px]:flex-row min-[1200px]:items-start min-[1200px]:justify-between min-[1200px]:gap-8">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-g-display text-g-body font-[590] leading-[1.3] tracking-[-0.013em] text-g-ink">
-                  Asset Studio
-                </span>
-                <Badge tone="default">{version?.currentVersion ?? "dev"}</Badge>
-                {version?.updateAvailable ? (
-                  <Badge tone="amber">
-                    {t("settings.updateAvailable", {
-                      version: version.latestVersion,
-                    })}
+              <div className="flex flex-wrap items-center gap-3">
+                <img
+                  className="size-11 shrink-0 rounded-[10px] shadow-g-sm"
+                  src="../../public/brand/aisets-app-icon.png"
+                  alt=""
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-g-display text-[20px] font-[620] leading-[1.2] tracking-[-0.02em] text-g-ink">
+                    Aisets
+                  </span>
+                  <Badge tone="default">
+                    {version?.currentVersion ?? "dev"}
                   </Badge>
-                ) : version === undefined ? null : (
-                  <Badge tone="green">{t("settings.upToDate")}</Badge>
-                )}
+                  {version?.updateAvailable ? (
+                    <Badge tone="amber">
+                      {t("settings.updateAvailable", {
+                        version: version.latestVersion,
+                      })}
+                    </Badge>
+                  ) : version === undefined ? null : (
+                    <Badge tone="green">{t("settings.upToDate")}</Badge>
+                  )}
+                </div>
               </div>
               <p className="mt-1 font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
                 {t("settings.license")}: MIT

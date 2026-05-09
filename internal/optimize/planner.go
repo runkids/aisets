@@ -178,15 +178,15 @@ func operationForItem(item scanner.AssetItem, req Request, hasTool toolChecker) 
 	case "convert-avif":
 		op.OutputFormat = "avif"
 		op.TargetPath = replaceExt(item.RepoPath, ".avif")
-		op.Tool = "asset-studio-imgtools"
+		op.Tool = "aisets-imgtools"
 	case "convert-webp":
 		op.OutputFormat = "webp"
 		op.TargetPath = replaceExt(item.RepoPath, ".webp")
-		op.Tool = "asset-studio-imgtools"
+		op.Tool = "aisets-imgtools"
 	case "webp-recompress":
 		op.OutputFormat = "webp"
 		op.TargetPath = item.RepoPath
-		op.Tool = "asset-studio-imgtools"
+		op.Tool = "aisets-imgtools"
 	case "gif-optimize":
 		op.OutputFormat = "gif"
 		op.TargetPath = item.RepoPath
@@ -391,7 +391,7 @@ func referencePolicy(item scanner.AssetItem) string {
 }
 
 func defaultToolChecker(name string) bool {
-	if name == "asset-studio-imgtools" {
+	if name == "aisets-imgtools" {
 		return imgtools.Available()
 	}
 	_, err := exec.LookPath(name)
@@ -415,15 +415,15 @@ func selectToolForOperation(op Operation, req Request, hasTool toolChecker) stri
 		}
 		return ""
 	}
-	if hasTool("asset-studio-imgtools") {
-		return "asset-studio-imgtools"
+	if hasTool("aisets-imgtools") {
+		return "aisets-imgtools"
 	}
 	for _, candidate := range externalToolCandidates(op.Operation) {
 		if externalToolEnabled(req, candidate) {
 			return candidate
 		}
 	}
-	return "asset-studio-imgtools"
+	return "aisets-imgtools"
 }
 
 func externalToolEnabled(req Request, id string) bool {
@@ -598,7 +598,7 @@ func measureSingleOperation(project scanner.Project, op Operation, req Request, 
 
 func gifTryWebPSingleOp(project scanner.Project, op *Operation, req Request, hasTool toolChecker) {
 	gifFallbackToWebP(op, hasTool)
-	if !hasTool("asset-studio-imgtools") {
+	if !hasTool("aisets-imgtools") {
 		return
 	}
 	candidate, fbBytes, err := buildCandidate(project, *op, req)
@@ -677,18 +677,18 @@ func gifFallbackToWebP(op *Operation, hasTool toolChecker) {
 	op.Operation = "convert-webp"
 	op.OutputFormat = "webp"
 	op.TargetPath = replaceExt(op.RepoPath, ".webp")
-	op.Tool = "asset-studio-imgtools"
+	op.Tool = "aisets-imgtools"
 	op.CanApply = false
-	if !hasTool("asset-studio-imgtools") {
+	if !hasTool("aisets-imgtools") {
 		op.Available = false
 		op.ReasonCode = "optimizer_tool_missing"
-		op.BlockedReason = "Required optimizer tool is not installed: asset-studio-imgtools"
+		op.BlockedReason = "Required optimizer tool is not installed: aisets-imgtools"
 	}
 }
 
 func gifTryWebPCandidate(project scanner.Project, op *Operation, req Request, keepCandidates bool, hasTool toolChecker) bool {
 	gifFallbackToWebP(op, hasTool)
-	if !hasTool("asset-studio-imgtools") {
+	if !hasTool("aisets-imgtools") {
 		return false
 	}
 	candidate, fbBytes, err := buildCandidate(project, *op, req)
@@ -806,7 +806,7 @@ func Apply(project scanner.Project, preview actions.Preview) (actions.ApplyResul
 		if err := os.MkdirAll(filepath.Dir(targetAbs), 0o755); err != nil {
 			return actions.ApplyResult{}, err
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(targetAbs), ".asset-studio-optimize-*")
+		tmp, err := os.CreateTemp(filepath.Dir(targetAbs), ".aisets-optimize-*")
 		if err != nil {
 			return actions.ApplyResult{}, err
 		}
@@ -884,7 +884,7 @@ func buildCandidate(project scanner.Project, op Operation, req Request) (string,
 		}
 		return buildSVGMinifyCandidate(sourceAbs)
 	default:
-		if op.Tool != "" && op.Tool != "asset-studio-imgtools" {
+		if op.Tool != "" && op.Tool != "aisets-imgtools" {
 			return buildExternalCandidate(sourceAbs, op, req)
 		}
 		return buildImgtoolsCandidate(sourceAbs, op, req)
@@ -929,10 +929,10 @@ func formatQuality(op Operation, reqQuality int) int {
 func buildImgtoolsCandidate(source string, op Operation, req Request) (string, int64, error) {
 	bin, err := imgtools.Binary()
 	if err != nil {
-		return "", 0, apierr.WithParams("optimizer_tool_missing", "asset-studio-imgtools not found", map[string]any{"tool": "asset-studio-imgtools"})
+		return "", 0, apierr.WithParams("optimizer_tool_missing", "aisets-imgtools not found", map[string]any{"tool": "aisets-imgtools"})
 	}
 	ext := "." + op.OutputFormat
-	target, err := os.CreateTemp("", "asset-studio-optimize-*"+ext)
+	target, err := os.CreateTemp("", "aisets-optimize-*"+ext)
 	if err != nil {
 		return "", 0, err
 	}
@@ -962,9 +962,9 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(targetPath)
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return "", 0, apierr.WithParams("optimizer_tool_timeout", "optimizer tool timed out", map[string]any{"tool": "asset-studio-imgtools"})
+			return "", 0, apierr.WithParams("optimizer_tool_timeout", "optimizer tool timed out", map[string]any{"tool": "aisets-imgtools"})
 		}
-		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": "asset-studio-imgtools", "output": string(out)})
+		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": "aisets-imgtools", "output": string(out)})
 	}
 	info, err := os.Stat(targetPath)
 	if err != nil {
@@ -975,7 +975,7 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 
 func buildExternalCandidate(source string, op Operation, req Request) (string, int64, error) {
 	ext := "." + op.OutputFormat
-	target, err := os.CreateTemp("", "asset-studio-optimize-*"+ext)
+	target, err := os.CreateTemp("", "aisets-optimize-*"+ext)
 	if err != nil {
 		return "", 0, err
 	}
@@ -1024,7 +1024,7 @@ func buildExternalCandidate(source string, op Operation, req Request) (string, i
 }
 
 func writeCandidate(source, ext string, bytes []byte) (string, int64, error) {
-	target, err := os.CreateTemp("", "asset-studio-optimize-*"+ext)
+	target, err := os.CreateTemp("", "aisets-optimize-*"+ext)
 	if err != nil {
 		return "", 0, err
 	}

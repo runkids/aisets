@@ -104,8 +104,8 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 		"#!/usr/bin/env bash",
 		`svgo --input "assets/icon \"quoted\".svg" --output "assets/icon \"quoted\".svg"`,
 		`# [info/manual] needs review → review`,
-		`asset-studio-imgtools convert --format avif --quality 50 --speed 6 --resize 1200 "assets/photo.png" "assets/photo.avif"`,
-		`echo "asset-studio: optimization script complete."`,
+		`aisets-imgtools convert --format avif --quality 50 --speed 6 --resize 1200 "assets/photo.png" "assets/photo.avif"`,
+		`echo "aisets: optimization script complete."`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("script missing %q:\n%s", want, script)
@@ -127,11 +127,11 @@ func TestCommandForCompressionVariants(t *testing.T) {
 		path string
 		want string
 	}{
-		{"png conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.png", TargetPath: "a.avif"}, "a.png", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
-		{"jpeg conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.jpeg", TargetPath: "a.avif"}, "a.jpeg", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
-		{"webp recompress via size", Operation{Operation: "webp-recompress", OutputFormat: "webp", RepoPath: "a.webp", TargetPath: "a.webp"}, "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
-		{"gif optimize", Operation{Operation: "gif-optimize", OutputFormat: "gif", RepoPath: "a.gif", TargetPath: "a.gif"}, "a.gif", `asset-studio-imgtools convert --format gif --quality 75 "a.gif" "a.gif"`},
-		{"convert with resize", Operation{Operation: "convert-webp", OutputFormat: "webp", RepoPath: "a.png", TargetPath: "a.webp", ResizeMaxDimensionPx: 1800}, "a.png", `asset-studio-imgtools convert --format webp --quality 80 --resize 1800 "a.png" "a.webp"`},
+		{"png conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.png", TargetPath: "a.avif"}, "a.png", `aisets-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
+		{"jpeg conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.jpeg", TargetPath: "a.avif"}, "a.jpeg", `aisets-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
+		{"webp recompress via size", Operation{Operation: "webp-recompress", OutputFormat: "webp", RepoPath: "a.webp", TargetPath: "a.webp"}, "a.webp", `aisets-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
+		{"gif optimize", Operation{Operation: "gif-optimize", OutputFormat: "gif", RepoPath: "a.gif", TargetPath: "a.gif"}, "a.gif", `aisets-imgtools convert --format gif --quality 75 "a.gif" "a.gif"`},
+		{"convert with resize", Operation{Operation: "convert-webp", OutputFormat: "webp", RepoPath: "a.png", TargetPath: "a.webp", ResizeMaxDimensionPx: 1800}, "a.png", `aisets-imgtools convert --format webp --quality 80 --resize 1800 "a.png" "a.webp"`},
 		{"unsupported operation", Operation{Operation: "manual-review", OutputFormat: "svg", RepoPath: "a.svg", TargetPath: "a.svg"}, "a.svg", ""},
 		{"unknown operation", Operation{Operation: "unknown", OutputFormat: "png", RepoPath: "a.png", TargetPath: "a.png"}, "a.png", ""},
 	}
@@ -225,10 +225,10 @@ func TestPlanUsesBuiltInOperationsForCommonFormats(t *testing.T) {
 	if len(ops) != 2 {
 		t.Fatalf("ops = %#v", ops)
 	}
-	if ops[0].Operation != "webp-recompress" || ops[0].Tool != "asset-studio-imgtools" {
+	if ops[0].Operation != "webp-recompress" || ops[0].Tool != "aisets-imgtools" {
 		t.Fatalf("webp op = %#v", ops[0])
 	}
-	if ops[1].Operation != "convert-webp" || ops[1].Tool != "asset-studio-imgtools" {
+	if ops[1].Operation != "convert-webp" || ops[1].Tool != "aisets-imgtools" {
 		t.Fatalf("gif op = %#v", ops[1])
 	}
 	for i, name := range []string{"webp-recompress", "convert-webp"} {
@@ -638,8 +638,8 @@ func TestMeasureOperationsGIFSuggestsWebPWhenCwebpMissing(t *testing.T) {
 	if result[0].OutputFormat != "webp" {
 		t.Fatalf("expected webp output format, got %s", result[0].OutputFormat)
 	}
-	if result[0].Tool != "asset-studio-imgtools" {
-		t.Fatalf("expected asset-studio-imgtools tool, got %s", result[0].Tool)
+	if result[0].Tool != "aisets-imgtools" {
+		t.Fatalf("expected aisets-imgtools tool, got %s", result[0].Tool)
 	}
 	if result[0].Available {
 		t.Fatal("expected tool to be marked unavailable")
@@ -656,8 +656,8 @@ func TestMeasureOperationsGIFSuggestsWebPWhenCwebpMissing(t *testing.T) {
 }
 
 func TestMeasureOperationsGIFFallbackToWebP(t *testing.T) {
-	if !defaultToolChecker("asset-studio-imgtools") {
-		t.Skip("asset-studio-imgtools not installed, skipping WebP fallback test")
+	if !defaultToolChecker("aisets-imgtools") {
+		t.Skip("aisets-imgtools not installed, skipping WebP fallback test")
 	}
 	root := t.TempDir()
 	gifPath := filepath.Join(root, "src", "anim.gif")
@@ -715,8 +715,8 @@ func writeTestPNG(t *testing.T, path string, w, h int) {
 }
 
 func TestImgtoolsConvertFormats(t *testing.T) {
-	if !defaultToolChecker("asset-studio-imgtools") {
-		t.Skip("asset-studio-imgtools not installed")
+	if !defaultToolChecker("aisets-imgtools") {
+		t.Skip("aisets-imgtools not installed")
 	}
 	root := t.TempDir()
 	pngPath := filepath.Join(root, "src", "photo.png")
@@ -761,8 +761,8 @@ func TestImgtoolsConvertFormats(t *testing.T) {
 }
 
 func TestImgtoolsResize(t *testing.T) {
-	if !defaultToolChecker("asset-studio-imgtools") {
-		t.Skip("asset-studio-imgtools not installed")
+	if !defaultToolChecker("aisets-imgtools") {
+		t.Skip("aisets-imgtools not installed")
 	}
 	root := t.TempDir()
 	pngPath := filepath.Join(root, "src", "large.png")
