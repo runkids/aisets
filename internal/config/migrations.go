@@ -229,6 +229,24 @@ func (s *Store) migrate() error {
 			updated_at TEXT NOT NULL,
 			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, engine_name, engine_version, settings_hash)
 		)`,
+		`CREATE TABLE IF NOT EXISTS ai_tags (
+			project_id      TEXT    NOT NULL,
+			repo_path       TEXT    NOT NULL,
+			content_hash    TEXT    NOT NULL,
+			hash_algorithm  TEXT    NOT NULL,
+			provider_name   TEXT    NOT NULL,
+			model_name      TEXT    NOT NULL,
+			prompt_version  TEXT    NOT NULL,
+			status          TEXT    NOT NULL DEFAULT 'pending',
+			category        TEXT    NOT NULL DEFAULT '',
+			tags_json       TEXT    NOT NULL DEFAULT '[]',
+			description     TEXT    NOT NULL DEFAULT '',
+			error_code      TEXT    NOT NULL DEFAULT '',
+			error_message   TEXT    NOT NULL DEFAULT '',
+			duration_ms     INTEGER NOT NULL DEFAULT 0,
+			updated_at      TEXT    NOT NULL,
+			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name, prompt_version)
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_scans_completed_at ON scans(completed_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_scan_project_snapshots_scan ON scan_project_snapshots(scan_id, project_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_project_path ON asset_snapshots(project_id, repo_path)`,
@@ -236,6 +254,8 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_project_path ON ocr_results(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_hash ON ocr_results(hash_algorithm, content_hash)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name, prompt_version)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_tags_category ON ai_tags (category) WHERE status = 'ready'`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {

@@ -587,6 +587,7 @@ func (s *Store) ResetData() error {
 		"action_history",
 		"tasks",
 		"ocr_results",
+		"ai_tags",
 		"asset_notes",
 		"asset_labels",
 		"labels",

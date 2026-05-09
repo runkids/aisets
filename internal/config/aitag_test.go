@@ -1,0 +1,129 @@
+package config
+
+import (
+	"path/filepath"
+	"testing"
+
+	"aisets/internal/aitag"
+	"aisets/internal/scanner"
+)
+
+func TestAITagUpsertAndQuery(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	result := aitag.Result{
+		ProjectID:     "proj1",
+		RepoPath:      "src/icon.png",
+		ContentHash:   "abc123",
+		HashAlgorithm: "sha256",
+		ProviderName:  "ollama",
+		ModelName:     "llava",
+		Status:        aitag.StatusReady,
+		Category:      "icon",
+		Tags:          []string{"dark-mode", "navigation"},
+		Description:   "A dark-themed navigation icon",
+		DurationMs:    3200,
+	}
+	if err := store.UpsertAITagResult(result); err != nil {
+		t.Fatal(err)
+	}
+
+	items := []scanner.AssetItem{{
+		ProjectID:     "proj1",
+		RepoPath:      "src/icon.png",
+		ContentHash:   "abc123",
+		HashAlgorithm: "sha256",
+	}}
+	results, err := store.AITagResults(items, "ollama", "llava")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := results[aiTagKey("proj1", "src/icon.png")]
+	if !ok {
+		t.Fatal("expected result for proj1/src/icon.png")
+	}
+	if got.Status != aitag.StatusReady || got.Category != "icon" || len(got.Tags) != 2 || got.Tags[0] != "dark-mode" || got.Description != "A dark-themed navigation icon" {
+		t.Fatalf("unexpected result: %+v", got)
+	}
+}
+
+func TestAITagContentHashDedup(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	result := aitag.Result{
+		ProjectID:     "proj1",
+		RepoPath:      "src/logo.png",
+		ContentHash:   "hash999",
+		HashAlgorithm: "sha256",
+		ProviderName:  "ollama",
+		ModelName:     "llava",
+		Status:        aitag.StatusReady,
+		Category:      "logo",
+		Tags:          []string{"brand"},
+		Description:   "Company logo",
+		DurationMs:    1500,
+	}
+	if err := store.UpsertAITagResult(result); err != nil {
+		t.Fatal(err)
+	}
+
+	// Same content hash, different path — should find the cached result
+	got, found, err := store.AITagResultForContentHash("hash999", "sha256", "ollama", "llava")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("expected cache hit for same content hash")
+	}
+	if got.Category != "logo" || got.Tags[0] != "brand" {
+		t.Fatalf("unexpected dedup result: %+v", got)
+	}
+}
+
+func TestAITagCacheMissOnModelChange(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	result := aitag.Result{
+		ProjectID:     "proj1",
+		RepoPath:      "src/photo.jpg",
+		ContentHash:   "hashXYZ",
+		HashAlgorithm: "sha256",
+		ProviderName:  "ollama",
+		ModelName:     "llava",
+		Status:        aitag.StatusReady,
+		Category:      "photo",
+		Tags:          []string{"outdoor"},
+		Description:   "Outdoor scene",
+		DurationMs:    2000,
+	}
+	if err := store.UpsertAITagResult(result); err != nil {
+		t.Fatal(err)
+	}
+
+	// Different model = cache miss
+	_, found, err := store.AITagResultForContentHash("hashXYZ", "sha256", "ollama", "moondream2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Fatal("expected cache miss for different model")
+	}
+}
