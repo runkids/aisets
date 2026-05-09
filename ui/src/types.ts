@@ -64,6 +64,7 @@ export type AppSettings = {
   optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
   preferredEditor: string;
+  llmEnabled: boolean;
   llmProvider: string;
   llmEndpoint: string;
   llmVisionModel: string;

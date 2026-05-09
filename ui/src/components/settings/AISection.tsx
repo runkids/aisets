@@ -6,7 +6,7 @@ import { isAITagActivityBusy } from "../../aiTagActivity";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
-import { Button, Card, IconButton, Select, TextInput } from "../ui";
+import { Button, Card, IconButton, Select, Switch, TextInput } from "../ui";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
 
@@ -49,7 +49,7 @@ export function AISection({
     "openai-compat": `http://${host}:1234/v1`,
   };
 
-  const providerEnabled = draft.llmProvider !== "";
+  const providerEnabled = draft.llmEnabled && draft.llmProvider !== "";
   const modelsQuery = useLLMModelsQuery(providerEnabled);
   const healthMutation = useLLMHealthMutation();
 
@@ -60,7 +60,6 @@ export function AISection({
   ];
 
   const providerOptions = [
-    { value: "", label: t("settings.llmProviderDisabled") },
     { value: "ollama", label: t("settings.llmProviderOllama") },
     {
       value: "openai-compat",
@@ -103,18 +102,31 @@ export function AISection({
           </span>
         </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-          <FieldRow label={t("settings.llmProvider")}>
-            <Select
-              value={draft.llmProvider}
-              options={providerOptions}
-              onChange={handleProviderChange}
-              aria-label={t("settings.llmProvider")}
-              className="min-w-[400px]"
+          <FieldRow
+            label={t("settings.llmEnabled")}
+            description={t("settings.llmEnabledHint")}
+          >
+            <Switch
+              checked={draft.llmEnabled}
+              onCheckedChange={(next) =>
+                onUpdateDraft((current) => ({ ...current, llmEnabled: next }))
+              }
+              aria-label={t("settings.llmEnabled")}
             />
           </FieldRow>
 
-          {providerEnabled && (
+          {draft.llmEnabled && (
             <>
+              <FieldRow label={t("settings.llmProvider")}>
+                <Select
+                  value={draft.llmProvider || "ollama"}
+                  options={providerOptions}
+                  onChange={handleProviderChange}
+                  aria-label={t("settings.llmProvider")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
+
               <FieldRow label={t("settings.llmEndpoint")}>
                 <TextInput
                   value={draft.llmEndpoint}

@@ -67,7 +67,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_settings_failed")})
 		return
 	}
-	if settings.LLMProvider == "" || settings.LLMVisionModel == "" {
+	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or vision model not configured")})
 		return
 	}

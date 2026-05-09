@@ -405,6 +405,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.PreferredEditor != nil {
 		settings.PreferredEditor = *update.PreferredEditor
 	}
+	if update.LLMEnabled != nil {
+		settings.LLMEnabled = *update.LLMEnabled
+	}
 	if update.LLMProvider != nil {
 		p := strings.TrimSpace(*update.LLMProvider)
 		if p != "" && p != "ollama" && p != "openai-compat" {

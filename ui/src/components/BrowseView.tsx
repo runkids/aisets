@@ -992,7 +992,7 @@ export function BrowseView({
         aiTagReadyCount={facets?.aiTagReadyCount}
         totalCount={facets?.projectTotal}
         ocrEnabled={ocrEnabled}
-        aiEnabled={Boolean(settingsQuery.data?.settings.llmProvider)}
+        aiEnabled={Boolean(settingsQuery.data?.settings.llmEnabled)}
         onFiltersChange={handleFiltersChange}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">

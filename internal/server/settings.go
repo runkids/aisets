@@ -77,7 +77,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, settingsErrorStatus(err), err)
 		return
 	}
-	if body.LLMProvider != nil || body.LLMEndpoint != nil {
+	if body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMEndpoint != nil {
 		s.initLLMProvider()
 	}
 	settings, err := s.currentSettingsInfo()

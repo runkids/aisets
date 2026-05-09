@@ -57,6 +57,7 @@ export type SettingsDraft = {
   ocrBatchSize: number;
   ocrConcurrency: number;
   ocrFuzzySearch: boolean;
+  llmEnabled: boolean;
   llmProvider: string;
   llmEndpoint: string;
   llmVisionModel: string;

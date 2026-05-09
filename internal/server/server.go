@@ -179,7 +179,11 @@ func (s *Server) initLLMProvider() {
 	if err != nil {
 		return
 	}
-	s.llmProvider = newLLMProvider(settings.LLMProvider, settings.LLMEndpoint)
+	if settings.LLMEnabled {
+		s.llmProvider = newLLMProvider(settings.LLMProvider, settings.LLMEndpoint)
+	} else {
+		s.llmProvider = nil
+	}
 }
 
 func newLLMProvider(provider, endpoint string) llm.Provider {

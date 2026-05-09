@@ -785,6 +785,8 @@
     "removeWorkspace": "Delete workspace",
     "removeWorkspaceConfirm": "Delete {{name}}? Projects stay on disk, but this workspace and its tracked project list will be removed.",
     "removeWorkspaceSuccess": "Deleted workspace {{name}}",
+    "llmEnabled": "Enable AI",
+    "llmEnabledHint": "Enable a local LLM provider for AI tagging, classification, and search",
     "llmProvider": "Provider",
     "llmEndpoint": "Endpoint",
     "llmVisionModel": "Vision Model",

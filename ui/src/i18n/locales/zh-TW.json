@@ -1480,6 +1480,8 @@
     "removeWorkspace": "刪除工作區",
     "removeWorkspaceConfirm": "要刪除 {{name}} 嗎？專案檔案會保留在磁碟上，但此工作區與追蹤專案清單會被移除",
     "removeWorkspaceSuccess": "已刪除工作區 {{name}}",
+    "llmEnabled": "啟用 AI",
+    "llmEnabledHint": "啟用本地 LLM 提供者以使用 AI 標記、分類與搜尋功能",
     "llmProvider": "提供者",
     "llmEndpoint": "端點",
     "llmVisionModel": "視覺模型",
