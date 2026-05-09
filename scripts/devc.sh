@@ -5,7 +5,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$PROJECT_ROOT/.devcontainer/docker-compose.yml"
+DOTENV_FILE="$PROJECT_ROOT/.devcontainer/.env"
 SERVICE="aisets-devcontainer"
+
+write_dotenv() {
+  cat > "$DOTENV_FILE" <<EOF
+PROJECT_ROOT=${PROJECT_ROOT}
+AISETS_PORT=${AISETS_PORT:-19520}
+AISETS_UI_PORT=${AISETS_UI_PORT:-5174}
+AISETS_LLM_ENDPOINT=${AISETS_LLM_ENDPOINT:-http://host.docker.internal:11434}
+EOF
+}
 
 usage() {
   echo "Usage: $(basename "$0") <command> [options]"
@@ -132,6 +142,7 @@ cmd="$1"
 shift
 
 parse_port_flag "$@"
+write_dotenv
 
 case "$cmd" in
   up) cmd_up ;;
