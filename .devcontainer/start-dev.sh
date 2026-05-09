@@ -12,14 +12,17 @@ case ":$PATH:" in
 esac
 PROFILE_EOF
 
+_api_port="${AISETS_PORT:-19520}"
+_ui_port="${AISETS_UI_PORT:-5174}"
+
 echo "Dev servers ready:"
-echo "  ui                       # API :19520 + Vite :5174, open browser when available"
+echo "  ui                       # API :${_api_port} + Vite :${_ui_port}, open browser when available"
 echo "  ui /workspace/demo       # start servers and add a real asset project"
 echo "  ui --app                 # open app window when a browser exists in the container"
 echo "  ui --no-open             # start servers only"
 echo "  ui stop                  # stop API + Vite"
 
-if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/19520" 2>/dev/null; then
+if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/${_api_port}" 2>/dev/null; then
   echo "▸ Starting dev servers ..."
   nohup /workspace/.devcontainer/bin/ui --no-open > /tmp/aisets-autostart.log 2>&1 &
   disown
