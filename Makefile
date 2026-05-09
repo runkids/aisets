@@ -33,22 +33,22 @@ check: vet test imgtools-test
 PORT_FLAG = $(if $(PORT),--port $(PORT),)
 
 devc:
-	./scripts/devc.sh up $(PORT_FLAG) && ./scripts/devc.sh shell
+	./scripts/devc.sh up $(PORT_FLAG) && ./scripts/devc.sh shell $(PORT_FLAG)
 
 devc-up:
 	./scripts/devc.sh up $(PORT_FLAG)
 
 devc-down:
-	./scripts/devc.sh down
+	./scripts/devc.sh down $(PORT_FLAG)
 
 devc-restart:
-	./scripts/devc.sh restart
+	./scripts/devc.sh restart $(PORT_FLAG)
 
 devc-reset:
-	./scripts/devc.sh reset
+	./scripts/devc.sh reset $(PORT_FLAG)
 
 devc-status:
-	./scripts/devc.sh status
+	./scripts/devc.sh status $(PORT_FLAG)
 
 ui-install:
 	cd ui && pnpm install
