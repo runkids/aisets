@@ -1,4 +1,4 @@
-name: aisets_devcontainer_wt
+name: aisets_devcontainer
 
 services:
   aisets-devcontainer:
@@ -11,23 +11,23 @@ services:
       HOME: /home/developer
       GOCACHE: /go/build-cache
       AISETS_UI_HOST: 0.0.0.0
-      AISETS_UI_PORT: "5175"
-      AISETS_PORT: "19521"
-      AISETS_LLM_ENDPOINT: http://host.docker.internal:11434
+      AISETS_PORT: "${AISETS_PORT:-19520}"
+      AISETS_UI_PORT: "${AISETS_UI_PORT:-5174}"
+      AISETS_LLM_ENDPOINT: "${AISETS_LLM_ENDPOINT:-http://host.docker.internal:11434}"
     ports:
-      - "5175:5175"
-      - "19521:19521"
+      - "${AISETS_UI_PORT:-5174}:${AISETS_UI_PORT:-5174}"
+      - "${AISETS_PORT:-19520}:${AISETS_PORT:-19520}"
     volumes:
       - ..:/workspace
-      - wt-ui-node-modules:/workspace/ui/node_modules
-      - wt-go-mod-cache:/go/pkg/mod
-      - wt-go-build-cache:/go/build-cache
-      - wt-dev-home:/home/developer
+      - ui-node-modules:/workspace/ui/node_modules
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/go/build-cache
+      - dev-home:/home/developer
     security_opt:
       - no-new-privileges:true
 
 volumes:
-  wt-go-mod-cache:
-  wt-go-build-cache:
-  wt-dev-home:
-  wt-ui-node-modules:
+  go-mod-cache:
+  go-build-cache:
+  dev-home:
+  ui-node-modules:

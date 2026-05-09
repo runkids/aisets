@@ -10,6 +10,7 @@ help:
 	@echo "  make check          # vet + test"
 	@echo "  make ui-dev         # Go API server + Vite dev server"
 	@echo "  make devc           # start devcontainer + enter shell"
+	@echo "  make devc PORT=N    # start on custom port (UI auto-derives)"
 	@echo "  make devc-up        # start devcontainer"
 	@echo "  make devc-down      # stop devcontainer"
 	@echo "  make build-all      # ui-build + build"
@@ -29,11 +30,13 @@ vet:
 
 check: vet test imgtools-test
 
+PORT_FLAG = $(if $(PORT),--port $(PORT),)
+
 devc:
-	./scripts/devc.sh up && ./scripts/devc.sh shell
+	./scripts/devc.sh up $(PORT_FLAG) && ./scripts/devc.sh shell
 
 devc-up:
-	./scripts/devc.sh up
+	./scripts/devc.sh up $(PORT_FLAG)
 
 devc-down:
 	./scripts/devc.sh down
