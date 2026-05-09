@@ -212,40 +212,25 @@ export function NavSidebar({
         ))}
       </nav>
 
-      <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2.5 shadow-g-sm max-[960px]:items-center max-[960px]:px-2 max-[960px]:py-2">
-        <div className="flex items-center justify-between">
-          <span className="text-g-caption font-g-display font-[590] text-g-ink-3 max-[960px]:text-g-chip">
-            <span className="max-[960px]:hidden">Aisets</span>
-            <span className="hidden max-[960px]:inline">AS</span>
+      <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm max-[960px]:items-center max-[960px]:px-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-g-chip font-g-display font-[590] text-g-ink-3 max-[960px]:hidden">
+            Aisets
+          </span>
+          <span className="hidden text-g-chip font-g-display font-[590] text-g-ink-3 max-[960px]:inline">
+            AS
           </span>
           {version && (
-            <span className="font-g-mono text-g-chip text-g-ink-4 max-[960px]:hidden">
+            <span className="font-g-mono text-g-chip text-g-ink-5 max-[960px]:hidden">
               v{version}
             </span>
           )}
         </div>
-        <div className="flex flex-col gap-1 text-g-chip text-g-ink-4 max-[960px]:hidden">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="font-g-mono font-[510] tabular-nums text-g-ink-3">
-              {badges.projects}
-            </span>
-            <span>{t("nav.footerProjects")}</span>
-            <span className="text-g-ink-5">·</span>
-            <span className="font-g-mono font-[510] tabular-nums text-g-ink-3">
-              {totalAssets.toLocaleString()}
-            </span>
-            <span>{t("nav.footerAssets")}</span>
-          </div>
-          <div className="flex min-w-0 items-center gap-1.5 text-g-ink-4">
-            <span
-              className="inline-block size-1.5 shrink-0 rounded-g-pill bg-g-green"
-              aria-hidden="true"
-            />
-            <span className="shrink-0">{t("nav.lastScan")}</span>
-            <span className="truncate font-g-mono tabular-nums text-g-ink-3">
-              {lastScan}
-            </span>
-          </div>
+        <div className="flex min-w-0 items-center gap-1.5 text-g-chip text-g-ink-4 max-[960px]:hidden">
+          <span className="shrink-0">{t("nav.lastScan")}</span>
+          <span className="truncate font-g-mono tabular-nums text-g-ink-3">
+            {lastScan}
+          </span>
         </div>
       </div>
     </aside>

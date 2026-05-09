@@ -73,7 +73,7 @@ export function Select({
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
           className={cn(
-            "z-[140] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
+            "z-[140] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[min(480px,calc(100vw-24px))] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
           )}
           position="popper"
           sideOffset={6}
@@ -100,7 +100,7 @@ export function Select({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{option.label}</span>
                     {option.description && (
-                      <span className="block truncate text-g-caption font-normal text-g-ink-3">
+                      <span className="block text-g-caption font-normal leading-snug text-g-ink-3">
                         {option.description}
                       </span>
                     )}

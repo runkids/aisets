@@ -126,7 +126,7 @@ export function AboutSection({
               <div className="flex flex-wrap items-center gap-3">
                 <img
                   className="size-11 shrink-0 rounded-[10px] shadow-g-sm"
-                  src="../../public/brand/aisets-app-icon.png"
+                  src="../../public/brand/aisets-app-icon.avif"
                   alt=""
                 />
                 <div className="flex flex-wrap items-center gap-2">
