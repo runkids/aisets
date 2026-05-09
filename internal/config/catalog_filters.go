@@ -91,6 +91,18 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	optimizationTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimizable")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	optimizationPendingTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimizationPending")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
+	optimizationDoneTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimized")
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -114,16 +126,33 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		})
 	}
 	return CatalogItemFacets{
-		Projects:               projects,
-		ProjectTotal:           projectTotal,
-		Extensions:             extensions,
-		ExtensionTotal:         extensionTotal,
-		OptimizationCategories: categories,
-		OptimizationSeverities: severities,
-		Operations:             operations,
-		CustomFilters:          customFilters,
-		CustomFilterTotal:      customTotal,
+		Projects:                 projects,
+		ProjectTotal:             projectTotal,
+		Extensions:               extensions,
+		ExtensionTotal:           extensionTotal,
+		OptimizationCategories:   categories,
+		OptimizationSeverities:   severities,
+		Operations:               operations,
+		OptimizationTotal:        optimizationTotal,
+		OptimizationPendingTotal: optimizationPendingTotal,
+		OptimizationDoneTotal:    optimizationDoneTotal,
+		CustomFilters:            customFilters,
+		CustomFilterTotal:        customTotal,
 	}, nil
+}
+
+func (s *Store) catalogItemTotalForStatus(scanID int64, query CatalogItemQuery, status string) (int, error) {
+	statusQuery := query
+	statusQuery.Status = status
+	where, args, err := s.catalogItemWhere(scanID, statusQuery)
+	if err != nil {
+		return 0, err
+	}
+	var total int
+	if err := s.rdb.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr string) ([]CatalogFacetOption, int, error) {
@@ -443,6 +472,9 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 	case "optimized":
 		clauses = append(clauses, `(EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
 			AND NOT EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id AND o2.has_existing_variant = 0))`)
+	case "optimizationPending":
+		clauses = append(clauses, `(EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
+			AND EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id AND o2.has_existing_variant = 0))`)
 	case "nearDuplicate":
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM near_duplicate_snapshots n WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id))")
 	}

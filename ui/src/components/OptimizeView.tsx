@@ -211,15 +211,25 @@ export function OptimizeView({
   const virtualContainerRef = useRef<HTMLDivElement>(null);
   const [toolbarH, toolbarRef] = useElementHeight();
 
+  const effectiveExt = category === "svg-minify" ? ".svg" : ext;
+  const effectiveOptimizationCategory =
+    category === "svg-minify" ? "" : category;
+  const optimizationStatus =
+    optimizedFilter === "done"
+      ? "optimized"
+      : optimizedFilter === "pending"
+        ? "optimizationPending"
+        : "optimizable";
+
   const itemsQuery = useCatalogItemsInfiniteQuery(
     scanId,
     {
       projectId: projectFilterId || undefined,
       projectName: projectFilterId ? undefined : projectName || undefined,
-      status: "optimizable",
+      status: optimizationStatus,
       q: search || undefined,
-      ext: ext || undefined,
-      optimizationCategory: category || undefined,
+      ext: effectiveExt || undefined,
+      optimizationCategory: effectiveOptimizationCategory || undefined,
       optimizationSeverity: severity || undefined,
       operation: operation || undefined,
       sort: "bytes-desc",
@@ -232,33 +242,13 @@ export function OptimizeView({
     () => itemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [itemsQuery.data],
   );
-  const optimizedCount = useMemo(
-    () =>
-      allItems.filter(
-        (item) =>
-          item.optimizationRecommendations.length > 0 &&
-          item.optimizationRecommendations.every((r) => r.hasExistingVariant),
-      ).length,
-    [allItems],
-  );
-  const pendingCount = allItems.length - optimizedCount;
-  const items = useMemo(() => {
-    if (optimizedFilter === "pending")
-      return allItems.filter(
-        (item) =>
-          !item.optimizationRecommendations.every((r) => r.hasExistingVariant),
-      );
-    if (optimizedFilter === "done")
-      return allItems.filter(
-        (item) =>
-          item.optimizationRecommendations.length > 0 &&
-          item.optimizationRecommendations.every((r) => r.hasExistingVariant),
-      );
-    return allItems;
-  }, [allItems, optimizedFilter]);
+  const items = allItems;
   const firstPage = itemsQuery.data?.pages[0];
   const totalCount = firstPage?.total ?? 0;
   const facets = firstPage?.facets;
+  const optimizedCount = facets?.optimizationDoneTotal ?? 0;
+  const pendingCount = facets?.optimizationPendingTotal ?? 0;
+  const optimizationTotal = facets?.optimizationTotal ?? totalCount;
   const visibleIds = useMemo(() => items.map((item) => item.id), [items]);
   const itemsById = useMemo(
     () => new Map(items.map((item) => [item.id, item])),
@@ -1092,16 +1082,22 @@ export function OptimizeView({
           <RailItem
             label={t("filter.allExtensions")}
             count={facets?.extensionTotal ?? totalCount}
-            active={!ext}
-            onClick={() => setExt("")}
+            active={!effectiveExt}
+            onClick={() => {
+              setCategory("");
+              setExt("");
+            }}
           />
           {(facets?.extensions ?? []).map((option) => (
             <RailItem
               key={option.id}
               label={option.id.toUpperCase()}
               count={option.count}
-              active={ext === option.id}
-              onClick={() => setExt(option.id)}
+              active={effectiveExt === option.id}
+              onClick={() => {
+                setCategory("");
+                setExt(option.id);
+              }}
             />
           ))}
         </RailSection>
@@ -1286,7 +1282,9 @@ export function OptimizeView({
                   value={category}
                   ariaLabel={t("optimize.categoryFilter")}
                   onChange={(value) => {
-                    if (!selectionLocked) setCategory(value as Category);
+                    if (selectionLocked) return;
+                    setCategory(value as Category);
+                    if (value === "svg-minify") setExt("");
                   }}
                   items={(
                     [
@@ -1304,9 +1302,13 @@ export function OptimizeView({
                     ...(key && {
                       badge: (
                         <span className="font-[400] text-g-ink-4">
-                          {facets?.optimizationCategories?.find(
-                            (c) => c.id === key,
-                          )?.count ?? 0}
+                          {key === "svg-minify"
+                            ? (facets?.extensions?.find(
+                                (option) => option.id === ".svg",
+                              )?.count ?? 0)
+                            : (facets?.optimizationCategories?.find(
+                                (c) => c.id === key,
+                              )?.count ?? 0)}
                         </span>
                       ),
                     }),
@@ -1365,7 +1367,7 @@ export function OptimizeView({
                 />
               </div>
 
-              {optimizedCount > 0 && (
+              {optimizationTotal > 0 && (
                 <div className="min-w-0 flex-none overflow-x-auto">
                   <Tabs
                     value={optimizedFilter}

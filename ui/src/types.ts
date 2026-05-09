@@ -412,6 +412,9 @@ export type CatalogItemsPage = {
     optimizationCategories: Array<{ id: string; count: number }>;
     optimizationSeverities: Array<{ id: string; count: number }>;
     operations: Array<{ id: string; count: number }>;
+    optimizationTotal: number;
+    optimizationPendingTotal: number;
+    optimizationDoneTotal: number;
     customFilters: Array<{
       id: string;
       label: string;

@@ -724,11 +724,12 @@ func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
 	}}
 	resize := scanAsset(root, "p", "workspace", "src/hero.jpg", 2000, "hero", 1, 0)
 	resize.Optimization = []scanner.OptimizationSuggestion{{
-		Category:       "dimensions",
-		Severity:       "warning",
-		ReasonCode:     "image_dimensions_large",
-		SuggestionCode: "use_responsive_or_smaller_source",
-		SavingsBytes:   800,
+		Category:           "dimensions",
+		Severity:           "warning",
+		ReasonCode:         "image_dimensions_large",
+		SuggestionCode:     "use_responsive_or_smaller_source",
+		SavingsBytes:       800,
+		HasExistingVariant: true,
 	}}
 	if _, err := store.RecordScan(scanner.Catalog{
 		GeneratedAt: "2026-05-08T00:00:00Z",
@@ -760,6 +761,25 @@ func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
 	}
 	if len(page.Facets.OptimizationCategories) != 1 || page.Facets.OptimizationCategories[0].ID != "format" || len(page.Facets.OptimizationSeverities) != 1 || page.Facets.OptimizationSeverities[0].ID != "info" {
 		t.Fatalf("optimization facets = %#v", page.Facets)
+	}
+	if page.Facets.OptimizationTotal != 1 || page.Facets.OptimizationPendingTotal != 1 || page.Facets.OptimizationDoneTotal != 0 {
+		t.Fatalf("optimization status facets = %#v", page.Facets)
+	}
+
+	page, err = store.CatalogItems(CatalogItemQuery{Status: "optimizationPending", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != webp.ID || page.Facets.OptimizationTotal != 2 || page.Facets.OptimizationPendingTotal != 1 || page.Facets.OptimizationDoneTotal != 1 {
+		t.Fatalf("pending optimization page = %#v", page)
+	}
+
+	page, err = store.CatalogItems(CatalogItemQuery{Status: "optimized", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != resize.ID || page.Facets.OptimizationTotal != 2 || page.Facets.OptimizationPendingTotal != 1 || page.Facets.OptimizationDoneTotal != 1 {
+		t.Fatalf("done optimization page = %#v", page)
 	}
 }
 

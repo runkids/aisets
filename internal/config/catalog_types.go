@@ -69,15 +69,18 @@ type CatalogCustomFilterFacet struct {
 }
 
 type CatalogItemFacets struct {
-	Projects               []CatalogFacetOption       `json:"projects"`
-	ProjectTotal           int                        `json:"projectTotal"`
-	Extensions             []CatalogFacetOption       `json:"extensions"`
-	ExtensionTotal         int                        `json:"extensionTotal"`
-	OptimizationCategories []CatalogFacetOption       `json:"optimizationCategories"`
-	OptimizationSeverities []CatalogFacetOption       `json:"optimizationSeverities"`
-	Operations             []CatalogFacetOption       `json:"operations"`
-	CustomFilters          []CatalogCustomFilterFacet `json:"customFilters"`
-	CustomFilterTotal      int                        `json:"customFilterTotal"`
+	Projects                 []CatalogFacetOption       `json:"projects"`
+	ProjectTotal             int                        `json:"projectTotal"`
+	Extensions               []CatalogFacetOption       `json:"extensions"`
+	ExtensionTotal           int                        `json:"extensionTotal"`
+	OptimizationCategories   []CatalogFacetOption       `json:"optimizationCategories"`
+	OptimizationSeverities   []CatalogFacetOption       `json:"optimizationSeverities"`
+	Operations               []CatalogFacetOption       `json:"operations"`
+	OptimizationTotal        int                        `json:"optimizationTotal"`
+	OptimizationPendingTotal int                        `json:"optimizationPendingTotal"`
+	OptimizationDoneTotal    int                        `json:"optimizationDoneTotal"`
+	CustomFilters            []CatalogCustomFilterFacet `json:"customFilters"`
+	CustomFilterTotal        int                        `json:"customFilterTotal"`
 }
 
 type CatalogFolderQuery struct {
