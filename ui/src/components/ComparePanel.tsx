@@ -118,7 +118,7 @@ export function ComparePanel({ left, right, mode, compact }: Props) {
   const bgCn = imageBackgroundClassName(bgMode);
 
   const sidePanelCn = cn(
-    "grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-g-md",
+    "relative aspect-[4/3] w-full overflow-hidden rounded-g-md",
     bgCn,
   );
 
@@ -135,7 +135,7 @@ export function ComparePanel({ left, right, mode, compact }: Props) {
                 <img
                   src={asset.url}
                   alt={fileName(asset.repoPath)}
-                  className="max-h-full max-w-full object-contain"
+                  className="absolute inset-0 h-full w-full object-contain"
                 />
               </div>
               <span className="max-w-full truncate font-g-mono text-g-caption text-g-ink-2">

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { toCompareAsset } from "./compareTypes";
@@ -112,25 +113,39 @@ export function AssetDrawerSimilar({
           />
 
           {enriched.length >= 2 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-              {enriched.map((s, i) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedIdx(i)}
-                  className={`shrink-0 cursor-pointer rounded-g-sm border-2 transition-colors duration-[120ms] ease-g ${
-                    i === selectedIdx
-                      ? "border-g-active-text"
-                      : "border-transparent hover:border-g-line"
-                  }`}
-                  aria-label={s.item.repoPath}
-                >
-                  <AssetThumbnail
-                    src={s.item.thumbnailUrl || s.item.url}
-                    size="sm"
-                  />
-                </button>
-              ))}
+            <div className="flex items-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 px-2 py-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIdx((i) => (i > 0 ? i - 1 : enriched.length - 1))
+                }
+                className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-g-sm text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink"
+                aria-label="Previous"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <AssetThumbnail
+                  src={selected.item.thumbnailUrl || selected.item.url}
+                  size="sm"
+                />
+                <span className="truncate font-g-mono text-g-caption text-g-ink">
+                  {fileName(selected.item.repoPath)}
+                </span>
+                <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
+                  {selectedIdx + 1}/{enriched.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIdx((i) => (i < enriched.length - 1 ? i + 1 : 0))
+                }
+                className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-g-sm text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink"
+                aria-label="Next"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
           )}
         </div>

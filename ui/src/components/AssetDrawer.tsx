@@ -599,15 +599,14 @@ function VariantCard({
         )}
       >
         {variant.item ? (
-          <AssetThumbnail
+          <img
             src={variant.item.thumbnailUrl || variant.item.url}
             alt={variant.name}
-            size="fill"
             loading="eager"
-            className="size-[44px] shrink-0 rounded-g-sm p-0.5 [&_img]:max-h-full [&_img]:max-w-full"
+            className="w-[44px] shrink-0 rounded-g-sm object-contain"
           />
         ) : (
-          <div className="flex size-[44px] shrink-0 items-center justify-center rounded-g-sm bg-g-surface-2">
+          <div className="flex w-[44px] shrink-0 items-center justify-center rounded-g-sm bg-g-surface-2 py-3">
             <CheckCircle size={18} className="text-g-green/40" />
           </div>
         )}
