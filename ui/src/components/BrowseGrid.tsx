@@ -202,7 +202,7 @@ export function BrowseGrid({
         aria-label={ariaLabel}
       >
         <ImagePreview
-          src={imgSrc}
+          src={item.url}
           alt={fileName(item.repoPath)}
           enabled={imagePreviewEnabled}
         >

@@ -623,6 +623,7 @@ export function App() {
         projects={projectSwitchProjects}
         selectedProjectId={effectiveSelectedProjectId}
         totalAssets={catalogSummary?.stats.totalFiles ?? 0}
+        lastScanAt={catalogSummary?.generatedAt}
         workspaceSwitchDisabled={ocrActivityBusy || optimizeActivityBusy}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}

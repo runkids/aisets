@@ -599,15 +599,21 @@ export function DuplicatesView({
                 items={[
                   {
                     value: "exact",
-                    label: t("duplicates.exactTab", {
-                      count: exactFirstPage?.total ?? groups.length,
-                    }),
+                    label: t("duplicates.exact"),
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {exactFirstPage?.total ?? groups.length}
+                      </span>
+                    ),
                   },
                   {
                     value: "similar",
-                    label: t("duplicates.similarTab", {
-                      count: nearFirstPage?.total ?? nearDuplicates.length,
-                    }),
+                    label: t("duplicates.similar"),
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {nearFirstPage?.total ?? nearDuplicates.length}
+                      </span>
+                    ),
                   },
                 ]}
               />

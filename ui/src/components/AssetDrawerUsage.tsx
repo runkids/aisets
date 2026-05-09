@@ -42,6 +42,7 @@ export function AssetDrawerUsage({
   const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: references.length,
     getScrollElement: () => parentRef.current,

@@ -36,17 +36,18 @@ const (
 )
 
 type Request struct {
-	AssetIDs         []string                             `json:"assetIds"`
-	Strategy         Strategy                             `json:"strategy"`
-	OutputMode       OutputMode                           `json:"outputMode"`
-	UpdateReferences bool                                 `json:"updateReferences"`
-	Quality          int                                  `json:"quality"`
-	MaxDimensionPx   int                                  `json:"maxDimensionPx"`
-	AvifSpeed        int                                  `json:"avifSpeed"`
-	Workers          int                                  `json:"workers"`
-	Strategies       []imageproc.OptimizationStrategy     `json:"optimizationStrategies,omitempty"`
-	ExternalTools    []imageproc.OptimizationExternalTool `json:"optimizationExternalTools,omitempty"`
-	StrategyHash     string                               `json:"optimizationStrategyHash,omitempty"`
+	AssetIDs              []string                             `json:"assetIds"`
+	Strategy              Strategy                             `json:"strategy"`
+	OutputMode            OutputMode                           `json:"outputMode"`
+	UpdateReferences      bool                                 `json:"updateReferences"`
+	Quality               int                                  `json:"quality"`
+	MaxDimensionPx        int                                  `json:"maxDimensionPx"`
+	AvifSpeed             int                                  `json:"avifSpeed"`
+	Workers               int                                  `json:"workers"`
+	Strategies            []imageproc.OptimizationStrategy     `json:"optimizationStrategies,omitempty"`
+	ExternalTools         []imageproc.OptimizationExternalTool `json:"optimizationExternalTools,omitempty"`
+	StrategyHash          string                               `json:"optimizationStrategyHash,omitempty"`
+	OutputFormatOverrides map[string]string                    `json:"outputFormatOverrides,omitempty"`
 }
 
 type Operation struct {
@@ -159,6 +160,9 @@ func operationForItem(item scanner.AssetItem, req Request, hasTool toolChecker) 
 	op.AvifSpeed = planned.AvifSpeed
 	if op.Operation == "" {
 		op.Operation = SuggestionOperation(primary.SuggestionCode, ext)
+	}
+	if overrideFmt, ok := req.OutputFormatOverrides[item.ID]; ok && overrideFmt != "" && overrideFmt != "auto" {
+		op.Operation = formatToOperation(overrideFmt, ext)
 	}
 	switch op.Operation {
 	case "svg-minify":

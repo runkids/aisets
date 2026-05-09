@@ -20,7 +20,7 @@ type Props = {
 
 export function DashboardView({ catalog, onJump }: Props) {
   const { t } = useTranslation();
-  const items = catalog.items ?? [];
+  const items = useMemo(() => catalog.items ?? [], [catalog.items]);
   const projects = catalog.projects ?? [];
   const optimizeCount = items.filter(
     (item) => item.optimizationRecommendations.length > 0,

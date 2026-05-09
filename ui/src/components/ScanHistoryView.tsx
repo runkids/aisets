@@ -8,6 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { cn } from "@/lib/cn";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import { useElementHeight } from "../hooks/useElementHeight";
@@ -25,7 +26,7 @@ import {
   type ScanDiffRow,
 } from "../scanHistory";
 import type { ScanDiff, ScanSummary } from "../types";
-import { formatBytes } from "../ui";
+import { fileName, formatBytes } from "../ui";
 import { useScanDiffQuery, useScansQuery } from "../queries";
 import {
   Badge,
@@ -41,6 +42,7 @@ import {
   Tabs,
   TextInput,
   TextInputClearButton,
+  Tooltip,
   type StackedBarSegment,
   type TabItem,
 } from "./ui";
@@ -64,25 +66,31 @@ const diffColumns = [
   "references",
 ] as const;
 
-const DIFF_ROW_HEIGHT = 40;
+const DIFF_ROW_HEIGHT = 52;
 const diffGridCols =
-  "grid-cols-[100px_minmax(140px,1fr)_140px_80px_180px_100px]";
+  "grid-cols-[90px_minmax(140px,2fr)_minmax(90px,1fr)_70px_minmax(100px,1fr)_80px]";
 
 type RailFilter = { project: string; ext: string };
 
-function formatScanDate(scan: Pick<ScanSummary, "completedAt" | "startedAt">) {
+function formatScanDate(
+  scan: Pick<ScanSummary, "completedAt" | "startedAt">,
+  locale: string,
+) {
   const date = new Date(scan.completedAt || scan.startedAt);
   return Number.isNaN(date.getTime())
     ? scan.completedAt || scan.startedAt || ""
-    : date.toLocaleString();
+    : date.toLocaleString(locale);
 }
 
-function scanLabel(scan: {
-  id: number;
-  completedAt?: string;
-  startedAt: string;
-}) {
-  const formatted = formatScanDate(scan);
+function scanLabel(
+  scan: {
+    id: number;
+    completedAt?: string;
+    startedAt: string;
+  },
+  locale: string,
+) {
+  const formatted = formatScanDate(scan, locale);
   return formatted ? `${formatted} · #${scan.id}` : `#${scan.id}`;
 }
 
@@ -98,6 +106,21 @@ function rowTone(category: ScanDiffRow["category"]) {
       return "amber" as const;
     case "references":
       return "blue" as const;
+  }
+}
+
+function rowBorderColor(category: ScanDiffRow["category"]) {
+  switch (category) {
+    case "added":
+    case "noLongerUnused":
+      return "border-l-g-green";
+    case "removed":
+    case "becameUnused":
+      return "border-l-g-red";
+    case "modified":
+      return "border-l-g-amber";
+    case "references":
+      return "border-l-g-blue";
   }
 }
 
@@ -141,7 +164,8 @@ function ScanSnapshotColumn({
   label: string;
   scan: ScanSummary;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const metrics = [
     {
       label: t("history.metric.profile"),
@@ -151,23 +175,23 @@ function ScanSnapshotColumn({
     },
     {
       label: t("history.metric.totalAssets"),
-      value: scan.totalFiles.toLocaleString(),
+      value: scan.totalFiles.toLocaleString(locale),
     },
     {
       label: t("history.metric.duplicates"),
-      value: scan.duplicateGroups.toLocaleString(),
+      value: scan.duplicateGroups.toLocaleString(locale),
     },
     {
       label: t("history.metric.unused"),
-      value: scan.unusedFiles.toLocaleString(),
+      value: scan.unusedFiles.toLocaleString(locale),
     },
     {
       label: t("history.metric.nearDuplicates"),
-      value: scan.nearDuplicates.toLocaleString(),
+      value: scan.nearDuplicates.toLocaleString(locale),
     },
     {
       label: t("history.metric.cacheHits"),
-      value: scan.cacheHits.toLocaleString(),
+      value: scan.cacheHits.toLocaleString(locale),
     },
   ];
 
@@ -189,7 +213,7 @@ function ScanSnapshotColumn({
         </Badge>
       </div>
       <div className="mb-3 text-g-caption text-g-ink-3">
-        {formatScanDate(scan)}
+        {formatScanDate(scan, locale)}
       </div>
       <div className="grid gap-1.5">
         {metrics.map((metric) => (
@@ -333,7 +357,7 @@ const SHELL_CLASS =
   "flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pt-0 pb-12";
 
 export function ScanHistoryView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const scansQuery = useScansQuery();
   const scans = useMemo(
     () => sortedScans(scansQuery.data?.scans ?? []),
@@ -402,6 +426,7 @@ export function ScanHistoryView() {
   const virtualContainerRef = useRef<HTMLDivElement>(null);
   const scrollMargin = virtualContainerRef.current?.offsetTop ?? 0;
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
     getScrollElement: () => scrollRef.current,
@@ -420,15 +445,15 @@ export function ScanHistoryView() {
     () =>
       scans.map((scan) => ({
         value: String(scan.id),
-        label: scanLabel(scan),
+        label: scanLabel(scan, i18n.language),
         description: t("history.scanOptionMeta", {
-          count: scan.totalFiles.toLocaleString(),
+          count: scan.totalFiles.toLocaleString(i18n.language),
           profile: t(`settings.scanProfile.${scan.profile}`, {
             defaultValue: scan.profile,
           }),
         }),
       })),
-    [scans, t],
+    [scans, t, i18n.language],
   );
 
   const tabItems: Array<TabItem<ScanDiffCategory>> = useMemo(
@@ -667,14 +692,14 @@ export function ScanHistoryView() {
                 />
                 <div className="border-t border-g-line text-g-ui" role="table">
                   <div
-                    className={`sticky z-[5] grid ${diffGridCols} items-center bg-g-surface-2 text-g-caption uppercase tracking-[0.06em] text-g-ink-4`}
+                    className={`sticky z-[5] grid ${diffGridCols} items-center border-b border-g-line border-l-[3px] border-l-transparent bg-g-surface-2 pl-5 text-g-caption uppercase tracking-[0.06em] text-g-ink-4`}
                     style={{ top: `${toolbarH}px` }}
                     role="row"
                   >
                     {diffColumns.map((col) => (
                       <div
                         key={col}
-                        className="border-b border-g-line px-3 py-2 font-[590]"
+                        className="px-3 py-2 font-[590]"
                         role="columnheader"
                       >
                         {t(`history.column.${col}`)}
@@ -693,7 +718,10 @@ export function ScanHistoryView() {
                       return (
                         <div
                           key={row.id}
-                          className={`absolute left-0 top-0 grid w-full ${diffGridCols} items-center transition-colors duration-75 translate-y-[var(--row-y,0)] hover:bg-g-surface-2`}
+                          className={cn(
+                            `absolute left-0 top-0 grid w-full ${diffGridCols} items-center border-b border-g-line border-l-[3px] pl-5 transition-colors duration-75 translate-y-[var(--row-y,0)] hover:bg-g-surface-2`,
+                            rowBorderColor(row.category),
+                          )}
                           style={
                             {
                               "--row-y": `${vItem.start - scrollMargin}px`,
@@ -701,31 +729,50 @@ export function ScanHistoryView() {
                           }
                           role="row"
                         >
-                          <div className="border-b border-g-line px-3 py-2">
+                          <div className="px-3 py-2.5">
                             <Badge tone={rowTone(row.category)}>
                               {t(`history.category.${row.category}`)}
                             </Badge>
                           </div>
-                          <div className="overflow-hidden border-b border-g-line px-3 py-2">
-                            <span className="block truncate font-g-mono text-g-caption text-g-ink">
-                              {row.repoPath}
-                            </span>
-                          </div>
-                          <div className="border-b border-g-line px-3 py-2 text-g-ink-2">
+                          <Tooltip
+                            label={row.repoPath}
+                            placement="top"
+                            contentClassName="max-w-[420px] whitespace-normal break-words"
+                          >
+                            <div className="overflow-hidden px-3 py-2.5">
+                              <span className="block truncate font-g-mono text-g-body font-medium text-g-ink">
+                                {fileName(row.repoPath)}
+                              </span>
+                              <span className="block truncate font-g-mono text-g-chip text-g-ink-4">
+                                {row.repoPath.split("/").slice(0, -1).join("/")}
+                              </span>
+                            </div>
+                          </Tooltip>
+                          <div className="px-3 py-2.5 font-g-mono text-g-caption text-g-ink-2">
                             {row.projectName}
                           </div>
-                          <div className="border-b border-g-line px-3 py-2">
+                          <div className="px-3 py-2.5">
                             <Badge tone="line">
                               {row.ext || t("common.none")}
                             </Badge>
                           </div>
-                          <div className="border-b border-g-line px-3 py-2 font-g-mono text-g-caption text-g-ink-3">
-                            {bytesLabel(row.beforeBytes)} →{" "}
-                            {bytesLabel(row.afterBytes)}
+                          <div className="px-3 py-2.5 font-g-mono text-g-caption">
+                            <span className="text-g-ink-4">
+                              {bytesLabel(row.beforeBytes)}
+                            </span>
+                            <span className="text-g-ink-3"> → </span>
+                            <span className="font-[510] text-g-ink">
+                              {bytesLabel(row.afterBytes)}
+                            </span>
                           </div>
-                          <div className="border-b border-g-line px-3 py-2 font-g-mono text-g-caption text-g-ink-3">
-                            {countLabel(row.beforeUsedCount)} →{" "}
-                            {countLabel(row.afterUsedCount)}
+                          <div className="px-3 py-2.5 font-g-mono text-g-caption">
+                            <span className="text-g-ink-4">
+                              {countLabel(row.beforeUsedCount)}
+                            </span>
+                            <span className="text-g-ink-3"> → </span>
+                            <span className="font-[510] text-g-ink">
+                              {countLabel(row.afterUsedCount)}
+                            </span>
                           </div>
                         </div>
                       );

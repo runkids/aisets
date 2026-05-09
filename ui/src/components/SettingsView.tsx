@@ -167,6 +167,24 @@ export function SettingsView({
     );
   }
 
+  async function onToggleTool(toolId: string, enabled: boolean) {
+    const next: SettingsDraft = {
+      ...draft,
+      optimizationExternalTools: draft.optimizationExternalTools.map((item) =>
+        item.id === toolId ? { ...item, enabled } : item,
+      ),
+    };
+    setDraftOverride(next);
+    try {
+      const result = await updateMutation.mutateAsync(updateFromDraft(next));
+      setDraftOverride(draftFromSettings(result.settings));
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("toast.settingsSaveFailed"),
+      });
+    }
+  }
+
   async function onSaveSettings() {
     try {
       const result = await updateMutation.mutateAsync(updateFromDraft(draft));
@@ -401,6 +419,7 @@ export function SettingsView({
         const next = new URLSearchParams(prev);
         if (section === "workspace") next.delete("section");
         else next.set("section", section);
+        next.delete("expand");
         return next;
       },
       { replace: true },
@@ -538,10 +557,13 @@ export function SettingsView({
               settingsLoading={settingsQuery.isLoading}
               updatePending={updateMutation.isPending}
               updateError={updateMutation.error}
+              expandStrategies={searchParams.get("expand") === "strategies"}
+              expandTools={searchParams.get("expand") === "tools"}
               settingActions={(extraDisabled) =>
                 settingActionsFor("optimization", extraDisabled)
               }
               onUpdateDraft={updateDraft}
+              onToggleTool={onToggleTool}
               onRefreshTools={() => void settingsQuery.refetch()}
             />
           )}

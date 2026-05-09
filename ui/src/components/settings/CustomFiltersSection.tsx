@@ -254,7 +254,7 @@ export function CustomFiltersSection({
                       <TextInput
                         value={filter.name}
                         disabled={working}
-                        size="sm"
+                        size="md"
                         icon={<Pencil size={13} />}
                         inputClassName="font-g text-g-body font-[590] tracking-g-ui"
                         aria-label={t("settings.customFilterName")}
@@ -366,6 +366,7 @@ export function CustomFiltersSection({
                                     )}
                                   >
                                     <Select
+                                      size="md"
                                       value={clause.field}
                                       className="min-w-0"
                                       aria-label={t(
@@ -393,6 +394,7 @@ export function CustomFiltersSection({
                                     />
                                     {!singleOperator && (
                                       <Select
+                                        size="md"
                                         value={clause.operator}
                                         className="min-w-0"
                                         aria-label={t(
@@ -418,6 +420,7 @@ export function CustomFiltersSection({
                                     )}
                                     {valueOptions ? (
                                       <Select
+                                        size="md"
                                         value={clause.value}
                                         className="min-w-0"
                                         aria-label={t(
@@ -443,6 +446,7 @@ export function CustomFiltersSection({
                                       />
                                     ) : (
                                       <TextInput
+                                        size="md"
                                         value={clause.value}
                                         disabled={working}
                                         inputClassName="font-g-mono text-g-caption tracking-g-mono"

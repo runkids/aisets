@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { OptimizationStrategy } from "../../types";
-import { Button, IconButton, Select, Switch, TextInput, Tooltip } from "../ui";
+import { Button, Select, Switch, TextInput, Tooltip } from "../ui";
 import type { StrategyFieldErrors } from "./optimizationStrategyValidation";
 
 const FORMAT_OPTIONS: { key: string; label: string; values: string[] }[] = [
@@ -145,16 +145,15 @@ export function OptimizationStrategyRow({
             className="min-w-[90px] flex-1"
           />
         </Tooltip>
-        <div className="shrink-0 pb-0.5">
-          <IconButton
-            size="md"
-            aria-label={t("settings.removeStrategy")}
-            disabled={disabled}
-            onClick={onDelete}
-          >
-            <Trash2 size={14} />
-          </IconButton>
-        </div>
+        <button
+          type="button"
+          className="grid size-7 shrink-0 cursor-pointer place-items-center self-end rounded-g-md text-g-ink-3 transition-[background,color] duration-[120ms] ease-g hover:bg-g-red-soft hover:text-g-red focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+          aria-label={t("settings.removeStrategy")}
+          disabled={disabled}
+          onClick={onDelete}
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
       {errors.priority && <FieldError>{errors.priority}</FieldError>}
 

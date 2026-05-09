@@ -1,5 +1,5 @@
 import { ChevronDown, Info, ListChecks, Plus } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { OptimizationStrategy } from "../../types";
@@ -15,6 +15,7 @@ type OptimizationStrategiesCardProps = {
   disabled: boolean;
   hasStrategyErrors: boolean;
   strategyErrors: Map<string, StrategyFieldErrors>;
+  initialExpanded?: boolean;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
 };
 
@@ -23,14 +24,26 @@ export function OptimizationStrategiesCard({
   disabled,
   hasStrategyErrors,
   strategyErrors,
+  initialExpanded = false,
   onUpdateDraft,
 }: OptimizationStrategiesCardProps) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [helpOpen, setHelpOpen] = useState(false);
   const [strategyPendingDelete, setStrategyPendingDelete] =
     useState<OptimizationStrategy | null>(null);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  const scrollRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node && initialExpanded) {
+        requestAnimationFrame(() =>
+          node.scrollIntoView({ behavior: "smooth", block: "start" }),
+        );
+      }
+    },
+    [initialExpanded],
+  );
 
   const enabledCount = draft.optimizationStrategies.filter(
     (s) => s.enabled,
@@ -92,6 +105,7 @@ export function OptimizationStrategiesCard({
 
   return (
     <>
+      <div ref={scrollRef} />
       <Card
         className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
         padding="none"
@@ -186,7 +200,7 @@ export function OptimizationStrategiesCard({
                   onDelete={() => setStrategyPendingDelete(strategy)}
                 />
               ))}
-              <div className="flex gap-2 border-t border-g-line pt-4">
+              <div className="flex gap-2 border-t border-g-line py-4">
                 <Button
                   size="md"
                   variant="primary"

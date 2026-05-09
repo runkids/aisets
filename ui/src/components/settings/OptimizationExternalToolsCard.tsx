@@ -1,5 +1,5 @@
 import { ChevronDown, Info, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { OptimizationToolRuntime } from "../../types";
@@ -13,7 +13,9 @@ type OptimizationExternalToolsCardProps = {
   draft: SettingsDraft;
   toolRuntime: OptimizationToolRuntime[];
   disabled: boolean;
+  initialExpanded?: boolean;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
+  onToggleTool?: (toolId: string, enabled: boolean) => void;
   onRefreshTools?: () => void;
 };
 
@@ -21,11 +23,23 @@ export function OptimizationExternalToolsCard({
   draft,
   toolRuntime,
   disabled,
+  initialExpanded,
   onUpdateDraft,
+  onToggleTool,
   onRefreshTools,
 }: OptimizationExternalToolsCardProps) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initialExpanded ?? false);
+  const scrollRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node && initialExpanded) {
+        requestAnimationFrame(() =>
+          node.scrollIntoView({ behavior: "smooth", block: "start" }),
+        );
+      }
+    },
+    [initialExpanded],
+  );
   const [helpOpen, setHelpOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const runtimeByID = new Map(toolRuntime.map((tool) => [tool.id, tool]));
@@ -44,6 +58,7 @@ export function OptimizationExternalToolsCard({
 
   return (
     <>
+      <div ref={scrollRef} />
       <Card
         className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
         padding="none"
@@ -138,7 +153,7 @@ export function OptimizationExternalToolsCard({
                         checked={tool.enabled}
                         disabled={disabled || !runtime?.detected}
                         aria-label={tool.id}
-                        onCheckedChange={(next) =>
+                        onCheckedChange={(next) => {
                           onUpdateDraft((prev) => ({
                             ...prev,
                             optimizationExternalTools:
@@ -147,8 +162,9 @@ export function OptimizationExternalToolsCard({
                                   ? { ...item, enabled: next }
                                   : item,
                               ),
-                          }))
-                        }
+                          }));
+                          onToggleTool?.(tool.id, next);
+                        }}
                       />
                     </div>
                   </FieldRow>

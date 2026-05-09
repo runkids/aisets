@@ -4,12 +4,11 @@ import { cn } from "@/lib/cn";
 
 const statCardVariants = cva(
   [
-    "overflow-hidden rounded-g-md border border-g-line bg-g-surface px-5 py-[18px] text-left shadow-g-sm",
-    "transition-[border-color,box-shadow,transform] duration-[120ms] ease-g",
-    "data-[clickable=true]:cursor-pointer data-[clickable=true]:hover:-translate-y-0.5",
+    "overflow-hidden rounded-g-md border border-g-line bg-g-surface px-5 py-3 text-left shadow-g-sm",
+    "transition-[border-color,box-shadow] duration-[120ms] ease-g",
+    "data-[clickable=true]:cursor-pointer",
     "data-[clickable=true]:hover:border-g-line-strong data-[clickable=true]:hover:shadow-g-md",
     "data-[clickable=true]:focus-visible:outline-none data-[clickable=true]:focus-visible:shadow-g-focus",
-    "motion-reduce:data-[clickable=true]:hover:translate-y-0",
   ],
   {
     variants: {
@@ -114,10 +113,10 @@ export function StatCard({
         {icon}
         {label}
       </div>
-      <div className="mt-2 font-g-display text-4xl font-[590] leading-none tracking-[-0.035em] text-g-ink tabular-nums">
+      <div className="mt-1.5 font-g-display text-[28px] font-[590] leading-none tracking-[-0.035em] text-g-ink tabular-nums">
         {animatedValue}
       </div>
-      {meta && <div className="mt-1.5 text-g-caption text-g-ink-3">{meta}</div>}
+      {meta && <div className="mt-1 text-g-caption text-g-ink-3">{meta}</div>}
     </>
   );
 

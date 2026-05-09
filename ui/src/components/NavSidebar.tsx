@@ -36,11 +36,24 @@ type Props = {
   projects: ProjectSwitcherProject[];
   selectedProjectId: string;
   totalAssets: number;
+  lastScanAt?: string;
   workspaceSwitchDisabled?: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelect: (mode: Mode) => void;
 };
+
+function formatLastScanTime(value: string | undefined, locale: string) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(locale, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 export function NavSidebar({
   mode,
@@ -51,14 +64,16 @@ export function NavSidebar({
   projects,
   selectedProjectId,
   totalAssets,
+  lastScanAt,
   workspaceSwitchDisabled = false,
   onSelectWorkspace,
   onSelectProject,
   onSelect,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const versionQuery = useVersionQuery();
   const version = versionQuery.data?.currentVersion ?? "";
+  const lastScan = formatLastScanTime(lastScanAt, i18n.language);
 
   const groups: Array<{
     title: string;
@@ -209,14 +224,28 @@ export function NavSidebar({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-g-chip text-g-ink-4 max-[960px]:hidden">
-          <span className="tabular-nums">
-            {badges.projects} {t("nav.footerProjects")}
-          </span>
-          <span className="text-g-ink-5">·</span>
-          <span className="tabular-nums">
-            {totalAssets.toLocaleString()} {t("nav.footerAssets")}
-          </span>
+        <div className="flex flex-col gap-1 text-g-chip text-g-ink-4 max-[960px]:hidden">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="font-g-mono font-[510] tabular-nums text-g-ink-3">
+              {badges.projects}
+            </span>
+            <span>{t("nav.footerProjects")}</span>
+            <span className="text-g-ink-5">·</span>
+            <span className="font-g-mono font-[510] tabular-nums text-g-ink-3">
+              {totalAssets.toLocaleString()}
+            </span>
+            <span>{t("nav.footerAssets")}</span>
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 text-g-ink-4">
+            <span
+              className="inline-block size-1.5 shrink-0 rounded-g-pill bg-g-green"
+              aria-hidden="true"
+            />
+            <span className="shrink-0">{t("nav.lastScan")}</span>
+            <span className="truncate font-g-mono tabular-nums text-g-ink-3">
+              {lastScan}
+            </span>
+          </div>
         </div>
       </div>
     </aside>

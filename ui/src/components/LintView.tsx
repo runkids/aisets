@@ -145,7 +145,10 @@ export function LintView({
     onLoadMore: lintQuery.fetchNextPage,
   });
 
-  const sevFacets = firstPage?.facets.severities ?? [];
+  const sevFacets = useMemo(
+    () => firstPage?.facets.severities ?? [],
+    [firstPage?.facets.severities],
+  );
   const ruleFacets = firstPage?.facets.rules ?? [];
   const projectFacets = firstPage?.facets.projects ?? [];
   const projectTotal = firstPage?.facets.projectTotal ?? 0;
@@ -289,6 +292,7 @@ export function LintView({
   }, [groups, collapsed]);
 
   const rowKey = virtualRows.length + "-" + collapsed.size;
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: virtualRows.length,
     getScrollElement: () => scrollRef.current,
@@ -447,34 +451,37 @@ export function LintView({
                 items={[
                   {
                     value: "",
-                    label: t("filter.countLabel", {
-                      label: t("status.all"),
-                      count: totalFromFacets,
-                    }),
+                    label: t("status.all"),
                   },
                   {
                     value: "critical",
-                    label: t("filter.countLabel", {
-                      label: t("severity.critical"),
-                      count: facetSevMap["critical"] ?? 0,
-                    }),
+                    label: t("severity.critical"),
                     icon: <XCircle size={13} className="text-g-red" />,
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {facetSevMap["critical"] ?? 0}
+                      </span>
+                    ),
                   },
                   {
                     value: "warning",
-                    label: t("filter.countLabel", {
-                      label: t("severity.warning"),
-                      count: facetSevMap["warning"] ?? 0,
-                    }),
+                    label: t("severity.warning"),
                     icon: <AlertTriangle size={13} className="text-g-amber" />,
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {facetSevMap["warning"] ?? 0}
+                      </span>
+                    ),
                   },
                   {
                     value: "info",
-                    label: t("filter.countLabel", {
-                      label: t("severity.info"),
-                      count: facetSevMap["info"] ?? 0,
-                    }),
+                    label: t("severity.info"),
                     icon: <Info size={13} className="text-g-blue" />,
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {facetSevMap["info"] ?? 0}
+                      </span>
+                    ),
                   },
                 ]}
               />
@@ -648,8 +655,10 @@ export function LintView({
                         >
                           {SEVERITY_ICON[row.severity]}
                         </span>
-                        <span className="font-g-mono text-g-caption">
-                          {row.ruleId}
+                        <span className="text-g-caption">
+                          {t(`lint.rule.${row.ruleId}.name`, {
+                            defaultValue: row.ruleId,
+                          })}
                         </span>
                         <Badge
                           tone="line"
@@ -713,7 +722,9 @@ export function LintView({
                           {groupTab === "file" && (
                             <>
                               <Badge tone="line" className="text-[10px]">
-                                {finding.ruleId}
+                                {t(`lint.rule.${finding.ruleId}.name`, {
+                                  defaultValue: finding.ruleId,
+                                })}
                               </Badge>
                               <span className="font-g-mono text-g-chip text-g-ink-3">
                                 L:{finding.line}

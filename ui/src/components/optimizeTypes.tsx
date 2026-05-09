@@ -180,6 +180,17 @@ export async function postJSON<T>(
   return res.json() as Promise<T>;
 }
 
+export const formatBadgeBg: Record<string, string> = {
+  jpg: "bg-g-green",
+  jpeg: "bg-g-green",
+  svg: "bg-g-blue",
+  png: "bg-g-accent",
+  gif: "bg-g-amber",
+  webp: "bg-g-purple",
+  avif: "bg-g-blue",
+  ico: "bg-g-ink-4",
+};
+
 export function optimizationOperations(preview: PreviewResponse["preview"]) {
   return preview.payload?.optimization?.operations ?? [];
 }

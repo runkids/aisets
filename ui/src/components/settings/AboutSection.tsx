@@ -228,23 +228,54 @@ export function AboutSection({
                   if (file) void onImport(file);
                 }}
               />
-              <span className="hidden h-4 w-px bg-g-line min-[480px]:block" />
-              <Button
-                variant="danger"
-                leadingIcon={<Trash2 size={15} />}
-                onClick={() => setClearScanHistoryOpen(true)}
-                disabled={working}
-              >
-                {t("settings.clearScanHistory")}
-              </Button>
-              <Button
-                variant="danger"
-                leadingIcon={<RotateCcw size={15} />}
-                onClick={() => setResetDatabaseOpen(true)}
-                disabled={working}
-              >
-                {t("settings.resetDatabase")}
-              </Button>
+            </div>
+            <div className="mt-4 rounded-g-md border border-g-red-soft bg-g-red-soft/10 p-4">
+              <span className="block font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-red">
+                {t("settings.dangerZone")}
+              </span>
+              <div className="mt-3 grid gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                      {t("settings.clearScanHistory")}
+                    </span>
+                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {t("settings.clearScanHistoryHint")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    leadingIcon={<Trash2 size={13} />}
+                    onClick={() => setClearScanHistoryOpen(true)}
+                    disabled={working}
+                    className="shrink-0 self-start"
+                  >
+                    {t("settings.clearScanHistory")}
+                  </Button>
+                </div>
+                <div className="border-t border-g-red-soft/50" />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                      {t("settings.resetDatabase")}
+                    </span>
+                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {t("settings.resetDatabaseHint")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    leadingIcon={<RotateCcw size={13} />}
+                    onClick={() => setResetDatabaseOpen(true)}
+                    disabled={working}
+                    className="shrink-0 self-start"
+                  >
+                    {t("settings.resetDatabase")}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 

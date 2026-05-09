@@ -1,22 +1,32 @@
 import {
+  AlertTriangle,
   CheckSquare,
   FileArchive,
   ImageDown,
   Images,
+  Info,
   LoaderCircle,
   Search,
   Sliders,
   Terminal,
   Wrench,
   X,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { useTranslation } from "react-i18next";
-import { projectScanIntentLabel } from "../projectScanIntent";
+import { useNavigate } from "react-router-dom";
 import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "../queries";
-import { fileName, formatBytes, primarySeverity } from "../ui";
+import { formatBytes, primarySeverity } from "../ui";
 import type {
   Category,
   Operation,
@@ -39,6 +49,9 @@ import {
 import { OptimizeHelpPopover } from "./OptimizeHelpPopover";
 import { OptimizePreviewModal } from "./OptimizePreviewModal";
 import { OptimizeScriptModal } from "./OptimizeScriptModal";
+import { OptimizeRowItem } from "./OptimizeRowItem";
+import { OptimizeQuickConfirmModal } from "./OptimizeQuickConfirmModal";
+import { OptimizeEstimatePromptModal } from "./OptimizeEstimatePromptModal";
 import {
   buildEstimateFromOperations,
   combinePreviews,
@@ -55,7 +68,6 @@ import { cn } from "@/lib/cn";
 import { useToast } from "./ToastProvider";
 import type { OptimizeActivityAction } from "../optimizeActivity";
 import {
-  AssetThumbnail,
   Badge,
   Button,
   Checkbox,
@@ -110,6 +122,7 @@ export function OptimizeView({
   onOpenAsset,
 }: Props) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const toast = useToast();
   const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data?.settings;
@@ -146,6 +159,9 @@ export function OptimizeView({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [estimate, setEstimate] = useState<OptimizationEstimate | null>(null);
   const [preview, setPreview] = useState<PreviewBatch | null>(null);
+  const [formatOverrides, setFormatOverrides] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [scriptOpen, setScriptOpen] = useState<{ script: string } | null>(null);
   const [toolsModalOpen, setToolsModalOpen] = useState(false);
   const [quickConfirm, setQuickConfirm] = useState<{
@@ -199,7 +215,20 @@ export function OptimizeView({
     [items],
   );
   const externalLockedIds = optimizeLockedIds ?? EMPTY_OPTIMIZE_IDS;
-  const selectedItems = items.filter((item) => selected.has(item.id));
+
+  const { selectedTotalBytes, selectedSavings } = useMemo(() => {
+    let bytes = 0;
+    let savings = 0;
+    for (const item of items) {
+      if (!selected.has(item.id)) continue;
+      bytes += item.bytes;
+      for (const rec of item.optimizationRecommendations) {
+        savings += rec.savingsBytes ?? 0;
+      }
+    }
+    return { selectedTotalBytes: bytes, selectedSavings: savings };
+  }, [items, selected]);
+
   const actionIds = useMemo(
     () =>
       externalLockedIds.length > 0
@@ -209,19 +238,28 @@ export function OptimizeView({
           : visibleIds,
     [externalLockedIds, selected, visibleIds],
   );
-  const selectedTotalBytes = selectedItems.reduce(
-    (sum, item) => sum + item.bytes,
-    0,
-  );
-  const selectedSavings = selectedItems.reduce(
-    (sum, item) =>
-      sum +
-      item.optimizationRecommendations.reduce(
-        (inner, rec) => inner + (rec.savingsBytes ?? 0),
-        0,
+
+  const getCacheKeyForItem = useCallback(
+    (item: Parameters<typeof estimateOperationCacheKey>[0]) =>
+      estimateOperationCacheKey(
+        item,
+        replaceOriginal,
+        updateReferences,
+        quality,
+        maxDimensionPx,
+        strategyHash,
+        enabledToolIds,
       ),
-    0,
+    [
+      replaceOriginal,
+      updateReferences,
+      quality,
+      maxDimensionPx,
+      strategyHash,
+      enabledToolIds,
+    ],
   );
+
   const estimatedOperationsByAsset = useMemo(() => {
     ensureEstimateOperationCacheLoaded();
     const operations = new Map(
@@ -229,30 +267,12 @@ export function OptimizeView({
     );
     for (const item of items) {
       if (operations.has(item.id)) continue;
-      const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(
-          item,
-          replaceOriginal,
-          updateReferences,
-          quality,
-          maxDimensionPx,
-          strategyHash,
-          enabledToolIds,
-        ),
-      );
-      if (operation) operations.set(item.id, operation);
+      const cached = estimateOperationCache.get(getCacheKeyForItem(item));
+      if (cached) operations.set(item.id, cached);
     }
     return operations;
-  }, [
-    estimate,
-    items,
-    quality,
-    maxDimensionPx,
-    strategyHash,
-    enabledToolIds,
-    replaceOriginal,
-    updateReferences,
-  ]);
+  }, [estimate, items, getCacheKeyForItem]);
+
   const actionableActionIds = useMemo(
     () =>
       actionIds.filter(
@@ -261,6 +281,7 @@ export function OptimizeView({
     [actionIds, estimatedOperationsByAsset],
   );
   const skippedActionCount = actionIds.length - actionableActionIds.length;
+
   const recommendationTotalBytes = useMemo(
     () => items.reduce((sum, item) => sum + item.bytes, 0),
     [items],
@@ -339,31 +360,32 @@ export function OptimizeView({
       enabledToolIds,
     ],
   );
-  function cachedEstimateFor(assetIds: string[]) {
-    ensureEstimateOperationCacheLoaded();
-    const operations: OptimizationOperation[] = [];
-    for (const assetId of assetIds) {
-      const item = itemsById.get(assetId);
-      if (!item) continue;
-      const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(
-          item,
-          replaceOriginal,
-          updateReferences,
-          quality,
-          maxDimensionPx,
-          strategyHash,
-          enabledToolIds,
-        ),
-      );
-      if (operation) operations.push(operation);
-    }
-    if (operations.length === 0) return null;
-    return buildEstimateFromOperations(assetIds, itemsById, operations);
-  }
+  const cachedEstimateFor = useCallback(
+    (assetIds: string[]) => {
+      ensureEstimateOperationCacheLoaded();
+      const operations: OptimizationOperation[] = [];
+      for (const assetId of assetIds) {
+        const item = itemsById.get(assetId);
+        if (!item) continue;
+        const op = estimateOperationCache.get(getCacheKeyForItem(item));
+        if (op) operations.push(op);
+      }
+      if (operations.length === 0) return null;
+      return buildEstimateFromOperations(assetIds, itemsById, operations);
+    },
+    [itemsById, getCacheKeyForItem],
+  );
 
+  const lockTransitionRef = useRef(false);
   useEffect(() => {
-    if (externalLockedIds.length > 0) return;
+    if (externalLockedIds.length > 0) {
+      lockTransitionRef.current = true;
+      return;
+    }
+    if (lockTransitionRef.current) {
+      lockTransitionRef.current = false;
+      return;
+    }
     setBulkMode(false);
     setSelected(new Set());
     setEstimate(null);
@@ -390,8 +412,7 @@ export function OptimizeView({
     setEstimate(
       estimateCache.get(currentEstimateKey) ?? cachedEstimateFor(actionIds),
     );
-    setPreview(null);
-  }, [currentEstimateKey, actionIds, itemsById]);
+  }, [currentEstimateKey, actionIds, itemsById, cachedEstimateFor]);
 
   useEffect(() => {
     if (working != null || externalLockedIds.length > 0) return;
@@ -417,6 +438,7 @@ export function OptimizeView({
 
   const scrollMargin = virtualContainerRef.current?.offsetTop ?? 0;
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -445,6 +467,11 @@ export function OptimizeView({
 
   function requestBody(assetIds?: string[]) {
     const ids = assetIds ?? actionableActionIds;
+    const overrides: Record<string, string> = {};
+    for (const id of ids) {
+      const fmt = formatOverrides.get(id);
+      if (fmt && fmt !== "auto") overrides[id] = fmt;
+    }
     return {
       assetIds: ids,
       strategy: "conservative",
@@ -454,6 +481,9 @@ export function OptimizeView({
       maxDimensionPx,
       avifSpeed,
       workers,
+      ...(Object.keys(overrides).length > 0 && {
+        outputFormatOverrides: overrides,
+      }),
     };
   }
 
@@ -488,19 +518,9 @@ export function OptimizeView({
         missingIds.push(assetId);
         continue;
       }
-      const operation = estimateOperationCache.get(
-        estimateOperationCacheKey(
-          item,
-          replaceOriginal,
-          updateReferences,
-          quality,
-          maxDimensionPx,
-          strategyHash,
-          enabledToolIds,
-        ),
-      );
-      if (operation) {
-        cachedOperations.push(operation);
+      const op = estimateOperationCache.get(getCacheKeyForItem(item));
+      if (op) {
+        cachedOperations.push(op);
       } else {
         missingIds.push(assetId);
       }
@@ -529,18 +549,7 @@ export function OptimizeView({
         streamedOps.push(op);
         const item = itemsById.get(op.assetId);
         if (item && op.estimatedBytes > 0) {
-          estimateOperationCache.set(
-            estimateOperationCacheKey(
-              item,
-              replaceOriginal,
-              updateReferences,
-              quality,
-              maxDimensionPx,
-              strategyHash,
-              enabledToolIds,
-            ),
-            op,
-          );
+          estimateOperationCache.set(getCacheKeyForItem(item), op);
         }
         if (!flushTimer) flushTimer = setTimeout(flushPartial, 300);
       },
@@ -584,8 +593,8 @@ export function OptimizeView({
         total: cachedEstimate.operations.length,
         stage: "estimating",
       });
-      for (const operation of cachedEstimate.operations) {
-        onOptimizeActivity?.({ type: "operation", operation });
+      for (const op of cachedEstimate.operations) {
+        onOptimizeActivity?.({ type: "operation", operation: op });
       }
       emittedActivity = true;
     }
@@ -615,8 +624,8 @@ export function OptimizeView({
           total: nextEstimate.operations.length,
           stage: "estimating",
         });
-        for (const operation of nextEstimate.operations) {
-          onOptimizeActivity?.({ type: "operation", operation });
+        for (const op of nextEstimate.operations) {
+          onOptimizeActivity?.({ type: "operation", operation: op });
         }
       }
       if (wasCached) toast.info(t("optimize.estimateCached"));
@@ -655,8 +664,12 @@ export function OptimizeView({
     }
   }
 
-  async function runEstimateThenPreview(assetIds: string[]) {
-    setEstimatePrompt(null);
+  async function runEstimateAndPreview(
+    assetIds: string[],
+    options: { clearPrompt?: boolean; isQuickFlow?: boolean } = {},
+  ) {
+    if (options.clearPrompt) setEstimatePrompt(null);
+    if (options.isQuickFlow) quickFlowRef.current = true;
     setLockedActionIds(assetIds);
     setError(null);
     try {
@@ -693,6 +706,7 @@ export function OptimizeView({
       onOptimizeLockIds?.(null);
       setWorking(null);
       setLockedActionIds(null);
+      if (options.isQuickFlow) quickFlowRef.current = false;
     }
   }
 
@@ -805,49 +819,6 @@ export function OptimizeView({
     setQuickConfirm({ ids: actionableActionIds });
   }
 
-  async function runQuickOptimize(ids: string[]) {
-    setQuickConfirm(null);
-    quickFlowRef.current = true;
-    setLockedActionIds(ids);
-    setError(null);
-    try {
-      setWorking("estimate");
-      const nextEstimate = await trackedEstimateFor(ids, {
-        completeActivity: false,
-        releaseLock: false,
-      });
-      const previewIds = applicableIdsFromEstimate(ids, nextEstimate);
-      if (previewIds.length === 0) {
-        const message = t("optimize.noApplicableOperations", {
-          count: ids.length,
-          defaultValue:
-            "No selected assets have applicable optimization after estimation.",
-        });
-        setError(message);
-        toast.info(message);
-        onOptimizeActivity?.({ type: "done" });
-        return;
-      }
-      onOptimizeActivity?.({ type: "stage", stage: "previewing" });
-      setWorking("preview");
-      await runPreview(previewIds, { keepWorking: true, throwOnError: true });
-      onOptimizeActivity?.({ type: "done" });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        onOptimizeActivity?.({ type: "stopped" });
-      } else {
-        const message = err instanceof Error ? err.message : String(err);
-        setError(message);
-        onOptimizeActivity?.({ type: "error", errorMessage: message });
-      }
-    } finally {
-      onOptimizeLockIds?.(null);
-      setWorking(null);
-      setLockedActionIds(null);
-      quickFlowRef.current = false;
-    }
-  }
-
   async function runApply() {
     if (!preview) return;
     const ctrl = new AbortController();
@@ -944,6 +915,18 @@ export function OptimizeView({
     });
   }
 
+  const handleFormatChange = useCallback(
+    (itemId: string, format: string | null) => {
+      setFormatOverrides((prev) => {
+        const next = new Map(prev);
+        if (format == null) next.delete(itemId);
+        else next.set(itemId, format);
+        return next;
+      });
+    },
+    [],
+  );
+
   const estimateMissingTools =
     estimate?.tools?.filter((tool) => tool.required && !tool.available)
       .length ?? 0;
@@ -968,11 +951,6 @@ export function OptimizeView({
   const operationLabel = (id: string) =>
     t(`optimize.operationLabel.${id}`, {
       defaultValue: operationLabels[id] ?? id,
-    });
-  const blockedReasonLabel = (op: OptimizationOperation) =>
-    t(`optimize.blockedReason.${op.reasonCode}`, {
-      defaultValue: op.blockedReason || t("optimize.blocked"),
-      tool: op.tool,
     });
 
   return (
@@ -1103,10 +1081,8 @@ export function OptimizeView({
                   ? "amber"
                   : "neutral"
               }
-              onClick={
-                missingTools > 0 || !imgtoolsRuntime?.detected
-                  ? () => setToolsModalOpen(true)
-                  : undefined
+              onClick={() =>
+                navigate("/settings?section=optimization&expand=tools")
               }
             />
           </div>
@@ -1183,7 +1159,16 @@ export function OptimizeView({
                     value: key,
                     label: key
                       ? t(`optimize.category.${key}`)
-                      : t("optimize.allCategories"),
+                      : t("status.all"),
+                    ...(key && {
+                      badge: (
+                        <span className="font-[400] text-g-ink-4">
+                          {facets?.optimizationCategories?.find(
+                            (c) => c.id === key,
+                          )?.count ?? 0}
+                        </span>
+                      ),
+                    }),
                   }))}
                 />
               </div>
@@ -1195,14 +1180,47 @@ export function OptimizeView({
                   onChange={(value) => {
                     if (!selectionLocked) setSeverity(value as Severity);
                   }}
-                  items={(
-                    ["", "critical", "warning", "info"] as Severity[]
-                  ).map((key) => ({
-                    value: key,
-                    label: key
-                      ? t(`severity.${key}`)
-                      : t("optimize.allSeverities"),
-                  }))}
+                  items={[
+                    { value: "" as Severity, label: t("status.all") },
+                    {
+                      value: "critical" as Severity,
+                      label: t("severity.critical"),
+                      icon: <XCircle size={13} className="text-g-red" />,
+                      badge: (
+                        <span className="font-[400] text-g-ink-4">
+                          {facets?.optimizationSeverities?.find(
+                            (s) => s.id === "critical",
+                          )?.count ?? 0}
+                        </span>
+                      ),
+                    },
+                    {
+                      value: "warning" as Severity,
+                      label: t("severity.warning"),
+                      icon: (
+                        <AlertTriangle size={13} className="text-g-amber" />
+                      ),
+                      badge: (
+                        <span className="font-[400] text-g-ink-4">
+                          {facets?.optimizationSeverities?.find(
+                            (s) => s.id === "warning",
+                          )?.count ?? 0}
+                        </span>
+                      ),
+                    },
+                    {
+                      value: "info" as Severity,
+                      label: t("severity.info"),
+                      icon: <Info size={13} className="text-g-blue" />,
+                      badge: (
+                        <span className="font-[400] text-g-ink-4">
+                          {facets?.optimizationSeverities?.find(
+                            (s) => s.id === "info",
+                          )?.count ?? 0}
+                        </span>
+                      ),
+                    },
+                  ]}
                 />
               </div>
 
@@ -1237,17 +1255,23 @@ export function OptimizeView({
               </Button>
             </div>
 
-            {bulkMode && selected.size > 0 && (
+            {bulkMode && (
               <div className="sticky top-0 z-[5] flex w-full min-h-[44px] items-center gap-0.5 overflow-x-auto rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
                 <span className="inline-flex min-h-[34px] shrink-0 items-center whitespace-nowrap px-2.5 font-g-mono text-g-body text-g-ink-2">
-                  {t("selection.summary", {
-                    count: selected.size,
-                    size: formatBytes(selectedTotalBytes),
-                  })}
-                  {selectedSavings > 0 &&
-                    t("selection.savingsSuffix", {
-                      size: formatBytes(selectedSavings),
-                    })}
+                  {selected.size > 0
+                    ? `${t("selection.summary", {
+                        count: selected.size,
+                        size: formatBytes(selectedTotalBytes),
+                      })}${
+                        selectedSavings > 0
+                          ? t("selection.savingsSuffix", {
+                              size: formatBytes(selectedSavings),
+                            })
+                          : ""
+                      }`
+                    : t("optimize.selectItems", {
+                        defaultValue: "Select items to optimize",
+                      })}
                 </span>
                 {skippedActionCount > 0 && (
                   <Tooltip
@@ -1328,7 +1352,7 @@ export function OptimizeView({
                   type="button"
                   className={batchActionButtonClassName}
                   onClick={handleQuickOptimize}
-                  disabled={!canAct || selectionLocked}
+                  disabled={!canAct || selectionLocked || selected.size === 0}
                 >
                   {quickFlowRef.current && working ? (
                     <LoaderCircle size={14} className="animate-spin" />
@@ -1345,7 +1369,7 @@ export function OptimizeView({
                   type="button"
                   className={batchActionButtonClassName}
                   onClick={() => void runEstimate()}
-                  disabled={!canAct || selectionLocked}
+                  disabled={!canAct || selectionLocked || selected.size === 0}
                 >
                   {working === "estimate" && !quickFlowRef.current ? (
                     <LoaderCircle size={14} className="animate-spin" />
@@ -1360,7 +1384,7 @@ export function OptimizeView({
                   type="button"
                   className={batchActionButtonClassName}
                   onClick={handlePreviewClick}
-                  disabled={!canAct || selectionLocked}
+                  disabled={!canAct || selectionLocked || selected.size === 0}
                 >
                   {working === "preview" && !quickFlowRef.current ? (
                     <LoaderCircle size={14} className="animate-spin" />
@@ -1375,7 +1399,7 @@ export function OptimizeView({
                   type="button"
                   className={batchActionButtonClassName}
                   onClick={generateScript}
-                  disabled={!canAct || selectionLocked}
+                  disabled={!canAct || selectionLocked || selected.size === 0}
                 >
                   {working === "script" ? (
                     <LoaderCircle size={14} className="animate-spin" />
@@ -1443,19 +1467,24 @@ export function OptimizeView({
             <div className="rounded-g-md border border-g-line bg-g-surface shadow-g-sm">
               <div
                 className={cn(
-                  "sticky z-[5] hidden items-center border-b border-g-line bg-g-surface-2 font-g-mono text-g-caption uppercase tracking-[0.06em] text-g-ink-4 min-[980px]:grid",
+                  "sticky z-[5] hidden items-center gap-2 border-b border-g-line bg-g-surface-2 px-3 font-g-mono text-g-caption uppercase tracking-[0.06em] text-g-ink-4 min-[980px]:grid",
                   bulkMode
-                    ? "grid-cols-[40px_72px_minmax(0,1.4fr)_180px_170px_130px]"
-                    : "grid-cols-[72px_minmax(0,1.4fr)_180px_170px_130px]",
+                    ? "grid-cols-[40px_minmax(0,1.2fr)_minmax(140px,1fr)_200px_150px]"
+                    : "grid-cols-[minmax(0,1.2fr)_minmax(140px,1fr)_200px_150px]",
                 )}
                 style={{ top: `${toolbarH}px` }}
               >
-                {bulkMode && <div className="px-3 py-2" />}
-                <div className="px-3 py-2">{t("asset.thumbnail")}</div>
-                <div className="px-3 py-2">{t("assetDrawer.path")}</div>
-                <div className="px-3 py-2">{t("optimize.operation")}</div>
-                <div className="px-3 py-2">{t("preview.output")}</div>
-                <div className="px-3 py-2 text-right">
+                {bulkMode && <div className="py-2" />}
+                <div className="py-2">
+                  {t("optimize.columnFile", { defaultValue: "File" })}
+                </div>
+                <div className="py-2">{t("optimize.operation")}</div>
+                <div className="py-2">
+                  {t("optimize.columnSourceTarget", {
+                    defaultValue: "Source → Target",
+                  })}
+                </div>
+                <div className="py-2 text-right">
                   {t("optimize.statSavings")}
                 </div>
               </div>
@@ -1467,20 +1496,9 @@ export function OptimizeView({
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                   const item = items[virtualRow.index];
                   if (!item) return null;
-                  const sev = primarySeverity(item);
                   const planned = estimatedOperationsByAsset.get(item.id);
                   const op =
                     (planned?.operation as Operation) || operationFor(item);
-                  const rec = item.optimizationRecommendations[0];
-                  const recSavings = rec?.savingsBytes ?? 0;
-                  const isSelected = selected.has(item.id);
-                  const estimated = planned?.estimatedBytes ?? 0;
-                  const savings = planned?.savingsBytes ?? 0;
-                  const hasEstimate = planned != null && estimated > 0;
-                  const rowBlocked = planned?.canApply === false;
-                  const rowBlockedLabel = planned
-                    ? blockedReasonLabel(planned)
-                    : "";
                   return (
                     <div
                       key={item.id}
@@ -1491,218 +1509,19 @@ export function OptimizeView({
                         transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                       }}
                     >
-                      <div
-                        className={cn(
-                          "grid min-h-[84px] items-center gap-2 border-b border-g-line px-3 py-2 transition-[background,border-color,box-shadow] duration-[120ms] ease-g last:border-b-0 hover:bg-g-surface-2",
-                          bulkMode
-                            ? "grid-cols-[40px_64px_minmax(0,1fr)] min-[980px]:grid-cols-[40px_72px_minmax(0,1.4fr)_180px_170px_130px]"
-                            : "grid-cols-[64px_minmax(0,1fr)] min-[980px]:grid-cols-[72px_minmax(0,1.4fr)_180px_170px_130px]",
-                          isSelected &&
-                            !rowBlocked &&
-                            "bg-g-surface-2 shadow-[inset_4px_0_0_var(--g-active-bg)]",
-                          rowBlocked &&
-                            "bg-g-surface-2 opacity-[0.72] hover:bg-g-surface-2",
-                          bulkMode && rowBlocked && "cursor-not-allowed",
-                        )}
-                        onClick={() => {
-                          if (bulkMode && !rowBlocked) toggleOne(item.id);
-                        }}
-                      >
-                        {bulkMode && (
-                          <div
-                            className="grid place-items-center"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Tooltip
-                              label={rowBlockedLabel}
-                              placement="top"
-                              contentClassName="max-w-[320px] whitespace-normal break-words"
-                              disabled={!rowBlocked}
-                            >
-                              <span className="inline-grid">
-                                <Checkbox
-                                  checked={isSelected && !rowBlocked}
-                                  size="md"
-                                  disabled={selectionLocked || rowBlocked}
-                                  onCheckedChange={() => toggleOne(item.id)}
-                                  aria-label={
-                                    rowBlocked
-                                      ? rowBlockedLabel
-                                      : isSelected
-                                        ? t("action.deselect")
-                                        : t("action.select")
-                                  }
-                                />
-                              </span>
-                            </Tooltip>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className="rounded-g-md focus-visible:outline-none focus-visible:shadow-g-focus"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onOpenAsset?.(item.id);
-                          }}
-                          aria-label={t("asset.openDetails", {
-                            name: fileName(item.repoPath),
-                          })}
-                        >
-                          <AssetThumbnail
-                            src={item.thumbnailUrl || item.url}
-                            size="md"
-                            className="size-14 rounded-g-md"
-                          />
-                        </button>
-                        <div className="min-w-0">
-                          <Tooltip
-                            label={item.repoPath}
-                            placement="top"
-                            contentClassName="max-w-[360px] whitespace-normal break-words"
-                          >
-                            <span className="block truncate font-g-mono text-g-body font-medium text-g-ink">
-                              {fileName(item.repoPath)}
-                            </span>
-                          </Tooltip>
-                          <Tooltip
-                            label={`${item.projectName} / ${item.repoPath}`}
-                            placement="top"
-                            contentClassName="max-w-[420px] whitespace-normal break-words"
-                          >
-                            <span className="block truncate font-g-mono text-g-chip text-g-ink-4">
-                              {item.projectName} / {item.repoPath}
-                            </span>
-                          </Tooltip>
-                          <div className="mt-1 flex flex-wrap gap-1 min-[980px]:hidden">
-                            {sev && (
-                              <Badge
-                                tone={
-                                  sev === "critical"
-                                    ? "red"
-                                    : sev === "warning"
-                                      ? "amber"
-                                      : "blue"
-                                }
-                              >
-                                {t(`severity.${sev}`)}
-                              </Badge>
-                            )}
-                            <Badge tone="line">{operationLabel(op)}</Badge>
-                            {rowBlocked && (
-                              <Badge tone="amber">
-                                {t("optimize.noEffectiveSavings")}
-                              </Badge>
-                            )}
-                            <Badge tone="line">
-                              {hasEstimate
-                                ? `${formatBytes(item.bytes)} → ${formatBytes(estimated)}`
-                                : recSavings > 0
-                                  ? `${formatBytes(item.bytes)} ≈ −${formatBytes(recSavings)}`
-                                  : t("optimize.pendingEstimate")}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="hidden min-w-0 min-[980px]:block">
-                          <div className="flex flex-wrap gap-1">
-                            {sev && (
-                              <Badge
-                                tone={
-                                  sev === "critical"
-                                    ? "red"
-                                    : sev === "warning"
-                                      ? "amber"
-                                      : "blue"
-                                }
-                              >
-                                {t(`severity.${sev}`)}
-                              </Badge>
-                            )}
-                            <Badge tone="line">{operationLabel(op)}</Badge>
-                          </div>
-                          {planned && !planned.canApply ? (
-                            <Tooltip
-                              label={blockedReasonLabel(planned)}
-                              placement="top"
-                              contentClassName="max-w-[420px] whitespace-normal break-words"
-                            >
-                              <div className="mt-1 truncate text-g-caption text-g-amber">
-                                {blockedReasonLabel(planned)}
-                              </div>
-                            </Tooltip>
-                          ) : (
-                            <div className="mt-1 truncate text-g-caption text-g-ink-4">
-                              {planned?.tool
-                                ? `${planned.tool} ${
-                                    planned.available
-                                      ? t("optimize.ready")
-                                      : t("optimize.blocked")
-                                  }`
-                                : projectScanIntentLabel(t, item.scanIntent)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="hidden min-w-0 min-[980px]:block">
-                          <div className="font-g-mono text-g-ui text-g-ink">
-                            {hasEstimate
-                              ? `${formatBytes(item.bytes)} → ${formatBytes(estimated)}`
-                              : t("optimize.pendingEstimate")}
-                          </div>
-                          <div className="truncate text-g-chip text-g-ink-4">
-                            {item.ext.replace(".", "").toUpperCase()} /{" "}
-                            {item.image.width}×{item.image.height}
-                          </div>
-                        </div>
-                        <div className="hidden text-right min-[980px]:block">
-                          <div className="font-g-mono text-g-ui text-g-ink">
-                            {!planned
-                              ? recSavings > 0
-                                ? `≈ ${formatBytes(recSavings)}`
-                                : t("optimize.pendingEstimate")
-                              : savings > 0
-                                ? `~${formatBytes(savings)}`
-                                : t("optimize.noEffectiveSavings")}
-                          </div>
-                          {((planned && savings > 0) ||
-                            (!planned && recSavings > 0)) &&
-                            item.bytes > 0 && (
-                              <span className="font-g-mono text-g-chip text-g-green">
-                                −
-                                {Math.round(
-                                  ((planned ? savings : recSavings) /
-                                    item.bytes) *
-                                    100,
-                                )}
-                                %
-                              </span>
-                            )}
-                          <Tooltip
-                            label={
-                              rec
-                                ? t(
-                                    `optimization.suggestion.${rec.suggestionCode}`,
-                                    {
-                                      defaultValue: rec.suggestion,
-                                    },
-                                  )
-                                : t("common.none")
-                            }
-                            placement="top"
-                            align="end"
-                            contentClassName="max-w-[420px] whitespace-normal break-words text-left"
-                          >
-                            <span className="block truncate text-g-chip text-g-ink-4">
-                              {rec
-                                ? t(
-                                    `optimization.suggestion.${rec.suggestionCode}`,
-                                    {
-                                      defaultValue: rec.suggestion,
-                                    },
-                                  )
-                                : t("common.none")}
-                            </span>
-                          </Tooltip>
-                        </div>
-                      </div>
+                      <OptimizeRowItem
+                        item={item}
+                        op={op}
+                        sev={primarySeverity(item) ?? ""}
+                        planned={planned}
+                        isSelected={selected.has(item.id)}
+                        bulkMode={bulkMode}
+                        selectionLocked={selectionLocked}
+                        formatOverride={formatOverrides.get(item.id)}
+                        onToggle={toggleOne}
+                        onOpenAsset={onOpenAsset ?? (() => {})}
+                        onFormatChange={handleFormatChange}
+                      />
                     </div>
                   );
                 })}
@@ -1714,50 +1533,14 @@ export function OptimizeView({
       </div>
 
       {estimatePrompt && (
-        <Modal
-          title={t("optimize.estimatePromptTitle")}
-          onClose={() => {
-            if (working == null) setEstimatePrompt(null);
-          }}
-          footer={
-            <div className="ml-auto flex gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setEstimatePrompt(null)}
-                disabled={working != null}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => void runEstimateThenPreview(estimatePrompt.ids)}
-                disabled={working != null}
-                leadingIcon={
-                  working === "estimate" || working === "preview" ? (
-                    <LoaderCircle size={14} className="animate-spin" />
-                  ) : undefined
-                }
-              >
-                {working === "estimate"
-                  ? t("optimize.estimating")
-                  : working === "preview"
-                    ? t("optimize.optimizing")
-                    : t("optimize.estimateThenPreview")}
-              </Button>
-            </div>
+        <OptimizeEstimatePromptModal
+          ids={estimatePrompt.ids}
+          working={working}
+          onClose={() => setEstimatePrompt(null)}
+          onConfirm={(ids) =>
+            void runEstimateAndPreview(ids, { clearPrompt: true })
           }
-        >
-          <div className="space-y-3">
-            <Notice tone="warning">
-              {t("optimize.estimatePromptDesc", {
-                count: estimatePrompt.ids.length,
-              })}
-            </Notice>
-            <div className="rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-g-caption text-g-ink-3">
-              {t("optimize.selectionLockedDesc")}
-            </div>
-          </div>
-        </Modal>
+        />
       )}
 
       {preview && (
@@ -1765,7 +1548,6 @@ export function OptimizeView({
           preview={preview}
           itemsById={itemsById}
           replaceOriginal={replaceOriginal}
-          updateReferences={updateReferences}
           working={working}
           onClose={() => setPreview(null)}
           onApply={runApply}
@@ -1806,47 +1588,17 @@ export function OptimizeView({
       )}
 
       {quickConfirm && (
-        <Modal
-          title={t("optimize.quickOptimizeTitle")}
+        <OptimizeQuickConfirmModal
+          ids={quickConfirm.ids}
+          itemsById={itemsById}
+          estimatedOperationsByAsset={estimatedOperationsByAsset}
+          replaceOriginal={replaceOriginal}
           onClose={() => setQuickConfirm(null)}
-          footer={
-            <div className="ml-auto flex gap-2">
-              <Button variant="ghost" onClick={() => setQuickConfirm(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                leadingIcon={<Zap size={14} />}
-                onClick={() => void runQuickOptimize(quickConfirm.ids)}
-              >
-                {t("optimize.quickOptimizeConfirm")}
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-3">
-            <Notice tone="info">
-              {t("optimize.quickOptimizeDesc", {
-                count: quickConfirm.ids.length,
-              })}
-            </Notice>
-            <div className="rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-g-caption text-g-ink-3">
-              <div className="mb-1 font-[510] text-g-ink">
-                {t("optimize.quickOptimizeSteps")}
-              </div>
-              <ol className="list-inside list-decimal space-y-0.5">
-                <li>{t("optimize.quickStep1")}</li>
-                <li>{t("optimize.quickStep2")}</li>
-                <li>{t("optimize.quickStep3")}</li>
-              </ol>
-            </div>
-            <div className="rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 text-g-caption text-g-ink-3">
-              {replaceOriginal
-                ? t("optimize.quickRiskReplace")
-                : t("optimize.quickRiskSafe")}
-            </div>
-          </div>
-        </Modal>
+          onConfirm={(ids) => {
+            setQuickConfirm(null);
+            void runEstimateAndPreview(ids, { isQuickFlow: true });
+          }}
+        />
       )}
     </>
   );

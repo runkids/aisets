@@ -8,6 +8,8 @@ FROM golang:${GO_VERSION}-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl git procps tini tesseract-ocr \
+    ffmpeg webp libavif-bin gifsicle imagemagick \
+  && ln -sf /usr/bin/convert /usr/local/bin/magick \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/
@@ -18,7 +20,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
   && ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 ARG PNPM_VERSION
-RUN npm install -g pnpm@${PNPM_VERSION} \
+RUN npm install -g pnpm@${PNPM_VERSION} svgo \
   && go install github.com/air-verse/air@latest
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt
@@ -29,7 +31,8 @@ RUN useradd --create-home --shell /bin/bash developer \
   && chown -R developer:developer /workspace /go /home/developer
 
 USER developer
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt \
+  && /home/developer/.cargo/bin/cargo install oxipng
 USER root
 ENV PATH="/home/developer/.cargo/bin:/root/.cargo/bin:${PATH}"
 

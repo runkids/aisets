@@ -182,7 +182,7 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Tooltips via Radix, not `title`** | Native tooltips can't be styled, have inconsistent delay, and no keyboard trigger. |
 | **Lucide icons only** | Mixing icon sets (or using emoji) creates visual noise. |
 | **`cn()` for all class merging** | It wraps `clsx` + `twMerge` — handles conditional classes and deduplicates conflicts. |
-| **No left-edge accent bars** | Never add vertical colored bars/stripes on container edges. Use tinted bg + border + icon for tone. |
+| **No decorative left-edge bars** | Never add purely decorative vertical colored bars on container edges. Exception: functional severity indicators (`border-l-[3px]` + severity color) are allowed on data rows when severity is a primary dimension (e.g. Optimize list items). Always pair with `border-l-transparent` fallback for consistent alignment and add extra `pl-5` to separate the bar from content. |
 | **StatCard icon mandatory** | Every `<StatCard>` must have `icon={<LucideIcon size={14} />}`. Omitting icons on some cards in a grid breaks visual rhythm. |
 | **i18n code-first** | Never render backend strings directly. Use `t(\`ns.${code}\`, { defaultValue: raw })` with the machine code field. |
 | **Collapsible via grid-rows** | Animated expand/collapse uses `grid-rows-[0fr]` → `grid-rows-[1fr]` with `overflow-hidden` inner div. Add `motion-reduce:transition-none`. |
@@ -208,6 +208,9 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Callback ref for conditional-render measurement** | When a view has early-return branches (loading/empty), `useEffect(fn, [])` misses the ref target on first render. Use `useCallback` ref + `ResizeObserver` for dynamic measurements like toolbar height for second-level sticky. |
 | **Virtual scroll `scrollMargin` for nested containers** | When the virtual container sits below StatCards/toolbar/panels inside the scroll element, pass `scrollMargin: virtualContainerRef.offsetTop` to `useVirtualizer` and subtract it from each item's `translateY`. Without this, items render at wrong positions (gap between header and first row). |
 | **No `<table>` with virtualizer** | `<tr>` cannot be `position: absolute`. Use div + CSS grid (`grid-cols-[...]`) with `role="table"`, `role="row"`, `role="columnheader"` for virtualized tabular data. Match BrowseList's `--row-y` CSS custom property + `translate-y-[var(--row-y,0)]` pattern. |
+| **Tab counts via `badge` prop** | Show tab counts as separate styled elements using the Tabs `badge` prop (`<span className="font-[400] text-g-ink-4">{count}</span>`), not embedded in the `label` string. "All" tabs must NOT show counts — only individual filter values show counts. Consistent across Duplicates, Optimize, and Lint views. |
+| **Grid table: `border-b` on row, not cells** | In div-based CSS grid tables, put `border-b` on the row div, not on individual cells. Cells may have different heights (badges vs text), causing per-cell borders to misalign. A single row-level border guarantees one straight horizontal line. |
+| **Grid table: distribute `fr` across columns** | When defining `grid-cols-[...]` for data tables, never give only one column `1fr` while all others are fixed `px` — that column absorbs all remaining space, creating a visual gap. Use `fr` on 2–3 content columns (e.g. `path: 2fr`, `project: 1fr`, `bytes: 1fr`) so extra space is distributed proportionally. |
 
 ---
 

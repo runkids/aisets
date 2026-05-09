@@ -81,7 +81,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	}
 	severityQuery := query
 	severityQuery.OptimizationSeverity = ""
-	severities, _, err := s.catalogOptimizationFacetCounts(scanID, severityQuery, "o.severity")
+	severities, _, err := s.catalogMaxSeverityFacetCounts(scanID, severityQuery)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -185,6 +185,40 @@ func (s *Store) catalogOptimizationFacetCounts(scanID int64, query CatalogItemQu
 		if option.ID != "" {
 			options = append(options, option)
 		}
+	}
+	return options, 0, rows.Err()
+}
+
+func (s *Store) catalogMaxSeverityFacetCounts(scanID int64, query CatalogItemQuery) ([]CatalogFacetOption, int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(`
+		SELECT max_sev, COUNT(*) FROM (
+			SELECT a.asset_id,
+				CASE MAX(CASE o.severity WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
+					WHEN 3 THEN 'critical' WHEN 2 THEN 'warning' WHEN 1 THEN 'info' ELSE '' END AS max_sev
+			FROM asset_snapshots a
+			JOIN optimization_snapshots o ON o.scan_id = a.scan_id AND o.asset_id = a.asset_id
+			`+where+`
+			GROUP BY a.asset_id
+		) sub
+		WHERE max_sev != ''
+		GROUP BY max_sev
+		ORDER BY COUNT(*) DESC, max_sev ASC
+	`, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	options := []CatalogFacetOption{}
+	for rows.Next() {
+		var option CatalogFacetOption
+		if err := rows.Scan(&option.ID, &option.Count); err != nil {
+			return nil, 0, err
+		}
+		options = append(options, option)
 	}
 	return options, 0, rows.Err()
 }
@@ -417,11 +451,12 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		args = append(args, category)
 	}
 	if severity := strings.TrimSpace(query.OptimizationSeverity); severity != "" {
-		clauses = append(clauses, `EXISTS (
-			SELECT 1 FROM optimization_snapshots os
-			WHERE os.scan_id = a.scan_id AND os.asset_id = a.asset_id AND os.severity = ?
-		)`)
-		args = append(args, severity)
+		clauses = append(clauses, `(
+			SELECT MAX(CASE os.severity WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
+			FROM optimization_snapshots os
+			WHERE os.scan_id = a.scan_id AND os.asset_id = a.asset_id
+		) = ?`)
+		args = append(args, severityFilterRank(severity))
 	}
 	if operation := strings.TrimSpace(query.Operation); operation != "" {
 		clauses = append(clauses, `EXISTS (
@@ -443,4 +478,17 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		}
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
+}
+
+func severityFilterRank(severity string) int {
+	switch severity {
+	case "critical":
+		return 3
+	case "warning":
+		return 2
+	case "info":
+		return 1
+	default:
+		return 0
+	}
 }

@@ -61,6 +61,33 @@ func OperationSQL(suggestionColumn, extColumn string) string {
 	return b.String()
 }
 
+func formatToOperation(targetFormat, sourceExt string) string {
+	targetFormat = strings.ToLower(strings.TrimSpace(targetFormat))
+	src := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(sourceExt)), ".")
+	switch targetFormat {
+	case "avif":
+		return "convert-avif"
+	case "webp":
+		return "convert-webp"
+	case "svg":
+		return "svg-minify"
+	case "jpg", "jpeg":
+		if src == "jpg" || src == "jpeg" {
+			return "jpeg-recompress"
+		}
+		return "jpeg-recompress"
+	case "png":
+		if src == "png" {
+			return "png-recompress"
+		}
+		return "png-recompress"
+	case "gif":
+		return "gif-optimize"
+	default:
+		return "manual-review"
+	}
+}
+
 func containsString(values []string, needle string) bool {
 	for _, value := range values {
 		if value == needle {
