@@ -77,12 +77,24 @@ export function OptimizationHelpModal({
       <OptimizationHelpSection
         title={t("settings.externalToolsHelpToolsTitle")}
         items={[
-          "svgo: SVG minify",
-          "gifsicle / ffmpeg: GIF optimization",
-          "cwebp / ffmpeg: WebP convert or recompress",
-          "avifenc: AVIF convert",
-          "magick: resize fallback",
-          "oxipng: PNG recompress fallback",
+          t("settings.externalToolsHelpTool.svgo", {
+            defaultValue: "svgo — SVG minification",
+          }),
+          t("settings.externalToolsHelpTool.gifsicle", {
+            defaultValue: "gifsicle / ffmpeg — GIF optimization",
+          }),
+          t("settings.externalToolsHelpTool.cwebp", {
+            defaultValue: "cwebp / ffmpeg — WebP conversion",
+          }),
+          t("settings.externalToolsHelpTool.avifenc", {
+            defaultValue: "avifenc — AVIF conversion",
+          }),
+          t("settings.externalToolsHelpTool.magick", {
+            defaultValue: "magick — Image resize",
+          }),
+          t("settings.externalToolsHelpTool.oxipng", {
+            defaultValue: "oxipng — PNG lossless compression",
+          }),
         ]}
       />
     </Modal>

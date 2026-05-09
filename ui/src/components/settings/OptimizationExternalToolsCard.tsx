@@ -154,7 +154,7 @@ export function OptimizationExternalToolsCard({
                   </FieldRow>
                 );
               })}
-              <div className="flex gap-2 py-4">
+              <div className="flex gap-2 border-t border-g-line pt-4">
                 <Button
                   size="md"
                   variant="primary"

@@ -1,20 +1,10 @@
-import { ChevronDown, Info, ListChecks, Plus, Sliders } from "lucide-react";
+import { ChevronDown, Info, ListChecks, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { OptimizationStrategy } from "../../types";
 import type { SettingsDraft } from "./types";
-import {
-  Badge,
-  Button,
-  Card,
-  IconButton,
-  Modal,
-  Notice,
-  Range,
-  Switch,
-} from "../ui";
-import { FieldRow } from "./FieldRow";
+import { Badge, Button, Card, IconButton, Modal, Notice } from "../ui";
 import { defaultOptimizationStrategies } from "./constants";
 import { OptimizationHelpModal } from "./OptimizationHelpModal";
 import { OptimizationStrategyRow } from "./OptimizationStrategyRow";
@@ -23,8 +13,6 @@ import type { StrategyFieldErrors } from "./optimizationStrategyValidation";
 type OptimizationStrategiesCardProps = {
   draft: SettingsDraft;
   disabled: boolean;
-  settingsLoading: boolean;
-  updatePending: boolean;
   hasStrategyErrors: boolean;
   strategyErrors: Map<string, StrategyFieldErrors>;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
@@ -33,8 +21,6 @@ type OptimizationStrategiesCardProps = {
 export function OptimizationStrategiesCard({
   draft,
   disabled,
-  settingsLoading,
-  updatePending,
   hasStrategyErrors,
   strategyErrors,
   onUpdateDraft,
@@ -164,12 +150,6 @@ export function OptimizationStrategiesCard({
                     count: enabledCount,
                   })}
                 </Badge>
-                <Badge tone="default">
-                  {t("settings.strategiesBadgeWorkers", {
-                    defaultValue: "{{count}} workers",
-                    count: draft.optimizationWorkers,
-                  })}
-                </Badge>
               </div>
             </div>
           )}
@@ -181,109 +161,13 @@ export function OptimizationStrategiesCard({
           )}
         >
           <div className="overflow-hidden">
-            <div className="flex flex-col gap-2 px-6 py-3 md:px-8">
-              <div className="divide-y divide-g-line">
-                <FieldRow
-                  label={t("settings.workers")}
-                  description={t("settings.workersHint")}
-                  icon={<Sliders size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
-                    <div className="flex items-center gap-3">
-                      <Range
-                        min={1}
-                        max={4}
-                        value={draft.optimizationWorkers}
-                        disabled={settingsLoading || updatePending}
-                        onChange={(event) =>
-                          onUpdateDraft((prev) => ({
-                            ...prev,
-                            optimizationWorkers: Number(event.target.value),
-                          }))
-                        }
-                        aria-label={t("settings.workers")}
-                      />
-                      <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
-                        {draft.optimizationWorkers}
-                      </span>
-                    </div>
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.avifSpeed")}
-                  description={t("settings.avifSpeedHint")}
-                  icon={<Sliders size={15} />}
-                  align="start"
-                >
-                  <div className="flex w-full flex-col gap-3 min-[1200px]:w-[320px]">
-                    <div className="flex items-center gap-3">
-                      <Range
-                        min={1}
-                        max={10}
-                        value={draft.optimizationAvifSpeed}
-                        disabled={settingsLoading || updatePending}
-                        onChange={(event) =>
-                          onUpdateDraft((prev) => ({
-                            ...prev,
-                            optimizationAvifSpeed: Number(event.target.value),
-                          }))
-                        }
-                        aria-label={t("settings.avifSpeed")}
-                      />
-                      <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
-                        {draft.optimizationAvifSpeed}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      {(
-                        [
-                          { label: t("settings.avifSpeedFast"), value: 10 },
-                          { label: t("settings.avifSpeedBalanced"), value: 6 },
-                          { label: t("settings.avifSpeedBest"), value: 1 },
-                        ] as const
-                      ).map((preset) => (
-                        <Button
-                          key={preset.value}
-                          variant="chip"
-                          size="sm"
-                          data-active={
-                            draft.optimizationAvifSpeed === preset.value ||
-                            undefined
-                          }
-                          disabled={settingsLoading || updatePending}
-                          onClick={() =>
-                            onUpdateDraft((prev) => ({
-                              ...prev,
-                              optimizationAvifSpeed: preset.value,
-                            }))
-                          }
-                          className="flex-1"
-                        >
-                          {preset.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </FieldRow>
-                <FieldRow
-                  label={t("settings.autoApply")}
-                  description={t("settings.autoApplyHint")}
-                  icon={<Sliders size={15} />}
-                >
-                  <Switch
-                    checked={draft.optimizationAutoApply}
-                    onCheckedChange={(next) =>
-                      onUpdateDraft((prev) => ({
-                        ...prev,
-                        optimizationAutoApply: next,
-                      }))
-                    }
-                    disabled={settingsLoading || updatePending}
-                    aria-label={t("settings.autoApply")}
-                  />
-                </FieldRow>
-              </div>
+            <div className="flex flex-col gap-3 px-6 py-3 md:px-8">
+              <p className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+                {t("settings.strategiesInlineHelp", {
+                  defaultValue:
+                    "Each strategy is a rule: images matching the conditions are processed by the action. Lower priority values are checked first — the first match wins.",
+                })}
+              </p>
               {hasStrategyErrors && (
                 <Notice
                   tone="warning"
@@ -302,7 +186,7 @@ export function OptimizationStrategiesCard({
                   onDelete={() => setStrategyPendingDelete(strategy)}
                 />
               ))}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 border-t border-g-line pt-4">
                 <Button
                   size="md"
                   variant="primary"

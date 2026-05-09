@@ -5,7 +5,6 @@ import type { SettingsDraft } from "./types";
 import { OptimizationDefaultsCard } from "./OptimizationDefaultsCard";
 import { OptimizationExternalToolsCard } from "./OptimizationExternalToolsCard";
 import { OptimizationStrategiesCard } from "./OptimizationStrategiesCard";
-import { OptimizationThresholdsCard } from "./OptimizationThresholdsCard";
 import { validateStrategy } from "./optimizationStrategyValidation";
 
 type OptimizationSectionProps = {
@@ -51,19 +50,9 @@ export function OptimizationSection({
         settingActions={settingActions(hasStrategyErrors)}
         onUpdateDraft={onUpdateDraft}
       />
-      <OptimizationThresholdsCard
-        draft={draft}
-        settingsLoading={settingsLoading}
-        updatePending={updatePending}
-        updateError={updateError}
-        settingActions={settingActions(hasStrategyErrors)}
-        onUpdateDraft={onUpdateDraft}
-      />
       <OptimizationStrategiesCard
         draft={draft}
         disabled={disabled}
-        settingsLoading={settingsLoading}
-        updatePending={updatePending}
         hasStrategyErrors={hasStrategyErrors}
         strategyErrors={strategyErrors}
         onUpdateDraft={onUpdateDraft}

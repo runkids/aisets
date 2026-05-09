@@ -1,4 +1,3 @@
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -861,14 +860,12 @@ export function App() {
   }
 
   return (
-    <TooltipPrimitive.Provider delayDuration={400}>
-      <ImageBackgroundProvider
-        mode={imageBackgroundMode}
-        onModeChange={setImageBackgroundMode}
-      >
-        {appShell}
-      </ImageBackgroundProvider>
-    </TooltipPrimitive.Provider>
+    <ImageBackgroundProvider
+      mode={imageBackgroundMode}
+      onModeChange={setImageBackgroundMode}
+    >
+      {appShell}
+    </ImageBackgroundProvider>
   );
 }
 
