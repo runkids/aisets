@@ -142,6 +142,7 @@ export function AssetDrawer({
   );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
+  const assetFileName = fileName(asset.repoPath);
 
   const dimensions =
     asset.image.width > 0 && asset.image.height > 0
@@ -272,7 +273,7 @@ export function AssetDrawer({
               <div className="grid grid-cols-[80px_minmax(0,1fr)] items-start gap-3.5 pr-9 max-[600px]:grid-cols-[64px_minmax(0,1fr)] max-[600px]:gap-3">
                 <AssetThumbnail
                   src={asset.thumbnailUrl || asset.url}
-                  alt={fileName(asset.repoPath)}
+                  alt={assetFileName}
                   size="fill"
                   loading="eager"
                   className="size-[80px] rounded-g-lg p-1 max-[600px]:size-[64px] [&_img]:max-h-full [&_img]:max-w-full"
@@ -282,9 +283,9 @@ export function AssetDrawer({
                   <DialogPrimitive.Title asChild>
                     <h2
                       className="line-clamp-2 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
-                      title={fileName(asset.repoPath)}
+                      title={assetFileName}
                     >
-                      {fileName(asset.repoPath)}
+                      {assetFileName}
                     </h2>
                   </DialogPrimitive.Title>
                   <div
@@ -429,6 +430,17 @@ export function AssetDrawer({
                   }}
                 >
                   {t("action.copyPath")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<Copy size={14} />}
+                  onClick={() => {
+                    copyText(assetFileName);
+                    toast.success(t("toast.copied"));
+                  }}
+                >
+                  {t("action.copyFileName")}
                 </Button>
                 {onRename && (
                   <Tooltip label={t("action.rename")}>

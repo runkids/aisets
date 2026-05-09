@@ -737,6 +737,7 @@ export function App() {
                 projectFilterName={selectedProject?.name ?? ""}
                 optimizeAbortRef={optimizeActivityAbortRef}
                 optimizeLockedIds={optimizeLockedIds}
+                optimizeActivity={optimizeActivity}
                 onOptimizeActivity={dispatchOptimizeActivity}
                 onOptimizeLockIds={setOptimizeLockedIds}
                 onOpenAsset={setDrawerId}

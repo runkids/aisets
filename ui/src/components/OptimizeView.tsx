@@ -67,7 +67,14 @@ import { useElementHeight } from "../hooks/useElementHeight";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
 import { cn } from "@/lib/cn";
 import { useToast } from "./ToastProvider";
-import type { OptimizeActivityAction } from "../optimizeActivity";
+import type {
+  OptimizeActivityAction,
+  OptimizeActivityState,
+} from "../optimizeActivity";
+import {
+  isOptimizeActivityBusy,
+  optimizeActivityProgressPercent,
+} from "../optimizeActivity";
 import {
   Badge,
   Button,
@@ -106,6 +113,7 @@ type Props = {
   enabled?: boolean;
   optimizeAbortRef?: RefObject<AbortController | null>;
   optimizeLockedIds?: string[] | null;
+  optimizeActivity?: OptimizeActivityState;
   onOptimizeActivity?: (action: OptimizeActivityAction) => void;
   onOptimizeLockIds?: (ids: string[] | null) => void;
   onOpenAsset?: (id: string) => void;
@@ -118,6 +126,7 @@ export function OptimizeView({
   enabled = true,
   optimizeAbortRef,
   optimizeLockedIds,
+  optimizeActivity,
   onOptimizeActivity,
   onOptimizeLockIds,
   onOpenAsset,
@@ -176,9 +185,15 @@ export function OptimizeView({
   const [lockedActionIds, setLockedActionIds] = useState<string[] | null>(null);
   const [working, setWorking] = useState<
     "estimate" | "preview" | "apply" | "script" | null
-  >(null);
+  >(() => {
+    if (!optimizeActivity || !isOptimizeActivityBusy(optimizeActivity))
+      return null;
+    return optimizeActivity.stage === "previewing" ? "preview" : "estimate";
+  });
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(() =>
+    optimizeActivity ? optimizeActivityProgressPercent(optimizeActivity) : 0,
+  );
   const abortRef = useRef<AbortController | null>(null);
   const quickFlowRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -414,6 +429,17 @@ export function OptimizeView({
       estimateCache.get(currentEstimateKey) ?? cachedEstimateFor(actionIds),
     );
   }, [currentEstimateKey, actionIds, itemsById, cachedEstimateFor]);
+
+  useEffect(() => {
+    if (!optimizeActivity) return;
+    if (
+      !isOptimizeActivityBusy(optimizeActivity) &&
+      (working === "estimate" || working === "preview")
+    ) {
+      setWorking(null);
+      setProgress(0);
+    }
+  }, [optimizeActivity?.phase, working]);
 
   useEffect(() => {
     if (working != null || externalLockedIds.length > 0) return;
