@@ -1187,6 +1187,15 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	if _, err := store.UpdateSettings(SettingsUpdate{OCRConcurrency: &badOCRConcurrency}); err == nil || err.(apierr.Error).Code != "settings_ocr_concurrency_invalid" {
 		t.Fatalf("bad OCR concurrency err = %T %[1]v", err)
 	}
+	if _, err := store.UpdateSettings(SettingsUpdate{OptimizationExternalTools: []imageproc.OptimizationExternalTool{{ID: "unknown", Enabled: true}}}); err == nil || err.(apierr.Error).Code != "settings_optimization_tool_unknown" {
+		t.Fatalf("bad optimization tool err = %T %[1]v", err)
+	}
+	badStrategy := imageproc.DefaultOptimizationStrategies()[0]
+	badStrategyQuality := 101
+	badStrategy.Action.Quality = &badStrategyQuality
+	if _, err := store.UpdateSettings(SettingsUpdate{OptimizationStrategies: []imageproc.OptimizationStrategy{badStrategy}}); err == nil || err.(apierr.Error).Code != "settings_optimization_strategy_quality_invalid" {
+		t.Fatalf("bad optimization strategy err = %T %[1]v", err)
+	}
 
 	workspace := " Team Assets "
 	rootPath := " /repo "
@@ -1200,6 +1209,10 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	ocrFuzzySearch := false
 	autoApply := true
 	quality := 0
+	tools := imageproc.DefaultOptimizationExternalTools()
+	tools[0].Enabled = true
+	strategies := imageproc.DefaultOptimizationStrategies()
+	strategies[0].Name = "Custom SVG"
 	settings, err := store.UpdateSettings(SettingsUpdate{
 		WorkspaceName:              &workspace,
 		DefaultProjectRoot:         &rootPath,
@@ -1213,6 +1226,8 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 		OCRFuzzySearch:             &ocrFuzzySearch,
 		OptimizationDefaultQuality: &quality,
 		OptimizationAutoApply:      &autoApply,
+		OptimizationExternalTools:  tools,
+		OptimizationStrategies:     strategies,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1222,6 +1237,9 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	}
 	if !settings.OCREnabled || strings.Join(settings.OCRLanguages, ",") != "eng,chi_tra" || settings.OCRMaxPixels != 1000 || settings.OCRBatchSize != 3 || settings.OCRConcurrency != 2 || settings.OCRFuzzySearch {
 		t.Fatalf("OCR settings = %#v", settings)
+	}
+	if !settings.OptimizationExternalTools[0].Enabled || settings.OptimizationStrategies[0].Name != "Custom SVG" {
+		t.Fatalf("optimization settings = %#v %#v", settings.OptimizationExternalTools, settings.OptimizationStrategies)
 	}
 }
 

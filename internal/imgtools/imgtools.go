@@ -12,16 +12,22 @@ import (
 const binaryName = "asset-studio-imgtools"
 
 var (
-	resolveOnce  sync.Once
+	resolveMu    sync.Mutex
 	resolvedPath string
-	resolveErr   error
 )
 
 func Binary() (string, error) {
-	resolveOnce.Do(func() {
-		resolvedPath, resolveErr = resolve()
-	})
-	return resolvedPath, resolveErr
+	resolveMu.Lock()
+	defer resolveMu.Unlock()
+	if resolvedPath != "" {
+		return resolvedPath, nil
+	}
+	path, err := resolve()
+	if err != nil {
+		return "", err
+	}
+	resolvedPath = path
+	return resolvedPath, nil
 }
 
 func Available() bool {

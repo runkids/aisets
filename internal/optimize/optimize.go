@@ -105,12 +105,13 @@ func ComputeWithProject(project scanner.Project, items []scanner.AssetItem, req 
 // GenerateScript builds a bash script applying suggested optimizations to the
 // given items. Operations write to sibling files where the tool does not
 // overwrite by design; review before running.
-func GenerateScript(items []scanner.AssetItem) string {
+func GenerateScript(items []scanner.AssetItem, req Request) string {
+	req = normalizeRequest(req)
 	var b strings.Builder
 	b.WriteString("#!/usr/bin/env bash\n")
 	b.WriteString("# asset-studio: optimization script\n")
 	b.WriteString("# Review each command before running.\n")
-	b.WriteString("# Script fallback requires external CLI tools. In-app optimization uses built-in handlers for common formats.\n")
+	b.WriteString("# Commands are generated from the active optimization settings.\n")
 	b.WriteString("set -euo pipefail\n\n")
 
 	count := 0
@@ -123,14 +124,21 @@ func GenerateScript(items []scanner.AssetItem) string {
 		if path == "" {
 			path = item.RepoPath
 		}
-		ext := strings.ToLower(filepath.Ext(path))
 		quoted := shellQuote(path)
 		b.WriteString(fmt.Sprintf("# --- %s (%s) ---\n", item.RepoPath, item.ProjectName))
 		for _, opt := range item.Optimization {
 			b.WriteString(fmt.Sprintf("# [%s/%s] %s → %s\n", opt.Severity, opt.Category, opt.Reason, opt.Suggestion))
-			cmd := commandFor(opt.SuggestionCode, ext, path)
+		}
+		ops := Plan([]scanner.AssetItem{item}, req)
+		if len(ops) == 0 {
+			b.WriteString(fmt.Sprintf("#   (no automated command; review %s manually)\n", quoted))
+			b.WriteString("\n")
+			continue
+		}
+		for _, op := range ops {
+			cmd := commandForOperation(op, path, req)
 			if cmd == "" {
-				b.WriteString(fmt.Sprintf("#   (no automated command for %s; review %s manually)\n", opt.SuggestionCode, quoted))
+				b.WriteString(fmt.Sprintf("#   (no automated command for %s; review %s manually)\n", op.Operation, quoted))
 				continue
 			}
 			b.WriteString(cmd)
@@ -145,26 +153,99 @@ func GenerateScript(items []scanner.AssetItem) string {
 	return b.String()
 }
 
-func commandFor(suggestionCode, ext, path string) string {
+func commandForOperation(op Operation, path string, req Request) string {
+	if op.Operation == "" || op.Operation == "manual-review" {
+		return ""
+	}
+	quality := formatQuality(op, req.Quality)
+	target := operationOutputPath(op, path, req)
 	q := shellQuote(path)
-	switch SuggestionOperation(suggestionCode, ext) {
+	out := shellQuote(target)
+	switch op.Operation {
 	case "svg-minify":
 		return fmt.Sprintf("svgo --input %s --output %s", q, q)
-	case "convert-avif":
-		out := shellQuote(replaceExt(path, ".avif"))
-		return fmt.Sprintf("asset-studio-imgtools convert --format avif --quality 50 --speed 6 %s %s", q, out)
-	case "convert-webp":
-		out := shellQuote(replaceExt(path, ".webp"))
-		return fmt.Sprintf("asset-studio-imgtools convert --format webp --quality 80 %s %s", q, out)
-	case "webp-recompress":
-		return fmt.Sprintf("asset-studio-imgtools convert --format webp --quality 60 %s %s", q, q)
-	case "gif-optimize":
-		return fmt.Sprintf("asset-studio-imgtools convert --format gif --quality 75 %s %s", q, q)
-	case "resize-variant":
-		out := shellQuote(replaceExt(path, "@1200"+ext))
-		return fmt.Sprintf("asset-studio-imgtools resize --max-dimension 1200 %s %s", q, out)
+	case "resize-variant", "resize-replace":
+		maxDimension := resizeMaxDimension(op, req)
+		if maxDimension <= 0 {
+			maxDimension = 1200
+		}
+		return fmt.Sprintf("asset-studio-imgtools resize --max-dimension %d %s %s", maxDimension, q, out)
+	case "convert-avif", "convert-webp", "webp-recompress", "gif-optimize", "png-recompress", "jpeg-recompress":
+		if op.Tool != "" && op.Tool != "asset-studio-imgtools" {
+			return externalCommandForOperation(op, path, target, req)
+		}
+		args := []string{
+			"asset-studio-imgtools",
+			"convert",
+			"--format",
+			op.OutputFormat,
+			"--quality",
+			fmt.Sprintf("%d", quality),
+		}
+		if op.Operation == "convert-avif" {
+			speed := req.AvifSpeed
+			if op.AvifSpeed > 0 {
+				speed = op.AvifSpeed
+			}
+			if speed <= 0 {
+				speed = 6
+			}
+			args = append(args, "--speed", fmt.Sprintf("%d", speed))
+		}
+		if maxDimension := resizeMaxDimension(op, req); op.ResizeMaxDimensionPx > 0 && maxDimension > 0 {
+			args = append(args, "--resize", fmt.Sprintf("%d", maxDimension))
+		}
+		args = append(args, q, out)
+		return strings.Join(args, " ")
 	}
 	return ""
+}
+
+func externalCommandForOperation(op Operation, path, target string, req Request) string {
+	q := shellQuote(path)
+	out := shellQuote(target)
+	quality := formatQuality(op, req.Quality)
+	switch op.Tool {
+	case "svgo":
+		return fmt.Sprintf("svgo --input %s --output %s", q, out)
+	case "cwebp":
+		return fmt.Sprintf("cwebp -q %d %s -o %s", quality, q, out)
+	case "avifenc":
+		speed := req.AvifSpeed
+		if op.AvifSpeed > 0 {
+			speed = op.AvifSpeed
+		}
+		if speed <= 0 {
+			speed = 6
+		}
+		return fmt.Sprintf("avifenc --min %d --max %d --speed %d %s %s", quality, quality, speed, q, out)
+	case "gifsicle":
+		return fmt.Sprintf("gifsicle -O3 %s -o %s", q, out)
+	case "ffmpeg":
+		return fmt.Sprintf("ffmpeg -y -i %s %s", q, out)
+	case "magick":
+		maxDimension := resizeMaxDimension(op, req)
+		if maxDimension <= 0 {
+			maxDimension = 1200
+		}
+		return fmt.Sprintf("magick %s -resize %dx%d\\> %s", q, maxDimension, maxDimension, out)
+	case "oxipng":
+		return fmt.Sprintf("oxipng -o 4 --out %s %s", out, q)
+	}
+	return ""
+}
+
+func operationOutputPath(op Operation, path string, req Request) string {
+	if op.Operation == "resize-variant" {
+		return resizeTargetPath(path, resizeMaxDimension(op, req))
+	}
+	if op.TargetPath == op.RepoPath {
+		return path
+	}
+	if op.OutputFormat == "" {
+		return path
+	}
+	return replaceExt(path, "."+op.OutputFormat)
 }
 
 func replaceExt(path, newExt string) string {

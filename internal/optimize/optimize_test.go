@@ -86,6 +86,12 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 		{
 			RepoPath:    "assets/photo.png",
 			ProjectName: "web",
+			Ext:         ".png",
+			Image: imageproc.Metadata{
+				Format: "png",
+				Width:  2400,
+				Height: 1600,
+			},
 			Optimization: []scanner.OptimizationSuggestion{
 				{Severity: "warning", Category: "format", Reason: "modern", Suggestion: "webp", SuggestionCode: "try_modern_photographic_format"},
 				{Severity: "critical", Category: "dimensions", Reason: "large", Suggestion: "resize", SuggestionCode: "use_responsive_or_smaller_source"},
@@ -93,13 +99,12 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 		},
 	}
 
-	script := GenerateScript(items)
+	script := GenerateScript(items, Request{})
 	for _, want := range []string{
 		"#!/usr/bin/env bash",
 		`svgo --input "assets/icon \"quoted\".svg" --output "assets/icon \"quoted\".svg"`,
-		`#   (no automated command for manual_review; review "assets/icon \"quoted\".svg" manually)`,
-		`asset-studio-imgtools convert --format avif --quality 50 --speed 6 "assets/photo.png" "assets/photo.avif"`,
-		`asset-studio-imgtools resize --max-dimension 1200 "assets/photo.png" "assets/photo@1200.png"`,
+		`# [info/manual] needs review → review`,
+		`asset-studio-imgtools convert --format avif --quality 50 --speed 6 --resize 1200 "assets/photo.png" "assets/photo.avif"`,
 		`echo "asset-studio: optimization script complete."`,
 	} {
 		if !strings.Contains(script, want) {
@@ -109,7 +114,7 @@ func TestGenerateScriptBuildsCommandsForRecommendations(t *testing.T) {
 }
 
 func TestGenerateScriptHandlesEmptySelection(t *testing.T) {
-	script := GenerateScript([]scanner.AssetItem{{RepoPath: "assets/a.png"}})
+	script := GenerateScript([]scanner.AssetItem{{RepoPath: "assets/a.png"}}, Request{})
 	if !strings.Contains(script, "# No optimizable items in selection.") {
 		t.Fatalf("empty script = %s", script)
 	}
@@ -118,23 +123,22 @@ func TestGenerateScriptHandlesEmptySelection(t *testing.T) {
 func TestCommandForCompressionVariants(t *testing.T) {
 	tests := []struct {
 		name string
-		code string
-		ext  string
+		op   Operation
 		path string
 		want string
 	}{
-		{"png conversion", "review_compression_or_modern_format", ".png", "a.png", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
-		{"jpeg conversion", "review_compression_or_modern_format", ".jpeg", "a.jpeg", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
-		{"webp recompress via size", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
-		{"gif to webp", "review_compression_or_modern_format", ".gif", "a.gif", `asset-studio-imgtools convert --format webp --quality 80 "a.gif" "a.webp"`},
-		{"webp recompress", "review_compression_or_modern_format", ".webp", "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
-		{"unsupported modern format", "try_modern_photographic_format", ".svg", "a.svg", ""},
-		{"unknown code", "unknown", ".png", "a.png", ""},
+		{"png conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.png", TargetPath: "a.avif"}, "a.png", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.png" "a.avif"`},
+		{"jpeg conversion", Operation{Operation: "convert-avif", OutputFormat: "avif", RepoPath: "a.jpeg", TargetPath: "a.avif"}, "a.jpeg", `asset-studio-imgtools convert --format avif --quality 50 --speed 6 "a.jpeg" "a.avif"`},
+		{"webp recompress via size", Operation{Operation: "webp-recompress", OutputFormat: "webp", RepoPath: "a.webp", TargetPath: "a.webp"}, "a.webp", `asset-studio-imgtools convert --format webp --quality 60 "a.webp" "a.webp"`},
+		{"gif optimize", Operation{Operation: "gif-optimize", OutputFormat: "gif", RepoPath: "a.gif", TargetPath: "a.gif"}, "a.gif", `asset-studio-imgtools convert --format gif --quality 75 "a.gif" "a.gif"`},
+		{"convert with resize", Operation{Operation: "convert-webp", OutputFormat: "webp", RepoPath: "a.png", TargetPath: "a.webp", ResizeMaxDimensionPx: 1800}, "a.png", `asset-studio-imgtools convert --format webp --quality 80 --resize 1800 "a.png" "a.webp"`},
+		{"unsupported operation", Operation{Operation: "manual-review", OutputFormat: "svg", RepoPath: "a.svg", TargetPath: "a.svg"}, "a.svg", ""},
+		{"unknown operation", Operation{Operation: "unknown", OutputFormat: "png", RepoPath: "a.png", TargetPath: "a.png"}, "a.png", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := commandFor(tt.code, tt.ext, tt.path); got != tt.want {
-				t.Fatalf("commandFor() = %q, want %q", got, tt.want)
+			if got := commandForOperation(tt.op, tt.path, Request{}); got != tt.want {
+				t.Fatalf("commandForOperation() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -269,6 +273,60 @@ func TestPlanRoutesFormatsByRules(t *testing.T) {
 				t.Fatalf("got %q, want %q", ops[0].Operation, tt.wantOp)
 			}
 		})
+	}
+}
+
+func TestPlanUsesSettingsStrategiesAndChainsResize(t *testing.T) {
+	items := []scanner.AssetItem{{
+		ID:         "a",
+		RepoPath:   "src/photo.png",
+		Ext:        ".png",
+		Bytes:      3 * 1024 * 1024,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image: imageproc.Metadata{
+			Format: "png",
+			Width:  4000,
+			Height: 2000,
+			Alpha:  false,
+		},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "info",
+			SuggestionCode: "review_compression_or_modern_format",
+		}},
+	}}
+
+	ops := planWithTools(items, Request{MaxDimensionPx: 1800, Strategies: imageproc.DefaultOptimizationStrategies()}, func(string) bool { return true })
+	if len(ops) != 1 {
+		t.Fatalf("ops = %#v", ops)
+	}
+	if ops[0].Operation != "convert-avif" || ops[0].ResizeMaxDimensionPx != 1800 || ops[0].Quality != 50 || ops[0].AvifSpeed != 6 {
+		t.Fatalf("strategy op = %#v", ops[0])
+	}
+}
+
+func TestDisabledStrategyFallsBackToSuggestionRule(t *testing.T) {
+	strategies := imageproc.DefaultOptimizationStrategies()
+	for index := range strategies {
+		strategies[index].Enabled = false
+	}
+	items := []scanner.AssetItem{{
+		ID:         "a",
+		RepoPath:   "src/photo.png",
+		Ext:        ".png",
+		Bytes:      1000,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image:      imageMeta(false),
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "info",
+			SuggestionCode: "try_alpha_preserving_format",
+		}},
+	}}
+
+	ops := planWithTools(items, Request{Strategies: strategies}, func(string) bool { return true })
+	if len(ops) != 1 || ops[0].Operation != "convert-webp" || ops[0].Quality != 0 {
+		t.Fatalf("fallback op = %#v", ops)
 	}
 }
 

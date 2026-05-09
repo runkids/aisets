@@ -65,6 +65,94 @@ func equalPatterns(a, b []string) bool {
 	return true
 }
 
+func normalizeOptimizationExternalTools(tools []imageproc.OptimizationExternalTool) []imageproc.OptimizationExternalTool {
+	defaults := imageproc.DefaultOptimizationExternalTools()
+	enabledByID := map[string]bool{}
+	for _, tool := range tools {
+		enabledByID[strings.TrimSpace(tool.ID)] = tool.Enabled
+	}
+	for index := range defaults {
+		defaults[index].Enabled = enabledByID[defaults[index].ID]
+	}
+	return defaults
+}
+
+func validateOptimizationExternalTools(tools []imageproc.OptimizationExternalTool) ([]imageproc.OptimizationExternalTool, error) {
+	known := imageproc.KnownOptimizationExternalToolIDs()
+	seen := map[string]bool{}
+	for _, tool := range tools {
+		id := strings.TrimSpace(tool.ID)
+		if !known[id] {
+			return nil, apierr.WithParams("settings_optimization_tool_unknown", "optimization tool is not supported", map[string]any{"id": id})
+		}
+		if seen[id] {
+			return nil, apierr.WithParams("settings_optimization_tool_duplicate", "optimization tool is duplicated", map[string]any{"id": id})
+		}
+		seen[id] = true
+	}
+	return normalizeOptimizationExternalTools(tools), nil
+}
+
+func validateOptimizationStrategies(strategies []imageproc.OptimizationStrategy) ([]imageproc.OptimizationStrategy, error) {
+	validFormats := map[string]bool{"svg": true, "png": true, "jpg": true, "jpeg": true, "gif": true, "webp": true, "avif": true}
+	validAlpha := map[string]bool{"any": true, "transparent": true, "opaque": true}
+	validAnimated := map[string]bool{"any": true, "true": true, "false": true}
+	validOps := map[string]bool{"convert": true, "recompress": true, "resize": true, "svg-minify": true}
+	validOutput := map[string]bool{"": true, "svg": true, "png": true, "jpg": true, "jpeg": true, "gif": true, "webp": true, "avif": true}
+	seen := map[string]bool{}
+	for _, strategy := range strategies {
+		id := strings.TrimSpace(strategy.ID)
+		if id == "" {
+			return nil, apierr.New("settings_optimization_strategy_id_required", "optimization strategy id is required")
+		}
+		if seen[id] {
+			return nil, apierr.WithParams("settings_optimization_strategy_duplicate", "optimization strategy is duplicated", map[string]any{"id": id})
+		}
+		seen[id] = true
+		if strategy.Priority < 0 {
+			return nil, apierr.WithParams("settings_optimization_strategy_priority_invalid", "optimization strategy priority must not be negative", map[string]any{"id": id})
+		}
+		if !validAlpha[strategy.Match.Alpha] && strategy.Match.Alpha != "" {
+			return nil, apierr.WithParams("settings_optimization_strategy_alpha_invalid", "optimization strategy alpha matcher is invalid", map[string]any{"id": id, "alpha": strategy.Match.Alpha})
+		}
+		if !validAnimated[strategy.Match.Animated] && strategy.Match.Animated != "" {
+			return nil, apierr.WithParams("settings_optimization_strategy_animated_invalid", "optimization strategy animated matcher is invalid", map[string]any{"id": id, "animated": strategy.Match.Animated})
+		}
+		for _, format := range strategy.Match.Formats {
+			format = imageproc.NormalizeOptimizationFormat(format)
+			if !validFormats[format] {
+				return nil, apierr.WithParams("settings_optimization_strategy_format_invalid", "optimization strategy format is invalid", map[string]any{"id": id, "format": format})
+			}
+		}
+		if !validOps[strategy.Action.Operation] {
+			return nil, apierr.WithParams("settings_optimization_strategy_operation_invalid", "optimization strategy operation is invalid", map[string]any{"id": id, "operation": strategy.Action.Operation})
+		}
+		outputFormat := imageproc.NormalizeOptimizationFormat(strategy.Action.OutputFormat)
+		if !validOutput[outputFormat] {
+			return nil, apierr.WithParams("settings_optimization_strategy_output_invalid", "optimization strategy output format is invalid", map[string]any{"id": id, "outputFormat": strategy.Action.OutputFormat})
+		}
+		if strategy.Action.Quality != nil && (*strategy.Action.Quality < 0 || *strategy.Action.Quality > 100) {
+			return nil, apierr.WithParams("settings_optimization_strategy_quality_invalid", "optimization strategy quality must be between 0 and 100", map[string]any{"id": id})
+		}
+		if strategy.Action.AvifSpeed != nil && (*strategy.Action.AvifSpeed < 1 || *strategy.Action.AvifSpeed > 10) {
+			return nil, apierr.WithParams("settings_optimization_strategy_avif_speed_invalid", "optimization strategy AVIF speed must be between 1 and 10", map[string]any{"id": id})
+		}
+		if strategy.Action.ResizeMaxDimensionPx != nil && *strategy.Action.ResizeMaxDimensionPx < 0 {
+			return nil, apierr.WithParams("settings_optimization_strategy_resize_invalid", "optimization strategy resize max dimension must not be negative", map[string]any{"id": id})
+		}
+		if strategy.Match.MinBytesKB != nil && *strategy.Match.MinBytesKB < 0 {
+			return nil, apierr.WithParams("settings_optimization_strategy_min_bytes_invalid", "optimization strategy min bytes must not be negative", map[string]any{"id": id})
+		}
+		if strategy.Match.MinWidthPx != nil && *strategy.Match.MinWidthPx < 0 {
+			return nil, apierr.WithParams("settings_optimization_strategy_min_width_invalid", "optimization strategy min width must not be negative", map[string]any{"id": id})
+		}
+		if strategy.Match.MinHeightPx != nil && *strategy.Match.MinHeightPx < 0 {
+			return nil, apierr.WithParams("settings_optimization_strategy_min_height_invalid", "optimization strategy min height must not be negative", map[string]any{"id": id})
+		}
+	}
+	return imageproc.NormalizeOptimizationStrategies(strategies), nil
+}
+
 func DefaultAppSettings() AppSettings {
 	return AppSettings{
 		WorkspaceName:              "Asset Studio",
@@ -87,6 +175,8 @@ func DefaultAppSettings() AppSettings {
 		OptimizationAvifSpeed:      6,
 		OptimizationAutoApply:      false,
 		OptimizationThresholds:     imageproc.DefaultOptimizationThresholds(),
+		OptimizationExternalTools:  imageproc.DefaultOptimizationExternalTools(),
+		OptimizationStrategies:     imageproc.DefaultOptimizationStrategies(),
 		CustomAssetFilters:         []CustomAssetFilter{},
 		PreferredEditor:            "vscode",
 	}
@@ -144,6 +234,8 @@ func (s *Store) Settings() (AppSettings, error) {
 	if settings.OptimizationThresholds == (imageproc.OptimizationThresholds{}) {
 		settings.OptimizationThresholds = imageproc.DefaultOptimizationThresholds()
 	}
+	settings.OptimizationExternalTools = normalizeOptimizationExternalTools(settings.OptimizationExternalTools)
+	settings.OptimizationStrategies = imageproc.NormalizeOptimizationStrategies(settings.OptimizationStrategies)
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	return settings, nil
@@ -247,6 +339,20 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 		}
 		settings.OptimizationThresholds = t
 	}
+	if update.OptimizationExternalTools != nil {
+		tools, err := validateOptimizationExternalTools(update.OptimizationExternalTools)
+		if err != nil {
+			return AppSettings{}, err
+		}
+		settings.OptimizationExternalTools = tools
+	}
+	if update.OptimizationStrategies != nil {
+		strategies, err := validateOptimizationStrategies(update.OptimizationStrategies)
+		if err != nil {
+			return AppSettings{}, err
+		}
+		settings.OptimizationStrategies = strategies
+	}
 	if update.CustomAssetFilters != nil {
 		filters, err := normalizeCustomAssetFilters(update.CustomAssetFilters)
 		if err != nil {
@@ -288,6 +394,8 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	} else if settings.OptimizationAvifSpeed > 10 {
 		settings.OptimizationAvifSpeed = 10
 	}
+	settings.OptimizationExternalTools = normalizeOptimizationExternalTools(settings.OptimizationExternalTools)
+	settings.OptimizationStrategies = imageproc.NormalizeOptimizationStrategies(settings.OptimizationStrategies)
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	if len(settings.OCRLanguages) == 0 {
@@ -410,6 +518,8 @@ func (s *Store) ImportData(data ExportData) error {
 			OptimizationDefaultQuality: &data.Settings.OptimizationDefaultQuality,
 			OptimizationAutoApply:      &data.Settings.OptimizationAutoApply,
 			OptimizationThresholds:     &data.Settings.OptimizationThresholds,
+			OptimizationExternalTools:  data.Settings.OptimizationExternalTools,
+			OptimizationStrategies:     data.Settings.OptimizationStrategies,
 			CustomAssetFilters:         data.Settings.CustomAssetFilters,
 			PreferredEditor:            &data.Settings.PreferredEditor,
 		}

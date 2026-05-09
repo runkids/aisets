@@ -6,7 +6,9 @@ import (
 
 	"asset-studio/internal/apierr"
 	"asset-studio/internal/config"
+	"asset-studio/internal/imageproc"
 	"asset-studio/internal/ocr"
+	"asset-studio/internal/optimize"
 )
 
 func settingsErrorStatus(err error) int {
@@ -18,12 +20,14 @@ func settingsErrorStatus(err error) int {
 
 type settingsInfo struct {
 	config.AppSettings
-	Workspaces   []config.Workspace `json:"workspaces"`
-	Projects     []config.Project   `json:"projects"`
-	DatabasePath string             `json:"databasePath"`
-	DataDir      string             `json:"dataDir"`
-	CacheDir     string             `json:"cacheDir"`
-	OCRRuntime   ocr.RuntimeStatus  `json:"ocrRuntime"`
+	Workspaces               []config.Workspace     `json:"workspaces"`
+	Projects                 []config.Project       `json:"projects"`
+	DatabasePath             string                 `json:"databasePath"`
+	DataDir                  string                 `json:"dataDir"`
+	CacheDir                 string                 `json:"cacheDir"`
+	OCRRuntime               ocr.RuntimeStatus      `json:"ocrRuntime"`
+	OptimizationToolRuntime  []optimize.ToolRuntime `json:"optimizationToolRuntime"`
+	OptimizationStrategyHash string                 `json:"optimizationStrategyHash"`
 }
 
 func (s *Server) currentSettingsInfo() (settingsInfo, error) {
@@ -32,13 +36,15 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 		return settingsInfo{}, err
 	}
 	return settingsInfo{
-		AppSettings:  settings,
-		Workspaces:   s.store.Workspaces(),
-		Projects:     s.store.AllProjects(),
-		DatabasePath: s.store.Path(),
-		DataDir:      config.DataDir(),
-		CacheDir:     config.CacheDir(),
-		OCRRuntime:   ocr.Runtime(context.Background(), config.DataDir(), s.ocrEngine),
+		AppSettings:              settings,
+		Workspaces:               s.store.Workspaces(),
+		Projects:                 s.store.AllProjects(),
+		DatabasePath:             s.store.Path(),
+		DataDir:                  config.DataDir(),
+		CacheDir:                 config.CacheDir(),
+		OCRRuntime:               ocr.Runtime(context.Background(), config.DataDir(), s.ocrEngine),
+		OptimizationToolRuntime:  optimize.ToolRuntimeStatus(settings.OptimizationExternalTools),
+		OptimizationStrategyHash: imageproc.OptimizationStrategyHash(settings.OptimizationStrategies, settings.OptimizationThresholds),
 	}, nil
 }
 
@@ -60,7 +66,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if body.ActiveWorkspaceID != nil {
 		s.clearCatalog()
 	}
-	if body.OptimizationThresholds != nil || body.ExcludePatterns != nil || body.ExcludePatternsByIntent != nil {
+	if body.OptimizationThresholds != nil || body.OptimizationStrategies != nil || body.ExcludePatterns != nil || body.ExcludePatternsByIntent != nil {
 		s.markCatalogStale()
 	}
 	if _, err := s.store.UpdateSettings(body); err != nil {

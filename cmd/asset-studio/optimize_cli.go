@@ -40,7 +40,11 @@ func cmdOptimizeEstimate(args []string, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
-	estimate := optimize.Compute(items)
+	req, err := optimizationRequestFromStore(store)
+	if err != nil {
+		return err
+	}
+	estimate := optimize.ComputeWithRequest(items, req)
 	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "estimate": estimate})
 	}
@@ -64,10 +68,29 @@ func cmdOptimizeScript(args []string, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
-	script := optimize.GenerateScript(items)
+	req, err := optimizationRequestFromStore(store)
+	if err != nil {
+		return err
+	}
+	script := optimize.GenerateScript(items, req)
 	if jsonOut {
 		return writeJSON(os.Stdout, map[string]any{"ok": true, "format": "bash", "script": script, "itemCount": len(items)})
 	}
 	fmt.Print(script)
 	return nil
+}
+
+func optimizationRequestFromStore(store *config.Store) (optimize.Request, error) {
+	settings, err := store.Settings()
+	if err != nil {
+		return optimize.Request{}, err
+	}
+	return optimize.Request{
+		Quality:        settings.OptimizationDefaultQuality,
+		MaxDimensionPx: settings.OptimizationThresholds.MaxDimensionPx,
+		AvifSpeed:      settings.OptimizationAvifSpeed,
+		Workers:        settings.OptimizationWorkers,
+		Strategies:     settings.OptimizationStrategies,
+		ExternalTools:  settings.OptimizationExternalTools,
+	}, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"asset-studio/internal/actions"
 	"asset-studio/internal/apierr"
+	"asset-studio/internal/imageproc"
 	"asset-studio/internal/optimize"
 	"asset-studio/internal/precheck"
 	"asset-studio/internal/scanner"
@@ -48,13 +49,29 @@ func (s *Server) handleOptimizationPreview(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	preview, err := optimize.Preview(project, items, body.Request)
+	req := s.optimizationRequest(body.Request)
+	preview, err := optimize.Preview(project, items, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 	s.storePreview(preview)
 	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
+}
+
+func (s *Server) optimizationRequest(req optimize.Request) optimize.Request {
+	settings, err := s.store.Settings()
+	if err != nil {
+		return req
+	}
+	req.Quality = settings.OptimizationDefaultQuality
+	req.MaxDimensionPx = settings.OptimizationThresholds.MaxDimensionPx
+	req.AvifSpeed = settings.OptimizationAvifSpeed
+	req.Workers = settings.OptimizationWorkers
+	req.Strategies = settings.OptimizationStrategies
+	req.ExternalTools = settings.OptimizationExternalTools
+	req.StrategyHash = imageproc.OptimizationStrategyHash(settings.OptimizationStrategies, settings.OptimizationThresholds)
+	return req
 }
 
 func (s *Server) handleRenamePreview(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +186,7 @@ func (s *Server) handleOptimizationEstimate(w http.ResponseWriter, r *http.Reque
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
-		estimate := optimize.ComputeWithProject(project, projectItems, body.Request)
+		estimate := optimize.ComputeWithProject(project, projectItems, s.optimizationRequest(body.Request))
 		result.ItemCount += estimate.ItemCount
 		result.TotalBytes += estimate.TotalBytes
 		result.SavingsBytes += estimate.SavingsBytes
@@ -269,7 +286,8 @@ func (s *Server) handleOptimizationEstimateStream(w http.ResponseWriter, r *http
 		for _, item := range g.items {
 			itemsByID[item.ID] = item
 		}
-		ops := optimize.Plan(g.items, body.Request)
+		req := s.optimizationRequest(body.Request)
+		ops := optimize.Plan(g.items, req)
 		for _, op := range ops {
 			item := itemsByID[op.AssetID]
 			workItems = append(workItems, estimateWork{
@@ -286,9 +304,9 @@ func (s *Server) handleOptimizationEstimateStream(w http.ResponseWriter, r *http
 		work = append(work, item.operation)
 	}
 
-	sendNDJSON(w, map[string]any{"type": "start", "total": len(work), "workers": body.Request.Workers})
+	req := s.optimizationRequest(body.Request)
+	sendNDJSON(w, map[string]any{"type": "start", "total": len(work), "workers": req.Workers})
 
-	req := body.Request
 	if req.AvifSpeed <= 0 {
 		req.AvifSpeed = 10
 	}
@@ -333,7 +351,7 @@ func (s *Server) handleOptimizationGenerateScript(w http.ResponseWriter, r *http
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"format":    "bash",
-		"script":    optimize.GenerateScript(items),
+		"script":    optimize.GenerateScript(items, s.optimizationRequest(optimize.Request{})),
 		"itemCount": len(items),
 	})
 }
