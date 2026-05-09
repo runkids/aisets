@@ -200,13 +200,15 @@ type NearDuplicate struct {
 }
 
 type OptimizationSuggestion struct {
-	Category       string `json:"category"`
-	ReasonCode     string `json:"reasonCode"`
-	Reason         string `json:"reason"`
-	Severity       string `json:"severity"`
-	SuggestionCode string `json:"suggestionCode"`
-	Suggestion     string `json:"suggestion"`
-	Operation      string `json:"operation,omitempty"`
-	EstimatedBytes int64  `json:"estimatedBytes,omitempty"`
-	SavingsBytes   int64  `json:"savingsBytes,omitempty"`
+	Category           string `json:"category"`
+	ReasonCode         string `json:"reasonCode"`
+	Reason             string `json:"reason"`
+	Severity           string `json:"severity"`
+	SuggestionCode     string `json:"suggestionCode"`
+	Suggestion         string `json:"suggestion"`
+	Operation          string `json:"operation,omitempty"`
+	EstimatedBytes     int64  `json:"estimatedBytes,omitempty"`
+	SavingsBytes       int64  `json:"savingsBytes,omitempty"`
+	HasExistingVariant bool   `json:"hasExistingVariant,omitempty"`
+	VariantBytes       int64  `json:"variantBytes,omitempty"`
 }

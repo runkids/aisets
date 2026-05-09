@@ -88,6 +88,17 @@ func formatToOperation(targetFormat, sourceExt string) string {
 	}
 }
 
+func OperationTargetExt(operation string) string {
+	switch operation {
+	case "convert-avif":
+		return ".avif"
+	case "convert-webp":
+		return ".webp"
+	default:
+		return ""
+	}
+}
+
 func containsString(values []string, needle string) bool {
 	for _, value := range values {
 		if value == needle {

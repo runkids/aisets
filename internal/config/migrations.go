@@ -275,6 +275,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateOptimizationThresholds(); err != nil {
 		return err
 	}
+	if err := s.migrateOptimizationVariantColumn(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -766,4 +769,22 @@ func (s *Store) migrateOptimizationThresholds() error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Store) migrateOptimizationVariantColumn() error {
+	cols, err := s.tableColumns("optimization_snapshots")
+	if err != nil {
+		return err
+	}
+	if !cols["has_existing_variant"] {
+		if _, err = s.db.Exec(`ALTER TABLE optimization_snapshots ADD COLUMN has_existing_variant INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	if !cols["variant_bytes"] {
+		if _, err = s.db.Exec(`ALTER TABLE optimization_snapshots ADD COLUMN variant_bytes INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	return nil
 }

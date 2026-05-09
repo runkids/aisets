@@ -305,6 +305,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 			record.ThresholdsHash = thresholdsHash
 			_ = s.cache.Set(cacheKey, record)
 		}
+		markExistingVariants(&item)
 		return item, true, nil
 	}
 
@@ -334,5 +335,51 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		ThresholdsHash: thresholdsHash,
 		ThumbKey:       cacheKey,
 	})
+	markExistingVariants(&item)
 	return item, false, nil
+}
+
+func markExistingVariants(item *AssetItem) {
+	if len(item.Optimization) == 0 || item.LocalPath == "" {
+		return
+	}
+	for i := range item.Optimization {
+		target := variantTargetExt(item.Optimization[i].SuggestionCode, item.Ext)
+		if target == "" || target == item.Ext {
+			continue
+		}
+		ext := filepath.Ext(item.LocalPath)
+		variantPath := item.LocalPath[:len(item.LocalPath)-len(ext)] + target
+		if fi, err := os.Stat(variantPath); err == nil {
+			item.Optimization[i].HasExistingVariant = true
+			item.Optimization[i].VariantBytes = fi.Size()
+		}
+	}
+}
+
+// variantTargetExt mirrors optimize.operationRules — kept local to avoid an import cycle.
+func variantTargetExt(suggestionCode, sourceExt string) string {
+	switch suggestionCode {
+	case "try_alpha_preserving_format":
+		if sourceExt == ".png" {
+			return ".webp"
+		}
+		return ""
+	case "try_modern_photographic_format":
+		switch sourceExt {
+		case ".png", ".jpg", ".jpeg":
+			return ".avif"
+		}
+		return ""
+	case "review_compression_or_modern_format":
+		switch sourceExt {
+		case ".png", ".jpg", ".jpeg":
+			return ".avif"
+		case ".gif":
+			return ".webp"
+		}
+		return ""
+	default:
+		return ""
+	}
 }

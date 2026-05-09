@@ -440,6 +440,9 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		))`)
 	case "optimizable":
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)")
+	case "optimized":
+		clauses = append(clauses, `(EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
+			AND NOT EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id AND o2.has_existing_variant = 0))`)
 	case "nearDuplicate":
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM near_duplicate_snapshots n WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id))")
 	}

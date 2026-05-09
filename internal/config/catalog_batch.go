@@ -165,7 +165,7 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 		extByID[item.ID] = item.Ext
 	}
 	rows, err := s.db.Query(`
-		SELECT asset_id, category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes
+		SELECT asset_id, category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes, has_existing_variant, variant_bytes
 		FROM optimization_snapshots
 		WHERE scan_id = ? AND `+idClause+`
 		ORDER BY asset_id ASC, severity ASC, category ASC
@@ -178,7 +178,7 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 	for rows.Next() {
 		var assetID string
 		var opt scanner.OptimizationSuggestion
-		if err := rows.Scan(&assetID, &opt.Category, &opt.Severity, &opt.ReasonCode, &opt.SuggestionCode, &opt.EstimatedBytes, &opt.SavingsBytes); err != nil {
+		if err := rows.Scan(&assetID, &opt.Category, &opt.Severity, &opt.ReasonCode, &opt.SuggestionCode, &opt.EstimatedBytes, &opt.SavingsBytes, &opt.HasExistingVariant, &opt.VariantBytes); err != nil {
 			return err
 		}
 		opt.Operation = optimize.SuggestionOperation(opt.SuggestionCode, extByID[assetID])

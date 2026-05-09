@@ -80,9 +80,11 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 	optStmt, err := tx.Prepare(`
 		INSERT INTO optimization_snapshots (
 			scan_id, asset_id, project_id, repo_path, category, severity,
-			reason_code, suggestion_code, estimated_bytes, savings_bytes
+			reason_code, suggestion_code, estimated_bytes, savings_bytes,
+			has_existing_variant,
+			variant_bytes
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return 0, err
@@ -105,7 +107,9 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		}
 		for _, opt := range item.Optimization {
 			if _, err = optStmt.Exec(scanID, item.ID, item.ProjectID, item.RepoPath, opt.Category, opt.Severity,
-				opt.ReasonCode, opt.SuggestionCode, opt.EstimatedBytes, opt.SavingsBytes); err != nil {
+				opt.ReasonCode, opt.SuggestionCode, opt.EstimatedBytes, opt.SavingsBytes,
+				boolInt(opt.HasExistingVariant),
+				opt.VariantBytes); err != nil {
 				return 0, err
 			}
 		}

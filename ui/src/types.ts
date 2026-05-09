@@ -271,6 +271,8 @@ export type AssetItem = {
     operation?: string;
     estimatedBytes?: number;
     savingsBytes?: number;
+    hasExistingVariant?: boolean;
+    variantBytes?: number;
   }>;
   ocr?: {
     status: "pending" | "ready" | "failed" | "skipped";

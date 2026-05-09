@@ -1,6 +1,9 @@
 package config
 
-import "asset-studio/internal/scanner"
+import (
+	"asset-studio/internal/optimize"
+	"asset-studio/internal/scanner"
+)
 
 func (s *Store) CatalogItemDetail(scanID int64, assetID string) (CatalogItemDetail, error) {
 	scanID, err := s.resolveScanID(scanID)
@@ -20,6 +23,9 @@ func (s *Store) CatalogItemDetail(scanID int64, assetID string) (CatalogItemDeta
 	opts, err := s.assetOptimization(scanID, assetID)
 	if err != nil {
 		return CatalogItemDetail{}, err
+	}
+	for i := range opts {
+		opts[i].Operation = optimize.SuggestionOperation(opts[i].SuggestionCode, item.Ext)
 	}
 	item.Optimization = opts
 	dups, err := s.assetDuplicates(scanID, item)
@@ -78,7 +84,7 @@ func (s *Store) assetReferences(scanID int64, assetID string) ([]scanner.AssetRe
 
 func (s *Store) assetOptimization(scanID int64, assetID string) ([]scanner.OptimizationSuggestion, error) {
 	rows, err := s.db.Query(`
-		SELECT category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes
+		SELECT category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes, has_existing_variant, variant_bytes
 		FROM optimization_snapshots
 		WHERE scan_id = ? AND asset_id = ?
 		ORDER BY severity ASC, category ASC
@@ -90,7 +96,7 @@ func (s *Store) assetOptimization(scanID int64, assetID string) ([]scanner.Optim
 	out := []scanner.OptimizationSuggestion{}
 	for rows.Next() {
 		var opt scanner.OptimizationSuggestion
-		if err := rows.Scan(&opt.Category, &opt.Severity, &opt.ReasonCode, &opt.SuggestionCode, &opt.EstimatedBytes, &opt.SavingsBytes); err != nil {
+		if err := rows.Scan(&opt.Category, &opt.Severity, &opt.ReasonCode, &opt.SuggestionCode, &opt.EstimatedBytes, &opt.SavingsBytes, &opt.HasExistingVariant, &opt.VariantBytes); err != nil {
 			return nil, err
 		}
 		out = append(out, opt)
