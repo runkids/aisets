@@ -20,8 +20,8 @@ type RenameRules struct {
 	Suffix       string            `json:"suffix,omitempty"`
 }
 
-// BatchDeleteResult holds the outcome of a batch delete operation.
-type BatchDeleteResult struct {
+// BatchResult holds the outcome of a batch delete or copy operation.
+type BatchResult struct {
 	Succeeded []string          `json:"succeeded"`
 	Failed    []BatchFailedItem `json:"failed"`
 	Skipped   []string          `json:"skipped"`
@@ -53,7 +53,6 @@ type BatchPreview struct {
 	CreatedAt string           `json:"createdAt"`
 }
 
-// BatchMovePreview generates a preview for moving multiple assets into targetDir.
 func BatchMovePreview(project scanner.Project, items []scanner.AssetItem, targetDir string) BatchPreview {
 	preview := BatchPreview{
 		ID:        newID("batch-move:" + project.ID + ":" + targetDir),
@@ -120,7 +119,6 @@ func BatchMergePreview(project scanner.Project, items []scanner.AssetItem, prefe
 	return preview
 }
 
-// BatchApply applies a batch move preview: updates references then moves files.
 func BatchApply(project scanner.Project, preview BatchPreview) (ApplyResult, error) {
 	if !preview.CanApply {
 		return ApplyResult{}, apierr.New("preview_has_blockers", "preview has blockers")
@@ -211,7 +209,6 @@ func applyRenameRules(name string, rules RenameRules) string {
 	return base + ext
 }
 
-// BatchRenamePreview generates a preview for renaming multiple assets by rules.
 func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rules RenameRules) BatchPreview {
 	preview := BatchPreview{
 		ID:        newID("batch-rename:" + project.ID),
@@ -257,17 +254,8 @@ func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rule
 	return preview
 }
 
-// BatchCopyResult holds the outcome of a batch copy operation.
-type BatchCopyResult struct {
-	Succeeded []string          `json:"succeeded"`
-	Failed    []BatchFailedItem `json:"failed"`
-	Skipped   []string          `json:"skipped"`
-	AppliedAt string            `json:"appliedAt"`
-}
-
-// BatchCopy copies the given asset files into targetDir, preserving original filenames.
-func BatchCopy(project scanner.Project, items []scanner.AssetItem, targetDir string) BatchCopyResult {
-	result := BatchCopyResult{AppliedAt: time.Now().UTC().Format(time.RFC3339)}
+func BatchCopy(project scanner.Project, items []scanner.AssetItem, targetDir string) BatchResult {
+	result := BatchResult{AppliedAt: time.Now().UTC().Format(time.RFC3339)}
 	for _, item := range items {
 		newPath := filepath.ToSlash(filepath.Join(targetDir, filepath.Base(item.RepoPath)))
 		srcAbs, err := safeAbs(project.Path, item.RepoPath)
@@ -307,18 +295,23 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(dst)
 		return err
 	}
-	return out.Close()
+	if err := out.Close(); err != nil {
+		os.Remove(dst)
+		return err
+	}
+	return nil
 }
 
 // BatchDelete removes the given asset files from disk, classifying each
 // outcome as succeeded, skipped (already absent), or failed (path escape,
 // permission error, etc.).
-func BatchDelete(project scanner.Project, items []scanner.AssetItem) BatchDeleteResult {
-	result := BatchDeleteResult{AppliedAt: time.Now().UTC().Format(time.RFC3339)}
+func BatchDelete(project scanner.Project, items []scanner.AssetItem) BatchResult {
+	result := BatchResult{AppliedAt: time.Now().UTC().Format(time.RFC3339)}
 	for _, item := range items {
 		abs, err := safeAbs(project.Path, item.RepoPath)
 		if err != nil {

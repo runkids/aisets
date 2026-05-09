@@ -75,13 +75,26 @@ import {
   Tooltip,
 } from "./ui";
 
+const EMPTY_OPTIMIZE_IDS: string[] = [];
+
+const categoryTone: Record<string, StackedBarSegment["tone"]> = {
+  size: "red",
+  format: "purple",
+  "svg-minify": "green",
+  svg: "green",
+  dimensions: "blue",
+  animation: "amber",
+};
+
 type Props = {
   scanId?: number;
   projectFilterId?: string;
   projectFilterName?: string;
   enabled?: boolean;
   optimizeAbortRef?: RefObject<AbortController | null>;
+  optimizeLockedIds?: string[] | null;
   onOptimizeActivity?: (action: OptimizeActivityAction) => void;
+  onOptimizeLockIds?: (ids: string[] | null) => void;
   onOpenAsset?: (id: string) => void;
 };
 
@@ -91,7 +104,9 @@ export function OptimizeView({
   projectFilterName = "",
   enabled = true,
   optimizeAbortRef,
+  optimizeLockedIds,
   onOptimizeActivity,
+  onOptimizeLockIds,
   onOpenAsset,
 }: Props) {
   const { t } = useTranslation();
@@ -163,10 +178,16 @@ export function OptimizeView({
     () => new Map(items.map((item) => [item.id, item])),
     [items],
   );
+  const externalLockedIds = optimizeLockedIds ?? EMPTY_OPTIMIZE_IDS;
   const selectedItems = items.filter((item) => selected.has(item.id));
   const actionIds = useMemo(
-    () => (selected.size > 0 ? [...selected] : visibleIds),
-    [selected, visibleIds],
+    () =>
+      externalLockedIds.length > 0
+        ? externalLockedIds
+        : selected.size > 0
+          ? [...selected]
+          : visibleIds,
+    [externalLockedIds, selected, visibleIds],
   );
   const selectedTotalBytes = selectedItems.reduce(
     (sum, item) => sum + item.bytes,
@@ -199,7 +220,15 @@ export function OptimizeView({
       if (operation) operations.set(item.id, operation);
     }
     return operations;
-  }, [estimate, items, replaceOriginal, updateReferences]);
+  }, [estimate, items, quality, replaceOriginal, updateReferences]);
+  const actionableActionIds = useMemo(
+    () =>
+      actionIds.filter(
+        (id) => estimatedOperationsByAsset.get(id)?.canApply !== false,
+      ),
+    [actionIds, estimatedOperationsByAsset],
+  );
+  const skippedActionCount = actionIds.length - actionableActionIds.length;
   const recommendationTotalBytes = useMemo(
     () => items.reduce((sum, item) => sum + item.bytes, 0),
     [items],
@@ -234,14 +263,6 @@ export function OptimizeView({
         .filter((s) => s.value > 0),
     [facets, t],
   );
-  const categoryTone: Record<string, StackedBarSegment["tone"]> = {
-    size: "red",
-    format: "purple",
-    "svg-minify": "green",
-    svg: "green",
-    dimensions: "blue",
-    animation: "amber",
-  };
   const categorySegments: StackedBarSegment[] = useMemo(
     () =>
       (estimate?.byCategory ?? [])
@@ -257,7 +278,10 @@ export function OptimizeView({
     [estimate],
   );
   const selectionLocked =
-    working != null || estimatePrompt != null || lockedActionIds != null;
+    working != null ||
+    estimatePrompt != null ||
+    lockedActionIds != null ||
+    externalLockedIds.length > 0;
   const replaceInputId = "optimize-replace-original";
   const referencesInputId = "optimize-update-references";
   const currentEstimateKey = useMemo(
@@ -292,11 +316,13 @@ export function OptimizeView({
   }
 
   useEffect(() => {
+    if (externalLockedIds.length > 0) return;
     setBulkMode(false);
     setSelected(new Set());
     setEstimate(null);
     setPreview(null);
   }, [
+    externalLockedIds.length,
     scanId,
     projectFilterId,
     projectName,
@@ -307,11 +333,33 @@ export function OptimizeView({
     ext,
   ]);
   useEffect(() => {
+    if (externalLockedIds.length > 0) {
+      setBulkMode(true);
+      setSelected(new Set(externalLockedIds));
+    }
+  }, [externalLockedIds]);
+
+  useEffect(() => {
     setEstimate(
       estimateCache.get(currentEstimateKey) ?? cachedEstimateFor(actionIds),
     );
     setPreview(null);
   }, [currentEstimateKey, actionIds, itemsById]);
+
+  useEffect(() => {
+    if (working != null || externalLockedIds.length > 0) return;
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        if (estimatedOperationsByAsset.get(id)?.canApply === false) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [estimatedOperationsByAsset, externalLockedIds.length, working]);
 
   useInfiniteScrollSentinel({
     rootRef: scrollRef,
@@ -330,8 +378,26 @@ export function OptimizeView({
     scrollMargin,
   });
 
+  function applicableIdsFor(assetIds: string[]) {
+    return assetIds.filter(
+      (id) => estimatedOperationsByAsset.get(id)?.canApply !== false,
+    );
+  }
+
+  function applicableIdsFromEstimate(
+    assetIds: string[],
+    nextEstimate: OptimizationEstimate,
+  ) {
+    const operationsByAsset = new Map(
+      nextEstimate.operations.map((op) => [op.assetId, op]),
+    );
+    return assetIds.filter(
+      (id) => operationsByAsset.get(id)?.canApply !== false,
+    );
+  }
+
   function requestBody(assetIds?: string[]) {
-    const ids = assetIds ?? actionIds;
+    const ids = assetIds ?? actionableActionIds;
     return {
       assetIds: ids,
       strategy: "conservative",
@@ -436,7 +502,13 @@ export function OptimizeView({
     return merged;
   }
 
-  async function trackedEstimateFor(ids: string[]) {
+  async function trackedEstimateFor(
+    ids: string[],
+    options: { completeActivity?: boolean; releaseLock?: boolean } = {},
+  ) {
+    const completeActivity = options.completeActivity ?? true;
+    const releaseLock = options.releaseLock ?? true;
+    onOptimizeLockIds?.(ids);
     const fullKey = estimateCacheKey(
       ids,
       replaceOriginal,
@@ -444,17 +516,33 @@ export function OptimizeView({
       itemsById,
       quality,
     );
-    const wasCached = estimateCache.has(fullKey);
+    const cachedEstimate = estimateCache.get(fullKey);
+    const wasCached = Boolean(cachedEstimate);
+    let emittedActivity = false;
+    if (!completeActivity && cachedEstimate) {
+      onOptimizeActivity?.({
+        type: "start",
+        total: cachedEstimate.operations.length,
+        stage: "estimating",
+      });
+      for (const operation of cachedEstimate.operations) {
+        onOptimizeActivity?.({ type: "operation", operation });
+      }
+      emittedActivity = true;
+    }
+    abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     if (optimizeAbortRef) optimizeAbortRef.current = ctrl;
     try {
-      await estimateFor(ids, {
+      const nextEstimate = await estimateFor(ids, {
         signal: ctrl.signal,
         onEvent: (event) => {
           if (event.type === "start") {
+            emittedActivity = true;
             onOptimizeActivity?.({ type: "start", total: event.total });
           } else if (event.type === "operation") {
+            emittedActivity = true;
             onOptimizeActivity?.({
               type: "operation",
               operation: event.operation,
@@ -462,8 +550,20 @@ export function OptimizeView({
           }
         },
       });
+      if (!completeActivity && !emittedActivity) {
+        onOptimizeActivity?.({
+          type: "start",
+          total: nextEstimate.operations.length,
+          stage: "estimating",
+        });
+        for (const operation of nextEstimate.operations) {
+          onOptimizeActivity?.({ type: "operation", operation });
+        }
+      }
       if (wasCached) toast.info(t("optimize.estimateCached"));
-      if (!wasCached) onOptimizeActivity?.({ type: "done" });
+      if (completeActivity && !wasCached)
+        onOptimizeActivity?.({ type: "done" });
+      return nextEstimate;
     } catch (err) {
       if (ctrl.signal.aborted) {
         onOptimizeActivity?.({ type: "stopped" });
@@ -473,6 +573,7 @@ export function OptimizeView({
       }
       throw err;
     } finally {
+      if (releaseLock) onOptimizeLockIds?.(null);
       if (abortRef.current === ctrl) abortRef.current = null;
       if (optimizeAbortRef?.current === ctrl) optimizeAbortRef.current = null;
     }
@@ -501,29 +602,66 @@ export function OptimizeView({
     setError(null);
     try {
       setWorking("estimate");
-      await trackedEstimateFor(assetIds);
+      const nextEstimate = await trackedEstimateFor(assetIds, {
+        completeActivity: false,
+        releaseLock: false,
+      });
+      const previewIds = applicableIdsFromEstimate(assetIds, nextEstimate);
+      if (previewIds.length === 0) {
+        const message = t("optimize.noApplicableOperations", {
+          count: assetIds.length,
+          defaultValue:
+            "No selected assets have applicable optimization after estimation.",
+        });
+        setError(message);
+        toast.info(message);
+        onOptimizeActivity?.({ type: "done" });
+        return;
+      }
+      onOptimizeActivity?.({ type: "stage", stage: "previewing" });
       setWorking("preview");
-      await runPreview(assetIds, { keepWorking: true });
+      await runPreview(previewIds, { keepWorking: true, throwOnError: true });
+      onOptimizeActivity?.({ type: "done" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        onOptimizeActivity?.({ type: "stopped" });
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        onOptimizeActivity?.({ type: "error", errorMessage: message });
+      }
     } finally {
+      onOptimizeLockIds?.(null);
       setWorking(null);
       setLockedActionIds(null);
     }
   }
 
   async function runPreview(
-    assetIds = actionIds,
-    options: { keepWorking?: boolean } = {},
+    assetIds = actionableActionIds,
+    options: { keepWorking?: boolean; throwOnError?: boolean } = {},
   ) {
+    const targetIds = assetIds;
+    if (targetIds.length === 0) {
+      const message = t("optimize.noApplicableOperations", {
+        count: assetIds.length,
+        defaultValue:
+          "No selected assets have applicable optimization after estimation.",
+      });
+      setError(message);
+      toast.info(message);
+      if (options.throwOnError) throw new Error(message);
+      return;
+    }
     const ctrl = abortRef.current ?? new AbortController();
     if (!abortRef.current) abortRef.current = ctrl;
+    if (optimizeAbortRef) optimizeAbortRef.current = ctrl;
     setWorking("preview");
     setProgress(0);
     setError(null);
     try {
       const idsByProject = new Map<string, string[]>();
-      for (const id of assetIds) {
+      for (const id of targetIds) {
         const item = itemsById.get(id);
         if (!item) continue;
         const ids = idsByProject.get(item.projectId) ?? [];
@@ -542,20 +680,58 @@ export function OptimizeView({
         previews.push(result);
         setProgress(((i + 1) / groups.length) * 100);
       }
-      if (!ctrl.signal.aborted) setPreview(combinePreviews(previews));
+      if (ctrl.signal.aborted) {
+        if (options.throwOnError)
+          throw new DOMException("Aborted", "AbortError");
+        return;
+      }
+      setPreview(combinePreviews(previews));
     } catch (err) {
-      if (!ctrl.signal.aborted)
+      if (!ctrl.signal.aborted) {
         setError(err instanceof Error ? err.message : String(err));
+      }
+      if (options.throwOnError) throw err;
     } finally {
       if (!options.keepWorking) {
         setWorking(null);
-        abortRef.current = null;
+        if (abortRef.current === ctrl) abortRef.current = null;
+        if (optimizeAbortRef?.current === ctrl) optimizeAbortRef.current = null;
       }
     }
   }
 
+  async function runTrackedPreview(ids: string[]) {
+    setLockedActionIds(ids);
+    onOptimizeLockIds?.(ids);
+    onOptimizeActivity?.({ type: "stage", stage: "previewing" });
+    try {
+      await runPreview(ids, { throwOnError: true });
+      onOptimizeActivity?.({ type: "done" });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        onOptimizeActivity?.({ type: "stopped" });
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        onOptimizeActivity?.({ type: "error", errorMessage: message });
+      }
+    } finally {
+      onOptimizeLockIds?.(null);
+      setLockedActionIds(null);
+    }
+  }
+
   function handlePreviewClick() {
-    const ids = lockedActionIds ?? actionIds;
+    const ids = applicableIdsFor(lockedActionIds ?? actionIds);
+    if (ids.length === 0) {
+      const message = t("optimize.noApplicableOperations", {
+        count: actionIds.length,
+        defaultValue:
+          "No selected assets have applicable optimization after estimation.",
+      });
+      setError(message);
+      toast.info(message);
+      return;
+    }
     const missingEstimate = ids.some(
       (id) => !estimatedOperationsByAsset.has(id),
     );
@@ -563,11 +739,11 @@ export function OptimizeView({
       setEstimatePrompt({ ids });
       return;
     }
-    void runPreview(ids);
+    void runTrackedPreview(ids);
   }
 
   function handleQuickOptimize() {
-    setQuickConfirm({ ids: actionIds });
+    setQuickConfirm({ ids: actionableActionIds });
   }
 
   async function runQuickOptimize(ids: string[]) {
@@ -577,12 +753,36 @@ export function OptimizeView({
     setError(null);
     try {
       setWorking("estimate");
-      await trackedEstimateFor(ids);
+      const nextEstimate = await trackedEstimateFor(ids, {
+        completeActivity: false,
+        releaseLock: false,
+      });
+      const previewIds = applicableIdsFromEstimate(ids, nextEstimate);
+      if (previewIds.length === 0) {
+        const message = t("optimize.noApplicableOperations", {
+          count: ids.length,
+          defaultValue:
+            "No selected assets have applicable optimization after estimation.",
+        });
+        setError(message);
+        toast.info(message);
+        onOptimizeActivity?.({ type: "done" });
+        return;
+      }
+      onOptimizeActivity?.({ type: "stage", stage: "previewing" });
       setWorking("preview");
-      await runPreview(ids, { keepWorking: true });
+      await runPreview(previewIds, { keepWorking: true, throwOnError: true });
+      onOptimizeActivity?.({ type: "done" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        onOptimizeActivity?.({ type: "stopped" });
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        onOptimizeActivity?.({ type: "error", errorMessage: message });
+      }
     } finally {
+      onOptimizeLockIds?.(null);
       setWorking(null);
       setLockedActionIds(null);
       quickFlowRef.current = false;
@@ -636,11 +836,14 @@ export function OptimizeView({
   }
 
   function cancelOperation() {
-    if (working === "estimate") onOptimizeActivity?.({ type: "stopping" });
+    if (working === "estimate" || working === "preview") {
+      onOptimizeActivity?.({ type: "stopping" });
+    }
     abortRef.current?.abort();
     setWorking(null);
     setProgress(0);
     abortRef.current = null;
+    if (optimizeAbortRef) optimizeAbortRef.current = null;
   }
 
   async function generateScript() {
@@ -668,7 +871,12 @@ export function OptimizeView({
   }
 
   function toggleOne(id: string) {
-    if (!bulkMode || selectionLocked) return;
+    if (
+      !bulkMode ||
+      selectionLocked ||
+      estimatedOperationsByAsset.get(id)?.canApply === false
+    )
+      return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -680,7 +888,7 @@ export function OptimizeView({
   const missingTools =
     estimate?.tools?.filter((tool) => tool.required && !tool.available)
       .length ?? 0;
-  const canAct = actionIds.length > 0;
+  const canAct = actionableActionIds.length > 0;
   const operationLabel = (id: string) =>
     t(`optimize.operationLabel.${id}`, {
       defaultValue: operationLabels[id] ?? id,
@@ -963,6 +1171,26 @@ export function OptimizeView({
                       size: formatBytes(selectedSavings),
                     })}
                 </span>
+                {skippedActionCount > 0 && (
+                  <Tooltip
+                    label={t("optimize.skippedBlockedDesc", {
+                      count: skippedActionCount,
+                      defaultValue:
+                        "Estimated items that are not worth applying are excluded from preview and apply.",
+                    })}
+                    placement="top"
+                    contentClassName="max-w-[280px] whitespace-normal"
+                  >
+                    <span>
+                      <Badge tone="amber">
+                        {t("optimize.skippedBlocked", {
+                          count: skippedActionCount,
+                          defaultValue: "{{count}} skipped",
+                        })}
+                      </Badge>
+                    </span>
+                  </Tooltip>
+                )}
                 <Tooltip
                   label={t("optimize.help.replaceOriginal")}
                   placement="top"
@@ -1086,16 +1314,23 @@ export function OptimizeView({
 
             {working && (
               <div className="mb-2 flex items-center gap-2">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-g-pill bg-g-surface-3">
-                  <div
-                    className={cn(
-                      "h-full rounded-g-pill bg-g-accent transition-[width] duration-300 ease-g",
-                      progress === 0 &&
-                        "w-[30%] animate-[pulse-soft_1.4s_ease-in-out_infinite]",
-                    )}
-                    style={progress > 0 ? { width: `${progress}%` } : undefined}
-                  />
+                <div className="relative h-2 flex-1 overflow-hidden rounded-g-pill bg-g-surface-3">
+                  {progress > 0 ? (
+                    <div
+                      className="relative h-full overflow-hidden rounded-g-pill bg-g-accent transition-[width] duration-300 ease-g"
+                      style={{ width: `${progress}%` }}
+                    >
+                      <div className="absolute inset-0 animate-[progress-shimmer_2.4s_linear_infinite] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-y-0 w-[28%] animate-[progress-indeterminate_1.6s_ease-in-out_infinite] rounded-g-pill bg-g-accent opacity-80 motion-reduce:hidden" />
+                  )}
                 </div>
+                {progress > 0 && (
+                  <span className="min-w-[3ch] text-right font-g-mono text-g-chip tabular-nums text-g-accent">
+                    {Math.round(progress)}%
+                  </span>
+                )}
                 <button
                   type="button"
                   className="grid size-5 shrink-0 place-items-center rounded-g-sm text-g-ink-4 transition-colors duration-[120ms] hover:bg-g-surface-2 hover:text-g-ink"
@@ -1164,6 +1399,10 @@ export function OptimizeView({
                   const estimated = planned?.estimatedBytes ?? 0;
                   const savings = planned?.savingsBytes ?? 0;
                   const hasEstimate = planned != null && estimated > 0;
+                  const rowBlocked = planned?.canApply === false;
+                  const rowBlockedLabel = planned
+                    ? blockedReasonLabel(planned)
+                    : "";
                   return (
                     <div
                       key={item.id}
@@ -1181,10 +1420,14 @@ export function OptimizeView({
                             ? "grid-cols-[40px_64px_minmax(0,1fr)] min-[980px]:grid-cols-[40px_72px_minmax(0,1.4fr)_180px_170px_130px]"
                             : "grid-cols-[64px_minmax(0,1fr)] min-[980px]:grid-cols-[72px_minmax(0,1.4fr)_180px_170px_130px]",
                           isSelected &&
+                            !rowBlocked &&
                             "bg-g-surface-2 shadow-[inset_4px_0_0_var(--g-active-bg)]",
+                          rowBlocked &&
+                            "bg-g-surface-2 opacity-[0.72] hover:bg-g-surface-2",
+                          bulkMode && rowBlocked && "cursor-not-allowed",
                         )}
                         onClick={() => {
-                          if (bulkMode) toggleOne(item.id);
+                          if (bulkMode && !rowBlocked) toggleOne(item.id);
                         }}
                       >
                         {bulkMode && (
@@ -1192,17 +1435,28 @@ export function OptimizeView({
                             className="grid place-items-center"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <Checkbox
-                              checked={isSelected}
-                              size="md"
-                              disabled={selectionLocked}
-                              onCheckedChange={() => toggleOne(item.id)}
-                              aria-label={
-                                isSelected
-                                  ? t("action.deselect")
-                                  : t("action.select")
-                              }
-                            />
+                            <Tooltip
+                              label={rowBlockedLabel}
+                              placement="top"
+                              contentClassName="max-w-[320px] whitespace-normal break-words"
+                              disabled={!rowBlocked}
+                            >
+                              <span className="inline-grid">
+                                <Checkbox
+                                  checked={isSelected && !rowBlocked}
+                                  size="md"
+                                  disabled={selectionLocked || rowBlocked}
+                                  onCheckedChange={() => toggleOne(item.id)}
+                                  aria-label={
+                                    rowBlocked
+                                      ? rowBlockedLabel
+                                      : isSelected
+                                        ? t("action.deselect")
+                                        : t("action.select")
+                                  }
+                                />
+                              </span>
+                            </Tooltip>
                           </div>
                         )}
                         <button
@@ -1256,6 +1510,11 @@ export function OptimizeView({
                               </Badge>
                             )}
                             <Badge tone="line">{operationLabel(op)}</Badge>
+                            {rowBlocked && (
+                              <Badge tone="amber">
+                                {t("optimize.noEffectiveSavings")}
+                              </Badge>
+                            )}
                             <Badge tone="line">
                               {hasEstimate
                                 ? `${formatBytes(item.bytes)} → ${formatBytes(estimated)}`

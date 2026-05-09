@@ -31,6 +31,24 @@ import {
   Tooltip,
 } from "./ui";
 
+const modeLabels = {
+  addProject: {
+    title: "directoryPicker.title",
+    confirm: "directoryPicker.addDir",
+    working: "directoryPicker.adding",
+  },
+  move: {
+    title: "directoryPicker.titleMove",
+    confirm: "directoryPicker.moveDir",
+    working: "directoryPicker.moving",
+  },
+  copy: {
+    title: "directoryPicker.titleCopy",
+    confirm: "directoryPicker.copyDir",
+    working: "directoryPicker.copying",
+  },
+} as const;
+
 const dirRowClass =
   "grid grid-cols-[18px_minmax(0,200px)_1fr] items-center gap-2.5 py-2 px-2.5 rounded-g-md bg-transparent text-g-ink-2 text-[13px] font-normal tracking-[-0.012em] text-left cursor-pointer transition-[background,color] duration-[120ms] ease-[var(--g-ease)] w-full hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&>svg]:text-g-ink-3 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>span]:font-g [&>span]:font-[510] [&>span]:text-g-ink [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>code]:font-g-mono [&>code]:text-[11px] [&>code]:tracking-[-0.015em] [&>code]:text-g-ink-4 [&>code]:overflow-hidden [&>code]:text-ellipsis [&>code]:whitespace-nowrap [&>code]:text-right [&>code]:bg-transparent [&>code]:p-0 hover:[&>code]:text-g-ink-3";
 
@@ -107,24 +125,11 @@ export function DirectoryPickerModal({
     };
   }, [showScanIntent, listing?.path, open]);
 
-  const titleKey =
-    mode === "move"
-      ? "directoryPicker.titleMove"
-      : mode === "copy"
-        ? "directoryPicker.titleCopy"
-        : "directoryPicker.title";
-  const confirmKey =
-    mode === "move"
-      ? "directoryPicker.moveDir"
-      : mode === "copy"
-        ? "directoryPicker.copyDir"
-        : "directoryPicker.addDir";
-  const workingKey =
-    mode === "move"
-      ? "directoryPicker.moving"
-      : mode === "copy"
-        ? "directoryPicker.copying"
-        : "directoryPicker.adding";
+  const {
+    title: titleKey,
+    confirm: confirmKey,
+    working: workingKey,
+  } = modeLabels[mode];
 
   if (!open) return null;
 

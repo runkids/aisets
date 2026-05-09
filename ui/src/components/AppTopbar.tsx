@@ -6,8 +6,6 @@ import {
   RefreshCw,
   ScanText,
   Search,
-  Square,
-  X,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
@@ -27,7 +25,8 @@ import {
   ocrActivityProgressPercent,
   type OCRActivityState,
 } from "../ocrActivity";
-import { Button, Keycap, TextInputButton, Tooltip } from "./ui";
+import { ActivityDropdown } from "./ActivityDropdown";
+import { Keycap, TextInputButton, Tooltip } from "./ui";
 import { IconButton } from "./ui/Button";
 
 type Props = {
@@ -65,8 +64,6 @@ export function AppTopbar({
 }: Props) {
   const { t } = useTranslation();
   const [scanStatusOpen, setScanStatusOpen] = useState(false);
-  const [ocrStatusOpen, setOCRStatusOpen] = useState(false);
-  const [optimizeStatusOpen, setOptimizeStatusOpen] = useState(false);
   const progress = scanProgress?.type === "progress" ? scanProgress : null;
   const done = scanProgress?.type === "done";
   const failed = scanProgress?.type === "error";
@@ -93,33 +90,16 @@ export function AppTopbar({
     : "translate-y-1 opacity-0";
   const ocrVisible = isOCRActivityVisible(ocrActivity);
   const ocrBusy = isOCRActivityBusy(ocrActivity);
-  const ocrCanDismiss = canDismissOCRActivity(ocrActivity);
-  const ocrFailed = ocrActivity.phase === "error";
-  const ocrDone = ocrActivity.phase === "done";
-  const ocrStopped = ocrActivity.phase === "stopped";
-  const ocrDotTone = ocrFailed
-    ? "bg-g-red"
-    : ocrDone
-      ? "bg-g-green"
-      : "bg-g-accent";
-  const ocrProgressPercent = ocrActivityProgressPercent(ocrActivity);
-  const ocrDropdownState = ocrStatusOpen
-    ? "translate-y-0 opacity-100 pointer-events-auto"
-    : "translate-y-1 opacity-0";
+  const ocrStatusLabels: Record<string, string> = {
+    saving: t("activity.ocrSaving"),
+    running: t("activity.ocrRunning", { batch: ocrActivity.batch }),
+    stopping: t("activity.ocrStopping"),
+    done: t("activity.ocrDone"),
+    stopped: t("activity.ocrStopped"),
+    error: t("activity.ocrError"),
+  };
   const ocrStatusLabel =
-    ocrActivity.phase === "saving"
-      ? t("activity.ocrSaving")
-      : ocrActivity.phase === "running"
-        ? t("activity.ocrRunning", { batch: ocrActivity.batch })
-        : ocrActivity.phase === "stopping"
-          ? t("activity.ocrStopping")
-          : ocrDone
-            ? t("activity.ocrDone")
-            : ocrStopped
-              ? t("activity.ocrStopped")
-              : ocrFailed
-                ? t("activity.ocrError")
-                : t("activity.ocrTitle");
+    ocrStatusLabels[ocrActivity.phase] ?? t("activity.ocrTitle");
   const ocrCounts = ocrActivity.counts
     ? t("activity.ocrCounts", {
         processed: ocrActivity.counts.processed,
@@ -131,32 +111,18 @@ export function AppTopbar({
     : t("activity.ocrPreparing");
   const optimizeVisible = isOptimizeActivityVisible(optimizeActivity);
   const optimizeBusy = isOptimizeActivityBusy(optimizeActivity);
-  const optimizeCanDismiss = canDismissOptimizeActivity(optimizeActivity);
-  const optimizeFailed = optimizeActivity.phase === "error";
-  const optimizeDone = optimizeActivity.phase === "done";
-  const optimizeStopped = optimizeActivity.phase === "stopped";
-  const optimizeDotTone = optimizeFailed
-    ? "bg-g-red"
-    : optimizeDone
-      ? "bg-g-green"
-      : "bg-g-accent";
-  const optimizeProgressPercent =
-    optimizeActivityProgressPercent(optimizeActivity);
-  const optimizeDropdownState = optimizeStatusOpen
-    ? "translate-y-0 opacity-100 pointer-events-auto"
-    : "translate-y-1 opacity-0";
+  const optimizeStatusLabels: Record<string, string> = {
+    running:
+      optimizeActivity.stage === "previewing"
+        ? t("activity.optimizePreviewing")
+        : t("activity.optimizeRunning"),
+    stopping: t("activity.optimizeStopping"),
+    done: t("activity.optimizeDone"),
+    stopped: t("activity.optimizeStopped"),
+    error: t("activity.optimizeError"),
+  };
   const optimizeStatusLabel =
-    optimizeActivity.phase === "running"
-      ? t("activity.optimizeRunning")
-      : optimizeActivity.phase === "stopping"
-        ? t("activity.optimizeStopping")
-        : optimizeDone
-          ? t("activity.optimizeDone")
-          : optimizeStopped
-            ? t("activity.optimizeStopped")
-            : optimizeFailed
-              ? t("activity.optimizeError")
-              : t("activity.optimizeTitle");
+    optimizeStatusLabels[optimizeActivity.phase] ?? t("activity.optimizeTitle");
   const optimizeCounts = optimizeActivity.counts
     ? t("activity.optimizeCounts", {
         processed: optimizeActivity.counts.processed,
@@ -320,225 +286,71 @@ export function AppTopbar({
           </Tooltip>
         )}
         {optimizeVisible && (
-          <span className="group relative inline-flex">
-            <IconButton
-              aria-label={t("activity.optimizeTitle")}
-              active={optimizeStatusOpen}
-              onClick={() => setOptimizeStatusOpen((open) => !open)}
-            >
-              <ImageDown size={16} />
-              <span className="absolute right-1 top-1 size-1.5" aria-hidden>
-                {optimizeBusy && (
-                  <span
-                    className={`absolute inset-0 rounded-g-pill opacity-75 motion-reduce:animate-none ${optimizeDotTone} animate-ping`}
-                  />
-                )}
-                <span
-                  className={`absolute inset-0 rounded-g-pill ${optimizeDotTone}`}
-                />
-              </span>
-            </IconButton>
-            <div
-              className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[320px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${optimizeDropdownState}`}
-              role={optimizeFailed ? "alert" : "status"}
-              aria-live={optimizeFailed ? "assertive" : "polite"}
-            >
-              <div className="flex items-center gap-2">
-                {optimizeDone ? (
-                  <CheckCircle2
-                    className="shrink-0 text-g-green"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : optimizeFailed ? (
-                  <XCircle
-                    className="shrink-0 text-g-red"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : optimizeStopped ? (
-                  <Square
-                    className="shrink-0 text-g-ink-3"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Loader2
-                    className="shrink-0 animate-spin text-g-accent"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
-                  {optimizeStatusLabel}
-                </span>
-              </div>
-              <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
-                {optimizeCounts}
-              </p>
-              {optimizeActivity.errorMessage && (
-                <p className="mt-2 rounded-g-md border border-g-line bg-g-surface px-2 py-1.5 text-g-caption leading-[1.45] text-g-red">
-                  {optimizeActivity.errorMessage}
-                </p>
-              )}
-              <span
-                className="mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
-                aria-hidden="true"
-              >
-                <span
-                  className={
-                    optimizeFailed
-                      ? "block h-full rounded-g-pill bg-g-red transition-[width] duration-150 ease-g"
-                      : optimizeDone
-                        ? "block h-full rounded-g-pill bg-g-green transition-[width] duration-150 ease-g"
-                        : "block h-full rounded-g-pill bg-g-accent transition-[width] duration-150 ease-g"
+          <ActivityDropdown
+            icon={<ImageDown size={16} />}
+            ariaLabel={t("activity.optimizeTitle")}
+            busy={optimizeBusy}
+            done={optimizeActivity.phase === "done"}
+            failed={optimizeActivity.phase === "error"}
+            stopped={optimizeActivity.phase === "stopped"}
+            canDismiss={canDismissOptimizeActivity(optimizeActivity)}
+            statusLabel={optimizeStatusLabel}
+            countsLabel={optimizeCounts}
+            errorMessage={optimizeActivity.errorMessage}
+            progressPercent={optimizeActivityProgressPercent(optimizeActivity)}
+            showIndeterminate
+            primaryAction={{
+              label: t("activity.viewOptimize"),
+              onClick: onOpenOptimize,
+            }}
+            stopButton={
+              optimizeBusy
+                ? {
+                    label:
+                      optimizeActivity.phase === "stopping"
+                        ? t("activity.optimizeStopping")
+                        : t("activity.stopOptimize"),
+                    onClick: onStopOptimize,
+                    disabled: optimizeActivity.phase === "stopping",
                   }
-                  style={{ width: `${optimizeProgressPercent}%` }}
-                />
-              </span>
-              <div className="mt-3 flex justify-end gap-2">
-                <Button size="sm" variant="secondary" onClick={onOpenOptimize}>
-                  {t("activity.viewOptimize")}
-                </Button>
-                {optimizeBusy ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    leadingIcon={<Square size={13} />}
-                    onClick={onStopOptimize}
-                    disabled={optimizeActivity.phase === "stopping"}
-                  >
-                    {optimizeActivity.phase === "stopping"
-                      ? t("activity.optimizeStopping")
-                      : t("activity.stopOptimize")}
-                  </Button>
-                ) : optimizeCanDismiss ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    leadingIcon={<X size={13} />}
-                    onClick={onDismissOptimize}
-                  >
-                    {t("activity.dismiss")}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          </span>
+                : undefined
+            }
+            onDismiss={onDismissOptimize}
+          />
         )}
         {ocrVisible && (
-          <span className="group relative inline-flex">
-            <IconButton
-              aria-label={t("activity.ocrTitle")}
-              active={ocrStatusOpen}
-              onClick={() => setOCRStatusOpen((open) => !open)}
-            >
-              <ScanText size={16} />
-              <span className="absolute right-1 top-1 size-1.5" aria-hidden>
-                {ocrBusy && (
-                  <span
-                    className={`absolute inset-0 rounded-g-pill opacity-75 motion-reduce:animate-none ${ocrDotTone} animate-ping`}
-                  />
-                )}
-                <span
-                  className={`absolute inset-0 rounded-g-pill ${ocrDotTone}`}
-                />
-              </span>
-            </IconButton>
-            <div
-              className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[320px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${ocrDropdownState}`}
-              role={ocrFailed ? "alert" : "status"}
-              aria-live={ocrFailed ? "assertive" : "polite"}
-            >
-              <div className="flex items-center gap-2">
-                {ocrDone ? (
-                  <CheckCircle2
-                    className="shrink-0 text-g-green"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : ocrFailed ? (
-                  <XCircle
-                    className="shrink-0 text-g-red"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : ocrStopped ? (
-                  <Square
-                    className="shrink-0 text-g-ink-3"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Loader2
-                    className="shrink-0 animate-spin text-g-accent"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
-                  {ocrStatusLabel}
-                </span>
-              </div>
-              <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
-                {ocrCounts}
-              </p>
-              {ocrActivity.errorMessage && (
-                <p className="mt-2 rounded-g-md border border-g-line bg-g-surface px-2 py-1.5 text-g-caption leading-[1.45] text-g-red">
-                  {ocrActivity.errorMessage}
-                </p>
-              )}
-              <span
-                className="mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
-                aria-hidden="true"
-              >
-                <span
-                  className={
-                    ocrFailed
-                      ? "block h-full rounded-g-pill bg-g-red transition-[width] duration-150 ease-g"
-                      : ocrDone
-                        ? "block h-full rounded-g-pill bg-g-green transition-[width] duration-150 ease-g"
-                        : "block h-full rounded-g-pill bg-g-accent transition-[width] duration-150 ease-g"
-                  }
-                  style={{ width: `${ocrProgressPercent}%` }}
-                />
-              </span>
-              <div className="mt-3 flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={onOpenOCRSettings}
-                >
-                  {t("activity.viewOCRSettings")}
-                </Button>
-                {ocrBusy ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    leadingIcon={<Square size={13} />}
-                    onClick={onStopOCR}
-                    disabled={
-                      ocrActivity.phase === "saving" ||
+          <ActivityDropdown
+            icon={<ScanText size={16} />}
+            ariaLabel={t("activity.ocrTitle")}
+            busy={ocrBusy}
+            done={ocrActivity.phase === "done"}
+            failed={ocrActivity.phase === "error"}
+            stopped={ocrActivity.phase === "stopped"}
+            canDismiss={canDismissOCRActivity(ocrActivity)}
+            statusLabel={ocrStatusLabel}
+            countsLabel={ocrCounts}
+            errorMessage={ocrActivity.errorMessage}
+            progressPercent={ocrActivityProgressPercent(ocrActivity)}
+            primaryAction={{
+              label: t("activity.viewOCRSettings"),
+              onClick: onOpenOCRSettings,
+            }}
+            stopButton={
+              ocrBusy
+                ? {
+                    label:
                       ocrActivity.phase === "stopping"
-                    }
-                  >
-                    {ocrActivity.phase === "stopping"
-                      ? t("settings.ocrStopping")
-                      : t("settings.ocrStop")}
-                  </Button>
-                ) : ocrCanDismiss ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    leadingIcon={<X size={13} />}
-                    onClick={onDismissOCR}
-                  >
-                    {t("activity.dismiss")}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          </span>
+                        ? t("settings.ocrStopping")
+                        : t("settings.ocrStop"),
+                    onClick: onStopOCR,
+                    disabled:
+                      ocrActivity.phase === "saving" ||
+                      ocrActivity.phase === "stopping",
+                  }
+                : undefined
+            }
+            onDismiss={onDismissOCR}
+          />
         )}
       </div>
     </header>

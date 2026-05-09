@@ -24,7 +24,7 @@ func (s *Server) handleBatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.AssetIDs) == 0 {
-		writeJSON(w, http.StatusOK, actions.BatchDeleteResult{Succeeded: []string{}})
+		writeJSON(w, http.StatusOK, actions.BatchResult{Succeeded: []string{}})
 		return
 	}
 	items, project, err := s.batchItems(r.Context(), body.AssetIDs)
@@ -58,12 +58,7 @@ func (s *Server) handleBatchMovePreview(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	targetDir := body.TargetDir
-	if filepath.IsAbs(targetDir) {
-		if rel, err := filepath.Rel(project.Path, targetDir); err == nil {
-			targetDir = filepath.ToSlash(rel)
-		}
-	}
+	targetDir := normalizeTargetDir(project.Path, body.TargetDir)
 	preview := actions.BatchMovePreview(project, items, targetDir)
 	s.storeBatchPreview(preview)
 	writeJSON(w, http.StatusOK, map[string]any{"preview": preview, "token": preview.ID})
@@ -171,7 +166,7 @@ func (s *Server) handleBatchCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.AssetIDs) == 0 {
-		writeJSON(w, http.StatusOK, actions.BatchCopyResult{Succeeded: []string{}})
+		writeJSON(w, http.StatusOK, actions.BatchResult{Succeeded: []string{}})
 		return
 	}
 	items, project, err := s.batchItems(r.Context(), body.AssetIDs)
@@ -179,12 +174,7 @@ func (s *Server) handleBatchCopy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	targetDir := body.TargetDir
-	if filepath.IsAbs(targetDir) {
-		if rel, err := filepath.Rel(project.Path, targetDir); err == nil {
-			targetDir = filepath.ToSlash(rel)
-		}
-	}
+	targetDir := normalizeTargetDir(project.Path, body.TargetDir)
 	result := actions.BatchCopy(project, items, targetDir)
 	s.markCatalogStale()
 	go func() {
@@ -232,6 +222,17 @@ func (s *Server) handleBatchExport(w http.ResponseWriter, r *http.Request) {
 		io.Copy(entry, f)
 		f.Close()
 	}
+}
+
+// normalizeTargetDir converts an absolute targetDir to a project-relative
+// slash-separated path when it falls inside projectPath.
+func normalizeTargetDir(projectPath, targetDir string) string {
+	if filepath.IsAbs(targetDir) {
+		if rel, err := filepath.Rel(projectPath, targetDir); err == nil {
+			targetDir = filepath.ToSlash(rel)
+		}
+	}
+	return targetDir
 }
 
 func (s *Server) batchItems(ctx context.Context, ids []string) ([]scanner.AssetItem, scanner.Project, error) {

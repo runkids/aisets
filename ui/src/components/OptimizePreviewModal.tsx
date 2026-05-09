@@ -28,6 +28,11 @@ export function OptimizePreviewModal({
   const previewDeletes = preview.preview.deletes ?? [];
   const operations: OptimizationOperation[] =
     preview.preview.payload?.optimization?.operations ?? [];
+  const blockedReasonLabel = (op: OptimizationOperation) =>
+    t(`optimize.blockedReason.${op.reasonCode}`, {
+      defaultValue: op.blockedReason || t("optimize.blocked"),
+      tool: op.tool,
+    });
 
   return (
     <Modal
@@ -141,15 +146,12 @@ export function OptimizePreviewModal({
                 </Tooltip>
                 {!op.canApply && op.blockedReason && (
                   <Tooltip
-                    label={op.blockedReason}
+                    label={blockedReasonLabel(op)}
                     placement="top"
                     contentClassName="max-w-[420px] whitespace-normal break-words"
                   >
                     <span className="mt-1 block truncate text-g-caption text-g-amber">
-                      {t(`optimize.blockedReason.${op.reasonCode}`, {
-                        defaultValue: op.blockedReason,
-                        tool: op.tool,
-                      })}
+                      {blockedReasonLabel(op)}
                     </span>
                   </Tooltip>
                 )}

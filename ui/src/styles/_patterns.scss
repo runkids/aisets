@@ -99,6 +99,14 @@ textarea::-webkit-resizer {
     transform: rotate(360deg);
   }
 }
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
 @keyframes modalIn {
   from {
     opacity: 0;
@@ -167,5 +175,21 @@ textarea::-webkit-resizer {
   }
   100% {
     box-shadow: 0 0 0 14px transparent;
+  }
+}
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(380%);
   }
 }

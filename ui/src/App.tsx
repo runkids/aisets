@@ -147,6 +147,9 @@ export function App() {
     optimizeActivityReducer,
     initialOptimizeActivityState,
   );
+  const [optimizeLockedIds, setOptimizeLockedIds] = useState<string[] | null>(
+    null,
+  );
   const optimizeActivityAbortRef = useRef<AbortController | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(storedThemePreference);
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
@@ -458,6 +461,7 @@ export function App() {
   }
 
   function onDismissOptimizeActivity() {
+    setOptimizeLockedIds(null);
     dispatchOptimizeActivity({ type: "dismiss" });
   }
 
@@ -732,7 +736,9 @@ export function App() {
                 projectFilterId={effectiveSelectedProjectId || undefined}
                 projectFilterName={selectedProject?.name ?? ""}
                 optimizeAbortRef={optimizeActivityAbortRef}
+                optimizeLockedIds={optimizeLockedIds}
                 onOptimizeActivity={dispatchOptimizeActivity}
+                onOptimizeLockIds={setOptimizeLockedIds}
                 onOpenAsset={setDrawerId}
               />
             )

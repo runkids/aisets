@@ -16,14 +16,18 @@ export type OptimizeActivityCounts = {
   savingsBytes: number;
 };
 
+export type OptimizeActivityStage = "estimating" | "previewing";
+
 export type OptimizeActivityState = {
   phase: OptimizeActivityPhase;
+  stage?: OptimizeActivityStage;
   counts: OptimizeActivityCounts | null;
   errorMessage?: string;
 };
 
 export type OptimizeActivityAction =
-  | { type: "start"; total: number }
+  | { type: "start"; total: number; stage?: OptimizeActivityStage }
+  | { type: "stage"; stage: OptimizeActivityStage }
   | { type: "operation"; operation: OptimizationOperation }
   | { type: "stopping" }
   | { type: "done" }
@@ -44,6 +48,7 @@ export function optimizeActivityReducer(
     case "start":
       return {
         phase: "running",
+        stage: action.stage ?? "estimating",
         counts: {
           total: action.total,
           processed: 0,
@@ -52,6 +57,10 @@ export function optimizeActivityReducer(
           savingsBytes: 0,
         },
       };
+    case "stage":
+      return isOptimizeActivityBusy(state)
+        ? { ...state, stage: action.stage }
+        : { ...state, phase: "running", stage: action.stage };
     case "operation": {
       const counts = state.counts ?? {
         total: 0,
@@ -75,15 +84,21 @@ export function optimizeActivityReducer(
       };
     }
     case "stopping":
+      if (state.phase === "stopping") return state;
       return isOptimizeActivityBusy(state)
         ? { ...state, phase: "stopping" }
         : state;
     case "done":
-      return { ...state, phase: "done" };
+      return { ...state, phase: "done", stage: undefined };
     case "stopped":
-      return { ...state, phase: "stopped" };
+      return { ...state, phase: "stopped", stage: undefined };
     case "error":
-      return { ...state, phase: "error", errorMessage: action.errorMessage };
+      return {
+        ...state,
+        phase: "error",
+        stage: undefined,
+        errorMessage: action.errorMessage,
+      };
     case "dismiss":
       return initialOptimizeActivityState;
   }

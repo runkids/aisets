@@ -36,7 +36,6 @@ type ItemEstimate struct {
 	Recommendations []scanner.OptimizationSuggestion `json:"recommendations"`
 }
 
-// Compute walks items and produces an aggregate Estimate.
 func Compute(items []scanner.AssetItem) Estimate {
 	return ComputeWithRequest(items, Request{})
 }
