@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/imageproc"
+	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/optimize"
 )
@@ -28,6 +30,7 @@ type settingsInfo struct {
 	OCRRuntime               ocr.RuntimeStatus      `json:"ocrRuntime"`
 	OptimizationToolRuntime  []optimize.ToolRuntime `json:"optimizationToolRuntime"`
 	OptimizationStrategyHash string                 `json:"optimizationStrategyHash"`
+	LLMRuntime               llm.RuntimeStatus      `json:"llmRuntime"`
 }
 
 func (s *Server) currentSettingsInfo() (settingsInfo, error) {
@@ -45,6 +48,7 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 		OCRRuntime:               ocr.Runtime(context.Background(), config.DataDir(), s.ocrEngine),
 		OptimizationToolRuntime:  optimize.ToolRuntimeStatus(settings.OptimizationExternalTools),
 		OptimizationStrategyHash: imageproc.OptimizationStrategyHash(settings.OptimizationStrategies, settings.OptimizationThresholds),
+		LLMRuntime:               s.currentLLMRuntime(settings),
 	}, nil
 }
 
@@ -72,6 +76,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.UpdateSettings(body); err != nil {
 		writeError(w, settingsErrorStatus(err), err)
 		return
+	}
+	if body.LLMProvider != nil || body.LLMEndpoint != nil {
+		s.initLLMProvider()
 	}
 	settings, err := s.currentSettingsInfo()
 	if err != nil {
@@ -128,4 +135,26 @@ func (s *Server) handleSettingsResetDatabase(w http.ResponseWriter, r *http.Requ
 	}
 	s.clearCatalog()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) currentLLMRuntime(settings config.AppSettings) llm.RuntimeStatus {
+	status := llm.RuntimeStatus{
+		Provider:    settings.LLMProvider,
+		Endpoint:    settings.LLMEndpoint,
+		VisionModel: settings.LLMVisionModel,
+		EmbedModel:  settings.LLMEmbedModel,
+	}
+	if s.llmProvider == nil {
+		return status
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	models, err := s.llmProvider.ListModels(ctx)
+	if err != nil {
+		status.Error = err.Error()
+		return status
+	}
+	status.Connected = true
+	status.Models = models
+	return status
 }

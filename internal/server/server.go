@@ -10,6 +10,7 @@ import (
 
 	"aisets/internal/actions"
 	"aisets/internal/config"
+	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
 )
@@ -30,9 +31,10 @@ type Server struct {
 	version   string
 	mux       *http.ServeMux
 	handler   http.Handler
-	scanner   *scanner.Scanner
-	ocrEngine ocr.Engine
-	onReady   func()
+	scanner     *scanner.Scanner
+	ocrEngine   ocr.Engine
+	llmProvider llm.Provider
+	onReady     func()
 
 	mu            sync.Mutex
 	catalog       scanner.Catalog
@@ -58,6 +60,7 @@ func New(opts Options) (*Server, error) {
 		previews:      map[string]actions.Preview{},
 		batchPreviews: map[string]actions.BatchPreview{},
 	}
+	s.initLLMProvider()
 	s.routes()
 	s.handler = s.wrapBasePath(s.mux)
 	return s, nil
@@ -152,6 +155,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/actions/optimization/estimate", s.handleOptimizationEstimate)
 	s.mux.HandleFunc("POST /api/actions/optimization/estimate-stream", s.handleOptimizationEstimateStream)
 	s.mux.HandleFunc("POST /api/actions/optimization/generate-script", s.handleOptimizationGenerateScript)
+	s.mux.HandleFunc("GET /api/llm/models", s.handleLLMModels)
+	s.mux.HandleFunc("POST /api/llm/health", s.handleLLMHealth)
 	if s.uiDistDir != "" {
 		s.mux.Handle("/", spaHandlerFromDisk(s.uiDistDir, s.basePath))
 	} else {
@@ -161,4 +166,26 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": s.version})
+}
+
+func (s *Server) initLLMProvider() {
+	if s.store == nil {
+		return
+	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		return
+	}
+	s.llmProvider = newLLMProvider(settings.LLMProvider, settings.LLMEndpoint)
+}
+
+func newLLMProvider(provider, endpoint string) llm.Provider {
+	switch provider {
+	case "ollama":
+		return llm.NewOllamaProvider(endpoint)
+	case "openai-compat":
+		return llm.NewOpenAICompatProvider(endpoint)
+	default:
+		return nil
+	}
 }
