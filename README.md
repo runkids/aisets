@@ -15,13 +15,13 @@ distribution model as Skillshare.
 macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/runkids/asset-studio/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/runkids/aisets/main/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-iwr https://raw.githubusercontent.com/runkids/asset-studio/main/install.ps1 -UseB | iex
+iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | iex
 ```
 
 The installer downloads the latest `aisets` CLI, then asks whether to install the local Tesseract OCR engine dependency. Aisets still downloads OCR language packs from Settings so users can choose only the languages they need. For unattended installs, set `INSTALL_OCR_ENGINE=1` or `INSTALL_OCR_ENGINE=0` on macOS/Linux, or run the PowerShell installer with `-InstallOcrEngine` or `-SkipOcrEngine`. Before the public repository exists, point installers at a different release repo with `AISETS_REPO=owner/name` or PowerShell `-Repo owner/name`.

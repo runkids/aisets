@@ -1,6 +1,6 @@
 # Aisets — Feature Port Plan
 
-Port design from internal `asset-duplicate-check` to public `asset-studio`.
+Port design from internal `asset-duplicate-check` to public `aisets`.
 Excludes company-specific logic (owner/theme facets, @gorilla aliases, shared-assets priority, Docker compose, batch auto-execute).
 
 ## Architecture Decisions

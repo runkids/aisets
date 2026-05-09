@@ -46,8 +46,8 @@ brews:
       owner: runkids
       name: homebrew-tap
     directory: Formula
-    homepage: https://github.com/runkids/asset-studio
-    description: Local-first asset management studio
+    homepage: https://github.com/runkids/aisets
+    description: Local-first asset ops
     license: MIT
     dependencies:
       - name: tesseract

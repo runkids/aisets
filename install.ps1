@@ -2,7 +2,7 @@ param(
   [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\Aisets"),
   [switch]$SkipOcrEngine,
   [switch]$InstallOcrEngine,
-  [string]$Repo = $(if ($env:AISETS_REPO) { $env:AISETS_REPO } else { "runkids/asset-studio" })
+  [string]$Repo = $(if ($env:AISETS_REPO) { $env:AISETS_REPO } else { "runkids/aisets" })
 )
 
 $ErrorActionPreference = "Stop"

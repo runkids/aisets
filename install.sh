@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="${AISETS_REPO:-runkids/asset-studio}"
+REPO="${AISETS_REPO:-runkids/aisets}"
 BINARY_NAME="aisets"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 INSTALL_OCR_ENGINE="${INSTALL_OCR_ENGINE:-ask}"
