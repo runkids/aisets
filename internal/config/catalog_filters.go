@@ -103,6 +103,12 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	aiCatQuery := query
+	aiCatQuery.AICategory = ""
+	aiCategories, aiCategoryTotal, err := s.catalogAITagFacetCounts(scanID, aiCatQuery)
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -138,6 +144,8 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		OptimizationDoneTotal:    optimizationDoneTotal,
 		CustomFilters:            customFilters,
 		CustomFilterTotal:        customTotal,
+		AICategories:             aiCategories,
+		AICategoryTotal:          aiCategoryTotal,
 	}, nil
 }
 
@@ -250,6 +258,42 @@ func (s *Store) catalogMaxSeverityFacetCounts(scanID int64, query CatalogItemQue
 		options = append(options, option)
 	}
 	return options, 0, rows.Err()
+}
+
+func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery) ([]CatalogFacetOption, int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(`
+		SELECT ait.category AS id, COUNT(DISTINCT a.asset_id)
+		FROM asset_snapshots a
+		JOIN ai_tags ait ON ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+			AND ait.status = 'ready'
+		`+where+`
+		GROUP BY id
+		ORDER BY COUNT(DISTINCT a.asset_id) DESC, id ASC
+	`, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	options := []CatalogFacetOption{}
+	total := 0
+	for rows.Next() {
+		var option CatalogFacetOption
+		if err := rows.Scan(&option.ID, &option.Count); err != nil {
+			return nil, 0, err
+		}
+		if option.ID != "" {
+			options = append(options, option)
+			total += option.Count
+		}
+	}
+	return options, total, rows.Err()
 }
 
 func customFilterUsesOCR(filter CustomAssetFilter) bool {
@@ -446,9 +490,17 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND oq.content_hash = a.content_hash
 				AND oq.hash_algorithm = a.hash_algorithm
 				AND (oq.normalized_text LIKE ? OR oq.text LIKE ? OR ocr_search_match(COALESCE(oq.normalized_text, oq.text, ''), ?) = 1)
+		) OR EXISTS (
+			SELECT 1 FROM ai_tags ait2
+			WHERE ait2.project_id = a.project_id
+				AND ait2.repo_path = a.repo_path
+				AND ait2.content_hash = a.content_hash
+				AND ait2.hash_algorithm = a.hash_algorithm
+				AND ait2.status = 'ready'
+				AND (ait2.tags_json LIKE ? OR ait2.description LIKE ?)
 		))`)
 		like := "%" + q + "%"
-		args = append(args, like, like, like, like, q)
+		args = append(args, like, like, like, like, q, like, like)
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":
@@ -511,6 +563,18 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 			clauses = append(clauses, clause)
 			args = append(args, filterArgs...)
 		}
+	}
+	if aiCategory := strings.TrimSpace(query.AICategory); aiCategory != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM ai_tags ait
+			WHERE ait.project_id = a.project_id
+				AND ait.repo_path = a.repo_path
+				AND ait.content_hash = a.content_hash
+				AND ait.hash_algorithm = a.hash_algorithm
+				AND ait.status = 'ready'
+				AND ait.category = ?
+		)`)
+		args = append(args, aiCategory)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

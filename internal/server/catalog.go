@@ -123,6 +123,7 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		OptimizationCategory: r.URL.Query().Get("optimizationCategory"),
 		OptimizationSeverity: r.URL.Query().Get("optimizationSeverity"),
 		Operation:            r.URL.Query().Get("operation"),
+		AICategory:           r.URL.Query().Get("aiCategory"),
 		Limit:                limit,
 		Cursor:               r.URL.Query().Get("cursor"),
 	})
@@ -132,6 +133,11 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(page.Items) > 0 {
 		catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: page.Items})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		catalog, err = s.enrichCatalogAITag(catalog)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
@@ -184,6 +190,11 @@ func (s *Server) handleCatalogItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: []scanner.AssetItem{detail.Item}})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	catalog, err = s.enrichCatalogAITag(catalog)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -669,6 +680,28 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 		if eligibleForOCRMetadata(catalog.Items[index], ocrSettings).Status == ocr.StatusPending {
 			result := ocr.Result{Status: ocr.StatusPending}
 			catalog.Items[index].OCR = &result
+		}
+	}
+	return catalog, nil
+}
+
+func (s *Server) enrichCatalogAITag(catalog scanner.Catalog) (scanner.Catalog, error) {
+	settings, err := s.store.Settings()
+	if err != nil {
+		return scanner.Catalog{}, err
+	}
+	if settings.LLMProvider == "" || settings.LLMVisionModel == "" {
+		return catalog, nil
+	}
+	results, err := s.store.AITagResults(catalog.Items, settings.LLMProvider, settings.LLMVisionModel)
+	if err != nil {
+		return scanner.Catalog{}, err
+	}
+	for index := range catalog.Items {
+		result, ok := results[catalog.Items[index].ProjectID+"\x00"+catalog.Items[index].RepoPath]
+		if ok {
+			copy := result
+			catalog.Items[index].AITag = &copy
 		}
 	}
 	return catalog, nil

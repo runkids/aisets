@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"aisets/internal/aitag"
 	"aisets/internal/imageproc"
 	"aisets/internal/lint"
 	"aisets/internal/ocr"
@@ -168,6 +169,7 @@ type AssetItem struct {
 	PreferredDuplicatePath *string                  `json:"preferredDuplicatePath"`
 	Optimization           []OptimizationSuggestion `json:"optimizationRecommendations"`
 	OCR                    *ocr.Result              `json:"ocr,omitempty"`
+	AITag                  *aitag.Result            `json:"aiTag,omitempty"`
 	ScanIntent             ProjectScanIntent        `json:"scanIntent"`
 	UsageClassification    UsageClassification      `json:"usageClassification"`
 	DeleteUnusedAllowed    bool                     `json:"deleteUnusedAllowed"`
