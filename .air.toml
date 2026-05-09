@@ -1,0 +1,24 @@
+# Air - Go hot reload for `make ui-dev` and devcontainer `ui`.
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  entrypoint = "./cmd/aisets"
+  pre_cmd = ["make imgtools-install 2>/dev/null || true"]
+  cmd = "go build -o ./tmp/aisets ./cmd/aisets"
+  full_bin = "${AISETS_UI_EXEC_PREFIX}./tmp/aisets ui once --no-open --host ${AISETS_UI_HOST:-localhost} ${AISETS_UI_FLAGS}"
+  delay = 1000
+  kill_delay = 500
+  send_interrupt = true
+  include_ext = ["go", "rs", "toml"]
+  include_dir = ["cmd", "internal", "tools"]
+  exclude_dir = ["ui", "tests", "scripts", "docker", "tmp", ".devcontainer", ".github", "tools/imgtools/target"]
+  exclude_regex = ["_test\\.go$"]
+  log = "build-errors.log"
+
+[log]
+  main_only = true
+
+[misc]
+  clean_on_exit = true

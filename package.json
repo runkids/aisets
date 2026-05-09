@@ -1,0 +1,27 @@
+{
+  "name": "aisets",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "ui/src/**/*.{ts,tsx}": [
+      "pnpm --dir ui exec prettier --write",
+      "pnpm --dir ui exec eslint --fix --config eslint.config.js"
+    ],
+    "ui/src/**/*.{scss,css}": [
+      "pnpm --dir ui exec prettier --write"
+    ],
+    "ui/src/**/*.{json,md}": [
+      "pnpm --dir ui exec prettier --write"
+    ],
+    "**/*.go": [
+      "gofmt -w"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.0"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

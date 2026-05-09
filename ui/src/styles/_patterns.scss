@@ -1,0 +1,195 @@
+/* Checker background for transparent images */
+.bg-checker {
+  background-color: #f7f8fc;
+  background-image:
+    linear-gradient(45deg, #eef0f5 25%, transparent 25%),
+    linear-gradient(-45deg, #eef0f5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eef0f5 75%),
+    linear-gradient(-45deg, transparent 75%, #eef0f5 75%);
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    6px 0;
+  background-size: 12px 12px;
+}
+
+.asset-image-bg-checker {
+  background-color: var(--g-canvas);
+  background-image: repeating-conic-gradient(
+    var(--g-surface-3) 0 25%,
+    var(--g-canvas) 0 50%
+  );
+  background-size: 14px 14px;
+}
+
+.asset-image-bg-light {
+  background: var(--g-surface);
+}
+
+.asset-image-bg-dark {
+  background: var(--g-ink);
+}
+
+[data-theme="dark"] .asset-image-bg-light {
+  background: var(--g-ink);
+}
+
+[data-theme="dark"] .asset-image-bg-dark {
+  background: var(--g-canvas);
+}
+
+/* Visible but subtle textarea resize grip */
+textarea::-webkit-resizer {
+  background:
+    linear-gradient(
+      135deg,
+      transparent 60%,
+      var(--g-ink-3) 60%,
+      var(--g-ink-3) 65%,
+      transparent 65%
+    ),
+    linear-gradient(
+      135deg,
+      transparent 75%,
+      var(--g-ink-3) 75%,
+      var(--g-ink-3) 80%,
+      transparent 80%
+    );
+}
+
+/* Utility */
+.mono {
+  font-family: var(--g-mono);
+  font-feature-settings:
+    "tnum" 1,
+    "ss01" 1;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.78;
+    transform: scale(0.98);
+  }
+}
+.pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+/* Keyframes used by Tailwind animate-[...] utilities */
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes cmdkIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideInR {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes slideOutR {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes slideUp2 {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes selectedPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--g-accent-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(380%);
+  }
+}

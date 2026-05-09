@@ -1,0 +1,101 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: make build
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Go tests with coverage
+        run: |
+          mkdir -p tmp
+          go test ./... -coverprofile=tmp/backend-coverage.out
+
+      - name: Enforce backend coverage floor
+        run: |
+          go tool cover -func=tmp/backend-coverage.out | tee tmp/backend-coverage-func.txt
+          if grep -E '\s0\.0%$' tmp/backend-coverage-func.txt; then
+            echo "Backend functions must not have 0% test coverage. Add deterministic tests for uncovered logic." >&2
+            exit 1
+          fi
+
+  ui-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        run: cd ui && pnpm install --frozen-lockfile
+
+      - name: UI lint
+        run: cd ui && pnpm run lint
+
+      - name: UI tests
+        run: cd ui && pnpm run test
+
+  imgtools-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/imgtools/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tools/imgtools/Cargo.lock') }}
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/imgtools/Cargo.toml -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/imgtools/Cargo.toml -- --check
+
+      - name: Tests
+        run: cargo test --manifest-path tools/imgtools/Cargo.toml
+
+      - name: Build release
+        run: cargo build --release --manifest-path tools/imgtools/Cargo.toml

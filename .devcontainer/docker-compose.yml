@@ -1,0 +1,33 @@
+name: aisets_devcontainer
+
+services:
+  aisets-devcontainer:
+    build:
+      context: ${PROJECT_ROOT:-.}
+      dockerfile: docker/sandbox/Dockerfile
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      HOME: /home/developer
+      GOCACHE: /go/build-cache
+      AISETS_UI_HOST: 0.0.0.0
+      AISETS_PORT: "${AISETS_PORT:-19520}"
+      AISETS_UI_PORT: "${AISETS_UI_PORT:-5174}"
+      AISETS_LLM_ENDPOINT: "${AISETS_LLM_ENDPOINT:-http://host.docker.internal:11434}"
+    ports:
+      - "${AISETS_UI_PORT:-5174}:${AISETS_UI_PORT:-5174}"
+      - "${AISETS_PORT:-19520}:${AISETS_PORT:-19520}"
+    volumes:
+      - ${PROJECT_ROOT:-.}:/workspace
+      - ui-node-modules:/workspace/ui/node_modules
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/go/build-cache
+      - dev-home:/home/developer
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
+  dev-home:
+  ui-node-modules:

@@ -1,0 +1,55 @@
+version: 2
+project_name: aisets
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: aisets
+    main: ./cmd/aisets
+    binary: aisets
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+  extra_files:
+    - glob: ./aisets-ui-dist.tar.gz
+
+release:
+  github:
+    owner: runkids
+    name: aisets
+  extra_files:
+    - glob: ./aisets-ui-dist.tar.gz
+
+brews:
+  - name: aisets
+    repository:
+      owner: runkids
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/runkids/aisets
+    description: Local-first asset ops
+    license: MIT
+    dependencies:
+      - name: tesseract
+    test: |
+      system "#{bin}/aisets", "version"

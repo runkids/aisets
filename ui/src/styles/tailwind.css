@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@source "../";
+
+@theme {
+  --color-g-canvas: var(--g-canvas);
+  --color-g-surface: var(--g-surface);
+  --color-g-surface-2: var(--g-surface-2);
+  --color-g-surface-3: var(--g-surface-3);
+  --color-g-line: var(--g-line);
+  --color-g-line-strong: var(--g-line-strong);
+  --color-g-input-border: var(--g-input-border);
+  --color-g-input-hover: var(--g-input-border-hover);
+  --color-g-input-focus: var(--g-input-border-focus);
+  --color-g-input-hover-bg: var(--g-input-bg-hover);
+  --color-g-ink: var(--g-ink);
+  --color-g-ink-2: var(--g-ink-2);
+  --color-g-ink-3: var(--g-ink-3);
+  --color-g-ink-4: var(--g-ink-4);
+  --color-g-cta: var(--g-cta);
+  --color-g-cta-ink: var(--g-cta-ink);
+  --color-g-cta-hover: var(--g-cta-hover);
+  --color-g-active-bg: var(--g-active-bg);
+  --color-g-active-text: var(--g-active-text);
+  --color-g-accent: var(--g-accent);
+  --color-g-accent-soft: var(--g-accent-soft);
+  --color-g-accent-ink: var(--g-accent-ink);
+  --color-g-red: var(--g-red);
+  --color-g-red-soft: var(--g-red-soft);
+  --color-g-amber: var(--g-amber);
+  --color-g-amber-soft: var(--g-amber-soft);
+  --color-g-green: var(--g-green);
+  --color-g-green-soft: var(--g-green-soft);
+  --color-g-blue: var(--g-blue);
+  --color-g-blue-soft: var(--g-blue-soft);
+  --color-g-purple: var(--g-purple);
+  --color-g-purple-soft: var(--g-purple-soft);
+  --color-g-info: var(--g-info);
+  --color-g-info-soft: var(--g-info-soft);
+
+  --radius-g-sm: var(--g-r-sm);
+  --radius-g-md: var(--g-r-md);
+  --radius-g-lg: var(--g-r-lg);
+  --radius-g-pill: 9999px;
+
+  --shadow-g-sm: var(--g-shadow-sm);
+  --shadow-g-md: var(--g-shadow-md);
+  --shadow-g-lg: var(--g-shadow-lg);
+  --shadow-g-pop: var(--g-shadow-pop);
+  --shadow-g-inset: var(--g-shadow-inset);
+  --shadow-g-focus: var(--g-shadow-focus);
+  --shadow-g-input-focus: var(--g-input-shadow-focus);
+
+  --font-g: var(--g-font);
+  --font-g-mono: var(--g-mono);
+  --font-g-display: var(--g-display);
+
+  /* Core type scale */
+  --text-g-chip: 11px;
+  --text-g-chip--line-height: 1.33;
+  --text-g-caption: 12px;
+  --text-g-caption--line-height: 1.33;
+  --text-g-ui: 13px;
+  --text-g-ui--line-height: 1.4;
+  --text-g-body: 14px;
+  --text-g-body--line-height: 1.4;
+  --tracking-g-ui: -0.012em;
+  --tracking-g-mono: -0.015em;
+
+  /* Extended type scale — headings */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 14px;
+  --text-body--line-height: 1.5;
+  --text-subheading: 16px;
+  --text-subheading--line-height: 1.4;
+  --text-heading-sm: 18px;
+  --text-heading-sm--line-height: 1.33;
+  --text-heading: 22px;
+  --text-heading--line-height: 1.27;
+  --text-heading-lg: 28px;
+  --text-heading-lg--line-height: 1.2;
+  --text-display: 36px;
+  --text-display--line-height: 1.1;
+  --tracking-caption: -0.12px;
+  --tracking-body-sm: -0.15px;
+  --tracking-body: -0.15px;
+  --tracking-subheading: -0.2px;
+  --tracking-heading-sm: -0.3px;
+  --tracking-heading: -0.4px;
+  --tracking-heading-lg: -0.6px;
+  --tracking-display: -0.8px;
+
+  --ease-g: var(--g-ease);
+  --ease-g-out: var(--g-ease-out);
+  --ease-g-spring: var(--g-ease-spring);
+
+  /* Button heights */
+  --spacing-g-btn-sm: 26px;
+  --spacing-g-btn-md: 32px;
+  --spacing-g-btn-lg: 36px;
+
+  /* Extended spacing */
+  --spacing-56: 56px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-128: 128px;
+  --spacing-160: 160px;
+  --spacing-240: 240px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  :root {
+    --background: var(--g-canvas);
+    --foreground: var(--g-ink);
+    --card: var(--g-surface);
+    --card-foreground: var(--g-ink);
+    --popover: var(--g-surface);
+    --popover-foreground: var(--g-ink);
+    --primary: var(--g-cta);
+    --primary-foreground: var(--g-cta-ink);
+    --secondary: var(--g-surface-2);
+    --secondary-foreground: var(--g-ink);
+    --muted: var(--g-surface-2);
+    --muted-foreground: var(--g-ink-3);
+    --accent: var(--g-surface-3);
+    --accent-foreground: var(--g-ink);
+    --destructive: var(--g-red);
+    --destructive-foreground: var(--g-cta-ink);
+    --border: var(--g-line);
+    --input: var(--g-line);
+    --ring: var(--g-accent);
+    --radius: var(--g-r-md);
+  }
+
+  [data-theme="dark"] {
+    --background: var(--g-canvas);
+    --foreground: var(--g-ink);
+    --card: var(--g-surface);
+    --card-foreground: var(--g-ink);
+    --popover: var(--g-surface);
+    --popover-foreground: var(--g-ink);
+    --primary: var(--g-cta);
+    --primary-foreground: var(--g-cta-ink);
+    --secondary: var(--g-surface-2);
+    --secondary-foreground: var(--g-ink);
+    --muted: var(--g-surface-2);
+    --muted-foreground: var(--g-ink-3);
+    --accent: var(--g-surface-3);
+    --accent-foreground: var(--g-ink);
+    --destructive: var(--g-red);
+    --destructive-foreground: var(--g-cta-ink);
+    --border: var(--g-line);
+    --input: var(--g-line);
+    --ring: var(--g-accent);
+  }
+}

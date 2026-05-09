@@ -1,0 +1,27 @@
+{
+  "name": "Aisets Dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "aisets-devcontainer",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [5174, 19520],
+  "portsAttributes": {
+    "5174": { "label": "Aisets UI" },
+    "19520": { "label": "Aisets API" }
+  },
+  "remoteEnv": {
+    "PATH": "/workspace/.devcontainer/bin:/usr/local/bin:${containerEnv:PATH}",
+    "AISETS_UI_HOST": "0.0.0.0"
+  },
+  "postCreateCommand": ".devcontainer/setup.sh",
+  "postStartCommand": ".devcontainer/start-dev.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

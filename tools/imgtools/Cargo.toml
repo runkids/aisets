@@ -1,0 +1,21 @@
+[package]
+name = "aisets-imgtools"
+version = "0.1.0"
+edition = "2024"
+description = "Image processing CLI for Aisets"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", features = ["gif", "jpeg", "png", "webp", "avif"] }
+webp = "0.3"
+libwebp-sys = "0.9"
+ravif = "0.13"
+rgb = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
