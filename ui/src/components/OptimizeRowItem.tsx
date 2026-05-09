@@ -83,6 +83,20 @@ export function OptimizeRowItem({
         tool: planned.tool,
       })
     : "";
+  const recSuggestionCode =
+    rec?.suggestionCode === "review_compression_or_modern_format" &&
+    item.ext.toLowerCase() === ".svg"
+      ? "review_complex_svg_or_raster_format"
+      : rec?.suggestionCode;
+  const recSuggestion = recSuggestionCode
+    ? t(`optimization.suggestion.${recSuggestionCode}`, {
+        defaultValue: rec?.suggestion,
+      })
+    : "";
+  const rowBlockedDetailLabel =
+    planned?.reasonCode === "operation_unsupported" && recSuggestion
+      ? recSuggestion
+      : rowBlockedLabel;
   const operationLabel = (id: string) =>
     t(`optimize.operationLabel.${id}`, {
       defaultValue: operationLabels[id] ?? id,
@@ -282,26 +296,29 @@ export function OptimizeRowItem({
           </div>
         ) : planned && !planned.canApply ? (
           <Tooltip
-            label={rowBlockedLabel}
+            label={rowBlockedDetailLabel}
             placement="top"
             contentClassName="max-w-[420px] whitespace-normal break-words"
           >
-            <div className="mt-1 truncate text-g-caption text-g-amber">
-              {rowBlockedLabel}
+            <div
+              className={cn(
+                "mt-1 truncate text-g-caption",
+                planned.reasonCode === "operation_unsupported" && recSuggestion
+                  ? "text-g-ink-4"
+                  : "text-g-amber",
+              )}
+            >
+              {rowBlockedDetailLabel}
             </div>
           </Tooltip>
         ) : rec ? (
           <Tooltip
-            label={t(`optimization.suggestion.${rec.suggestionCode}`, {
-              defaultValue: rec.suggestion,
-            })}
+            label={recSuggestion}
             placement="top"
             contentClassName="max-w-[420px] whitespace-normal break-words"
           >
             <div className="mt-1 truncate text-g-caption text-g-ink-4">
-              {t(`optimization.suggestion.${rec.suggestionCode}`, {
-                defaultValue: rec.suggestion,
-              })}
+              {recSuggestion}
             </div>
           </Tooltip>
         ) : (
@@ -329,7 +346,7 @@ export function OptimizeRowItem({
           ) : recSavings > 0 ? (
             `${formatBytes(item.bytes)} ≈ −${formatBytes(recSavings)}`
           ) : (
-            t("optimize.pendingEstimate")
+            formatBytes(item.bytes)
           )}
         </div>
         {hasEstimate && !rowBlocked && item.bytes > 0 && (
