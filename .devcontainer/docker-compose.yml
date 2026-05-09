@@ -3,7 +3,7 @@ name: aisets_devcontainer
 services:
   aisets-devcontainer:
     build:
-      context: ..
+      context: ${PROJECT_ROOT:-.}
       dockerfile: docker/sandbox/Dockerfile
     working_dir: /workspace
     command: sleep infinity
@@ -18,7 +18,7 @@ services:
       - "${AISETS_UI_PORT:-5174}:${AISETS_UI_PORT:-5174}"
       - "${AISETS_PORT:-19520}:${AISETS_PORT:-19520}"
     volumes:
-      - ..:/workspace
+      - ${PROJECT_ROOT:-.}:/workspace
       - ui-node-modules:/workspace/ui/node_modules
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/go/build-cache
