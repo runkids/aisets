@@ -1,0 +1,278 @@
+package server
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"aisets/internal/aitag"
+	"aisets/internal/apierr"
+	"aisets/internal/llm"
+	"aisets/internal/scanner"
+)
+
+type aiTagCounts struct {
+	Queued    int `json:"queued"`
+	Processed int `json:"processed"`
+	Ready     int `json:"ready"`
+	Failed    int `json:"failed"`
+	Skipped   int `json:"skipped"`
+	CacheHit  int `json:"cacheHit"`
+}
+
+func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("cache-control", "no-store")
+
+	settings, err := s.store.Settings()
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_settings_failed")})
+		return
+	}
+	if settings.LLMProvider == "" || settings.LLMVisionModel == "" {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or vision model not configured")})
+		return
+	}
+	if s.llmProvider == nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_provider_unavailable", "LLM provider is not available")})
+		return
+	}
+
+	catalog, err := s.ensureCatalog(r.Context())
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_catalog_failed")})
+		return
+	}
+
+	providerName := settings.LLMProvider
+	modelName := settings.LLMVisionModel
+
+	counts := aiTagCounts{}
+	candidates := []scanner.AssetItem{}
+	inFlightHashes := map[string]struct{}{}
+	pendingDuplicates := map[string][]scanner.AssetItem{}
+	readyByHash := map[string]aitag.Result{}
+
+	for _, rawItem := range catalog.Items {
+		item := rawItem
+		if !eligibleForAITag(item) {
+			counts.Skipped++
+			continue
+		}
+		if item.ContentHash == "" || item.HashAlgorithm == "" {
+			sum, algorithm, err := scanner.ContentHash(r.Context(), item.LocalPath)
+			if err != nil {
+				counts.Skipped++
+				continue
+			}
+			item.ContentHash = sum
+			item.HashAlgorithm = algorithm
+		}
+
+		key := aiTagContentKey(item)
+
+		// Check per-item cache
+		items := []scanner.AssetItem{item}
+		cached, err := s.store.AITagResults(items, providerName, modelName)
+		if err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
+			return
+		}
+		if result, ok := cached[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == aitag.StatusReady {
+			readyByHash[key] = result
+			counts.CacheHit++
+			continue
+		}
+
+		// Check content-hash dedup from earlier in this run
+		if result, ok := readyByHash[key]; ok {
+			copied := copyAITagResultForItem(result, item)
+			if err := s.store.UpsertAITagResult(copied); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
+				return
+			}
+			counts.CacheHit++
+			continue
+		}
+
+		// Check content-hash dedup from DB
+		if result, found, err := s.store.AITagResultForContentHash(item.ContentHash, item.HashAlgorithm, providerName, modelName); err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
+			return
+		} else if found {
+			copied := copyAITagResultForItem(result, item)
+			if err := s.store.UpsertAITagResult(copied); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
+				return
+			}
+			readyByHash[key] = result
+			counts.CacheHit++
+			continue
+		}
+
+		// Dedup in-flight
+		if _, ok := inFlightHashes[key]; ok {
+			pendingDuplicates[key] = append(pendingDuplicates[key], item)
+			counts.CacheHit++
+			continue
+		}
+
+		candidates = append(candidates, item)
+		counts.Queued++
+		inFlightHashes[key] = struct{}{}
+	}
+
+	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
+
+	// Single worker — process sequentially
+	for _, item := range candidates {
+		if r.Context().Err() != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(r.Context().Err(), "aitag_canceled"), "counts": counts})
+			return
+		}
+
+		result := s.processAITag(r.Context(), item, providerName, modelName)
+		if result.Status == aitag.StatusFailed {
+			counts.Failed++
+		} else {
+			counts.Ready++
+		}
+		counts.Processed++
+
+		if err := s.store.UpsertAITagResult(result); err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed"), "counts": counts})
+			return
+		}
+
+		// Copy result to pending duplicates
+		key := aiTagContentKey(item)
+		for _, dup := range pendingDuplicates[key] {
+			copied := copyAITagResultForItem(result, dup)
+			if err := s.store.UpsertAITagResult(copied); err != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed"), "counts": counts})
+				return
+			}
+		}
+
+		sendNDJSON(w, map[string]any{"type": "progress", "assetId": item.ID, "repoPath": item.RepoPath, "status": result.Status, "counts": counts})
+	}
+
+	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
+}
+
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName string) aitag.Result {
+	result := aitag.Result{
+		ProjectID:     item.ProjectID,
+		RepoPath:      item.RepoPath,
+		ContentHash:   item.ContentHash,
+		HashAlgorithm: item.HashAlgorithm,
+		ProviderName:  providerName,
+		ModelName:     modelName,
+		Status:        aitag.StatusReady,
+	}
+
+	data, err := os.ReadFile(item.LocalPath)
+	if err != nil {
+		result.Status = aitag.StatusFailed
+		result.ErrorCode = "aitag_read_failed"
+		result.ErrorMessage = err.Error()
+		return result
+	}
+
+	b64 := base64.StdEncoding.EncodeToString(data)
+
+	start := time.Now()
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model: modelName,
+		Messages: []llm.ChatMessage{{
+			Role:    "user",
+			Content: aitag.TagPrompt,
+			Images:  []string{b64},
+		}},
+	})
+	result.DurationMs = time.Since(start).Milliseconds()
+
+	if err != nil {
+		result.Status = aitag.StatusFailed
+		result.ErrorCode = "aitag_llm_failed"
+		result.ErrorMessage = err.Error()
+		return result
+	}
+
+	// Parse JSON from response, stripping markdown fences if present
+	content := strings.TrimSpace(resp.Content)
+	content = stripMarkdownFences(content)
+
+	var parsed struct {
+		Category    string   `json:"category"`
+		Tags        []string `json:"tags"`
+		Description string   `json:"description"`
+	}
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		result.Status = aitag.StatusFailed
+		result.ErrorCode = "aitag_parse_failed"
+		result.ErrorMessage = "failed to parse VLM JSON response: " + err.Error()
+		return result
+	}
+
+	result.Category = strings.ToLower(strings.TrimSpace(parsed.Category))
+	result.Tags = parsed.Tags
+	result.Description = strings.TrimSpace(parsed.Description)
+	if result.Tags == nil {
+		result.Tags = []string{}
+	}
+	return result
+}
+
+func eligibleForAITag(item scanner.AssetItem) bool {
+	ext := strings.ToLower(item.Ext)
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg":
+	default:
+		return false
+	}
+	if item.Image.Animated {
+		return false
+	}
+	if item.Image.Width <= 0 || item.Image.Height <= 0 {
+		return false
+	}
+	const maxBytes = 20 * 1024 * 1024 // 20MB
+	if item.Bytes > maxBytes {
+		return false
+	}
+	return true
+}
+
+func aiTagContentKey(item scanner.AssetItem) string {
+	if item.ContentHash == "" || item.HashAlgorithm == "" {
+		return ""
+	}
+	return item.HashAlgorithm + "\x00" + item.ContentHash
+}
+
+func copyAITagResultForItem(result aitag.Result, item scanner.AssetItem) aitag.Result {
+	result.ProjectID = item.ProjectID
+	result.RepoPath = item.RepoPath
+	result.ContentHash = item.ContentHash
+	result.HashAlgorithm = item.HashAlgorithm
+	result.UpdatedAt = ""
+	return result
+}
+
+func stripMarkdownFences(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```json") {
+		s = strings.TrimPrefix(s, "```json")
+	} else if strings.HasPrefix(s, "```") {
+		s = strings.TrimPrefix(s, "```")
+	}
+	if strings.HasSuffix(s, "```") {
+		s = strings.TrimSuffix(s, "```")
+	}
+	return strings.TrimSpace(s)
+}

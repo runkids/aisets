@@ -157,6 +157,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/actions/optimization/generate-script", s.handleOptimizationGenerateScript)
 	s.mux.HandleFunc("GET /api/llm/models", s.handleLLMModels)
 	s.mux.HandleFunc("POST /api/llm/health", s.handleLLMHealth)
+	s.mux.HandleFunc("POST /api/ai/tag/run", s.handleAITagRun)
 	if s.uiDistDir != "" {
 		s.mux.Handle("/", spaHandlerFromDisk(s.uiDistDir, s.basePath))
 	} else {
