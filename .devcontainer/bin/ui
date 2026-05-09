@@ -8,8 +8,8 @@
 #   ui stop
 set -euo pipefail
 
-PORT=19520
-VITE_PORT=5174
+PORT="${AISETS_PORT:-19520}"
+VITE_PORT="${AISETS_UI_PORT:-5174}"
 OPEN_MODE=browser
 PIDDIR=/tmp/aisets-dev-servers
 LOGDIR=/tmp
