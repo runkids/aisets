@@ -218,13 +218,14 @@ export function App() {
   );
   const scanMutation = useScanCatalogMutation({ onEvent: handleScanEvent });
   const scanStatusQuery = useScanStatusQuery(!scanMutation.isPending);
-  const wasPollingRef = useRef(false);
+  const observedScanIdRef = useRef(0);
+  const wasPollingScanRef = useRef(false);
   useEffect(() => {
     const status = scanStatusQuery.data;
     if (scanMutation.isPending || !status) return undefined;
     let cancelled = false;
     if (status.running) {
-      wasPollingRef.current = true;
+      wasPollingScanRef.current = true;
       queueMicrotask(() => {
         if (cancelled) return;
         setScanProgress({
@@ -232,15 +233,19 @@ export function App() {
           phase: status.phase,
           current: status.current,
           total: status.total,
-        } as ScanEvent);
+        });
         setScanProgressVisible(true);
       });
-    } else if (wasPollingRef.current) {
-      wasPollingRef.current = false;
+    } else if (status.scanId && status.scanId !== observedScanIdRef.current) {
+      observedScanIdRef.current = status.scanId;
+      const showCompletion = wasPollingScanRef.current;
+      wasPollingScanRef.current = false;
       queueMicrotask(() => {
         if (cancelled) return;
-        setScanProgress({ type: "done" } as ScanEvent);
-        setScanProgressVisible(true);
+        if (showCompletion) {
+          setScanProgress({ type: "done", scanId: status.scanId });
+          setScanProgressVisible(true);
+        }
         void queryClient.invalidateQueries({ queryKey: catalogQueryKey });
       });
     }

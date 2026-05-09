@@ -8,7 +8,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ScanEvent } from "../types";
 import {
@@ -88,6 +88,17 @@ export function AppTopbar({
   const scanDropdownState = scanStatusOpen
     ? "translate-y-0 opacity-100"
     : "translate-y-1 opacity-0";
+
+  useEffect(() => {
+    if (scanProgress) return undefined;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setScanStatusOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scanProgress]);
   const ocrVisible = isOCRActivityVisible(ocrActivity);
   const ocrBusy = isOCRActivityBusy(ocrActivity);
   const ocrStatusLabels: Record<string, string> = {
@@ -195,7 +206,7 @@ export function AppTopbar({
           </span>
         </Tooltip>
         {scanProgress ? (
-          <span className="group relative inline-flex">
+          <span className="relative inline-flex">
             <IconButton
               aria-label={t("action.rescan")}
               data-loading={working || undefined}
@@ -205,7 +216,7 @@ export function AppTopbar({
               <RefreshCw size={16} />
             </IconButton>
             <div
-              className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[280px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 ${scanDropdownState}`}
+              className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[280px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g ${scanDropdownState}`}
               role={failed ? "alert" : "status"}
               aria-live={failed ? "assertive" : "polite"}
             >

@@ -18,6 +18,7 @@ import type {
   ScanDiff,
   ScanEvent,
   ScanSummary,
+  ScanProgressPhase,
   ScanProfile,
   SettingsInfo,
   SettingsUpdate,
@@ -331,9 +332,10 @@ function scanDoneFallback(): Extract<ScanEvent, { type: "done" }> {
 
 export type ScanStatus = {
   running: boolean;
-  phase: string;
+  phase: ScanProgressPhase;
   current: number;
   total: number;
+  scanId?: number;
 };
 
 export async function fetchScanStatus(): Promise<ScanStatus> {
