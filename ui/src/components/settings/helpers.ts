@@ -121,6 +121,10 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     ocrBatchSize: settings?.ocrBatchSize ?? 25,
     ocrConcurrency: settings?.ocrConcurrency ?? 1,
     ocrFuzzySearch: settings?.ocrFuzzySearch ?? true,
+    llmProvider: settings?.llmProvider ?? "",
+    llmEndpoint: settings?.llmEndpoint ?? "http://localhost:11434",
+    llmVisionModel: settings?.llmVisionModel ?? "",
+    llmEmbedModel: settings?.llmEmbedModel ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -162,6 +166,10 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     ocrBatchSize: draft.ocrBatchSize,
     ocrConcurrency: draft.ocrConcurrency,
     ocrFuzzySearch: draft.ocrFuzzySearch,
+    llmProvider: draft.llmProvider,
+    llmEndpoint: draft.llmEndpoint,
+    llmVisionModel: draft.llmVisionModel,
+    llmEmbedModel: draft.llmEmbedModel,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -212,6 +220,14 @@ export function resetSectionDraft(
         ocrBatchSize: defaults.ocrBatchSize,
         ocrConcurrency: defaults.ocrConcurrency,
         ocrFuzzySearch: defaults.ocrFuzzySearch,
+      };
+    case "ai":
+      return {
+        ...current,
+        llmProvider: defaults.llmProvider,
+        llmEndpoint: defaults.llmEndpoint,
+        llmVisionModel: defaults.llmVisionModel,
+        llmEmbedModel: defaults.llmEmbedModel,
       };
     case "customFilters":
       return {

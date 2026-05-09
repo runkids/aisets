@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  BrainCircuit,
   Filter,
   FolderKanban,
   Info,
@@ -26,6 +27,7 @@ export const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "theme", icon: <Paintbrush size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
+  { id: "ai", icon: <BrainCircuit size={15} /> },
   { id: "customFilters", icon: <Filter size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },
@@ -147,6 +149,10 @@ export const defaultSettings: SettingsUpdate = {
   ocrBatchSize: 25,
   ocrConcurrency: 1,
   ocrFuzzySearch: true,
+  llmProvider: "",
+  llmEndpoint: "http://localhost:11434",
+  llmVisionModel: "",
+  llmEmbedModel: "",
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [

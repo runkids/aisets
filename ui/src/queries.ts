@@ -15,8 +15,10 @@ import {
   batchMergePreview,
   batchMovePreview,
   batchRenamePreview,
+  checkLLMHealth,
   clearScanHistory,
   deleteUnusedPreview,
+  fetchLLMModels,
   fetchScanStatus,
   getCatalog,
   getCatalogDuplicates,
@@ -651,5 +653,20 @@ export function useBatchCopyMutation() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },
+  });
+}
+
+export function useLLMModelsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: ["llm-models"],
+    queryFn: fetchLLMModels,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useLLMHealthMutation() {
+  return useMutation({
+    mutationFn: checkLLMHealth,
   });
 }

@@ -64,6 +64,10 @@ export type AppSettings = {
   optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
   preferredEditor: string;
+  llmProvider: string;
+  llmEndpoint: string;
+  llmVisionModel: string;
+  llmEmbedModel: string;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -129,6 +133,7 @@ export type SettingsInfo = AppSettings & {
   ocrRuntime: OCRRuntime;
   optimizationToolRuntime: OptimizationToolRuntime[];
   optimizationStrategyHash: string;
+  llmRuntime: LLMRuntime;
 };
 
 export type OCRRuntime = {
@@ -166,6 +171,22 @@ export type OptimizationToolRuntime = {
   path?: string;
   enabled: boolean;
   operations: string[];
+};
+
+export type LLMModel = {
+  name: string;
+  size: number;
+  modifiedAt: string;
+};
+
+export type LLMRuntime = {
+  provider: string;
+  endpoint: string;
+  connected: boolean;
+  error?: string;
+  models: LLMModel[];
+  visionModel: string;
+  embedModel: string;
 };
 
 export type OptimizationStrategy = {

@@ -47,6 +47,10 @@ describe("settings draft helpers", () => {
       optimizationStrategies: [],
       customAssetFilters: [],
       preferredEditor: "vscode",
+      llmProvider: "",
+      llmEndpoint: "http://localhost:11434",
+      llmVisionModel: "",
+      llmEmbedModel: "",
       workspaces: [],
       projects: [],
       databasePath: "/tmp/aisets.db",
@@ -63,6 +67,14 @@ describe("settings draft helpers", () => {
       },
       optimizationToolRuntime: [],
       optimizationStrategyHash: "test",
+      llmRuntime: {
+        provider: "",
+        endpoint: "http://localhost:11434",
+        connected: false,
+        models: [],
+        visionModel: "",
+        embedModel: "",
+      },
     });
 
     draft.excludePatternsByIntentText.code = "**/*.test.*\n**/*.spec.*";
@@ -138,6 +150,10 @@ describe("settings draft helpers", () => {
         },
       ],
       preferredEditor: "vscode",
+      llmProvider: "ollama",
+      llmEndpoint: "http://localhost:11434",
+      llmVisionModel: "llava",
+      llmEmbedModel: "nomic-embed-text",
       workspaces: [],
       projects: [],
       databasePath: "/tmp/aisets.db",
@@ -154,6 +170,14 @@ describe("settings draft helpers", () => {
       },
       optimizationToolRuntime: [],
       optimizationStrategyHash: "custom",
+      llmRuntime: {
+        provider: "ollama",
+        endpoint: "http://localhost:11434",
+        connected: true,
+        models: [],
+        visionModel: "llava",
+        embedModel: "nomic-embed-text",
+      },
     });
 
     const workspace = resetSectionDraft(draft, "workspace");

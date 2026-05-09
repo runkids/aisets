@@ -11,6 +11,8 @@ import type {
   CatalogSummary,
   DirectoryListing,
   ExportData,
+  LLMModel,
+  LLMRuntime,
   OCRRunEvent,
   Project,
   ProjectScanIntent,
@@ -618,6 +620,14 @@ export function batchMovePreview(assetIds: string[], targetDir: string) {
     method: "POST",
     body: JSON.stringify({ assetIds, targetDir }),
   });
+}
+
+export function fetchLLMModels() {
+  return request<{ models: LLMModel[]; error?: string }>("/api/llm/models");
+}
+
+export function checkLLMHealth() {
+  return request<LLMRuntime>("/api/llm/health", { method: "POST" });
 }
 
 export function batchRenamePreview(

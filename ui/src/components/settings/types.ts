@@ -33,6 +33,7 @@ export type Section =
   | "projects"
   | "theme"
   | "scanning"
+  | "ai"
   | "customFilters"
   | "optimization"
   | "hotkeys"
@@ -51,6 +52,10 @@ export type SettingsDraft = {
   ocrBatchSize: number;
   ocrConcurrency: number;
   ocrFuzzySearch: boolean;
+  llmProvider: string;
+  llmEndpoint: string;
+  llmVisionModel: string;
+  llmEmbedModel: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;
