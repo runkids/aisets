@@ -236,7 +236,12 @@ function writeBrowseStoredState(state: BrowseStoredState) {
 export function resetBrowseFiltersForStatusChange(
   projectScopeName = "",
 ): BrowseFilters {
-  return { project: projectScopeName, ext: "", customFilter: "", aiCategory: "" };
+  return {
+    project: projectScopeName,
+    ext: "",
+    customFilter: "",
+    aiCategory: "",
+  };
 }
 
 function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
@@ -641,7 +646,7 @@ export function BrowseView({
   const settingsQuery = useSettingsQuery();
   const llmConfigured = Boolean(
     settingsQuery.data?.settings.llmProvider &&
-      settingsQuery.data?.settings.llmVisionModel,
+    settingsQuery.data?.settings.llmVisionModel,
   );
   const [aiTagProgress, setAITagProgress] = useState<AITagRunCounts | null>(
     null,
@@ -778,7 +783,12 @@ export function BrowseView({
   useEffect(() => {
     if (!autoScrollAssetId) return undefined;
     const resetId = window.setTimeout(() => {
-      setFilters({ project: projectFilterName, ext: "", customFilter: "", aiCategory: "" });
+      setFilters({
+        project: projectFilterName,
+        ext: "",
+        customFilter: "",
+        aiCategory: "",
+      });
       setSearchQuery(initialSearchQuery);
       setStatusFilter("");
       setSelectedFolder("");
@@ -999,9 +1009,7 @@ export function BrowseView({
             <div className="flex items-center gap-2 py-1">
               <Tooltip
                 label={
-                  aiTagRunning
-                    ? t("browse.aiTagRunning")
-                    : t("browse.runAITag")
+                  aiTagRunning ? t("browse.aiTagRunning") : t("browse.runAITag")
                 }
               >
                 <Button

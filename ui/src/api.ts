@@ -398,7 +398,8 @@ function parseOCRLine(
   if (!line.trim()) return null;
   const event = JSON.parse(line) as OCRRunEvent;
   onEvent?.(event);
-  if (event.type === "error") throwRunError(event.error, "ocr_failed", "OCR failed");
+  if (event.type === "error")
+    throwRunError(event.error, "ocr_failed", "OCR failed");
   return event;
 }
 

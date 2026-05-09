@@ -70,6 +70,7 @@ Aisets is a Go-backed local web tool for auditing image / asset hygiene in a cod
 - **Run all UI and CLI verification inside the devcontainer / Docker environment.** Do not run `go test`, `go vet`, `pnpm`, Vite, or CLI smoke checks on the host unless the user explicitly asks for a host-only check.
 - If not already inside the devcontainer, enter it first with `make devc` (or `./scripts/devc.sh shell` when the container is already running). Use `/workspace` as the repo root inside the container.
 - For UI review, first ask the user whether they are already inside the devcontainer. Once confirmed, run `ui` inside the devcontainer. The UI is served at `http://127.0.0.1:5174` and the API at `19520`.
+- **Custom devcontainer ports must be checked for host Vite collisions.** When running with `PORT=N`, the UI port is `N - 19520 + 5174`; before trusting the browser, run `lsof -nP -iTCP:<ui-port> -sTCP:LISTEN` on the host and confirm the listener is Docker/OrbStack, not a host `node ... vite` process. A stale host Vite can serve old main-branch UI on the same port while the devcontainer API is correct, making feature work look missing.
 - A UI commit must:
   - Touch the relevant TSX / SCSS tokens
   - Touch `DESIGN.md` if any design-surface delta exists

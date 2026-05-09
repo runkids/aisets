@@ -145,9 +145,7 @@ export function AssetDrawer({
     asset.ocr &&
     asset.ocr.status === "ready",
   );
-  const aiTagVisible = Boolean(
-    asset.aiTag && asset.aiTag.status === "ready",
-  );
+  const aiTagVisible = Boolean(asset.aiTag && asset.aiTag.status === "ready");
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
   const assetFileName = fileName(asset.repoPath);
@@ -578,7 +576,9 @@ export function AssetDrawer({
                       </h4>
                       <div className="flex flex-wrap gap-1">
                         {asset.aiTag.tags.map((tag) => (
-                          <Badge key={tag} tone="line">{tag}</Badge>
+                          <Badge key={tag} tone="line">
+                            {tag}
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -595,10 +595,15 @@ export function AssetDrawer({
                   )}
                   <div className="flex items-center gap-4 border-t border-g-line pt-3 font-g text-g-caption text-g-ink-4">
                     {asset.aiTag.durationMs != null && (
-                      <span>{t("drawer.aiDuration")}: {(asset.aiTag.durationMs / 1000).toFixed(1)}s</span>
+                      <span>
+                        {t("drawer.aiDuration")}:{" "}
+                        {(asset.aiTag.durationMs / 1000).toFixed(1)}s
+                      </span>
                     )}
                     {asset.aiTag.updatedAt && (
-                      <span>{new Date(asset.aiTag.updatedAt).toLocaleString()}</span>
+                      <span>
+                        {new Date(asset.aiTag.updatedAt).toLocaleString()}
+                      </span>
                     )}
                   </div>
                 </div>

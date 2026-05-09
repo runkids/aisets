@@ -41,6 +41,46 @@ require_docker() {
   fi
 }
 
+is_docker_port_owner() {
+  case "$1" in
+    OrbStack|Docker|com.docke*|docker*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_host_port_available() {
+  local port="$1"
+  local role="$2"
+  local conflicts=()
+  local line command
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    command="${line%% *}"
+    if ! is_docker_port_owner "$command"; then
+      conflicts+=("$line")
+    fi
+  done < <(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | tail -n +2)
+
+  if [[ ${#conflicts[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "Error: ${role} port ${port} is already owned by a non-Docker host process:" >&2
+  printf '  %s\n' "${conflicts[@]}" >&2
+  echo "Stop the process or choose another PORT before starting the devcontainer." >&2
+  return 1
+}
+
+check_host_ports_available() {
+  check_host_port_available "${AISETS_UI_PORT:-5174}" "UI"
+  check_host_port_available "${AISETS_PORT:-19520}" "API"
+}
+
 parse_port_flag() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -79,6 +119,7 @@ cmd_up() {
   cd "$PROJECT_ROOT"
   local ui_port="${AISETS_UI_PORT:-5174}"
   local api_port="${AISETS_PORT:-19520}"
+  check_host_ports_available
   echo "▸ Starting devcontainer (UI :${ui_port}  API :${api_port}) ..."
   docker compose -f "$COMPOSE_FILE" up -d --build
   if is_initialised; then
@@ -109,6 +150,7 @@ cmd_down() {
 cmd_restart() {
   require_docker
   cd "$PROJECT_ROOT"
+  check_host_ports_available
   docker compose -f "$COMPOSE_FILE" restart
   docker compose -f "$COMPOSE_FILE" exec -T -w /workspace "$SERVICE" \
     bash -c '/workspace/.devcontainer/start-dev.sh'

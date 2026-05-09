@@ -77,7 +77,12 @@ describe("normalizeBrowseStoredState", () => {
     );
 
     expect(result).toEqual({
-      filters: { project: "workspace", ext: ".png", customFilter: "icons", aiCategory: "" },
+      filters: {
+        project: "workspace",
+        ext: ".png",
+        customFilter: "icons",
+        aiCategory: "",
+      },
       view: "list",
       gridSize: "l",
       searchQuery: "logo",
@@ -184,7 +189,12 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "App", ext: ".png", customFilter: "icons", aiCategory: "" },
+      filters: {
+        project: "App",
+        ext: ".png",
+        customFilter: "icons",
+        aiCategory: "",
+      },
       searchQuery: "home",
       statusFilter: "referenced",
       customFilters: [customFilter("icons", "/icons/")],
@@ -206,7 +216,12 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "App", ext: ".png", customFilter: "icons", aiCategory: "" },
+      filters: {
+        project: "App",
+        ext: ".png",
+        customFilter: "icons",
+        aiCategory: "",
+      },
       searchQuery: "",
       statusFilter: "",
       customFilters: [
