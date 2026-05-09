@@ -53,6 +53,7 @@ export function SettingsView({
   imagePreviewEnabled,
   imageBackgroundMode,
   ocrActivity,
+  scanWorking = false,
   onThemeChange,
   onImagePreviewEnabledChange,
   onImageBackgroundModeChange,
@@ -104,7 +105,13 @@ export function SettingsView({
   const workspaces = settings?.workspaces ?? [];
   const activeWorkspaceId = settings?.activeWorkspaceId ?? "default";
   const projects = catalogQuery.data?.projects ?? [];
-  const settingsProjects = settings?.projects ?? projects;
+  const settingsProjectMap = new Map(
+    (settings?.projects ?? []).map((project) => [project.id, project]),
+  );
+  for (const project of projects) {
+    settingsProjectMap.set(project.id, project);
+  }
+  const settingsProjects = Array.from(settingsProjectMap.values());
   const workspaceProjects = new Map(
     workspaces.map((workspace) => [
       workspace.id,
@@ -118,6 +125,7 @@ export function SettingsView({
     }
   }
   const working =
+    scanWorking ||
     addWorkspaceMutation.isPending ||
     clearScanHistoryMutation.isPending ||
     importMutation.isPending ||
@@ -296,6 +304,7 @@ export function SettingsView({
   }
 
   function onRemoveProject(projectId: string) {
+    if (scanWorking) return;
     const project = settingsProjects.find((p) => p.id === projectId);
     removeProjectMutation.mutate(projectId, {
       onSuccess: () => {
@@ -371,6 +380,7 @@ export function SettingsView({
   }
 
   function onResetDatabase() {
+    if (scanWorking) return;
     resetMutation.mutate(undefined, {
       onSuccess: () => {
         toast.success(t("toast.databaseReset"));

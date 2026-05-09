@@ -122,6 +122,17 @@ describe("catalogItemsTotalCount", () => {
 });
 
 describe("navigationBadges", () => {
+  it("hides duplicate count while duplicate analysis is incomplete", () => {
+    const summary = makeSummary(["001"], 4);
+    summary.analysis.nearDuplicates = "notComputed";
+    const scopedStats = {
+      ...summary.stats,
+      duplicateGroups: 84,
+    };
+
+    expect(navigationBadges(summary, scopedStats, 0).duplicate).toBe(0);
+  });
+
   it("always counts all Projects while keeping asset workflow counts scoped", () => {
     const summary = makeSummary(["001", "workspace"], 4);
     const scopedStats = {

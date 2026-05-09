@@ -259,17 +259,21 @@ func (s *Server) handleCatalogLint(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("cache-control", "no-store")
+
+	options, err := s.scanOptionsFromRequest(r)
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_invalid_request")})
+		return
+	}
+	if !s.beginScan() {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(apierr.New("scan_already_running", "scan is already running"), "scan_already_running")})
+		return
+	}
+	defer s.finishScan()
 	sendNDJSON(w, map[string]any{"type": "start"})
 
-	s.scanMu.Lock()
-	s.scanRunning = true
-	s.scanProgress = scanner.ScanProgress{}
-	s.scanMu.Unlock()
-
 	progress := func(event scanner.ScanProgress) {
-		s.scanMu.Lock()
-		s.scanProgress = event
-		s.scanMu.Unlock()
+		s.updateScanProgress(event)
 		sendNDJSON(w, map[string]any{
 			"type":    "progress",
 			"phase":   event.Phase,
@@ -280,23 +284,20 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			"reason":  event.Reason,
 		})
 	}
-	options, err := s.scanOptionsFromRequest(r)
-	if err != nil {
-		s.scanMu.Lock()
-		s.scanRunning = false
-		s.scanMu.Unlock()
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_invalid_request")})
-		return
-	}
-	catalog, scanID, err := s.scanWithProgress(r.Context(), options, progress)
-	s.scanMu.Lock()
-	s.scanRunning = false
-	s.scanMu.Unlock()
+	catalog, scanID, err := s.scanWithProgress(context.Background(), options, progress)
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_failed")})
 		return
 	}
 	sendNDJSON(w, map[string]any{"type": "done", "scanId": scanID, "stats": catalog.Stats, "analysis": catalog.Analysis})
+}
+
+func (s *Server) rejectCatalogMutationWhileScanRunning(w http.ResponseWriter) bool {
+	if !s.isScanRunning() {
+		return false
+	}
+	writeError(w, http.StatusConflict, apierr.New("scan_already_running", "scan is already running"))
+	return true
 }
 
 func (s *Server) handleScanStatus(w http.ResponseWriter, _ *http.Request) {
@@ -315,6 +316,9 @@ func (s *Server) handleScanStatus(w http.ResponseWriter, _ *http.Request) {
 		"phase":   progress.Phase,
 		"current": progress.Current,
 		"total":   progress.Total,
+		"message": progress.Message,
+		"state":   progress.State,
+		"reason":  progress.Reason,
 		"scanId":  scanID,
 	})
 }
@@ -455,6 +459,51 @@ func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
 	return s.scanWithProgress(ctx, scanner.ScanOptions{}, nil)
 }
 
+func (s *Server) scanFast(ctx context.Context) (scanner.Catalog, int64, error) {
+	return s.scanWithProgress(ctx, scanner.ScanOptions{Profile: scanner.ScanProfileFast}, nil)
+}
+
+func (s *Server) scanTracked(ctx context.Context, options scanner.ScanOptions) (scanner.Catalog, int64, error) {
+	if !s.beginScan() {
+		return scanner.Catalog{}, 0, apierr.New("scan_already_running", "scan is already running")
+	}
+	defer s.finishScan()
+	return s.scanWithProgress(ctx, options, s.updateScanProgress)
+}
+
+func (s *Server) scanFastTracked(ctx context.Context) (scanner.Catalog, int64, error) {
+	return s.scanTracked(ctx, scanner.ScanOptions{Profile: scanner.ScanProfileFast})
+}
+
+func (s *Server) beginScan() bool {
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+	if s.scanRunning {
+		return false
+	}
+	s.scanRunning = true
+	s.scanProgress = scanner.ScanProgress{}
+	return true
+}
+
+func (s *Server) updateScanProgress(event scanner.ScanProgress) {
+	s.scanMu.Lock()
+	s.scanProgress = event
+	s.scanMu.Unlock()
+}
+
+func (s *Server) finishScan() {
+	s.scanMu.Lock()
+	s.scanRunning = false
+	s.scanMu.Unlock()
+}
+
+func (s *Server) isScanRunning() bool {
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+	return s.scanRunning
+}
+
 func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOptions, progress scanner.ProgressFunc) (scanner.Catalog, int64, error) {
 	projects := toScannerProjects(s.store.Projects())
 	settings, err := s.store.Settings()
@@ -498,13 +547,34 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 	s.mu.Lock()
 	stale := s.catalogStale
 	s.mu.Unlock()
-	if !stale {
-		summary, err := s.store.CatalogSummary()
-		if err == nil && !s.analysisIncomplete(summary) {
+	if summary, err := s.store.CatalogSummary(); err == nil {
+		if stale {
+			if s.isScanRunning() {
+				return summary, nil
+			}
+			_, _, err := s.scanFastTracked(ctx)
+			if err != nil {
+				return config.CatalogSummary{}, err
+			}
+			return s.store.CatalogSummary()
+		}
+		projects := s.store.Projects()
+		if len(projects) == 0 {
 			return summary, nil
 		}
+		if match, err := s.store.ScanProjectIntentsMatch(summary.ScanID, projects); err == nil && !match {
+			if s.isScanRunning() {
+				return summary, nil
+			}
+			_, _, err := s.scanFastTracked(ctx)
+			if err != nil {
+				return config.CatalogSummary{}, err
+			}
+			return s.store.CatalogSummary()
+		}
+		return summary, nil
 	}
-	_, _, err := s.scan(ctx)
+	_, _, err := s.scanTracked(ctx, scanner.ScanOptions{})
 	if err != nil {
 		return config.CatalogSummary{}, err
 	}

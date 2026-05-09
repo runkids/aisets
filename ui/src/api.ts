@@ -1,6 +1,7 @@
 import type {
   ActionPreview,
   APIErrorBody,
+  AnalysisState,
   BatchResult,
   CatalogDuplicatesPage,
   CatalogFoldersPage,
@@ -335,6 +336,9 @@ export type ScanStatus = {
   phase: ScanProgressPhase;
   current: number;
   total: number;
+  message?: string;
+  state?: AnalysisState;
+  reason?: "" | "skippedByUser" | "skippedByThreshold" | "notApplicable";
   scanId?: number;
 };
 
@@ -429,14 +433,22 @@ export function removeOCR(languages: string[] = []) {
   });
 }
 
+export type AddProjectResult = {
+  status: "added" | "existing" | "restored";
+  project: Project;
+};
+
 export function addProject(
   path: string,
   scanIntent: ProjectScanIntent = "code",
 ) {
-  return request<{ projects: Project[] }>("/api/projects/add", {
-    method: "POST",
-    body: JSON.stringify({ path, scanIntent }),
-  });
+  return request<{ projects: Project[]; result?: AddProjectResult }>(
+    "/api/projects/add",
+    {
+      method: "POST",
+      body: JSON.stringify({ path, scanIntent }),
+    },
+  );
 }
 
 export function detectProjectScanIntent(path: string) {

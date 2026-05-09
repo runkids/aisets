@@ -1116,20 +1116,47 @@ func TestAddProjectsSkipsEmptyRejectsFilesAndRestoresDeleted(t *testing.T) {
 	}
 	defer store.Close()
 
-	if err := store.AddProjects([]string{"", project}); err != nil {
+	results, err := store.AddProjectsWithIntentResult([]string{"", project}, scanner.ProjectScanIntentCode)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != ProjectAddStatusAdded {
+		t.Fatalf("add results = %#v", results)
 	}
 	if projects := store.Projects(); len(projects) != 1 {
 		t.Fatalf("projects = %#v", projects)
 	}
+	results, err = store.AddProjectsWithIntentResult([]string{project}, scanner.ProjectScanIntentAssetPack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != ProjectAddStatusExisting || results[0].Project.ScanIntent != scanner.ProjectScanIntentCode {
+		t.Fatalf("existing results = %#v", results)
+	}
 	if err := store.RemoveProject(project); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.AddProjects([]string{project}); err != nil {
+	results, err = store.AddProjectsWithIntentResult([]string{project}, scanner.ProjectScanIntentCode)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != ProjectAddStatusRestored {
+		t.Fatalf("restored results = %#v", results)
 	}
 	if projects := store.Projects(); len(projects) != 1 || projects[0].Path != project {
 		t.Fatalf("restored projects = %#v", projects)
+	}
+
+	link := filepath.Join(root, "project-link")
+	if err := os.Symlink(project, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	results, err = store.AddProjectsWithIntentResult([]string{link}, scanner.ProjectScanIntentCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != ProjectAddStatusExisting || results[0].Project.Path != project {
+		t.Fatalf("symlink existing results = %#v", results)
 	}
 
 	err = store.AddProjects([]string{file})

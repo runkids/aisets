@@ -106,6 +106,9 @@ func projectErrorStatus(err error) int {
 }
 
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
+	if s.rejectCatalogMutationWhileScanRunning(w) {
+		return
+	}
 	var body struct {
 		Path       string                    `json:"path"`
 		ScanIntent scanner.ProjectScanIntent `json:"scanIntent"`
@@ -114,11 +117,16 @@ func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.store.AddProjectsWithIntent([]string{body.Path}, body.ScanIntent); err != nil {
+	results, err := s.store.AddProjectsWithIntentResult([]string{body.Path}, body.ScanIntent)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, projectPathError(err, body.Path))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"projects": s.store.Projects()})
+	var result config.ProjectAddResult
+	if len(results) > 0 {
+		result = results[0]
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"projects": s.store.Projects(), "result": result})
 }
 
 func (s *Server) handleDetectProjectScanIntent(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +151,9 @@ func (s *Server) handleDetectProjectScanIntent(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
+	if s.rejectCatalogMutationWhileScanRunning(w) {
+		return
+	}
 	var body struct {
 		ID string `json:"id"`
 	}
@@ -159,6 +170,9 @@ func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRenameProject(w http.ResponseWriter, r *http.Request) {
+	if s.rejectCatalogMutationWhileScanRunning(w) {
+		return
+	}
 	var body struct {
 		ID         string                    `json:"id"`
 		Name       string                    `json:"name"`

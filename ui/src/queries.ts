@@ -390,6 +390,7 @@ export function useRemoveOCRMutation() {
 }
 
 export function useAddProjectMutation() {
+  const client = useQueryClient();
   return useMutation({
     mutationFn: ({
       path,
@@ -398,6 +399,9 @@ export function useAddProjectMutation() {
       path: string;
       scanIntent: ProjectScanIntent;
     }) => addProject(path, scanIntent),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: settingsQueryKey });
+    },
   });
 }
 

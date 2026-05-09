@@ -143,7 +143,7 @@ func markNearDuplicates(ctx context.Context, items []AssetItem, progress Progres
 		currentHash, hasCurrentHash := parseDHash(items[current].DHash)
 		flippedHash, hasFlippedHash := parseDHash(items[current].DHashFlipped)
 		if !hasCurrentHash && !hasFlippedHash {
-			notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items)})
+			notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items), Message: items[current].RepoPath})
 			continue
 		}
 
@@ -184,7 +184,7 @@ func markNearDuplicates(ctx context.Context, items []AssetItem, progress Progres
 		if hasCurrentHash {
 			index.insert(currentHash, current)
 		}
-		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items)})
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseNearDuplicates, Current: current + 1, Total: len(items), Message: items[current].RepoPath})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].LeftPath != out[j].LeftPath {

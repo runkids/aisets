@@ -91,7 +91,10 @@ export function navigationBadges(
   return {
     projects: summary?.projects.length ?? 0,
     total: scopedStats.totalFiles,
-    duplicate: scopedStats.duplicateGroups,
+    duplicate:
+      summary?.analysis.nearDuplicates === "computed"
+        ? scopedStats.duplicateGroups
+        : 0,
     unused: scopedStats.unusedFiles,
     optimize: optimizeCount,
     lint: scopedStats.lintFindings,

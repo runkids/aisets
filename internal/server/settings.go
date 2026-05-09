@@ -87,6 +87,9 @@ func (s *Server) handleSettingsExport(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
+	if s.rejectCatalogMutationWhileScanRunning(w) {
+		return
+	}
 	var body config.ExportData
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -105,6 +108,9 @@ func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettingsResetDatabase(w http.ResponseWriter, r *http.Request) {
+	if s.rejectCatalogMutationWhileScanRunning(w) {
+		return
+	}
 	var body struct {
 		Confirm string `json:"confirm"`
 	}

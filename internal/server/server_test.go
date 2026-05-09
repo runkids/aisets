@@ -297,6 +297,158 @@ func TestCatalogRescansWhenScanIntentSnapshotIsStale(t *testing.T) {
 	}
 }
 
+func TestScanContinuesWhenRequestContextIsCanceled(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	writePNG(t, filepath.Join(root, "src", "logo.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{root}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/scan", nil)
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+	s.handler.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `"type":"done"`) {
+		t.Fatalf("scan with canceled request context = %d %s", rec.Code, body)
+	}
+}
+
+func TestScanRejectsWhenAlreadyRunning(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	writePNG(t, filepath.Join(root, "src", "logo.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{root}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.beginScan() {
+		t.Fatal("failed to mark scan running")
+	}
+	defer s.finishScan()
+
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/scan", nil))
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "scan_already_running") {
+		t.Fatalf("second scan = %d %s", rec.Code, body)
+	}
+}
+
+func TestCatalogMutationsRejectWhileScanRunning(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.beginScan() {
+		t.Fatal("failed to mark scan running")
+	}
+	defer s.finishScan()
+
+	tests := []struct {
+		name string
+		path string
+		body string
+	}{
+		{name: "remove project", path: "/api/projects/remove", body: `{"id":"` + project + `"}`},
+		{name: "reset database", path: "/api/settings/reset-database", body: `{"confirm":"RESET"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body)))
+			if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "scan_already_running") {
+				t.Fatalf("mutation while scan running = %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestEnsureLatestScanDoesNotStartRepairScanWhileScanRunning(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	projects := store.Projects()
+	oldScanID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects: []scanner.Project{{
+			ID:         projects[0].ID,
+			Name:       projects[0].Name,
+			Path:       projects[0].Path,
+			ScanIntent: scanner.ProjectScanIntentCode,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	s.catalogStale = true
+	s.mu.Unlock()
+	if !s.beginScan() {
+		t.Fatal("failed to mark scan running")
+	}
+	defer s.finishScan()
+
+	summary, err := s.ensureLatestScan(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.ScanID != oldScanID {
+		t.Fatalf("ensureLatestScan triggered repair scan: got %d, want %d", summary.ScanID, oldScanID)
+	}
+}
+
 func TestScanWithProgressUsesSettingsExcludePatterns(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
@@ -680,6 +832,56 @@ func TestProjectMutationRoutesReturnJSON(t *testing.T) {
 	}
 	if len(removed.Projects) != 0 {
 		t.Fatalf("removed projects = %#v", removed.Projects)
+	}
+}
+
+func TestAddProjectRouteReportsExistingProject(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload, _ := json.Marshal(map[string]string{"path": project, "scanIntent": string(scanner.ProjectScanIntentCode)})
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/projects/add", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add project = %d %s", rec.Code, rec.Body.String())
+	}
+	var added struct {
+		Result config.ProjectAddResult `json:"result"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &added); err != nil {
+		t.Fatal(err)
+	}
+	if added.Result.Status != config.ProjectAddStatusAdded || added.Result.Project.Path != project {
+		t.Fatalf("add result = %#v", added.Result)
+	}
+
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/projects/add", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add existing project = %d %s", rec.Code, rec.Body.String())
+	}
+	var existing struct {
+		Projects []config.Project        `json:"projects"`
+		Result   config.ProjectAddResult `json:"result"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &existing); err != nil {
+		t.Fatal(err)
+	}
+	if existing.Result.Status != config.ProjectAddStatusExisting || len(existing.Projects) != 1 {
+		t.Fatalf("existing result = %#v projects=%#v", existing.Result, existing.Projects)
 	}
 }
 

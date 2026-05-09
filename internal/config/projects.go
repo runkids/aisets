@@ -43,6 +43,23 @@ func (s *Store) AllProjects() []Project {
 	return out
 }
 
+func (s *Store) Project(id string) (Project, error) {
+	var project Project
+	err := s.db.QueryRow(`
+		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at
+		FROM projects
+		WHERE id = ? AND deleted_at IS NULL
+	`, id).Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Path, &project.IconImage, &project.ScanIntent, &project.CreatedAt)
+	if err == sql.ErrNoRows {
+		return Project{}, apierr.New("project_not_found", "project not found")
+	}
+	if err != nil {
+		return Project{}, err
+	}
+	project.ScanIntent = scanner.NormalizeProjectScanIntent(project.ScanIntent)
+	return project, nil
+}
+
 func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	rows, err := s.db.Query(`
 		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at
@@ -66,41 +83,88 @@ func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
 	return out
 }
 
+type ProjectAddStatus string
+
+const (
+	ProjectAddStatusAdded    ProjectAddStatus = "added"
+	ProjectAddStatusExisting ProjectAddStatus = "existing"
+	ProjectAddStatusRestored ProjectAddStatus = "restored"
+)
+
+type ProjectAddResult struct {
+	Status  ProjectAddStatus `json:"status"`
+	Project Project          `json:"project"`
+}
+
 func (s *Store) AddProjects(paths []string) error {
-	return s.AddProjectsWithIntent(paths, scanner.ProjectScanIntentCode)
+	_, err := s.AddProjectsWithIntentResult(paths, scanner.ProjectScanIntentCode)
+	return err
 }
 
 func (s *Store) AddProjectsWithIntent(paths []string, intent scanner.ProjectScanIntent) error {
-	return s.AddProjectsToWorkspaceWithIntent(s.activeWorkspaceID(), paths, intent)
+	_, err := s.AddProjectsWithIntentResult(paths, intent)
+	return err
+}
+
+func (s *Store) AddProjectsWithIntentResult(paths []string, intent scanner.ProjectScanIntent) ([]ProjectAddResult, error) {
+	return s.AddProjectsToWorkspaceWithIntentResult(s.activeWorkspaceID(), paths, intent)
 }
 
 func (s *Store) AddProjectsToWorkspace(workspaceID string, paths []string) error {
-	return s.AddProjectsToWorkspaceWithIntent(workspaceID, paths, scanner.ProjectScanIntentCode)
+	_, err := s.AddProjectsToWorkspaceWithIntentResult(workspaceID, paths, scanner.ProjectScanIntentCode)
+	return err
 }
 
 func (s *Store) AddProjectsToWorkspaceWithIntent(workspaceID string, paths []string, intent scanner.ProjectScanIntent) error {
+	_, err := s.AddProjectsToWorkspaceWithIntentResult(workspaceID, paths, intent)
+	return err
+}
+
+func (s *Store) AddProjectsToWorkspaceWithIntentResult(workspaceID string, paths []string, intent scanner.ProjectScanIntent) ([]ProjectAddResult, error) {
 	if _, err := s.workspace(workspaceID); err != nil {
-		return err
+		return nil, err
 	}
 	if intent != "" && !scanner.ValidProjectScanIntent(intent) {
-		return apierr.WithParams("project_scan_intent_invalid", "project scan intent is invalid", map[string]any{"scanIntent": intent})
+		return nil, apierr.WithParams("project_scan_intent_invalid", "project scan intent is invalid", map[string]any{"scanIntent": intent})
 	}
 	intent = scanner.NormalizeProjectScanIntent(intent)
 	now := nowUTC()
+	results := []ProjectAddResult{}
 	for _, raw := range paths {
 		if raw == "" {
 			continue
 		}
-		abs, err := filepath.Abs(raw)
+		abs, err := canonicalProjectPath(raw)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		info, err := os.Stat(abs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !info.IsDir() {
-			return &PathError{Path: abs, Message: "project path must be a directory"}
+			return nil, &PathError{Path: abs, Message: "project path must be a directory"}
+		}
+		id := projectID(workspaceID, abs)
+		status := ProjectAddStatusAdded
+		var deletedAt sql.NullString
+		err = s.db.QueryRow(`
+			SELECT deleted_at
+			FROM projects
+			WHERE workspace_id = ? AND path = ?
+		`, workspaceID, abs).Scan(&deletedAt)
+		if err == nil {
+			project, err := s.Project(id)
+			if err != nil && (!deletedAt.Valid || deletedAt.String == "") {
+				return nil, err
+			}
+			if !deletedAt.Valid || deletedAt.String == "" {
+				results = append(results, ProjectAddResult{Status: ProjectAddStatusExisting, Project: project})
+				continue
+			}
+			status = ProjectAddStatusRestored
+		} else if err != sql.ErrNoRows {
+			return nil, err
 		}
 		if _, err := s.db.Exec(`
 			INSERT INTO projects (id, workspace_id, name, path, scan_intent, created_at, updated_at)
@@ -110,11 +174,16 @@ func (s *Store) AddProjectsToWorkspaceWithIntent(workspaceID string, paths []str
 				scan_intent = excluded.scan_intent,
 				deleted_at = NULL,
 				updated_at = excluded.updated_at
-		`, projectID(workspaceID, abs), workspaceID, filepath.Base(abs), abs, intent, now, now); err != nil {
-			return err
+		`, id, workspaceID, filepath.Base(abs), abs, intent, now, now); err != nil {
+			return nil, err
 		}
+		project, err := s.Project(id)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, ProjectAddResult{Status: status, Project: project})
 	}
-	return nil
+	return results, nil
 }
 
 func (s *Store) RemoveProject(id string) error {
@@ -178,6 +247,18 @@ func (s *Store) RenameProject(id, name, iconImage string, intents ...scanner.Pro
 		return apierr.New("project_not_found", "project not found")
 	}
 	return nil
+}
+
+func canonicalProjectPath(raw string) (string, error) {
+	abs, err := filepath.Abs(raw)
+	if err != nil {
+		return "", err
+	}
+	realPath, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(realPath), nil
 }
 
 type PathError struct {

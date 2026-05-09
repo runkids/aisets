@@ -18,6 +18,7 @@ export type SettingsViewProps = {
   imagePreviewEnabled: boolean;
   imageBackgroundMode: ImageBackgroundMode;
   ocrActivity: OCRActivityState;
+  scanWorking?: boolean;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
   onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;

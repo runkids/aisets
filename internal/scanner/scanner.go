@@ -121,7 +121,11 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 	processed := 0
 	for result := range results {
 		processed++
-		notifyProgress(progress, ScanProgress{Phase: ScanPhaseMetadata, Current: processed, Total: len(candidates)})
+		message := ""
+		if result.index >= 0 && result.index < len(candidates) {
+			message = candidates[result.index].repo
+		}
+		notifyProgress(progress, ScanProgress{Phase: ScanPhaseMetadata, Current: processed, Total: len(candidates), Message: message})
 		if result.err != nil {
 			return Catalog{}, result.err
 		}
