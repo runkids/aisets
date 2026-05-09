@@ -41,6 +41,8 @@ const triggerVariants = cva(
   },
 );
 
+const EMPTY_SENTINEL = "__select_none__";
+
 export function Select({
   value,
   options,
@@ -49,10 +51,18 @@ export function Select({
   size = "md",
   className,
 }: Props) {
-  const selected = options.find((o) => o.value === value);
+  const internalValue = value === "" ? EMPTY_SENTINEL : value;
+  const normalizedOptions = options.map((o) =>
+    o.value === "" ? { ...o, value: EMPTY_SENTINEL } : o,
+  );
+  const selected = normalizedOptions.find((o) => o.value === internalValue);
+
+  function handleChange(v: string) {
+    onChange(v === EMPTY_SENTINEL ? "" : v);
+  }
 
   return (
-    <SelectPrimitive.Root value={value} onValueChange={onChange}>
+    <SelectPrimitive.Root value={internalValue} onValueChange={handleChange}>
       <SelectPrimitive.Trigger
         className={cn(triggerVariants({ size }), className)}
         aria-label={ariaLabel}
@@ -80,7 +90,7 @@ export function Select({
           collisionPadding={12}
         >
           <SelectPrimitive.Viewport className="flex flex-col gap-1">
-            {options.map((option) => (
+            {normalizedOptions.map((option) => (
               <SelectPrimitive.Item
                 key={option.value}
                 value={option.value}
