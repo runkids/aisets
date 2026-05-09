@@ -37,6 +37,7 @@ type StatusFilter =
   | "notApplicable"
   | "duplicate"
   | "optimize"
+  | "optimized"
   | "referenced";
 
 type BrowseToolbarProps = {
@@ -112,6 +113,7 @@ export function BrowseToolbar({
     { value: "notApplicable" as const, label: t("status.notApplicable") },
     { value: "duplicate" as const, label: t("status.duplicate") },
     { value: "optimize" as const, label: t("status.optimizable") },
+    { value: "optimized" as const, label: t("status.optimized") },
     { value: "referenced" as const, label: t("status.referenced") },
   ];
   const statusHelpItems = [
@@ -139,6 +141,11 @@ export function BrowseToolbar({
       label: t("status.optimizable"),
       description: t("status.help.optimizable"),
       dot: "bg-g-blue",
+    },
+    {
+      label: t("status.optimized"),
+      description: t("status.help.optimized"),
+      dot: "bg-g-green",
     },
     {
       label: t("status.referenced"),

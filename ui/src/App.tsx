@@ -773,6 +773,7 @@ export function App() {
           key={drawerAsset.id}
           asset={drawerAsset}
           assetIds={[drawerAsset.id]}
+          scanId={catalogSummary?.scanId}
           onClose={() => setDrawerId("")}
           onRename={onRename}
           onDelete={onDelete}

@@ -64,6 +64,7 @@ const CARD_FLAG_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(i
 const CARD_FLAG_POSSIBLY_UNUSED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-amber)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-amber)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-amber)_78%,var(--g-ink)_22%)]`;
 const CARD_FLAG_NOT_APPLICABLE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-g-line bg-g-surface-2 text-g-ink-3`;
 const CARD_FLAG_OPTIMIZE_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-blue)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-blue)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-blue)_78%,var(--g-ink)_22%)]`;
+const CARD_FLAG_OPTIMIZED_CLASS_NAME = `${CARD_FLAG_CLASS_NAME} border-[color-mix(in_srgb,var(--g-green)_52%,var(--g-surface)_48%)] bg-[color-mix(in_srgb,var(--g-green)_18%,var(--g-surface)_82%)] text-[color-mix(in_srgb,var(--g-green)_78%,var(--g-ink)_22%)]`;
 
 function useElementWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -177,12 +178,19 @@ export function BrowseGrid({
     const isNotApplicable = usage === "notApplicable";
     const duplicate = hasDuplicates(item);
     const optimizable = item.optimizationRecommendations.length > 0;
+    const optimized =
+      optimizable &&
+      item.optimizationRecommendations.every((r) => r.hasExistingVariant);
     const statusLabels = [
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       isPossiblyUnused ? t("browse.flagPossiblyUnused") : "",
       isNotApplicable ? notApplicableUsageLabel(t, item) : "",
-      optimizable ? t("browse.flagOptimizable") : "",
+      optimized
+        ? t("browse.flagOptimized")
+        : optimizable
+          ? t("browse.flagOptimizable")
+          : "",
       ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
     const referenceLabel = t("asset.refs", { count: item.usedBy.length });
@@ -259,12 +267,17 @@ export function BrowseGrid({
                     {notApplicableUsageLabel(t, item)}
                   </span>
                 )}
-                {optimizable && (
+                {optimized ? (
+                  <span className={CARD_FLAG_OPTIMIZED_CLASS_NAME}>
+                    <Gauge size={10} />
+                    {t("browse.flagOptimized")}
+                  </span>
+                ) : optimizable ? (
                   <span className={CARD_FLAG_OPTIMIZE_CLASS_NAME}>
                     <Gauge size={10} />
                     {t("browse.flagOptimizable")}
                   </span>
-                )}
+                ) : null}
               </div>
             )}
             <Checkbox

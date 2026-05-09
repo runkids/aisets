@@ -65,6 +65,7 @@ type StatusFilter =
   | "notApplicable"
   | "duplicate"
   | "optimize"
+  | "optimized"
   | "referenced";
 type BrowseFilters = { project: string; ext: string; customFilter: string };
 type BrowseStoredState = {
@@ -86,6 +87,7 @@ const statusFilters: StatusFilter[] = [
   "notApplicable",
   "duplicate",
   "optimize",
+  "optimized",
   "referenced",
 ];
 const sortModes: SortMode[] = ["name", "size", "recent"];
@@ -235,6 +237,11 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
       return Boolean(item.duplicateGroupId) || item.similar.length > 0;
     case "optimize":
       return item.optimizationRecommendations.length > 0;
+    case "optimized":
+      return (
+        item.optimizationRecommendations.length > 0 &&
+        item.optimizationRecommendations.every((r) => r.hasExistingVariant)
+      );
     case "referenced":
       return item.usedBy.length > 0;
     default:
@@ -244,6 +251,7 @@ function matchesStatus(item: AssetItem, status: StatusFilter): boolean {
 
 function apiStatus(status: StatusFilter) {
   if (status === "optimize") return "optimizable";
+  if (status === "optimized") return "optimized";
   if (
     status === "unused" ||
     status === "possiblyUnused" ||

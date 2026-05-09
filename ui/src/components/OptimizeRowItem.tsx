@@ -1,4 +1,10 @@
-import { Check, ChevronDown, Wand2 } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  Wand2,
+} from "lucide-react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { useTranslation } from "react-i18next";
 import { fileName, formatBytes } from "../ui";
@@ -28,6 +34,8 @@ type Props = {
   formatOverride: string | undefined;
   onToggle: (id: string) => void;
   onOpenAsset: (id: string) => void;
+  onViewVariant: (variantFilename: string) => void;
+  onOpenVariant: (projectId: string, variantRepoPath: string) => void;
   onFormatChange: (itemId: string, format: string | null) => void;
 };
 
@@ -42,10 +50,28 @@ export function OptimizeRowItem({
   formatOverride,
   onToggle,
   onOpenAsset,
+  onViewVariant,
+  onOpenVariant,
   onFormatChange,
 }: Props) {
   const { t } = useTranslation();
   const rec = item.optimizationRecommendations[0];
+  const allVariantsExist =
+    item.optimizationRecommendations.length > 0 &&
+    item.optimizationRecommendations.every((r) => r.hasExistingVariant);
+  const variantExt =
+    rec?.operation === "convert-avif"
+      ? ".avif"
+      : rec?.operation === "convert-webp"
+        ? ".webp"
+        : "";
+  const variantRepoPath = variantExt
+    ? item.repoPath.replace(/\.[^.]+$/, variantExt)
+    : "";
+  const variantFilename = variantRepoPath ? fileName(variantRepoPath) : "";
+  const variantBytes = rec?.variantBytes ?? 0;
+  const variantSavings =
+    allVariantsExist && variantBytes > 0 ? item.bytes - variantBytes : 0;
   const recSavings = rec?.savingsBytes ?? 0;
   const estimated = planned?.estimatedBytes ?? 0;
   const savings = planned?.savingsBytes ?? 0;
@@ -195,23 +221,66 @@ export function OptimizeRowItem({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex flex-wrap items-center gap-1">
-          <Badge
-            tone={
-              sev === "critical" ? "red" : sev === "warning" ? "amber" : "line"
-            }
-          >
-            {operationLabel(op)}
-          </Badge>
-          <FormatDropdown
-            itemId={item.id}
-            srcExt={item.ext.replace(".", "").toLowerCase()}
-            op={op}
-            planned={planned}
-            override={formatOverride ?? "auto"}
-            onFormatChange={onFormatChange}
-          />
+          {allVariantsExist ? (
+            <span className="inline-flex items-center gap-1.5 text-g-body font-[510] text-g-green">
+              <CheckCircle size={13} className="shrink-0" />
+              {t("optimize.variantExists")}
+            </span>
+          ) : (
+            <>
+              <Badge
+                tone={
+                  sev === "critical"
+                    ? "red"
+                    : sev === "warning"
+                      ? "amber"
+                      : "line"
+                }
+              >
+                {operationLabel(op)}
+              </Badge>
+              <FormatDropdown
+                itemId={item.id}
+                srcExt={item.ext.replace(".", "").toLowerCase()}
+                op={op}
+                planned={planned}
+                override={formatOverride ?? "auto"}
+                onFormatChange={onFormatChange}
+              />
+            </>
+          )}
         </div>
-        {planned && !planned.canApply ? (
+        {allVariantsExist && variantFilename ? (
+          <div className="mt-1 flex items-center gap-1">
+            <Tooltip
+              label={t("optimize.viewVariant", { name: variantFilename })}
+              placement="top"
+            >
+              <button
+                type="button"
+                className="cursor-pointer truncate font-g-mono text-g-caption text-g-ink-2 underline decoration-g-line hover:text-g-ink hover:decoration-g-ink-3"
+                onClick={() => onOpenVariant(item.projectId, variantRepoPath)}
+              >
+                {variantFilename}
+              </button>
+            </Tooltip>
+            <Tooltip
+              label={t("optimize.viewVariant", { name: variantFilename })}
+              placement="top"
+            >
+              <button
+                type="button"
+                className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-g-ink-4 transition-colors hover:bg-g-surface-2 hover:text-g-ink"
+                onClick={() => onViewVariant(variantFilename)}
+                aria-label={t("optimize.viewVariant", {
+                  name: variantFilename,
+                })}
+              >
+                <ArrowUpRight size={12} />
+              </button>
+            </Tooltip>
+          </div>
+        ) : planned && !planned.canApply ? (
           <Tooltip
             label={rowBlockedLabel}
             placement="top"
@@ -243,7 +312,14 @@ export function OptimizeRowItem({
       {/* Source → Target column */}
       <div className="hidden min-w-0 min-[980px]:block">
         <div className="font-g-mono text-g-ui text-g-ink">
-          {rowBlocked ? (
+          {allVariantsExist && variantBytes > 0 ? (
+            <>
+              {formatBytes(item.bytes)} →{" "}
+              <span className="font-[590] text-g-green">
+                {formatBytes(variantBytes)}
+              </span>
+            </>
+          ) : rowBlocked ? (
             formatBytes(item.bytes)
           ) : hasEstimate ? (
             <>
@@ -290,7 +366,16 @@ export function OptimizeRowItem({
 
       {/* Savings column */}
       <div className="hidden text-right min-[980px]:block">
-        {(planned && savings > 0) || (!planned && recSavings > 0) ? (
+        {allVariantsExist && variantSavings > 0 ? (
+          <>
+            <div className="font-g-mono text-g-body font-[590] text-g-green">
+              −{formatBytes(variantSavings)}
+            </div>
+            <div className="font-g-mono text-g-chip text-g-green">
+              −{Math.round((variantSavings / item.bytes) * 100)}%
+            </div>
+          </>
+        ) : (planned && savings > 0) || (!planned && recSavings > 0) ? (
           <>
             <div className="font-g-mono text-g-body font-[590] text-g-green">
               −{formatBytes(planned ? savings : recSavings)}
@@ -305,6 +390,10 @@ export function OptimizeRowItem({
               </div>
             )}
           </>
+        ) : allVariantsExist ? (
+          <Badge tone="green" className="whitespace-nowrap">
+            {t("optimize.alreadyDone")}
+          </Badge>
         ) : (
           <Badge tone="line" className="whitespace-nowrap">
             {planned

@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  CheckCircle,
   CheckSquare,
   FileArchive,
   ImageDown,
@@ -26,7 +27,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "../queries";
-import { formatBytes, primarySeverity } from "../ui";
+import { getCatalogItems } from "../api";
+import { fileName, formatBytes, primarySeverity } from "../ui";
 import type {
   Category,
   Operation,
@@ -55,6 +57,7 @@ import { OptimizeQuickConfirmModal } from "./OptimizeQuickConfirmModal";
 import { OptimizeEstimatePromptModal } from "./OptimizeEstimatePromptModal";
 import {
   buildEstimateFromOperations,
+  clearEstimateCaches,
   combinePreviews,
   estimateCache,
   estimateCacheKey,
@@ -169,6 +172,10 @@ export function OptimizeView({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [estimate, setEstimate] = useState<OptimizationEstimate | null>(null);
   const [preview, setPreview] = useState<PreviewBatch | null>(null);
+  const [justApplied, setJustApplied] = useState(false);
+  const [optimizedFilter, setOptimizedFilter] = useState<
+    "" | "pending" | "done"
+  >("");
   const [formatOverrides, setFormatOverrides] = useState<Map<string, string>>(
     new Map(),
   );
@@ -190,6 +197,9 @@ export function OptimizeView({
       return null;
     return optimizeActivity.stage === "previewing" ? "preview" : "estimate";
   });
+  useEffect(() => {
+    if (justApplied) setJustApplied(false);
+  }, [category, severity, operation, search, ext, projectName]); // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(() =>
     optimizeActivity ? optimizeActivityProgressPercent(optimizeActivity) : 0,
@@ -218,10 +228,34 @@ export function OptimizeView({
     enabled,
   );
 
-  const items = useMemo(
+  const allItems = useMemo(
     () => itemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [itemsQuery.data],
   );
+  const optimizedCount = useMemo(
+    () =>
+      allItems.filter(
+        (item) =>
+          item.optimizationRecommendations.length > 0 &&
+          item.optimizationRecommendations.every((r) => r.hasExistingVariant),
+      ).length,
+    [allItems],
+  );
+  const pendingCount = allItems.length - optimizedCount;
+  const items = useMemo(() => {
+    if (optimizedFilter === "pending")
+      return allItems.filter(
+        (item) =>
+          !item.optimizationRecommendations.every((r) => r.hasExistingVariant),
+      );
+    if (optimizedFilter === "done")
+      return allItems.filter(
+        (item) =>
+          item.optimizationRecommendations.length > 0 &&
+          item.optimizationRecommendations.every((r) => r.hasExistingVariant),
+      );
+    return allItems;
+  }, [allItems, optimizedFilter]);
   const firstPage = itemsQuery.data?.pages[0];
   const totalCount = firstPage?.total ?? 0;
   const facets = firstPage?.facets;
@@ -902,6 +936,8 @@ export function OptimizeView({
       setPreview(null);
       setBulkMode(false);
       setSelected(new Set());
+      setJustApplied(true);
+      clearEstimateCaches();
       void itemsQuery.refetch();
     } catch (err) {
       if (!ctrl.signal.aborted) {
@@ -978,6 +1014,27 @@ export function OptimizeView({
       estimateCache.clear();
     },
     [],
+  );
+
+  const handleOpenVariant = useCallback(
+    async (projectId: string, variantRepoPath: string) => {
+      if (!scanId || !onOpenAsset) return;
+      try {
+        const result = await getCatalogItems({
+          scanId,
+          projectId,
+          q: fileName(variantRepoPath),
+          limit: 10,
+        });
+        const match = result.items.find(
+          (i) => i.repoPath === variantRepoPath && i.projectId === projectId,
+        );
+        if (match) onOpenAsset(match.id);
+      } catch {
+        // silently fail — variant may not be in catalog
+      }
+    },
+    [scanId, onOpenAsset],
   );
 
   const estimateMissingTools =
@@ -1192,8 +1249,39 @@ export function OptimizeView({
             ref={toolbarRef}
             className="sticky top-0 z-[4] mb-1 grid min-w-0 gap-1.5 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] pb-1 backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]"
           >
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="min-w-0 flex-none overflow-x-auto">
+            <div className="flex items-center gap-2.5">
+              <TextInput
+                variant="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("optimize.searchPlaceholder")}
+                icon={<Search size={16} />}
+                disabled={selectionLocked}
+                suffix={
+                  search ? (
+                    <TextInputClearButton
+                      label={t("toolbar.clearSearch")}
+                      onClick={() => setSearch("")}
+                    />
+                  ) : undefined
+                }
+                className="min-w-[200px] flex-1"
+                inputClassName="font-g text-g-ui tracking-g-ui"
+              />
+              <Button
+                size="md"
+                variant={bulkMode ? "primary" : "secondary"}
+                leadingIcon={<CheckSquare size={14} />}
+                onClick={toggleBulkMode}
+                disabled={selectionLocked}
+                className="shrink-0"
+              >
+                {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2.5 overflow-x-auto">
+              <div className="min-w-0 flex-none">
                 <Tabs
                   value={category}
                   ariaLabel={t("optimize.categoryFilter")}
@@ -1277,35 +1365,42 @@ export function OptimizeView({
                 />
               </div>
 
-              <TextInput
-                variant="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("optimize.searchPlaceholder")}
-                icon={<Search size={16} />}
-                disabled={selectionLocked}
-                suffix={
-                  search ? (
-                    <TextInputClearButton
-                      label={t("toolbar.clearSearch")}
-                      onClick={() => setSearch("")}
-                    />
-                  ) : undefined
-                }
-                className="min-w-[200px] flex-[1_1_280px]"
-                inputClassName="font-g text-g-ui tracking-g-ui"
-              />
-
-              <Button
-                size="md"
-                variant={bulkMode ? "primary" : "secondary"}
-                leadingIcon={<CheckSquare size={14} />}
-                onClick={toggleBulkMode}
-                disabled={selectionLocked}
-                className="shrink-0"
-              >
-                {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
-              </Button>
+              {optimizedCount > 0 && (
+                <div className="min-w-0 flex-none overflow-x-auto">
+                  <Tabs
+                    value={optimizedFilter}
+                    ariaLabel={t("optimize.optimizedFilter")}
+                    onChange={(value) => {
+                      if (!selectionLocked)
+                        setOptimizedFilter(value as "" | "pending" | "done");
+                    }}
+                    items={[
+                      { value: "", label: t("status.all") },
+                      {
+                        value: "pending",
+                        label: t("optimize.filterPending"),
+                        badge: (
+                          <span className="font-[400] text-g-ink-4">
+                            {pendingCount}
+                          </span>
+                        ),
+                      },
+                      {
+                        value: "done",
+                        label: t("optimize.filterDone"),
+                        icon: (
+                          <CheckCircle size={13} className="text-g-green" />
+                        ),
+                        badge: (
+                          <span className="font-[400] text-g-ink-4">
+                            {optimizedCount}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              )}
             </div>
 
             {bulkMode && (
@@ -1512,8 +1607,19 @@ export function OptimizeView({
             <EmptyState title={t("common.loading")} />
           ) : items.length === 0 ? (
             <EmptyState
-              title={t("common.noResults")}
-              description={t("optimize.noRecommendations")}
+              icon={
+                justApplied ? (
+                  <CheckCircle size={24} className="text-g-green" />
+                ) : undefined
+              }
+              title={
+                justApplied ? t("optimize.allDone") : t("common.noResults")
+              }
+              description={
+                justApplied
+                  ? t("optimize.allDoneDesc")
+                  : t("optimize.noRecommendations")
+              }
               tone="neutral"
             />
           ) : (
@@ -1573,6 +1679,10 @@ export function OptimizeView({
                         formatOverride={formatOverrides.get(item.id)}
                         onToggle={toggleOne}
                         onOpenAsset={onOpenAsset ?? (() => {})}
+                        onViewVariant={(name) =>
+                          navigate(`/browse?q=${encodeURIComponent(name)}`)
+                        }
+                        onOpenVariant={handleOpenVariant}
                         onFormatChange={handleFormatChange}
                       />
                     </div>

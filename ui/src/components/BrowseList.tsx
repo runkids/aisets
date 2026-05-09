@@ -103,12 +103,19 @@ export function BrowseList({
     const isNotApplicable = usage === "notApplicable";
     const duplicate = hasDuplicates(item);
     const optimizable = item.optimizationRecommendations.length > 0;
+    const optimized =
+      optimizable &&
+      item.optimizationRecommendations.every((r) => r.hasExistingVariant);
     const statusLabels = [
       duplicate ? t("browse.flagDuplicate") : "",
       isUnused ? t("browse.flagUnused") : "",
       isPossiblyUnused ? t("browse.flagPossiblyUnused") : "",
       isNotApplicable ? notApplicableUsageLabel(t, item) : "",
-      optimizable ? t("browse.flagOptimizable") : "",
+      optimized
+        ? t("browse.flagOptimized")
+        : optimizable
+          ? t("browse.flagOptimizable")
+          : "",
       ocrEnabled ? ocrStatusLabel(t, item) : "",
     ].filter(Boolean);
     const ariaLabel = [item.repoPath, ...statusLabels].join(" · ");
@@ -208,12 +215,17 @@ export function BrowseList({
               {notApplicableUsageLabel(t, item, { short: true })}
             </span>
           )}
-          {optimizable && (
+          {optimized ? (
+            <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-green)_35%,transparent)] bg-g-green-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-green">
+              <Gauge size={10} />
+              {t("browse.flagOptimizedShort")}
+            </span>
+          ) : optimizable ? (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-blue)_35%,transparent)] bg-g-blue-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-blue">
               <Gauge size={10} />
               {t("browse.flagOptimizableShort")}
             </span>
-          )}
+          ) : null}
         </span>
       </button>
     );

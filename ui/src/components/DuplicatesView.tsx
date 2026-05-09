@@ -586,8 +586,38 @@ export function DuplicatesView({
           )}
 
           {/* ── Sticky filter + action bar ── */}
-          <div className="sticky top-0 z-10 bg-g-canvas pb-3">
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="sticky top-0 z-10 grid gap-1.5 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] pb-1 backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
+            {tab === "exact" && (
+              <div className="flex items-center gap-2.5">
+                <TextInput
+                  variant="search"
+                  placeholder={t("duplicates.searchPlaceholder")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  icon={<Search size={14} />}
+                  suffix={
+                    search ? (
+                      <TextInputClearButton
+                        label={t("toolbar.clearSearch")}
+                        onClick={() => setSearch("")}
+                      />
+                    ) : undefined
+                  }
+                  className="min-w-0 flex-1"
+                />
+                <Button
+                  variant={bulkMode ? "primary" : "secondary"}
+                  size="md"
+                  leadingIcon={<CheckSquare size={14} />}
+                  onClick={toggleBulkMode}
+                  className="shrink-0"
+                >
+                  {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2.5">
               <Tabs
                 value={tab}
                 ariaLabel={t("duplicates.title")}
@@ -627,35 +657,6 @@ export function DuplicatesView({
                     { value: "size", label: t("sort.bySize") },
                   ]}
                 />
-              )}
-              {tab === "exact" && (
-                <TextInput
-                  variant="search"
-                  placeholder={t("duplicates.searchPlaceholder")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  icon={<Search size={14} />}
-                  suffix={
-                    search ? (
-                      <TextInputClearButton
-                        label={t("toolbar.clearSearch")}
-                        onClick={() => setSearch("")}
-                      />
-                    ) : undefined
-                  }
-                  className="min-w-0 flex-[1_1_180px]"
-                />
-              )}
-              {tab === "exact" && (
-                <Button
-                  variant={bulkMode ? "primary" : "secondary"}
-                  size="md"
-                  leadingIcon={<CheckSquare size={14} />}
-                  onClick={toggleBulkMode}
-                  className="shrink-0"
-                >
-                  {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
-                </Button>
               )}
             </div>
 
@@ -716,7 +717,7 @@ export function DuplicatesView({
                     (f) => f.id === activeExt,
                   )?.count ?? groupViews.length;
                 return (
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="font-g-mono text-g-ui font-[510] uppercase text-g-ink-3">
                       {formatExt(activeExt)}
                     </span>
