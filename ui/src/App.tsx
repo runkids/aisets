@@ -47,6 +47,7 @@ import {
   useDeleteUnusedPreviewMutation,
   useRenamePreviewMutation,
   useScanCatalogMutation,
+  useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
 import { runOCR } from "./api";
@@ -70,6 +71,7 @@ import {
 import type {
   ActionPreview,
   AssetItem,
+  CatalogSummary,
   ProjectScanIntent,
   ScanEvent,
 } from "./types";
@@ -81,6 +83,26 @@ type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
+
+const emptyCatalogSummary: CatalogSummary = {
+  generatedAt: "",
+  projects: [],
+  projectStats: [],
+  stats: {
+    totalFiles: 0,
+    duplicateGroups: 0,
+    duplicateFiles: 0,
+    unusedFiles: 0,
+    nearDuplicates: 0,
+    lintFindings: 0,
+    cacheHits: 0,
+  },
+  analysis: {
+    references: "notComputed",
+    nearDuplicates: "notComputed",
+    optimization: "notComputed",
+  },
+};
 const IMAGE_BACKGROUND_STORAGE_KEY = "aisets-image-background";
 const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
@@ -195,6 +217,37 @@ export function App() {
     [setScanProgress, setScanProgressVisible],
   );
   const scanMutation = useScanCatalogMutation({ onEvent: handleScanEvent });
+  const scanStatusQuery = useScanStatusQuery(!scanMutation.isPending);
+  const wasPollingRef = useRef(false);
+  useEffect(() => {
+    const status = scanStatusQuery.data;
+    if (scanMutation.isPending || !status) return undefined;
+    let cancelled = false;
+    if (status.running) {
+      wasPollingRef.current = true;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setScanProgress({
+          type: "progress",
+          phase: status.phase,
+          current: status.current,
+          total: status.total,
+        } as ScanEvent);
+        setScanProgressVisible(true);
+      });
+    } else if (wasPollingRef.current) {
+      wasPollingRef.current = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setScanProgress({ type: "done" } as ScanEvent);
+        setScanProgressVisible(true);
+        void queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [scanStatusQuery.data, scanMutation.isPending, queryClient]);
   const settingsQuery = useSettingsQuery();
   const addProjectMutation = useAddProjectMutation();
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
@@ -314,7 +367,7 @@ export function App() {
   useEffect(() => {
     const settings = settingsQuery.data?.settings;
     if (autoScanStartedRef.current || !settings || !catalogSummary) return;
-    if (!settings.scanOnOpen && !settings.autoScanOnOpen) return;
+    if (!settings.scanOnOpen) return;
     if (catalogSummary.projects.length === 0) return;
 
     autoScanStartedRef.current = true;
@@ -385,6 +438,15 @@ export function App() {
         onSuccess: () => {
           setDirectoryPickerOpen(false);
           toast.success(t("toast.projectAdded", { path }));
+          clearEstimateCaches();
+          setScanProgress(null);
+          setScanProgressVisible(true);
+          scanMutation.mutate(
+            { profile: "fast" },
+            {
+              onError: (e) => toast.error(errorMessage(e)),
+            },
+          );
         },
         onError: (e) => toast.error(errorMessage(e)),
       },
@@ -670,6 +732,7 @@ export function App() {
               onStartOCR={onStartOCRActivity}
               onStopOCR={onStopOCRActivity}
               onDismissOCR={onDismissOCRActivity}
+              onAddProject={() => setDirectoryPickerOpen(true)}
             />
           ) : mode === "duplicates" && catalogSummary ? (
             catalogSummary.analysis.nearDuplicates === "notComputed" ? (
@@ -752,11 +815,10 @@ export function App() {
             >
               {mode === "precheck" ? (
                 <PreCheckView onOpenAsset={setDrawerId} />
-              ) : catalogSummary == null &&
-                !catalogQuery.isLoading ? null : mode === "projects" &&
-                catalogSummary ? (
+              ) : mode === "projects" ? (
                 <ProjectsView
-                  catalog={catalogSummary}
+                  catalog={catalogSummary ?? emptyCatalogSummary}
+                  scanProgress={scanProgressVisible ? scanProgress : null}
                   onJump={changeMode}
                   onAddProject={() => setDirectoryPickerOpen(true)}
                 />

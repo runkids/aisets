@@ -59,6 +59,7 @@ export function SettingsView({
   onStartOCR,
   onStopOCR,
   onDismissOCR,
+  onAddProject,
 }: SettingsViewProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -481,6 +482,7 @@ export function SettingsView({
               onRenameProject={onRenameProject}
               onRemoveProject={onRemoveProject}
               onSwitchWorkspace={onSwitchWorkspace}
+              onAddProject={onAddProject}
             />
           )}
 

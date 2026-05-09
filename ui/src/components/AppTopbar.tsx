@@ -195,79 +195,73 @@ export function AppTopbar({
           </span>
         </Tooltip>
         {scanProgress ? (
-          <Tooltip
-            label={catalogActionTooltip ?? t("action.rescan")}
-            placement="bottom"
-            disabled={!catalogActionTooltip}
-          >
-            <span className="group relative inline-flex">
-              <IconButton
-                aria-label={t("action.rescan")}
-                data-loading={working || undefined}
-                onClick={onScanClick}
-                disabled={catalogActionsDisabled}
-              >
-                <RefreshCw size={16} />
-              </IconButton>
-              <div
-                className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[280px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 ${scanDropdownState}`}
-                role={failed ? "alert" : "status"}
-                aria-live={failed ? "assertive" : "polite"}
-              >
-                <div className="flex items-center gap-2">
-                  {done ? (
-                    <CheckCircle2
-                      className="shrink-0 text-g-green"
-                      size={16}
-                      aria-hidden="true"
-                    />
-                  ) : failed ? (
-                    <XCircle
-                      className="shrink-0 text-g-red"
-                      size={16}
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Loader2
-                      className="shrink-0 animate-spin text-g-accent"
-                      size={16}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
-                    {progressLabel}
-                  </span>
-                  {progress && progressTotal > 0 && (
-                    <span className="font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums">
-                      {progressCurrent}/{progressTotal}
-                    </span>
-                  )}
-                </div>
-                {progressReasonLabel && (
-                  <p className="mt-2 text-g-caption leading-snug text-g-ink-3">
-                    {progressReasonLabel}
-                  </p>
-                )}
-                {(done || failed || (progress && progressTotal > 0)) && (
-                  <span
-                    className="mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
+          <span className="group relative inline-flex">
+            <IconButton
+              aria-label={t("action.rescan")}
+              data-loading={working || undefined}
+              onClick={onScanClick}
+              disabled={catalogActionsDisabled}
+            >
+              <RefreshCw size={16} />
+            </IconButton>
+            <div
+              className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[280px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 ${scanDropdownState}`}
+              role={failed ? "alert" : "status"}
+              aria-live={failed ? "assertive" : "polite"}
+            >
+              <div className="flex items-center gap-2">
+                {done ? (
+                  <CheckCircle2
+                    className="shrink-0 text-g-green"
+                    size={16}
                     aria-hidden="true"
-                  >
-                    <span
-                      className={
-                        done
-                          ? "block h-full rounded-g-pill bg-g-green transition-[width] duration-150 ease-g"
-                          : failed
-                            ? "block h-full rounded-g-pill bg-g-red transition-[width] duration-150 ease-g"
-                            : "block h-full rounded-g-pill bg-g-accent transition-[width] duration-150 ease-g"
-                      }
-                      style={{ width: `${progressPercent}%` }}
-                    />
+                  />
+                ) : failed ? (
+                  <XCircle
+                    className="shrink-0 text-g-red"
+                    size={16}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Loader2
+                    className="shrink-0 animate-spin text-g-accent"
+                    size={16}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
+                  {progressLabel}
+                </span>
+                {progress && progressTotal > 0 && (
+                  <span className="font-g-mono text-[11px] tracking-[-0.015em] text-g-ink-3 tabular-nums">
+                    {progressCurrent}/{progressTotal}
                   </span>
                 )}
               </div>
-            </span>
-          </Tooltip>
+              {progressReasonLabel && (
+                <p className="mt-2 text-g-caption leading-snug text-g-ink-3">
+                  {progressReasonLabel}
+                </p>
+              )}
+              {(done || failed || (progress && progressTotal > 0)) && (
+                <span
+                  className="mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
+                  aria-hidden="true"
+                >
+                  <span
+                    className={
+                      done
+                        ? "block h-full rounded-g-pill bg-g-green transition-[width] duration-150 ease-g"
+                        : failed
+                          ? "block h-full rounded-g-pill bg-g-red transition-[width] duration-150 ease-g"
+                          : "block h-full rounded-g-pill bg-g-accent transition-[width] duration-150 ease-g"
+                    }
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </span>
+              )}
+            </div>
+          </span>
         ) : (
           <Tooltip
             label={catalogActionTooltip ?? t("action.rescan")}

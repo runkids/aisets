@@ -260,7 +260,16 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("cache-control", "no-store")
 	sendNDJSON(w, map[string]any{"type": "start"})
+
+	s.scanMu.Lock()
+	s.scanRunning = true
+	s.scanProgress = scanner.ScanProgress{}
+	s.scanMu.Unlock()
+
 	progress := func(event scanner.ScanProgress) {
+		s.scanMu.Lock()
+		s.scanProgress = event
+		s.scanMu.Unlock()
 		sendNDJSON(w, map[string]any{
 			"type":    "progress",
 			"phase":   event.Phase,
@@ -273,15 +282,34 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 	options, err := s.scanOptionsFromRequest(r)
 	if err != nil {
+		s.scanMu.Lock()
+		s.scanRunning = false
+		s.scanMu.Unlock()
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_invalid_request")})
 		return
 	}
 	catalog, scanID, err := s.scanWithProgress(r.Context(), options, progress)
+	s.scanMu.Lock()
+	s.scanRunning = false
+	s.scanMu.Unlock()
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "scan_failed")})
 		return
 	}
 	sendNDJSON(w, map[string]any{"type": "done", "scanId": scanID, "stats": catalog.Stats, "analysis": catalog.Analysis})
+}
+
+func (s *Server) handleScanStatus(w http.ResponseWriter, _ *http.Request) {
+	s.scanMu.Lock()
+	running := s.scanRunning
+	progress := s.scanProgress
+	s.scanMu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"running": running,
+		"phase":   progress.Phase,
+		"current": progress.Current,
+		"total":   progress.Total,
+	})
 }
 
 func (s *Server) handleScans(w http.ResponseWriter, _ *http.Request) {

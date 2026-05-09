@@ -17,6 +17,7 @@ import {
   batchRenamePreview,
   clearScanHistory,
   deleteUnusedPreview,
+  fetchScanStatus,
   getCatalog,
   getCatalogDuplicates,
   getCatalogFolders,
@@ -323,6 +324,17 @@ export function useUpdateAppMutation() {
   });
 }
 
+const scanStatusQueryKey = ["scanStatus"] as const;
+
+export function useScanStatusQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: scanStatusQueryKey,
+    queryFn: fetchScanStatus,
+    enabled,
+    refetchInterval: (query) => (query.state.data?.running ? 1000 : false),
+  });
+}
+
 export function useScanCatalogMutation(options?: {
   onEvent?: (event: ScanEvent) => void;
 }) {
@@ -378,21 +390,14 @@ export function useRemoveOCRMutation() {
 }
 
 export function useAddProjectMutation() {
-  const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       path,
       scanIntent,
     }: {
       path: string;
       scanIntent: ProjectScanIntent;
-    }) => {
-      await addProject(path, scanIntent);
-      return scanCatalog();
-    },
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
-    },
+    }) => addProject(path, scanIntent),
   });
 }
 

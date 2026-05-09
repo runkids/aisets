@@ -13,6 +13,29 @@ import (
 	"asset-studio/internal/scanner"
 )
 
+func defaultGlobalExcludePatterns() []string {
+	return []string{
+		".git",
+		".cache",
+		".claude",
+		".pi",
+		".agents",
+		".feature-radar",
+		".next",
+		".nuxt",
+		".turbo",
+		".venv",
+		".pytest_cache",
+		"node_modules",
+		"storybook-static",
+		"dist",
+		"build",
+		"coverage",
+		"target",
+		"tmp",
+	}
+}
+
 func defaultExcludePatterns() []string {
 	return []string{
 		"**/*.test.*",
@@ -168,7 +191,7 @@ func DefaultAppSettings() AppSettings {
 		OCRBatchSize:               ocr.DefaultBatchSize,
 		OCRConcurrency:             ocr.DefaultConcurrency,
 		OCRFuzzySearch:             true,
-		ExcludePatterns:            []string{},
+		ExcludePatterns:            defaultGlobalExcludePatterns(),
 		ExcludePatternsByIntent:    defaultExcludePatternsByIntent(),
 		OptimizationDefaultQuality: 80,
 		OptimizationWorkers:        1,
@@ -265,6 +288,7 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.AutoScanOnOpen != nil {
 		settings.AutoScanOnOpen = *update.AutoScanOnOpen
+		settings.ScanOnOpen = settings.ScanOnOpen || *update.AutoScanOnOpen
 	}
 	if update.ScanOnOpen != nil {
 		settings.ScanOnOpen = *update.ScanOnOpen
@@ -502,11 +526,11 @@ func (s *Store) ImportData(data ExportData) error {
 				excludePatternsByIntent = emptyExcludePatternsByIntent()
 			}
 		}
+		mergedScanOnOpen := data.Settings.ScanOnOpen || data.Settings.AutoScanOnOpen
 		update := SettingsUpdate{
 			WorkspaceName:              &data.Settings.WorkspaceName,
 			DefaultProjectRoot:         &data.Settings.DefaultProjectRoot,
-			AutoScanOnOpen:             &data.Settings.AutoScanOnOpen,
-			ScanOnOpen:                 &data.Settings.ScanOnOpen,
+			ScanOnOpen:                 &mergedScanOnOpen,
 			OCREnabled:                 &data.Settings.OCREnabled,
 			OCRLanguages:               data.Settings.OCRLanguages,
 			OCRMaxPixels:               &data.Settings.OCRMaxPixels,

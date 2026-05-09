@@ -329,6 +329,17 @@ function scanDoneFallback(): Extract<ScanEvent, { type: "done" }> {
   return { type: "done" };
 }
 
+export type ScanStatus = {
+  running: boolean;
+  phase: string;
+  current: number;
+  total: number;
+};
+
+export async function fetchScanStatus(): Promise<ScanStatus> {
+  return request<ScanStatus>("/api/scan/status");
+}
+
 export async function scanCatalog(options?: {
   onEvent?: (event: ScanEvent) => void;
   profile?: ScanProfile;

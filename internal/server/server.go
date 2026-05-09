@@ -39,6 +39,10 @@ type Server struct {
 	catalogStale  bool
 	previews      map[string]actions.Preview
 	batchPreviews map[string]actions.BatchPreview
+
+	scanMu       sync.Mutex
+	scanRunning  bool
+	scanProgress scanner.ScanProgress
 }
 
 func New(opts Options) (*Server, error) {
@@ -116,6 +120,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/catalog/duplicates", s.handleCatalogDuplicates)
 	s.mux.HandleFunc("GET /api/catalog/lint", s.handleCatalogLint)
 	s.mux.HandleFunc("POST /api/scan", s.handleScan)
+	s.mux.HandleFunc("GET /api/scan/status", s.handleScanStatus)
 	s.mux.HandleFunc("POST /api/ocr/install", s.handleOCRInstall)
 	s.mux.HandleFunc("POST /api/ocr/remove", s.handleOCRRemove)
 	s.mux.HandleFunc("POST /api/ocr/run", s.handleOCRRun)

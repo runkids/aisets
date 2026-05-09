@@ -5,6 +5,7 @@ import {
   FolderPlus,
   HardDrive,
   Images,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Search,
@@ -12,7 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CatalogSummary, Project } from "../types";
+import type { CatalogSummary, Project, ScanEvent } from "../types";
 import {
   useRemoveProjectMutation,
   useRenameProjectMutation,
@@ -46,6 +47,7 @@ import { WorkspaceAvatar } from "./WorkspaceAvatar";
 
 type Props = {
   catalog: CatalogSummary;
+  scanProgress?: ScanEvent | null;
   onJump: (mode: Mode, projectId?: string) => void;
   onAddProject?: () => void;
 };
@@ -328,7 +330,12 @@ function AddProjectCard({ onAddProject }: { onAddProject?: () => void }) {
   );
 }
 
-export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
+export function ProjectsView({
+  catalog,
+  scanProgress,
+  onJump,
+  onAddProject,
+}: Props) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
@@ -420,6 +427,10 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
     return sortProjectStats(filtered, sort);
   }, [projectStats, query, sort]);
 
+  const scanning =
+    scanProgress != null &&
+    scanProgress.type !== "done" &&
+    scanProgress.type !== "error";
   const unused = catalog.stats.unusedFiles;
   const duplicateFiles = catalog.stats.duplicateFiles;
   const lastScan = formatScanTime(catalog.generatedAt, i18n.language);
@@ -448,108 +459,148 @@ export function ProjectsView({ catalog, onJump, onAddProject }: Props) {
             </h2>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-g-caption text-g-ink-4">
-          <span className="size-1.5 rounded-g-pill bg-g-green" />
-          <span>{t("projects.lastCompletedScan")}</span>
-          <span className="font-g-mono tabular-nums">{lastScan}</span>
-        </div>
-      </div>
-
-      {/* ── Stats grid ── */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        <StatCard
-          label={t("projects.projects")}
-          value={projects.length}
-          icon={<FolderKanban size={14} />}
-        />
-        <StatCard
-          label={t("projects.totalAssets")}
-          value={catalog.stats.totalFiles}
-          icon={<Images size={14} />}
-        />
-        <StatCard
-          label={t("projects.totalSize")}
-          value={formatBytes(totalBytes)}
-          icon={<HardDrive size={14} />}
-        />
-        <StatCard
-          label={t("projects.unused")}
-          value={unused}
-          tone={unused > 0 ? "red" : "neutral"}
-          icon={<Trash2 size={14} />}
-          onClick={() => onJump("unused")}
-        />
-        <StatCard
-          label={t("projects.duplicateGroups")}
-          value={duplicateFiles}
-          tone={duplicateFiles > 0 ? "amber" : "neutral"}
-          icon={<Copy size={14} />}
-          onClick={() => onJump("duplicates")}
-        />
-      </div>
-
-      {/* ── Toolbar: search + sort ── */}
-      <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3">
-        <Card padding="md">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <TextInput
-              variant="search"
-              icon={<Search size={16} />}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("projects.searchProjectsPlaceholder")}
-              suffix={
-                query ? (
-                  <TextInputClearButton
-                    label={t("toolbar.clearSearch")}
-                    onClick={() => setQuery("")}
-                  />
-                ) : undefined
-              }
-              className="w-full max-w-[420px]"
-              inputClassName="font-g text-g-ui tracking-g-ui"
+        {scanProgress && scanProgress.type !== "done" ? (
+          <div className="flex items-center gap-2 text-g-caption text-g-ink-2">
+            <Loader2
+              size={14}
+              className="shrink-0 animate-spin text-g-accent"
             />
-            <div className="flex items-center gap-2">
-              <span className="text-g-caption text-g-ink-3">
-                {t("projects.sortLabel")}
-              </span>
-              <Tabs
-                value={sort}
-                items={localizedSortItems}
-                onChange={setSort}
-                ariaLabel={t("projects.sortAria")}
-              />
-            </div>
+            <span className="font-[510]">
+              {scanProgress.type === "progress"
+                ? t(`scanProgress.phase.${scanProgress.phase}`)
+                : t("scanProgress.starting")}
+            </span>
+            {scanProgress.type === "progress" &&
+              (scanProgress.total ?? 0) > 0 && (
+                <span className="font-g-mono tabular-nums text-g-ink-3">
+                  {scanProgress.current ?? 0}/{scanProgress.total}
+                </span>
+              )}
           </div>
-        </Card>
+        ) : (
+          <div className="flex items-center gap-1.5 text-g-caption text-g-ink-4">
+            <span className="size-1.5 rounded-g-pill bg-g-green" />
+            <span>{t("projects.lastCompletedScan")}</span>
+            <span className="font-g-mono tabular-nums">{lastScan}</span>
+          </div>
+        )}
       </div>
 
-      {/* ── Project cards ── */}
-      {visibleProjects.length === 0 ? (
+      {projects.length === 0 && scanning ? (
         <EmptyState
-          title={t("projects.noProjects")}
-          description={t("projects.noProjectsDesc")}
+          icon={<Loader2 className="animate-spin" />}
+          title={t("status.scanning")}
+          description={t("status.scanningDesc")}
+        />
+      ) : projects.length === 0 ? (
+        <EmptyState
+          icon={<FolderPlus />}
+          title={t("dashboard.noProjects")}
+          description={t("dashboard.noProjectsDesc")}
           action={
             onAddProject ? (
-              <Button variant="primary" onClick={onAddProject}>
+              <Button
+                variant="primary"
+                leadingIcon={<FolderPlus size={14} />}
+                onClick={onAddProject}
+              >
                 {t("projects.addProject")}
               </Button>
             ) : undefined
           }
         />
       ) : (
-        <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {visibleProjects.map((stat) => (
-            <ProjectCard
-              key={stat.project.id}
-              stat={stat}
-              onJump={onJump}
-              onRename={handleRenameRequest}
-              onRemove={handleRemoveRequest}
+        <>
+          {/* ── Stats grid ── */}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            <StatCard
+              label={t("projects.projects")}
+              value={projects.length}
+              icon={<FolderKanban size={14} />}
             />
-          ))}
-          <AddProjectCard onAddProject={onAddProject} />
-        </section>
+            <StatCard
+              label={t("projects.totalAssets")}
+              value={catalog.stats.totalFiles}
+              icon={<Images size={14} />}
+            />
+            <StatCard
+              label={t("projects.totalSize")}
+              value={formatBytes(totalBytes)}
+              icon={<HardDrive size={14} />}
+            />
+            <StatCard
+              label={t("projects.unused")}
+              value={unused}
+              tone={unused > 0 ? "red" : "neutral"}
+              icon={<Trash2 size={14} />}
+              onClick={() => onJump("unused")}
+            />
+            <StatCard
+              label={t("projects.duplicateGroups")}
+              value={duplicateFiles}
+              tone={duplicateFiles > 0 ? "amber" : "neutral"}
+              icon={<Copy size={14} />}
+              onClick={() => onJump("duplicates")}
+            />
+          </div>
+
+          {/* ── Toolbar: search + sort ── */}
+          <div className="sticky top-0 z-[20] -mx-3 bg-g-canvas px-3">
+            <Card padding="md">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <TextInput
+                  variant="search"
+                  icon={<Search size={16} />}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("projects.searchProjectsPlaceholder")}
+                  suffix={
+                    query ? (
+                      <TextInputClearButton
+                        label={t("toolbar.clearSearch")}
+                        onClick={() => setQuery("")}
+                      />
+                    ) : undefined
+                  }
+                  className="w-full max-w-[420px]"
+                  inputClassName="font-g text-g-ui tracking-g-ui"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-g-caption text-g-ink-3">
+                    {t("projects.sortLabel")}
+                  </span>
+                  <Tabs
+                    value={sort}
+                    items={localizedSortItems}
+                    onChange={setSort}
+                    ariaLabel={t("projects.sortAria")}
+                  />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* ── Project cards ── */}
+          {visibleProjects.length === 0 ? (
+            <EmptyState
+              title={t("projects.noProjects")}
+              description={t("projects.noProjectsDesc")}
+            />
+          ) : (
+            <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {visibleProjects.map((stat) => (
+                <ProjectCard
+                  key={stat.project.id}
+                  stat={stat}
+                  onJump={onJump}
+                  onRename={handleRenameRequest}
+                  onRemove={handleRemoveRequest}
+                />
+              ))}
+              <AddProjectCard onAddProject={onAddProject} />
+            </section>
+          )}
+        </>
       )}
 
       <ProjectDialog

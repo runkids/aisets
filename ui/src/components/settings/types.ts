@@ -24,6 +24,7 @@ export type SettingsViewProps = {
   onStartOCR: (saveSettings: () => Promise<void>) => void;
   onStopOCR: () => void;
   onDismissOCR: () => void;
+  onAddProject?: () => void;
 };
 
 export type Section =

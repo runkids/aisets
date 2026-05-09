@@ -1,10 +1,16 @@
-import { ArrowLeftRight, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CheckCircle2,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { projectScanIntentLabel } from "../../projectScanIntent";
 import type { Project, ProjectScanIntent, Workspace } from "../../types";
-import { Badge, Button, Card, ConfirmDialog } from "../ui";
+import { Badge, Button, Card, ConfirmDialog, EmptyState } from "../ui";
 import { ProjectAvatar } from "../ProjectAvatar";
 import { ProjectDialog } from "../ProjectDialog";
 import { WorkspaceAvatar } from "../WorkspaceAvatar";
@@ -31,6 +37,7 @@ type ProjectsSectionProps = {
   ) => void;
   onRemoveProject: (projectId: string) => void;
   onSwitchWorkspace: (workspaceId: string) => void;
+  onAddProject?: () => void;
 };
 
 export function ProjectsSection({
@@ -43,6 +50,7 @@ export function ProjectsSection({
   onRenameProject,
   onRemoveProject,
   onSwitchWorkspace,
+  onAddProject,
 }: ProjectsSectionProps) {
   const { t } = useTranslation();
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
@@ -84,9 +92,24 @@ export function ProjectsSection({
         />
         <div className="px-6 py-5 md:px-8">
           {projects.length === 0 ? (
-            <p className="font-g text-g-ui text-g-ink-3">
-              {t("settings.noProjects")}
-            </p>
+            <EmptyState
+              size="sm"
+              icon={<FolderPlus />}
+              title={t("settings.noProjects")}
+              description={t("settings.noProjectsDesc")}
+              action={
+                onAddProject ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leadingIcon={<FolderPlus size={14} />}
+                    onClick={onAddProject}
+                  >
+                    {t("projects.addProject")}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="space-y-5">
               {workspaces.map((workspace) => {
