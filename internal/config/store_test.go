@@ -1600,6 +1600,93 @@ func TestExportImportAndResetData(t *testing.T) {
 	}
 }
 
+func TestLLMSettingsRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	provider := "ollama"
+	endpoint := "http://localhost:11434"
+	vision := "llava:7b"
+	embed := "nomic-embed-text"
+	updated, err := store.UpdateSettings(SettingsUpdate{
+		LLMProvider:    &provider,
+		LLMEndpoint:    &endpoint,
+		LLMVisionModel: &vision,
+		LLMEmbedModel:  &embed,
+	})
+	if err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	if updated.LLMProvider != "ollama" {
+		t.Errorf("expected ollama, got %s", updated.LLMProvider)
+	}
+	if updated.LLMVisionModel != "llava:7b" {
+		t.Errorf("expected llava:7b, got %s", updated.LLMVisionModel)
+	}
+	if updated.LLMEmbedModel != "nomic-embed-text" {
+		t.Errorf("expected nomic-embed-text, got %s", updated.LLMEmbedModel)
+	}
+
+	read, err := store.Settings()
+	if err != nil {
+		t.Fatalf("Settings: %v", err)
+	}
+	if read.LLMProvider != "ollama" {
+		t.Errorf("persisted: expected ollama, got %s", read.LLMProvider)
+	}
+	if read.LLMEndpoint != "http://localhost:11434" {
+		t.Errorf("persisted: expected endpoint, got %s", read.LLMEndpoint)
+	}
+}
+
+func TestLLMSettingsInvalidProvider(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	invalid := "invalid-provider"
+	_, err = store.UpdateSettings(SettingsUpdate{LLMProvider: &invalid})
+	if err == nil {
+		t.Fatal("expected error for invalid provider")
+	}
+}
+
+func TestLLMSettingsEndpointNormalization(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	provider := "ollama"
+	endpoint := "  http://localhost:11434/  "
+	_, err = store.UpdateSettings(SettingsUpdate{
+		LLMProvider: &provider,
+		LLMEndpoint: &endpoint,
+	})
+	if err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	read, err := store.Settings()
+	if err != nil {
+		t.Fatalf("Settings: %v", err)
+	}
+	if read.LLMEndpoint != "http://localhost:11434" {
+		t.Errorf("expected normalized endpoint, got %q", read.LLMEndpoint)
+	}
+}
+
 func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash string, usedCount int, savings int64) scanner.AssetItem {
 	usedBy := make([]string, 0, usedCount)
 	refs := make([]scanner.AssetReference, 0, usedCount)

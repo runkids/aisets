@@ -47,6 +47,10 @@ type AppSettings struct {
 	OptimizationStrategies     []imageproc.OptimizationStrategy     `json:"optimizationStrategies"`
 	CustomAssetFilters         []CustomAssetFilter                  `json:"customAssetFilters"`
 	PreferredEditor            string                               `json:"preferredEditor"`
+	LLMProvider                string                               `json:"llmProvider"`
+	LLMEndpoint                string                               `json:"llmEndpoint"`
+	LLMVisionModel             string                               `json:"llmVisionModel"`
+	LLMEmbedModel              string                               `json:"llmEmbedModel"`
 }
 
 type SettingsUpdate struct {
@@ -74,6 +78,10 @@ type SettingsUpdate struct {
 	OptimizationStrategies     []imageproc.OptimizationStrategy     `json:"optimizationStrategies"`
 	CustomAssetFilters         []CustomAssetFilter                  `json:"customAssetFilters"`
 	PreferredEditor            *string                              `json:"preferredEditor"`
+	LLMProvider                *string                              `json:"llmProvider"`
+	LLMEndpoint                *string                              `json:"llmEndpoint"`
+	LLMVisionModel             *string                              `json:"llmVisionModel"`
+	LLMEmbedModel              *string                              `json:"llmEmbedModel"`
 }
 
 type CustomAssetFilter struct {

@@ -202,6 +202,10 @@ func DefaultAppSettings() AppSettings {
 		OptimizationStrategies:     imageproc.DefaultOptimizationStrategies(),
 		CustomAssetFilters:         []CustomAssetFilter{},
 		PreferredEditor:            "vscode",
+		LLMProvider:                "",
+		LLMEndpoint:                "http://localhost:11434",
+		LLMVisionModel:             "",
+		LLMEmbedModel:              "",
 	}
 }
 
@@ -219,6 +223,12 @@ func normalizeOCRSettings(settings AppSettings) AppSettings {
 	settings.OCRBatchSize = ocrSettings.BatchSize
 	settings.OCRConcurrency = ocrSettings.Concurrency
 	return settings
+}
+
+func normalizeLLMEndpoint(endpoint string) string {
+	endpoint = strings.TrimSpace(endpoint)
+	endpoint = strings.TrimRight(endpoint, "/")
+	return endpoint
 }
 
 func normalizeScanSettings(settings AppSettings) AppSettings {
@@ -386,6 +396,22 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.PreferredEditor != nil {
 		settings.PreferredEditor = *update.PreferredEditor
+	}
+	if update.LLMProvider != nil {
+		p := strings.TrimSpace(*update.LLMProvider)
+		if p != "" && p != "ollama" && p != "openai-compat" {
+			return AppSettings{}, apierr.New("settings_llm_provider_invalid", "LLM provider must be empty, ollama, or openai-compat")
+		}
+		settings.LLMProvider = p
+	}
+	if update.LLMEndpoint != nil {
+		settings.LLMEndpoint = normalizeLLMEndpoint(*update.LLMEndpoint)
+	}
+	if update.LLMVisionModel != nil {
+		settings.LLMVisionModel = strings.TrimSpace(*update.LLMVisionModel)
+	}
+	if update.LLMEmbedModel != nil {
+		settings.LLMEmbedModel = strings.TrimSpace(*update.LLMEmbedModel)
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
