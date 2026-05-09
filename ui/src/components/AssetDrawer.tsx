@@ -94,7 +94,7 @@ function projectRoot(localPath: string, repoPath: string) {
   return "";
 }
 
-type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
+type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr" | "ai";
 
 type Props = {
   asset: AssetItem;
@@ -144,6 +144,9 @@ export function AssetDrawer({
     settingsQuery.data?.settings.ocrEnabled &&
     asset.ocr &&
     asset.ocr.status === "ready",
+  );
+  const aiTagVisible = Boolean(
+    asset.aiTag && asset.aiTag.status === "ready",
   );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
@@ -200,8 +203,11 @@ export function AssetDrawer({
     if (ocrVisible) {
       items.push({ value: "ocr", label: t("assetDrawer.tabOCR") });
     }
+    if (aiTagVisible) {
+      items.push({ value: "ai", label: t("drawer.tab.ai") });
+    }
     return items;
-  }, [asset, ocrVisible, similarCount, t]);
+  }, [asset, ocrVisible, aiTagVisible, similarCount, t]);
 
   const tabValues = useMemo(() => tabs.map((t) => t.value), [tabs]);
   const tab = tabValues.includes(rawTab) ? rawTab : "overview";
@@ -556,6 +562,46 @@ export function AssetDrawer({
               )}
               {tab === "ocr" && ocrVisible && asset.ocr && (
                 <AssetDrawerOCR ocr={asset.ocr} />
+              )}
+              {tab === "ai" && aiTagVisible && asset.aiTag && (
+                <div className="grid gap-4 p-4">
+                  <div>
+                    <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                      {t("drawer.aiCategory")}
+                    </h4>
+                    <Badge tone="blue">{asset.aiTag.category}</Badge>
+                  </div>
+                  {asset.aiTag.tags && asset.aiTag.tags.length > 0 && (
+                    <div>
+                      <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                        {t("drawer.aiTags")}
+                      </h4>
+                      <div className="flex flex-wrap gap-1">
+                        {asset.aiTag.tags.map((tag) => (
+                          <Badge key={tag} tone="line">{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {asset.aiTag.description && (
+                    <div>
+                      <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                        {t("drawer.aiDescription")}
+                      </h4>
+                      <p className="font-g text-g-body text-g-ink-2">
+                        {asset.aiTag.description}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-4 border-t border-g-line pt-3 font-g text-g-caption text-g-ink-4">
+                    {asset.aiTag.durationMs != null && (
+                      <span>{t("drawer.aiDuration")}: {(asset.aiTag.durationMs / 1000).toFixed(1)}s</span>
+                    )}
+                    {asset.aiTag.updatedAt && (
+                      <span>{new Date(asset.aiTag.updatedAt).toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </DialogDrawerSurface>
