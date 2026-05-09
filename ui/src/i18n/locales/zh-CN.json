@@ -654,6 +654,8 @@
     "searchPlaceholder": "依文件或規則筛选...",
     "empty": "没有 lint 发现匹配当前筛选",
     "emptyDesc": "试试调整搜索条件或严重程度筛选",
+    "notApplicable": "代码引用 Lint 不适用",
+    "notApplicableDesc": "此项目类型会跳过依赖引用的 Lint，请改用重复、优化、元数据与筛选来检查素材品质",
     "statTotal": "发现总数",
     "healthBar": "Lint 严重程度分布",
     "groupBy": "分组方式",

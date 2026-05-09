@@ -260,34 +260,35 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		return AssetItem{}, false, ctx.Err()
 	}
 	info := candidate.info
+	cacheKey := imageproc.CacheKey(candidate.project.ID, candidate.repo, info.Size(), info.ModTime().UnixNano())
+	assetID := stableID(candidate.project.ID + ":" + candidate.repo)
+
 	contentHash, err := contentHashFile(ctx, candidate.path)
 	if err != nil {
 		return AssetItem{}, false, err
 	}
-	cacheKey := imageproc.CacheKey(candidate.project.ID, candidate.repo, info.Size(), info.ModTime().UnixNano())
-	assetID := stableID(candidate.project.ID + ":" + candidate.repo)
-	assetVersion := "?v=" + contentHash
-	item := AssetItem{
-		ID:            assetID,
-		ProjectID:     candidate.project.ID,
-		ProjectName:   candidate.project.Name,
-		RepoPath:      candidate.repo,
-		LocalPath:     candidate.path,
-		Ext:           strings.ToLower(filepath.Ext(candidate.path)),
-		Bytes:         info.Size(),
-		ModifiedUnix:  info.ModTime().Unix(),
-		ContentHash:   contentHash,
-		URL:           "/api/assets/" + assetID + assetVersion,
-		ThumbnailURL:  "/api/thumbs/" + assetID + assetVersion,
-		HashAlgorithm: contentHashAlgorithm,
-		ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
-	}
+
 	if record, ok := s.cache.Get(cacheKey, info.Size(), info.ModTime().UnixNano()); ok && record.ContentHash == contentHash {
-		item.ContentHash = contentHash
+		// Cache hit: skip Probe, DHash, and Optimization re-computation
+		item := AssetItem{
+			ID:            assetID,
+			ProjectID:     candidate.project.ID,
+			ProjectName:   candidate.project.Name,
+			RepoPath:      candidate.repo,
+			LocalPath:     candidate.path,
+			Ext:           strings.ToLower(filepath.Ext(candidate.path)),
+			Bytes:         info.Size(),
+			ModifiedUnix:  info.ModTime().Unix(),
+			ContentHash:   contentHash,
+			URL:           "/api/assets/" + assetID + "?v=" + contentHash,
+			ThumbnailURL:  "/api/thumbs/" + assetID + "?v=" + contentHash,
+			HashAlgorithm: contentHashAlgorithm,
+			ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
+			Image:         record.Metadata,
+		}
 		if record.HashAlgorithm != "" {
 			item.HashAlgorithm = record.HashAlgorithm
 		}
-		item.Image = record.Metadata
 		if needsDHash {
 			item.DHash = record.Hashes.DHash
 			item.DHashFlipped = record.Hashes.DHashFlipped
@@ -313,6 +314,21 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		return item, true, nil
 	}
 
+	item := AssetItem{
+		ID:            assetID,
+		ProjectID:     candidate.project.ID,
+		ProjectName:   candidate.project.Name,
+		RepoPath:      candidate.repo,
+		LocalPath:     candidate.path,
+		Ext:           strings.ToLower(filepath.Ext(candidate.path)),
+		Bytes:         info.Size(),
+		ModifiedUnix:  info.ModTime().Unix(),
+		ContentHash:   contentHash,
+		URL:           "/api/assets/" + assetID + "?v=" + contentHash,
+		ThumbnailURL:  "/api/thumbs/" + assetID + "?v=" + contentHash,
+		HashAlgorithm: contentHashAlgorithm,
+		ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
+	}
 	meta, _ := imageproc.Probe(candidate.path)
 	item.Image = meta
 	var hashes imageproc.Hashes
@@ -331,7 +347,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		RepoPath:       candidate.repo,
 		Size:           info.Size(),
 		MTimeUnix:      info.ModTime().UnixNano(),
-		ContentHash:    item.ContentHash,
+		ContentHash:    contentHash,
 		HashAlgorithm:  contentHashAlgorithm,
 		Metadata:       meta,
 		Hashes:         hashes,

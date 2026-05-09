@@ -180,6 +180,9 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 			return 0, err
 		}
 	}
+	if err = carryForwardAnalysis(tx, scanID, catalog.Analysis); err != nil {
+		return 0, err
+	}
 	if err = pruneOldScansTx(tx, 10); err != nil {
 		return 0, err
 	}
@@ -187,6 +190,93 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		return 0, err
 	}
 	return scanID, nil
+}
+
+func carryForwardAnalysis(tx *sql.Tx, scanID int64, analysis scanner.CatalogAnalysis) error {
+	needOpt := analysis.Optimization == scanner.AnalysisNotComputed
+	needNear := analysis.NearDuplicates == scanner.AnalysisNotComputed
+	if !needOpt && !needNear {
+		return nil
+	}
+
+	findSource := func(stateCol string) (int64, bool) {
+		var id int64
+		err := tx.QueryRow(`
+			SELECT id FROM scans
+			WHERE status = 'completed' AND id < ? AND `+stateCol+` = 'computed'
+			ORDER BY id DESC LIMIT 1
+		`, scanID).Scan(&id)
+		if err != nil {
+			return 0, false
+		}
+		return id, true
+	}
+
+	carriedOpt := false
+	if needOpt {
+		if srcID, ok := findSource("optimization_state"); ok {
+			if _, err := tx.Exec(`
+				INSERT INTO optimization_snapshots (
+					scan_id, asset_id, project_id, repo_path, category, severity,
+					reason_code, suggestion_code, estimated_bytes, savings_bytes,
+					has_existing_variant, variant_bytes
+				)
+				SELECT ?, o.asset_id, o.project_id, o.repo_path, o.category, o.severity,
+					o.reason_code, o.suggestion_code, o.estimated_bytes, o.savings_bytes,
+					o.has_existing_variant, o.variant_bytes
+				FROM optimization_snapshots o
+				WHERE o.scan_id = ?
+				  AND EXISTS (
+					SELECT 1 FROM asset_snapshots a
+					WHERE a.scan_id = ? AND a.project_id = o.project_id AND a.repo_path = o.repo_path
+				  )
+			`, scanID, srcID, scanID); err != nil {
+				return err
+			}
+			carriedOpt = true
+		}
+	}
+
+	carriedNear := false
+	if needNear {
+		if srcID, ok := findSource("near_duplicates_state"); ok {
+			if _, err := tx.Exec(`
+				INSERT INTO near_duplicate_snapshots (
+					scan_id, near_id, left_id, right_id, left_path, right_path, distance, flipped
+				)
+				SELECT ?, n.near_id, n.left_id, n.right_id, n.left_path, n.right_path, n.distance, n.flipped
+				FROM near_duplicate_snapshots n
+				WHERE n.scan_id = ?
+				  AND EXISTS (SELECT 1 FROM asset_snapshots a WHERE a.scan_id = ? AND a.asset_id = n.left_id)
+				  AND EXISTS (SELECT 1 FROM asset_snapshots a WHERE a.scan_id = ? AND a.asset_id = n.right_id)
+			`, scanID, srcID, scanID, scanID); err != nil {
+				return err
+			}
+			carriedNear = true
+		}
+	}
+
+	if !carriedOpt && !carriedNear {
+		return nil
+	}
+
+	optState := analysis.Optimization
+	if carriedOpt {
+		optState = scanner.AnalysisComputed
+	}
+	nearState := analysis.NearDuplicates
+	if carriedNear {
+		nearState = scanner.AnalysisComputed
+	}
+
+	_, err := tx.Exec(`
+		UPDATE scans SET
+			optimization_state = ?,
+			near_duplicates_state = ?,
+			near_duplicates = (SELECT COUNT(*) FROM near_duplicate_snapshots WHERE scan_id = ?)
+		WHERE id = ?
+	`, optState, nearState, scanID, scanID)
+	return err
 }
 
 func (s *Store) ClearScans() error {

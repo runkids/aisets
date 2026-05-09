@@ -350,6 +350,7 @@ export type LintFinding = {
 
 export type Catalog = {
   scanId?: number;
+  startedAt?: string;
   generatedAt: string;
   projects: Project[];
   projectStats: Array<{
@@ -390,7 +391,13 @@ export type Catalog = {
 
 export type CatalogSummary = Pick<
   Catalog,
-  "scanId" | "generatedAt" | "projects" | "projectStats" | "stats" | "analysis"
+  | "scanId"
+  | "startedAt"
+  | "generatedAt"
+  | "projects"
+  | "projectStats"
+  | "stats"
+  | "analysis"
 >;
 
 export type CatalogItemsPage = {

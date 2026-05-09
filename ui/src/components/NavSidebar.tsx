@@ -37,6 +37,7 @@ type Props = {
   selectedProjectId: string;
   totalAssets: number;
   lastScanAt?: string;
+  lastScanStartedAt?: string;
   workspaceSwitchDisabled?: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
@@ -55,6 +56,22 @@ function formatLastScanTime(value: string | undefined, locale: string) {
   }).format(date);
 }
 
+function formatScanDuration(
+  startedAt: string | undefined,
+  completedAt: string | undefined,
+) {
+  if (!startedAt || !completedAt) return "";
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return "";
+  const sec = Math.round((end - start) / 1000);
+  if (sec < 1) return "<1s";
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return rem > 0 ? `${min}m${rem}s` : `${min}m`;
+}
+
 export function NavSidebar({
   mode,
   badges,
@@ -65,6 +82,7 @@ export function NavSidebar({
   selectedProjectId,
   totalAssets,
   lastScanAt,
+  lastScanStartedAt,
   workspaceSwitchDisabled = false,
   onSelectWorkspace,
   onSelectProject,
@@ -74,6 +92,7 @@ export function NavSidebar({
   const versionQuery = useVersionQuery();
   const version = versionQuery.data?.currentVersion ?? "";
   const lastScan = formatLastScanTime(lastScanAt, i18n.language);
+  const scanDuration = formatScanDuration(lastScanStartedAt, lastScanAt);
 
   const groups: Array<{
     title: string;
@@ -231,6 +250,11 @@ export function NavSidebar({
           <span className="truncate font-g-mono tabular-nums text-g-ink-3">
             {lastScan}
           </span>
+          {scanDuration && (
+            <span className="shrink-0 font-g-mono tabular-nums text-g-ink-4">
+              ({scanDuration})
+            </span>
+          )}
         </div>
       </div>
     </aside>

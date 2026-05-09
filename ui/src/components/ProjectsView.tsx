@@ -463,7 +463,7 @@ export function ProjectsView({
         {scanProgress && scanProgress.type !== "done" ? (
           <ScanProgressContent
             scanProgress={scanProgress}
-            className="min-w-0 sm:max-w-[52%]"
+            className="ml-auto min-w-0 sm:w-[44%] sm:max-w-[440px]"
           />
         ) : (
           <div className="flex items-center gap-1.5 text-g-caption text-g-ink-4">

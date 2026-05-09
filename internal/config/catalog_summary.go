@@ -59,6 +59,7 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 	}
 	return CatalogSummary{
 		ScanID:       scan.ID,
+		StartedAt:    scan.StartedAt,
 		GeneratedAt:  scan.CompletedAt,
 		Projects:     projects,
 		ProjectStats: projectStats,

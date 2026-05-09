@@ -9,6 +9,7 @@ const catalogItemsLimitMax = 200
 
 type CatalogSummary struct {
 	ScanID       int64                   `json:"scanId"`
+	StartedAt    string                  `json:"startedAt"`
 	GeneratedAt  string                  `json:"generatedAt"`
 	Projects     []Project               `json:"projects"`
 	ProjectStats []CatalogProjectStats   `json:"projectStats"`

@@ -180,7 +180,7 @@ export function AppTopbar({
               role={failed ? "alert" : "status"}
               aria-live={failed ? "assertive" : "polite"}
             >
-              <ScanProgressContent scanProgress={scanProgress} />
+              <ScanProgressContent scanProgress={scanProgress} truncatePath />
             </div>
           </span>
         ) : (

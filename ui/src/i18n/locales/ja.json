@@ -654,6 +654,8 @@
     "searchPlaceholder": "ファイルまたはルールで絞り込み...",
     "empty": "現在のフィルターに一致する lint 検出はありません",
     "emptyDesc": "検索条件または重大度フィルターを調整してみてください",
+    "notApplicable": "コード参照 Lint は対象外です",
+    "notApplicableDesc": "このプロジェクトタイプは参照依存の Lint をスキップします。重複、最適化、メタデータ、フィルターでアセット品質を確認してください",
     "statTotal": "検出総数",
     "healthBar": "Lint 重要度分布",
     "groupBy": "グループ化",

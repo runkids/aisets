@@ -747,6 +747,7 @@ export function App() {
         selectedProjectId={effectiveSelectedProjectId}
         totalAssets={catalogSummary?.stats.totalFiles ?? 0}
         lastScanAt={catalogSummary?.generatedAt}
+        lastScanStartedAt={catalogSummary?.startedAt}
         workspaceSwitchDisabled={ocrActivityBusy || optimizeActivityBusy}
         onSelectWorkspace={onSwitchWorkspace}
         onSelectProject={setSelectedProjectId}
@@ -1013,11 +1014,8 @@ function isScanAlreadyRunningError(error: unknown) {
 function ScanProgressState({ scanProgress }: { scanProgress: ScanEvent }) {
   if (scanProgress.type !== "progress") return null;
   return (
-    <div className="flex flex-1 items-center justify-center px-6 py-20">
-      <ScanProgressContent
-        scanProgress={scanProgress}
-        className="w-full max-w-md"
-      />
+    <div className="flex flex-1 items-start justify-end px-6 py-20">
+      <ScanProgressContent scanProgress={scanProgress} className="max-w-md" />
     </div>
   );
 }

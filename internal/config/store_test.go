@@ -1727,3 +1727,230 @@ func facetMap(facets []CatalogFacetOption) map[string]int {
 	}
 	return m
 }
+
+func TestCarryForwardAnalysis(t *testing.T) {
+	setup := func(t *testing.T) *Store {
+		t.Helper()
+		root := t.TempDir()
+		t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+		store, err := OpenStore()
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { store.Close() })
+		return store
+	}
+
+	fullCatalog := func(root string) scanner.Catalog {
+		return scanner.Catalog{
+			GeneratedAt: "2026-05-10T00:00:00Z",
+			Projects:    []scanner.Project{{ID: "p1", Name: "proj1", Path: root}},
+			Analysis: scanner.CatalogAnalysis{
+				References:     scanner.AnalysisComputed,
+				NearDuplicates: scanner.AnalysisComputed,
+				Optimization:   scanner.AnalysisComputed,
+			},
+			Items: []scanner.AssetItem{
+				{
+					ID: "a1", ProjectID: "p1", ProjectName: "proj1", RepoPath: "img/a.png",
+					LocalPath: filepath.Join(root, "img/a.png"), Ext: ".png", Bytes: 100,
+					ContentHash: "h1", HashAlgorithm: "blake3",
+					Image: imageproc.Metadata{Format: "png", Width: 1, Height: 1, Pages: 1},
+					Optimization: []scanner.OptimizationSuggestion{{
+						Category: "format", Severity: "info",
+						ReasonCode: "modern_format", SuggestionCode: "convert_webp",
+						EstimatedBytes: 50, SavingsBytes: 50,
+					}},
+				},
+				{
+					ID: "a2", ProjectID: "p1", ProjectName: "proj1", RepoPath: "img/b.png",
+					LocalPath: filepath.Join(root, "img/b.png"), Ext: ".png", Bytes: 200,
+					ContentHash: "h2", HashAlgorithm: "blake3",
+					Image: imageproc.Metadata{Format: "png", Width: 1, Height: 1, Pages: 1},
+					Optimization: []scanner.OptimizationSuggestion{{
+						Category: "size", Severity: "warning",
+						ReasonCode: "large_asset", SuggestionCode: "compress",
+						EstimatedBytes: 100, SavingsBytes: 100,
+					}},
+				},
+			},
+			NearDuplicates: []scanner.NearDuplicate{{
+				ID: "nd1", LeftID: "a1", RightID: "a2",
+				LeftPath: "img/a.png", RightPath: "img/b.png", Distance: 5,
+			}},
+			Stats: scanner.CatalogStats{TotalFiles: 2, NearDuplicates: 1},
+		}
+	}
+
+	fastCatalog := func(root string, items []scanner.AssetItem) scanner.Catalog {
+		return scanner.Catalog{
+			GeneratedAt: "2026-05-10T01:00:00Z",
+			Projects:    []scanner.Project{{ID: "p1", Name: "proj1", Path: root}},
+			Analysis: scanner.CatalogAnalysis{
+				References:     scanner.AnalysisComputed,
+				NearDuplicates: scanner.AnalysisNotComputed,
+				Optimization:   scanner.AnalysisNotComputed,
+			},
+			Items: items,
+			Stats: scanner.CatalogStats{TotalFiles: len(items)},
+		}
+	}
+
+	bareItem := func(root, id, repoPath, hash string) scanner.AssetItem {
+		return scanner.AssetItem{
+			ID: id, ProjectID: "p1", ProjectName: "proj1", RepoPath: repoPath,
+			LocalPath: filepath.Join(root, repoPath), Ext: ".png", Bytes: 100,
+			ContentHash: hash, HashAlgorithm: "blake3",
+			Image: imageproc.Metadata{Format: "png", Width: 1, Height: 1, Pages: 1},
+		}
+	}
+
+	assertScanState := func(t *testing.T, store *Store, scanID int64, wantOpt, wantNear string) {
+		t.Helper()
+		var optState, nearState string
+		err := store.db.QueryRow(
+			`SELECT optimization_state, near_duplicates_state FROM scans WHERE id = ?`, scanID,
+		).Scan(&optState, &nearState)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if optState != wantOpt {
+			t.Errorf("optimization_state = %q, want %q", optState, wantOpt)
+		}
+		if nearState != wantNear {
+			t.Errorf("near_duplicates_state = %q, want %q", nearState, wantNear)
+		}
+	}
+
+	assertSnapshotCount := func(t *testing.T, store *Store, table string, scanID int64, want int) {
+		t.Helper()
+		var got int
+		err := store.db.QueryRow("SELECT count(*) FROM "+table+" WHERE scan_id = ?", scanID).Scan(&got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("%s rows for scan %d = %d, want %d", table, scanID, got, want)
+		}
+	}
+
+	t.Run("basic", func(t *testing.T) {
+		store := setup(t)
+		root := t.TempDir()
+		_, err := store.RecordScan(fullCatalog(root))
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := []scanner.AssetItem{
+			bareItem(root, "a1", "img/a.png", "h1"),
+			bareItem(root, "a2", "img/b.png", "h2"),
+		}
+		fastID, err := store.RecordScan(fastCatalog(root, items))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertScanState(t, store, fastID, "computed", "computed")
+		assertSnapshotCount(t, store, "optimization_snapshots", fastID, 2)
+		assertSnapshotCount(t, store, "near_duplicate_snapshots", fastID, 1)
+	})
+
+	t.Run("deleted_assets", func(t *testing.T) {
+		store := setup(t)
+		root := t.TempDir()
+		_, err := store.RecordScan(fullCatalog(root))
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := []scanner.AssetItem{
+			bareItem(root, "a1", "img/a.png", "h1"),
+		}
+		fastID, err := store.RecordScan(fastCatalog(root, items))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertScanState(t, store, fastID, "computed", "computed")
+		assertSnapshotCount(t, store, "optimization_snapshots", fastID, 1)
+		assertSnapshotCount(t, store, "near_duplicate_snapshots", fastID, 0)
+	})
+
+	t.Run("no_prior_full", func(t *testing.T) {
+		store := setup(t)
+		root := t.TempDir()
+		items := []scanner.AssetItem{
+			bareItem(root, "a1", "img/a.png", "h1"),
+		}
+		fastID, err := store.RecordScan(fastCatalog(root, items))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertScanState(t, store, fastID, "notComputed", "notComputed")
+		assertSnapshotCount(t, store, "optimization_snapshots", fastID, 0)
+		assertSnapshotCount(t, store, "near_duplicate_snapshots", fastID, 0)
+	})
+
+	t.Run("cross_project_near_dup_one_side_removed", func(t *testing.T) {
+		store := setup(t)
+		root := t.TempDir()
+		full := fullCatalog(root)
+		full.Projects = append(full.Projects, scanner.Project{ID: "p2", Name: "proj2", Path: root + "/p2"})
+		full.Items = append(full.Items, scanner.AssetItem{
+			ID: "a3", ProjectID: "p2", ProjectName: "proj2", RepoPath: "icon/c.png",
+			LocalPath: filepath.Join(root, "icon/c.png"), Ext: ".png", Bytes: 300,
+			ContentHash: "h3", HashAlgorithm: "blake3",
+			Image: imageproc.Metadata{Format: "png", Width: 1, Height: 1, Pages: 1},
+		})
+		full.NearDuplicates = append(full.NearDuplicates, scanner.NearDuplicate{
+			ID: "nd2", LeftID: "a1", RightID: "a3",
+			LeftPath: "img/a.png", RightPath: "icon/c.png", Distance: 4,
+		})
+		full.Stats.NearDuplicates = 2
+		_, err := store.RecordScan(full)
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := []scanner.AssetItem{
+			bareItem(root, "a1", "img/a.png", "h1"),
+			bareItem(root, "a2", "img/b.png", "h2"),
+		}
+		fastID, err := store.RecordScan(fastCatalog(root, items))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertSnapshotCount(t, store, "near_duplicate_snapshots", fastID, 1)
+		var nearCount int
+		store.db.QueryRow(`SELECT near_duplicates FROM scans WHERE id = ?`, fastID).Scan(&nearCount)
+		if nearCount != 1 {
+			t.Errorf("near_duplicates stat = %d, want 1", nearCount)
+		}
+	})
+
+	t.Run("summary_after_carry", func(t *testing.T) {
+		store := setup(t)
+		root := t.TempDir()
+		if err := store.AddProjects([]string{root}); err != nil {
+			t.Fatal(err)
+		}
+		_, err := store.RecordScan(fullCatalog(root))
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := []scanner.AssetItem{
+			bareItem(root, "a1", "img/a.png", "h1"),
+			bareItem(root, "a2", "img/b.png", "h2"),
+		}
+		_, err = store.RecordScan(fastCatalog(root, items))
+		if err != nil {
+			t.Fatal(err)
+		}
+		summary, err := store.CatalogSummary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if summary.Analysis.Optimization != scanner.AnalysisComputed {
+			t.Errorf("summary optimization = %q, want computed", summary.Analysis.Optimization)
+		}
+		if summary.Analysis.NearDuplicates != scanner.AnalysisComputed {
+			t.Errorf("summary near duplicates = %q, want computed", summary.Analysis.NearDuplicates)
+		}
+	})
+}

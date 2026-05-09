@@ -216,7 +216,7 @@ export function ProjectsSection({
                                     )}
                                   </Badge>
                                 </div>
-                                <div className="truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
+                                <div className="mt-1 truncate font-g-mono text-g-chip tracking-g-mono text-g-ink-3">
                                   {project.path}
                                 </div>
                               </div>

@@ -6,6 +6,7 @@ import { cn } from "../../lib/cn";
 type ScanProgressContentProps = {
   scanProgress: ScanEvent;
   className?: string;
+  truncatePath?: boolean;
 };
 
 function ScanProgressContent({
@@ -42,7 +43,7 @@ function ScanProgressContent({
   const countWidth = total > 0 ? String(total).length * 2 + 1 : 0;
 
   return (
-    <div className={cn("text-g-ui text-g-ink-2", className)}>
+    <div className={cn("w-full min-w-0 text-g-ui text-g-ink-2", className)}>
       <div className="flex items-center gap-2">
         {done ? (
           <CheckCircle2
@@ -76,9 +77,12 @@ function ScanProgressContent({
       </div>
 
       {progress?.message && (
-        <code className="mt-1.5 block truncate bg-transparent p-0 font-g-mono text-[11px] tracking-g-mono text-g-ink-4">
-          {progress.message}
-        </code>
+        <div
+          className="mt-1.5 h-4 min-w-0 overflow-hidden"
+          title={progress.message}
+        >
+          <ProgressPath value={progress.message} />
+        </div>
       )}
 
       {reasonLabel && (
@@ -103,6 +107,34 @@ function ScanProgressContent({
       )}
     </div>
   );
+}
+
+function ProgressPath({ value }: { value: string }) {
+  const { directory, fileName } = splitProgressPath(value);
+
+  return (
+    <code className="flex h-4 w-full min-w-0 items-center justify-end overflow-hidden whitespace-nowrap bg-transparent p-0 text-right font-g-mono text-[11px] leading-4 tracking-g-mono text-g-ink-4">
+      {directory && (
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          {directory}
+        </span>
+      )}
+      <span className="min-w-0 max-w-full shrink-0 overflow-hidden text-ellipsis whitespace-nowrap">
+        {fileName}
+      </span>
+    </code>
+  );
+}
+
+function splitProgressPath(value: string) {
+  const slashIndex = Math.max(value.lastIndexOf("/"), value.lastIndexOf("\\"));
+  if (slashIndex < 0 || slashIndex === value.length - 1) {
+    return { directory: "", fileName: value };
+  }
+  return {
+    directory: value.slice(0, slashIndex + 1),
+    fileName: value.slice(slashIndex + 1),
+  };
 }
 
 export { ScanProgressContent };
