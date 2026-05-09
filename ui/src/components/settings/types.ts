@@ -2,6 +2,8 @@ import type { ImageBackgroundMode } from "../../imageBackground";
 import type { OCRActivityState } from "../../ocrActivity";
 import type {
   CustomAssetFilter,
+  OptimizationExternalTool,
+  OptimizationStrategy,
   OptimizationThresholds,
   ProjectScanIntent,
   ScanAnalyses,
@@ -54,6 +56,8 @@ export type SettingsDraft = {
   optimizationAvifSpeed: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;
+  optimizationExternalTools: OptimizationExternalTool[];
+  optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
 };
 

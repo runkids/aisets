@@ -12,6 +12,8 @@ import type {
 import {
   customFilterOperatorsByField,
   defaultOCRLanguages,
+  defaultOptimizationExternalTools,
+  defaultOptimizationStrategies,
   defaultSettings,
   emptyExcludePatternsByIntent,
   projectScanIntentValues,
@@ -133,6 +135,10 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     optimizationThresholds:
       settings?.optimizationThresholds ??
       defaultSettings.optimizationThresholds!,
+    optimizationExternalTools:
+      settings?.optimizationExternalTools ?? defaultOptimizationExternalTools,
+    optimizationStrategies:
+      settings?.optimizationStrategies ?? defaultOptimizationStrategies,
     customAssetFilters: settings?.customAssetFilters ?? [],
   };
 }
@@ -168,6 +174,8 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     optimizationAvifSpeed: draft.optimizationAvifSpeed,
     optimizationAutoApply: draft.optimizationAutoApply,
     optimizationThresholds: draft.optimizationThresholds,
+    optimizationExternalTools: draft.optimizationExternalTools,
+    optimizationStrategies: draft.optimizationStrategies,
     customAssetFilters: draft.customAssetFilters,
   };
 }
@@ -218,6 +226,8 @@ export function resetSectionDraft(
         optimizationAvifSpeed: defaults.optimizationAvifSpeed,
         optimizationAutoApply: defaults.optimizationAutoApply,
         optimizationThresholds: defaults.optimizationThresholds,
+        optimizationExternalTools: defaults.optimizationExternalTools,
+        optimizationStrategies: defaults.optimizationStrategies,
       };
     default:
       return defaults;

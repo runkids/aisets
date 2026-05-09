@@ -112,10 +112,30 @@ export function OptimizeView({
   const { t } = useTranslation();
   const toast = useToast();
   const settingsQuery = useSettingsQuery();
-  const quality =
-    settingsQuery.data?.settings?.optimizationDefaultQuality ?? 80;
-  const workers = settingsQuery.data?.settings?.optimizationWorkers ?? 1;
-  const avifSpeed = settingsQuery.data?.settings?.optimizationAvifSpeed ?? 6;
+  const settings = settingsQuery.data?.settings;
+  const quality = settings?.optimizationDefaultQuality ?? 80;
+  const maxDimensionPx =
+    settings?.optimizationThresholds?.maxDimensionPx ?? 2560;
+  const workers = settings?.optimizationWorkers ?? 1;
+  const avifSpeed = settings?.optimizationAvifSpeed ?? 6;
+  const strategyHash = settings?.optimizationStrategyHash ?? "";
+  const enabledToolIds = useMemo(
+    () =>
+      settings?.optimizationExternalTools
+        ?.filter((tool) => tool.enabled)
+        .map((tool) => tool.id) ?? [],
+    [settings?.optimizationExternalTools],
+  );
+  const runtimeTools = settings?.optimizationToolRuntime ?? [];
+  const imgtoolsRuntime = runtimeTools.find(
+    (tool) => tool.id === "asset-studio-imgtools",
+  );
+  const enabledRuntimeTools = runtimeTools.filter(
+    (tool) => tool.enabled && tool.id !== "asset-studio-imgtools",
+  );
+  const missingEnabledRuntimeTools = enabledRuntimeTools.filter(
+    (tool) => !tool.detected,
+  );
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("");
   const [severity, setSeverity] = useState<Severity>("");
@@ -215,12 +235,24 @@ export function OptimizeView({
           replaceOriginal,
           updateReferences,
           quality,
+          maxDimensionPx,
+          strategyHash,
+          enabledToolIds,
         ),
       );
       if (operation) operations.set(item.id, operation);
     }
     return operations;
-  }, [estimate, items, quality, replaceOriginal, updateReferences]);
+  }, [
+    estimate,
+    items,
+    quality,
+    maxDimensionPx,
+    strategyHash,
+    enabledToolIds,
+    replaceOriginal,
+    updateReferences,
+  ]);
   const actionableActionIds = useMemo(
     () =>
       actionIds.filter(
@@ -292,8 +324,20 @@ export function OptimizeView({
         updateReferences,
         itemsById,
         quality,
+        maxDimensionPx,
+        strategyHash,
+        enabledToolIds,
       ),
-    [actionIds, replaceOriginal, updateReferences, itemsById, quality],
+    [
+      actionIds,
+      replaceOriginal,
+      updateReferences,
+      itemsById,
+      quality,
+      maxDimensionPx,
+      strategyHash,
+      enabledToolIds,
+    ],
   );
   function cachedEstimateFor(assetIds: string[]) {
     ensureEstimateOperationCacheLoaded();
@@ -307,6 +351,9 @@ export function OptimizeView({
           replaceOriginal,
           updateReferences,
           quality,
+          maxDimensionPx,
+          strategyHash,
+          enabledToolIds,
         ),
       );
       if (operation) operations.push(operation);
@@ -404,7 +451,7 @@ export function OptimizeView({
       outputMode: replaceOriginal ? "replace" : "safeVariants",
       updateReferences: replaceOriginal && updateReferences,
       quality,
-      maxDimensionPx: 1200,
+      maxDimensionPx,
       avifSpeed,
       workers,
     };
@@ -423,6 +470,9 @@ export function OptimizeView({
       updateReferences,
       itemsById,
       quality,
+      maxDimensionPx,
+      strategyHash,
+      enabledToolIds,
     );
     const cached = estimateCache.get(key);
     if (cached) {
@@ -444,6 +494,9 @@ export function OptimizeView({
           replaceOriginal,
           updateReferences,
           quality,
+          maxDimensionPx,
+          strategyHash,
+          enabledToolIds,
         ),
       );
       if (operation) {
@@ -482,6 +535,9 @@ export function OptimizeView({
               replaceOriginal,
               updateReferences,
               quality,
+              maxDimensionPx,
+              strategyHash,
+              enabledToolIds,
             ),
             op,
           );
@@ -515,6 +571,9 @@ export function OptimizeView({
       updateReferences,
       itemsById,
       quality,
+      maxDimensionPx,
+      strategyHash,
+      enabledToolIds,
     );
     const cachedEstimate = estimateCache.get(fullKey);
     const wasCached = Boolean(cachedEstimate);
@@ -885,9 +944,26 @@ export function OptimizeView({
     });
   }
 
-  const missingTools =
+  const estimateMissingTools =
     estimate?.tools?.filter((tool) => tool.required && !tool.available)
       .length ?? 0;
+  const missingTools = estimateMissingTools + missingEnabledRuntimeTools.length;
+  const toolStatValue =
+    missingTools > 0 ? missingTools : imgtoolsRuntime?.detected ? "OK" : "!";
+  const toolStatMeta =
+    missingTools > 0
+      ? t("optimize.toolsMissingMeta", {
+          count: missingTools,
+          defaultValue: "{{count}} 個已啟用工具缺少",
+        })
+      : imgtoolsRuntime?.detected
+        ? t("optimize.toolsRuntimeReadyMeta", {
+            count: enabledRuntimeTools.length,
+            defaultValue: "Imgtools 可用 · {{count}} 個外部工具已啟用",
+          })
+        : t("optimize.toolsRuntimeFallbackMeta", {
+            defaultValue: "Imgtools 缺少 · 使用內建備援",
+          });
   const canAct = actionableActionIds.length > 0;
   const operationLabel = (id: string) =>
     t(`optimize.operationLabel.${id}`, {
@@ -1020,15 +1096,17 @@ export function OptimizeView({
             <StatCard
               icon={<Wrench size={14} />}
               label={t("optimize.statTools")}
-              value={missingTools}
-              meta={
-                missingTools > 0
-                  ? t("optimize.toolsMeta")
-                  : t("optimize.toolsReadyMeta")
+              value={toolStatValue}
+              meta={toolStatMeta}
+              tone={
+                missingTools > 0 || !imgtoolsRuntime?.detected
+                  ? "amber"
+                  : "neutral"
               }
-              tone={missingTools > 0 ? "amber" : "neutral"}
               onClick={
-                missingTools > 0 ? () => setToolsModalOpen(true) : undefined
+                missingTools > 0 || !imgtoolsRuntime?.detected
+                  ? () => setToolsModalOpen(true)
+                  : undefined
               }
             />
           </div>

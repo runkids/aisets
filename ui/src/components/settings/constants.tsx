@@ -13,6 +13,8 @@ import type {
   CustomAssetFilterField,
   CustomAssetFilterOperator,
   ExcludePatternsByIntent,
+  OptimizationExternalTool,
+  OptimizationStrategy,
   ProjectScanIntent,
   ScanProfile,
   SettingsUpdate,
@@ -28,6 +30,104 @@ export const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },
   { id: "about", icon: <Info size={15} /> },
+];
+
+export const defaultOptimizationExternalTools: OptimizationExternalTool[] = [
+  { id: "ffmpeg", enabled: false },
+  { id: "cwebp", enabled: false },
+  { id: "avifenc", enabled: false },
+  { id: "gifsicle", enabled: false },
+  { id: "svgo", enabled: false },
+  { id: "magick", enabled: false },
+  { id: "oxipng", enabled: false },
+];
+
+export const defaultOptimizationStrategies: OptimizationStrategy[] = [
+  {
+    id: "svg-minify",
+    name: "SVG minify",
+    enabled: true,
+    priority: 10,
+    match: { formats: ["svg"], alpha: "any", animated: "any" },
+    action: { operation: "svg-minify", outputFormat: "svg" },
+  },
+  {
+    id: "oversized-raster-resize",
+    name: "Oversized raster resize",
+    enabled: true,
+    priority: 20,
+    match: {
+      formats: ["png", "jpg", "jpeg", "webp", "gif"],
+      alpha: "any",
+      animated: "any",
+    },
+    action: { operation: "resize" },
+  },
+  {
+    id: "png-opaque-avif",
+    name: "PNG opaque to AVIF",
+    enabled: true,
+    priority: 30,
+    match: { formats: ["png"], alpha: "opaque", animated: "false" },
+    action: {
+      operation: "convert",
+      outputFormat: "avif",
+      quality: 50,
+      avifSpeed: 6,
+    },
+  },
+  {
+    id: "png-alpha-webp",
+    name: "PNG transparent to WebP",
+    enabled: true,
+    priority: 40,
+    match: { formats: ["png"], alpha: "transparent", animated: "false" },
+    action: { operation: "convert", outputFormat: "webp", quality: 80 },
+  },
+  {
+    id: "jpeg-large-avif",
+    name: "JPEG large to AVIF",
+    enabled: true,
+    priority: 50,
+    match: {
+      formats: ["jpg", "jpeg"],
+      alpha: "opaque",
+      animated: "false",
+      minBytesKB: 200,
+    },
+    action: {
+      operation: "convert",
+      outputFormat: "avif",
+      quality: 50,
+      avifSpeed: 6,
+    },
+  },
+  {
+    id: "gif-animated-keep-gif",
+    name: "GIF animated recompress",
+    enabled: true,
+    priority: 60,
+    match: { formats: ["gif"], alpha: "any", animated: "true" },
+    action: {
+      operation: "recompress",
+      outputFormat: "gif",
+      quality: 75,
+      preserveAnimation: true,
+    },
+  },
+  {
+    id: "webp-large-recompress",
+    name: "WebP large recompress",
+    enabled: true,
+    priority: 70,
+    match: {
+      formats: ["webp"],
+      alpha: "any",
+      animated: "any",
+      minBytesKB: 800,
+    },
+    action: { operation: "recompress", outputFormat: "webp", quality: 60 },
+  },
 ];
 
 export const defaultSettings: SettingsUpdate = {
@@ -83,6 +183,8 @@ export const defaultSettings: SettingsUpdate = {
     fileSizeCriticalKB: 500,
     pngAlphaCheckEnabled: true,
   },
+  optimizationExternalTools: defaultOptimizationExternalTools,
+  optimizationStrategies: defaultOptimizationStrategies,
   customAssetFilters: [],
 };
 

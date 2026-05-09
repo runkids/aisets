@@ -377,14 +377,19 @@ export function SettingsView({
     });
   }
 
-  function settingActionsFor(section: Section | "catalogScanning" | "ocr") {
+  function settingActionsFor(
+    section: Section | "catalogScanning" | "ocr",
+    extraDisabled = false,
+  ) {
     return (
       <SettingsActions
-        disabled={settingsActionDisabled}
+        disabled={settingsActionDisabled || extraDisabled}
         onSave={() => void onSaveSettings()}
         onReset={() => onResetSectionDraft(section)}
         saveLabel={t("settings.save")}
         resetLabel={t("settings.reset")}
+        resetConfirmTitle={t("settings.resetSectionConfirmTitle")}
+        resetConfirmDescription={t("settings.resetSectionConfirmDesc")}
       />
     );
   }
@@ -529,11 +534,15 @@ export function SettingsView({
           {activeSection === "optimization" && (
             <OptimizationSection
               draft={draft}
+              toolRuntime={settings?.optimizationToolRuntime}
               settingsLoading={settingsQuery.isLoading}
               updatePending={updateMutation.isPending}
               updateError={updateMutation.error}
-              settingActions={settingActionsFor("optimization")}
+              settingActions={(extraDisabled) =>
+                settingActionsFor("optimization", extraDisabled)
+              }
               onUpdateDraft={updateDraft}
+              onRefreshTools={() => void settingsQuery.refetch()}
             />
           )}
 

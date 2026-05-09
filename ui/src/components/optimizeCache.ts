@@ -19,6 +19,9 @@ export function estimateCacheKey(
   updateReferences: boolean,
   itemsById?: Map<string, AssetItem>,
   quality = 80,
+  maxDimensionPx = 1200,
+  strategyHash = "",
+  enabledTools: string[] = [],
 ) {
   return JSON.stringify({
     ids: [...assetIds].sort().map((assetId) => {
@@ -30,6 +33,9 @@ export function estimateCacheKey(
     outputMode: replaceOriginal ? "replace" : "safeVariants",
     updateReferences: replaceOriginal && updateReferences,
     quality,
+    maxDimensionPx,
+    strategyHash,
+    enabledTools: [...enabledTools].sort(),
   });
 }
 
@@ -38,6 +44,9 @@ export function estimateOperationCacheKey(
   replaceOriginal: boolean,
   updateReferences: boolean,
   quality = 80,
+  maxDimensionPx = 1200,
+  strategyHash = "",
+  enabledTools: string[] = [],
 ) {
   return JSON.stringify({
     assetId: item.id,
@@ -47,7 +56,9 @@ export function estimateOperationCacheKey(
     outputMode: replaceOriginal ? "replace" : "safeVariants",
     updateReferences: replaceOriginal && updateReferences,
     quality,
-    maxDimensionPx: 1200,
+    maxDimensionPx,
+    strategyHash,
+    enabledTools: [...enabledTools].sort(),
   });
 }
 

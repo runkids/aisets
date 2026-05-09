@@ -43,6 +43,8 @@ describe("settings draft helpers", () => {
         fileSizeCriticalKB: 500,
         pngAlphaCheckEnabled: true,
       },
+      optimizationExternalTools: [],
+      optimizationStrategies: [],
       customAssetFilters: [],
       preferredEditor: "vscode",
       workspaces: [],
@@ -59,6 +61,8 @@ describe("settings draft helpers", () => {
         engineVersion: "",
         engineAvailable: false,
       },
+      optimizationToolRuntime: [],
+      optimizationStrategyHash: "test",
     });
 
     draft.excludePatternsByIntentText.code = "**/*.test.*\n**/*.spec.*";
@@ -110,6 +114,17 @@ describe("settings draft helpers", () => {
         fileSizeCriticalKB: 20,
         pngAlphaCheckEnabled: false,
       },
+      optimizationExternalTools: [{ id: "svgo", enabled: true }],
+      optimizationStrategies: [
+        {
+          id: "custom",
+          name: "Custom",
+          enabled: true,
+          priority: 1,
+          match: { formats: ["png"], alpha: "any", animated: "any" },
+          action: { operation: "convert", outputFormat: "webp" },
+        },
+      ],
       customAssetFilters: [
         {
           id: "custom",
@@ -137,6 +152,8 @@ describe("settings draft helpers", () => {
         engineVersion: "",
         engineAvailable: false,
       },
+      optimizationToolRuntime: [],
+      optimizationStrategyHash: "custom",
     });
 
     const workspace = resetSectionDraft(draft, "workspace");
@@ -165,5 +182,9 @@ describe("settings draft helpers", () => {
     expect(optimization.optimizationDefaultQuality).toBe(80);
     expect(optimization.optimizationAutoApply).toBe(false);
     expect(optimization.optimizationThresholds.maxDimensionPx).toBe(2560);
+    expect(
+      optimization.optimizationExternalTools.every((tool) => !tool.enabled),
+    ).toBe(true);
+    expect(optimization.optimizationStrategies.length).toBeGreaterThan(0);
   });
 });

@@ -60,6 +60,8 @@ export type AppSettings = {
   optimizationAvifSpeed: number;
   optimizationAutoApply: boolean;
   optimizationThresholds: OptimizationThresholds;
+  optimizationExternalTools: OptimizationExternalTool[];
+  optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
   preferredEditor: string;
 };
@@ -125,6 +127,8 @@ export type SettingsInfo = AppSettings & {
   dataDir: string;
   cacheDir: string;
   ocrRuntime: OCRRuntime;
+  optimizationToolRuntime: OptimizationToolRuntime[];
+  optimizationStrategyHash: string;
 };
 
 export type OCRRuntime = {
@@ -149,6 +153,46 @@ export type OptimizationThresholds = {
   fileSizeWarningKB: number;
   fileSizeCriticalKB: number;
   pngAlphaCheckEnabled: boolean;
+};
+
+export type OptimizationExternalTool = {
+  id: string;
+  enabled: boolean;
+};
+
+export type OptimizationToolRuntime = {
+  id: string;
+  detected: boolean;
+  path?: string;
+  enabled: boolean;
+  operations: string[];
+};
+
+export type OptimizationStrategy = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  match: OptimizationStrategyMatch;
+  action: OptimizationStrategyAction;
+};
+
+export type OptimizationStrategyMatch = {
+  formats: string[];
+  alpha: "any" | "transparent" | "opaque";
+  animated: "any" | "true" | "false";
+  minBytesKB?: number;
+  minWidthPx?: number;
+  minHeightPx?: number;
+};
+
+export type OptimizationStrategyAction = {
+  operation: "convert" | "recompress" | "resize" | "svg-minify";
+  outputFormat?: string;
+  quality?: number;
+  avifSpeed?: number;
+  resizeMaxDimensionPx?: number;
+  preserveAnimation?: boolean;
 };
 
 export type SettingsUpdate = Partial<AppSettings>;

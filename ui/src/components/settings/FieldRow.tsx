@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Button } from "../ui";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Button, Modal } from "../ui";
 
 export function FieldRow({
   label,
@@ -53,21 +55,64 @@ export function SettingsActions({
   onReset,
   saveLabel,
   resetLabel,
+  resetConfirmTitle,
+  resetConfirmDescription,
 }: {
   disabled: boolean;
   onSave: () => void;
   onReset: () => void;
   saveLabel: string;
   resetLabel: string;
+  resetConfirmTitle?: string;
+  resetConfirmDescription?: string;
 }) {
+  const { t } = useTranslation();
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+
+  function reset() {
+    setConfirmResetOpen(false);
+    onReset();
+  }
+
   return (
-    <div className="flex gap-2 py-4">
-      <Button variant="primary" onClick={onSave} disabled={disabled}>
-        {saveLabel}
-      </Button>
-      <Button variant="ghost" onClick={onReset} disabled={disabled}>
-        {resetLabel}
-      </Button>
-    </div>
+    <>
+      <div className="flex gap-2 py-4">
+        <Button variant="primary" onClick={onSave} disabled={disabled}>
+          {saveLabel}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => setConfirmResetOpen(true)}
+          disabled={disabled}
+        >
+          {resetLabel}
+        </Button>
+      </div>
+      {confirmResetOpen && (
+        <Modal
+          title={resetConfirmTitle ?? resetLabel}
+          description={resetConfirmDescription}
+          size="sm"
+          onClose={() => setConfirmResetOpen(false)}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmResetOpen(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button variant="danger" onClick={reset}>
+                {resetLabel}
+              </Button>
+            </>
+          }
+        >
+          <p className="font-g text-g-ui leading-[1.6] tracking-g-ui text-g-ink-3">
+            {t("settings.resetSectionConfirmBody")}
+          </p>
+        </Modal>
+      )}
+    </>
   );
 }
