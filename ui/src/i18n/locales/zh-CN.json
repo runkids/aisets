@@ -650,7 +650,12 @@
     "listHeaderProject": "项目",
     "listHeaderStatus": "状态",
     "allFolders": "所有文件夹",
-    "loadMore": "加载更多"
+    "loadMore": "加载更多",
+    "runAITag": "运行 AI 标记",
+    "aiTagRunning": "AI 标记进行中…",
+    "aiTagDisabledHint": "请在设置 → AI 中配置 AI 提供者",
+    "aiTagProgress": "已标记 {{processed}}/{{queued}}（{{ready}} 完成、{{failed}} 失败、{{skipped}} 跳过、{{cacheHit}} 缓存）",
+    "aiTagDone": "AI 标记完成"
   },
   "lint": {
     "title": "Lint",
@@ -1213,5 +1218,18 @@
     "removeDialogTitle": "移除项目",
     "removeConfirm": "要从此工作区移除 {{name}} 吗？不会删除文件",
     "removeDialogConfirm": "移除"
+  },
+  "filterRail": {
+    "aiCategory": "分类"
+  },
+  "drawer": {
+    "tab": {
+      "ai": "AI"
+    },
+    "aiCategory": "分类",
+    "aiTags": "标签",
+    "aiDescription": "描述",
+    "aiModel": "模型",
+    "aiDuration": "处理时间"
   }
 }

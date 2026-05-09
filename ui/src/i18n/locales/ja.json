@@ -650,7 +650,12 @@
     "listHeaderProject": "プロジェクト",
     "listHeaderStatus": "状態",
     "allFolders": "すべてのフォルダー",
-    "loadMore": "さらに読み込む"
+    "loadMore": "さらに読み込む",
+    "runAITag": "AI タグ付けを実行",
+    "aiTagRunning": "AI タグ付け中…",
+    "aiTagDisabledHint": "設定 → AI で AI プロバイダーを設定してください",
+    "aiTagProgress": "タグ付け {{processed}}/{{queued}}（{{ready}} 完了、{{failed}} 失敗、{{skipped}} スキップ、{{cacheHit}} キャッシュ）",
+    "aiTagDone": "AI タグ付け完了"
   },
   "lint": {
     "title": "Lint",
@@ -1213,5 +1218,18 @@
     "removeDialogTitle": "プロジェクトを削除",
     "removeConfirm": "{{name}} をこのワークスペースから削除しますか？ファイルは削除されません",
     "removeDialogConfirm": "削除"
+  },
+  "filterRail": {
+    "aiCategory": "カテゴリ"
+  },
+  "drawer": {
+    "tab": {
+      "ai": "AI"
+    },
+    "aiCategory": "カテゴリ",
+    "aiTags": "タグ",
+    "aiDescription": "説明",
+    "aiModel": "モデル",
+    "aiDuration": "処理時間"
   }
 }

@@ -758,7 +758,12 @@
     "listHeaderProject": "專案",
     "listHeaderStatus": "狀態",
     "allFolders": "所有資料夾",
-    "loadMore": "載入更多"
+    "loadMore": "載入更多",
+    "runAITag": "執行 AI 標記",
+    "aiTagRunning": "AI 標記進行中…",
+    "aiTagDisabledHint": "請在設定 → AI 中設定 AI 提供者",
+    "aiTagProgress": "已標記 {{processed}}/{{queued}}（{{ready}} 完成、{{failed}} 失敗、{{skipped}} 跳過、{{cacheHit}} 快取）",
+    "aiTagDone": "AI 標記完成"
   },
   "lint": {
     "title": "Lint",
@@ -1571,5 +1576,18 @@
     "removeDialogTitle": "移除專案",
     "removeConfirm": "要從此工作區移除 {{name}} 嗎？不會刪除檔案",
     "removeDialogConfirm": "移除"
+  },
+  "filterRail": {
+    "aiCategory": "分類"
+  },
+  "drawer": {
+    "tab": {
+      "ai": "AI"
+    },
+    "aiCategory": "分類",
+    "aiTags": "標籤",
+    "aiDescription": "描述",
+    "aiModel": "模型",
+    "aiDuration": "處理時間"
   }
 }

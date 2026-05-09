@@ -1248,7 +1248,12 @@
     "listHeaderProject": "Project",
     "listHeaderStatus": "Status",
     "allFolders": "All folders",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "runAITag": "Run AI Tagging",
+    "aiTagRunning": "AI tagging in progress...",
+    "aiTagDisabledHint": "Configure AI provider in Settings → AI",
+    "aiTagProgress": "Tagged {{processed}}/{{queued}} ({{ready}} ready, {{failed}} failed, {{skipped}} skipped, {{cacheHit}} cached)",
+    "aiTagDone": "AI tagging complete"
   },
   "lint": {
     "title": "Lint",
@@ -1551,5 +1556,18 @@
     "removeDialogTitle": "Remove project",
     "removeConfirm": "Remove {{name}} from this workspace? Files are not deleted.",
     "removeDialogConfirm": "Remove"
+  },
+  "filterRail": {
+    "aiCategory": "Category"
+  },
+  "drawer": {
+    "tab": {
+      "ai": "AI"
+    },
+    "aiCategory": "Category",
+    "aiTags": "Tags",
+    "aiDescription": "Description",
+    "aiModel": "Model",
+    "aiDuration": "Processing time"
   }
 }

@@ -662,7 +662,12 @@
     "listHeaderProject": "프로젝트",
     "listHeaderStatus": "상태",
     "allFolders": "모든 폴더",
-    "loadMore": "더 불러오기"
+    "loadMore": "더 불러오기",
+    "runAITag": "AI 태깅 실행",
+    "aiTagRunning": "AI 태깅 진행 중…",
+    "aiTagDisabledHint": "설정 → AI에서 AI 공급자를 설정하세요",
+    "aiTagProgress": "태깅 {{processed}}/{{queued}} ({{ready}} 완료, {{failed}} 실패, {{skipped}} 건너뜀, {{cacheHit}} 캐시)",
+    "aiTagDone": "AI 태깅 완료"
   },
   "lint": {
     "title": "Lint",
@@ -1218,5 +1223,18 @@
     "removeDialogTitle": "프로젝트 제거",
     "removeConfirm": "이 워크스페이스에서 {{name}} 프로젝트를 제거할까요? 파일은 삭제되지 않습니다.",
     "removeDialogConfirm": "제거"
+  },
+  "filterRail": {
+    "aiCategory": "카테고리"
+  },
+  "drawer": {
+    "tab": {
+      "ai": "AI"
+    },
+    "aiCategory": "카테고리",
+    "aiTags": "태그",
+    "aiDescription": "설명",
+    "aiModel": "모델",
+    "aiDuration": "처리 시간"
   }
 }
