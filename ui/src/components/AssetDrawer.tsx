@@ -1,4 +1,5 @@
 import {
+  CheckCircle,
   Copy,
   ExternalLink,
   FileCode,
@@ -23,9 +24,11 @@ import {
   usageClassification,
 } from "../projectScanIntent";
 import type { AssetItem, NearDuplicate } from "../types";
+import { cn } from "../lib/cn";
 import { fileName, formatBytes } from "../ui";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
 import { AssetDrawerOptimize } from "./AssetDrawerOptimize";
+import { useOptimizeVariants, type VariantInfo } from "./useOptimizeVariants";
 import { AssetDrawerOverview } from "./AssetDrawerOverview";
 import { AssetDrawerSimilar } from "./AssetDrawerSimilar";
 import { AssetDrawerUsage } from "./AssetDrawerUsage";
@@ -96,6 +99,7 @@ type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr";
 type Props = {
   asset: AssetItem;
   assetIds?: string[];
+  scanId?: number;
   onClose: () => void;
   onRename?: (item: AssetItem) => void;
   onDelete?: (item: AssetItem) => void;
@@ -111,6 +115,7 @@ type Props = {
 export function AssetDrawer({
   asset,
   assetIds,
+  scanId,
   onClose,
   onRename,
   onDelete,
@@ -143,6 +148,7 @@ export function AssetDrawer({
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
   const assetFileName = fileName(asset.repoPath);
+  const variants = useOptimizeVariants(asset, scanId);
 
   const dimensions =
     asset.image.width > 0 && asset.image.height > 0
@@ -368,15 +374,24 @@ export function AssetDrawer({
                           </Badge>
                         </HeroBadgeButton>
                       )}
-                      {asset.optimizationRecommendations.length > 0 && (
-                        <HeroBadgeButton
-                          onClick={() => handleTabChange("optimize")}
-                        >
-                          <Badge tone="blue">
-                            {t("assetDrawer.chipOptimizable")}
-                          </Badge>
-                        </HeroBadgeButton>
-                      )}
+                      {asset.optimizationRecommendations.length > 0 &&
+                        (() => {
+                          const optimized =
+                            asset.optimizationRecommendations.every(
+                              (r) => r.hasExistingVariant,
+                            );
+                          return (
+                            <HeroBadgeButton
+                              onClick={() => handleTabChange("optimize")}
+                            >
+                              <Badge tone={optimized ? "green" : "blue"}>
+                                {optimized
+                                  ? t("assetDrawer.chipOptimized")
+                                  : t("assetDrawer.chipOptimizable")}
+                              </Badge>
+                            </HeroBadgeButton>
+                          );
+                        })()}
                       {ocrVisible && asset.ocr && (
                         <HeroBadgeButton onClick={() => handleTabChange("ocr")}>
                           <Badge
@@ -398,6 +413,21 @@ export function AssetDrawer({
                   )}
                 </div>
               </div>
+
+              {variants.length > 0 && (
+                <div className="flex gap-2">
+                  {variants.map((v) => (
+                    <VariantCard
+                      key={v.repoPath}
+                      variant={v}
+                      originalBytes={asset.bytes}
+                      onOpen={
+                        v.item ? () => onOpenAsset?.(v.item!.id) : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -519,7 +549,9 @@ export function AssetDrawer({
               )}
               {tab === "optimize" && (
                 <AssetDrawerOptimize
-                  recommendations={asset.optimizationRecommendations}
+                  asset={asset}
+                  variants={variants}
+                  onOpenAsset={onOpenAsset}
                 />
               )}
               {tab === "ocr" && ocrVisible && asset.ocr && (
@@ -530,6 +562,68 @@ export function AssetDrawer({
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  );
+}
+
+function VariantCard({
+  variant,
+  originalBytes,
+  onOpen,
+}: {
+  variant: VariantInfo;
+  originalBytes: number;
+  onOpen?: () => void;
+}) {
+  const { t } = useTranslation();
+  const savingsPct =
+    variant.savings > 0
+      ? Math.round((variant.savings / originalBytes) * 100)
+      : 0;
+
+  return (
+    <Tooltip
+      label={onOpen ? t("optimize.drawerViewVariant") : variant.name}
+      placement="top"
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        className={cn(
+          "flex items-center gap-2.5 rounded-g-md border bg-g-surface px-2.5 py-2 text-left",
+          "transition-[border-color] duration-[120ms] ease-g",
+          "focus-visible:outline-none focus-visible:shadow-g-focus",
+          onOpen
+            ? "cursor-pointer border-g-green/30 hover:border-g-green"
+            : "cursor-default border-g-line opacity-60",
+        )}
+      >
+        {variant.item ? (
+          <AssetThumbnail
+            src={variant.item.thumbnailUrl || variant.item.url}
+            alt={variant.name}
+            size="fill"
+            loading="eager"
+            className="size-[44px] shrink-0 rounded-g-sm p-0.5 [&_img]:max-h-full [&_img]:max-w-full"
+          />
+        ) : (
+          <div className="flex size-[44px] shrink-0 items-center justify-center rounded-g-sm bg-g-surface-2">
+            <CheckCircle size={18} className="text-g-green/40" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <div className="truncate font-g-mono text-g-caption font-medium text-g-ink">
+            {variant.ext.replace(".", "").toUpperCase()}
+          </div>
+          {variant.variantBytes > 0 && (
+            <div className="mt-0.5 font-g-mono text-g-chip text-g-green">
+              {formatBytes(variant.variantBytes)}
+              {savingsPct > 0 && ` (−${savingsPct}%)`}
+            </div>
+          )}
+        </div>
+      </button>
+    </Tooltip>
   );
 }
 
