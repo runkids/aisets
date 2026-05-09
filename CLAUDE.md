@@ -24,6 +24,7 @@ Asset Studio is a Go-backed local web tool for auditing image / asset hygiene in
 - Every `<button>` without visible text needs `aria-label`.
 - Every overlay needs ESC dismissal + focus trap + focus restoration.
 - **i18n code-first:** Backend API must return machine-readable codes (`reasonCode`, `code`, `suggestionCode`), not hardcoded human-readable strings. Frontend translates codes via `t(\`namespace.${code}\`, { defaultValue: fallbackString })`. Never display raw backend English strings to the user.
+- **i18n CJK punctuation:** zh-TW / zh-CN / ja / ko translations must not end with a period (句號 `。`). Use bare sentences without trailing punctuation. English locale keeps standard punctuation.
 - **StatCard consistency:** Every `<StatCard>` must include an `icon` prop (Lucide, `size={14}`). Use semantic `tone` for actionable metrics (e.g. `tone={count > 0 ? "red" : "neutral"}`). Do not omit icons on some cards — all cards in a stats grid must look uniform.
 - **Server-side filtering:** FilterRail filters (project, extension, custom) must be passed as query params to API hooks, triggering a server-side re-fetch. Never client-side filter loaded `items` arrays — with lazy loading, that only filters partial data and shows wrong counts.
 - **Counts from API totals:** StatCards, Tabs, and FilterRail must use the first-page `total` and `facets` from the API response, not `items.length` or `groups.length` of accumulated loaded data. DuplicatesView uses group-count facets from `exactDuplicatesQuery`, not file-count facets from `duplicateItemsQuery`.
