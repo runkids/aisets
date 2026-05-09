@@ -17,6 +17,7 @@ type FilterState = {
   project: string;
   ext: string;
   customFilter: string;
+  aiCategory: string;
 };
 
 type FilterRailProps = {
@@ -31,6 +32,8 @@ type FilterRailProps = {
   extensionAllLabel?: string;
   customFilterOptions?: CustomFilterOption[];
   customFilterTotal?: number;
+  aiCategoryOptions?: FilterOption[];
+  aiCategoryTotal?: number;
   ocrEnabled?: boolean;
   onFiltersChange: (filters: FilterState) => void;
 };
@@ -58,6 +61,8 @@ export function FilterRail({
   extensionAllLabel,
   customFilterOptions,
   customFilterTotal,
+  aiCategoryOptions,
+  aiCategoryTotal,
   ocrEnabled = true,
   onFiltersChange,
 }: FilterRailProps) {
@@ -104,6 +109,26 @@ export function FilterRail({
           />
         ))}
       </RailSection>
+
+      {(aiCategoryOptions?.length ?? 0) > 0 && (
+        <RailSection heading={t("filterRail.aiCategory")}>
+          <RailItem
+            active={filters.aiCategory === ""}
+            label={t("filter.all")}
+            count={aiCategoryTotal ?? 0}
+            onClick={() => onFiltersChange({ ...filters, aiCategory: "" })}
+          />
+          {(aiCategoryOptions ?? []).map((option) => (
+            <RailItem
+              key={option.id}
+              active={filters.aiCategory === option.id}
+              label={option.id}
+              count={option.count}
+              onClick={() => toggle("aiCategory", option.id)}
+            />
+          ))}
+        </RailSection>
+      )}
 
       <RailSection heading={extensionHeading || t("filter.extension")}>
         <RailItem

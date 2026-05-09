@@ -54,7 +54,7 @@ function customFilter(id: string, value: string): CustomAssetFilter {
 }
 
 const defaultBrowseState = {
-  filters: { project: "", ext: "", customFilter: "" },
+  filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
   view: "grid" as const,
   gridSize: "m" as const,
   searchQuery: "",
@@ -77,7 +77,7 @@ describe("normalizeBrowseStoredState", () => {
     );
 
     expect(result).toEqual({
-      filters: { project: "workspace", ext: ".png", customFilter: "icons" },
+      filters: { project: "workspace", ext: ".png", customFilter: "icons", aiCategory: "" },
       view: "list",
       gridSize: "l",
       searchQuery: "logo",
@@ -117,6 +117,7 @@ describe("normalizeBrowseStoredState", () => {
         project: "Current project",
         ext: "",
         customFilter: "palette-filter",
+        aiCategory: "",
       },
     });
   });
@@ -128,6 +129,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       project: "",
       ext: "",
       customFilter: "",
+      aiCategory: "",
     });
   });
 
@@ -136,6 +138,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       project: "workspace",
       ext: "",
       customFilter: "",
+      aiCategory: "",
     });
   });
 });
@@ -181,7 +184,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "App", ext: ".png", customFilter: "icons" },
+      filters: { project: "App", ext: ".png", customFilter: "icons", aiCategory: "" },
       searchQuery: "home",
       statusFilter: "referenced",
       customFilters: [customFilter("icons", "/icons/")],
@@ -203,7 +206,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "App", ext: ".png", customFilter: "icons" },
+      filters: { project: "App", ext: ".png", customFilter: "icons", aiCategory: "" },
       searchQuery: "",
       statusFilter: "",
       customFilters: [
@@ -248,7 +251,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "" },
+      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
       searchQuery: "sale",
       statusFilter: "",
       customFilters: [],
@@ -268,7 +271,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "" },
+      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
       searchQuery: "",
       statusFilter: "notApplicable",
       customFilters: [],
@@ -285,7 +288,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "" },
+      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
       searchQuery: "",
       statusFilter: "duplicate",
       customFilters: [],
@@ -310,7 +313,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "" },
+      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
       searchQuery: "sale",
       statusFilter: "",
       customFilters: [],
@@ -345,7 +348,7 @@ describe("applyBrowseFilters", () => {
 
     const result = applyBrowseFilters({
       items,
-      filters: { project: "", ext: "", customFilter: "" },
+      filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
       searchQuery: "party",
       statusFilter: "",
       customFilters: [],
@@ -357,7 +360,7 @@ describe("applyBrowseFilters", () => {
     expect(
       applyBrowseFilters({
         items,
-        filters: { project: "", ext: "", customFilter: "" },
+        filters: { project: "", ext: "", customFilter: "", aiCategory: "" },
         searchQuery: "party",
         statusFilter: "",
         customFilters: [],
