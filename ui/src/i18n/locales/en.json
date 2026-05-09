@@ -253,6 +253,7 @@
     "notApplicable": "Asset Pack",
     "duplicate": "Duplicate",
     "optimizable": "Optimizable",
+    "optimized": "Optimized",
     "referenced": "Referenced",
     "notApplicableHelp": "Usually an asset pack: assets may be used outside this repo, so zero code references are not used to decide unused status. Scans with reference analysis disabled also appear here.",
     "helpTitle": "Status labels",
@@ -262,6 +263,7 @@
       "notApplicable": "Asset packs aren't referenced by code — that's normal. They're excluded from unused checks.",
       "duplicate": "This file is identical or visually very similar to another — consider keeping just one copy.",
       "optimizable": "This file can be smaller or in a better format. Compressing it would save space.",
+      "optimized": "An optimized variant already exists for all recommendations on this file.",
       "referenced": "Found at least one code reference — this asset is in use."
     },
     "helpIntro": "Each asset is automatically labeled based on its code references, helping you spot what's safe to clean up. These labels only affect suggestions — you can always act on any file manually."
@@ -923,9 +925,9 @@
     "openDetails": "Open {{name}}"
   },
   "severity": {
-    "critical": "Critical",
-    "warning": "Warning",
-    "info": "Suggestion"
+    "critical": "Crit",
+    "warning": "Warn",
+    "info": "Suggest"
   },
   "optimization": {
     "reason": {
@@ -996,10 +998,10 @@
     "categoryFilter": "Optimization category",
     "category": {
       "size": "Size",
-      "format": "Format",
+      "format": "Fmt",
       "svg-minify": "SVG",
       "svg": "SVG",
-      "dimensions": "Dimensions",
+      "dimensions": "Dims",
       "animation": "Animation"
     },
     "operationLabel": {
@@ -1094,6 +1096,17 @@
     "noApplicableOperations": "No selected assets have applicable optimization after estimation.",
     "scriptGenerationFailed": "Script generation failed",
     "noRecommendations": "No optimization recommendations match your filter.",
+    "variantExists": "Variant exists",
+    "alreadyDone": "Done",
+    "openOriginal": "Open original asset details",
+    "viewVariant": "View {{name}} in Browse",
+    "allDone": "All assets optimized",
+    "allDoneDesc": "No items need optimization right now.",
+    "drawerVariantsDone": "All recommended variants exist",
+    "drawerViewVariant": "View optimized variant",
+    "filterPending": "Pending",
+    "filterDone": "Done",
+    "optimizedFilter": "Optimization status filter",
     "scriptDialogAria": "Optimization script",
     "scriptTitle": "Optimization Script",
     "actionsHelpTitle": "Actions Guide",
@@ -1197,11 +1210,13 @@
     "flagNotApplicable": "Not Applicable",
     "flagUsageNotChecked": "Refs Not Analyzed",
     "flagOptimizable": "Optimize",
+    "flagOptimized": "Optimized",
     "flagUnusedShort": "Unused",
     "flagPossiblyUnusedShort": "Possible",
     "flagNotApplicableShort": "Not Checked",
     "flagUsageNotCheckedShort": "No Refs",
     "flagOptimizableShort": "Opt",
+    "flagOptimizedShort": "Done",
     "gridAriaLabel": "Asset grid",
     "listAriaLabel": "Asset list",
     "listHeaderFile": "File",
@@ -1367,6 +1382,7 @@
     "chipDuplicate": "Duplicate",
     "chipSimilar": "Similar",
     "chipOptimizable": "Optimizable",
+    "chipOptimized": "Optimized",
     "chipOCR": "OCR",
     "usageEmpty": "No code references found. This asset is a deletion candidate.",
     "usagePossiblyUnused": "No references were found, but this project's reference coverage is partial or external consumers may exist. Review manually; this is not included in unused cleanup suggestions.",

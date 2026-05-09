@@ -211,6 +211,7 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **Tab counts via `badge` prop** | Show tab counts as separate styled elements using the Tabs `badge` prop (`<span className="font-[400] text-g-ink-4">{count}</span>`), not embedded in the `label` string. "All" tabs must NOT show counts — only individual filter values show counts. Consistent across Duplicates, Optimize, and Lint views. |
 | **Grid table: `border-b` on row, not cells** | In div-based CSS grid tables, put `border-b` on the row div, not on individual cells. Cells may have different heights (badges vs text), causing per-cell borders to misalign. A single row-level border guarantees one straight horizontal line. |
 | **Grid table: distribute `fr` across columns** | When defining `grid-cols-[...]` for data tables, never give only one column `1fr` while all others are fixed `px` — that column absorbs all remaining space, creating a visual gap. Use `fr` on 2–3 content columns (e.g. `path: 2fr`, `project: 1fr`, `bytes: 1fr`) so extra space is distributed proportionally. |
+| **i18n tab label length** | English labels are 2–3× wider than CJK ("Dimensions" vs "尺寸"). When multiple `<Tabs>` groups share one row, keep EN labels to 3–6 chars (Fmt, Dims, Crit, Warn, Suggest). Always verify EN locale at 1440px — overflow invisible in zh-TW will break English. |
 
 ---
 
