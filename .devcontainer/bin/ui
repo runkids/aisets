@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Devcontainer: launch Aisets API + Vite frontend.
 # Usage:
+#   ui
 #   ui /workspace/project-a /workspace/project-b
 #   ui --app /workspace/project-a
-#   ui --no-open /workspace/project-a
+#   ui --no-open
 #   ui stop
 set -euo pipefail
 
