@@ -153,8 +153,8 @@ func splitUIMode(args []string) (string, []string) {
 
 func parseUIOptions(args []string) (uiOptions, error) {
 	opts := uiOptions{
-		host:     defaultUIHost,
-		port:     defaultUIPort,
+		host:     envOrDefault("AISETS_UI_HOST", defaultUIHost),
+		port:     envIntOrDefault("AISETS_PORT", defaultUIPort),
 		basePath: envOrDefault("AISETS_UI_BASE_PATH", ""),
 	}
 	for i := 0; i < len(args); i++ {
@@ -488,6 +488,15 @@ func ensureUIAvailable() (string, error) {
 func envOrDefault(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return fallback
+}
+
+func envIntOrDefault(key string, fallback int) int {
+	if value := os.Getenv(key); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			return n
+		}
 	}
 	return fallback
 }
