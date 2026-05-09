@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Store) LatestScan() (ScanSummary, error) {
-	row := s.db.QueryRow(`
+	row := s.rdb.QueryRow(`
 		SELECT id, started_at, COALESCE(completed_at, ''), status, project_count, total_files,
 			duplicate_groups, duplicate_files, unused_files, near_duplicates, cache_hits,
 			scan_profile, references_state, near_duplicates_state, optimization_state
@@ -69,7 +69,7 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 }
 
 func (s *Store) ScanProjectIntentsMatch(scanID int64, projects []Project) (bool, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT project_id, scan_intent
 		FROM scan_project_snapshots
 		WHERE scan_id = ?
@@ -103,7 +103,7 @@ func (s *Store) ScanProjectIntentsMatch(scanID int64, projects []Project) (bool,
 
 func (s *Store) catalogLintFindingsCount(scanID int64) (int, error) {
 	var count int
-	if err := s.db.QueryRow(`
+	if err := s.rdb.QueryRow(`
 		SELECT COUNT(*)
 		FROM lint_snapshots
 		WHERE scan_id = ?
@@ -115,7 +115,7 @@ func (s *Store) catalogLintFindingsCount(scanID int64) (int, error) {
 
 func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]CatalogProjectStats, error) {
 	stats := map[string]CatalogProjectStats{}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT a.project_id,
 			COUNT(*),
 			COALESCE(SUM(a.bytes), 0),
@@ -149,7 +149,7 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	dupGroupRows, err := s.db.Query(`
+	dupGroupRows, err := s.rdb.Query(`
 		SELECT project_id, COUNT(DISTINCT group_id)
 		FROM duplicate_group_assets
 		WHERE scan_id = ?
@@ -173,7 +173,7 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 	if err := dupGroupRows.Err(); err != nil {
 		return nil, err
 	}
-	lintRows, err := s.db.Query(`
+	lintRows, err := s.rdb.Query(`
 		SELECT a.project_id, COUNT(*)
 		FROM lint_snapshots l
 		JOIN asset_snapshots a ON a.scan_id = l.scan_id AND a.asset_id = l.asset_id

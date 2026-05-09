@@ -7,11 +7,46 @@ import (
 	"strings"
 
 	"aisets/internal/apierr"
+	"aisets/internal/lint"
 	"aisets/internal/scanner"
 )
 
+const recordBatchSize = 500
+
 func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 	catalog.Analysis = normalizeCatalogAnalysis(catalog.Analysis)
+
+	scanID, err := s.recordScanPhases(catalog)
+	if err != nil && scanID > 0 {
+		_, _ = s.db.Exec("DELETE FROM scans WHERE id = ?", scanID)
+	}
+	return scanID, err
+}
+
+func (s *Store) recordScanPhases(catalog scanner.Catalog) (int64, error) {
+	scanID, err := s.recordScanHeader(catalog)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.recordScanAssets(scanID, catalog.Items); err != nil {
+		return scanID, err
+	}
+	if err := s.recordScanDuplicates(scanID, catalog); err != nil {
+		return scanID, err
+	}
+	if err := s.recordScanNearDuplicates(scanID, catalog.NearDuplicates); err != nil {
+		return scanID, err
+	}
+	if err := s.recordScanLintFindings(scanID, catalog.LintFindings); err != nil {
+		return scanID, err
+	}
+	if err := s.finalizeScan(scanID, catalog.Analysis); err != nil {
+		return scanID, err
+	}
+	return scanID, nil
+}
+
+func (s *Store) recordScanHeader(catalog scanner.Catalog) (int64, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
@@ -30,7 +65,7 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 			duplicate_groups, duplicate_files, unused_files, near_duplicates, cache_hits
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, catalog.GeneratedAt, now, "completed", scanProfileForCatalog(catalog), catalog.Analysis.References,
+	`, catalog.GeneratedAt, now, "recording", scanProfileForCatalog(catalog), catalog.Analysis.References,
 		catalog.Analysis.NearDuplicates, catalog.Analysis.Optimization, len(catalog.Projects), catalog.Stats.TotalFiles,
 		catalog.Stats.DuplicateGroups, catalog.Stats.DuplicateFiles, catalog.Stats.UnusedFiles,
 		catalog.Stats.NearDuplicates, catalog.Stats.CacheHits)
@@ -56,6 +91,34 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		}
 	}
 
+	err = tx.Commit()
+	return scanID, err
+}
+
+func (s *Store) recordScanAssets(scanID int64, items []scanner.AssetItem) error {
+	for i := 0; i < len(items); i += recordBatchSize {
+		end := i + recordBatchSize
+		if end > len(items) {
+			end = len(items)
+		}
+		if err := s.recordScanAssetBatch(scanID, items[i:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) recordScanAssetBatch(scanID int64, items []scanner.AssetItem) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	assetStmt, err := tx.Prepare(`
 		INSERT INTO asset_snapshots (
 			scan_id, asset_id, project_id, project_name, repo_path, file_name, local_path, ext,
@@ -66,7 +129,7 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer assetStmt.Close()
 	refStmt, err := tx.Prepare(`
@@ -74,7 +137,7 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer refStmt.Close()
 	optStmt, err := tx.Prepare(`
@@ -87,10 +150,11 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer optStmt.Close()
-	for _, item := range catalog.Items {
+
+	for _, item := range items {
 		item = normalizeSnapshotItem(item)
 		usedCount := len(item.UsedBy)
 		if _, err = assetStmt.Exec(scanID, item.ID, item.ProjectID, item.ProjectName, item.RepoPath, assetFileName(item.RepoPath), item.LocalPath, item.Ext,
@@ -98,11 +162,11 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 			item.Image.Height, boolInt(item.Image.Animated), boolInt(item.Image.Alpha), item.Image.Pages,
 			item.DHash, item.DHashFlipped, usedCount, item.ScanIntent, item.UsageClassification,
 			boolInt(item.DeleteUnusedAllowed), item.LintApplicability); err != nil {
-			return 0, err
+			return err
 		}
 		for _, ref := range item.References {
 			if _, err = refStmt.Exec(scanID, item.ID, item.ProjectID, item.RepoPath, ref.File, ref.Line, ref.Specifier, ref.Kind); err != nil {
-				return 0, err
+				return err
 			}
 		}
 		for _, opt := range item.Optimization {
@@ -110,16 +174,35 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 				opt.ReasonCode, opt.SuggestionCode, opt.EstimatedBytes, opt.SavingsBytes,
 				boolInt(opt.HasExistingVariant),
 				opt.VariantBytes); err != nil {
-				return 0, err
+				return err
 			}
 		}
 	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (s *Store) recordScanDuplicates(scanID int64, catalog scanner.Catalog) error {
+	if len(catalog.DuplicateGroups) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	groupStmt, err := tx.Prepare(`
 		INSERT INTO duplicate_group_snapshots (scan_id, group_id, content_hash, hash_algorithm, preferred_path)
 		VALUES (?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer groupStmt.Close()
 	groupAssetStmt, err := tx.Prepare(`
@@ -127,31 +210,54 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		VALUES (?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer groupAssetStmt.Close()
+
+	itemsByGroup := make(map[string][]scanner.AssetItem)
+	for _, item := range catalog.Items {
+		if item.DuplicateGroupID != nil {
+			itemsByGroup[*item.DuplicateGroupID] = append(itemsByGroup[*item.DuplicateGroupID], item)
+		}
+	}
+
 	for _, group := range catalog.DuplicateGroups {
 		if _, err = groupStmt.Exec(scanID, group.ID, group.ContentHash, group.HashAlgorithm, group.PreferredPath); err != nil {
-			return 0, err
+			return err
 		}
-		insertedGroupAssets := false
-		for _, item := range catalog.Items {
-			if item.DuplicateGroupID == nil || *item.DuplicateGroupID != group.ID {
-				continue
+		if members := itemsByGroup[group.ID]; len(members) > 0 {
+			for _, item := range members {
+				if _, err = groupAssetStmt.Exec(scanID, group.ID, item.ID, item.ProjectID, item.RepoPath); err != nil {
+					return err
+				}
 			}
-			if _, err = groupAssetStmt.Exec(scanID, group.ID, item.ID, item.ProjectID, item.RepoPath); err != nil {
-				return 0, err
-			}
-			insertedGroupAssets = true
-		}
-		if !insertedGroupAssets {
+		} else {
 			for _, path := range group.Paths {
 				if _, err = groupAssetStmt.Exec(scanID, group.ID, "", "", path); err != nil {
-					return 0, err
+					return err
 				}
 			}
 		}
 	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (s *Store) recordScanNearDuplicates(scanID int64, nearDuplicates []scanner.NearDuplicate) error {
+	if len(nearDuplicates) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	nearStmt, err := tx.Prepare(`
 		INSERT INTO near_duplicate_snapshots (
 			scan_id, near_id, left_id, right_id, left_path, right_path, distance, flipped
@@ -159,37 +265,75 @@ func (s *Store) RecordScan(catalog scanner.Catalog) (int64, error) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer nearStmt.Close()
-	for _, near := range catalog.NearDuplicates {
+	for _, near := range nearDuplicates {
 		if _, err = nearStmt.Exec(scanID, near.ID, near.LeftID, near.RightID, near.LeftPath, near.RightPath, near.Distance, boolInt(near.Flipped)); err != nil {
-			return 0, err
+			return err
 		}
 	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (s *Store) recordScanLintFindings(scanID int64, findings []lint.Finding) error {
+	if len(findings) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	lintStmt, err := tx.Prepare(`
 		INSERT INTO lint_snapshots (scan_id, rule_id, severity, file, line, snippet, message, suggestion, asset_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer lintStmt.Close()
-	for _, finding := range catalog.LintFindings {
+	for _, finding := range findings {
 		if _, err = lintStmt.Exec(scanID, finding.RuleID, finding.Severity, finding.File, finding.Line, finding.Snippet, finding.Message, finding.Suggestion, finding.AssetID); err != nil {
-			return 0, err
+			return err
 		}
 	}
-	if err = carryForwardAnalysis(tx, scanID, catalog.Analysis); err != nil {
-		return 0, err
+
+	err = tx.Commit()
+	return err
+}
+
+func (s *Store) finalizeScan(scanID int64, analysis scanner.CatalogAnalysis) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if err = carryForwardAnalysis(tx, scanID, analysis); err != nil {
+		return err
 	}
 	if err = pruneOldScansTx(tx, 10); err != nil {
-		return 0, err
+		return err
 	}
-	if err = tx.Commit(); err != nil {
-		return 0, err
+	_, err = tx.Exec(`UPDATE scans SET status = 'completed' WHERE id = ?`, scanID)
+	if err != nil {
+		return err
 	}
-	return scanID, nil
+
+	err = tx.Commit()
+	return err
 }
 
 func carryForwardAnalysis(tx *sql.Tx, scanID int64, analysis scanner.CatalogAnalysis) error {
@@ -313,7 +457,7 @@ func assetFileName(repoPath string) string {
 }
 
 func (s *Store) ListScans() ([]ScanSummary, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT id, started_at, COALESCE(completed_at, ''), status, project_count, total_files,
 			duplicate_groups, duplicate_files, unused_files, near_duplicates, cache_hits,
 			scan_profile, references_state, near_duplicates_state, optimization_state
@@ -337,7 +481,7 @@ func (s *Store) ListScans() ([]ScanSummary, error) {
 }
 
 func (s *Store) Scan(id int64) (ScanSummary, error) {
-	row := s.db.QueryRow(`
+	row := s.rdb.QueryRow(`
 		SELECT id, started_at, COALESCE(completed_at, ''), status, project_count, total_files,
 			duplicate_groups, duplicate_files, unused_files, near_duplicates, cache_hits,
 			scan_profile, references_state, near_duplicates_state, optimization_state
@@ -471,7 +615,7 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 }
 
 func (s *Store) scanAssets(scanID int64) (map[string]scanAssetSnapshot, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT project_id, project_name, repo_path, ext, bytes, COALESCE(content_hash, ''), used_count,
 			COALESCE(usage_classification, 'notApplicable')
 		FROM asset_snapshots
@@ -494,7 +638,7 @@ func (s *Store) scanAssets(scanID int64) (map[string]scanAssetSnapshot, error) {
 
 func (s *Store) optimizationSavings(scanID int64) (int64, error) {
 	var total int64
-	err := s.db.QueryRow(`
+	err := s.rdb.QueryRow(`
 		SELECT COALESCE(SUM(savings_bytes), 0)
 		FROM optimization_snapshots
 		WHERE scan_id = ?

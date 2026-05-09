@@ -327,11 +327,39 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 func EstimateOptimization(path string, meta Metadata, sizeBytes int64, thresholds OptimizationThresholds) []Optimization {
 	ext := strings.ToLower(filepath.Ext(path))
 	var out []Optimization
+	warningBytes := int64(thresholds.FileSizeWarningKB) * 1024
+	criticalBytes := int64(thresholds.FileSizeCriticalKB) * 1024
+
 	if ext == ".svg" {
-		if suggestion, ok := estimateSVG(path, sizeBytes, thresholds.SVGMinSavingsPercent); ok {
-			out = append(out, suggestion)
+		if analysis, ok := analyzeSVG(path, sizeBytes, thresholds.SVGMinSavingsPercent); ok {
+			if warningBytes > 0 && sizeBytes > warningBytes {
+				if analysis.HasEmbeddedRaster {
+					out = append(out, Optimization{
+						Category:       "format",
+						Severity:       fileSizeSeverity(sizeBytes, criticalBytes),
+						ReasonCode:     "svg_contains_embedded_raster",
+						Reason:         "SVG contains embedded raster image data; minifying XML will not meaningfully reduce the embedded bitmap.",
+						SuggestionCode: "extract_embedded_raster_or_use_modern_format",
+						Suggestion:     "Extract the raster image and use WebP, AVIF, or PNG instead of wrapping it in SVG.",
+					})
+				} else if !analysis.CanMinify {
+					out = append(out, Optimization{
+						Category:       "format",
+						Severity:       fileSizeSeverity(sizeBytes, criticalBytes),
+						ReasonCode:     "svg_large_low_minify_savings",
+						Reason:         "Large SVG has low XML minification savings; size is likely driven by path complexity or raster-like content.",
+						SuggestionCode: "review_complex_svg_or_raster_format",
+						Suggestion:     "Simplify the vector artwork, or export it as WebP or AVIF when it is raster-like.",
+					})
+				}
+			}
+			if analysis.CanMinify && !analysis.HasEmbeddedRaster {
+				out = append(out, analysis.Minify)
+			}
 		}
+		return out
 	}
+
 	if thresholds.MaxDimensionPx > 0 && (meta.Width > thresholds.MaxDimensionPx || meta.Height > thresholds.MaxDimensionPx) {
 		out = append(out, Optimization{
 			Category:       "dimensions",
@@ -342,16 +370,10 @@ func EstimateOptimization(path string, meta Metadata, sizeBytes int64, threshold
 			Suggestion:     "Consider responsive variants or a smaller source image.",
 		})
 	}
-	warningBytes := int64(thresholds.FileSizeWarningKB) * 1024
-	criticalBytes := int64(thresholds.FileSizeCriticalKB) * 1024
 	if warningBytes > 0 && sizeBytes > warningBytes {
-		severity := "warning"
-		if criticalBytes > 0 && sizeBytes > criticalBytes {
-			severity = "critical"
-		}
 		out = append(out, Optimization{
 			Category:       "size",
-			Severity:       severity,
+			Severity:       fileSizeSeverity(sizeBytes, criticalBytes),
 			ReasonCode:     "asset_file_large",
 			Reason:         "Large assets can slow down initial route loading.",
 			SuggestionCode: "review_compression_or_modern_format",
@@ -626,28 +648,40 @@ func fitSize(width, height, maxSize int) (int, int) {
 	return max(1, int(math.Round(float64(width)*scale))), max(1, int(math.Round(float64(height)*scale)))
 }
 
-func estimateSVG(path string, sizeBytes int64, minSavingsPercent int) (Optimization, bool) {
+type svgOptimizationAnalysis struct {
+	CanMinify         bool
+	HasEmbeddedRaster bool
+	Minify            Optimization
+}
+
+func analyzeSVG(path string, sizeBytes int64, minSavingsPercent int) (svgOptimizationAnalysis, bool) {
 	bytes, err := os.ReadFile(path)
 	if err != nil || len(bytes) == 0 {
-		return Optimization{}, false
+		return svgOptimizationAnalysis{}, false
+	}
+	analysis := svgOptimizationAnalysis{HasEmbeddedRaster: svgContainsEmbeddedRaster(bytes)}
+	effectiveSize := sizeBytes
+	if effectiveSize <= 0 {
+		effectiveSize = int64(len(bytes))
 	}
 	m := minify.New()
 	m.AddFunc("image/svg+xml", minifysvg.Minify)
 	minified, err := m.Bytes("image/svg+xml", bytes)
 	if err != nil || len(minified) >= len(bytes) {
-		return Optimization{}, false
+		return analysis, true
 	}
-	savings := sizeBytes - int64(len(minified))
+	savings := effectiveSize - int64(len(minified))
 	if savings <= 0 {
-		return Optimization{}, false
+		return analysis, true
 	}
-	if sizeBytes > 0 && minSavingsPercent > 0 {
-		pct := float64(savings) * 100 / float64(sizeBytes)
+	if effectiveSize > 0 && minSavingsPercent > 0 {
+		pct := float64(savings) * 100 / float64(effectiveSize)
 		if pct < float64(minSavingsPercent) {
-			return Optimization{}, false
+			return analysis, true
 		}
 	}
-	return Optimization{
+	analysis.CanMinify = true
+	analysis.Minify = Optimization{
 		Category:       "svg-minify",
 		Severity:       "info",
 		ReasonCode:     "svg_can_minify",
@@ -656,7 +690,28 @@ func estimateSVG(path string, sizeBytes int64, minSavingsPercent int) (Optimizat
 		Suggestion:     "Preview minified SVG output before applying in a separate optimization workflow.",
 		EstimatedBytes: int64(len(minified)),
 		SavingsBytes:   savings,
-	}, true
+	}
+	return analysis, true
+}
+
+func svgContainsEmbeddedRaster(bytes []byte) bool {
+	lower := strings.ToLower(string(bytes))
+	if !strings.Contains(lower, "<image") {
+		return false
+	}
+	for _, mime := range []string{"data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/webp", "data:image/gif", "data:image/avif", "data:image/bmp", "data:image/tiff"} {
+		if strings.Contains(lower, mime) {
+			return true
+		}
+	}
+	return false
+}
+
+func fileSizeSeverity(sizeBytes, criticalBytes int64) string {
+	if criticalBytes > 0 && sizeBytes > criticalBytes {
+		return "critical"
+	}
+	return "warning"
 }
 
 func parseSVGLength(value string) int {

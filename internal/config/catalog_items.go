@@ -22,12 +22,12 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	}
 	totalQuery := "SELECT COUNT(*) FROM asset_snapshots a " + where
 	var total int
-	if err := s.db.QueryRow(totalQuery, args...).Scan(&total); err != nil {
+	if err := s.rdb.QueryRow(totalQuery, args...).Scan(&total); err != nil {
 		return CatalogItemsPage{}, err
 	}
 	orderBy := catalogItemOrder(query.Sort)
 	args = append(args, limit+1, offset)
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
@@ -71,7 +71,7 @@ func (s *Store) CatalogItem(scanID int64, assetID string) (scanner.AssetItem, er
 	if err != nil {
 		return scanner.AssetItem{}, err
 	}
-	row := s.db.QueryRow(`
+	row := s.rdb.QueryRow(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id

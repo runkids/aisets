@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -233,6 +234,39 @@ func TestSVGMinifyEstimate(t *testing.T) {
 	}
 	if out[0].ReasonCode != "svg_can_minify" || out[0].SuggestionCode != "preview_svg_minify" {
 		t.Fatalf("optimization codes = %#v", out[0])
+	}
+}
+
+func TestLargeSVGEmbeddedRasterSuggestsFormatReview(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "wrapped.svg")
+	content := `<svg width="360" height="614" xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,` + strings.Repeat("A", 240*1024) + `" width="360" height="614"/></svg>`
+	mustWrite(t, path, content)
+
+	out := EstimateOptimization(path, Metadata{Format: "svg", Width: 360, Height: 614, Alpha: true}, int64(len(content)), DefaultOptimizationThresholds())
+	if len(out) != 1 {
+		t.Fatalf("EstimateOptimization = %#v", out)
+	}
+	if out[0].ReasonCode != "svg_contains_embedded_raster" || out[0].SuggestionCode != "extract_embedded_raster_or_use_modern_format" {
+		t.Fatalf("large embedded SVG recommendation = %#v", out[0])
+	}
+	if out[0].Category != "format" || out[0].Severity != "warning" {
+		t.Fatalf("large embedded SVG severity = %#v", out[0])
+	}
+}
+
+func TestLargeSVGLowMinifySavingsSuggestsReviewInsteadOfMinify(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "complex.svg")
+	content := `<svg width="360" height="614" xmlns="http://www.w3.org/2000/svg">` + strings.Repeat(`<path d="M0 0h1v1z"/>`, 13_000) + `</svg>`
+	mustWrite(t, path, content)
+
+	out := EstimateOptimization(path, Metadata{Format: "svg", Width: 360, Height: 614, Alpha: true}, int64(len(content)), DefaultOptimizationThresholds())
+	if len(out) != 1 {
+		t.Fatalf("EstimateOptimization = %#v", out)
+	}
+	if out[0].ReasonCode != "svg_large_low_minify_savings" || out[0].SuggestionCode != "review_complex_svg_or_raster_format" {
+		t.Fatalf("large low-savings SVG recommendation = %#v", out[0])
 	}
 }
 

@@ -375,14 +375,18 @@
       "asset_file_large": "ファイルが大きいとページ読み込みが遅くなる可能性があります",
       "png_without_alpha": "透過なしの PNG は JPEG・WebP・AVIF の方が圧縮効率が良い場合があります",
       "png_with_alpha": "アルファ付き PNG は WebP でより効率的に保存できます",
-      "svg_can_minify": "SVG は参照を変更せずに圧縮できます"
+      "svg_can_minify": "SVG は参照を変更せずに圧縮できます",
+      "svg_contains_embedded_raster": "SVG にラスター画像データが埋め込まれており、XML を圧縮しても内蔵ビットマップはほとんど小さくなりません",
+      "svg_large_low_minify_savings": "大きな SVG ですが XML 圧縮の削減効果が低く、サイズはパスの複雑さやラスターに近い内容が原因の可能性があります"
     },
     "suggestion": {
       "use_responsive_or_smaller_source": "レスポンシブバリアントまたは小さいソース画像の使用を検討してください",
       "review_compression_or_modern_format": "圧縮設定を確認するか、最新の画像フォーマットを試してください",
       "try_modern_photographic_format": "非透過ラスター画像には写真フォーマットを試してください",
       "try_alpha_preserving_format": "アルファ対応で高圧縮の WebP 形式をお試しください",
-      "preview_svg_minify": "適用前に圧縮後の SVG 出力をプレビューしてください"
+      "preview_svg_minify": "適用前に圧縮後の SVG 出力をプレビューしてください",
+      "extract_embedded_raster_or_use_modern_format": "埋め込みラスター画像を取り出し、SVG で包まず WebP、AVIF、PNG を使用してください",
+      "review_complex_svg_or_raster_format": "ベクターアートを簡略化するか、ラスターに近い内容なら WebP または AVIF として書き出してください"
     }
   },
   "sort": {
@@ -714,14 +718,18 @@
       "asset_file_large": "ファイルサイズが大きく、読み込み性能に影響する可能性があります",
       "png_without_alpha": "アルファなしのPNGはJPEG、WebP、またはAVIFの方が圧縮率が高い場合があります",
       "png_with_alpha": "アルファ付き PNG は WebP でより効率的に保存できます",
-      "svg_can_minify": "SVGを圧縮してファイルサイズを削減できます"
+      "svg_can_minify": "SVGを圧縮してファイルサイズを削減できます",
+      "svg_contains_embedded_raster": "SVG にラスター画像データが埋め込まれており、XML を圧縮しても内蔵ビットマップはほとんど小さくなりません",
+      "svg_large_low_minify_savings": "大きな SVG ですが XML 圧縮の削減効果が低く、サイズはパスの複雑さやラスターに近い内容が原因の可能性があります"
     },
     "optSuggestion": {
       "use_responsive_or_smaller_source": "レスポンシブ画像またはより小さいソースの使用を検討してください",
       "review_compression_or_modern_format": "圧縮設定を見直すか、モダンなフォーマットに変換してください",
       "try_modern_photographic_format": "非透過のラスター画像には写真向けフォーマットをお試しください",
       "try_alpha_preserving_format": "アルファ対応で高圧縮の WebP 形式をお試しください",
-      "preview_svg_minify": "SVG圧縮をプレビューして視覚的な差異がないか確認してください"
+      "preview_svg_minify": "SVG圧縮をプレビューして視覚的な差異がないか確認してください",
+      "extract_embedded_raster_or_use_modern_format": "埋め込みラスター画像を取り出し、SVG で包まず WebP、AVIF、PNG を使用してください",
+      "review_complex_svg_or_raster_format": "ベクターアートを簡略化するか、ラスターに近い内容なら WebP または AVIF として書き出してください"
     },
     "namingIssue": {
       "contains_spaces": "ファイル名にスペースが含まれています。ハイフンまたはアンダースコアを推奨します",

@@ -375,14 +375,18 @@
       "asset_file_large": "文件过大可能拖慢页面加载速度",
       "png_without_alpha": "不含透明度的 PNG 通常以 JPEG、WebP 或 AVIF 压缩效果更好",
       "png_with_alpha": "含透明度的 PNG 以 WebP 存储效率更高",
-      "svg_can_minify": "SVG 可在不影响引用的情况下进行压缩"
+      "svg_can_minify": "SVG 可在不影响引用的情况下进行压缩",
+      "svg_contains_embedded_raster": "SVG 内含位图图片数据，压缩 XML 无法有效缩小内嵌图片",
+      "svg_large_low_minify_savings": "大型 SVG 的 XML 压缩收益偏低，大小可能来自路径复杂度或类位图内容"
     },
     "suggestion": {
       "use_responsive_or_smaller_source": "考虑使用响应式变体或较小的源图片",
       "review_compression_or_modern_format": "检查压缩设置或尝试现代图片格式",
       "try_modern_photographic_format": "对非透明位图尝试照片格式",
       "try_alpha_preserving_format": "尝试 WebP 格式，支持透明度且压缩更优",
-      "preview_svg_minify": "应用前先预览压缩后的 SVG 输出"
+      "preview_svg_minify": "应用前先预览压缩后的 SVG 输出",
+      "extract_embedded_raster_or_use_modern_format": "取出内嵌位图，改用 WebP、AVIF 或 PNG，不要包在 SVG 内",
+      "review_complex_svg_or_raster_format": "简化矢量图稿；若内容接近位图，改导出为 WebP 或 AVIF"
     }
   },
   "sort": {
@@ -714,14 +718,18 @@
       "asset_file_large": "文件大小偏大，可能影响加载性能",
       "png_without_alpha": "无透明通道的 PNG 通常可用 JPEG、WebP 或 AVIF 获得更好的压缩",
       "png_with_alpha": "含透明度的 PNG 以 WebP 存储效率更高",
-      "svg_can_minify": "SVG 可进行压缩以缩小文件大小"
+      "svg_can_minify": "SVG 可进行压缩以缩小文件大小",
+      "svg_contains_embedded_raster": "SVG 内含位图图片数据，压缩 XML 无法有效缩小内嵌图片",
+      "svg_large_low_minify_savings": "大型 SVG 的 XML 压缩收益偏低，大小可能来自路径复杂度或类位图内容"
     },
     "optSuggestion": {
       "use_responsive_or_smaller_source": "建议使用响应式图片或较小的源文件",
       "review_compression_or_modern_format": "检查压缩设置，或转换为现代格式",
       "try_modern_photographic_format": "尝试使用摄影格式处理非透明的位图图片",
       "try_alpha_preserving_format": "尝试 WebP 格式，支持透明度且压缩更优",
-      "preview_svg_minify": "预览 SVG 压缩结果以确认是否有视觉差异"
+      "preview_svg_minify": "预览 SVG 压缩结果以确认是否有视觉差异",
+      "extract_embedded_raster_or_use_modern_format": "取出内嵌位图，改用 WebP、AVIF 或 PNG，不要包在 SVG 内",
+      "review_complex_svg_or_raster_format": "简化矢量图稿；若内容接近位图，改导出为 WebP 或 AVIF"
     },
     "namingIssue": {
       "contains_spaces": "文件名含有空格，建议使用连字符或下划线",

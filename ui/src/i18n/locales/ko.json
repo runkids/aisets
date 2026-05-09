@@ -387,14 +387,18 @@
       "asset_file_large": "파일이 크면 페이지 로딩이 느려질 수 있습니다.",
       "png_without_alpha": "투명도 없는 PNG는 JPEG, WebP, AVIF로 압축 효율이 더 좋을 수 있습니다.",
       "png_with_alpha": "알파 채널이 있는 PNG는 WebP로 더 효율적으로 저장할 수 있습니다",
-      "svg_can_minify": "SVG는 참조를 변경하지 않고 압축할 수 있습니다."
+      "svg_can_minify": "SVG는 참조를 변경하지 않고 압축할 수 있습니다",
+      "svg_contains_embedded_raster": "SVG에 래스터 이미지 데이터가 포함되어 있어 XML을 압축해도 내장 비트맵은 의미 있게 줄어들지 않습니다",
+      "svg_large_low_minify_savings": "큰 SVG지만 XML 압축 절감 효과가 낮아 크기가 경로 복잡도나 래스터에 가까운 콘텐츠에서 비롯됐을 수 있습니다"
     },
     "suggestion": {
       "use_responsive_or_smaller_source": "반응형 변형 또는 더 작은 소스 이미지 사용을 고려하세요.",
       "review_compression_or_modern_format": "압축 설정을 확인하거나 최신 이미지 포맷을 시도하세요.",
       "try_modern_photographic_format": "비투명 래스터 이미지에는 사진 포맷을 시도하세요.",
       "try_alpha_preserving_format": "알파를 지원하고 압축률이 높은 WebP 형식을 사용해 보세요",
-      "preview_svg_minify": "적용 전 압축된 SVG 출력을 미리보기 하세요."
+      "preview_svg_minify": "적용 전 압축된 SVG 출력을 미리보기 하세요",
+      "extract_embedded_raster_or_use_modern_format": "내장 래스터 이미지를 분리하고 SVG로 감싸는 대신 WebP, AVIF 또는 PNG를 사용하세요",
+      "review_complex_svg_or_raster_format": "벡터 아트를 단순화하거나 래스터에 가까운 콘텐츠라면 WebP 또는 AVIF로 내보내세요"
     }
   },
   "sort": {
@@ -726,14 +730,18 @@
       "asset_file_large": "파일 크기가 커서 로드 성능에 영향을 줄 수 있습니다.",
       "png_without_alpha": "알파 채널이 없는 PNG는 JPEG, WebP 또는 AVIF로 더 나은 압축이 가능합니다.",
       "png_with_alpha": "알파 채널이 있는 PNG는 WebP로 더 효율적으로 저장할 수 있습니다",
-      "svg_can_minify": "SVG를 압축하여 파일 크기를 줄일 수 있습니다."
+      "svg_can_minify": "SVG를 압축하여 파일 크기를 줄일 수 있습니다",
+      "svg_contains_embedded_raster": "SVG에 래스터 이미지 데이터가 포함되어 있어 XML을 압축해도 내장 비트맵은 의미 있게 줄어들지 않습니다",
+      "svg_large_low_minify_savings": "큰 SVG지만 XML 압축 절감 효과가 낮아 크기가 경로 복잡도나 래스터에 가까운 콘텐츠에서 비롯됐을 수 있습니다"
     },
     "optSuggestion": {
       "use_responsive_or_smaller_source": "반응형 이미지 또는 더 작은 소스 사용을 고려해 주세요.",
       "review_compression_or_modern_format": "압축 설정을 검토하거나 최신 형식으로 변환해 주세요.",
       "try_modern_photographic_format": "비투명 래스터 이미지에는 사진 형식을 시도해 보세요.",
       "try_alpha_preserving_format": "알파를 지원하고 압축률이 높은 WebP 형식을 사용해 보세요",
-      "preview_svg_minify": "SVG 압축 결과를 미리 보고 시각적 차이가 없는지 확인해 주세요."
+      "preview_svg_minify": "SVG 압축 결과를 미리 보고 시각적 차이가 없는지 확인해 주세요",
+      "extract_embedded_raster_or_use_modern_format": "내장 래스터 이미지를 분리하고 SVG로 감싸는 대신 WebP, AVIF 또는 PNG를 사용하세요",
+      "review_complex_svg_or_raster_format": "벡터 아트를 단순화하거나 래스터에 가까운 콘텐츠라면 WebP 또는 AVIF로 내보내세요"
     },
     "namingIssue": {
       "contains_spaces": "파일명에 공백이 포함되어 있습니다. 하이픈 또는 밑줄을 권장합니다.",

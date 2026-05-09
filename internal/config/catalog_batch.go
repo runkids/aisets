@@ -43,7 +43,7 @@ func (s *Store) AllOptimizableItems(scanID int64) ([]scanner.AssetItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
@@ -82,7 +82,7 @@ func (s *Store) catalogItemsByIDs(scanID int64, ids []string) ([]scanner.AssetIt
 	}
 	idClause, idArgs := inClauseSQL("a.asset_id", uniqueIDs)
 	args := append([]any{scanID}, idArgs...)
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM asset_snapshots a
 		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
@@ -120,7 +120,7 @@ func (s *Store) hydrateAssetReferences(scanID int64, items []scanner.AssetItem) 
 	}
 	idClause, idArgs := inClauseSQL("asset_id", ids)
 	args := append([]any{scanID}, idArgs...)
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT asset_id, file, line, specifier, kind
 		FROM reference_snapshots
 		WHERE scan_id = ? AND `+idClause+`
@@ -164,7 +164,7 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 	for _, item := range items {
 		extByID[item.ID] = item.Ext
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT asset_id, category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes, has_existing_variant, variant_bytes
 		FROM optimization_snapshots
 		WHERE scan_id = ? AND `+idClause+`

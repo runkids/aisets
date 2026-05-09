@@ -17,7 +17,7 @@ import (
 )
 
 func TestStoreProjectsPersistInSQLite(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 }
 
 func TestStorePreservesProjectScanIntent(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	project := filepath.Join(root, "assets")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func TestStorePreservesProjectScanIntent(t *testing.T) {
 }
 
 func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
@@ -146,7 +146,7 @@ func TestStoreSupportsMultipleWorkspaces(t *testing.T) {
 }
 
 func TestStoreRenamesAndRemovesProjects(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
@@ -185,7 +185,7 @@ func TestStoreRenamesAndRemovesProjects(t *testing.T) {
 }
 
 func TestStoreMigratesLegacySettingsValueJSON(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
 	dataDir := filepath.Join(dataHome, "aisets")
@@ -225,7 +225,7 @@ func TestStoreMigratesLegacySettingsValueJSON(t *testing.T) {
 }
 
 func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -255,7 +255,7 @@ func TestStoreDefaultSettingsLeaveProjectRootEmpty(t *testing.T) {
 }
 
 func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
 	dataDir := filepath.Join(dataHome, "aisets")
@@ -320,7 +320,7 @@ func TestStoreMigratesDefaultGlobalExcludePatternsToIntentDefaults(t *testing.T)
 }
 
 func TestStoreDoesNotSplitCustomGlobalExcludePatterns(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	dataHome := filepath.Join(root, "data")
 	t.Setenv("XDG_DATA_HOME", dataHome)
 	dataDir := filepath.Join(dataHome, "aisets")
@@ -367,7 +367,7 @@ func TestStoreDoesNotSplitCustomGlobalExcludePatterns(t *testing.T) {
 }
 
 func TestStoreUpdatesSettings(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -415,7 +415,7 @@ func TestStoreUpdatesSettings(t *testing.T) {
 }
 
 func TestRecordScanPersistsSnapshotTables(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -486,7 +486,7 @@ func TestRecordScanPersistsSnapshotTables(t *testing.T) {
 }
 
 func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -638,7 +638,7 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 }
 
 func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -705,7 +705,7 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 }
 
 func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -764,7 +764,7 @@ func TestCatalogItemsFiltersOptimizationFacets(t *testing.T) {
 }
 
 func TestCatalogLintFiltersByProjectID(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -811,7 +811,7 @@ func TestCatalogLintFiltersByProjectID(t *testing.T) {
 }
 
 func TestCatalogSummaryProjectStatsDuplicateGroups(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -876,7 +876,7 @@ func TestCatalogSummaryProjectStatsDuplicateGroups(t *testing.T) {
 }
 
 func TestScanProjectIntentsMatchIncludesEmptyProjects(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -925,7 +925,7 @@ func TestScanProjectIntentsMatchIncludesEmptyProjects(t *testing.T) {
 }
 
 func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1009,7 +1009,7 @@ func TestCatalogDuplicatesExactLoadsPathsWithSingleConnection(t *testing.T) {
 }
 
 func TestScanHistoryAndDiff(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1087,7 +1087,7 @@ func TestScanHistoryAndDiff(t *testing.T) {
 }
 
 func TestDataAndCacheDirsHonorXDG(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 
@@ -1100,7 +1100,7 @@ func TestDataAndCacheDirsHonorXDG(t *testing.T) {
 }
 
 func TestAddProjectsSkipsEmptyRejectsFilesAndRestoresDeleted(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	project := filepath.Join(root, "project")
 	file := filepath.Join(root, "asset.png")
@@ -1167,7 +1167,7 @@ func TestAddProjectsSkipsEmptyRejectsFilesAndRestoresDeleted(t *testing.T) {
 }
 
 func TestProjectMutationValidationErrors(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1190,7 +1190,7 @@ func TestProjectMutationValidationErrors(t *testing.T) {
 }
 
 func TestSettingsValidationAndAllFields(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1271,7 +1271,7 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 }
 
 func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1391,7 +1391,7 @@ func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
 }
 
 func TestOCRResultsPersistAndMatchCurrentSettings(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1466,7 +1466,7 @@ func TestOCRResultsPersistAndMatchCurrentSettings(t *testing.T) {
 }
 
 func TestExportImportAndResetData(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
@@ -1585,6 +1585,16 @@ func isAPIErrorCode(err error, code string) bool {
 	return ok && coded.Code == code
 }
 
+func resolvedTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
+}
+
 func assertRowCount(t *testing.T, store *Store, table string, want int) {
 	t.Helper()
 	var got int
@@ -1597,7 +1607,7 @@ func assertRowCount(t *testing.T, store *Store, table string, want int) {
 }
 
 func TestCatalogLintFacetsAndFilters(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	store, err := OpenStore()
 	if err != nil {
@@ -1731,7 +1741,7 @@ func facetMap(facets []CatalogFacetOption) map[string]int {
 func TestCarryForwardAnalysis(t *testing.T) {
 	setup := func(t *testing.T) *Store {
 		t.Helper()
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 		store, err := OpenStore()
 		if err != nil {
@@ -1836,7 +1846,7 @@ func TestCarryForwardAnalysis(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		store := setup(t)
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		_, err := store.RecordScan(fullCatalog(root))
 		if err != nil {
 			t.Fatal(err)
@@ -1856,7 +1866,7 @@ func TestCarryForwardAnalysis(t *testing.T) {
 
 	t.Run("deleted_assets", func(t *testing.T) {
 		store := setup(t)
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		_, err := store.RecordScan(fullCatalog(root))
 		if err != nil {
 			t.Fatal(err)
@@ -1875,7 +1885,7 @@ func TestCarryForwardAnalysis(t *testing.T) {
 
 	t.Run("no_prior_full", func(t *testing.T) {
 		store := setup(t)
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		items := []scanner.AssetItem{
 			bareItem(root, "a1", "img/a.png", "h1"),
 		}
@@ -1890,7 +1900,7 @@ func TestCarryForwardAnalysis(t *testing.T) {
 
 	t.Run("cross_project_near_dup_one_side_removed", func(t *testing.T) {
 		store := setup(t)
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		full := fullCatalog(root)
 		full.Projects = append(full.Projects, scanner.Project{ID: "p2", Name: "proj2", Path: root + "/p2"})
 		full.Items = append(full.Items, scanner.AssetItem{
@@ -1926,7 +1936,7 @@ func TestCarryForwardAnalysis(t *testing.T) {
 
 	t.Run("summary_after_carry", func(t *testing.T) {
 		store := setup(t)
-		root := t.TempDir()
+		root := resolvedTempDir(t)
 		if err := store.AddProjects([]string{root}); err != nil {
 			t.Fatal(err)
 		}

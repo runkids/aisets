@@ -234,7 +234,7 @@ func normalizeScanSettings(settings AppSettings) AppSettings {
 func (s *Store) Settings() (AppSettings, error) {
 	settings := DefaultAppSettings()
 	var raw string
-	err := s.db.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw)
+	err := s.rdb.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, "app").Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return settings, nil
 	}

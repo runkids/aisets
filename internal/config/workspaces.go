@@ -19,7 +19,7 @@ const defaultWorkspaceID = "default"
 const maxWorkspaceIconBytes = 512 * 1024
 
 func (s *Store) Workspaces() []Workspace {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT w.id, w.name, w.icon_image, COUNT(p.id) AS project_count
 		FROM workspaces w
 		LEFT JOIN projects p ON p.workspace_id = w.id AND p.deleted_at IS NULL
@@ -160,7 +160,7 @@ func (s *Store) activeWorkspaceID() string {
 
 func (s *Store) workspace(id string) (Workspace, error) {
 	var workspace Workspace
-	err := s.db.QueryRow(`
+	err := s.rdb.QueryRow(`
 		SELECT w.id, w.name, w.icon_image, COUNT(p.id) AS project_count
 		FROM workspaces w
 		LEFT JOIN projects p ON p.workspace_id = w.id AND p.deleted_at IS NULL

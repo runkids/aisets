@@ -103,7 +103,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 			return CatalogItemFacets{}, err
 		}
 		var count int
-		if err := s.db.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&count); err != nil {
+		if err := s.rdb.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&count); err != nil {
 			return CatalogItemFacets{}, err
 		}
 		customFilters = append(customFilters, CatalogCustomFilterFacet{
@@ -132,10 +132,10 @@ func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr st
 		return nil, 0, err
 	}
 	var total int
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&total); err != nil {
+	if err := s.rdb.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+expr+` AS id, COUNT(*)
 		FROM asset_snapshots a
 		`+where+`
@@ -164,7 +164,7 @@ func (s *Store) catalogOptimizationFacetCounts(scanID int64, query CatalogItemQu
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+expr+` AS id, COUNT(DISTINCT a.asset_id)
 		FROM asset_snapshots a
 		JOIN optimization_snapshots o ON o.scan_id = a.scan_id AND o.asset_id = a.asset_id
@@ -194,7 +194,7 @@ func (s *Store) catalogMaxSeverityFacetCounts(scanID int64, query CatalogItemQue
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT max_sev, COUNT(*) FROM (
 			SELECT a.asset_id,
 				CASE MAX(CASE o.severity WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)

@@ -257,6 +257,9 @@ func strategyOperationForItem(item scanner.AssetItem, req Request) plannedStrate
 }
 
 func strategyMatchesItem(strategy imageproc.OptimizationStrategy, item scanner.AssetItem, req Request) bool {
+	if strategy.Action.Operation == "svg-minify" && !itemHasSuggestion(item, "preview_svg_minify") {
+		return false
+	}
 	format := imageproc.NormalizeOptimizationFormat(item.Ext)
 	if format == "" {
 		format = imageproc.NormalizeOptimizationFormat(filepath.Ext(item.RepoPath))
@@ -355,6 +358,15 @@ func strategyResizeMax(strategy imageproc.OptimizationStrategy, req Request) int
 		return *strategy.Action.ResizeMaxDimensionPx
 	}
 	return req.MaxDimensionPx
+}
+
+func itemHasSuggestion(item scanner.AssetItem, suggestionCode string) bool {
+	for _, rec := range item.Optimization {
+		if rec.SuggestionCode == suggestionCode {
+			return true
+		}
+	}
+	return false
 }
 
 func primaryRecommendation(recs []scanner.OptimizationSuggestion) scanner.OptimizationSuggestion {

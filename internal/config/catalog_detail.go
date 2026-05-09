@@ -61,7 +61,7 @@ func (s *Store) CatalogItemDetail(scanID int64, assetID string) (CatalogItemDeta
 }
 
 func (s *Store) assetReferences(scanID int64, assetID string) ([]scanner.AssetReference, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT file, line, specifier, kind
 		FROM reference_snapshots
 		WHERE scan_id = ? AND asset_id = ?
@@ -83,7 +83,7 @@ func (s *Store) assetReferences(scanID int64, assetID string) ([]scanner.AssetRe
 }
 
 func (s *Store) assetOptimization(scanID int64, assetID string) ([]scanner.OptimizationSuggestion, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT category, severity, reason_code, suggestion_code, estimated_bytes, savings_bytes, has_existing_variant, variant_bytes
 		FROM optimization_snapshots
 		WHERE scan_id = ? AND asset_id = ?
@@ -108,7 +108,7 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 	if item.DuplicateGroupID == nil {
 		return []scanner.AssetItem{}, nil
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM duplicate_group_assets d
 		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
@@ -132,7 +132,7 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 }
 
 func (s *Store) assetNearDuplicates(scanID int64, assetID string) ([]scanner.NearDuplicate, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT near_id, left_id, right_id, left_path, right_path, distance, flipped
 		FROM near_duplicate_snapshots
 		WHERE scan_id = ? AND (left_id = ? OR right_id = ?)

@@ -276,6 +276,31 @@ func TestPlanRoutesFormatsByRules(t *testing.T) {
 	}
 }
 
+func TestPlanDoesNotAutoMinifyLargeSVGReview(t *testing.T) {
+	items := []scanner.AssetItem{{
+		ID:         "a",
+		RepoPath:   "src/tutorial.svg",
+		Ext:        ".svg",
+		Bytes:      7 * 1024 * 1024,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image:      imageproc.Metadata{Format: "svg", Width: 360, Height: 614, Alpha: true},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category:       "format",
+			Severity:       "critical",
+			ReasonCode:     "svg_large_low_minify_savings",
+			SuggestionCode: "review_complex_svg_or_raster_format",
+		}},
+	}}
+
+	ops := planWithTools(items, Request{Strategies: imageproc.DefaultOptimizationStrategies()}, func(string) bool { return true })
+	if len(ops) != 1 {
+		t.Fatalf("ops = %#v", ops)
+	}
+	if ops[0].Operation != "manual-review" || ops[0].CanApply {
+		t.Fatalf("large SVG review should not auto-minify: %#v", ops[0])
+	}
+}
+
 func TestPlanUsesSettingsStrategiesAndChainsResize(t *testing.T) {
 	items := []scanner.AssetItem{{
 		ID:         "a",

@@ -24,7 +24,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 		countArgs := make([]any, 0, 1+len(nearArgs))
 		countArgs = append(countArgs, scanID)
 		countArgs = append(countArgs, nearArgs...)
-		if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
+		if err := s.rdb.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
 			return CatalogDuplicatesPage{}, err
 		}
 		selectSQL := fmt.Sprintf(`
@@ -38,7 +38,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 		selectArgs = append(selectArgs, scanID)
 		selectArgs = append(selectArgs, nearArgs...)
 		selectArgs = append(selectArgs, limit+1, offset)
-		rows, err := s.db.Query(selectSQL, selectArgs...)
+		rows, err := s.rdb.Query(selectSQL, selectArgs...)
 		if err != nil {
 			return CatalogDuplicatesPage{}, err
 		}
@@ -69,7 +69,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 	var total, totalFiles int
 	countSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT g.group_id) FROM duplicate_group_snapshots g%s WHERE g.scan_id = ?%s`, filterJoin, filterWhere)
 	countArgs := append([]any{scanID}, filterArgs...)
-	if err := s.db.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
+	if err := s.rdb.QueryRow(countSQL, countArgs...).Scan(&total); err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
 	filesSQL := fmt.Sprintf(`SELECT COUNT(*) FROM duplicate_group_assets da
@@ -79,7 +79,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 	filesArgs := make([]any, 0, 2+len(filterArgs))
 	filesArgs = append(filesArgs, scanID, scanID)
 	filesArgs = append(filesArgs, filterArgs...)
-	if err := s.db.QueryRow(filesSQL, filesArgs...).Scan(&totalFiles); err != nil {
+	if err := s.rdb.QueryRow(filesSQL, filesArgs...).Scan(&totalFiles); err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
 
@@ -91,7 +91,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 		LIMIT ? OFFSET ?
 	`, filterJoin, filterWhere)
 	selectArgs := append([]any{scanID}, append(filterArgs, limit+1, offset)...)
-	rows, err := s.db.Query(selectSQL, selectArgs...)
+	rows, err := s.rdb.Query(selectSQL, selectArgs...)
 	if err != nil {
 		return CatalogDuplicatesPage{}, err
 	}
@@ -216,7 +216,7 @@ func (s *Store) dupFacetCounts(scanID int64, groupByExpr, projectName, ext strin
 		FROM duplicate_group_assets d
 		JOIN asset_snapshots a ON a.scan_id = d.scan_id AND a.asset_id = d.asset_id
 		%s`, where)
-	if err := s.db.QueryRow(totalSQL, args...).Scan(&total); err != nil {
+	if err := s.rdb.QueryRow(totalSQL, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -226,7 +226,7 @@ func (s *Store) dupFacetCounts(scanID int64, groupByExpr, projectName, ext strin
 		%s
 		GROUP BY %s
 		ORDER BY COUNT(DISTINCT d.group_id) DESC, %s ASC`, groupByExpr, where, groupByExpr, groupByExpr)
-	rows, err := s.db.Query(facetSQL, args...)
+	rows, err := s.rdb.Query(facetSQL, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -253,7 +253,7 @@ func (s *Store) duplicateGroupMembersByGroup(scanID int64, groupIDs []string) (m
 	}
 	groupClause, groupArgs := inClauseSQL("da.group_id", groupIDs)
 	args := append([]any{scanID}, groupArgs...)
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT `+catalogAssetSelectColumns+`
 		FROM duplicate_group_assets da
 		JOIN asset_snapshots a ON a.scan_id = da.scan_id AND a.asset_id = da.asset_id
@@ -312,7 +312,7 @@ func (s *Store) DuplicateTrend(limit int) ([]DuplicateTrendPoint, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT id, completed_at, duplicate_groups, duplicate_files, near_duplicates, total_files
 		FROM scans
 		WHERE status = 'completed' AND completed_at IS NOT NULL

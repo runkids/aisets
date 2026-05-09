@@ -25,7 +25,7 @@ func (s *Store) CatalogFolders(query CatalogFolderQuery) (CatalogFoldersPage, er
 	if err != nil {
 		return CatalogFoldersPage{}, err
 	}
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT a.repo_path
 		FROM asset_snapshots a
 		`+where+`

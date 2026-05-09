@@ -16,7 +16,7 @@ func (s *Store) Projects() []Project {
 }
 
 func (s *Store) AllProjects() []Project {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at
 		FROM projects
 		WHERE deleted_at IS NULL
@@ -45,7 +45,7 @@ func (s *Store) AllProjects() []Project {
 
 func (s *Store) Project(id string) (Project, error) {
 	var project Project
-	err := s.db.QueryRow(`
+	err := s.rdb.QueryRow(`
 		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at
 		FROM projects
 		WHERE id = ? AND deleted_at IS NULL
@@ -61,7 +61,7 @@ func (s *Store) Project(id string) (Project, error) {
 }
 
 func (s *Store) ProjectsInWorkspace(workspaceID string) []Project {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at
 		FROM projects
 		WHERE workspace_id = ? AND deleted_at IS NULL
@@ -148,7 +148,7 @@ func (s *Store) AddProjectsToWorkspaceWithIntentResult(workspaceID string, paths
 		id := projectID(workspaceID, abs)
 		status := ProjectAddStatusAdded
 		var deletedAt sql.NullString
-		err = s.db.QueryRow(`
+		err = s.rdb.QueryRow(`
 			SELECT deleted_at
 			FROM projects
 			WHERE workspace_id = ? AND path = ?

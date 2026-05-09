@@ -21,7 +21,7 @@ func (s *Store) CatalogLint(query CatalogLintQuery) (CatalogLintPage, error) {
 	where := "WHERE " + strings.Join(allClauses, " AND ")
 
 	var total int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM lint_snapshots l `+where, allArgs...).Scan(&total); err != nil {
+	if err := s.rdb.QueryRow(`SELECT COUNT(*) FROM lint_snapshots l `+where, allArgs...).Scan(&total); err != nil {
 		return CatalogLintPage{}, err
 	}
 
@@ -33,7 +33,7 @@ func (s *Store) CatalogLint(query CatalogLintQuery) (CatalogLintPage, error) {
 	limit := normalizeCatalogLimit(query.Limit)
 	offset := parseCursorOffset(query.Cursor)
 	pagingArgs := append(append([]any{}, allArgs...), limit+1, offset)
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 		SELECT l.rule_id, l.severity, l.file, l.line, l.snippet, l.message, l.suggestion, l.asset_id
 		FROM lint_snapshots l
 		`+where+`
@@ -139,7 +139,7 @@ func (s *Store) lintFacets(scanID int64, query CatalogLintQuery) (CatalogLintFac
 	}
 
 	var projTotal int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM lint_snapshots l `+projWhere, projArgs...).Scan(&projTotal); err != nil {
+	if err := s.rdb.QueryRow(`SELECT COUNT(*) FROM lint_snapshots l `+projWhere, projArgs...).Scan(&projTotal); err != nil {
 		return CatalogLintFacets{}, err
 	}
 
@@ -194,7 +194,7 @@ func (s *Store) lintFacets(scanID int64, query CatalogLintQuery) (CatalogLintFac
 }
 
 func (s *Store) lintFacetQuery(sql string, args []any) ([]CatalogFacetOption, error) {
-	rows, err := s.db.Query(sql, args...)
+	rows, err := s.rdb.Query(sql, args...)
 	if err != nil {
 		return nil, err
 	}

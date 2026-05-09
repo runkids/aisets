@@ -69,7 +69,7 @@ func (s *Store) OCRResults(items []scanner.AssetItem, settings ocr.Settings, eng
 		if item.ContentHash == "" || item.HashAlgorithm == "" {
 			continue
 		}
-		row := s.db.QueryRow(`
+		row := s.rdb.QueryRow(`
 			SELECT status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
 			FROM ocr_results
@@ -120,7 +120,7 @@ func (s *Store) OCRResultForContentHash(contentHash, hashAlgorithm string, setti
 		return ocr.Result{}, false, nil
 	}
 	settingsHash := ocr.SettingsHash(settings)
-	row := s.db.QueryRow(`
+	row := s.rdb.QueryRow(`
 		SELECT project_id, repo_path, status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
 			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
 		FROM ocr_results
