@@ -104,7 +104,9 @@ export type CustomAssetFilterField =
   | "aiCategory"
   | "aiTag"
   | "aiDescription"
-  | "aiStatus";
+  | "aiStatus"
+  | "aiContainsFace"
+  | "aiSceneType";
 
 export type CustomAssetFilterOperator =
   | "contains"
@@ -331,6 +333,10 @@ export type AssetItem = {
     tags?: string[];
     description?: string;
     languages?: string[];
+    containsFace?: boolean;
+    sceneType?: string;
+    estimatedLocation?: string;
+    locationConfidence?: string;
     modelName?: string;
     errorCode?: string;
     errorMessage?: string;

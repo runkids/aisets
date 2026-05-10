@@ -513,7 +513,9 @@
       "aiCategory": "AI category",
       "aiTag": "AI tag",
       "aiDescription": "AI description",
-      "aiStatus": "AI status"
+      "aiStatus": "AI status",
+      "aiContainsFace": "Contains face",
+      "aiSceneType": "Scene type"
     },
     "customFilterFieldDesc": {
       "path": "Full file path including name",
@@ -533,7 +535,9 @@
       "aiCategory": "AI-classified image category",
       "aiTag": "Any tag in AI-generated tag list",
       "aiDescription": "AI-generated image description",
-      "aiStatus": "AI tagging processing state"
+      "aiStatus": "AI tagging processing state",
+      "aiContainsFace": "Whether a human face is visible",
+      "aiSceneType": "AI-inferred scene type (indoor, outdoor, etc.)"
     },
     "customFilterOperator": {
       "contains": "contains",
@@ -595,6 +599,10 @@
         "contains": "Description includes substring",
         "oneOf": "Match any whole word (comma-separated)",
         "regex": "Regular expression"
+      },
+      "aiSceneType": {
+        "contains": "Scene type includes text",
+        "equals": "Exact scene type match"
       }
     },
     "customFilterValue": {
@@ -902,7 +910,7 @@
     "aiTagCustomPrompt": "Custom Prompt",
     "aiTagCustomPromptHint": "Customize the prompt sent to the vision model for image analysis",
     "aiTagResetPrompt": "Reset to default",
-    "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"description\" (string), \"languages\" (string array). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
+    "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"description\" (string), \"languages\" (string array), \"containsFace\" (boolean), \"sceneType\" (string), \"estimatedLocation\" (string or null), \"locationConfidence\" (string). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
     "aiTagPromptCustomized": "Customized",
     "aiTagDefaultPromptLabel": "Using default prompt",
     "aiOcrCustomPrompt": "Custom Prompt",
@@ -1771,6 +1779,13 @@
     "aiSection": {
       "tag": "AI Tagging",
       "ocr": "AI OCR"
+    },
+    "aiEnrich": {
+      "faceDetected": "Face detected",
+      "noFace": "No face",
+      "scene": "Scene",
+      "location": "Location",
+      "confidence": "Confidence"
     }
   },
   "prompts": {

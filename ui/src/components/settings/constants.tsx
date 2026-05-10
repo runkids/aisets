@@ -254,6 +254,8 @@ export const customFilterFields: CustomAssetFilterField[] = [
   "aiTag",
   "aiDescription",
   "aiStatus",
+  "aiContainsFace",
+  "aiSceneType",
 ];
 
 export const customFilterOperatorsByField: Record<
@@ -278,6 +280,8 @@ export const customFilterOperatorsByField: Record<
   aiTag: ["contains", "oneOf"],
   aiDescription: ["contains", "oneOf", "regex"],
   aiStatus: ["is"],
+  aiContainsFace: ["is"],
+  aiSceneType: ["equals", "contains"],
 };
 
 export const editorOptions = [

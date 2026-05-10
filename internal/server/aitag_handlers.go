@@ -420,10 +420,14 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	content = stripMarkdownFences(content)
 
 	var parsed struct {
-		Category    string   `json:"category"`
-		Tags        []string `json:"tags"`
-		Description string   `json:"description"`
-		Languages   []string `json:"languages"`
+		Category           string   `json:"category"`
+		Tags               []string `json:"tags"`
+		Description        string   `json:"description"`
+		Languages          []string `json:"languages"`
+		ContainsFace       bool     `json:"containsFace"`
+		SceneType          string   `json:"sceneType"`
+		EstimatedLocation  *string  `json:"estimatedLocation"`
+		LocationConfidence string   `json:"locationConfidence"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		result.Status = aitag.StatusFailed
@@ -436,6 +440,12 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	result.Tags = parsed.Tags
 	result.Description = strings.TrimSpace(parsed.Description)
 	result.Languages = parsed.Languages
+	result.ContainsFace = parsed.ContainsFace
+	result.SceneType = strings.ToLower(strings.TrimSpace(parsed.SceneType))
+	if parsed.EstimatedLocation != nil {
+		result.EstimatedLocation = strings.TrimSpace(*parsed.EstimatedLocation)
+	}
+	result.LocationConfidence = strings.ToLower(strings.TrimSpace(parsed.LocationConfidence))
 	if result.Tags == nil {
 		result.Tags = []string{}
 	}

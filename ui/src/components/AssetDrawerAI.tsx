@@ -1,4 +1,12 @@
-import { FileText, Globe, ScanText, Tags, Timer } from "lucide-react";
+import {
+  FileText,
+  Globe,
+  MapPin,
+  ScanText,
+  Tags,
+  Timer,
+  User,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { AiChipIcon } from "./ui/AiChipIcon";
@@ -68,6 +76,45 @@ export function AssetDrawerAI({ aiTag, ocr }: Props) {
                   </Badge>
                 ))}
               </div>
+            </div>
+          )}
+
+          {(aiTag.containsFace != null ||
+            aiTag.sceneType ||
+            aiTag.estimatedLocation) && (
+            <div className="flex flex-col gap-2">
+              {aiTag.containsFace != null && (
+                <div className="flex items-center gap-2">
+                  <User size={12} className="shrink-0 text-g-ink-4" />
+                  <Badge tone={aiTag.containsFace ? "blue" : "line"}>
+                    {t(
+                      aiTag.containsFace
+                        ? "drawer.aiEnrich.faceDetected"
+                        : "drawer.aiEnrich.noFace",
+                    )}
+                  </Badge>
+                </div>
+              )}
+              {aiTag.sceneType && (
+                <div className="flex items-center gap-2">
+                  <MapPin size={12} className="shrink-0 text-g-ink-4" />
+                  <Badge tone="line">{aiTag.sceneType}</Badge>
+                </div>
+              )}
+              {aiTag.estimatedLocation && (
+                <div className="flex items-center gap-2">
+                  <MapPin size={12} className="shrink-0 text-g-ink-4" />
+                  <span className="font-g text-g-caption text-g-ink-2">
+                    {aiTag.estimatedLocation}
+                  </span>
+                  {aiTag.locationConfidence &&
+                    aiTag.locationConfidence !== "none" && (
+                      <Badge tone="line" className="text-g-ink-3">
+                        {aiTag.locationConfidence}
+                      </Badge>
+                    )}
+                </div>
+              )}
             </div>
           )}
 

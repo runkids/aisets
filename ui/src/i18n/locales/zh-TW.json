@@ -1212,7 +1212,9 @@
       "aiCategory": "AI 分類",
       "aiTag": "AI 標籤",
       "aiDescription": "AI 描述",
-      "aiStatus": "AI 狀態"
+      "aiStatus": "AI 狀態",
+      "aiContainsFace": "包含人臉",
+      "aiSceneType": "場景類型"
     },
     "customFilterFieldDesc": {
       "path": "含檔名的完整檔案路徑",
@@ -1232,7 +1234,9 @@
       "aiCategory": "AI 分類的圖片類型",
       "aiTag": "AI 生成標籤列表中的任意標籤",
       "aiDescription": "AI 生成的圖片描述",
-      "aiStatus": "AI 標記處理狀態"
+      "aiStatus": "AI 標記處理狀態",
+      "aiContainsFace": "圖片中是否可見人臉",
+      "aiSceneType": "AI 推斷的場景類型（室內、室外等）"
     },
     "customFilterOperator": {
       "contains": "包含",
@@ -1294,6 +1298,10 @@
         "contains": "描述包含子字串",
         "oneOf": "匹配任一完整單詞（逗號分隔）",
         "regex": "正規表達式"
+      },
+      "aiSceneType": {
+        "contains": "場景類型包含文字",
+        "equals": "完全符合場景類型"
       }
     },
     "customFilterValue": {
@@ -1622,7 +1630,7 @@
     "aiTagCustomPrompt": "自訂提示詞",
     "aiTagCustomPromptHint": "自訂送給視覺模型的圖片分析提示詞",
     "aiTagResetPrompt": "重設為預設值",
-    "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"description\"（字串）、\"languages\"（字串陣列）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
+    "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"description\"（字串）、\"languages\"（字串陣列）、\"containsFace\"（布林值）、\"sceneType\"（字串）、\"estimatedLocation\"（字串或 null）、\"locationConfidence\"（字串）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
     "aiTagPromptCustomized": "已自訂",
     "aiTagDefaultPromptLabel": "使用預設提示詞",
     "aiOcrCustomPrompt": "自訂提示詞",
@@ -1792,6 +1800,13 @@
     "aiSection": {
       "tag": "AI 標記",
       "ocr": "AI OCR"
+    },
+    "aiEnrich": {
+      "faceDetected": "偵測到人臉",
+      "noFace": "無人臉",
+      "scene": "場景",
+      "location": "位置",
+      "confidence": "信心度"
     }
   },
   "prompts": {

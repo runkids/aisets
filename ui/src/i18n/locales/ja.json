@@ -1050,7 +1050,9 @@
       "aiCategory": "AI カテゴリ",
       "aiTag": "AI タグ",
       "aiDescription": "AI 説明",
-      "aiStatus": "AI ステータス"
+      "aiStatus": "AI ステータス",
+      "aiContainsFace": "顔を含む",
+      "aiSceneType": "シーンタイプ"
     },
     "customFilterOperator": {
       "contains": "含む",
@@ -1112,6 +1114,10 @@
         "contains": "説明に部分文字列を含む",
         "oneOf": "いずれかの単語に完全一致（カンマ区切り）",
         "regex": "正規表現"
+      },
+      "aiSceneType": {
+        "contains": "シーンタイプにテキストを含む",
+        "equals": "シーンタイプの完全一致"
       }
     },
     "customFilterValue": {
@@ -1418,7 +1424,7 @@
     "aiTagCustomPrompt": "カスタムプロンプト",
     "aiTagCustomPromptHint": "画像分析のためにビジョンモデルに送るプロンプトをカスタマイズ",
     "aiTagResetPrompt": "デフォルトに戻す",
-    "aiTagPromptGuide": "VLM は有効な JSON を返す必要があります。必須フィールド: \"category\"（文字列）、\"tags\"（文字列配列）、\"description\"（文字列）、\"languages\"（文字列配列）。余分なフィールドは無視されます。JSON の解析に失敗した場合、結果は失敗と表示されます——「デフォルトに戻す」で復元できます",
+    "aiTagPromptGuide": "VLM は有効な JSON を返す必要があります。必須フィールド: \"category\"（文字列）、\"tags\"（文字列配列）、\"description\"（文字列）、\"languages\"（文字列配列）、\"containsFace\"（真偽値）、\"sceneType\"（文字列）、\"estimatedLocation\"（文字列または null）、\"locationConfidence\"（文字列）。余分なフィールドは無視されます。JSON の解析に失敗した場合、結果は失敗と表示されます——「デフォルトに戻す」で復元できます",
     "aiTagPromptCustomized": "カスタム済み",
     "aiTagDefaultPromptLabel": "デフォルトのプロンプトを使用中",
     "aiOcrCustomPrompt": "カスタムプロンプト",
@@ -1581,7 +1587,9 @@
       "aiCategory": "AI が分類した画像カテゴリ",
       "aiTag": "AI 生成タグリスト内の任意のタグ",
       "aiDescription": "AI 生成の画像説明",
-      "aiStatus": "AI タグ付けの処理状態"
+      "aiStatus": "AI タグ付けの処理状態",
+      "aiContainsFace": "画像に人の顔が含まれるか",
+      "aiSceneType": "AI推定のシーンタイプ（屋内、屋外など）"
     },
     "clearOCRCache": "OCR キャッシュをクリア",
     "clearOCRCacheHint": "すべての OCR 結果（AI OCR を含む）を削除します。再処理するには OCR または AI OCR を再実行してください",
@@ -1706,6 +1714,13 @@
     "aiSection": {
       "tag": "AI タグ付け",
       "ocr": "AI OCR"
+    },
+    "aiEnrich": {
+      "faceDetected": "顔を検出",
+      "noFace": "顔なし",
+      "scene": "シーン",
+      "location": "場所",
+      "confidence": "信頼度"
     }
   },
   "scanProgress": {

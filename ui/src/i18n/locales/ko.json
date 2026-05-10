@@ -1068,7 +1068,9 @@
       "aiCategory": "AI 카테고리",
       "aiTag": "AI 태그",
       "aiDescription": "AI 설명",
-      "aiStatus": "AI 상태"
+      "aiStatus": "AI 상태",
+      "aiContainsFace": "얼굴 포함",
+      "aiSceneType": "장면 유형"
     },
     "customFilterOperator": {
       "contains": "포함",
@@ -1130,6 +1132,10 @@
         "contains": "설명에 부분 문자열 포함",
         "oneOf": "완전한 단어 중 하나와 일치 (쉼표로 구분)",
         "regex": "정규 표현식"
+      },
+      "aiSceneType": {
+        "contains": "장면 유형에 텍스트 포함",
+        "equals": "장면 유형 정확히 일치"
       }
     },
     "customFilterValue": {
@@ -1429,7 +1435,7 @@
     "aiTagCustomPrompt": "사용자 정의 프롬프트",
     "aiTagCustomPromptHint": "이미지 분석을 위해 비전 모델에 보내는 프롬프트를 맞춤 설정",
     "aiTagResetPrompt": "기본값으로 재설정",
-    "aiTagPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"category\"(문자열), \"tags\"(문자열 배열), \"description\"(문자열), \"languages\"(문자열 배열). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다 — \"기본값으로 재설정\"으로 복원할 수 있습니다",
+    "aiTagPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"category\"(문자열), \"tags\"(문자열 배열), \"description\"(문자열), \"languages\"(문자열 배열), \"containsFace\"(불리언), \"sceneType\"(문자열), \"estimatedLocation\"(문자열 또는 null), \"locationConfidence\"(문자열). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다 — \"기본값으로 재설정\"으로 복원할 수 있습니다",
     "aiTagPromptCustomized": "맞춤 설정됨",
     "aiTagDefaultPromptLabel": "기본 프롬프트 사용 중",
     "aiOcrCustomPrompt": "맞춤 프롬프트",
@@ -1592,7 +1598,9 @@
       "aiCategory": "AI가 분류한 이미지 카테고리",
       "aiTag": "AI 생성 태그 목록의 임의 태그",
       "aiDescription": "AI 생성 이미지 설명",
-      "aiStatus": "AI 태그 처리 상태"
+      "aiStatus": "AI 태그 처리 상태",
+      "aiContainsFace": "이미지에 사람 얼굴이 보이는지 여부",
+      "aiSceneType": "AI가 추정한 장면 유형(실내, 실외 등)"
     },
     "clearOCRCache": "OCR 캐시 지우기",
     "clearOCRCacheHint": "모든 OCR 결과(AI OCR 포함)를 제거합니다. 재처리하려면 OCR 또는 AI OCR을 다시 실행하세요",
@@ -1724,6 +1732,13 @@
     "aiSection": {
       "tag": "AI 태그",
       "ocr": "AI OCR"
+    },
+    "aiEnrich": {
+      "faceDetected": "얼굴 감지됨",
+      "noFace": "얼굴 없음",
+      "scene": "장면",
+      "location": "위치",
+      "confidence": "신뢰도"
     }
   },
   "projectIntent": {

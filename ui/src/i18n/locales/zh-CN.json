@@ -1050,7 +1050,9 @@
       "aiCategory": "AI 分类",
       "aiTag": "AI 标签",
       "aiDescription": "AI 描述",
-      "aiStatus": "AI 状态"
+      "aiStatus": "AI 状态",
+      "aiContainsFace": "包含人脸",
+      "aiSceneType": "场景类型"
     },
     "customFilterOperator": {
       "contains": "包含",
@@ -1112,6 +1114,10 @@
         "contains": "描述包含子字符串",
         "oneOf": "匹配任一完整单词（逗号分隔）",
         "regex": "正则表达式"
+      },
+      "aiSceneType": {
+        "contains": "场景类型包含文字",
+        "equals": "完全匹配场景类型"
       }
     },
     "customFilterValue": {
@@ -1418,7 +1424,7 @@
     "aiTagCustomPrompt": "自定义提示词",
     "aiTagCustomPromptHint": "自定义发送给视觉模型的图片分析提示词",
     "aiTagResetPrompt": "重置为默认值",
-    "aiTagPromptGuide": "VLM 必须返回有效 JSON，包含以下字段：\"category\"（字符串）、\"tags\"（字符串数组）、\"description\"（字符串）、\"languages\"（字符串数组）。多余字段会被忽略。若 JSON 解析失败，结果标记为失败——可按「重置为默认值」还原",
+    "aiTagPromptGuide": "VLM 必须返回有效 JSON，包含以下字段：\"category\"（字符串）、\"tags\"（字符串数组）、\"description\"（字符串）、\"languages\"（字符串数组）、\"containsFace\"（布尔值）、\"sceneType\"（字符串）、\"estimatedLocation\"（字符串或 null）、\"locationConfidence\"（字符串）。多余字段会被忽略。若 JSON 解析失败，结果标记为失败——可按「重置为默认值」还原",
     "aiTagPromptCustomized": "已自定义",
     "aiTagDefaultPromptLabel": "使用默认提示词",
     "aiOcrCustomPrompt": "自定义提示词",
@@ -1581,7 +1587,9 @@
       "aiCategory": "AI 分类的图片类型",
       "aiTag": "AI 生成标签列表中的任意标签",
       "aiDescription": "AI 生成的图片描述",
-      "aiStatus": "AI 标记处理状态"
+      "aiStatus": "AI 标记处理状态",
+      "aiContainsFace": "图片中是否可见人脸",
+      "aiSceneType": "AI 推断的场景类型（室内、室外等）"
     },
     "clearOCRCache": "清除 OCR 缓存",
     "clearOCRCacheHint": "移除所有 OCR 结果（包括 AI OCR）。重新运行 OCR 或 AI OCR 可重新处理",
@@ -1706,6 +1714,13 @@
     "aiSection": {
       "tag": "AI 标记",
       "ocr": "AI OCR"
+    },
+    "aiEnrich": {
+      "faceDetected": "检测到人脸",
+      "noFace": "无人脸",
+      "scene": "场景",
+      "location": "位置",
+      "confidence": "置信度"
     }
   },
   "scanProgress": {
