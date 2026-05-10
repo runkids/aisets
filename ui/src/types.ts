@@ -332,7 +332,9 @@ export type AssetItem = {
     status: "pending" | "ready" | "failed" | "skipped";
     category?: string;
     tags?: string[];
+    tagsI18n?: Record<string, string[]>;
     description?: string;
+    descriptionI18n?: Record<string, string>;
     languages?: string[];
     containsFace?: boolean;
     sceneType?: string;
@@ -352,6 +354,19 @@ export type AssetItem = {
     | "notApplicable";
   deleteUnusedAllowed?: boolean;
   lintApplicability?: "applicable" | "advisory" | "notApplicable";
+  exif?: EXIFData;
+};
+
+export type EXIFData = {
+  hasExif: boolean;
+  gpsLatitude?: number;
+  gpsLongitude?: number;
+  cameraMake?: string;
+  cameraModel?: string;
+  dateTimeOriginal?: string;
+  orientation?: number;
+  dpiX?: number;
+  dpiY?: number;
 };
 
 export type OptimizationRecommendation =
@@ -484,6 +499,8 @@ export type CatalogItemsPage = {
     ocrReadyCount: number;
     vlmOcrReadyCount: number;
     aiTagReadyCount: number;
+    exifHasGps: number;
+    exifHasCamera: number;
   };
 };
 
