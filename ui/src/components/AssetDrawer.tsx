@@ -150,8 +150,11 @@ export function AssetDrawer({
   const vlmOcrReady = Boolean(
     asset.ocr && asset.ocr.status === "ready" && asset.ocr.engineName === "vlm",
   );
+  const llmEnabled = Boolean(settingsQuery.data?.settings.llmEnabled);
   const aiTagVisible = Boolean(
-    (asset.aiTag && asset.aiTag.status === "ready") || vlmOcrReady,
+    llmEnabled ||
+    (asset.aiTag && asset.aiTag.status === "ready") ||
+    vlmOcrReady,
   );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
@@ -586,8 +589,10 @@ export function AssetDrawer({
               )}
               {tab === "ai" && aiTagVisible && (
                 <AssetDrawerAI
+                  asset={asset}
                   aiTag={asset.aiTag}
                   ocr={vlmOcrReady ? asset.ocr : undefined}
+                  llmEnabled={llmEnabled}
                 />
               )}
             </div>

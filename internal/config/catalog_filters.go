@@ -477,9 +477,9 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return aiTagJSONContainsSQL("ait.tags_json", strings.ToLower(value)), nil, nil
 	case "aiDescription":
 		if clause.Operator == "oneOf" {
-			return aiTagTextContainsAnySQL("COALESCE(ait.description, '')", lowerList(value)), nil, nil
+			return aiTagTextContainsAnySQL("COALESCE(ait.description, '') || ' ' || COALESCE(ait.description_i18n_json, '')", lowerList(value)), nil, nil
 		}
-		return aiTagExistsSQL(textClauseSQL("COALESCE(ait.description, '')", clause.Operator, value))
+		return aiTagExistsSQL(textClauseSQL("COALESCE(ait.description, '') || ' ' || COALESCE(ait.description_i18n_json, '')", clause.Operator, value))
 	case "aiStatus":
 		if value == "none" {
 			return aiTagNotExistsSQL(), nil, nil
@@ -591,14 +591,15 @@ func aiTagNotExistsSQL() string {
 }
 
 func aiTagJSONContainsSQL(expr, value string) string {
+	escaped := strings.ReplaceAll(value, "'", "''")
 	return fmt.Sprintf(`EXISTS (
 		SELECT 1 FROM ai_tags ait
 		WHERE ait.project_id = a.project_id
 			AND ait.repo_path = a.repo_path
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
-			AND LOWER(%s) LIKE '%%"%s"%%'
-	)`, expr, strings.ReplaceAll(value, "'", "''"))
+			AND (LOWER(%s) LIKE '%%"%s"%%' OR LOWER(ait.tags_i18n_json) LIKE '%%"%s"%%')
+	)`, expr, escaped, escaped)
 }
 
 func aiTagTextContainsAnySQL(expr string, keywords []string) string {
@@ -626,7 +627,8 @@ func aiTagJSONListContainsSQL(expr string, values []string) string {
 	}
 	parts := make([]string, 0, len(values))
 	for _, value := range values {
-		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%'", expr, strings.ReplaceAll(value, "'", "''")))
+		escaped := strings.ReplaceAll(value, "'", "''")
+		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%' OR LOWER(ait.tags_i18n_json) LIKE '%%\"%s\"%%'", expr, escaped, escaped))
 	}
 	return `EXISTS (
 		SELECT 1 FROM ai_tags ait
@@ -699,10 +701,10 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait2.content_hash = a.content_hash
 				AND ait2.hash_algorithm = a.hash_algorithm
 				AND ait2.status = ?
-				AND (ait2.tags_json LIKE ? OR ait2.description LIKE ?)
+				AND (ait2.tags_json LIKE ? OR ait2.tags_i18n_json LIKE ? OR ait2.description LIKE ? OR ait2.description_i18n_json LIKE ?)
 		))`)
 		like := "%" + q + "%"
-		args = append(args, like, like, like, like, q, aitag.StatusReady, like, like)
+		args = append(args, like, like, like, like, q, aitag.StatusReady, like, like, like, like)
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":

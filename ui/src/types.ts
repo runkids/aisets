@@ -332,7 +332,9 @@ export type AssetItem = {
     status: "pending" | "ready" | "failed" | "skipped";
     category?: string;
     tags?: string[];
+    tagsI18n?: Record<string, string[]>;
     description?: string;
+    descriptionI18n?: Record<string, string>;
     languages?: string[];
     containsFace?: boolean;
     sceneType?: string;

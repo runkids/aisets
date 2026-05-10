@@ -1807,6 +1807,15 @@
       "scene": "場景",
       "location": "位置",
       "confidence": "信心度"
+    },
+    "aiAction": {
+      "tag": "AI 標記",
+      "ocr": "AI OCR",
+      "rerun": "重新執行",
+      "tagSuccess": "AI 標記完成",
+      "ocrSuccess": "AI OCR 完成",
+      "tagHint": "執行 AI 標記以分析此圖片",
+      "ocrHint": "執行 AI OCR 以提取圖片文字"
     }
   },
   "prompts": {

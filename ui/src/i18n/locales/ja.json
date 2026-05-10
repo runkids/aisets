@@ -1721,6 +1721,15 @@
       "scene": "シーン",
       "location": "場所",
       "confidence": "信頼度"
+    },
+    "aiAction": {
+      "tag": "AI タグ",
+      "ocr": "AI OCR",
+      "rerun": "再実行",
+      "tagSuccess": "AI タグ完了",
+      "ocrSuccess": "AI OCR 完了",
+      "tagHint": "AI タグを実行して画像を分析",
+      "ocrHint": "AI OCR を実行してテキストを抽出"
     }
   },
   "scanProgress": {

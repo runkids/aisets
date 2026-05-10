@@ -1786,6 +1786,15 @@
       "scene": "Scene",
       "location": "Location",
       "confidence": "Confidence"
+    },
+    "aiAction": {
+      "tag": "AI Tag",
+      "ocr": "AI OCR",
+      "rerun": "Rerun",
+      "tagSuccess": "AI Tag completed",
+      "ocrSuccess": "AI OCR completed",
+      "tagHint": "Run AI Tag to analyze this image",
+      "ocrHint": "Run AI OCR to extract text from this image"
     }
   },
   "prompts": {

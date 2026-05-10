@@ -1739,6 +1739,15 @@
       "scene": "장면",
       "location": "위치",
       "confidence": "신뢰도"
+    },
+    "aiAction": {
+      "tag": "AI 태그",
+      "ocr": "AI OCR",
+      "rerun": "재실행",
+      "tagSuccess": "AI 태그 완료",
+      "ocrSuccess": "AI OCR 완료",
+      "tagHint": "AI 태그를 실행하여 이미지 분석",
+      "ocrHint": "AI OCR을 실행하여 텍스트 추출"
     }
   },
   "projectIntent": {
