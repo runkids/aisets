@@ -201,20 +201,33 @@ export function ComparePanel({ left, right, mode, compact }: Props) {
             a: left.ext.toUpperCase().replace(".", ""),
             b: right.ext.toUpperCase().replace(".", ""),
           },
-        ].map((row) => (
-          <div
-            key={row.label}
-            className="flex flex-col items-center gap-1 bg-g-surface-2 px-3 py-2"
-          >
-            <span className="text-g-chip text-g-ink-3">{row.label}</span>
-            <span className="font-g-mono text-g-caption text-g-ink">
-              {row.a}
-            </span>
-            <span className="font-g-mono text-g-caption text-g-ink-2">
-              {row.b}
-            </span>
-          </div>
-        ))}
+        ].map((row) => {
+          const differs = row.a !== row.b;
+          return (
+            <div
+              key={row.label}
+              className="flex flex-col items-center gap-1 bg-g-surface-2 px-3 py-2"
+            >
+              <span className="text-g-chip text-g-ink-3">{row.label}</span>
+              <span
+                className={cn(
+                  "font-g-mono text-g-caption",
+                  differs ? "text-g-amber" : "text-g-ink",
+                )}
+              >
+                {row.a}
+              </span>
+              <span
+                className={cn(
+                  "font-g-mono text-g-caption",
+                  differs ? "text-g-amber" : "text-g-ink-2",
+                )}
+              >
+                {row.b}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

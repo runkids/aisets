@@ -1,12 +1,18 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { AssetItem, NearDuplicate } from "../types";
 import { fileName, formatBytes } from "../ui";
 import { getDuplicateExplanation, type DuplicateExplanation } from "../api";
 import { toCompareAsset } from "./compareTypes";
 import { SimilarCompare } from "./SimilarCompare";
-import { AssetThumbnail, EmptyState } from "./ui";
+import {
+  AiActionButton,
+  AiResultPanel,
+  AiResultSkeleton,
+  AssetThumbnail,
+  EmptyState,
+} from "./ui";
 
 type EnrichedSimilar = {
   id: string;
@@ -34,12 +40,19 @@ export function AssetDrawerSimilar({
 }: Props) {
   const { t } = useTranslation();
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [explanations, setExplanations] = useState<Map<string, DuplicateExplanation>>(new Map());
+  const [explanations, setExplanations] = useState<
+    Map<string, DuplicateExplanation>
+  >(new Map());
   const [loadingPairs, setLoadingPairs] = useState<Set<string>>(new Set());
   const [errorPairs, setErrorPairs] = useState<Map<string, string>>(new Map());
 
   const handleExplain = useCallback(
-    async (pairKey: string, leftId: string, rightId: string, distance: number) => {
+    async (
+      pairKey: string,
+      leftId: string,
+      rightId: string,
+      distance: number,
+    ) => {
       setLoadingPairs((prev) => new Set(prev).add(pairKey));
       setErrorPairs((prev) => {
         const next = new Map(prev);
@@ -51,7 +64,10 @@ export function AssetDrawerSimilar({
         setExplanations((prev) => new Map(prev).set(pairKey, result));
       } catch (err) {
         setErrorPairs((prev) =>
-          new Map(prev).set(pairKey, err instanceof Error ? err.message : String(err)),
+          new Map(prev).set(
+            pairKey,
+            err instanceof Error ? err.message : String(err),
+          ),
         );
       } finally {
         setLoadingPairs((prev) => {
@@ -62,6 +78,18 @@ export function AssetDrawerSimilar({
       }
     },
     [],
+  );
+
+  const handleRegenerate = useCallback(
+    (pairKey: string, leftId: string, rightId: string, distance: number) => {
+      setExplanations((prev) => {
+        const next = new Map(prev);
+        next.delete(pairKey);
+        return next;
+      });
+      handleExplain(pairKey, leftId, rightId, distance);
+    },
+    [handleExplain],
   );
 
   const enriched = useMemo(() => {
@@ -156,55 +184,56 @@ export function AssetDrawerSimilar({
             const loading = loadingPairs.has(pairKey);
             const error = errorPairs.get(pairKey);
 
+            if (loading) {
+              return <AiResultSkeleton />;
+            }
+
             if (explanation) {
               return (
-                <div className="rounded-g-md border border-purple-300/30 bg-purple-50/10 p-3 dark:border-purple-500/20 dark:bg-purple-950/20">
-                  <div className="mb-2 flex items-center gap-1.5 text-g-caption font-semibold text-purple-600 dark:text-purple-400">
-                    <Sparkles size={14} />
-                    {t("duplicateExplain.summary")}
-                  </div>
-                  <p className="mb-2 text-g-body text-g-ink">{explanation.summary}</p>
-                  <div className="mb-1 text-g-caption font-semibold text-g-ink-3">
-                    {t("duplicateExplain.differences")}
-                  </div>
-                  <p className="mb-2 text-g-body text-g-ink-2">{explanation.differences}</p>
-                  <div className="mb-1 text-g-caption font-semibold text-g-ink-3">
-                    {t("duplicateExplain.recommendation")}
-                  </div>
-                  <p className="mb-2 text-g-body text-g-ink-2">{explanation.recommendation}</p>
-                  <div className="mb-1 text-g-caption font-semibold text-g-ink-3">
-                    {t("duplicateExplain.rationale")}
-                  </div>
-                  <p className="mb-2 text-g-body text-g-ink-2">{explanation.rationale}</p>
-                  <div className="text-[10px] text-g-ink-4">
-                    {t("duplicateExplain.tokens", {
-                      input: explanation.inputTokens,
-                      output: explanation.outputTokens,
-                    })}
-                    {" · "}
-                    {(explanation.durationMs / 1000).toFixed(1)}s
-                  </div>
-                </div>
+                <AiResultPanel
+                  summary={explanation.summary}
+                  sections={[
+                    {
+                      label: t("duplicateExplain.differences"),
+                      content: explanation.differences,
+                      defaultOpen: true,
+                    },
+                    {
+                      label: t("duplicateExplain.recommendation"),
+                      content: explanation.recommendation,
+                    },
+                    {
+                      label: t("duplicateExplain.rationale"),
+                      content: explanation.rationale,
+                    },
+                  ]}
+                  durationMs={explanation.durationMs}
+                  inputTokens={explanation.inputTokens}
+                  outputTokens={explanation.outputTokens}
+                  onRegenerate={() =>
+                    handleRegenerate(
+                      pairKey,
+                      nd.leftId,
+                      nd.rightId,
+                      nd.distance,
+                    )
+                  }
+                  regenerating={loading}
+                />
               );
             }
 
             return (
               <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleExplain(pairKey, nd.leftId, nd.rightId, nd.distance)}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 self-start rounded-g-md border border-g-line bg-g-surface px-3 py-1.5 text-g-caption text-g-ink-2 transition-colors duration-[120ms] ease-g hover:border-g-line-strong hover:text-g-ink disabled:opacity-50"
+                <AiActionButton
+                  onClick={() =>
+                    handleExplain(pairKey, nd.leftId, nd.rightId, nd.distance)
+                  }
                 >
-                  {loading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={14} />
-                  )}
                   {t("duplicateExplain.button")}
-                </button>
+                </AiActionButton>
                 {error && (
-                  <div className="rounded-g-md border border-red-300/30 bg-red-50/10 px-3 py-2 text-g-caption text-red-600 dark:border-red-500/20 dark:bg-red-950/20 dark:text-red-400">
+                  <div className="rounded-g-md border border-g-red/20 bg-g-red/5 px-3 py-2 text-g-caption text-g-red">
                     {t("duplicateExplain.error")}: {error}
                   </div>
                 )}
