@@ -258,6 +258,8 @@ func (s *Store) syncDefaultToSettings(presetType string, content PromptPresetCon
 		settings.LLMTagPrompt = formatted
 	case "ocr":
 		settings.LLMOcrPrompt = formatted
+	case "system":
+		settings.LLMSystemPrompt = formatted
 	default:
 		return nil
 	}

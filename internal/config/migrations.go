@@ -327,6 +327,9 @@ func (s *Store) migrate() error {
 	if err := s.seedDuplicatePresetIfMissing(); err != nil {
 		return err
 	}
+	if err := s.migratePromptPresetsSystemType(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -1221,4 +1224,50 @@ Important:
 - For files with mixed content (e.g. SVG containing embedded raster), recommend a specific format for the extracted raster portion, not just the container format
 
 Respond ONLY with the JSON object, no other text.`
+}
+
+func (s *Store) migratePromptPresetsSystemType() error {
+	rows, err := s.rdb.Query(`SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_presets'`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil
+	}
+	var ddl string
+	if err := rows.Scan(&ddl); err != nil {
+		return err
+	}
+	rows.Close()
+	if strings.Contains(ddl, "'system'") {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmts := []string{
+		`ALTER TABLE prompt_presets RENAME TO _prompt_presets_old`,
+		`CREATE TABLE prompt_presets (
+			id         TEXT    PRIMARY KEY,
+			type       TEXT    NOT NULL CHECK(type IN ('tag', 'ocr', 'optimize', 'duplicate', 'system')),
+			name       TEXT    NOT NULL,
+			content    TEXT    NOT NULL DEFAULT '{}',
+			is_default INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT    NOT NULL,
+			updated_at TEXT    NOT NULL
+		)`,
+		`INSERT INTO prompt_presets SELECT * FROM _prompt_presets_old`,
+		`DROP TABLE _prompt_presets_old`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
+	}
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("prompt_presets system type migration: %w", err)
+		}
+	}
+	return tx.Commit()
 }
