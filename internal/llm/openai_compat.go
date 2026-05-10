@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -67,7 +68,8 @@ func (p *OpenAICompatProvider) ListModels(ctx context.Context) ([]Model, error) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openai-compat: list models: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("openai-compat: list models: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw openAIModelsResponse
@@ -175,7 +177,8 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 	durationMs := time.Since(start).Milliseconds()
 
 	if resp.StatusCode != http.StatusOK {
-		return ChatResponse{}, fmt.Errorf("openai-compat: chat: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return ChatResponse{}, fmt.Errorf("openai-compat: chat: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw openAIChatResponse
@@ -235,7 +238,8 @@ func (p *OpenAICompatProvider) Embed(ctx context.Context, req EmbedRequest) (Emb
 	durationMs := time.Since(start).Milliseconds()
 
 	if resp.StatusCode != http.StatusOK {
-		return EmbedResponse{}, fmt.Errorf("openai-compat: embed: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return EmbedResponse{}, fmt.Errorf("openai-compat: embed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw openAIEmbedResponse

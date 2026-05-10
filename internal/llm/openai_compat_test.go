@@ -268,6 +268,46 @@ func TestOpenAICompatAvailableConnectionRefused(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatChatErrorBodySurfaced(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"error":{"message":"unsupported image format: webp"}}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	_, err := p.Chat(context.Background(), ChatRequest{
+		Model:    "test-model",
+		Messages: []ChatMessage{{Role: "user", Content: "hi"}},
+	})
+	if err == nil {
+		t.Fatal("expected error for 400 response, got nil")
+	}
+	if !strings.Contains(err.Error(), "status 400") {
+		t.Errorf("error should contain 'status 400', got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "unsupported image format: webp") {
+		t.Errorf("error should contain response body, got: %v", err)
+	}
+}
+
+func TestOpenAICompatListModelsErrorBodySurfaced(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, "server overloaded")
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	_, err := p.ListModels(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "server overloaded") {
+		t.Errorf("error should contain response body, got: %v", err)
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

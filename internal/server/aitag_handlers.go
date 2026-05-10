@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,15 +23,72 @@ import (
 	"aisets/internal/scanner"
 )
 
-func prepareImageForVLM(localPath, ext string) (string, error) {
+const VLMNormalizeVersion = "vlm-norm-v1"
+
+var vlmNormFallbackOnce sync.Once
+
+func prepareImageForVLM(localPath, ext, purpose string) (string, error) {
+	maxSize := 768
+	if purpose == "ocr" {
+		maxSize = 1536
+	}
+
+	bin, err := imgtools.Binary()
+	if err != nil {
+		vlmNormFallbackOnce.Do(func() {
+			log.Printf("[warn] imgtools not available, using fallback VLM image prep: %v", err)
+		})
+		return prepareImageForVLMFallback(localPath, ext)
+	}
+
+	tmp, err := os.CreateTemp("", "vlm-norm-*.png")
+	if err != nil {
+		return "", err
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+	defer os.Remove(tmpPath)
+
+	cmd := exec.Command(bin, "vlm-normalize",
+		"--purpose", purpose,
+		"--max-size", strconv.Itoa(maxSize),
+		"--background", "white",
+		localPath, tmpPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("vlm-normalize: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+
+	data, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+func prepareImageForVLMFallback(localPath, ext string) (string, error) {
 	ext = strings.ToLower(ext)
 	switch ext {
 	case ".svg":
-		pngData, err := rasterizeSVGViaImgtools(localPath, 512)
+		bin, err := imgtools.Binary()
+		if err != nil {
+			return "", fmt.Errorf("imgtools not available for SVG: %w", err)
+		}
+		tmp, err := os.CreateTemp("", "svgpng-*.png")
 		if err != nil {
 			return "", err
 		}
-		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngData), nil
+		tmpPath := tmp.Name()
+		tmp.Close()
+		defer os.Remove(tmpPath)
+		cmd := exec.Command(bin, "svg-to-png", "--max-size", "512", localPath, tmpPath)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("imgtools svg-to-png: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+		data, err := os.ReadFile(tmpPath)
+		if err != nil {
+			return "", err
+		}
+		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
 	case ".avif":
 		pngData, err := imageproc.ImageToPNG(localPath, 512)
 		if err != nil {
@@ -44,26 +102,6 @@ func prepareImageForVLM(localPath, ext string) (string, error) {
 		}
 		return "data:" + extToMIME(ext) + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 	}
-}
-
-func rasterizeSVGViaImgtools(path string, maxSize int) ([]byte, error) {
-	bin, err := imgtools.Binary()
-	if err != nil {
-		return nil, fmt.Errorf("imgtools not available: %w", err)
-	}
-	tmp, err := os.CreateTemp("", "svgpng-*.png")
-	if err != nil {
-		return nil, err
-	}
-	tmpPath := tmp.Name()
-	tmp.Close()
-	defer os.Remove(tmpPath)
-
-	cmd := exec.Command(bin, "svg-to-png", "--max-size", strconv.Itoa(maxSize), path, tmpPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("imgtools svg-to-png: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return os.ReadFile(tmpPath)
 }
 
 func extToMIME(ext string) string {
@@ -116,6 +154,14 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var body struct {
+		AssetIDs []string `json:"assetIds"`
+	}
+	if r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	forceReprocess := len(body.AssetIDs) > 0
+
 	catalog, err := s.ensureCatalog(r.Context())
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_catalog_failed")})
@@ -135,22 +181,36 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		prompt = aitag.TagPrompt
 	}
 
-	projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
-
-	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
-	for _, rawItem := range catalog.Items {
-		item := rawItem
-		if projectFilter != nil {
-			if _, ok := projectFilter[item.ProjectID]; !ok {
-				continue
-			}
+	var sourceItems []scanner.AssetItem
+	if forceReprocess {
+		sourceItems, err = s.store.CatalogItemsByIDs(0, body.AssetIDs)
+		if err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_catalog_failed")})
+			return
 		}
+	} else {
+		projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
+		sourceItems = make([]scanner.AssetItem, 0, len(catalog.Items))
+		for _, rawItem := range catalog.Items {
+			item := rawItem
+			if projectFilter != nil {
+				if _, ok := projectFilter[item.ProjectID]; !ok {
+					continue
+				}
+			}
+			sourceItems = append(sourceItems, item)
+		}
+	}
+
+	eligible := make([]scanner.AssetItem, 0, len(sourceItems))
+	for i := range sourceItems {
+		item := sourceItems[i]
 		if !eligibleForAITag(item) {
 			continue
 		}
 		if item.ContentHash == "" || item.HashAlgorithm == "" {
-			sum, algorithm, err := scanner.ContentHash(r.Context(), item.LocalPath)
-			if err != nil {
+			sum, algorithm, herr := scanner.ContentHash(r.Context(), item.LocalPath)
+			if herr != nil {
 				continue
 			}
 			item.ContentHash = sum
@@ -159,62 +219,74 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		eligible = append(eligible, item)
 	}
 
-	cachedResults, err := s.store.AITagResults(eligible, providerName, modelName)
-	if err != nil {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
-		return
-	}
-
-	counts := aiTagCounts{Skipped: len(catalog.Items) - len(eligible)}
+	counts := aiTagCounts{Skipped: len(sourceItems) - len(eligible)}
 	candidates := []scanner.AssetItem{}
 	inFlightHashes := map[string]struct{}{}
 	pendingDuplicates := map[string][]scanner.AssetItem{}
 	readyByHash := map[string]aitag.Result{}
 
-	for _, item := range eligible {
-		key := contentHashKey(item)
-
-		if result, ok := cachedResults[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == aitag.StatusReady {
-			readyByHash[key] = result
-			counts.CacheHit++
-			continue
-		}
-
-		if result, ok := readyByHash[key]; ok {
-			copied := copyAITagResultForItem(result, item)
-			if err := s.store.UpsertAITagResult(copied); err != nil {
-				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
-				return
+	if forceReprocess {
+		for _, item := range eligible {
+			key := contentHashKey(item)
+			if _, ok := inFlightHashes[key]; ok {
+				pendingDuplicates[key] = append(pendingDuplicates[key], item)
+				counts.CacheHit++
+				continue
 			}
-			counts.CacheHit++
-			continue
+			candidates = append(candidates, item)
+			counts.Queued++
+			inFlightHashes[key] = struct{}{}
 		}
-
-		// Check content-hash dedup from DB
-		if result, found, err := s.store.AITagResultForContentHash(item.ContentHash, item.HashAlgorithm, providerName, modelName); err != nil {
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_cache_failed")})
+	} else {
+		cachedResults, cerr := s.store.AITagResults(eligible, providerName, modelName)
+		if cerr != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(cerr, "aitag_cache_failed")})
 			return
-		} else if found {
-			copied := copyAITagResultForItem(result, item)
-			if err := s.store.UpsertAITagResult(copied); err != nil {
-				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
-				return
+		}
+
+		for _, item := range eligible {
+			key := contentHashKey(item)
+
+			if result, ok := cachedResults[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == aitag.StatusReady {
+				readyByHash[key] = result
+				counts.CacheHit++
+				continue
 			}
-			readyByHash[key] = result
-			counts.CacheHit++
-			continue
-		}
 
-		// Dedup in-flight
-		if _, ok := inFlightHashes[key]; ok {
-			pendingDuplicates[key] = append(pendingDuplicates[key], item)
-			counts.CacheHit++
-			continue
-		}
+			if result, ok := readyByHash[key]; ok {
+				copied := copyAITagResultForItem(result, item)
+				if err := s.store.UpsertAITagResult(copied); err != nil {
+					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
+					return
+				}
+				counts.CacheHit++
+				continue
+			}
 
-		candidates = append(candidates, item)
-		counts.Queued++
-		inFlightHashes[key] = struct{}{}
+			if result, found, cerr := s.store.AITagResultForContentHash(item.ContentHash, item.HashAlgorithm, providerName, modelName); cerr != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(cerr, "aitag_cache_failed")})
+				return
+			} else if found {
+				copied := copyAITagResultForItem(result, item)
+				if err := s.store.UpsertAITagResult(copied); err != nil {
+					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed")})
+					return
+				}
+				readyByHash[key] = result
+				counts.CacheHit++
+				continue
+			}
+
+			if _, ok := inFlightHashes[key]; ok {
+				pendingDuplicates[key] = append(pendingDuplicates[key], item)
+				counts.CacheHit++
+				continue
+			}
+
+			candidates = append(candidates, item)
+			counts.Queued++
+			inFlightHashes[key] = struct{}{}
+		}
 	}
 
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
@@ -315,7 +387,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Status:        aitag.StatusReady,
 	}
 
-	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext)
+	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "tag")
 	if err != nil {
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_read_failed"

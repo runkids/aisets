@@ -244,3 +244,129 @@ fn convert_rejects_unsupported_format() {
         "stderr should explain unsupported format, got: {stderr}"
     );
 }
+
+#[test]
+fn vlm_normalize_resizes_large_png_to_max_size() {
+    let temp = TempDir::new();
+    let input = temp.path("large.png");
+    let output = temp.path("normalized.png");
+    write_rgba_png(&input, 2000, 1000, Rgba([100, 150, 200, 255]));
+
+    assert_success(run(&[
+        "vlm-normalize",
+        "--purpose",
+        "tag",
+        "--max-size",
+        "768",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let img = image::open(&output).expect("open normalized");
+    assert_eq!(img.width(), 768);
+    assert_eq!(img.height(), 384);
+}
+
+#[test]
+fn vlm_normalize_does_not_upscale_small_image() {
+    let temp = TempDir::new();
+    let input = temp.path("small.png");
+    let output = temp.path("normalized.png");
+    write_rgba_png(&input, 100, 50, Rgba([10, 20, 30, 255]));
+
+    assert_success(run(&[
+        "vlm-normalize",
+        "--purpose",
+        "tag",
+        "--max-size",
+        "768",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let img = image::open(&output).expect("open normalized");
+    assert_eq!((img.width(), img.height()), (100, 50));
+}
+
+#[test]
+fn vlm_normalize_flattens_alpha_on_white() {
+    let temp = TempDir::new();
+    let input = temp.path("alpha.png");
+    let output = temp.path("normalized.png");
+    write_rgba_png(&input, 2, 2, Rgba([255, 0, 0, 128]));
+
+    assert_success(run(&[
+        "vlm-normalize",
+        "--purpose",
+        "ocr",
+        "--max-size",
+        "1536",
+        "--background",
+        "white",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let img = image::open(&output).expect("open normalized").to_rgba8();
+    let px = img.get_pixel(0, 0);
+    assert_eq!(px[3], 255, "alpha should be fully opaque after flatten");
+    assert!(
+        px[0] > 127,
+        "red channel blended with white should be > 127"
+    );
+    assert!(
+        px[1] > 60,
+        "green channel blended with white should be > 60"
+    );
+}
+
+#[test]
+fn vlm_normalize_svg_rasterizes_to_png() {
+    let temp = TempDir::new();
+    let input = temp.path("test.svg");
+    let output = temp.path("normalized.png");
+    fs::write(
+        &input,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect fill="red" width="200" height="100"/></svg>"#,
+    )
+    .expect("write svg fixture");
+
+    assert_success(run(&[
+        "vlm-normalize",
+        "--purpose",
+        "tag",
+        "--max-size",
+        "768",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let img = image::open(&output).expect("open normalized");
+    assert_eq!((img.width(), img.height()), (200, 100));
+}
+
+#[test]
+fn vlm_normalize_gif_uses_first_frame() {
+    let temp = TempDir::new();
+    let input = temp.path("animated.gif");
+    let output = temp.path("normalized.png");
+    write_animated_gif(&input);
+
+    assert_success(run(&[
+        "vlm-normalize",
+        "--purpose",
+        "tag",
+        "--max-size",
+        "768",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let img = image::open(&output).expect("open normalized").to_rgba8();
+    let px = img.get_pixel(0, 0);
+    assert!(
+        px[0] > 200,
+        "first frame should be red (R > 200), got R={}",
+        px[0]
+    );
+}

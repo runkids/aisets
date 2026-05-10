@@ -48,11 +48,13 @@ type vlmOcrCounts struct {
 
 func vlmOCRSettingsHash(modelName string) string {
 	payload := struct {
-		PromptVersion string `json:"promptVersion"`
-		ModelName     string `json:"modelName"`
+		PromptVersion    string `json:"promptVersion"`
+		ModelName        string `json:"modelName"`
+		NormalizeVersion string `json:"normalizeVersion"`
 	}{
-		PromptVersion: vlmOCRPromptVersion,
-		ModelName:     modelName,
+		PromptVersion:    vlmOCRPromptVersion,
+		ModelName:        modelName,
+		NormalizeVersion: VLMNormalizeVersion,
 	}
 	raw, _ := json.Marshal(payload)
 	sum := sha256.Sum256(raw)
@@ -97,6 +99,14 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var body struct {
+		AssetIDs []string `json:"assetIds"`
+	}
+	if r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	forceReprocess := len(body.AssetIDs) > 0
+
 	catalog, err := s.ensureCatalog(r.Context())
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_catalog_failed")})
@@ -118,22 +128,36 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		prompt = vlmOCRPrompt
 	}
 
-	projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
-
-	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
-	for _, rawItem := range catalog.Items {
-		item := rawItem
-		if projectFilter != nil {
-			if _, ok := projectFilter[item.ProjectID]; !ok {
-				continue
-			}
+	var sourceItems []scanner.AssetItem
+	if forceReprocess {
+		sourceItems, err = s.store.CatalogItemsByIDs(0, body.AssetIDs)
+		if err != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_catalog_failed")})
+			return
 		}
+	} else {
+		projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
+		sourceItems = make([]scanner.AssetItem, 0, len(catalog.Items))
+		for _, rawItem := range catalog.Items {
+			item := rawItem
+			if projectFilter != nil {
+				if _, ok := projectFilter[item.ProjectID]; !ok {
+					continue
+				}
+			}
+			sourceItems = append(sourceItems, item)
+		}
+	}
+
+	eligible := make([]scanner.AssetItem, 0, len(sourceItems))
+	for i := range sourceItems {
+		item := sourceItems[i]
 		if !eligibleForVLMOCR(item) {
 			continue
 		}
 		if item.ContentHash == "" || item.HashAlgorithm == "" {
-			sum, algorithm, err := scanner.ContentHash(r.Context(), item.LocalPath)
-			if err != nil {
+			sum, algorithm, herr := scanner.ContentHash(r.Context(), item.LocalPath)
+			if herr != nil {
 				continue
 			}
 			item.ContentHash = sum
@@ -142,62 +166,74 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		eligible = append(eligible, item)
 	}
 
-	cachedResults, err := s.store.VLMOCRResults(eligible, engineVersion, settingsHash)
-	if err != nil {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_cache_failed")})
-		return
-	}
-
-	counts := vlmOcrCounts{Skipped: len(catalog.Items) - len(eligible)}
+	counts := vlmOcrCounts{Skipped: len(sourceItems) - len(eligible)}
 	candidates := []scanner.AssetItem{}
 	inFlightHashes := map[string]struct{}{}
 	pendingDuplicates := map[string][]scanner.AssetItem{}
 	readyByHash := map[string]ocr.Result{}
 
-	for _, item := range eligible {
-		key := contentHashKey(item)
-
-		if result, ok := cachedResults[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == ocr.StatusReady {
-			readyByHash[key] = result
-			counts.CacheHit++
-			continue
-		}
-
-		if result, ok := readyByHash[key]; ok {
-			copied := copyOCRResultForVLMItem(result, item)
-			if err := s.store.UpsertOCRResult(copied); err != nil {
-				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed")})
-				return
+	if forceReprocess {
+		for _, item := range eligible {
+			key := contentHashKey(item)
+			if _, ok := inFlightHashes[key]; ok {
+				pendingDuplicates[key] = append(pendingDuplicates[key], item)
+				counts.CacheHit++
+				continue
 			}
-			counts.CacheHit++
-			continue
+			candidates = append(candidates, item)
+			counts.Queued++
+			inFlightHashes[key] = struct{}{}
 		}
-
-		// Check content-hash dedup from DB
-		if result, found, err := s.store.VLMOCRResultForContentHash(item.ContentHash, item.HashAlgorithm, engineVersion, settingsHash); err != nil {
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_cache_failed")})
+	} else {
+		cachedResults, cerr := s.store.VLMOCRResults(eligible, engineVersion, settingsHash)
+		if cerr != nil {
+			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(cerr, "vlm_ocr_cache_failed")})
 			return
-		} else if found {
-			copied := copyOCRResultForVLMItem(result, item)
-			if err := s.store.UpsertOCRResult(copied); err != nil {
-				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed")})
-				return
+		}
+
+		for _, item := range eligible {
+			key := contentHashKey(item)
+
+			if result, ok := cachedResults[item.ProjectID+"\x00"+item.RepoPath]; ok && result.Status == ocr.StatusReady {
+				readyByHash[key] = result
+				counts.CacheHit++
+				continue
 			}
-			readyByHash[key] = result
-			counts.CacheHit++
-			continue
-		}
 
-		// Dedup in-flight
-		if _, ok := inFlightHashes[key]; ok {
-			pendingDuplicates[key] = append(pendingDuplicates[key], item)
-			counts.CacheHit++
-			continue
-		}
+			if result, ok := readyByHash[key]; ok {
+				copied := copyOCRResultForVLMItem(result, item)
+				if err := s.store.UpsertOCRResult(copied); err != nil {
+					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed")})
+					return
+				}
+				counts.CacheHit++
+				continue
+			}
 
-		candidates = append(candidates, item)
-		counts.Queued++
-		inFlightHashes[key] = struct{}{}
+			if result, found, cerr := s.store.VLMOCRResultForContentHash(item.ContentHash, item.HashAlgorithm, engineVersion, settingsHash); cerr != nil {
+				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(cerr, "vlm_ocr_cache_failed")})
+				return
+			} else if found {
+				copied := copyOCRResultForVLMItem(result, item)
+				if err := s.store.UpsertOCRResult(copied); err != nil {
+					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed")})
+					return
+				}
+				readyByHash[key] = result
+				counts.CacheHit++
+				continue
+			}
+
+			if _, ok := inFlightHashes[key]; ok {
+				pendingDuplicates[key] = append(pendingDuplicates[key], item)
+				counts.CacheHit++
+				continue
+			}
+
+			candidates = append(candidates, item)
+			counts.Queued++
+			inFlightHashes[key] = struct{}{}
+		}
 	}
 
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
@@ -302,7 +338,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		Status:        ocr.StatusReady,
 	}
 
-	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext)
+	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "ocr")
 	if err != nil {
 		result.Status = ocr.StatusFailed
 		result.ErrorCode = "vlm_ocr_read_failed"

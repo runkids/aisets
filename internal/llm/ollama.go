@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -56,7 +57,8 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]Model, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ollama: list models: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("ollama: list models: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw ollamaTagsResponse
@@ -141,7 +143,8 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 	durationMs := time.Since(start).Milliseconds()
 
 	if resp.StatusCode != http.StatusOK {
-		return ChatResponse{}, fmt.Errorf("ollama: chat: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return ChatResponse{}, fmt.Errorf("ollama: chat: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw ollamaChatResponse
@@ -195,7 +198,8 @@ func (p *OllamaProvider) Embed(ctx context.Context, req EmbedRequest) (EmbedResp
 	durationMs := time.Since(start).Milliseconds()
 
 	if resp.StatusCode != http.StatusOK {
-		return EmbedResponse{}, fmt.Errorf("ollama: embed: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return EmbedResponse{}, fmt.Errorf("ollama: embed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var raw ollamaEmbedResponse

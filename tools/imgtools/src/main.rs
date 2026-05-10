@@ -2,6 +2,7 @@ mod convert;
 mod hash;
 mod probe;
 mod svg;
+mod vlm_normalize;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -93,6 +94,22 @@ enum Command {
         /// Output PNG file path
         output: String,
     },
+    /// Normalize image for VLM input (resize, flatten alpha, convert to PNG)
+    VlmNormalize {
+        /// Purpose: "tag" (max 768) or "ocr" (max 1536)
+        #[arg(long)]
+        purpose: String,
+        /// Max dimension in pixels
+        #[arg(long, default_value_t = 768)]
+        max_size: u32,
+        /// Background color for alpha compositing
+        #[arg(long, default_value = "white")]
+        background: String,
+        /// Input file path
+        input: String,
+        /// Output PNG file path
+        output: String,
+    },
     /// Print version
     Version,
 }
@@ -131,6 +148,13 @@ fn main() {
             input,
             output,
         } => svg::svg_to_png(&input, &output, max_size),
+        Command::VlmNormalize {
+            purpose,
+            max_size,
+            background,
+            input,
+            output,
+        } => vlm_normalize::run(&input, &output, &purpose, max_size, &background),
         Command::Version => {
             println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));
             Ok(())
