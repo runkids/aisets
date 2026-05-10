@@ -542,14 +542,11 @@ export function App() {
           clearEstimateCaches();
           setScanProgress(null);
           setScanProgressVisible(true);
-          scanMutation.mutate(
-            { profile: "fast" },
-            {
-              onError: (e) => {
-                if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
-              },
+          scanMutation.mutate(undefined, {
+            onError: (e) => {
+              if (!isScanAlreadyRunningError(e)) toast.error(errorMessage(e));
             },
-          );
+          });
         },
         onError: (e) => toast.error(errorMessage(e)),
       },

@@ -1,15 +1,25 @@
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
+  Copy,
   Loader2,
   Square,
   X,
   XCircle,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActivityError } from "../aiTagActivity";
 import { Button } from "./ui";
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
 import { IconButton } from "./ui/Button";
 
 type ActivityDropdownProps = {
@@ -26,6 +36,7 @@ type ActivityDropdownProps = {
   errors?: ActivityError[];
   progressPercent: number;
   showIndeterminate?: boolean;
+  startedAt?: number;
   primaryAction: { label: string; onClick: () => void };
   stopButton?: { label: string; onClick: () => void; disabled?: boolean };
   onDismiss: () => void;
@@ -45,6 +56,7 @@ export function ActivityDropdown({
   errors,
   progressPercent,
   showIndeterminate = false,
+  startedAt,
   primaryAction,
   stopButton,
   onDismiss,
@@ -52,6 +64,23 @@ export function ActivityDropdown({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [errorsExpanded, setErrorsExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const [finalElapsedMs, setFinalElapsedMs] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (!busy || !startedAt) return;
+    setFinalElapsedMs(undefined);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearInterval(id);
+      setFinalElapsedMs(Date.now() - startedAt);
+    };
+  }, [busy, startedAt]);
+  const elapsedMs = startedAt
+    ? busy
+      ? now - startedAt
+      : finalElapsedMs
+    : undefined;
   const hasErrors = errors && errors.length > 0;
 
   const dotTone = failed ? "bg-g-red" : done ? "bg-g-green" : "bg-g-accent";
@@ -83,10 +112,11 @@ export function ActivityDropdown({
         </span>
       </IconButton>
       <div
-        className={`pointer-events-none absolute right-0 top-[calc(100%+8px)] z-[60] w-[320px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${dropdownState}`}
+        className={`pointer-events-none absolute right-0 top-full z-[60] pt-2 transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${dropdownState}`}
         role={failed ? "alert" : "status"}
         aria-live={failed ? "assertive" : "polite"}
       >
+      <div className="w-[340px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop">
         <div className="flex items-center gap-2">
           {done ? (
             <CheckCircle2
@@ -120,26 +150,47 @@ export function ActivityDropdown({
         <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
           {countsLabel}
         </p>
+        {elapsedMs != null && (
+          <p className="font-g-mono text-[11px] tracking-g-mono text-g-ink-4 tabular-nums text-right">
+            {formatElapsed(elapsedMs)}
+          </p>
+        )}
         {(errorMessage || hasErrors) && (
           <div className="mt-2 rounded-g-md border border-g-line bg-g-surface text-g-caption leading-[1.45]">
             {hasErrors ? (
               <>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
-                  onClick={() => setErrorsExpanded((v) => !v)}
-                >
-                  <ChevronDown
-                    size={12}
-                    className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
-                  />
-                  <span className="flex-1 truncate">
-                    {t("activity.failedCount", {
-                      count: errors.length,
-                      defaultValue: "{{count}} failed",
-                    })}
-                  </span>
-                </button>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    className="flex flex-1 items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
+                    onClick={() => setErrorsExpanded((v) => !v)}
+                  >
+                    <ChevronDown
+                      size={12}
+                      className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
+                    />
+                    <span className="flex-1 truncate">
+                      {t("activity.failedCount", {
+                        count: errors.length,
+                        defaultValue: "{{count}} failed",
+                      })}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={copied ? t("activity.errorsCopied", { defaultValue: "Copied" }) : t("activity.copyErrors", { defaultValue: "Copy errors" })}
+                    className="shrink-0 px-2 py-1.5 text-g-ink-4 hover:text-g-ink transition-colors duration-100"
+                    onClick={() => {
+                      const text = errors.map((e) => `${e.repoPath}\n${e.message}`).join("\n\n");
+                      navigator.clipboard.writeText(text).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      });
+                    }}
+                  >
+                    {copied ? <Check size={12} className="text-g-green" /> : <Copy size={12} />}
+                  </button>
+                </div>
                 {errorsExpanded && (
                   <ul className="max-h-[120px] overflow-y-auto border-t border-g-line">
                     {errors.map((err, i) => (
@@ -200,6 +251,7 @@ export function ActivityDropdown({
             </Button>
           ) : null}
         </div>
+      </div>
       </div>
     </span>
   );

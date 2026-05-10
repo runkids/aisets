@@ -186,18 +186,20 @@ func (s *Server) initLLMProvider() {
 		return
 	}
 	if settings.LLMEnabled {
-		s.llmProvider = newLLMProvider(settings.LLMProvider, settings.LLMEndpoint)
+		s.llmProvider = newLLMProvider(settings.LLMProvider, settings.LLMEndpoint, settings.LLMApiKey)
 	} else {
 		s.llmProvider = nil
 	}
 }
 
-func newLLMProvider(provider, endpoint string) llm.Provider {
+func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {
 	switch provider {
 	case "ollama":
 		return llm.NewOllamaProvider(endpoint)
 	case "openai-compat":
-		return llm.NewOpenAICompatProvider(endpoint)
+		return llm.NewOpenAICompatProvider(endpoint, apiKey)
+	case "omlx":
+		return llm.NewOMLXProvider(endpoint, apiKey)
 	default:
 		return nil
 	}

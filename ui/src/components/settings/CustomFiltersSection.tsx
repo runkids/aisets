@@ -643,26 +643,40 @@ export function CustomFiltersSection({
                 ],
               },
               {
-                title: t("settings.customFiltersHelpAICategoryTitle"),
+                title: t("settings.customFiltersHelpUnprocessedTitle"),
                 rows: [
                   [
-                    t("settings.customFilterField.aiCategory"),
-                    t("settings.customFilterOperator.equals"),
-                    "icon",
-                  ],
-                  [
                     t("settings.customFilterField.aiStatus"),
-                    t("settings.customFilterValue.ready"),
+                    t("settings.customFilterValue.none"),
                   ],
                 ],
               },
               {
-                title: t("settings.customFiltersHelpAITagTitle"),
+                title: t("settings.customFiltersHelpLargePhotosTitle"),
                 rows: [
                   [
-                    t("settings.customFilterField.aiTag"),
-                    t("settings.customFilterOperator.oneOf"),
-                    "dark-mode,mobile,hero",
+                    t("settings.customFilterField.aiCategory"),
+                    t("settings.customFilterOperator.equals"),
+                    "photo",
+                  ],
+                  [
+                    t("settings.customFilterField.bytes"),
+                    t("settings.customFilterOperator.gte"),
+                    "204800",
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpTextImagesTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.ocrStatus"),
+                    t("settings.customFilterValue.ready"),
+                  ],
+                  [
+                    t("settings.customFilterField.ocrConfidence"),
+                    t("settings.customFilterOperator.gte"),
+                    "0.5",
                   ],
                 ],
               },

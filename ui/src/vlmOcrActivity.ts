@@ -16,11 +16,12 @@ export type VLMOcrActivityState = {
   currentFile?: string;
   errorMessage?: string;
   errors: ActivityError[];
+  startedAt?: number;
 };
 
 export type VLMOcrActivityAction =
   | { type: "saving" }
-  | { type: "running" }
+  | { type: "running"; startedAt: number }
   | { type: "event"; event: VLMOcrRunEvent }
   | { type: "stopping" }
   | { type: "done"; counts?: VLMOcrRunCounts }
@@ -46,7 +47,7 @@ export function vlmOcrActivityReducer(
     case "saving":
       return { phase: "saving", counts: null, errors: [] };
     case "running":
-      return { phase: "running", counts: state.counts, errors: state.errors };
+      return { phase: "running", counts: state.counts, errors: state.errors, startedAt: action.startedAt };
     case "event": {
       const e = action.event;
       if (!("counts" in e) || !e.counts) return state;
@@ -75,12 +76,14 @@ export function vlmOcrActivityReducer(
         phase: "done",
         counts: action.counts ?? state.counts,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "stopped":
       return {
         phase: "stopped",
         counts: action.counts ?? state.counts,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "error":
       return {
@@ -88,6 +91,7 @@ export function vlmOcrActivityReducer(
         counts: action.counts ?? state.counts,
         errorMessage: action.errorMessage,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "dismiss":
       return initialVLMOcrActivityState;
@@ -148,7 +152,7 @@ export async function runVLMOcrActivity({
 
   const controller = new AbortController();
   abortRef.current = controller;
-  dispatch({ type: "running" });
+  dispatch({ type: "running", startedAt: Date.now() });
 
   try {
     const result = await run({

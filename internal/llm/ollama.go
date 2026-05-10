@@ -92,9 +92,12 @@ type ollamaChatResponse struct {
 	EvalCount       int64 `json:"eval_count"`
 }
 
-// Chat sends a chat request to POST /api/chat with a 60s timeout.
 func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	timeout := DefaultChatTimeout
+	if req.TimeoutSec > 0 {
+		timeout = req.TimeoutSec
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
 	msgs := make([]ChatMessage, len(req.Messages))

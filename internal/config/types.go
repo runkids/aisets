@@ -50,11 +50,13 @@ type AppSettings struct {
 	LLMEnabled                 bool                                 `json:"llmEnabled"`
 	LLMProvider                string                               `json:"llmProvider"`
 	LLMEndpoint                string                               `json:"llmEndpoint"`
+	LLMApiKey                  string                               `json:"llmApiKey"`
 	LLMVisionModel             string                               `json:"llmVisionModel"`
 	LLMEmbedModel              string                               `json:"llmEmbedModel"`
 	LLMTagPrompt               string                               `json:"llmTagPrompt"`
 	LLMOcrPrompt               string                               `json:"llmOcrPrompt"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
+	LLMTimeout                 int                                  `json:"llmTimeout"`
 }
 
 type SettingsUpdate struct {
@@ -85,11 +87,13 @@ type SettingsUpdate struct {
 	LLMEnabled                 *bool                                `json:"llmEnabled"`
 	LLMProvider                *string                              `json:"llmProvider"`
 	LLMEndpoint                *string                              `json:"llmEndpoint"`
+	LLMApiKey                  *string                              `json:"llmApiKey"`
 	LLMVisionModel             *string                              `json:"llmVisionModel"`
 	LLMEmbedModel              *string                              `json:"llmEmbedModel"`
 	LLMTagPrompt               *string                              `json:"llmTagPrompt"`
 	LLMOcrPrompt               *string                              `json:"llmOcrPrompt"`
 	LLMConcurrency             *int                                 `json:"llmConcurrency"`
+	LLMTimeout                 *int                                 `json:"llmTimeout"`
 }
 
 type CustomAssetFilter struct {

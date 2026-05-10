@@ -67,8 +67,10 @@ export function SettingsView({
   onDismissOCR,
   onStartAITag,
   onStopAITag,
+  onDismissAITag,
   onStartVLMOcr,
   onStopVLMOcr,
+  onDismissVLMOcr,
   onAddProject,
 }: SettingsViewProps) {
   const { t } = useTranslation();
@@ -394,6 +396,8 @@ export function SettingsView({
     if (scanWorking) return;
     resetMutation.mutate(undefined, {
       onSuccess: () => {
+        onDismissAITag();
+        onDismissVLMOcr();
         toast.success(t("toast.databaseReset"));
       },
       onError: (error) => {
@@ -428,6 +432,7 @@ export function SettingsView({
   function onClearAITagCache() {
     clearAITagCacheMutation.mutate(undefined, {
       onSuccess: () => {
+        onDismissAITag();
         toast.success(t("toast.aiTagCacheCleared"));
       },
     });

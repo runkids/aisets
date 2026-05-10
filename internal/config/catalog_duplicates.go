@@ -43,7 +43,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 			return CatalogDuplicatesPage{}, err
 		}
 		defer rows.Close()
-		pairs := []scanner.NearDuplicate{}
+		rawPairs := []scanner.NearDuplicate{}
 		for rows.Next() {
 			var pair scanner.NearDuplicate
 			var flipped int
@@ -51,15 +51,30 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 				return CatalogDuplicatesPage{}, err
 			}
 			pair.Flipped = flipped != 0
-			pairs = append(pairs, pair)
+			rawPairs = append(rawPairs, pair)
 		}
 		if err := rows.Err(); err != nil {
 			return CatalogDuplicatesPage{}, err
 		}
 		next := ""
-		if len(pairs) > limit {
-			pairs = pairs[:limit]
+		if len(rawPairs) > limit {
+			rawPairs = rawPairs[:limit]
 			next = strconv.Itoa(offset + limit)
+		}
+		itemsByID, err := s.loadNearDuplicateItems(scanID, rawPairs)
+		if err != nil {
+			return CatalogDuplicatesPage{}, err
+		}
+		pairs := make([]CatalogNearDuplicatePair, 0, len(rawPairs))
+		for _, p := range rawPairs {
+			cp := CatalogNearDuplicatePair{NearDuplicate: p}
+			if item, ok := itemsByID[p.LeftID]; ok {
+				cp.LeftItem = &item
+			}
+			if item, ok := itemsByID[p.RightID]; ok {
+				cp.RightItem = &item
+			}
+			pairs = append(pairs, cp)
 		}
 		return CatalogDuplicatesPage{Pairs: pairs, Groups: []CatalogDuplicateGroup{}, Total: total, NextCursor: next}, nil
 	}
@@ -136,7 +151,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 			return CatalogDuplicatesPage{}, err
 		}
 	}
-	return CatalogDuplicatesPage{Groups: groups, Pairs: []scanner.NearDuplicate{}, Total: total, TotalFiles: totalFiles, NextCursor: next, Facets: facets}, nil
+	return CatalogDuplicatesPage{Groups: groups, Pairs: []CatalogNearDuplicatePair{}, Total: total, TotalFiles: totalFiles, NextCursor: next, Facets: facets}, nil
 }
 
 func (s *Store) duplicateGroupFilters(scanID int64, projectName, ext string) (join, where string, args []any) {
@@ -335,4 +350,43 @@ func (s *Store) DuplicateTrend(limit int) ([]DuplicateTrendPoint, error) {
 		return nil, err
 	}
 	return points, nil
+}
+
+func (s *Store) loadNearDuplicateItems(scanID int64, pairs []scanner.NearDuplicate) (map[string]scanner.AssetItem, error) {
+	seen := make(map[string]bool, len(pairs)*2)
+	ids := make([]string, 0, len(pairs)*2)
+	for _, p := range pairs {
+		if !seen[p.LeftID] {
+			ids = append(ids, p.LeftID)
+			seen[p.LeftID] = true
+		}
+		if !seen[p.RightID] {
+			ids = append(ids, p.RightID)
+			seen[p.RightID] = true
+		}
+	}
+	if len(ids) == 0 {
+		return map[string]scanner.AssetItem{}, nil
+	}
+	idClause, idArgs := inClauseSQL("a.asset_id", ids)
+	args := append([]any{scanID}, idArgs...)
+	rows, err := s.rdb.Query(`
+		SELECT `+catalogAssetSelectColumns+`
+		FROM asset_snapshots a
+		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
+		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
+		WHERE a.scan_id = ? AND `+idClause, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]scanner.AssetItem, len(ids))
+	for rows.Next() {
+		item, err := scanAssetFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		result[item.ID] = item
+	}
+	return result, rows.Err()
 }

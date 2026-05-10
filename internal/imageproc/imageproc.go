@@ -198,7 +198,7 @@ func DistanceHex(a, b string) (int, bool) {
 }
 
 const (
-	NearDuplicateVisualDistanceThreshold = 45
+	NearDuplicateVisualDistanceThreshold = 25
 	visualDistanceSampleSize             = 16
 )
 
@@ -217,28 +217,71 @@ func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
 			return result.Distance, nil
 		}
 	}
-	imgA, err := decodeRaster(pathA)
+	sA, err := VisualSample(pathA)
 	if err != nil {
 		return 0, err
 	}
-	imgB, err := decodeRaster(pathB)
+	sB, err := VisualSample(pathB)
 	if err != nil {
 		return 0, err
 	}
+	return VisualDistanceFromSamples(sA, sB, flipB), nil
+}
+
+func VisualSample(path string) (*image.NRGBA, error) {
+	img, err := decodeRaster(path)
+	if err != nil {
+		return nil, err
+	}
+	return visualSample(img), nil
+}
+
+func VisualDistanceFromSamples(sampleA, sampleB *image.NRGBA, flipB bool) int {
+	b := sampleB
 	if flipB {
-		imgB = flipHorizontal(imgB)
+		b = flipSample(sampleB)
 	}
-	sampleA := visualSample(imgA)
-	sampleB := visualSample(imgB)
-	var total int
+	const contentAlphaMin = 10
+	var total, count int
+	var bothContent, eitherContent int
 	for y := 0; y < visualDistanceSampleSize; y++ {
 		for x := 0; x < visualDistanceSampleSize; x++ {
 			rA, gA, bA, aA := rgba8(sampleA.At(x, y))
-			rB, gB, bB, aB := rgba8(sampleB.At(x, y))
+			rB, gB, bB, aB := rgba8(b.At(x, y))
+			hasA := aA > contentAlphaMin
+			hasB := aB > contentAlphaMin
+			if hasA || hasB {
+				eitherContent++
+			}
+			if hasA && hasB {
+				bothContent++
+			}
+			if aA == 0 && aB == 0 {
+				continue
+			}
+			count++
 			total += absInt(rA-rB) + absInt(gA-gB) + absInt(bA-bB) + absInt(aA-aB)
 		}
 	}
-	return int(math.Round(float64(total) / float64(visualDistanceSampleSize*visualDistanceSampleSize*4))), nil
+	if count == 0 {
+		return 255
+	}
+	if eitherContent > 0 && bothContent*10 < eitherContent*7 {
+		return 255
+	}
+	return int(math.Round(float64(total) / float64(count*4)))
+}
+
+func flipSample(src *image.NRGBA) *image.NRGBA {
+	w := src.Bounds().Dx()
+	h := src.Bounds().Dy()
+	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			dst.Set(w-1-x, y, src.At(x, y))
+		}
+	}
+	return dst
 }
 
 func visualSample(img image.Image) *image.NRGBA {

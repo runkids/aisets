@@ -67,11 +67,13 @@ export type AppSettings = {
   llmEnabled: boolean;
   llmProvider: string;
   llmEndpoint: string;
+  llmApiKey: string;
   llmVisionModel: string;
   llmEmbedModel: string;
   llmTagPrompt: string;
   llmOcrPrompt: string;
   llmConcurrency: number;
+  llmTimeout: number;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -380,6 +382,8 @@ export type NearDuplicate = {
   rightPath: string;
   distance: number;
   flipped: boolean;
+  leftItem?: AssetItem;
+  rightItem?: AssetItem;
 };
 
 export type LintFinding = {
@@ -657,8 +661,9 @@ export type AITagRunEvent =
       repoPath: string;
       status: string;
       counts: AITagRunCounts;
+      errorMessage?: string;
     }
-  | { type: "done"; counts: AITagRunCounts }
+  | { type: "done"; counts: AITagRunCounts; firstError?: string }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: AITagRunCounts };
 
 export type VLMOcrRunCounts = {
@@ -680,8 +685,9 @@ export type VLMOcrRunEvent =
       repoPath: string;
       status: string;
       counts: VLMOcrRunCounts;
+      errorMessage?: string;
     }
-  | { type: "done"; counts: VLMOcrRunCounts }
+  | { type: "done"; counts: VLMOcrRunCounts; firstError?: string }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: VLMOcrRunCounts };
 
 export type ActionPreview = {

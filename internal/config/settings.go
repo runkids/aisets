@@ -209,6 +209,7 @@ func DefaultAppSettings() AppSettings {
 		LLMVisionModel:             "",
 		LLMEmbedModel:              "",
 		LLMConcurrency:             llm.DefaultConcurrency,
+		LLMTimeout:                 llm.DefaultChatTimeout,
 	}
 }
 
@@ -412,13 +413,16 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.LLMProvider != nil {
 		p := strings.TrimSpace(*update.LLMProvider)
-		if p != "" && p != "ollama" && p != "openai-compat" {
-			return AppSettings{}, apierr.New("settings_llm_provider_invalid", "LLM provider must be empty, ollama, or openai-compat")
+		if p != "" && p != "ollama" && p != "openai-compat" && p != "omlx" {
+			return AppSettings{}, apierr.New("settings_llm_provider_invalid", "LLM provider must be empty, ollama, openai-compat, or omlx")
 		}
 		settings.LLMProvider = p
 	}
 	if update.LLMEndpoint != nil {
 		settings.LLMEndpoint = normalizeLLMEndpoint(*update.LLMEndpoint)
+	}
+	if update.LLMApiKey != nil {
+		settings.LLMApiKey = strings.TrimSpace(*update.LLMApiKey)
 	}
 	if update.LLMVisionModel != nil {
 		settings.LLMVisionModel = strings.TrimSpace(*update.LLMVisionModel)
@@ -438,6 +442,13 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 				"LLM concurrency must be between 1 and 8")
 		}
 		settings.LLMConcurrency = *update.LLMConcurrency
+	}
+	if update.LLMTimeout != nil {
+		if *update.LLMTimeout < llm.MinChatTimeout || *update.LLMTimeout > llm.MaxChatTimeout {
+			return AppSettings{}, apierr.New("settings_llm_timeout_invalid",
+				"LLM timeout must be between 30 and 600")
+		}
+		settings.LLMTimeout = *update.LLMTimeout
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID

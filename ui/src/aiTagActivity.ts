@@ -17,11 +17,12 @@ export type AITagActivityState = {
   currentFile?: string;
   errorMessage?: string;
   errors: ActivityError[];
+  startedAt?: number;
 };
 
 export type AITagActivityAction =
   | { type: "saving" }
-  | { type: "running" }
+  | { type: "running"; startedAt: number }
   | { type: "event"; event: AITagRunEvent }
   | { type: "stopping" }
   | { type: "done"; counts?: AITagRunCounts }
@@ -47,7 +48,7 @@ export function aiTagActivityReducer(
     case "saving":
       return { phase: "saving", counts: null, errors: [] };
     case "running":
-      return { phase: "running", counts: state.counts, errors: state.errors };
+      return { phase: "running", counts: state.counts, errors: state.errors, startedAt: action.startedAt };
     case "event": {
       const e = action.event;
       if (!("counts" in e) || !e.counts) return state;
@@ -76,12 +77,14 @@ export function aiTagActivityReducer(
         phase: "done",
         counts: action.counts ?? state.counts,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "stopped":
       return {
         phase: "stopped",
         counts: action.counts ?? state.counts,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "error":
       return {
@@ -89,6 +92,7 @@ export function aiTagActivityReducer(
         counts: action.counts ?? state.counts,
         errorMessage: action.errorMessage,
         errors: state.errors,
+        startedAt: state.startedAt,
       };
     case "dismiss":
       return initialAITagActivityState;
@@ -149,7 +153,7 @@ export async function runAITagActivity({
 
   const controller = new AbortController();
   abortRef.current = controller;
-  dispatch({ type: "running" });
+  dispatch({ type: "running", startedAt: Date.now() });
 
   try {
     const result = await run({

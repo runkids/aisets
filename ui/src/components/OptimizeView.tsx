@@ -637,12 +637,14 @@ export function OptimizeView({
     );
     const cachedEstimate = estimateCache.get(fullKey);
     const wasCached = Boolean(cachedEstimate);
+    const activityStartedAt = Date.now();
     let emittedActivity = false;
     if (!completeActivity && cachedEstimate) {
       onOptimizeActivity?.({
         type: "start",
         total: cachedEstimate.operations.length,
         stage: "estimating",
+        startedAt: activityStartedAt,
       });
       for (const op of cachedEstimate.operations) {
         onOptimizeActivity?.({ type: "operation", operation: op });
@@ -659,7 +661,7 @@ export function OptimizeView({
         onEvent: (event) => {
           if (event.type === "start") {
             emittedActivity = true;
-            onOptimizeActivity?.({ type: "start", total: event.total });
+            onOptimizeActivity?.({ type: "start", total: event.total, startedAt: activityStartedAt });
           } else if (event.type === "operation") {
             emittedActivity = true;
             onOptimizeActivity?.({
@@ -674,6 +676,7 @@ export function OptimizeView({
           type: "start",
           total: nextEstimate.operations.length,
           stage: "estimating",
+          startedAt: activityStartedAt,
         });
         for (const op of nextEstimate.operations) {
           onOptimizeActivity?.({ type: "operation", operation: op });

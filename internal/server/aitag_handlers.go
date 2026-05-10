@@ -222,6 +222,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
+	timeoutSec := settings.LLMTimeout
 	concurrency := min(max(settings.LLMConcurrency, 1), llm.MaxConcurrency)
 	if concurrency > len(candidates) && len(candidates) > 0 {
 		concurrency = len(candidates)
@@ -235,7 +236,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for item := range jobs {
-				result, chatResp := s.processAITag(ctx, item, providerName, modelName, prompt)
+				result, chatResp := s.processAITag(ctx, item, providerName, modelName, prompt, timeoutSec)
 				select {
 				case results <- aiTagWorkResult{item: item, result: result, chatResp: chatResp}:
 				case <-ctx.Done():
@@ -303,7 +304,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) (aitag.Result, llm.ChatResponse) {
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string, timeoutSec int) (aitag.Result, llm.ChatResponse) {
 	result := aitag.Result{
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
@@ -330,6 +331,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 			Content: prompt,
 			Images:  []string{dataURI},
 		}},
+		TimeoutSec: timeoutSec,
 	})
 	result.DurationMs = time.Since(start).Milliseconds()
 

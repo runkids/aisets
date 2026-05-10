@@ -752,10 +752,16 @@ export function batchMovePreview(assetIds: string[], targetDir: string) {
 export function fetchLLMModels(params?: {
   provider: string;
   endpoint: string;
+  apiKey?: string;
 }) {
-  const qs = params
-    ? `?provider=${encodeURIComponent(params.provider)}&endpoint=${encodeURIComponent(params.endpoint)}`
-    : "";
+  const parts: string[] = [];
+  if (params) {
+    parts.push(`provider=${encodeURIComponent(params.provider)}`);
+    parts.push(`endpoint=${encodeURIComponent(params.endpoint)}`);
+    if (params.apiKey)
+      parts.push(`apiKey=${encodeURIComponent(params.apiKey)}`);
+  }
+  const qs = parts.length ? `?${parts.join("&")}` : "";
   return request<{ models: LLMModel[]; error?: string }>(
     `/api/llm/models${qs}`,
   );
@@ -764,6 +770,7 @@ export function fetchLLMModels(params?: {
 export function checkLLMHealth(params?: {
   provider: string;
   endpoint: string;
+  apiKey?: string;
 }) {
   return request<LLMRuntime>("/api/llm/health", {
     method: "POST",

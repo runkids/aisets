@@ -11,10 +11,16 @@ import (
 func (s *Server) handleLLMModels(w http.ResponseWriter, r *http.Request) {
 	providerName := r.URL.Query().Get("provider")
 	endpoint := r.URL.Query().Get("endpoint")
+	apiKey := r.URL.Query().Get("apiKey")
 
 	var provider llm.Provider
 	if providerName != "" && endpoint != "" {
-		provider = newLLMProvider(providerName, endpoint)
+		if apiKey == "" {
+			if settings, err := s.store.Settings(); err == nil {
+				apiKey = settings.LLMApiKey
+			}
+		}
+		provider = newLLMProvider(providerName, endpoint, apiKey)
 	} else {
 		provider = s.llmProvider
 	}
@@ -37,17 +43,21 @@ func (s *Server) handleLLMHealth(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Provider string `json:"provider"`
 		Endpoint string `json:"endpoint"`
+		ApiKey   string `json:"apiKey"`
 	}
 	if r.Body != nil {
 		_ = readJSON(r, &body)
 	}
-	if body.Provider == "" || body.Endpoint == "" {
+	if body.Provider == "" || body.Endpoint == "" || body.ApiKey == "" {
 		settings, _ := s.store.Settings()
 		if body.Provider == "" {
 			body.Provider = settings.LLMProvider
 		}
 		if body.Endpoint == "" {
 			body.Endpoint = settings.LLMEndpoint
+		}
+		if body.ApiKey == "" {
+			body.ApiKey = settings.LLMApiKey
 		}
 	}
 
@@ -56,7 +66,7 @@ func (s *Server) handleLLMHealth(w http.ResponseWriter, r *http.Request) {
 		Endpoint: body.Endpoint,
 	}
 
-	provider := newLLMProvider(body.Provider, body.Endpoint)
+	provider := newLLMProvider(body.Provider, body.Endpoint, body.ApiKey)
 	if provider == nil {
 		status.Error = "no provider configured"
 		writeJSON(w, http.StatusOK, status)

@@ -1,9 +1,13 @@
 import {
   AlertTriangle,
+  Check,
+  ChevronDown,
+  Copy,
   LoaderCircle,
   Play,
   RefreshCw,
   ScanText,
+  Settings2,
   Square,
   Star,
   Tags,
@@ -24,7 +28,12 @@ import { AIScopePicker } from "./AIScopePicker";
 const AI_TAG_LAST_RUN_KEY = "aisets:ai-tag:last-run";
 const VLM_OCR_LAST_RUN_KEY = "aisets:vlm-ocr:last-run";
 
-type LastRunRecord<T> = { counts: T; timestamp: number; scopeLabel?: string };
+type LastRunRecord<T> = {
+  counts: T;
+  timestamp: number;
+  scopeLabel?: string;
+  elapsedMs?: number;
+};
 
 function readLastRun<T>(key: string): LastRunRecord<T> | null {
   try {
@@ -35,15 +44,28 @@ function readLastRun<T>(key: string): LastRunRecord<T> | null {
   }
 }
 
-function saveLastRun<T>(key: string, counts: T, scopeLabel?: string): void {
+function saveLastRun<T>(
+  key: string,
+  counts: T,
+  scopeLabel?: string,
+  elapsedMs?: number,
+): void {
   try {
     localStorage.setItem(
       key,
-      JSON.stringify({ counts, timestamp: Date.now(), scopeLabel }),
+      JSON.stringify({ counts, timestamp: Date.now(), scopeLabel, elapsedMs }),
     );
   } catch {
     // ignore storage errors (quota, private mode)
   }
+}
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
 function formatTokenCount(n: number): string {
@@ -54,7 +76,9 @@ function formatTokenCount(n: number): string {
 
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
+import { cn } from "../../lib/cn";
 import {
+  Badge,
   Button,
   Card,
   IconButton,
@@ -63,7 +87,11 @@ import {
   TextInput,
   Tooltip,
 } from "../ui";
-import { LLM_MAX_CONCURRENCY } from "./constants";
+import {
+  LLM_MAX_CONCURRENCY,
+  LLM_MIN_TIMEOUT,
+  LLM_MAX_TIMEOUT,
+} from "./constants";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
 
@@ -128,6 +156,7 @@ export function AISection({
   const selectedTagPresetId = selectedTagPresetIdOverride || tagDefaultPresetId;
   const selectedOcrPresetId = selectedOcrPresetIdOverride || ocrDefaultPresetId;
 
+  const [connectionExpanded, setConnectionExpanded] = useState(false);
   const [tagWorkspaceId, setTagWorkspaceId] =
     useState<string>(activeWorkspaceId);
   const [tagProjectId, setTagProjectId] = useState<string>("");
@@ -193,19 +222,26 @@ export function AISection({
     prevAITagPhase.current = aiTagActivity.phase;
     if (
       (prev === "running" || prev === "stopping" || prev === "saving") &&
-      (aiTagActivity.phase === "done" || aiTagActivity.phase === "stopped") &&
+      (aiTagActivity.phase === "done" ||
+        aiTagActivity.phase === "stopped" ||
+        aiTagActivity.phase === "error") &&
       aiTagActivity.counts
     ) {
       const sl = tagScopeLabelRef.current;
+      const elapsedMs =
+        aiTagActivity.startedAt != null
+          ? Date.now() - aiTagActivity.startedAt
+          : undefined;
       const record: LastRunRecord<AITagRunCounts> = {
         counts: aiTagActivity.counts,
         timestamp: Date.now(),
         scopeLabel: sl,
+        elapsedMs,
       };
-      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts, sl);
+      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts, sl, elapsedMs);
       setLastAITagRun(record);
     }
-  }, [aiTagActivity.phase, aiTagActivity.counts]);
+  }, [aiTagActivity.phase, aiTagActivity.counts, aiTagActivity.startedAt]);
 
   const prevVLMOcrPhase = useRef(vlmOcrActivity.phase);
   useEffect(() => {
@@ -213,19 +249,26 @@ export function AISection({
     prevVLMOcrPhase.current = vlmOcrActivity.phase;
     if (
       (prev === "running" || prev === "stopping" || prev === "saving") &&
-      (vlmOcrActivity.phase === "done" || vlmOcrActivity.phase === "stopped") &&
+      (vlmOcrActivity.phase === "done" ||
+        vlmOcrActivity.phase === "stopped" ||
+        vlmOcrActivity.phase === "error") &&
       vlmOcrActivity.counts
     ) {
       const sl = ocrScopeLabelRef.current;
+      const elapsedMs =
+        vlmOcrActivity.startedAt != null
+          ? Date.now() - vlmOcrActivity.startedAt
+          : undefined;
       const record: LastRunRecord<VLMOcrRunCounts> = {
         counts: vlmOcrActivity.counts,
         timestamp: Date.now(),
         scopeLabel: sl,
+        elapsedMs,
       };
-      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts, sl);
+      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts, sl, elapsedMs);
       setLastVLMOcrRun(record);
     }
-  }, [vlmOcrActivity.phase, vlmOcrActivity.counts]);
+  }, [vlmOcrActivity.phase, vlmOcrActivity.counts, vlmOcrActivity.startedAt]);
 
   const aiBusy =
     isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
@@ -234,13 +277,18 @@ export function AISection({
   const defaultEndpoints: Record<string, string> = {
     ollama: `http://${host}:11434`,
     "openai-compat": `http://${host}:1234/v1`,
+    omlx: `http://${host}:8000/v1`,
   };
 
   const providerEnabled = draft.llmEnabled && draft.llmProvider !== "";
   const modelsQuery = useLLMModelsQuery(
     providerEnabled && draft.llmEndpoint !== "",
     providerEnabled
-      ? { provider: draft.llmProvider, endpoint: draft.llmEndpoint }
+      ? {
+          provider: draft.llmProvider,
+          endpoint: draft.llmEndpoint,
+          apiKey: draft.llmApiKey || undefined,
+        }
       : undefined,
   );
   const healthMutation = useLLMHealthMutation();
@@ -257,7 +305,13 @@ export function AISection({
       value: "openai-compat",
       label: t("settings.llmProviderOpenAICompat"),
     },
+    {
+      value: "omlx",
+      label: t("settings.llmProviderOMLX"),
+    },
   ];
+  const providerLabel =
+    providerOptions.find((o) => o.value === draft.llmProvider)?.label ?? "";
 
   const runtime = healthMutation.data ?? settings?.llmRuntime;
   const isConnected = runtime?.connected ?? false;
@@ -283,6 +337,7 @@ export function AISection({
     void healthMutation.mutate({
       provider: draft.llmProvider,
       endpoint: draft.llmEndpoint,
+      apiKey: draft.llmApiKey || undefined,
     });
   }
 
@@ -326,147 +381,247 @@ export function AISection({
 
           {draft.llmEnabled && (
             <>
-              <FieldRow label={t("settings.llmProvider")}>
-                <Select
-                  value={draft.llmProvider || "ollama"}
-                  options={providerOptions}
-                  onChange={handleProviderChange}
-                  disabled={aiBusy}
-                  aria-label={t("settings.llmProvider")}
-                  className="min-w-[400px]"
-                />
-              </FieldRow>
-
-              <FieldRow label={t("settings.llmEndpoint")}>
-                <TextInput
-                  value={draft.llmEndpoint}
-                  disabled={aiBusy}
-                  onChange={(e) =>
-                    onUpdateDraft((current) => ({
-                      ...current,
-                      llmEndpoint: e.target.value,
-                    }))
-                  }
-                  aria-label={t("settings.llmEndpoint")}
-                  className="w-full min-w-[400px]"
-                />
-              </FieldRow>
-
-              <FieldRow
-                label={t("settings.llmVisionModel")}
-                description={t("settings.llmVisionModelHint")}
-              >
-                <div className="flex items-center gap-1.5 min-w-[400px]">
-                  <Select
-                    value={draft.llmVisionModel}
-                    options={modelOptions}
-                    disabled={aiBusy}
-                    onChange={(value) =>
-                      onUpdateDraft((current) => ({
-                        ...current,
-                        llmVisionModel: value,
-                      }))
-                    }
-                    aria-label={t("settings.llmVisionModel")}
-                    className="flex-1"
-                  />
-                  <IconButton
-                    aria-label={t("settings.llmRefreshModels")}
-                    onClick={() => void modelsQuery.refetch()}
-                    disabled={modelsQuery.isFetching}
-                    data-loading={modelsQuery.isFetching || undefined}
-                  >
-                    <RefreshCw size={14} />
-                  </IconButton>
-                </div>
-              </FieldRow>
-
-              <FieldRow
-                label={t("settings.llmEmbedModel")}
-                description={t("settings.llmEmbedModelHint")}
-              >
-                <div className="flex items-center gap-1.5 min-w-[400px]">
-                  <Select
-                    value={draft.llmEmbedModel}
-                    options={modelOptions}
-                    disabled={aiBusy}
-                    onChange={(value) =>
-                      onUpdateDraft((current) => ({
-                        ...current,
-                        llmEmbedModel: value,
-                      }))
-                    }
-                    aria-label={t("settings.llmEmbedModel")}
-                    className="flex-1"
-                  />
-                  <IconButton
-                    aria-label={t("settings.llmRefreshModels")}
-                    onClick={() => void modelsQuery.refetch()}
-                    disabled={modelsQuery.isFetching}
-                    data-loading={modelsQuery.isFetching || undefined}
-                  >
-                    <RefreshCw size={14} />
-                  </IconButton>
-                </div>
-              </FieldRow>
-
-              <FieldRow label={t("settings.llmStatus")}>
-                <div className="flex items-center gap-3 min-w-[400px]">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span
-                      className={`size-2 shrink-0 rounded-full ${isConnected ? "bg-g-green" : "bg-g-red"}`}
-                      aria-hidden="true"
-                    />
-                    <span className="font-g text-g-ui tracking-g-ui text-g-ink-2 truncate">
-                      {statusText}
-                    </span>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={working || healthMutation.isPending}
-                  >
-                    {t("settings.llmTestConnection")}
-                  </Button>
-                </div>
-              </FieldRow>
-              <div>
-                <FieldRow
-                  label={t("settings.llmConcurrency")}
-                  description={t("settings.llmConcurrencyHint")}
+              <div className="py-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 text-left"
+                  onClick={() => setConnectionExpanded((prev) => !prev)}
+                  aria-expanded={connectionExpanded}
                 >
-                  <TextInput
-                    type="number"
-                    min={1}
-                    max={LLM_MAX_CONCURRENCY}
-                    value={String(draft.llmConcurrency)}
-                    disabled={aiBusy}
-                    onChange={(e) =>
-                      onUpdateDraft((current) => ({
-                        ...current,
-                        llmConcurrency: Math.max(
-                          1,
-                          Math.min(
-                            LLM_MAX_CONCURRENCY,
-                            Number(e.target.value) || 1,
-                          ),
-                        ),
-                      }))
-                    }
-                    aria-label={t("settings.llmConcurrency")}
-                    className="min-w-[400px]"
+                  <Settings2 size={15} className="shrink-0 text-g-ink-3" />
+                  <span className="min-w-0 flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                    {t("settings.llmConnectionHeading")}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={cn(
+                      "shrink-0 text-g-ink-4 transition-transform duration-200 ease-g",
+                      connectionExpanded && "rotate-180",
+                    )}
                   />
-                </FieldRow>
-                {draft.llmConcurrency > 1 && (
-                  <div className="flex items-start gap-1.5 pb-4 text-g-amber">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    <span className="font-g text-[11px] leading-snug">
-                      {t("settings.llmConcurrencyWarning")}
-                    </span>
+                </button>
+                {!connectionExpanded && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {providerLabel && (
+                      <Badge tone="default">{providerLabel}</Badge>
+                    )}
+                    {draft.llmVisionModel && (
+                      <Badge tone="default">{draft.llmVisionModel}</Badge>
+                    )}
+                    <Badge tone={isConnected ? "green" : "default"}>
+                      {isConnected
+                        ? t("settings.llmStatusConnected")
+                        : t("settings.llmStatusNotTested")}
+                    </Badge>
                   </div>
                 )}
               </div>
+
+              {connectionExpanded && (
+                <>
+                  <FieldRow
+                    label={t("settings.llmProvider")}
+                    description={
+                      draft.llmProvider === "omlx"
+                        ? t("settings.llmOmlxGrammarHint")
+                        : undefined
+                    }
+                  >
+                    <Select
+                      value={draft.llmProvider || "ollama"}
+                      options={providerOptions}
+                      onChange={handleProviderChange}
+                      disabled={aiBusy}
+                      aria-label={t("settings.llmProvider")}
+                      className="min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow label={t("settings.llmEndpoint")}>
+                    <TextInput
+                      value={draft.llmEndpoint}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmEndpoint: e.target.value,
+                        }))
+                      }
+                      aria-label={t("settings.llmEndpoint")}
+                      className="w-full min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmApiKey")}
+                    description={t("settings.llmApiKeyHint")}
+                  >
+                    <TextInput
+                      type="password"
+                      value={draft.llmApiKey}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmApiKey: e.target.value,
+                        }))
+                      }
+                      placeholder={t("settings.llmApiKeyPlaceholder")}
+                      aria-label={t("settings.llmApiKey")}
+                      className="w-full min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmVisionModel")}
+                    description={t(
+                      `settings.llmVisionModelHint_${draft.llmProvider.replace("-", "_")}`,
+                      { defaultValue: t("settings.llmVisionModelHint") },
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-[400px]">
+                      <Select
+                        value={draft.llmVisionModel}
+                        options={modelOptions}
+                        disabled={aiBusy}
+                        onChange={(value) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmVisionModel: value,
+                          }))
+                        }
+                        aria-label={t("settings.llmVisionModel")}
+                        className="flex-1"
+                      />
+                      <IconButton
+                        aria-label={t("settings.llmRefreshModels")}
+                        onClick={() => void modelsQuery.refetch()}
+                        disabled={modelsQuery.isFetching}
+                        data-loading={modelsQuery.isFetching || undefined}
+                      >
+                        <RefreshCw size={14} />
+                      </IconButton>
+                    </div>
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmEmbedModel")}
+                    description={t(
+                      `settings.llmEmbedModelHint_${draft.llmProvider.replace("-", "_")}`,
+                      { defaultValue: t("settings.llmEmbedModelHint") },
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-[400px]">
+                      <Select
+                        value={draft.llmEmbedModel}
+                        options={modelOptions}
+                        disabled={aiBusy}
+                        onChange={(value) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmEmbedModel: value,
+                          }))
+                        }
+                        aria-label={t("settings.llmEmbedModel")}
+                        className="flex-1"
+                      />
+                      <IconButton
+                        aria-label={t("settings.llmRefreshModels")}
+                        onClick={() => void modelsQuery.refetch()}
+                        disabled={modelsQuery.isFetching}
+                        data-loading={modelsQuery.isFetching || undefined}
+                      >
+                        <RefreshCw size={14} />
+                      </IconButton>
+                    </div>
+                  </FieldRow>
+
+                  <FieldRow label={t("settings.llmStatus")}>
+                    <div className="flex items-center gap-3 min-w-[400px]">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span
+                          className={`size-2 shrink-0 rounded-full ${isConnected ? "bg-g-green" : "bg-g-red"}`}
+                          aria-hidden="true"
+                        />
+                        <span className="font-g text-g-ui tracking-g-ui text-g-ink-2 truncate">
+                          {statusText}
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleTestConnection}
+                        disabled={working || healthMutation.isPending}
+                      >
+                        {t("settings.llmTestConnection")}
+                      </Button>
+                    </div>
+                  </FieldRow>
+                  <div>
+                    <FieldRow
+                      label={t("settings.llmConcurrency")}
+                      description={t("settings.llmConcurrencyHint")}
+                    >
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={LLM_MAX_CONCURRENCY}
+                        value={String(draft.llmConcurrency)}
+                        disabled={aiBusy}
+                        onChange={(e) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmConcurrency: Math.max(
+                              1,
+                              Math.min(
+                                LLM_MAX_CONCURRENCY,
+                                Number(e.target.value) || 1,
+                              ),
+                            ),
+                          }))
+                        }
+                        aria-label={t("settings.llmConcurrency")}
+                        className="min-w-[400px]"
+                      />
+                    </FieldRow>
+                    {draft.llmConcurrency > 1 && (
+                      <div className="flex items-start gap-1.5 pb-4 text-g-amber">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                        <span className="font-g text-[11px] leading-snug">
+                          {t("settings.llmConcurrencyWarning")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <FieldRow
+                    label={t("settings.llmTimeout")}
+                    description={t("settings.llmTimeoutHint")}
+                  >
+                    <TextInput
+                      type="number"
+                      min={LLM_MIN_TIMEOUT}
+                      max={LLM_MAX_TIMEOUT}
+                      value={String(draft.llmTimeout)}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmTimeout: Math.max(
+                            LLM_MIN_TIMEOUT,
+                            Math.min(
+                              LLM_MAX_TIMEOUT,
+                              Number(e.target.value) || LLM_MIN_TIMEOUT,
+                            ),
+                          ),
+                        }))
+                      }
+                      aria-label={t("settings.llmTimeout")}
+                      className="min-w-[400px]"
+                    />
+                  </FieldRow>
+                </>
+              )}
             </>
           )}
           {settingActions}
@@ -560,12 +715,16 @@ export function AISection({
               </div>
               {isAITagActivityBusy(aiTagActivity) ||
               aiTagActivity.phase === "error" ? (
-                <AITagProgressText activity={aiTagActivity} />
+                <AITagProgressText
+                  activity={aiTagActivity}
+                  startedAt={aiTagActivity.startedAt}
+                />
               ) : lastAITagRun ? (
                 <LastRunText
                   counts={lastAITagRun.counts}
                   timestamp={lastAITagRun.timestamp}
                   scopeLabel={lastAITagRun.scopeLabel}
+                  elapsedMs={lastAITagRun.elapsedMs}
                 />
               ) : null}
             </div>
@@ -660,12 +819,16 @@ export function AISection({
               </div>
               {isVLMOcrActivityBusy(vlmOcrActivity) ||
               vlmOcrActivity.phase === "error" ? (
-                <VLMOcrProgressText activity={vlmOcrActivity} />
+                <VLMOcrProgressText
+                  activity={vlmOcrActivity}
+                  startedAt={vlmOcrActivity.startedAt}
+                />
               ) : lastVLMOcrRun ? (
                 <LastRunText
                   counts={lastVLMOcrRun.counts}
                   timestamp={lastVLMOcrRun.timestamp}
                   scopeLabel={lastVLMOcrRun.scopeLabel}
+                  elapsedMs={lastVLMOcrRun.elapsedMs}
                 />
               ) : null}
             </div>
@@ -737,10 +900,12 @@ function LastRunText({
   counts,
   timestamp,
   scopeLabel,
+  elapsedMs,
 }: {
   counts: AITagRunCounts | VLMOcrRunCounts;
   timestamp: number;
   scopeLabel?: string;
+  elapsedMs?: number;
 }) {
   const { t } = useTranslation();
   const date = new Date(timestamp);
@@ -755,18 +920,41 @@ function LastRunText({
         " " +
         timeStr;
 
+  const sep = (
+    <span className="text-g-ink-5 select-none" aria-hidden>
+      ·
+    </span>
+  );
+
   return (
     <div className="flex flex-col gap-0.5 items-end">
       <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-4 flex items-center gap-1.5">
         <span>{t("settings.aiLastRun", { time: dateStr })}</span>
         {"ready" in counts && (
-          <span>
-            {t("settings.aiLastRunCounts", {
-              ready: counts.ready,
-              skipped: counts.skipped,
-              cacheHit: counts.cacheHit,
-            })}
-          </span>
+          <>
+            {sep}
+            <span>
+              {t("settings.aiLastRunCounts", {
+                ready: counts.ready,
+                skipped: counts.skipped,
+                cacheHit: counts.cacheHit,
+              })}
+            </span>
+          </>
+        )}
+        {counts.failed > 0 && (
+          <>
+            {sep}
+            <span className="text-g-red">
+              {t("settings.aiLastRunFailed", { failed: counts.failed })}
+            </span>
+          </>
+        )}
+        {elapsedMs != null && (
+          <>
+            {sep}
+            <span>{formatElapsed(elapsedMs)}</span>
+          </>
         )}
       </p>
       {scopeLabel && (
@@ -785,17 +973,110 @@ function LastRunText({
   );
 }
 
-function AITagProgressText({ activity }: { activity: AITagActivityState }) {
+function ActivityErrorPanel({
+  errors,
+}: {
+  errors: { repoPath: string; message: string }[];
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (errors.length === 0) return null;
+  return (
+    <div className="mt-1 w-full rounded-g-md border border-g-line bg-g-surface text-g-caption leading-[1.45]">
+      <div className="flex items-center">
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <ChevronDown
+            size={12}
+            className={`shrink-0 transition-transform duration-100 ${expanded ? "" : "-rotate-90"}`}
+          />
+          <span className="flex-1 truncate">
+            {t("activity.failedCount", {
+              count: errors.length,
+              defaultValue: "{{count}} failed",
+            })}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label={
+            copied
+              ? t("activity.errorsCopied", { defaultValue: "Copied" })
+              : t("activity.copyErrors", { defaultValue: "Copy errors" })
+          }
+          className="shrink-0 px-2 py-1.5 text-g-ink-4 hover:text-g-ink transition-colors duration-100"
+          onClick={() => {
+            const text = errors
+              .map((e) => `${e.repoPath}\n${e.message}`)
+              .join("\n\n");
+            navigator.clipboard.writeText(text).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            });
+          }}
+        >
+          {copied ? (
+            <Check size={12} className="text-g-green" />
+          ) : (
+            <Copy size={12} />
+          )}
+        </button>
+      </div>
+      {expanded && (
+        <ul className="max-h-[160px] overflow-y-auto border-t border-g-line">
+          {errors.map((err, i) => (
+            <li
+              key={i}
+              className="border-b border-g-line px-2 py-1 last:border-b-0"
+            >
+              <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
+                {err.repoPath}
+              </span>
+              <span className="block truncate text-g-red">{err.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AITagProgressText({
+  activity,
+  startedAt,
+}: {
+  activity: AITagActivityState;
+  startedAt?: number;
+}) {
   const { t } = useTranslation();
   const busy = isAITagActivityBusy(activity);
   const label = aiTagProgressLabel(activity, t);
   const counts = activity.counts;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!busy || !startedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [busy, startedAt]);
+  const elapsedMs = busy && startedAt ? now - startedAt : undefined;
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
       <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
         {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
         {label}
+        {elapsedMs != null && (
+          <>
+            <span className="text-g-ink-5 select-none" aria-hidden>
+              ·
+            </span>
+            <span className="text-g-ink-4">{formatElapsed(elapsedMs)}</span>
+          </>
+        )}
       </p>
       {busy && activity.currentFile && (
         <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
@@ -807,6 +1088,9 @@ function AITagProgressText({ activity }: { activity: AITagActivityState }) {
           inputTokens={counts.inputTokens ?? 0}
           outputTokens={counts.outputTokens ?? 0}
         />
+      )}
+      {activity.errors.length > 0 && (
+        <ActivityErrorPanel errors={activity.errors} />
       )}
     </div>
   );
@@ -846,17 +1130,38 @@ function vlmOcrProgressLabel(
   }
 }
 
-function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
+function VLMOcrProgressText({
+  activity,
+  startedAt,
+}: {
+  activity: VLMOcrActivityState;
+  startedAt?: number;
+}) {
   const { t } = useTranslation();
   const busy = isVLMOcrActivityBusy(activity);
   const label = vlmOcrProgressLabel(activity, t);
   const counts = activity.counts;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!busy || !startedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [busy, startedAt]);
+  const elapsedMs = busy && startedAt ? now - startedAt : undefined;
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
       <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
         {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
         {label}
+        {elapsedMs != null && (
+          <>
+            <span className="text-g-ink-5 select-none" aria-hidden>
+              ·
+            </span>
+            <span className="text-g-ink-4">{formatElapsed(elapsedMs)}</span>
+          </>
+        )}
       </p>
       {busy && activity.currentFile && (
         <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
@@ -868,6 +1173,9 @@ function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
           inputTokens={counts.inputTokens ?? 0}
           outputTokens={counts.outputTokens ?? 0}
         />
+      )}
+      {activity.errors.length > 0 && (
+        <ActivityErrorPanel errors={activity.errors} />
       )}
     </div>
   );

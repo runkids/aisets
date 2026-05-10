@@ -144,11 +144,13 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmEnabled: settings?.llmEnabled ?? false,
     llmProvider: settings?.llmProvider ?? "",
     llmEndpoint: settings?.llmEndpoint ?? "http://localhost:11434",
+    llmApiKey: settings?.llmApiKey ?? "",
     llmVisionModel: settings?.llmVisionModel ?? "",
     llmEmbedModel: settings?.llmEmbedModel ?? "",
     llmTagPrompt: settings?.llmTagPrompt ?? "",
     llmOcrPrompt: settings?.llmOcrPrompt ?? "",
     llmConcurrency: settings?.llmConcurrency ?? 1,
+    llmTimeout: settings?.llmTimeout ?? 120,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -193,11 +195,13 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmEnabled: draft.llmEnabled,
     llmProvider: draft.llmProvider,
     llmEndpoint: draft.llmEndpoint,
+    llmApiKey: draft.llmApiKey,
     llmVisionModel: draft.llmVisionModel,
     llmEmbedModel: draft.llmEmbedModel,
     llmTagPrompt: draft.llmTagPrompt,
     llmOcrPrompt: draft.llmOcrPrompt,
     llmConcurrency: draft.llmConcurrency,
+    llmTimeout: draft.llmTimeout,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -259,6 +263,7 @@ export function resetSectionDraft(
         llmTagPrompt: defaults.llmTagPrompt,
         llmOcrPrompt: defaults.llmOcrPrompt,
         llmConcurrency: defaults.llmConcurrency,
+        llmTimeout: defaults.llmTimeout,
       };
     case "customFilters":
       return {

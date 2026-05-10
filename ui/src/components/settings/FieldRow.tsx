@@ -28,7 +28,7 @@ export function FieldRow({
           {label}
         </span>
         {description && (
-          <p className="mt-0.5 max-w-[48ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
+          <p className="mt-0.5 max-w-[64ch] font-g text-g-ui font-normal tracking-g-ui text-g-ink-3">
             {description}
           </p>
         )}

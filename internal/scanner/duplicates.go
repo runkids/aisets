@@ -2,10 +2,13 @@ package scanner
 
 import (
 	"context"
+	"image"
 	"math/bits"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"aisets/internal/imageproc"
 )
@@ -132,8 +135,48 @@ func hammingDistance(a, b uint64) int {
 	return bits.OnesCount64(a ^ b)
 }
 
+func precomputeVisualSamples(ctx context.Context, items []AssetItem) []*image.NRGBA {
+	samples := make([]*image.NRGBA, len(items))
+	workers := max(1, min(runtime.NumCPU(), 8))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for idx := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				if items[idx].LocalPath == "" {
+					continue
+				}
+				s, err := imageproc.VisualSample(items[idx].LocalPath)
+				if err == nil {
+					samples[idx] = s
+				}
+			}
+		}()
+	}
+	for i := range items {
+		if ctx.Err() != nil {
+			break
+		}
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	return samples
+}
+
 func markNearDuplicates(ctx context.Context, items []AssetItem, progress ProgressFunc) ([]NearDuplicate, error) {
 	const threshold = 5
+
+	samples := precomputeVisualSamples(ctx, items)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	var out []NearDuplicate
 	index := nearHashIndex{}
 	for current := 0; current < len(items); current++ {
@@ -166,7 +209,12 @@ func markNearDuplicates(ctx context.Context, items []AssetItem, progress Progres
 			if items[previous].ContentHash != "" && items[previous].ContentHash == items[current].ContentHash {
 				continue
 			}
-			if !imageproc.IsVisualMatch(items[previous].LocalPath, items[current].LocalPath, candidate.flipped) {
+			if samples[previous] != nil && samples[current] != nil {
+				dist := imageproc.VisualDistanceFromSamples(samples[previous], samples[current], candidate.flipped)
+				if dist > imageproc.NearDuplicateVisualDistanceThreshold {
+					continue
+				}
+			} else if !imageproc.IsVisualMatch(items[previous].LocalPath, items[current].LocalPath, candidate.flipped) {
 				continue
 			}
 			items[previous].Similar = append(items[previous].Similar, items[current].ID)

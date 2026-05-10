@@ -133,6 +133,8 @@ export const defaultOptimizationStrategies: OptimizationStrategy[] = [
 ];
 
 export const LLM_MAX_CONCURRENCY = 8;
+export const LLM_MIN_TIMEOUT = 30;
+export const LLM_MAX_TIMEOUT = 600;
 
 export const defaultSettings: SettingsUpdate = {
   workspaceName: "Aisets",

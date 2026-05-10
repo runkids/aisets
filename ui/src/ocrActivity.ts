@@ -15,11 +15,12 @@ export type OCRActivityState = {
   counts: OCRRunCounts | null;
   errorCode?: string;
   errorMessage?: string;
+  startedAt?: number;
 };
 
 export type OCRActivityAction =
   | { type: "saving" }
-  | { type: "batchStarted"; batch: number }
+  | { type: "batchStarted"; batch: number; startedAt?: number }
   | { type: "event"; event: OCRRunEvent }
   | { type: "stopping" }
   | { type: "done"; counts?: OCRRunCounts }
@@ -69,6 +70,7 @@ export function ocrActivityReducer(
         phase: "running",
         batch: action.batch,
         counts: state.counts,
+        startedAt: state.startedAt ?? action.startedAt,
       };
     case "event":
       return "counts" in action.event && action.event.counts
@@ -81,12 +83,14 @@ export function ocrActivityReducer(
         phase: "done",
         batch: state.batch,
         counts: action.counts ?? state.counts,
+        startedAt: state.startedAt,
       };
     case "stopped":
       return {
         phase: "stopped",
         batch: state.batch,
         counts: action.counts ?? state.counts,
+        startedAt: state.startedAt,
       };
     case "error":
       return {
@@ -95,6 +99,7 @@ export function ocrActivityReducer(
         counts: action.counts ?? state.counts,
         errorCode: action.errorCode,
         errorMessage: action.errorMessage,
+        startedAt: state.startedAt,
       };
     case "dismiss":
       return initialOCRActivityState;
@@ -157,7 +162,7 @@ export async function runOCRActivity({
       activeController = new AbortController();
       abortRef.current = activeController;
       batch += 1;
-      dispatch({ type: "batchStarted", batch });
+      dispatch({ type: "batchStarted", batch, startedAt: Date.now() });
 
       const result = await runBatch({
         signal: activeController.signal,

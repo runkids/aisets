@@ -47,6 +47,9 @@ type CatalogItemQuery struct {
 	Operation            string
 	AICategory           string
 	AIOcrStatus          string
+	VLMEngineVersion     string
+	AITagProviderName    string
+	AITagModelName       string
 	Limit                int
 	Cursor               string
 }
@@ -143,13 +146,19 @@ type CatalogDuplicateGroup struct {
 	Members       []scanner.AssetItem `json:"members"`
 }
 
+type CatalogNearDuplicatePair struct {
+	scanner.NearDuplicate
+	LeftItem  *scanner.AssetItem `json:"leftItem,omitempty"`
+	RightItem *scanner.AssetItem `json:"rightItem,omitempty"`
+}
+
 type CatalogDuplicatesPage struct {
-	Groups     []CatalogDuplicateGroup `json:"groups"`
-	Pairs      []scanner.NearDuplicate `json:"pairs"`
-	Total      int                     `json:"total"`
-	TotalFiles int                     `json:"totalFiles"`
-	NextCursor string                  `json:"nextCursor,omitempty"`
-	Facets     CatalogDuplicatesFacets `json:"facets"`
+	Groups     []CatalogDuplicateGroup  `json:"groups"`
+	Pairs      []CatalogNearDuplicatePair `json:"pairs"`
+	Total      int                      `json:"total"`
+	TotalFiles int                      `json:"totalFiles"`
+	NextCursor string                   `json:"nextCursor,omitempty"`
+	Facets     CatalogDuplicatesFacets  `json:"facets"`
 }
 
 type CatalogDuplicatesFacets struct {

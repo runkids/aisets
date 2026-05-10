@@ -166,13 +166,10 @@ export function DuplicatesView({
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const hasMoreData =
-    hasMoreDuplicateItems ||
-    (tab === "exact" ? hasMoreExactDuplicates : hasMoreNearDuplicates);
+    hasMoreDuplicateItems || (tab === "exact" && hasMoreExactDuplicates);
   const isFetchingMore =
     isFetchingMoreDuplicateItems ||
-    (tab === "exact"
-      ? isFetchingMoreExactDuplicates
-      : isFetchingMoreNearDuplicates);
+    (tab === "exact" && isFetchingMoreExactDuplicates);
 
   const loadMorePages = useCallback(() => {
     if (hasMoreDuplicateItems && !isFetchingMoreDuplicateItems)
@@ -180,9 +177,6 @@ export function DuplicatesView({
     if (tab === "exact") {
       if (hasMoreExactDuplicates && !isFetchingMoreExactDuplicates)
         void fetchNextExactDuplicatesPage();
-    } else {
-      if (hasMoreNearDuplicates && !isFetchingMoreNearDuplicates)
-        void fetchNextNearDuplicatesPage();
     }
   }, [
     tab,
@@ -192,9 +186,6 @@ export function DuplicatesView({
     fetchNextExactDuplicatesPage,
     hasMoreExactDuplicates,
     isFetchingMoreExactDuplicates,
-    fetchNextNearDuplicatesPage,
-    hasMoreNearDuplicates,
-    isFetchingMoreNearDuplicates,
   ]);
 
   useInfiniteScrollSentinel({
@@ -261,14 +252,6 @@ export function DuplicatesView({
     return groupViews.map((g) => ({ group: g }));
   }, [groupedByExt, groupViews]);
 
-  const visibleNearDuplicates = useMemo(
-    () =>
-      nearDuplicates.filter(
-        (nd) => itemById.has(nd.leftId) && itemById.has(nd.rightId),
-      ),
-    [nearDuplicates, itemById],
-  );
-
   // eslint-disable-next-line react-hooks/incompatible-library -- intentional virtual scroll for 900+ groups
   const exactVirtualizer = useVirtualizer({
     count: virtualRows.length,
@@ -279,15 +262,38 @@ export function DuplicatesView({
   });
   const exactVirtualItems = exactVirtualizer.getVirtualItems();
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- virtual scroll for similar pairs
+  const nearFirstPage = nearDuplicatesQuery.data?.pages[0];
+  const nearTotal = nearFirstPage?.total ?? 0;
+
+  // eslint-disable-next-line react-hooks/incompatible-library -- windowed virtual scroll for similar pairs
   const similarVirtualizer = useVirtualizer({
-    count: visibleNearDuplicates.length,
+    count: nearTotal,
     getScrollElement: () => exactScrollRef.current,
     estimateSize: () => 340,
     overscan: 4,
     enabled: tab === "similar",
   });
   const similarVirtualItems = similarVirtualizer.getVirtualItems();
+
+  const lastVisibleSimilarIndex =
+    similarVirtualItems.length > 0
+      ? similarVirtualItems[similarVirtualItems.length - 1].index
+      : -1;
+
+  useEffect(() => {
+    if (tab !== "similar") return;
+    if (!hasMoreNearDuplicates || isFetchingMoreNearDuplicates) return;
+    if (lastVisibleSimilarIndex >= nearDuplicates.length - 200) {
+      void fetchNextNearDuplicatesPage();
+    }
+  }, [
+    tab,
+    lastVisibleSimilarIndex,
+    nearDuplicates.length,
+    hasMoreNearDuplicates,
+    isFetchingMoreNearDuplicates,
+    fetchNextNearDuplicatesPage,
+  ]);
 
   /* ── Selection callbacks ── */
 
@@ -565,7 +571,6 @@ export function DuplicatesView({
   /* ── Render ── */
 
   const exactFirstPage = exactDuplicatesQuery.data?.pages[0];
-  const nearFirstPage = nearDuplicatesQuery.data?.pages[0];
 
   return (
     <>
@@ -803,11 +808,8 @@ export function DuplicatesView({
 
           {!loading &&
             tab === "similar" &&
-            (visibleNearDuplicates.length === 0 ? (
-              nearDuplicatesQuery.isLoading ||
-              duplicateItemsQuery.isLoading ||
-              nearDuplicatesQuery.isFetchingNextPage ||
-              duplicateItemsQuery.isFetchingNextPage ? (
+            (nearTotal === 0 ? (
+              nearDuplicatesQuery.isLoading ? (
                 <EmptyState title={t("common.loading")} />
               ) : (
                 <EmptyState
@@ -821,9 +823,13 @@ export function DuplicatesView({
                 style={{ height: similarVirtualizer.getTotalSize() }}
               >
                 {similarVirtualItems.map((vItem) => {
-                  const nd = visibleNearDuplicates[vItem.index];
-                  const left = itemById.get(nd.leftId)!;
-                  const right = itemById.get(nd.rightId)!;
+                  const nd = nearDuplicates[vItem.index];
+                  const left = nd
+                    ? (nd.leftItem ?? itemById.get(nd.leftId))
+                    : undefined;
+                  const right = nd
+                    ? (nd.rightItem ?? itemById.get(nd.rightId))
+                    : undefined;
                   return (
                     <div
                       key={vItem.key}
@@ -835,7 +841,11 @@ export function DuplicatesView({
                       data-index={vItem.index}
                     >
                       <div className="pb-4">
-                        <SimilarPairCard nd={nd} left={left} right={right} />
+                        {nd && left && right ? (
+                          <SimilarPairCard nd={nd} left={left} right={right} />
+                        ) : (
+                          <SimilarPairSkeleton />
+                        )}
                       </div>
                     </div>
                   );
@@ -908,6 +918,33 @@ export function DuplicatesView({
         </div>
       </div>
     </>
+  );
+}
+
+/* ── Similar pair skeleton ── */
+
+function SimilarPairSkeleton() {
+  return (
+    <Card padding="md">
+      <div className="mb-2 flex items-center gap-2">
+        <div className="h-5 w-10 animate-pulse rounded-full bg-g-surface-2" />
+        <span className="flex-1" />
+        <div className="h-7 w-48 animate-pulse rounded-g-md bg-g-surface-2" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="aspect-square animate-pulse rounded-g-md bg-g-surface-2" />
+        <div className="aspect-square animate-pulse rounded-g-md bg-g-surface-2" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-g-surface-2" />
+        <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-g-surface-2" />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="h-3 animate-pulse rounded-full bg-g-surface-2" />
+        <div className="h-3 animate-pulse rounded-full bg-g-surface-2" />
+        <div className="h-3 animate-pulse rounded-full bg-g-surface-2" />
+      </div>
+    </Card>
   );
 }
 

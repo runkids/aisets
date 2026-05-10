@@ -23,10 +23,11 @@ export type OptimizeActivityState = {
   stage?: OptimizeActivityStage;
   counts: OptimizeActivityCounts | null;
   errorMessage?: string;
+  startedAt?: number;
 };
 
 export type OptimizeActivityAction =
-  | { type: "start"; total: number; stage?: OptimizeActivityStage }
+  | { type: "start"; total: number; stage?: OptimizeActivityStage; startedAt?: number }
   | { type: "stage"; stage: OptimizeActivityStage }
   | { type: "operation"; operation: OptimizationOperation }
   | { type: "stopping" }
@@ -56,6 +57,7 @@ export function optimizeActivityReducer(
           blocked: 0,
           savingsBytes: 0,
         },
+        startedAt: state.startedAt ?? action.startedAt,
       };
     case "stage":
       return isOptimizeActivityBusy(state)

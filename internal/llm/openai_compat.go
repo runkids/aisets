@@ -124,10 +124,12 @@ type openAIChatResponse struct {
 	} `json:"usage"`
 }
 
-// Chat sends a chat request to POST /v1/chat/completions with a 120s timeout.
-// When a message has Images, the content is sent as an array with text + image_url parts.
 func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	timeout := DefaultChatTimeout
+	if req.TimeoutSec > 0 {
+		timeout = req.TimeoutSec
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
 	msgs := make([]openAIChatMessage, len(req.Messages))

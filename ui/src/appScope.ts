@@ -66,14 +66,12 @@ export function optimizableBadgeCount(
   selectedProjectStats: CatalogProjectStats | null,
   fallbackCount: number,
 ) {
+  if (summary?.analysis.optimization !== "computed") return 0;
   if (selectedProjectStats) return selectedProjectStats.optimizableFiles;
-  if (summary) {
-    return summary.projectStats.reduce(
-      (total, stat) => total + stat.optimizableFiles,
-      0,
-    );
-  }
-  return fallbackCount;
+  return summary.projectStats.reduce(
+    (total, stat) => total + stat.optimizableFiles,
+    0,
+  );
 }
 
 export function catalogItemsTotalCount(

@@ -77,8 +77,8 @@ describe("runOCRActivity", () => {
 
     expect(result).toEqual({ status: "done" });
     expect(dispatch).toHaveBeenCalledWith({ type: "saving" });
-    expect(dispatch).toHaveBeenCalledWith({ type: "batchStarted", batch: 1 });
-    expect(dispatch).toHaveBeenCalledWith({ type: "batchStarted", batch: 2 });
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "batchStarted", batch: 1 }));
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "batchStarted", batch: 2 }));
     expect(dispatch).toHaveBeenLastCalledWith({
       type: "done",
       counts: secondCounts,

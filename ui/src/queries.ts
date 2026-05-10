@@ -717,10 +717,15 @@ export function useBatchCopyMutation() {
 
 export function useLLMModelsQuery(
   enabled: boolean,
-  params?: { provider: string; endpoint: string },
+  params?: { provider: string; endpoint: string; apiKey?: string },
 ) {
   return useQuery({
-    queryKey: ["llm-models", params?.provider, params?.endpoint],
+    queryKey: [
+      "llm-models",
+      params?.provider,
+      params?.endpoint,
+      params?.apiKey,
+    ],
     queryFn: () => fetchLLMModels(params),
     enabled,
     staleTime: 30_000,

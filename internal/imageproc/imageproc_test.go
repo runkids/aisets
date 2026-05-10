@@ -158,6 +158,105 @@ func TestVisualDistanceRejectsColorOnlyHashCollisions(t *testing.T) {
 	}
 }
 
+func TestVisualDistanceAlphaWeighted(t *testing.T) {
+	root := t.TempDir()
+
+	iconA := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for y := 8; y < 24; y++ {
+		for x := 8; x < 24; x++ {
+			iconA.Set(x, y, color.NRGBA{A: 255})
+		}
+	}
+
+	iconB := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for y := 0; y < 32; y++ {
+		for x := 0; x < 16; x++ {
+			iconB.Set(x, y, color.NRGBA{R: 200, G: 150, B: 100, A: 255})
+		}
+	}
+
+	pathA := filepath.Join(root, "a.png")
+	pathB := filepath.Join(root, "b.png")
+	writePNG(t, pathA, iconA)
+	writePNG(t, pathB, iconB)
+
+	dist, err := VisualDistance(pathA, pathB, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dist <= NearDuplicateVisualDistanceThreshold {
+		t.Fatalf("different icons on transparent bg: distance=%d, want > %d", dist, NearDuplicateVisualDistanceThreshold)
+	}
+
+	same, err := VisualDistance(pathA, pathA, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same != 0 {
+		t.Fatalf("identical icon: distance=%d, want 0", same)
+	}
+
+	fullyTransparent := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	pathC := filepath.Join(root, "c.png")
+	writePNG(t, pathC, fullyTransparent)
+	allTransparent, err := VisualDistance(pathC, pathC, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allTransparent != 255 {
+		t.Fatalf("both fully transparent: distance=%d, want 255", allTransparent)
+	}
+}
+
+func TestVisualDistanceRejectsDifferentBlackSilhouettes(t *testing.T) {
+	root := t.TempDir()
+
+	bell := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for y := 10; y < 50; y++ {
+		for x := 12; x < 52; x++ {
+			if (x-32)*(x-32)+(y-30)*(y-30) < 400 {
+				bell.Set(x, y, color.NRGBA{A: 255})
+			}
+		}
+	}
+
+	house := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for y := 30; y < 55; y++ {
+		for x := 12; x < 52; x++ {
+			house.Set(x, y, color.NRGBA{A: 255})
+		}
+	}
+	for y := 10; y < 30; y++ {
+		cx := 32
+		hw := (y - 10) * 2
+		for x := cx - hw; x < cx+hw && x < 64; x++ {
+			if x >= 0 {
+				house.Set(x, y, color.NRGBA{A: 255})
+			}
+		}
+	}
+
+	bellPath := filepath.Join(root, "bell.png")
+	housePath := filepath.Join(root, "house.png")
+	writePNG(t, bellPath, bell)
+	writePNG(t, housePath, house)
+
+	dist, err := VisualDistance(bellPath, housePath, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dist <= NearDuplicateVisualDistanceThreshold {
+		t.Fatalf("bell vs house silhouette: distance=%d, want > %d", dist, NearDuplicateVisualDistanceThreshold)
+	}
+
+	sampleBell := visualSample(bell)
+	sampleHouse := visualSample(house)
+	distSamples := VisualDistanceFromSamples(sampleBell, sampleHouse, false)
+	if distSamples <= NearDuplicateVisualDistanceThreshold {
+		t.Fatalf("bell vs house from samples: distance=%d, want > %d", distSamples, NearDuplicateVisualDistanceThreshold)
+	}
+}
+
 func TestSVGThumbnailAndDHashUseGoRasterizer(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "icon.svg")

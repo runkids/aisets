@@ -205,6 +205,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
+	timeoutSec := settings.LLMTimeout
 	concurrency := min(max(settings.LLMConcurrency, 1), llm.MaxConcurrency)
 	if concurrency > len(candidates) && len(candidates) > 0 {
 		concurrency = len(candidates)
@@ -218,7 +219,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for item := range jobs {
-				result, chatResp := s.processVLMOCR(ctx, item, providerName, modelName, prompt)
+				result, chatResp := s.processVLMOCR(ctx, item, providerName, modelName, prompt, timeoutSec)
 				select {
 				case results <- vlmOcrWorkResult{item: item, result: result, chatResp: chatResp}:
 				case <-ctx.Done():
@@ -244,9 +245,13 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		close(results)
 	}()
 
+	var firstError string
 	for work := range results {
 		if work.result.Status == ocr.StatusFailed {
 			counts.Failed++
+			if firstError == "" {
+				firstError = work.result.ErrorMessage
+			}
 		} else {
 			counts.Ready++
 		}
@@ -268,13 +273,21 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts})
+		progressEvent := map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts}
+		if work.result.Status == ocr.StatusFailed && work.result.ErrorMessage != "" {
+			progressEvent["errorMessage"] = work.result.ErrorMessage
+		}
+		sendNDJSON(w, progressEvent)
 	}
 
-	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
+	doneEvent := map[string]any{"type": "done", "counts": counts}
+	if firstError != "" {
+		doneEvent["firstError"] = firstError
+	}
+	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) (ocr.Result, llm.ChatResponse) {
+func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string, timeoutSec int) (ocr.Result, llm.ChatResponse) {
 	engineVersion := providerName + "/" + modelName
 	result := ocr.Result{
 		ProjectID:     item.ProjectID,
@@ -305,6 +318,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 			Content: prompt,
 			Images:  []string{dataURI},
 		}},
+		TimeoutSec: timeoutSec,
 	})
 	result.DurationMs = time.Since(start).Milliseconds()
 

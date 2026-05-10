@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestOpenAICompatName(t *testing.T) {
-	p := NewOpenAICompatProvider("http://localhost:1234/v1")
+	p := NewOpenAICompatProvider("http://localhost:1234/v1", "")
 	if got := p.Name(); got != "openai-compat" {
 		t.Fatalf("Name() = %q, want %q", got, "openai-compat")
 	}
@@ -30,7 +32,7 @@ func TestOpenAICompatListModels(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOpenAICompatProvider(srv.URL + "/v1")
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
 	models, err := p.ListModels(context.Background())
 	if err != nil {
 		t.Fatalf("ListModels error: %v", err)
@@ -67,7 +69,7 @@ func TestOpenAICompatChat(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOpenAICompatProvider(srv.URL + "/v1")
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
 	resp, err := p.Chat(context.Background(), ChatRequest{
 		Model: "llava-v1.6",
 		Messages: []ChatMessage{
@@ -115,7 +117,7 @@ func TestOpenAICompatChatWithVision(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOpenAICompatProvider(srv.URL + "/v1")
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
 	resp, err := p.Chat(context.Background(), ChatRequest{
 		Model: "llava-v1.6",
 		Messages: []ChatMessage{
@@ -195,7 +197,7 @@ func TestOpenAICompatEmbed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOpenAICompatProvider(srv.URL + "/v1")
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
 	resp, err := p.Embed(context.Background(), EmbedRequest{
 		Model: "nomic-embed-text",
 		Input: "hello world",
@@ -214,8 +216,53 @@ func TestOpenAICompatEmbed(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatChatTimeoutSec(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(2 * time.Second):
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"slow"}}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	_, err := p.Chat(context.Background(), ChatRequest{
+		Model:      "test-model",
+		Messages:   []ChatMessage{{Role: "user", Content: "hi"}},
+		TimeoutSec: 1,
+	})
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected context deadline exceeded, got: %v", err)
+	}
+}
+
+func TestOpenAICompatChatDefaultTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"fast"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Model:    "test-model",
+		Messages: []ChatMessage{{Role: "user", Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Content != "fast" {
+		t.Errorf("Content = %q, want %q", resp.Content, "fast")
+	}
+}
+
 func TestOpenAICompatAvailableConnectionRefused(t *testing.T) {
-	p := NewOpenAICompatProvider("http://127.0.0.1:1/v1")
+	p := NewOpenAICompatProvider("http://127.0.0.1:1/v1", "")
 	if err := p.Available(context.Background()); err == nil {
 		t.Fatal("Available() expected error for unreachable server, got nil")
 	}

@@ -311,6 +311,7 @@ export function AppTopbar({
             countsLabel={optimizeCounts}
             errorMessage={optimizeActivity.errorMessage}
             progressPercent={optimizeActivityProgressPercent(optimizeActivity)}
+            startedAt={optimizeActivity.startedAt}
             showIndeterminate
             primaryAction={{
               label: t("activity.viewOptimize"),
@@ -345,6 +346,7 @@ export function AppTopbar({
             errorMessage={aiTagActivity.errorMessage}
             errors={aiTagActivity.errors}
             progressPercent={aiTagActivityProgressPercent(aiTagActivity)}
+            startedAt={aiTagActivity.startedAt}
             primaryAction={{
               label: t("activity.viewAISettings"),
               onClick: onOpenAISettings,
@@ -380,6 +382,7 @@ export function AppTopbar({
             errorMessage={vlmOcrActivity.errorMessage}
             errors={vlmOcrActivity.errors}
             progressPercent={vlmOcrActivityProgressPercent(vlmOcrActivity)}
+            startedAt={vlmOcrActivity.startedAt}
             primaryAction={{
               label: t("activity.viewAISettings"),
               onClick: onOpenAISettings,
@@ -414,6 +417,7 @@ export function AppTopbar({
             countsLabel={ocrCounts}
             errorMessage={ocrActivity.errorMessage}
             progressPercent={ocrActivityProgressPercent(ocrActivity)}
+            startedAt={ocrActivity.startedAt}
             primaryAction={{
               label: t("activity.viewOCRSettings"),
               onClick: onOpenOCRSettings,

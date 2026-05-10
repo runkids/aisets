@@ -481,20 +481,12 @@ func (s *Server) scan(ctx context.Context) (scanner.Catalog, int64, error) {
 	return s.scanWithProgress(ctx, scanner.ScanOptions{}, nil)
 }
 
-func (s *Server) scanFast(ctx context.Context) (scanner.Catalog, int64, error) {
-	return s.scanWithProgress(ctx, scanner.ScanOptions{Profile: scanner.ScanProfileFast}, nil)
-}
-
 func (s *Server) scanTracked(ctx context.Context, options scanner.ScanOptions) (scanner.Catalog, int64, error) {
 	if !s.beginScan() {
 		return scanner.Catalog{}, 0, apierr.New("scan_already_running", "scan is already running")
 	}
 	defer s.finishScan()
 	return s.scanWithProgress(ctx, options, s.updateScanProgress)
-}
-
-func (s *Server) scanFastTracked(ctx context.Context) (scanner.Catalog, int64, error) {
-	return s.scanTracked(ctx, scanner.ScanOptions{Profile: scanner.ScanProfileFast})
 }
 
 func (s *Server) beginScan() bool {
@@ -574,7 +566,7 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 			if s.isScanRunning() {
 				return summary, nil
 			}
-			_, _, err := s.scanFastTracked(ctx)
+			_, _, err := s.scanTracked(ctx, scanner.ScanOptions{})
 			if err != nil {
 				return config.CatalogSummary{}, err
 			}
@@ -588,7 +580,7 @@ func (s *Server) ensureLatestScan(ctx context.Context) (config.CatalogSummary, e
 			if s.isScanRunning() {
 				return summary, nil
 			}
-			_, _, err := s.scanFastTracked(ctx)
+			_, _, err := s.scanTracked(ctx, scanner.ScanOptions{})
 			if err != nil {
 				return config.CatalogSummary{}, err
 			}

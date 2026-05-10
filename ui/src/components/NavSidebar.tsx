@@ -12,7 +12,6 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
 import type { Mode } from "../ui";
-import { useVersionQuery } from "../queries";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 
 type Badges = {
@@ -92,8 +91,6 @@ export function NavSidebar({
   onSelect,
 }: Props) {
   const { t, i18n } = useTranslation();
-  const versionQuery = useVersionQuery();
-  const version = versionQuery.data?.currentVersion ?? "";
   const lastScan = formatLastScanTime(lastScanAt, i18n.language);
   const scanDuration = formatScanDuration(lastScanStartedAt, lastScanAt);
 
@@ -241,29 +238,18 @@ export function NavSidebar({
       </nav>
 
       <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm max-[960px]:items-center max-[960px]:px-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-g-chip font-g-display font-[590] text-g-ink-3 max-[960px]:hidden">
-            Aisets
-          </span>
-          <span className="hidden text-g-chip font-g-display font-[590] text-g-ink-3 max-[960px]:inline">
-            AS
-          </span>
-          {version && (
-            <span className="font-g-mono text-g-chip text-g-ink-5 max-[960px]:hidden">
-              v{version}
+        <div className="flex flex-col gap-0.5 text-g-chip text-g-ink-4 max-[960px]:hidden">
+          <span>{t("nav.lastScan")}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate font-g-mono tabular-nums text-g-ink-3">
+              {lastScan}
             </span>
-          )}
-        </div>
-        <div className="flex min-w-0 items-center gap-1.5 text-g-chip text-g-ink-4 max-[960px]:hidden">
-          <span className="shrink-0">{t("nav.lastScan")}</span>
-          <span className="truncate font-g-mono tabular-nums text-g-ink-3">
-            {lastScan}
-          </span>
-          {scanDuration && (
-            <span className="shrink-0 font-g-mono tabular-nums text-g-ink-4">
-              ({scanDuration})
-            </span>
-          )}
+            {scanDuration && (
+              <span className="shrink-0 font-g-mono tabular-nums text-g-ink-4">
+                ({scanDuration})
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </aside>

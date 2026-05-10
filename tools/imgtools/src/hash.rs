@@ -53,17 +53,26 @@ pub fn run_visual_distance(input_a: &str, input_b: &str, flip_b: bool) -> Result
     let sample_b = visual_sample(&img_b);
 
     let mut total: i64 = 0;
+    let mut count: u32 = 0;
     for y in 0..SAMPLE_SIZE {
         for x in 0..SAMPLE_SIZE {
             let pa = sample_a.get_pixel(x, y);
             let pb = sample_b.get_pixel(x, y);
+            if pa[3] == 0 && pb[3] == 0 {
+                continue;
+            }
+            count += 1;
             total += (pa[0] as i64 - pb[0] as i64).abs()
                 + (pa[1] as i64 - pb[1] as i64).abs()
                 + (pa[2] as i64 - pb[2] as i64).abs()
                 + (pa[3] as i64 - pb[3] as i64).abs();
         }
     }
-    let distance = (total as f64 / (SAMPLE_SIZE as f64 * SAMPLE_SIZE as f64 * 4.0)).round() as i32;
+    let distance = if count == 0 {
+        255
+    } else {
+        (total as f64 / (count as f64 * 4.0)).round() as i32
+    };
     let result = DistanceResult { distance };
     println!("{}", serde_json::to_string(&result)?);
     Ok(())

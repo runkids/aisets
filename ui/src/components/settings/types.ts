@@ -75,11 +75,13 @@ export type SettingsDraft = {
   llmEnabled: boolean;
   llmProvider: string;
   llmEndpoint: string;
+  llmApiKey: string;
   llmVisionModel: string;
   llmEmbedModel: string;
   llmTagPrompt: string;
   llmOcrPrompt: string;
   llmConcurrency: number;
+  llmTimeout: number;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;

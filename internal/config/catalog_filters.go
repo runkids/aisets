@@ -114,7 +114,11 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
-	vlmOcrReadyCount, err := s.catalogVLMOcrReadyCount(scanID, query)
+	vlmEngineVersion := ""
+	if settings.LLMProvider != "" && settings.LLMVisionModel != "" {
+		vlmEngineVersion = settings.LLMProvider + "/" + settings.LLMVisionModel
+	}
+	vlmOcrReadyCount, err := s.catalogVLMOcrReadyCount(scanID, query, vlmEngineVersion)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -320,8 +324,29 @@ func (s *Store) catalogOCRReadyCount(scanID int64, query CatalogItemQuery) (int,
 	return s.catalogOCRReadyCountByEngine(scanID, query, "")
 }
 
-func (s *Store) catalogVLMOcrReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
-	return s.catalogOCRReadyCountByEngine(scanID, query, "vlm")
+func (s *Store) catalogVLMOcrReadyCount(scanID int64, query CatalogItemQuery, engineVersion string) (int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return 0, err
+	}
+	versionClause := ""
+	facetArgs := append([]any{"ready", "vlm"}, args...)
+	if engineVersion != "" {
+		versionClause = "\n\t\t\tAND ocr.engine_version = ?"
+		facetArgs = append([]any{"ready", "vlm", engineVersion}, args...)
+	}
+	var count int
+	err = s.rdb.QueryRow(`
+		SELECT COUNT(DISTINCT a.asset_id)
+		FROM asset_snapshots a
+		JOIN ocr_results ocr ON ocr.project_id = a.project_id
+			AND ocr.repo_path = a.repo_path
+			AND ocr.content_hash = a.content_hash
+			AND ocr.hash_algorithm = a.hash_algorithm
+			AND ocr.status = ?
+			AND ocr.engine_name = ?`+versionClause+`
+		`+where, facetArgs...).Scan(&count)
+	return count, err
 }
 
 func (s *Store) catalogOCRReadyCountByEngine(scanID int64, query CatalogItemQuery, engineName string) (int, error) {
@@ -766,35 +791,57 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ocr.status = 'ready'
 		)`)
 	case "vlmOcrReady":
+		versionClause := ""
+		if query.VLMEngineVersion != "" {
+			versionClause = " AND ocr.engine_version = ?"
+			args = append(args, query.VLMEngineVersion)
+		}
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM ocr_results ocr
 			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
 				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
-				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'
+				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'`+versionClause+`
 		)`)
 	case "vlmOcrPending":
+		versionClause := ""
+		if query.VLMEngineVersion != "" {
+			versionClause = " AND ocr.engine_version = ?"
+			args = append(args, query.VLMEngineVersion)
+		}
 		clauses = append(clauses, `NOT EXISTS (
 			SELECT 1 FROM ocr_results ocr
 			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
 				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
-				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'
+				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'`+versionClause+`
 		)`)
 	case "aiTagReady":
+		providerClause := ""
+		aiTagArgs := []any{aitag.StatusReady}
+		if query.AITagProviderName != "" && query.AITagModelName != "" {
+			providerClause = " AND ait2.provider_name = ? AND ait2.model_name = ?"
+			aiTagArgs = append(aiTagArgs, query.AITagProviderName, query.AITagModelName)
+		}
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM ai_tags ait2
 			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
 				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
-				AND ait2.status = ?
+				AND ait2.status = ?`+providerClause+`
 		)`)
-		args = append(args, aitag.StatusReady)
+		args = append(args, aiTagArgs...)
 	case "aiTagPending":
+		providerClause := ""
+		aiTagArgs := []any{aitag.StatusReady}
+		if query.AITagProviderName != "" && query.AITagModelName != "" {
+			providerClause = " AND ait2.provider_name = ? AND ait2.model_name = ?"
+			aiTagArgs = append(aiTagArgs, query.AITagProviderName, query.AITagModelName)
+		}
 		clauses = append(clauses, `NOT EXISTS (
 			SELECT 1 FROM ai_tags ait2
 			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
 				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
-				AND ait2.status = ?
+				AND ait2.status = ?`+providerClause+`
 		)`)
-		args = append(args, aitag.StatusReady)
+		args = append(args, aiTagArgs...)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

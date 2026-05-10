@@ -3,6 +3,9 @@ package llm
 const (
 	DefaultConcurrency = 1
 	MaxConcurrency     = 8
+	DefaultChatTimeout = 120
+	MinChatTimeout     = 30
+	MaxChatTimeout     = 600
 )
 
 type Model struct {
@@ -18,8 +21,9 @@ type ChatMessage struct {
 }
 
 type ChatRequest struct {
-	Model    string        `json:"model"`
-	Messages []ChatMessage `json:"messages"`
+	Model      string        `json:"model"`
+	Messages   []ChatMessage `json:"messages"`
+	TimeoutSec int           `json:"timeoutSec,omitempty"`
 }
 
 type ChatResponse struct {
