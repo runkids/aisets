@@ -26,6 +26,8 @@ const aiFilterFields = new Set<CustomAssetFilterField>([
   "aiTag",
   "aiDescription",
   "aiStatus",
+  "aiContainsFace",
+  "aiSceneType",
 ]);
 
 function itemFolder(item: AssetItem) {
@@ -213,6 +215,14 @@ function matchesClause(
     case "aiStatus":
       if (value === "none") return !item.aiTag;
       return item.aiTag?.status === value;
+    case "aiContainsFace":
+      if (!item.aiTag || item.aiTag.status !== "ready") return false;
+      return value === "true" || value === "1"
+        ? item.aiTag.containsFace === true
+        : item.aiTag.containsFace !== true;
+    case "aiSceneType":
+      if (!item.aiTag || item.aiTag.status !== "ready") return false;
+      return matchesText(item.aiTag.sceneType ?? "", clause.operator, value);
     default:
       return false;
   }

@@ -18,17 +18,21 @@ func TestAITagUpsertAndQuery(t *testing.T) {
 	defer store.Close()
 
 	result := aitag.Result{
-		ProjectID:     "proj1",
-		RepoPath:      "src/icon.png",
-		ContentHash:   "abc123",
-		HashAlgorithm: "sha256",
-		ProviderName:  "ollama",
-		ModelName:     "llava",
-		Status:        aitag.StatusReady,
-		Category:      "icon",
-		Tags:          []string{"dark-mode", "navigation"},
-		Description:   "A dark-themed navigation icon",
-		DurationMs:    3200,
+		ProjectID:          "proj1",
+		RepoPath:           "src/icon.png",
+		ContentHash:        "abc123",
+		HashAlgorithm:      "sha256",
+		ProviderName:       "ollama",
+		ModelName:          "llava",
+		Status:             aitag.StatusReady,
+		Category:           "icon",
+		Tags:               []string{"dark-mode", "navigation"},
+		Description:        "A dark-themed navigation icon",
+		ContainsFace:       false,
+		SceneType:          "digital",
+		EstimatedLocation:  "",
+		LocationConfidence: "none",
+		DurationMs:         3200,
 	}
 	if err := store.UpsertAITagResult(result); err != nil {
 		t.Fatal(err)
@@ -50,6 +54,83 @@ func TestAITagUpsertAndQuery(t *testing.T) {
 	}
 	if got.Status != aitag.StatusReady || got.Category != "icon" || len(got.Tags) != 2 || got.Tags[0] != "dark-mode" || got.Description != "A dark-themed navigation icon" {
 		t.Fatalf("unexpected result: %+v", got)
+	}
+	if got.ContainsFace != false || got.SceneType != "digital" || got.LocationConfidence != "none" {
+		t.Fatalf("unexpected enrich fields: containsFace=%v sceneType=%q locationConfidence=%q", got.ContainsFace, got.SceneType, got.LocationConfidence)
+	}
+}
+
+func TestAITagEnrichFieldsRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	result := aitag.Result{
+		ProjectID:          "proj1",
+		RepoPath:           "src/photo.jpg",
+		ContentHash:        "facehash",
+		HashAlgorithm:      "sha256",
+		ProviderName:       "ollama",
+		ModelName:          "llava",
+		Status:             aitag.StatusReady,
+		Category:           "photo",
+		Tags:               []string{"portrait", "outdoor"},
+		Description:        "A person standing in front of Tokyo Tower",
+		ContainsFace:       true,
+		SceneType:          "outdoor",
+		EstimatedLocation:  "Tokyo, Japan",
+		LocationConfidence: "high",
+		DurationMs:         2500,
+	}
+	if err := store.UpsertAITagResult(result); err != nil {
+		t.Fatal(err)
+	}
+
+	items := []scanner.AssetItem{{
+		ProjectID: "proj1", RepoPath: "src/photo.jpg",
+		ContentHash: "facehash", HashAlgorithm: "sha256",
+	}}
+
+	results, err := store.AITagResults(items, "ollama", "llava")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := results[aiTagKey("proj1", "src/photo.jpg")]
+	if !got.ContainsFace {
+		t.Fatal("expected containsFace=true")
+	}
+	if got.SceneType != "outdoor" {
+		t.Fatalf("expected sceneType=outdoor, got %q", got.SceneType)
+	}
+	if got.EstimatedLocation != "Tokyo, Japan" {
+		t.Fatalf("expected estimatedLocation='Tokyo, Japan', got %q", got.EstimatedLocation)
+	}
+	if got.LocationConfidence != "high" {
+		t.Fatalf("expected locationConfidence=high, got %q", got.LocationConfidence)
+	}
+
+	best, err := store.AITagResultsBestMatch(items, "ollama", "llava")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotBest := best[aiTagKey("proj1", "src/photo.jpg")]
+	if !gotBest.ContainsFace || gotBest.SceneType != "outdoor" || gotBest.EstimatedLocation != "Tokyo, Japan" {
+		t.Fatalf("BestMatch enrich fields mismatch: %+v", gotBest)
+	}
+
+	gotHash, found, err := store.AITagResultForContentHash("facehash", "sha256", "ollama", "llava")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("expected content hash hit")
+	}
+	if !gotHash.ContainsFace || gotHash.EstimatedLocation != "Tokyo, Japan" {
+		t.Fatalf("ContentHash dedup enrich fields mismatch: %+v", gotHash)
 	}
 }
 

@@ -406,7 +406,7 @@ func customFilterUsesAI(filter CustomAssetFilter) bool {
 	for _, group := range filter.Groups {
 		for _, clause := range group.Clauses {
 			switch clause.Field {
-			case "aiCategory", "aiTag", "aiDescription", "aiStatus":
+			case "aiCategory", "aiTag", "aiDescription", "aiStatus", "aiContainsFace", "aiSceneType":
 				return true
 			}
 		}
@@ -485,6 +485,13 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 			return aiTagNotExistsSQL(), nil, nil
 		}
 		return aiTagExistsSQL("ait.status = ?", []any{value}, nil)
+	case "aiContainsFace":
+		if value == "true" || value == "1" {
+			return aiTagExistsSQL("ait.contains_face = 1", nil, nil)
+		}
+		return aiTagExistsSQL("ait.contains_face = 0", nil, nil)
+	case "aiSceneType":
+		return aiTagExistsSQL(textClauseSQL("ait.scene_type", clause.Operator, value))
 	default:
 		return "", nil, apierr.WithParams("custom_filter_field_invalid", "custom filter field is invalid", map[string]any{"field": clause.Field})
 	}
