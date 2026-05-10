@@ -11,6 +11,14 @@ export type BuiltinVariableDef = {
 
 export const TAG_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   {
+    name: "translations",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.translations",
+    dynamic: true,
+  },
+  {
     name: "categories",
     type: "tags",
     defaultValues: [

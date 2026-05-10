@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -351,6 +352,9 @@ func (s *Store) migrate() error {
 	if err := s.migratePromptPresetsSystemType(); err != nil {
 		return err
 	}
+	if err := s.migrateTagPresetTranslationsVar(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -412,10 +416,11 @@ func (s *Store) migrateScanPerformanceSchema() error {
 		}
 	}
 	assetStatements := map[string]string{
-		"scan_intent":           `ALTER TABLE asset_snapshots ADD COLUMN scan_intent TEXT NOT NULL DEFAULT 'code'`,
-		"usage_classification":  `ALTER TABLE asset_snapshots ADD COLUMN usage_classification TEXT NOT NULL DEFAULT 'notApplicable'`,
-		"delete_unused_allowed": `ALTER TABLE asset_snapshots ADD COLUMN delete_unused_allowed INTEGER NOT NULL DEFAULT 0`,
-		"lint_applicability":    `ALTER TABLE asset_snapshots ADD COLUMN lint_applicability TEXT NOT NULL DEFAULT 'advisory'`,
+		"scan_intent":            `ALTER TABLE asset_snapshots ADD COLUMN scan_intent TEXT NOT NULL DEFAULT 'code'`,
+		"usage_classification":   `ALTER TABLE asset_snapshots ADD COLUMN usage_classification TEXT NOT NULL DEFAULT 'notApplicable'`,
+		"delete_unused_allowed":  `ALTER TABLE asset_snapshots ADD COLUMN delete_unused_allowed INTEGER NOT NULL DEFAULT 0`,
+		"lint_applicability":     `ALTER TABLE asset_snapshots ADD COLUMN lint_applicability TEXT NOT NULL DEFAULT 'advisory'`,
+		"optimize_applicability": `ALTER TABLE asset_snapshots ADD COLUMN optimize_applicability TEXT NOT NULL DEFAULT 'applicable'`,
 	}
 	for column, statement := range assetStatements {
 		if assetColumns[column] {
@@ -1118,6 +1123,8 @@ func defaultTagPrompt() string {
 - "description": {{description}}
 - "languages": {{languages}}
 
+{{translations}}
+
 Respond ONLY with valid JSON, no markdown or explanation.`
 }
 
@@ -1339,4 +1346,58 @@ func (s *Store) migratePromptPresetsSystemType() error {
 		}
 	}
 	return tx.Commit()
+}
+
+func (s *Store) migrateTagPresetTranslationsVar() error {
+	const version = 9
+	var applied int
+	if err := s.db.QueryRow(`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&applied); err == nil {
+		return nil
+	}
+
+	rows, err := s.rdb.Query(`SELECT id, content FROM prompt_presets WHERE type = 'tag' AND content NOT LIKE '%{{translations}}%'`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type row struct {
+		id      string
+		content string
+	}
+	var toUpdate []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.content); err != nil {
+			return err
+		}
+		toUpdate = append(toUpdate, r)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, r := range toUpdate {
+		var content PromptPresetContent
+		if err := json.Unmarshal([]byte(r.content), &content); err != nil {
+			log.Printf("[warn] migrateTagPresetTranslationsVar: skipping preset %s: %v", r.id, err)
+			continue
+		}
+		idx := strings.Index(content.Template, "Respond ONLY")
+		if idx >= 0 {
+			content.Template = content.Template[:idx] + "{{translations}}\n\n" + content.Template[idx:]
+		} else {
+			content.Template += "\n\n{{translations}}"
+		}
+		raw, err := json.Marshal(content)
+		if err != nil {
+			continue
+		}
+		if _, err := s.db.Exec(`UPDATE prompt_presets SET content = ?, updated_at = ? WHERE id = ?`, string(raw), nowUTC(), r.id); err != nil {
+			return err
+		}
+	}
+
+	_, err = s.db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, nowUTC())
+	return err
 }

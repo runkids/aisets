@@ -89,7 +89,7 @@ func prepareImageForVLMFallback(localPath, ext string) (string, error) {
 			return "", err
 		}
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
-	case ".avif":
+	case ".avif", ".heic", ".heif":
 		pngData, err := imageproc.ImageToPNG(localPath, 512)
 		if err != nil {
 			return "", err
@@ -180,6 +180,9 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = aitag.TagPrompt
 	}
+	prompt = replaceDynamicVars(prompt, map[string]string{
+		"translations": aitag.TagTranslationsBlock,
+	})
 	systemPrompt := ""
 	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
 		systemPrompt = settings.LLMSystemPrompt
@@ -467,7 +470,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 func eligibleForAITag(item scanner.AssetItem) bool {
 	ext := strings.ToLower(item.Ext)
 	switch ext {
-	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg":
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg", ".heic", ".heif":
 	default:
 		return false
 	}

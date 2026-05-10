@@ -10,16 +10,19 @@ const (
 const TagPrompt = `Analyze this image and respond with a JSON object containing:
 - "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
 - "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")
-- "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
 - "description": one sentence describing the image content
-- "descriptionI18n": object mapping locale codes to translated descriptions: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the description naturally into each locale.
 - "languages": array of ISO 639-3 language codes for any visible text (e.g. ["eng"]). Empty array if no text.
 - "containsFace": true if a human face is clearly visible, false otherwise
 - "sceneType": one of "indoor", "outdoor", "studio", "digital", "abstract", "unknown"
 - "estimatedLocation": a short place description if identifiable from visual cues (landmarks, signage, architecture), or null if not determinable
 - "locationConfidence": one of "high", "medium", "low", "none"
 
+{{translations}}
+
 Respond ONLY with valid JSON, no markdown or explanation.`
+
+const TagTranslationsBlock = `- "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
+- "descriptionI18n": object mapping locale codes to translated descriptions: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the description naturally into each locale.`
 
 type Result struct {
 	ProjectID          string              `json:"projectId"`
