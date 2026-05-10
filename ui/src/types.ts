@@ -644,6 +644,27 @@ export type AITagRunEvent =
   | { type: "done"; counts: AITagRunCounts }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: AITagRunCounts };
 
+export type VLMOcrRunCounts = {
+  queued: number;
+  processed: number;
+  ready: number;
+  failed: number;
+  skipped: number;
+  cacheHit: number;
+};
+
+export type VLMOcrRunEvent =
+  | { type: "start"; counts: VLMOcrRunCounts }
+  | {
+      type: "progress";
+      assetId: string;
+      repoPath: string;
+      status: string;
+      counts: VLMOcrRunCounts;
+    }
+  | { type: "done"; counts: VLMOcrRunCounts }
+  | { type: "error"; error?: APIErrorBody["error"]; counts?: VLMOcrRunCounts };
+
 export type ActionPreview = {
   id: string;
   type: string;

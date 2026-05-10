@@ -44,6 +44,7 @@ import {
   resetDatabase,
   runAITagging,
   runOCR,
+  runVLMOcr,
   scanCatalog,
   switchWorkspace,
   updateApp,
@@ -59,6 +60,7 @@ import type {
   AITagRunEvent,
   ExportData,
   OCRRunEvent,
+  VLMOcrRunEvent,
   ProjectScanIntent,
   RenameRules,
   ScanAnalyses,
@@ -383,6 +385,19 @@ export function useRunAITagMutation(options?: {
   return useMutation({
     mutationFn: (signal?: AbortSignal) =>
       runAITagging({ onEvent: options?.onEvent, signal }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useRunVLMOcrMutation(options?: {
+  onEvent?: (event: VLMOcrRunEvent) => void;
+}) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (signal?: AbortSignal) =>
+      runVLMOcr({ onEvent: options?.onEvent, signal }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

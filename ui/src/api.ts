@@ -15,6 +15,7 @@ import type {
   LLMRuntime,
   AITagRunEvent,
   OCRRunEvent,
+  VLMOcrRunEvent,
   Project,
   ProjectScanIntent,
   ProjectScanIntentDetection,
@@ -479,6 +480,53 @@ export async function runAITagging(options?: {
     response,
     parseLine: (line) => parseAITagLine(line, options?.onEvent),
     isDone: isAITagDone,
+    fallbackDone: null,
+  });
+}
+
+function parseVLMOcrLine(
+  line: string,
+  onEvent?: (event: VLMOcrRunEvent) => void,
+): VLMOcrRunEvent | null {
+  if (!line.trim()) return null;
+  const event = JSON.parse(line) as VLMOcrRunEvent;
+  onEvent?.(event);
+  if (event.type === "error")
+    throwRunError(event.error, "vlm_ocr_failed", "VLM OCR failed");
+  return event;
+}
+
+function isVLMOcrDone(
+  event: VLMOcrRunEvent,
+): event is Extract<VLMOcrRunEvent, { type: "done" }> {
+  return event.type === "done";
+}
+
+export async function runVLMOcr(options?: {
+  onEvent?: (event: VLMOcrRunEvent) => void;
+  signal?: AbortSignal;
+}) {
+  const response = await fetch(`${basePath}/api/ai/ocr/run`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code)
+      throw new APIError(error.code, error.message, error.params);
+    throw new APIError("http_error", `HTTP ${response.status}`, {
+      status: response.status,
+    });
+  }
+  return streamNDJSON<
+    VLMOcrRunEvent,
+    Extract<VLMOcrRunEvent, { type: "done" }>
+  >({
+    response,
+    parseLine: (line) => parseVLMOcrLine(line, options?.onEvent),
+    isDone: isVLMOcrDone,
     fallbackDone: null,
   });
 }
