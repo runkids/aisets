@@ -12,6 +12,8 @@ import (
 var imageExts = map[string]bool{
 	".avif": true,
 	".gif":  true,
+	".heic": true,
+	".heif": true,
 	".jpeg": true,
 	".jpg":  true,
 	".png":  true,
