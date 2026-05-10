@@ -1055,7 +1055,7 @@ Respond ONLY with valid JSON, no markdown or explanation.`
 
 func (s *Store) migrateOptimizePresetSeed() error {
 	var count int
-	err := s.rdb.QueryRow(`SELECT COUNT(*) FROM prompt_presets WHERE type = 'optimize'`).Scan(&count)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM prompt_presets WHERE type = 'optimize'`).Scan(&count)
 	if err != nil || count > 0 {
 		return nil
 	}
