@@ -267,6 +267,21 @@ func (s *Store) migrate() error {
 			updated_at TEXT    NOT NULL
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
+		`CREATE TABLE IF NOT EXISTS exif_data (
+			scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+			asset_id TEXT NOT NULL,
+			has_gps INTEGER NOT NULL DEFAULT 0,
+			gps_latitude REAL,
+			gps_longitude REAL,
+			camera_make TEXT NOT NULL DEFAULT '',
+			camera_model TEXT NOT NULL DEFAULT '',
+			datetime_original TEXT NOT NULL DEFAULT '',
+			orientation INTEGER NOT NULL DEFAULT 0,
+			dpi_x INTEGER NOT NULL DEFAULT 0,
+			dpi_y INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (scan_id, asset_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_exif_data_gps ON exif_data(scan_id, has_gps) WHERE has_gps = 1`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {

@@ -182,6 +182,30 @@ func (s *Store) recordScanAssetBatch(scanID int64, items []scanner.AssetItem) er
 		}
 	}
 
+	var exifRecords []EXIFRecord
+	for _, item := range items {
+		if item.EXIF != nil && item.EXIF.HasEXIF {
+			r := EXIFRecord{
+				AssetID:          item.ID,
+				CameraMake:       item.EXIF.CameraMake,
+				CameraModel:      item.EXIF.CameraModel,
+				DateTimeOriginal: item.EXIF.DateTimeOriginal,
+				Orientation:      item.EXIF.Orientation,
+				DPIX:             item.EXIF.DPIX,
+				DPIY:             item.EXIF.DPIY,
+			}
+			if item.EXIF.GPSLatitude != nil && item.EXIF.GPSLongitude != nil {
+				r.HasGPS = true
+				r.GPSLatitude = item.EXIF.GPSLatitude
+				r.GPSLongitude = item.EXIF.GPSLongitude
+			}
+			exifRecords = append(exifRecords, r)
+		}
+	}
+	if err = s.recordEXIFBatch(tx, scanID, exifRecords); err != nil {
+		return err
+	}
+
 	err = tx.Commit()
 	return err
 }
