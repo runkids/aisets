@@ -12,7 +12,7 @@ import {
   Tags,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -334,12 +334,15 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
     );
   }
 
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key === "s") {
         e.preventDefault();
-        if (isDirty) handleSave();
+        if (isDirty) handleSaveRef.current();
       }
       if (e.key === "c" && !window.getSelection()?.toString()) {
         const tag = (document.activeElement as HTMLElement)?.tagName;
@@ -432,7 +435,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       ocr: `Analyze this image and respond with a JSON object:\n- "text": {{text}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
       optimize: `Analyze this image and provide compression advice. Respond as JSON with these fields:\n{\n  "contentType": one of {{contentTypes}},\n  "recommendedFormat": one of {{formats}},\n  "recommendedQuality": <number 1-100 or null for lossless>,\n  "lossless": <true|false>,\n  "rationale": "<one sentence explaining why this format and quality>"\n}\n\n{{rules}}\n\nRespond ONLY with the JSON object, no other text.`,
     };
-    const defaultTemplate = templates[preset.type] ?? templates.tag;
+    const defaultTemplate = templates[preset.type] ?? "";
     setTemplate(defaultTemplate);
     const names = extractVariableNames(defaultTemplate);
     const defaults: Record<string, PromptVariable> = {};
