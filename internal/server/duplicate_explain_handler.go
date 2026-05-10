@@ -1,0 +1,161 @@
+package server
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"aisets/internal/apierr"
+	"aisets/internal/config"
+	"aisets/internal/llm"
+)
+
+type DuplicateExplanationResponse struct {
+	Summary        string `json:"summary"`
+	Differences    string `json:"differences"`
+	Recommendation string `json:"recommendation"`
+	Rationale      string `json:"rationale"`
+	DurationMs     int64  `json:"durationMs"`
+	InputTokens    int64  `json:"inputTokens"`
+	OutputTokens   int64  `json:"outputTokens"`
+}
+
+func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) {
+	leftID := r.URL.Query().Get("leftId")
+	rightID := r.URL.Query().Get("rightId")
+	if leftID == "" || rightID == "" {
+		writeError(w, http.StatusBadRequest, apierr.New("missing_params", "leftId and rightId query params required"))
+		return
+	}
+
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, apierr.From(err, "settings_failed"))
+		return
+	}
+	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
+		writeError(w, http.StatusBadRequest, apierr.New("ai_not_configured", "AI provider or vision model not configured"))
+		return
+	}
+	if s.llmProvider == nil {
+		writeError(w, http.StatusServiceUnavailable, apierr.New("provider_unavailable", "LLM provider is not available"))
+		return
+	}
+
+	prompt := defaultDuplicateExplainPrompt
+	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
+		if preset, err := s.store.GetPromptPreset(presetID); err == nil {
+			prompt = config.FormatPrompt(preset.Content)
+		}
+	} else {
+		presets, _ := s.store.ListPromptPresets("duplicate")
+		for _, p := range presets {
+			if p.IsDefault {
+				prompt = config.FormatPrompt(p.Content)
+				break
+			}
+		}
+	}
+
+	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{leftID, rightID})
+	if err != nil || len(items) < 2 {
+		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "One or both assets not found in catalog"))
+		return
+	}
+	// Ensure left/right order matches the requested IDs.
+	var left, right = items[0], items[1]
+	if left.ID != leftID {
+		left, right = right, left
+	}
+	if left.ID != leftID || right.ID != rightID {
+		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "One or both assets not found in catalog"))
+		return
+	}
+
+	distance := r.URL.Query().Get("distance")
+	if distance == "" {
+		distance = "?"
+	}
+	prompt = replaceDynamicVars(prompt, map[string]string{
+		"leftMetadata":  formatFileMetadata(left),
+		"rightMetadata": formatFileMetadata(right),
+		"distance":      distance,
+	})
+
+	leftURI, err := prepareImageForVLM(left.LocalPath, left.Ext, "tag")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, apierr.From(err, "image_prep_failed"))
+		return
+	}
+	rightURI, err := prepareImageForVLM(right.LocalPath, right.Ext, "tag")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, apierr.From(err, "image_prep_failed"))
+		return
+	}
+
+	timeoutSec := settings.LLMTimeout
+	if timeoutSec == 0 {
+		timeoutSec = llm.DefaultChatTimeout
+	}
+
+	start := time.Now()
+	resp, err := s.llmProvider.Chat(r.Context(), llm.ChatRequest{
+		Model: settings.LLMVisionModel,
+		Messages: []llm.ChatMessage{{
+			Role:    "user",
+			Content: prompt,
+			Images:  []string{leftURI, rightURI},
+		}},
+		TimeoutSec: timeoutSec,
+	})
+	durationMs := time.Since(start).Milliseconds()
+
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, apierr.From(err, "llm_request_failed"))
+		return
+	}
+
+	content := strings.TrimSpace(resp.Content)
+	content = stripMarkdownFences(content)
+
+	var parsed struct {
+		Summary        string `json:"summary"`
+		Differences    string `json:"differences"`
+		Recommendation string `json:"recommendation"`
+		Rationale      string `json:"rationale"`
+	}
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		writeError(w, http.StatusInternalServerError, apierr.New("parse_failed", fmt.Sprintf("Failed to parse AI response: %v", err)))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, DuplicateExplanationResponse{
+		Summary:        parsed.Summary,
+		Differences:    parsed.Differences,
+		Recommendation: parsed.Recommendation,
+		Rationale:      parsed.Rationale,
+		DurationMs:     durationMs,
+		InputTokens:    resp.InputTokens,
+		OutputTokens:   resp.OutputTokens,
+	})
+}
+
+const defaultDuplicateExplainPrompt = `Compare these two images that were flagged as near-duplicates (dHash distance: {{distance}}/64).
+
+Image 1: {{leftMetadata}}
+Image 2: {{rightMetadata}}
+
+Explain:
+1. What the images show
+2. The specific visual differences between them
+3. Which one to keep and why (consider: resolution, quality, file size)
+
+Respond ONLY with a JSON object:
+{
+  "summary": "one-sentence description of what these images are",
+  "differences": "specific visual differences between the two",
+  "recommendation": "keep image 1 or image 2, with the filename",
+  "rationale": "why this one is better to keep"
+}`

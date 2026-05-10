@@ -162,6 +162,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/ai/tag/clear", s.handleAITagClear)
 	s.mux.HandleFunc("POST /api/ai/ocr/run", s.handleVLMOCRRun)
 	s.mux.HandleFunc("POST /api/ai/optimize-advice", s.handleOptimizeAIAdvice)
+	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
 	s.mux.HandleFunc("GET /api/prompt-presets", s.handleListPromptPresets)
 	s.mux.HandleFunc("POST /api/prompt-presets", s.handleCreatePromptPreset)
 	s.mux.HandleFunc("PATCH /api/prompt-presets/{id}", s.handleUpdatePromptPreset)
