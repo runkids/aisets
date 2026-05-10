@@ -816,6 +816,7 @@
     "aiTagCustomPrompt": "Custom Prompt",
     "aiTagCustomPromptHint": "Customize the prompt sent to the vision model for image analysis",
     "aiTagResetPrompt": "Reset to default",
+    "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"description\" (string), \"languages\" (string array). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
     "aiTagDefaultPromptLabel": "Using default prompt",
     "strategyAICategory": "AI Category",
     "strategyAICategoryHint": "Only match images classified by AI tagging — leave empty to match all",

@@ -336,6 +336,9 @@ export function AISection({
                   {t("settings.aiTagCustomPrompt")}
                 </summary>
                 <div className="mt-2 flex flex-col gap-2">
+                  <p className="font-g text-g-caption leading-[1.5] tracking-g-ui text-g-ink-3">
+                    {t("settings.aiTagPromptGuide")}
+                  </p>
                   <textarea
                     className="w-full min-h-[160px] rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 font-g-mono text-g-caption tracking-g-mono text-g-ink-1 focus:outline-none focus:ring-1 focus:ring-g-accent"
                     value={draft.llmTagPrompt || DEFAULT_TAG_PROMPT}

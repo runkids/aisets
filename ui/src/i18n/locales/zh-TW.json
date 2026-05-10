@@ -1529,6 +1529,7 @@
     "aiTagCustomPrompt": "自訂提示詞",
     "aiTagCustomPromptHint": "自訂送給視覺模型的圖片分析提示詞",
     "aiTagResetPrompt": "重設為預設值",
+    "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"description\"（字串）、\"languages\"（字串陣列）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
     "aiTagDefaultPromptLabel": "使用預設提示詞",
     "strategyAICategory": "AI 分類",
     "strategyAICategoryHint": "僅匹配經 AI 標記分類的圖片——留空則匹配全部",
