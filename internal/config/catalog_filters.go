@@ -446,7 +446,7 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 	case "duplicate":
 		return booleanExistsSQL("EXISTS (SELECT 1 FROM duplicate_group_assets d3 WHERE d3.scan_id = a.scan_id AND d3.asset_id = a.asset_id)", value), nil, nil
 	case "nearDuplicate":
-		return booleanExistsSQL("EXISTS (SELECT 1 FROM near_duplicate_snapshots n2 WHERE n2.scan_id = a.scan_id AND (n2.left_id = a.asset_id OR n2.right_id = a.asset_id))", value), nil, nil
+		return booleanExistsSQL("(EXISTS (SELECT 1 FROM near_duplicate_snapshots n2 WHERE n2.scan_id = a.scan_id AND n2.left_id = a.asset_id) OR EXISTS (SELECT 1 FROM near_duplicate_snapshots n2 WHERE n2.scan_id = a.scan_id AND n2.right_id = a.asset_id))", value), nil, nil
 	case "optimizable":
 		return booleanExistsSQL("EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id)", value), nil, nil
 	case "ocrText":
@@ -719,7 +719,10 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 			WHERE d2.scan_id = a.scan_id AND d2.asset_id = a.asset_id
 		) OR EXISTS (
 			SELECT 1 FROM near_duplicate_snapshots n
-			WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id)
+			WHERE n.scan_id = a.scan_id AND n.left_id = a.asset_id
+		) OR EXISTS (
+			SELECT 1 FROM near_duplicate_snapshots n
+			WHERE n.scan_id = a.scan_id AND n.right_id = a.asset_id
 		))`)
 	case "optimizable":
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)")
@@ -730,7 +733,13 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		clauses = append(clauses, `(EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)
 			AND EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id AND o2.has_existing_variant = 0))`)
 	case "nearDuplicate":
-		clauses = append(clauses, "EXISTS (SELECT 1 FROM near_duplicate_snapshots n WHERE n.scan_id = a.scan_id AND (n.left_id = a.asset_id OR n.right_id = a.asset_id))")
+		clauses = append(clauses, `(EXISTS (
+			SELECT 1 FROM near_duplicate_snapshots n
+			WHERE n.scan_id = a.scan_id AND n.left_id = a.asset_id
+		) OR EXISTS (
+			SELECT 1 FROM near_duplicate_snapshots n
+			WHERE n.scan_id = a.scan_id AND n.right_id = a.asset_id
+		))`)
 	}
 	if category := strings.TrimSpace(query.OptimizationCategory); category != "" {
 		clauses = append(clauses, `EXISTS (
