@@ -143,9 +143,15 @@ export function AssetDrawer({
   const ocrVisible = Boolean(
     settingsQuery.data?.settings.ocrEnabled &&
     asset.ocr &&
-    asset.ocr.status === "ready",
+    asset.ocr.status === "ready" &&
+    asset.ocr.engineName !== "vlm",
   );
-  const aiTagVisible = Boolean(asset.aiTag && asset.aiTag.status === "ready");
+  const vlmOcrReady = Boolean(
+    asset.ocr && asset.ocr.status === "ready" && asset.ocr.engineName === "vlm",
+  );
+  const aiTagVisible = Boolean(
+    (asset.aiTag && asset.aiTag.status === "ready") || vlmOcrReady,
+  );
   const preferredEditor =
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
   const assetFileName = fileName(asset.repoPath);
@@ -331,7 +337,9 @@ export function AssetDrawer({
                     isPossiblyUnused ||
                     isNotApplicable ||
                     asset.optimizationRecommendations.length > 0 ||
-                    ocrVisible) && (
+                    ocrVisible ||
+                    vlmOcrReady ||
+                    aiTagVisible) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {isUnused && (
                         <HeroBadgeButton
@@ -413,7 +421,12 @@ export function AssetDrawer({
                           </Badge>
                         </HeroBadgeButton>
                       )}
-                      {aiTagVisible && asset.aiTag && (
+                      {vlmOcrReady && (
+                        <HeroBadgeButton onClick={() => handleTabChange("ai")}>
+                          <Badge tone="purple">{t("ocr.badge.shortAI")}</Badge>
+                        </HeroBadgeButton>
+                      )}
+                      {asset.aiTag && asset.aiTag.status === "ready" && (
                         <HeroBadgeButton onClick={() => handleTabChange("ai")}>
                           <Badge tone="purple">
                             {asset.aiTag.category || t("drawer.tab.ai")}
@@ -568,51 +581,73 @@ export function AssetDrawer({
               {tab === "ocr" && ocrVisible && asset.ocr && (
                 <AssetDrawerOCR ocr={asset.ocr} />
               )}
-              {tab === "ai" && aiTagVisible && asset.aiTag && (
+              {tab === "ai" && aiTagVisible && (
                 <div className="grid gap-4 p-4">
-                  <div>
-                    <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                      {t("drawer.aiCategory")}
-                    </h4>
-                    <Badge tone="blue">{asset.aiTag.category}</Badge>
-                  </div>
-                  {asset.aiTag.tags && asset.aiTag.tags.length > 0 && (
-                    <div>
-                      <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                        {t("drawer.aiTags")}
-                      </h4>
-                      <div className="flex flex-wrap gap-1">
-                        {asset.aiTag.tags.map((tag) => (
-                          <Badge key={tag} tone="line">
-                            {tag}
-                          </Badge>
-                        ))}
+                  {asset.aiTag && asset.aiTag.status === "ready" && (
+                    <>
+                      <div>
+                        <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                          {t("drawer.aiCategory")}
+                        </h4>
+                        <Badge tone="blue">{asset.aiTag.category}</Badge>
                       </div>
-                    </div>
+                      {asset.aiTag.tags && asset.aiTag.tags.length > 0 && (
+                        <div>
+                          <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                            {t("drawer.aiTags")}
+                          </h4>
+                          <div className="flex flex-wrap gap-1">
+                            {asset.aiTag.tags.map((tag) => (
+                              <Badge key={tag} tone="line">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {asset.aiTag.description && (
+                        <div>
+                          <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
+                            {t("drawer.aiDescription")}
+                          </h4>
+                          <p className="font-g text-g-body text-g-ink-2">
+                            {asset.aiTag.description}
+                          </p>
+                        </div>
+                      )}
+                      {asset.aiTag.languages &&
+                        asset.aiTag.languages.length > 0 && (
+                          <div className="grid gap-1">
+                            <p className="font-g text-g-chip font-[590] uppercase tracking-[0.08em] text-g-ink-4">
+                              {t("drawer.aiLanguages")}
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {asset.aiTag.languages.map((lang) => (
+                                <Badge key={lang} tone="line">
+                                  {lang}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      <div className="flex items-center gap-4 border-t border-g-line pt-3 font-g text-g-caption text-g-ink-4">
+                        {asset.aiTag.durationMs != null && (
+                          <span>
+                            {t("drawer.aiDuration")}:{" "}
+                            {(asset.aiTag.durationMs / 1000).toFixed(1)}s
+                          </span>
+                        )}
+                        {asset.aiTag.updatedAt && (
+                          <span>
+                            {new Date(asset.aiTag.updatedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </>
                   )}
-                  {asset.aiTag.description && (
-                    <div>
-                      <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                        {t("drawer.aiDescription")}
-                      </h4>
-                      <p className="font-g text-g-body text-g-ink-2">
-                        {asset.aiTag.description}
-                      </p>
-                    </div>
+                  {vlmOcrReady && asset.ocr && (
+                    <AssetDrawerOCR ocr={asset.ocr} />
                   )}
-                  <div className="flex items-center gap-4 border-t border-g-line pt-3 font-g text-g-caption text-g-ink-4">
-                    {asset.aiTag.durationMs != null && (
-                      <span>
-                        {t("drawer.aiDuration")}:{" "}
-                        {(asset.aiTag.durationMs / 1000).toFixed(1)}s
-                      </span>
-                    )}
-                    {asset.aiTag.updatedAt && (
-                      <span>
-                        {new Date(asset.aiTag.updatedAt).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
                 </div>
               )}
             </div>

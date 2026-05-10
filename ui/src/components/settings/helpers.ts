@@ -126,6 +126,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmEndpoint: settings?.llmEndpoint ?? "http://localhost:11434",
     llmVisionModel: settings?.llmVisionModel ?? "",
     llmEmbedModel: settings?.llmEmbedModel ?? "",
+    llmTagPrompt: settings?.llmTagPrompt ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -172,6 +173,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmEndpoint: draft.llmEndpoint,
     llmVisionModel: draft.llmVisionModel,
     llmEmbedModel: draft.llmEmbedModel,
+    llmTagPrompt: draft.llmTagPrompt,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -230,6 +232,7 @@ export function resetSectionDraft(
         llmEndpoint: defaults.llmEndpoint,
         llmVisionModel: defaults.llmVisionModel,
         llmEmbedModel: defaults.llmEmbedModel,
+        llmTagPrompt: defaults.llmTagPrompt,
       };
     case "customFilters":
       return {

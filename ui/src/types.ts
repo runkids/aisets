@@ -69,6 +69,7 @@ export type AppSettings = {
   llmEndpoint: string;
   llmVisionModel: string;
   llmEmbedModel: string;
+  llmTagPrompt: string;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -203,6 +204,7 @@ export type OptimizationStrategyMatch = {
   formats: string[];
   alpha: "any" | "transparent" | "opaque";
   animated: "any" | "true" | "false";
+  aiCategories?: string[];
   minBytesKB?: number;
   minWidthPx?: number;
   minHeightPx?: number;
@@ -318,6 +320,7 @@ export type AssetItem = {
     category?: string;
     tags?: string[];
     description?: string;
+    languages?: string[];
     errorCode?: string;
     errorMessage?: string;
     durationMs?: number;
@@ -458,6 +461,7 @@ export type CatalogItemsPage = {
     aiCategories: Array<{ id: string; count: number }>;
     aiCategoryTotal: number;
     ocrReadyCount: number;
+    vlmOcrReadyCount: number;
     aiTagReadyCount: number;
   };
 };

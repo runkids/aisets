@@ -5,6 +5,21 @@ import type { OptimizationStrategy } from "../../types";
 import { Button, Select, Switch, TextInput, Tooltip } from "../ui";
 import type { StrategyFieldErrors } from "./optimizationStrategyValidation";
 
+const AI_CATEGORY_OPTIONS = [
+  "icon",
+  "photo",
+  "screenshot",
+  "diagram",
+  "illustration",
+  "pattern",
+  "logo",
+  "banner",
+  "texture",
+  "sprite",
+  "mockup",
+  "artwork",
+];
+
 const FORMAT_OPTIONS: { key: string; label: string; values: string[] }[] = [
   { key: "svg", label: "SVG", values: ["svg"] },
   { key: "png", label: "PNG", values: ["png"] },
@@ -61,6 +76,27 @@ export function OptimizationStrategyRow({
       return {
         ...current,
         match: { ...current.match, formats: next },
+      };
+    });
+  }
+
+  function isAICategoryActive(category: string) {
+    return strategy.match.aiCategories?.includes(category) ?? false;
+  }
+
+  function toggleAICategory(category: string) {
+    onChange((current) => {
+      const cats = current.match.aiCategories ?? [];
+      const active = cats.includes(category);
+      const next = active
+        ? cats.filter((c) => c !== category)
+        : [...cats, category];
+      return {
+        ...current,
+        match: {
+          ...current.match,
+          aiCategories: next.length > 0 ? next : undefined,
+        },
       };
     });
   }
@@ -181,6 +217,26 @@ export function OptimizationStrategyRow({
           ))}
         </div>
         {errors.formats && <FieldError>{errors.formats}</FieldError>}
+        <div className="grid gap-1">
+          <SectionLabel
+            label={t("settings.strategyAICategory")}
+            description={t("settings.strategyAICategoryHint")}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {AI_CATEGORY_OPTIONS.map((cat) => (
+              <Button
+                key={cat}
+                variant="chip"
+                size="md"
+                data-active={isAICategoryActive(cat) || undefined}
+                disabled={disabled}
+                onClick={() => toggleAICategory(cat)}
+              >
+                {t(`settings.aiCategory.${cat}`, { defaultValue: cat })}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-2 grid-cols-2">
           <SelectField
             label={t("settings.strategyAlpha")}

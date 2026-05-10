@@ -56,6 +56,9 @@ export function AISection({
 }: AISectionProps) {
   const { t } = useTranslation();
 
+  const aiBusy =
+    isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
+
   const host = deriveHost(settings?.llmEndpoint);
   const defaultEndpoints: Record<string, string> = {
     ollama: `http://${host}:11434`,
@@ -131,6 +134,7 @@ export function AISection({
           >
             <Switch
               checked={draft.llmEnabled}
+              disabled={aiBusy}
               onCheckedChange={(next) =>
                 onUpdateDraft((current) => ({
                   ...current,
@@ -156,6 +160,7 @@ export function AISection({
                   value={draft.llmProvider || "ollama"}
                   options={providerOptions}
                   onChange={handleProviderChange}
+                  disabled={aiBusy}
                   aria-label={t("settings.llmProvider")}
                   className="min-w-[400px]"
                 />
@@ -164,6 +169,7 @@ export function AISection({
               <FieldRow label={t("settings.llmEndpoint")}>
                 <TextInput
                   value={draft.llmEndpoint}
+                  disabled={aiBusy}
                   onChange={(e) =>
                     onUpdateDraft((current) => ({
                       ...current,
@@ -183,6 +189,7 @@ export function AISection({
                   <Select
                     value={draft.llmVisionModel}
                     options={modelOptions}
+                    disabled={aiBusy}
                     onChange={(value) =>
                       onUpdateDraft((current) => ({
                         ...current,
@@ -211,6 +218,7 @@ export function AISection({
                   <Select
                     value={draft.llmEmbedModel}
                     options={modelOptions}
+                    disabled={aiBusy}
                     onChange={(value) =>
                       onUpdateDraft((current) => ({
                         ...current,
@@ -314,6 +322,40 @@ export function AISection({
                 )}
               </div>
             </FieldRow>
+            <div className="py-2">
+              <details className="border-t border-g-line pt-2 mt-1">
+                <summary className="cursor-pointer font-g text-g-chip tracking-g-ui text-g-ink-3 select-none">
+                  {t("settings.aiTagCustomPrompt")}
+                </summary>
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    className="w-full min-h-[120px] rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 font-g-mono text-g-caption tracking-g-mono text-g-ink-1 placeholder:text-g-ink-4 focus:outline-none focus:ring-1 focus:ring-g-accent"
+                    value={draft.llmTagPrompt}
+                    placeholder={t("settings.aiTagDefaultPromptLabel")}
+                    onChange={(e) =>
+                      onUpdateDraft((current) => ({
+                        ...current,
+                        llmTagPrompt: e.target.value,
+                      }))
+                    }
+                  />
+                  {draft.llmTagPrompt !== "" && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmTagPrompt: "",
+                        }))
+                      }
+                    >
+                      {t("settings.aiTagResetPrompt")}
+                    </Button>
+                  )}
+                </div>
+              </details>
+            </div>
           </div>
         </Card>
       )}
@@ -392,7 +434,13 @@ function aiTagProgressLabel(
     case "running":
     case "stopping":
       return counts
-        ? `${counts.processed}/${counts.queued + counts.cacheHit + counts.skipped}`
+        ? t("activity.aiTagCounts", {
+            processed: counts.processed,
+            ready: counts.ready,
+            failed: counts.failed,
+            skipped: counts.skipped,
+            cacheHit: counts.cacheHit,
+          })
         : t("settings.aiTagSaving");
     case "done":
       return t("settings.aiTagDone", {
@@ -440,7 +488,13 @@ function vlmOcrProgressLabel(
     case "running":
     case "stopping":
       return counts
-        ? `${counts.processed}/${counts.queued + counts.cacheHit + counts.skipped}`
+        ? t("activity.aiOcrCounts", {
+            processed: counts.processed,
+            ready: counts.ready,
+            failed: counts.failed,
+            skipped: counts.skipped,
+            cacheHit: counts.cacheHit,
+          })
         : t("settings.aiOcrSaving");
     case "done":
       return t("settings.aiOcrDone", {
