@@ -6,6 +6,7 @@ import {
   Plus,
   RotateCcw,
   Gauge,
+  Save,
   ScanText,
   Star,
   Tags,
@@ -624,11 +625,18 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
             onClick={handleSave}
             disabled={!isDirty || updateMutation.isPending}
           >
+            <Save size={14} />
             {t("prompts.save")}
+            <kbd className="ml-1 rounded bg-white/20 px-1 py-px font-g-mono text-[10px] opacity-70">
+              ⌘S
+            </kbd>
           </Button>
           <Button variant="secondary" onClick={handleDuplicate}>
             <Copy size={14} />
             {t("prompts.duplicate")}
+            <kbd className="ml-1 rounded border border-g-line bg-g-surface-2 px-1 py-px font-g-mono text-[10px] text-g-ink-4">
+              ⌘C
+            </kbd>
           </Button>
           <Button variant="secondary" onClick={handleResetToDefault}>
             <RotateCcw size={14} />
