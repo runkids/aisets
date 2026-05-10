@@ -9,6 +9,7 @@ import {
   Gauge,
   Save,
   ScanText,
+  Settings2,
   Star,
   Tags,
   Trash2,
@@ -166,6 +167,13 @@ function PresetList({
       >
         {/* Type tabs */}
         <RailSection>
+          <RailItem
+            variant="settings"
+            active={type === "system"}
+            icon={<Settings2 size={15} />}
+            label={t("prompts.systemPresets")}
+            onClick={() => onTypeChange("system")}
+          />
           <RailItem
             variant="settings"
             active={type === "tag"}

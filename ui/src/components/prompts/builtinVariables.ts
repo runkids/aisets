@@ -137,6 +137,16 @@ export const OPTIMIZE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
+export const SYSTEM_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
+  {
+    name: "language",
+    type: "select",
+    defaultValues: ["zh-TW"],
+    required: false,
+    descriptionKey: "prompts.var.language",
+  },
+];
+
 export const DUPLICATE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   {
     name: "leftMetadata",
@@ -167,6 +177,7 @@ export const DUPLICATE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
 export function getBuiltinVariables(
   type: PromptPresetType,
 ): BuiltinVariableDef[] {
+  if (type === "system") return SYSTEM_BUILTIN_VARIABLES;
   if (type === "tag") return TAG_BUILTIN_VARIABLES;
   if (type === "ocr") return OCR_BUILTIN_VARIABLES;
   if (type === "optimize") return OPTIMIZE_BUILTIN_VARIABLES;
