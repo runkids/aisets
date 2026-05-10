@@ -156,6 +156,92 @@ func (s *Store) OCRResultForContentHash(contentHash, hashAlgorithm string, setti
 	return result, true, nil
 }
 
+func (s *Store) VLMOCRResults(items []scanner.AssetItem, engineVersion, settingsHash string) (map[string]ocr.Result, error) {
+	out := map[string]ocr.Result{}
+	if len(items) == 0 {
+		return out, nil
+	}
+	for _, item := range items {
+		if item.ContentHash == "" || item.HashAlgorithm == "" {
+			continue
+		}
+		row := s.rdb.QueryRow(`
+			SELECT status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
+				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
+			FROM ocr_results
+			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
+				AND engine_name = 'vlm' AND engine_version = ? AND settings_hash = ?
+		`, item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm, engineVersion, settingsHash)
+		result := ocr.Result{
+			ProjectID:     item.ProjectID,
+			RepoPath:      item.RepoPath,
+			ContentHash:   item.ContentHash,
+			HashAlgorithm: item.HashAlgorithm,
+			EngineName:    "vlm",
+			EngineVersion: engineVersion,
+			SettingsHash:  settingsHash,
+		}
+		var languagesRaw, scriptsRaw string
+		var confidence sql.NullFloat64
+		err := row.Scan(&result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence, &result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if confidence.Valid {
+			value := confidence.Float64
+			result.Confidence = &value
+		}
+		_ = json.Unmarshal([]byte(languagesRaw), &result.Languages)
+		_ = json.Unmarshal([]byte(scriptsRaw), &result.Scripts)
+		ocr.FinalizeResult(&result)
+		out[ocrKey(item.ProjectID, item.RepoPath)] = result
+	}
+	return out, nil
+}
+
+func (s *Store) VLMOCRResultForContentHash(contentHash, hashAlgorithm, engineVersion, settingsHash string) (ocr.Result, bool, error) {
+	if contentHash == "" || hashAlgorithm == "" {
+		return ocr.Result{}, false, nil
+	}
+	row := s.rdb.QueryRow(`
+		SELECT project_id, repo_path, status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
+			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
+		FROM ocr_results
+		WHERE content_hash = ? AND hash_algorithm = ?
+			AND engine_name = 'vlm' AND engine_version = ? AND settings_hash = ?
+			AND status = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, contentHash, hashAlgorithm, engineVersion, settingsHash, ocr.StatusReady)
+	result := ocr.Result{
+		ContentHash:   contentHash,
+		HashAlgorithm: hashAlgorithm,
+		EngineName:    "vlm",
+		EngineVersion: engineVersion,
+		SettingsHash:  settingsHash,
+	}
+	var languagesRaw, scriptsRaw string
+	var confidence sql.NullFloat64
+	err := row.Scan(&result.ProjectID, &result.RepoPath, &result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence, &result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return ocr.Result{}, false, nil
+	}
+	if err != nil {
+		return ocr.Result{}, false, err
+	}
+	if confidence.Valid {
+		value := confidence.Float64
+		result.Confidence = &value
+	}
+	_ = json.Unmarshal([]byte(languagesRaw), &result.Languages)
+	_ = json.Unmarshal([]byte(scriptsRaw), &result.Scripts)
+	ocr.FinalizeResult(&result)
+	return result, true, nil
+}
+
 func (s *Store) RemoveOCRResults() error {
 	_, err := s.db.Exec(`DELETE FROM ocr_results`)
 	return err

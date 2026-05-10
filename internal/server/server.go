@@ -24,13 +24,13 @@ type Options struct {
 }
 
 type Server struct {
-	addr      string
-	basePath  string
-	store     *config.Store
-	uiDistDir string
-	version   string
-	mux       *http.ServeMux
-	handler   http.Handler
+	addr        string
+	basePath    string
+	store       *config.Store
+	uiDistDir   string
+	version     string
+	mux         *http.ServeMux
+	handler     http.Handler
 	scanner     *scanner.Scanner
 	ocrEngine   ocr.Engine
 	llmProvider llm.Provider
@@ -160,6 +160,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/llm/health", s.handleLLMHealth)
 	s.mux.HandleFunc("POST /api/ai/tag/run", s.handleAITagRun)
 	s.mux.HandleFunc("POST /api/ai/tag/clear", s.handleAITagClear)
+	s.mux.HandleFunc("POST /api/ai/ocr/run", s.handleVLMOCRRun)
 	if s.uiDistDir != "" {
 		s.mux.Handle("/", spaHandlerFromDisk(s.uiDistDir, s.basePath))
 	} else {
