@@ -17,7 +17,9 @@
     "settings": "设置",
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets 导航",
-    "projects": "项目"
+    "projects": "项目",
+    "footerProjects": "个项目",
+    "footerAssets": "个素材"
   },
   "mode": {
     "dashboard": "总览",
@@ -67,7 +69,17 @@
     "copy": "复制",
     "downloadShell": "下载 .sh",
     "scrollToTop": "回到顶部",
-    "more": "更多操作"
+    "more": "更多操作",
+    "batchDeleteConfirmTitle": "删除 {{count}} 个文件",
+    "batchDeleteConfirmBody": "将永久删除 {{count}} 个文件（{{size}}），此操作无法撤销",
+    "batchDeleteSuccess": "已删除 {{count}} 个文件",
+    "batchDeletePartial": "已删除 {{succeeded}} / {{total}} 个文件（{{failed}} 个失败）",
+    "batchCopy": "复制到",
+    "batchCopySuccess": "已复制 {{count}} 个文件",
+    "batchCopyPartial": "已复制 {{succeeded}} / {{total}} 个文件（{{failed}} 个失败、{{skipped}} 个跳过）",
+    "batchMove": "移动",
+    "batchRename": "重命名",
+    "batchExport": "导出"
   },
   "search": {
     "placeholder": "搜索路径、项目、格式或 content hash…",
@@ -193,7 +205,20 @@
     "noSubdirs": "没有子目录",
     "noSubdirsDesc": "可以直接添加当前目录",
     "selectStart": "选择起始目录",
-    "selectStartDesc": "输入路径后按「前往」，或使用默认目录开始浏览"
+    "selectStartDesc": "输入路径后按「前往」，或使用默认目录开始浏览",
+    "projectType": "项目类型",
+    "projectTypeHint": "控制零引用是否可算作未使用；重复检测与优化仍独立运行",
+    "detectingIntent": "正在检测项目类型",
+    "detectedIntent": "建议：{{intent}}",
+    "detectIntentFailed": "无法检测项目类型，请手动选择",
+    "adding": "添加中…",
+    "addDisabledOcrBusy": "OCR 正在运行，完成后可添加",
+    "moveDir": "移动到这里",
+    "moving": "移动中…",
+    "copyDir": "复制到这里",
+    "copying": "复制中…",
+    "titleMove": "选择移动目标位置",
+    "titleCopy": "选择复制目标位置"
   },
   "preview": {
     "canApplyDesc": "此操作可套用请确认变更后再写入文件",
@@ -240,7 +265,8 @@
       "optimized": "所有优化建议都已生成对应的优化版本",
       "referenced": "代码里有找到至少一处引用，确定有在使用"
     },
-    "helpIntro": "每张素材会根据代码引用状况自动标上状态，帮你快速判断哪些可以清理，这些标签只影响建议，你随时可以手动操作任何文件"
+    "helpIntro": "每张素材会根据代码引用状况自动标上状态，帮你快速判断哪些可以清理，这些标签只影响建议，你随时可以手动操作任何文件",
+    "notApplicableHelp": "通常为素材包：素材可能在此仓库之外使用，因此不以零代码引用判断未使用状态。禁用引用分析的扫描也会出现在这里"
   },
   "error": {
     "catalogLoad": "Catalog 加载失败",
@@ -307,7 +333,18 @@
     "target_path_required": "需要指定目标路径",
     "preview_stale_missing_candidate": "预览已过时，候选文件已被移除",
     "preview_has_blockers": "部分项目无法套用",
-    "project_icon_invalid": "项目图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL"
+    "project_icon_invalid": "项目图片必须是 512 KB 以内的 PNG、JPEG、GIF 或 WebP data URL",
+    "custom_filter_confidence_invalid": "自定义筛选器置信度必须在 0 到 1 之间",
+    "custom_filter_ocr_status_invalid": "自定义筛选器 OCR 状态无效",
+    "settings_ocr_languages_required": "至少需要一种 OCR 语言",
+    "settings_ocr_max_pixels_invalid": "OCR 最大像素必须大于零",
+    "settings_ocr_batch_size_invalid": "OCR 批次大小必须大于零",
+    "settings_ocr_concurrency_invalid": "v1 中 OCR 并发数必须为 1",
+    "ocr_disabled": "请先启用并保存 OCR 设置，再运行 OCR",
+    "ocr_not_installed": "请先安装 OCR 语言包，再运行 OCR",
+    "ocr_engine_unavailable": "OCR 引擎不可用，请安装 Tesseract 命令行工具后重试",
+    "ocr_install_failed": "OCR 语言包下载失败",
+    "ocr_remove_failed": "OCR 语言包移除失败"
   },
   "topbar": {
     "totalLabel": "{{projects}} 个项目 · {{assets}} 个素材",
@@ -347,7 +384,19 @@
     "aiTagPreparing": "正在准备 AI 标记",
     "aiTagCounts": "已处理 {{processed}}，完成 {{ready}}，失败 {{failed}}，跳过 {{skipped}}，缓存 {{cacheHit}}",
     "viewAISettings": "AI 设置",
-    "aiTagLockedTooltip": "请先停止 AI 标记"
+    "aiTagLockedTooltip": "请先停止 AI 标记",
+    "optimizeTitle": "优化活动",
+    "optimizeRunning": "正在估算优化",
+    "optimizePreviewing": "正在准备优化预览",
+    "optimizeStopping": "正在停止优化",
+    "optimizeDone": "优化估算完成",
+    "optimizeStopped": "优化已停止",
+    "optimizeError": "优化失败",
+    "optimizePreparing": "正在准备优化",
+    "optimizeCounts": "已处理 {{processed}}/{{total}}，适用 {{applicable}}，已阻止 {{blocked}}",
+    "viewOptimize": "打开优化",
+    "stopOptimize": "停止",
+    "optimizeLockedTooltip": "请先停止优化"
   },
   "toast": {
     "projectAdded": "已新增项目：{{path}}",
@@ -364,7 +413,13 @@
     "scanHistoryCleared": "扫描历史已清除",
     "scanHistoryClearFailed": "扫描历史清除失败",
     "databaseReset": "数据库已重置",
-    "databaseResetFailed": "数据库重置失败"
+    "databaseResetFailed": "数据库重置失败",
+    "settingsSectionReset": "已重置，保存后生效",
+    "settingsScanningReset": "已重置，保存后生效",
+    "settingsCatalogScanningReset": "目录扫描已重置，保存后生效",
+    "settingsOcrReset": "OCR 已重置，保存后生效",
+    "ocrCacheCleared": "OCR 缓存已清除",
+    "aiTagCacheCleared": "AI 标签缓存已清除"
   },
   "prompt": {
     "renamePath": "新的项目相對路径"
@@ -433,7 +488,9 @@
     "overlayMode": "叠加",
     "overlayOpacity": "叠加透明度",
     "mergeConfirmTitle": "合并 {{count}} 个重复文件",
-    "mergeConfirmBody": "移除 {{count}} 个重复副本（{{size}}），并更新 {{refs}} 个引用指向首选路径"
+    "mergeConfirmBody": "移除 {{count}} 个重复副本（{{size}}），并更新 {{refs}} 个引用指向首选路径",
+    "filterByExt": "类型",
+    "allGroups": "所有分组"
   },
   "compare": {
     "side": "并排",
@@ -535,7 +592,8 @@
       "replace_requires_code_project": "只有代码项目能安全取代转档后的原文件",
       "replace_requires_reference_update": "此文件有引用；取代旧文件前必须更新引用",
       "reference_update_blocked": "有引用无法安全更新",
-      "target_already_exists": "已优化过，目标文件已存在"
+      "target_already_exists": "已优化过，目标文件已存在",
+      "optimizer_tool_timeout": "{{tool}} 的优化耗时过长，请尝试较小的图片或手动优化此动画"
     },
     "preview": "预览",
     "script": "脚本",
@@ -608,7 +666,11 @@
     "estimatePromptInfo": "我们会先估算 {{count}} 个素材，然后自动进入预览。估算期间选取会被锁定",
     "quickOptimizeSubtitle": "{{count}} 个素材 · 估算、预览、应用一气呵成",
     "applyStep": "应用",
-    "keyboardHint": "⌘ Enter 确认 · Esc 取消"
+    "keyboardHint": "⌘ Enter 确认 · Esc 取消",
+    "disabledStrategiesNote_other": "另有 {{count}} 个已禁用策略未显示",
+    "toolsRuntimeReadyMeta": "Imgtools 可用 · 已启用 {{count}} 个外部工具",
+    "toolsRuntimeFallbackMeta": "Imgtools 缺失 · 使用内置回退",
+    "toolsMissingMeta": "{{count}} 个已启用工具缺失"
   },
   "selection": {
     "summary": "已選 {{count}} · {{size}}",
@@ -667,7 +729,20 @@
     "aiTagRunning": "AI 标记进行中…",
     "aiTagDisabledHint": "请在设置 → AI 中配置 AI 提供者",
     "aiTagProgress": "已标记 {{processed}}/{{queued}}（{{ready}} 完成、{{failed}} 失败、{{skipped}} 跳过、{{cacheHit}} 缓存）",
-    "aiTagDone": "AI 标记完成"
+    "aiTagDone": "AI 标记完成",
+    "emptyOCRTextHint": "{{count}} 张图片完成 OCR 后未识别到任何文字，因此部分可见图片文字可能尚无法搜索",
+    "unusedNotApplicableEmpty": "无可安全清理的未使用素材",
+    "unusedNotApplicableDesc": "{{count}} 个素材属于素材包或未检查引用的扫描。零引用不是删除依据，因此不包含在未使用清理建议中",
+    "unusedAdvisoryEmpty": "无可安全清理的未使用素材",
+    "unusedAdvisoryDesc": "{{count}} 个素材仅为可能未使用，因为引用覆盖是建议性的。请人工检查；不建议作为未使用清理项",
+    "notApplicableTitle": "未使用状态不适用",
+    "notApplicableDesc": "这 {{count}} 个素材未检查未使用状态，大多数为素材包；禁用引用分析的扫描也会出现在这里",
+    "flagPossiblyUnused": "可能未使用",
+    "flagNotApplicable": "不适用",
+    "flagUsageNotChecked": "未分析引用",
+    "flagPossiblyUnusedShort": "可能",
+    "flagNotApplicableShort": "未检查",
+    "flagUsageNotCheckedShort": "无引用"
   },
   "lint": {
     "title": "Lint",
@@ -688,7 +763,51 @@
     "allClearDesc": "未检测到 lint 问题，资源使用状况良好",
     "severityFilter": "严重程度",
     "ruleFilter": "规则",
-    "allRules": "所有规则"
+    "allRules": "所有规则",
+    "collapseAll": "收起所有",
+    "expandAll": "展开所有",
+    "rule": {
+      "missing-lazy-loading": {
+        "name": "缺少懒加载",
+        "message": "<img> 加载大图片时未设置 loading 属性，可能影响滚动性能",
+        "suggestion": "折叠内容图片添加 loading=\"lazy\"，关键首屏图片添加 loading=\"eager\" / fetchpriority=\"high\""
+      },
+      "missing-dimensions": {
+        "name": "缺少尺寸",
+        "message": "<img> 缺少明确的 width/height 或宽高比，可能导致布局偏移（CLS）",
+        "suggestion": "添加 width/height 属性，或通过 Tailwind/CSS 同时提供 width 和 height/aspect-ratio"
+      },
+      "large-inline-import": {
+        "name": "大型内联导入",
+        "message": "将 {{kb}}KB 素材作为 raw/inline 导入可能会增大 JS 包体积",
+        "suggestion": "改用标准 URL 导入，仅对极小的 SVG/图标使用 ?raw/?inline"
+      },
+      "no-responsive-image": {
+        "name": "无响应式图片",
+        "message": "大型光栅图片（{{kb}}KB）未使用 srcset，可能在小屏幕上浪费带宽",
+        "suggestion": "内容图片通过 srcset 提供多尺寸版本，固定尺寸 UI 图片则压缩源文件"
+      },
+      "svg-as-img": {
+        "name": "SVG 作为 img",
+        "message": "通过 <img> 加载的 SVG 无法用 CSS 样式化或进行交互动画",
+        "suggestion": "静态 SVG 保留 <img>；需要 CSS 颜色控制或动画时改用内联 SVG 或组件"
+      },
+      "img-as-background": {
+        "name": "图片用作背景",
+        "message": "大型装饰图片（alt=\"\"）通过 <img> 加载，请考虑是否需要占用 DOM",
+        "suggestion": "纯装饰内容使用 CSS background/伪元素；若需要尺寸或加载行为则保留 <img alt=\"\">"
+      },
+      "bg-content-image": {
+        "name": "背景内容图片",
+        "message": "大型光栅图片（{{kb}}KB）通过 CSS background-image 加载，无法使用懒加载",
+        "suggestion": "内容图片改用带 loading=\"lazy\" 的 <img>；视觉背景则压缩/转换源文件或添加预加载策略"
+      },
+      "duplicate-asset": {
+        "name": "重复素材",
+        "message": "存在相同副本：{{path}}",
+        "suggestion": "删除此副本并更新引用以使用首选路径"
+      }
+    }
   },
   "commandPalette": {
     "placeholder": "搜索素材或切換页面...",
@@ -775,7 +894,40 @@
     "modified": "修改日期",
     "animated": "动画",
     "alphaChannel": "透明通道",
-    "imagePages": "页数"
+    "imagePages": "页数",
+    "ocr": "OCR",
+    "ocrNoText": "暂无 OCR 文字",
+    "ocrEmptyText": "已扫描，但未识别到可搜索的文字",
+    "ocrAttempts": "{{count}} 次尝试",
+    "tabOverview": "概览",
+    "tabUsage": "用量",
+    "tabSimilar": "相似",
+    "tabOptimize": "优化",
+    "tabOCR": "OCR",
+    "chipUnused": "未使用",
+    "chipPossiblyUnused": "可能未使用",
+    "chipUsageNotApplicable": "未使用状态未检查",
+    "chipDuplicate": "重复",
+    "chipSimilar": "相似",
+    "chipOptimizable": "可优化",
+    "chipOptimized": "已优化",
+    "chipOCR": "OCR",
+    "usageEmpty": "未找到代码引用，此素材为删除候选",
+    "usagePossiblyUnused": "未找到引用，但此项目的引用覆盖率不完整或存在外部消费者。请人工检查；不包含在未使用清理建议中",
+    "usageAssetPack": "此文件属于素材包项目。素材包供其他项目或手动选择使用，因此没有代码引用是正常的。Aisets 不会将其标记为未使用或列入清理建议",
+    "usageNotApplicable": "此次扫描未运行可用的引用分析，Aisets 无法判断此文件是否未使用。不包含在未使用清理建议中",
+    "copyAll": "复制全部",
+    "openInEditor": "在 {{editor}} 中打开",
+    "exactDuplicates": "完全重复",
+    "visualSimilar": "视觉相似",
+    "similarSideBySide": "并排对比",
+    "similarOverlay": "叠加对比",
+    "similarDiff": "像素差异",
+    "similarScore": "相似度 {{score}}%",
+    "similarMirrored": "镜像",
+    "noSimilar": "无相似文件",
+    "noDuplicates": "无完全重复文件",
+    "refCount": "{{count}} 个引用"
   },
   "settings": {
     "section": {
@@ -867,7 +1019,12 @@
       "status": "状态",
       "duplicate": "重复",
       "nearDuplicate": "相似重复",
-      "optimizable": "可优化"
+      "optimizable": "可优化",
+      "ocrText": "OCR 文字",
+      "ocrLanguage": "OCR 语言",
+      "ocrScript": "OCR 文字系统",
+      "ocrConfidence": "OCR 置信度",
+      "ocrStatus": "OCR 状态"
     },
     "customFilterOperator": {
       "contains": "包含",
@@ -884,7 +1041,11 @@
       "unused": "未使用",
       "referenced": "已引用",
       "true": "True",
-      "false": "False"
+      "false": "False",
+      "pending": "待处理",
+      "ready": "就绪",
+      "failed": "失败",
+      "skipped": "已跳过"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1167,7 +1328,136 @@
     "aiOcrSaving": "保存设置中…",
     "aiOcrDone": "完成 — {{ready}} 已提取、{{skipped}} 已跳过、{{cacheHit}} 缓存命中",
     "aiOcrStopped": "已停止",
-    "aiOcrFailed": "AI OCR 失败"
+    "aiOcrFailed": "AI OCR 失败",
+    "preferredEditor": "编辑器",
+    "preferredEditorDesc": "选择从素材抽屉打开文件时使用的代码编辑器",
+    "excludeScopeLabel": "排除规则范围",
+    "excludeScope": {
+      "global": "全局",
+      "globalHint": "应用到所有项目",
+      "codeHint": "仅添加到代码项目",
+      "assetPackHint": "仅添加到素材包",
+      "libraryHint": "仅添加到可复用库",
+      "mixedHint": "仅添加到混合 / 不确定项目"
+    },
+    "excludeScopeGlobalNote": "全局规则会先应用到所有项目，再追加项目类型专属规则。单纯文件名会匹配任意文件夹深度下的同名文件",
+    "excludeScopeIntentNote": "这些规则仅添加到「{{intent}}」项目，全局规则仍会优先应用。单纯文件名会匹配任意文件夹深度下的同名文件",
+    "ocrEnabled": "在搜索和筛选中使用 OCR",
+    "ocrEnabledHint": "允许浏览、自定义筛选器和 ⌘ P 使用已缓存的 OCR 文字，此开关本身不会读取图片",
+    "ocrLanguages": "OCR 语言",
+    "ocrLanguagesHint": "选择要使用并下载到本机的免费开源语言包",
+    "ocrLanguagesPlaceholder": "选择 OCR 语言",
+    "ocrLanguageLabels": {
+      "eng": "英语",
+      "chi_tra": "繁体中文",
+      "chi_sim": "简体中文",
+      "jpn": "日语",
+      "kor": "韩语",
+      "fra": "法语",
+      "deu": "德语",
+      "spa": "西班牙语",
+      "por": "葡萄牙语",
+      "ita": "意大利语",
+      "nld": "荷兰语",
+      "rus": "俄语",
+      "ukr": "乌克兰语",
+      "ara": "阿拉伯语",
+      "hin": "印地语",
+      "tha": "泰语",
+      "vie": "越南语",
+      "ind": "印度尼西亚语",
+      "msa": "马来语"
+    },
+    "ocrLimits": "OCR 高级设置",
+    "ocrLimitsHint": "大多数项目使用默认值即可，仅在需要控制速度、电脑负载或搜索容错时调整",
+    "ocrLimitsEdit": "配置",
+    "ocrLimitsHelpTitle": "OCR 高级设置",
+    "ocrLimitsHelpDesc": "这些设置会影响 OCR 运行成本和搜索容错",
+    "ocrLimitsKeepDefaults": "不确定时建议保留默认值。OCR 仍会在后台分批运行，不会在浏览或搜索输入时即时识别文字",
+    "ocrMaxPixels": "OCR 最大像素",
+    "ocrMaxPixelsHint": "超过此像素数的图片将被跳过，避免大截图或超大图片使 OCR 运行过长。2000000 约为 200 万像素",
+    "ocrBatchSize": "OCR 批次大小",
+    "ocrBatchSizeHint": "每批处理的图片数量。数值越大完成越快，但运行时 CPU 负载可能更明显",
+    "ocrConcurrency": "并行任务数",
+    "ocrConcurrencyHint": "同时处理的图片数量。1 最稳定；2 更快但 CPU 负载较高。当前最大值为 2 以保护性能",
+    "ocrGroupPerformance": "性能",
+    "ocrGroupSearch": "搜索行为",
+    "ocrMaxPixelsSuffix": "px",
+    "ocrMaxPixelsDefault": "默认：2,000,000",
+    "ocrBatchSizeDefault": "默认：25",
+    "ocrConcurrencyDefault": "默认：1",
+    "ocrFuzzySearch": "OCR 搜索容错",
+    "ocrFuzzySearchHint": "允许搜索匹配常见 OCR 噪声，如缺少、多余或脏字符。例如，ERARZAN 仍可匹配 tarzan。关闭则仅精确包含匹配",
+    "ocrRuntime": "OCR 缓存",
+    "ocrRuntimeHint": "安装本地语言包，然后为当前目录构建 OCR 缓存。图片不会上传",
+    "ocrInstall": "安装语言包",
+    "ocrInstalling": "安装中...",
+    "ocrRemove": "移除语言包",
+    "ocrRemoving": "移除中...",
+    "ocrRun": "构建 OCR 缓存",
+    "ocrRunning": "运行中...",
+    "ocrStop": "停止 OCR",
+    "ocrStopping": "停止中...",
+    "ocrInstalled": "OCR 语言包已安装到本机",
+    "ocrNotInstalled": "OCR 语言包尚未安装",
+    "ocrCacheScopeHint": "OCR 缓存保存在本地，按项目、路径、内容哈希、语言和引擎版本复用。移除 OCR 会清除所有 OCR 缓存",
+    "ocrEngineUnavailable": "OCR 引擎不可用：{{error}}",
+    "ocrEngineInstallHintDarwin": "使用以下命令安装 Tesseract：brew install tesseract",
+    "ocrEngineInstallHintLinux": "使用包管理器安装 Tesseract，例如：sudo apt-get install tesseract-ocr",
+    "ocrEngineInstallHintWindows": "使用以下命令安装 Tesseract：winget install --id UB-Mannheim.TesseractOCR --exact",
+    "ocrEngineInstallHintFallback": "安装 Tesseract 命令行工具，然后重启 Aisets",
+    "ocrRunSuccess": "OCR 运行完成",
+    "ocrRunStopped": "OCR 运行已停止",
+    "ocrRunFailed": "OCR 运行失败",
+    "ocrProgress": "已处理 {{processed}}，就绪 {{ready}}，失败 {{failed}}，跳过 {{skipped}}，缓存 {{cacheHit}}",
+    "ocrProgressWithSkipReason": "已处理 {{processed}}，就绪 {{ready}}，失败 {{failed}}，跳过 {{skipped}}，缓存 {{cacheHit}}；主要跳过原因：{{skipReason}} ({{skipReasonCount}})",
+    "ocrMissingSelectedLanguages": "请先安装所选语言包：{{languages}}",
+    "ocrRunConfirmTitle": "运行 OCR",
+    "ocrRunConfirmIntro": "Aisets 将为当前目录构建或刷新 OCR 文字",
+    "ocrRunConfirmLocal": "图片保留在本机，仅在本地处理",
+    "ocrRunConfirmBatch": "分批处理（每批 {{batchSize}} 张）以保持界面响应；运行 OCR 会持续进行直到没有可处理的图片为止",
+    "ocrRunConfirmSettings": "当前 OCR 设置将先保存。新选择的语言会使旧 OCR 缓存失效并重新处理",
+    "ocrRunConfirmSearch": "就绪的 OCR 文字可在浏览、自定义筛选器和 ⌘ P 中搜索，不会用于清理或删除决策",
+    "ocrRunConfirmAction": "开始 OCR",
+    "ocrRemoveConfirmTitle": "移除 OCR",
+    "ocrRemoveConfirmMessage": "将移除所有已安装的语言包并清除所有工作区和项目的 OCR 缓存。图片文件不会被删除，但需重建 OCR 才能使用图片文字搜索",
+    "ocrRemoveConfirmAction": "移除并清除缓存",
+    "ocrSkipReason": {
+      "ocr_missing_hash": "缺少内容哈希",
+      "ocr_image_unreadable": "图片不可读",
+      "ocr_animated_unsupported": "动态图片",
+      "ocr_extension_unsupported": "不支持的文件类型",
+      "ocr_dimensions_missing": "缺少图片尺寸",
+      "ocr_oversized": "超过 OCR 最大像素",
+      "ocr_hash_failed": "内容哈希失败"
+    },
+    "installed": "已安装",
+    "notInstalled": "未安装",
+    "customFilterFieldDesc": {
+      "path": "包含文件名的完整路径",
+      "folder": "素材的父文件夹",
+      "extension": "文件扩展名，例如 .png",
+      "project": "素材所属项目",
+      "bytes": "文件大小（字节）",
+      "status": "在代码中已使用或未使用",
+      "duplicate": "完全相同的内容哈希匹配",
+      "nearDuplicate": "与另一素材视觉相似",
+      "optimizable": "有压缩或格式建议",
+      "ocrText": "图片中识别的文字",
+      "ocrLanguage": "检测到的 OCR 语言",
+      "ocrScript": "检测到的 OCR 文字系统",
+      "ocrConfidence": "OCR 识别置信度（0–1）",
+      "ocrStatus": "OCR 处理状态"
+    },
+    "clearOCRCache": "清除 OCR 缓存",
+    "clearOCRCacheHint": "移除所有 OCR 结果（包括 AI OCR）。重新运行 OCR 或 AI OCR 可重新处理",
+    "clearOCRCacheConfirm": "清除所有 OCR 结果（包括 AI OCR）？此操作无法撤销，需重新运行 OCR 才能恢复",
+    "clearAITagCache": "清除 AI 标签缓存",
+    "clearAITagCacheHint": "移除所有 AI 标签、分类和描述。重新运行 AI 标注可重新分析",
+    "clearAITagCacheConfirm": "清除所有 AI 标签结果？此操作无法撤销，需重新运行 AI 标注才能恢复",
+    "llmEnabled": "启用 AI",
+    "llmEnabledHint": "启用本地 LLM 提供商以支持 AI 标注、分类和搜索",
+    "llmTesting": "测试中…"
   },
   "catalog": {
     "notComputed": {
@@ -1255,7 +1545,8 @@
     "projectIconReadError": "无法读取这张图片",
     "removeDialogTitle": "移除项目",
     "removeConfirm": "要从此工作区移除 {{name}} 吗？不会删除文件",
-    "removeDialogConfirm": "移除"
+    "removeDialogConfirm": "移除",
+    "projectType": "项目类型"
   },
   "filterRail": {
     "aiCategory": "分类",
@@ -1275,5 +1566,80 @@
     "aiDescription": "描述",
     "aiModel": "模型",
     "aiDuration": "处理时间"
+  },
+  "scanProgress": {
+    "starting": "开始扫描",
+    "complete": "扫描完成",
+    "phase": {
+      "collecting": "收集素材",
+      "metadata": "分析图片",
+      "references": "检查引用",
+      "duplicates": "整理重复素材",
+      "nearDuplicates": "比对相似素材",
+      "lint": "运行素材规则",
+      "persisting": "保存扫描结果"
+    },
+    "reason": {
+      "skippedByUser": "当前扫描配置已禁用此分析",
+      "skippedByThreshold": "为避免扫描时间过长，已跳过此分析",
+      "notApplicable": "此项目类型不使用代码引用分析，已跳过"
+    }
+  },
+  "projectIntent": {
+    "code": {
+      "label": "代码项目",
+      "description": "适合网站或 App 仓库。Aisets 会扫描支持的代码引用，仅在覆盖完整且零引用时才将素材标记为可清理"
+    },
+    "assetPack": {
+      "label": "素材包",
+      "description": "适合图片、图标或美术素材包。不检查未使用（素材可能在此仓库外被使用）；重复、元数据、优化与整理仍会运行"
+    },
+    "library": {
+      "label": "共享素材库",
+      "description": "适合被其他项目引用的库。会扫描内部引用，但零引用素材仅标为可能未使用，需人工确认"
+    },
+    "mixed": {
+      "label": "混合 / 不确定",
+      "description": "不确定时选此项。Aisets 会保守扫描：零引用素材标为可能未使用，而非清理建议"
+    }
+  },
+  "ocr": {
+    "badge": {
+      "short": "OCR",
+      "ready": "OCR 缓存已就绪，可搜索",
+      "empty": "OCR 已扫描此图片，但未找到文字",
+      "pending": "OCR 缓存待处理",
+      "failed": "OCR 缓存失败",
+      "skipped": "OCR 已跳过",
+      "shortAI": "AI OCR",
+      "ai": {
+        "ready": "AI OCR 已完成，可搜索文字",
+        "empty": "AI OCR 已扫描，但未找到文字",
+        "pending": "AI OCR 待处理",
+        "failed": "AI OCR 失败",
+        "skipped": "AI OCR 已跳过"
+      }
+    },
+    "status": {
+      "pending": "待处理",
+      "ready": "就绪",
+      "failed": "失败",
+      "skipped": "已跳过"
+    }
+  },
+  "batch": {
+    "previewSummary": "{{moves}} 个文件变更 · {{refs}} 个引用更新",
+    "blockersTitle": "{{count}} 个阻断项",
+    "fileChanges": "文件变更（{{count}}）",
+    "refChanges": "引用更新（{{count}}）"
+  },
+  "rename": {
+    "rulesTitle": "批量重命名规则",
+    "lowercase": "转换为小写",
+    "replaceSpaces": "将空格和特殊字符替换为下划线",
+    "prefix": "前缀",
+    "suffix": "后缀",
+    "preview": "预览",
+    "apply": "应用重命名"
   }
 }

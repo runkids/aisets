@@ -673,6 +673,7 @@
     "editRules": "編輯",
     "noStrategies": "沒有啟用的策略。請到「設定 → 最佳化」新增",
     "disabledStrategiesNote": "另有 {{count}} 個已停用策略未顯示",
+    "disabledStrategiesNote_other": "另有 {{count}} 個已停用策略未顯示",
     "help.replaceOriginal": "以最佳化版本覆寫原始檔。未勾選時，會在原始檔旁建立新檔案",
     "help.updateReferences": "當檔案副檔名或名稱改變時，自動更新 import 路徑和引用。僅適用於有偵測到引用的程式碼專案",
     "columnFile": "檔案",
@@ -969,7 +970,15 @@
       "empty": "OCR 已掃描，但沒有辨識出文字",
       "pending": "OCR 等待建立",
       "failed": "OCR 建立失敗",
-      "skipped": "OCR 已略過"
+      "skipped": "OCR 已略過",
+      "shortAI": "AI OCR",
+      "ai": {
+        "ready": "AI OCR 已完成，可搜尋文字",
+        "empty": "AI OCR 已掃描，但沒有辨識出文字",
+        "pending": "AI OCR 等待建立",
+        "failed": "AI OCR 失敗",
+        "skipped": "AI OCR 已略過"
+      }
     },
     "status": {
       "pending": "等待中",

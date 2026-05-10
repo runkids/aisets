@@ -1492,7 +1492,15 @@
       "empty": "OCR scanned this image but found no text",
       "pending": "OCR cache is pending",
       "failed": "OCR cache failed",
-      "skipped": "OCR was skipped"
+      "skipped": "OCR was skipped",
+      "shortAI": "AI OCR",
+      "ai": {
+        "ready": "AI OCR is ready and searchable",
+        "empty": "AI OCR scanned this image but found no text",
+        "pending": "AI OCR is pending",
+        "failed": "AI OCR failed",
+        "skipped": "AI OCR was skipped"
+      }
     },
     "status": {
       "pending": "Pending",

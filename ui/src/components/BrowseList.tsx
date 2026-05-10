@@ -22,6 +22,7 @@ import {
   usageClassification,
 } from "../projectScanIntent";
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
+import { AITagBadge } from "./AITagBadge";
 import { OCRStatusBadge } from "./OCRStatusBadge";
 import { Badge, ImagePreview, Tooltip } from "./ui";
 
@@ -33,7 +34,6 @@ type BrowseListProps = {
   activeAssetId: string;
   autoScrollAssetId: string;
   imagePreviewEnabled: boolean;
-  ocrEnabled: boolean;
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
@@ -58,7 +58,6 @@ export function BrowseList({
   activeAssetId,
   autoScrollAssetId,
   imagePreviewEnabled,
-  ocrEnabled,
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
@@ -116,7 +115,7 @@ export function BrowseList({
         : optimizable
           ? t("browse.flagOptimizable")
           : "",
-      ocrEnabled ? ocrStatusLabel(t, item) : "",
+      ocrStatusLabel(t, item),
     ].filter(Boolean);
     const ariaLabel = [item.repoPath, ...statusLabels].join(" · ");
 
@@ -190,7 +189,8 @@ export function BrowseList({
         </span>
         <span className="flex min-w-0 flex-wrap items-center gap-1">
           <Badge tone="line">{formatExt(item.ext)}</Badge>
-          <OCRStatusBadge item={item} enabled={ocrEnabled} />
+          <OCRStatusBadge item={item} />
+          <AITagBadge item={item} />
           {duplicate && (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
               <Copy size={10} />

@@ -60,7 +60,7 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 		if item.ContentHash == "" || item.HashAlgorithm == "" {
 			continue
 		}
-		row := s.db.QueryRow(`
+		row := s.rdb.QueryRow(`
 			SELECT status, category, tags_json, description, COALESCE(languages_json, '[]'),
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 			FROM ai_tags
@@ -104,7 +104,7 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 	if contentHash == "" || hashAlgorithm == "" {
 		return aitag.Result{}, false, nil
 	}
-	row := s.db.QueryRow(`
+	row := s.rdb.QueryRow(`
 		SELECT project_id, repo_path, status, category, tags_json, description,
 			COALESCE(languages_json, '[]'),
 			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at

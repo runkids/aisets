@@ -4,21 +4,18 @@ import type { AssetItem } from "../types";
 import { ocrStatusLabel } from "../ocrStatus";
 import { Badge, Tooltip } from "./ui";
 
-export function OCRStatusBadge({
-  item,
-  enabled = true,
-}: {
-  item: AssetItem;
-  enabled?: boolean;
-}) {
+export function OCRStatusBadge({ item }: { item: AssetItem }) {
   const { t } = useTranslation();
   const label = ocrStatusLabel(t, item);
-  if (!enabled || !item.ocr || !label) return null;
+  if (!item.ocr || !label) return null;
+
+  const isVLM = item.ocr.engineName === "vlm";
+  const readyTone = isVLM ? "purple" : "green";
   const tone =
     item.ocr.status === "ready"
       ? item.ocr.emptyText
         ? "amber"
-        : "green"
+        : readyTone
       : item.ocr.status === "failed"
         ? "red"
         : item.ocr.status === "skipped"
@@ -34,13 +31,14 @@ export function OCRStatusBadge({
         : item.ocr.status === "skipped"
           ? CircleMinus
           : Clock;
+  const badgeText = isVLM ? t("ocr.badge.shortAI") : t("ocr.badge.short");
 
   return (
     <Tooltip label={label} placement="top">
       <span className="inline-flex">
         <Badge tone={tone}>
           <Icon size={10} />
-          {t("ocr.badge.short")}
+          {badgeText}
         </Badge>
       </span>
     </Tooltip>

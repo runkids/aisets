@@ -40,7 +40,6 @@ type BrowseGridProps = {
   activeAssetId: string;
   autoScrollAssetId: string;
   imagePreviewEnabled: boolean;
-  ocrEnabled: boolean;
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
@@ -98,7 +97,6 @@ export function BrowseGrid({
   activeAssetId,
   autoScrollAssetId,
   imagePreviewEnabled,
-  ocrEnabled,
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
@@ -192,7 +190,7 @@ export function BrowseGrid({
         : optimizable
           ? t("browse.flagOptimizable")
           : "",
-      ocrEnabled ? ocrStatusLabel(t, item) : "",
+      ocrStatusLabel(t, item),
     ].filter(Boolean);
     const referenceLabel = t("asset.refs", { count: item.usedBy.length });
     const ariaLabel = [item.repoPath, referenceLabel, ...statusLabels].join(
@@ -311,10 +309,9 @@ export function BrowseGrid({
             </Tooltip>
           </div>
           {gridSize !== "s" &&
-          ((ocrEnabled && item.ocr?.status === "ready") ||
-            item.aiTag?.status === "ready") ? (
+          (item.ocr?.status === "ready" || item.aiTag?.status === "ready") ? (
             <div className="mt-1 flex flex-wrap items-center gap-1">
-              <OCRStatusBadge item={item} enabled={ocrEnabled} />
+              <OCRStatusBadge item={item} />
               <AITagBadge item={item} />
             </div>
           ) : null}

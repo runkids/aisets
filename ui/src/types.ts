@@ -298,6 +298,7 @@ export type AssetItem = {
   }>;
   ocr?: {
     status: "pending" | "ready" | "failed" | "skipped";
+    engineName?: string;
     text?: string;
     normalizedText?: string;
     textStatus?: "available" | "empty";

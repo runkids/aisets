@@ -1130,7 +1130,6 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
-                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -1148,7 +1147,6 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
-                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -1168,7 +1166,6 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
-                  ocrEnabled={ocrEnabled}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}

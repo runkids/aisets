@@ -17,7 +17,9 @@
     "settings": "設定",
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets ナビゲーション",
-    "projects": "プロジェクト"
+    "projects": "プロジェクト",
+    "footerProjects": "プロジェクト",
+    "footerAssets": "アセット"
   },
   "mode": {
     "dashboard": "概要",
@@ -67,7 +69,17 @@
     "copy": "コピー",
     "downloadShell": ".sh をダウンロード",
     "scrollToTop": "先頭へ戻る",
-    "more": "その他の操作"
+    "more": "その他の操作",
+    "batchDeleteConfirmTitle": "{{count}} 件のファイルを削除",
+    "batchDeleteConfirmBody": "{{count}} 件のファイル（{{size}}）を完全に削除します。この操作は取り消せません",
+    "batchDeleteSuccess": "{{count}} 件のファイルを削除しました",
+    "batchDeletePartial": "{{total}} 件中 {{succeeded}} 件を削除しました（{{failed}} 件失敗）",
+    "batchCopy": "コピー先",
+    "batchCopySuccess": "{{count}} 件のファイルをコピーしました",
+    "batchCopyPartial": "{{total}} 件中 {{succeeded}} 件をコピーしました（{{failed}} 件失敗、{{skipped}} 件スキップ）",
+    "batchMove": "移動",
+    "batchRename": "名前変更",
+    "batchExport": "エクスポート"
   },
   "search": {
     "placeholder": "パス、プロジェクト、フォーマット、コンテンツハッシュで検索…",
@@ -193,7 +205,20 @@
     "noSubdirs": "サブディレクトリなし",
     "noSubdirsDesc": "現在のディレクトリをそのまま追加できます",
     "selectStart": "開始ディレクトリを選択",
-    "selectStartDesc": "パスを入力して「移動」を押すか、デフォルトディレクトリからブラウズを開始してください"
+    "selectStartDesc": "パスを入力して「移動」を押すか、デフォルトディレクトリからブラウズを開始してください",
+    "projectType": "プロジェクト種別",
+    "projectTypeHint": "参照ゼロを未使用として扱うかを制御します。重複検出と最適化は独立して実行されます",
+    "detectingIntent": "プロジェクト種別を検出中",
+    "detectedIntent": "候補：{{intent}}",
+    "detectIntentFailed": "プロジェクト種別を検出できませんでした。手動で選択してください",
+    "adding": "追加中…",
+    "addDisabledOcrBusy": "OCR 実行中です。完了後に追加できます",
+    "moveDir": "ここに移動",
+    "moving": "移動中…",
+    "copyDir": "ここにコピー",
+    "copying": "コピー中…",
+    "titleMove": "移動先を選択",
+    "titleCopy": "コピー先を選択"
   },
   "preview": {
     "canApplyDesc": "この操作は適用可能です。変更内容を確認してからファイルに書き込んでください",
@@ -240,7 +265,8 @@
       "optimized": "すべての最適化推奨に対応するバリアントが生成済みです",
       "referenced": "コード内に少なくとも1つの参照が見つかりました。使用中です"
     },
-    "helpIntro": "各アセットはコード参照の状況に基づいて自動的にラベル付けされ、どれを整理できるか素早く判断できます。ラベルは提案のみで、いつでも手動で操作できます"
+    "helpIntro": "各アセットはコード参照の状況に基づいて自動的にラベル付けされ、どれを整理できるか素早く判断できます。ラベルは提案のみで、いつでも手動で操作できます",
+    "notApplicableHelp": "通常はアセットパックです：アセットはリポジトリ外で使われる可能性があるため、コード参照ゼロで未使用判定は行いません。参照分析を無効にしたスキャンもここに表示されます"
   },
   "error": {
     "catalogLoad": "カタログの読み込みに失敗",
@@ -307,7 +333,18 @@
     "target_path_required": "ターゲットパスが必要です",
     "preview_stale_missing_candidate": "プレビューの有効期限が切れました。候補ファイルが削除されています",
     "preview_has_blockers": "一部の項目は適用できません",
-    "project_icon_invalid": "プロジェクト画像は 512 KB 以下の PNG、JPEG、GIF、または WebP data URL である必要があります"
+    "project_icon_invalid": "プロジェクト画像は 512 KB 以下の PNG、JPEG、GIF、または WebP data URL である必要があります",
+    "custom_filter_confidence_invalid": "カスタムフィルタの信頼度は 0 から 1 の間でなければなりません",
+    "custom_filter_ocr_status_invalid": "カスタムフィルタの OCR ステータスが無効です",
+    "settings_ocr_languages_required": "OCR 言語を少なくとも 1 つ選択してください",
+    "settings_ocr_max_pixels_invalid": "OCR 最大ピクセル数はゼロより大きくなければなりません",
+    "settings_ocr_batch_size_invalid": "OCR バッチサイズはゼロより大きくなければなりません",
+    "settings_ocr_concurrency_invalid": "v1 では OCR の並列数は 1 でなければなりません",
+    "ocr_disabled": "OCR を実行する前に、OCR 設定を有効にして保存してください",
+    "ocr_not_installed": "OCR を実行する前に、OCR 言語パックをインストールしてください",
+    "ocr_engine_unavailable": "OCR エンジンが利用できません。Tesseract コマンドラインツールをインストールして再試行してください",
+    "ocr_install_failed": "OCR 言語パックのダウンロードに失敗しました",
+    "ocr_remove_failed": "OCR 言語パックの削除に失敗しました"
   },
   "topbar": {
     "totalLabel": "{{projects}} プロジェクト · {{assets}} アセット",
@@ -347,7 +384,19 @@
     "aiTagPreparing": "AI タグ付けを準備中",
     "aiTagCounts": "処理済み {{processed}}、完了 {{ready}}、失敗 {{failed}}、スキップ {{skipped}}、キャッシュ {{cacheHit}}",
     "viewAISettings": "AI 設定",
-    "aiTagLockedTooltip": "先に AI タグ付けを停止してください"
+    "aiTagLockedTooltip": "先に AI タグ付けを停止してください",
+    "optimizeTitle": "最適化アクティビティ",
+    "optimizeRunning": "最適化を見積もり中",
+    "optimizePreviewing": "最適化プレビューを準備中",
+    "optimizeStopping": "最適化を停止中",
+    "optimizeDone": "最適化の見積もりが完了しました",
+    "optimizeStopped": "最適化が停止されました",
+    "optimizeError": "最適化に失敗しました",
+    "optimizePreparing": "最適化を準備中",
+    "optimizeCounts": "処理済み {{processed}}/{{total}}、適用可能 {{applicable}}、ブロック {{blocked}}",
+    "viewOptimize": "最適化を開く",
+    "stopOptimize": "停止",
+    "optimizeLockedTooltip": "最適化を先に停止してください"
   },
   "toast": {
     "projectAdded": "プロジェクトを追加しました：{{path}}",
@@ -364,7 +413,13 @@
     "scanHistoryCleared": "スキャン履歴をクリアしました",
     "scanHistoryClearFailed": "スキャン履歴のクリアに失敗しました",
     "databaseReset": "データベースをリセットしました",
-    "databaseResetFailed": "データベースのリセットに失敗しました"
+    "databaseResetFailed": "データベースのリセットに失敗しました",
+    "settingsSectionReset": "リセットしました。保存して適用してください",
+    "settingsScanningReset": "リセットしました。保存して適用してください",
+    "settingsCatalogScanningReset": "カタログスキャンをリセットしました。保存して適用してください",
+    "settingsOcrReset": "OCR をリセットしました。保存して適用してください",
+    "ocrCacheCleared": "OCR キャッシュをクリアしました",
+    "aiTagCacheCleared": "AI タグキャッシュをクリアしました"
   },
   "prompt": {
     "renamePath": "新しいプロジェクト相対パス"
@@ -433,7 +488,9 @@
     "overlayMode": "オーバーレイ",
     "overlayOpacity": "オーバーレイ透明度",
     "mergeConfirmTitle": "{{count}}件の重複をマージ",
-    "mergeConfirmBody": "{{count}}件の重複コピー（{{size}}）を削除し、{{refs}}件の参照を推奨パスに更新します"
+    "mergeConfirmBody": "{{count}}件の重複コピー（{{size}}）を削除し、{{refs}}件の参照を推奨パスに更新します",
+    "filterByExt": "種別",
+    "allGroups": "すべてのグループ"
   },
   "compare": {
     "side": "並べて比較",
@@ -535,7 +592,8 @@
       "replace_requires_code_project": "変換後の元ファイル置換はコードプロジェクトでのみ安全に実行できます",
       "replace_requires_reference_update": "このファイルには参照があります。元ファイルを削除する前に参照を更新してください",
       "reference_update_blocked": "安全に更新できない参照があります",
-      "target_already_exists": "最適化済み — 対象ファイルが既に存在します"
+      "target_already_exists": "最適化済み — 対象ファイルが既に存在します",
+      "optimizer_tool_timeout": "{{tool}} の最適化に時間がかかりすぎました。小さい画像を試すか、このアニメーションを手動で最適化してください"
     },
     "preview": "プレビュー",
     "script": "Script",
@@ -608,7 +666,11 @@
     "estimatePromptInfo": "まず {{count}} 件のアセットを見積もり、自動的にプレビューに進みます。見積もり中は選択がロックされます",
     "quickOptimizeSubtitle": "{{count}} 件 · 見積もり→プレビュー→適用を一括実行",
     "applyStep": "適用",
-    "keyboardHint": "⌘ Enter で確定 · Esc でキャンセル"
+    "keyboardHint": "⌘ Enter で確定 · Esc でキャンセル",
+    "disabledStrategiesNote_other": "{{count}} 件の無効な戦略は非表示",
+    "toolsRuntimeReadyMeta": "Imgtools 利用可能 · 外部ツール {{count}} 件有効",
+    "toolsRuntimeFallbackMeta": "Imgtools なし · 内蔵フォールバックを使用",
+    "toolsMissingMeta": "{{count}} 件の有効ツールが見つかりません"
   },
   "selection": {
     "summary": "{{count}} selected · {{size}}",
@@ -667,7 +729,20 @@
     "aiTagRunning": "AI タグ付け中…",
     "aiTagDisabledHint": "設定 → AI で AI プロバイダーを設定してください",
     "aiTagProgress": "タグ付け {{processed}}/{{queued}}（{{ready}} 完了、{{failed}} 失敗、{{skipped}} スキップ、{{cacheHit}} キャッシュ）",
-    "aiTagDone": "AI タグ付け完了"
+    "aiTagDone": "AI タグ付け完了",
+    "emptyOCRTextHint": "{{count}} 件の画像が OCR を完了しましたが認識テキストがなく、画像内の文字がまだ検索できない場合があります",
+    "unusedNotApplicableEmpty": "クリーンアップ可能な未使用アセットはありません",
+    "unusedNotApplicableDesc": "{{count}} 件のアセットはアセットパックまたは参照を確認しないスキャンに含まれています。参照ゼロは削除の根拠にならないため、未使用クリーンアップ候補には含まれません",
+    "unusedAdvisoryEmpty": "クリーンアップ可能な未使用アセットはありません",
+    "unusedAdvisoryDesc": "{{count}} 件のアセットは参照カバレッジが暫定的なため、おそらく未使用となっています。手動で確認してください。未使用クリーンアップとしては提案されません",
+    "notApplicableTitle": "未使用確認対象外",
+    "notApplicableDesc": "これらの {{count}} 件のアセットは未使用ステータスを確認しません。多くはアセットパックで、参照分析を無効にしたスキャンもここに表示されます",
+    "flagPossiblyUnused": "おそらく未使用",
+    "flagNotApplicable": "対象外",
+    "flagUsageNotChecked": "参照未分析",
+    "flagPossiblyUnusedShort": "暫定",
+    "flagNotApplicableShort": "未確認",
+    "flagUsageNotCheckedShort": "参照なし"
   },
   "lint": {
     "title": "Lint",
@@ -688,7 +763,51 @@
     "allClearDesc": "lint の問題は検出されませんでした。アセットの使用状況は良好です",
     "severityFilter": "重要度",
     "ruleFilter": "ルール",
-    "allRules": "すべてのルール"
+    "allRules": "すべてのルール",
+    "collapseAll": "すべて折りたたむ",
+    "expandAll": "すべて展開",
+    "rule": {
+      "missing-lazy-loading": {
+        "name": "遅延読み込みなし",
+        "message": "<img> が loading 属性なしで大きな画像を読み込んでいます。スクロールパフォーマンスに影響する可能性があります",
+        "suggestion": "スクロール下の画像には loading=\"lazy\"、重要な上部画像には loading=\"eager\" / fetchpriority=\"high\" を追加してください"
+      },
+      "missing-dimensions": {
+        "name": "サイズ指定なし",
+        "message": "<img> に明示的な width/height またはアスペクト比がなく、レイアウトシフト（CLS）が発生する可能性があります",
+        "suggestion": "width/height 属性を追加するか、Tailwind/CSS で width と height/aspect-ratio の両方を指定してください"
+      },
+      "large-inline-import": {
+        "name": "大きなインラインインポート",
+        "message": "{{kb}}KB のアセットを raw/inline としてインポートすると JS バンドルが増大する可能性があります",
+        "suggestion": "標準的な URL インポートを使用してください。?raw/?inline は非常に小さな SVG/アイコンにのみ使用してください"
+      },
+      "no-responsive-image": {
+        "name": "レスポンシブ画像なし",
+        "message": "大きなラスター画像（{{kb}}KB）に srcset がなく、小さな画面で帯域を無駄にする可能性があります",
+        "suggestion": "コンテンツ画像には srcset で複数サイズを提供するか、固定サイズの UI 画像はソースを圧縮してください"
+      },
+      "svg-as-img": {
+        "name": "SVG を img として使用",
+        "message": "<img> で読み込んだ SVG は CSS でスタイリングしたりインタラクティブなアニメーションを行えません",
+        "suggestion": "静的な SVG は <img> のままで構いません。CSS の色制御やアニメーションが必要な場合はインライン SVG またはコンポーネントに切り替えてください"
+      },
+      "img-as-background": {
+        "name": "画像を背景として使用",
+        "message": "大きな装飾画像（alt=\"\"）が <img> で読み込まれています。DOM に含める必要があるか検討してください",
+        "suggestion": "純粋な装飾には CSS background/疑似要素を使用してください。サイズや読み込み動作が必要な場合は <img alt=\"\"> のままで構いません"
+      },
+      "bg-content-image": {
+        "name": "背景コンテンツ画像",
+        "message": "大きなラスター画像（{{kb}}KB）が CSS background-image で読み込まれており、遅延読み込みを使用できません",
+        "suggestion": "コンテンツ画像には loading=\"lazy\" の <img> を使用してください。視覚的な背景にはソースを圧縮 / 変換するか、プリロード戦略を追加してください"
+      },
+      "duplicate-asset": {
+        "name": "重複アセット",
+        "message": "{{path}} に同一のコピーがあります",
+        "suggestion": "このコピーを削除し、推奨パスを参照するように更新してください"
+      }
+    }
   },
   "commandPalette": {
     "placeholder": "アセット検索またはページ移動...",
@@ -775,7 +894,40 @@
     "modified": "更新日",
     "animated": "アニメーション",
     "alphaChannel": "アルファ",
-    "imagePages": "ページ数"
+    "imagePages": "ページ数",
+    "ocr": "OCR",
+    "ocrNoText": "OCR テキストはまだありません",
+    "ocrEmptyText": "スキャン済みですが、検索可能なテキストは認識されませんでした",
+    "ocrAttempts": "{{count}} 回試行",
+    "tabOverview": "概要",
+    "tabUsage": "使用状況",
+    "tabSimilar": "類似",
+    "tabOptimize": "最適化",
+    "tabOCR": "OCR",
+    "chipUnused": "未使用",
+    "chipPossiblyUnused": "おそらく未使用",
+    "chipUsageNotApplicable": "未使用未確認",
+    "chipDuplicate": "重複",
+    "chipSimilar": "類似",
+    "chipOptimizable": "最適化可能",
+    "chipOptimized": "最適化済み",
+    "chipOCR": "OCR",
+    "usageEmpty": "コード参照が見つかりません。このアセットは削除候補です",
+    "usagePossiblyUnused": "参照が見つかりませんでしたが、このプロジェクトの参照カバレッジは部分的か外部の利用者が存在する可能性があります。手動で確認してください。未使用クリーンアップ候補には含まれません",
+    "usageAssetPack": "このファイルはアセットパックプロジェクトに属しています。アセットパックは他のプロジェクトや手動選択のためのもので、コード参照がないのは正常です。Aisets はこれを未使用としてマークせず、クリーンアップ候補にも含みません",
+    "usageNotApplicable": "このスキャンは有効な参照分析を実行しなかったため、Aisets はこのファイルが未使用かどうか判断できません。未使用クリーンアップ候補には含まれません",
+    "copyAll": "すべてコピー",
+    "openInEditor": "{{editor}} で開く",
+    "exactDuplicates": "完全な重複",
+    "visualSimilar": "視覚的に類似",
+    "similarSideBySide": "並べて表示",
+    "similarOverlay": "オーバーレイ",
+    "similarDiff": "ピクセル差分",
+    "similarScore": "{{score}}% 一致",
+    "similarMirrored": "ミラー",
+    "noSimilar": "類似ファイルなし",
+    "noDuplicates": "完全な重複なし",
+    "refCount": "{{count}} 件の参照"
   },
   "settings": {
     "section": {
@@ -867,7 +1019,12 @@
       "status": "ステータス",
       "duplicate": "重複",
       "nearDuplicate": "近似重複",
-      "optimizable": "最適化可能"
+      "optimizable": "最適化可能",
+      "ocrText": "OCR テキスト",
+      "ocrLanguage": "OCR 言語",
+      "ocrScript": "OCR スクリプト",
+      "ocrConfidence": "OCR 信頼度",
+      "ocrStatus": "OCR ステータス"
     },
     "customFilterOperator": {
       "contains": "含む",
@@ -884,7 +1041,11 @@
       "unused": "未使用",
       "referenced": "参照あり",
       "true": "True",
-      "false": "False"
+      "false": "False",
+      "pending": "保留中",
+      "ready": "完了",
+      "failed": "失敗",
+      "skipped": "スキップ"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1167,7 +1328,136 @@
     "aiOcrSaving": "設定を保存中…",
     "aiOcrDone": "完了 — {{ready}} 件抽出、{{skipped}} 件スキップ、{{cacheHit}} 件キャッシュ",
     "aiOcrStopped": "停止済み",
-    "aiOcrFailed": "AI OCR に失敗"
+    "aiOcrFailed": "AI OCR に失敗",
+    "preferredEditor": "エディタ",
+    "preferredEditorDesc": "アセットドロワーからファイルを開くときに使用するコードエディタを選択してください",
+    "excludeScopeLabel": "除外パターンのスコープ",
+    "excludeScope": {
+      "global": "グローバル",
+      "globalHint": "すべてのプロジェクトに適用されます",
+      "codeHint": "コードプロジェクトにのみ追加されます",
+      "assetPackHint": "アセットパックにのみ追加されます",
+      "libraryHint": "再利用可能なライブラリにのみ追加されます",
+      "mixedHint": "混在または不明なプロジェクトにのみ追加されます"
+    },
+    "excludeScopeGlobalNote": "グローバルルールはプロジェクト種別ルールが追加される前にすべてのプロジェクトに適用されます。単純なファイル名はどの深さのフォルダでも一致します",
+    "excludeScopeIntentNote": "これらのルールは {{intent}} プロジェクトにのみ追加されます。グローバルルールは引き続き最初に適用されます。単純なファイル名はどの深さのフォルダでも一致します",
+    "ocrEnabled": "検索とフィルタで OCR を使用",
+    "ocrEnabledHint": "ブラウズ・カスタムフィルタ・⌘ P でキャッシュ済み OCR テキストを使用できるようにします。このスイッチ自体は画像を読み取りません",
+    "ocrLanguages": "OCR 言語",
+    "ocrLanguagesHint": "使用する無料オープンソースの言語パックを選択してこのマシンにダウンロードします",
+    "ocrLanguagesPlaceholder": "OCR 言語を選択",
+    "ocrLanguageLabels": {
+      "eng": "英語",
+      "chi_tra": "繁体字中国語",
+      "chi_sim": "簡体字中国語",
+      "jpn": "日本語",
+      "kor": "韓国語",
+      "fra": "フランス語",
+      "deu": "ドイツ語",
+      "spa": "スペイン語",
+      "por": "ポルトガル語",
+      "ita": "イタリア語",
+      "nld": "オランダ語",
+      "rus": "ロシア語",
+      "ukr": "ウクライナ語",
+      "ara": "アラビア語",
+      "hin": "ヒンディー語",
+      "tha": "タイ語",
+      "vie": "ベトナム語",
+      "ind": "インドネシア語",
+      "msa": "マレー語"
+    },
+    "ocrLimits": "OCR 詳細設定",
+    "ocrLimitsHint": "多くのプロジェクトではデフォルトのままで問題ありません。速度・CPU 負荷・検索の許容度を制御したい場合のみ調整してください",
+    "ocrLimitsEdit": "設定",
+    "ocrLimitsHelpTitle": "OCR 詳細設定",
+    "ocrLimitsHelpDesc": "これらの設定は OCR の実行コストと検索の許容度に影響します",
+    "ocrLimitsKeepDefaults": "不明な場合はデフォルトのままにしてください。OCR はバックグラウンドのバッチで引き続き実行され、ブラウズや検索の入力中にテキストを認識することはありません",
+    "ocrMaxPixels": "OCR 最大ピクセル数",
+    "ocrMaxPixelsHint": "この画素数を超える画像はスキップされます。大きなスクリーンショットや特大アートワークで OCR が長時間実行されるのを防ぎます。2000000 は約 200 万画素です",
+    "ocrBatchSize": "OCR バッチサイズ",
+    "ocrBatchSizeHint": "1 バッチで処理する画像数です。値を大きくすると早く完了しますが、OCR 実行中の CPU 負荷が高くなる場合があります",
+    "ocrConcurrency": "並列ジョブ数",
+    "ocrConcurrencyHint": "同時に OCR 処理する画像数です。1 が最も安全、2 は速いですが CPU 使用量が増えます。現在の上限はパフォーマンス保護のため 2 です",
+    "ocrGroupPerformance": "パフォーマンス",
+    "ocrGroupSearch": "検索動作",
+    "ocrMaxPixelsSuffix": "px",
+    "ocrMaxPixelsDefault": "デフォルト：2,000,000",
+    "ocrBatchSizeDefault": "デフォルト：25",
+    "ocrConcurrencyDefault": "デフォルト：1",
+    "ocrFuzzySearch": "OCR 検索の許容度",
+    "ocrFuzzySearchHint": "文字の欠落・余分・汚れなど一般的な OCR ノイズを検索でマッチできるようにします。例：ERARZAN でも tarzan にマッチします。完全一致のみにするには無効にしてください",
+    "ocrRuntime": "OCR キャッシュ",
+    "ocrRuntimeHint": "ローカル言語パックをインストールしてから、現在のカタログの OCR キャッシュを構築します。画像はアップロードされません",
+    "ocrInstall": "言語パックをインストール",
+    "ocrInstalling": "インストール中...",
+    "ocrRemove": "言語パックを削除",
+    "ocrRemoving": "削除中...",
+    "ocrRun": "OCR キャッシュを構築",
+    "ocrRunning": "実行中...",
+    "ocrStop": "OCR を停止",
+    "ocrStopping": "停止中...",
+    "ocrInstalled": "OCR 言語パックがローカルにインストールされています",
+    "ocrNotInstalled": "OCR 言語パックはインストールされていません",
+    "ocrCacheScopeHint": "OCR キャッシュはローカルに保存され、プロジェクト・パス・コンテンツハッシュ・言語・エンジンバージョンで再利用されます。OCR を削除するとすべての OCR キャッシュが消去されます",
+    "ocrEngineUnavailable": "OCR エンジンが利用できません：{{error}}",
+    "ocrEngineInstallHintDarwin": "次のコマンドで Tesseract をインストールしてください：brew install tesseract",
+    "ocrEngineInstallHintLinux": "パッケージマネージャで Tesseract をインストールしてください。例：sudo apt-get install tesseract-ocr",
+    "ocrEngineInstallHintWindows": "次のコマンドで Tesseract をインストールしてください：winget install --id UB-Mannheim.TesseractOCR --exact",
+    "ocrEngineInstallHintFallback": "Tesseract コマンドラインツールをインストールして、Aisets を再起動してください",
+    "ocrRunSuccess": "OCR が完了しました",
+    "ocrRunStopped": "OCR が停止されました",
+    "ocrRunFailed": "OCR が失敗しました",
+    "ocrProgress": "処理済み {{processed}}、完了 {{ready}}、失敗 {{failed}}、スキップ {{skipped}}、キャッシュ {{cacheHit}}",
+    "ocrProgressWithSkipReason": "処理済み {{processed}}、完了 {{ready}}、失敗 {{failed}}、スキップ {{skipped}}、キャッシュ {{cacheHit}}；主なスキップ理由：{{skipReason}} ({{skipReasonCount}})",
+    "ocrMissingSelectedLanguages": "先に選択した言語パックをインストールしてください：{{languages}}",
+    "ocrRunConfirmTitle": "OCR を実行",
+    "ocrRunConfirmIntro": "Aisets が現在のカタログの OCR テキストを構築または更新します",
+    "ocrRunConfirmLocal": "画像はこのマシンに留まり、ローカルで処理されます",
+    "ocrRunConfirmBatch": "{{batchSize}} 件ずつバッチ処理するため UI の応答性を維持します。OCR は対象画像がなくなるまで継続します",
+    "ocrRunConfirmSettings": "現在の OCR 設定が先に保存されます。新しく選択した言語は古い OCR キャッシュを古くし、再処理されます",
+    "ocrRunConfirmSearch": "完了した OCR テキストはブラウズ・カスタムフィルタ・⌘ P で検索可能になります。クリーンアップ / 削除の判断には使用されません",
+    "ocrRunConfirmAction": "OCR を開始",
+    "ocrRemoveConfirmTitle": "OCR を削除",
+    "ocrRemoveConfirmMessage": "インストール済みの言語パックをすべて削除し、全ワークスペース / プロジェクトの OCR キャッシュを消去します。画像ファイルは削除されませんが、画像テキスト検索には OCR の再構築が必要です",
+    "ocrRemoveConfirmAction": "削除してキャッシュを消去",
+    "ocrSkipReason": {
+      "ocr_missing_hash": "コンテンツハッシュがありません",
+      "ocr_image_unreadable": "画像が読み取れません",
+      "ocr_animated_unsupported": "アニメーション画像",
+      "ocr_extension_unsupported": "非対応のファイル形式",
+      "ocr_dimensions_missing": "画像のサイズ情報がありません",
+      "ocr_oversized": "OCR 最大ピクセル数を超えています",
+      "ocr_hash_failed": "コンテンツハッシュに失敗しました"
+    },
+    "installed": "インストール済み",
+    "notInstalled": "未インストール",
+    "customFilterFieldDesc": {
+      "path": "ファイル名を含む完全なパス",
+      "folder": "アセットの親フォルダ",
+      "extension": "ファイル拡張子（例：.png）",
+      "project": "アセットが属するプロジェクト",
+      "bytes": "ファイルサイズ（バイト）",
+      "status": "コードで使用済みまたは未使用",
+      "duplicate": "完全に同一のコンテンツハッシュ",
+      "nearDuplicate": "別のアセットと視覚的に類似",
+      "optimizable": "圧縮またはフォーマットの提案あり",
+      "ocrText": "画像から認識されたテキスト",
+      "ocrLanguage": "検出された OCR 言語",
+      "ocrScript": "検出された OCR スクリプトシステム",
+      "ocrConfidence": "OCR 認識の信頼度（0–1）",
+      "ocrStatus": "OCR の処理状態"
+    },
+    "clearOCRCache": "OCR キャッシュをクリア",
+    "clearOCRCacheHint": "すべての OCR 結果（AI OCR を含む）を削除します。再処理するには OCR または AI OCR を再実行してください",
+    "clearOCRCacheConfirm": "すべての OCR 結果（AI OCR を含む）を消去しますか？この操作は取り消せません。復元するには OCR を再実行する必要があります",
+    "clearAITagCache": "AI タグキャッシュをクリア",
+    "clearAITagCacheHint": "すべての AI タグ・カテゴリ・説明を削除します。再分析するには AI タグ付けを再実行してください",
+    "clearAITagCacheConfirm": "すべての AI タグ結果を消去しますか？この操作は取り消せません。復元するには AI タグ付けを再実行する必要があります",
+    "llmEnabled": "AI を有効化",
+    "llmEnabledHint": "AI タグ付け・分類・検索のためにローカル LLM プロバイダを有効にします",
+    "llmTesting": "テスト中…"
   },
   "catalog": {
     "notComputed": {
@@ -1255,7 +1545,8 @@
     "projectIconReadError": "この画像を読み取れませんでした",
     "removeDialogTitle": "プロジェクトを削除",
     "removeConfirm": "{{name}} をこのワークスペースから削除しますか？ファイルは削除されません",
-    "removeDialogConfirm": "削除"
+    "removeDialogConfirm": "削除",
+    "projectType": "プロジェクト種別"
   },
   "filterRail": {
     "aiCategory": "カテゴリ",
@@ -1275,5 +1566,80 @@
     "aiDescription": "説明",
     "aiModel": "モデル",
     "aiDuration": "処理時間"
+  },
+  "scanProgress": {
+    "starting": "スキャンを開始",
+    "complete": "スキャン完了",
+    "phase": {
+      "collecting": "アセットを収集中",
+      "metadata": "画像を分析中",
+      "references": "参照を確認中",
+      "duplicates": "重複をグループ化中",
+      "nearDuplicates": "類似アセットを比較中",
+      "lint": "アセットルールを実行中",
+      "persisting": "スキャン結果を保存中"
+    },
+    "reason": {
+      "skippedByUser": "この分析は現在のスキャンプロファイルで無効になっています",
+      "skippedByThreshold": "スキャン時間が長くなるのを防ぐため、この分析はスキップされました",
+      "notApplicable": "このプロジェクト種別はコード参照分析を使用しないためスキップされました"
+    }
+  },
+  "projectIntent": {
+    "code": {
+      "label": "コードプロジェクト",
+      "description": "ウェブサイトやアプリのリポジトリに最適です。Aisets は対応するコード参照をスキャンし、カバレッジが完全なときのみ参照ゼロのアセットをクリーンアップ対象としてマークします"
+    },
+    "assetPack": {
+      "label": "アセットパック",
+      "description": "画像・アイコン・アートパックに最適です。アセットはリポジトリ外で利用される可能性があるため未使用チェックは行いません。重複・メタデータ・最適化・整理は引き続き実行されます"
+    },
+    "library": {
+      "label": "共有アセットライブラリ",
+      "description": "他のプロジェクトからインポートされるライブラリに最適です。内部参照はスキャンされますが、参照ゼロのアセットは「おそらく未使用」として要確認扱いになります"
+    },
+    "mixed": {
+      "label": "混在 / 不明",
+      "description": "不明な場合に選択してください。Aisets は保守的にスキャンし、参照ゼロのアセットをクリーンアップ候補ではなく「おそらく未使用」としてマークします"
+    }
+  },
+  "ocr": {
+    "badge": {
+      "short": "OCR",
+      "ready": "OCR キャッシュが完成し、検索可能です",
+      "empty": "OCR でスキャンしましたが、テキストが見つかりませんでした",
+      "pending": "OCR キャッシュは保留中です",
+      "failed": "OCR キャッシュが失敗しました",
+      "skipped": "OCR がスキップされました",
+      "shortAI": "AI OCR",
+      "ai": {
+        "ready": "AI OCR が完了し、検索可能です",
+        "empty": "AI OCR でスキャンしましたが、テキストが見つかりませんでした",
+        "pending": "AI OCR は保留中です",
+        "failed": "AI OCR が失敗しました",
+        "skipped": "AI OCR がスキップされました"
+      }
+    },
+    "status": {
+      "pending": "保留中",
+      "ready": "完了",
+      "failed": "失敗",
+      "skipped": "スキップ"
+    }
+  },
+  "batch": {
+    "previewSummary": "{{moves}} 件のファイル変更 · {{refs}} 件の参照更新",
+    "blockersTitle": "{{count}} 件のブロッカー",
+    "fileChanges": "ファイル変更（{{count}} 件）",
+    "refChanges": "参照更新（{{count}} 件）"
+  },
+  "rename": {
+    "rulesTitle": "一括名前変更ルール",
+    "lowercase": "小文字に変換",
+    "replaceSpaces": "スペースと特殊文字をアンダースコアに置換",
+    "prefix": "プレフィックス",
+    "suffix": "サフィックス",
+    "preview": "プレビュー",
+    "apply": "名前変更を適用"
   }
 }
