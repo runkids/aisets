@@ -654,16 +654,23 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 	if err != nil {
 		return scanner.Catalog{}, err
 	}
-	if !settings.OCREnabled {
+
+	ocrEnabled := settings.OCREnabled
+	vlmEnabled := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != ""
+	if !ocrEnabled && !vlmEnabled {
 		return catalog, nil
 	}
+
 	ocrSettings := config.OCRSettingsFromApp(settings)
+
 	for index := range catalog.Items {
 		item := &catalog.Items[index]
 		if item.ContentHash != "" && item.HashAlgorithm != "" {
 			continue
 		}
-		if eligibleForOCRMetadata(*item, ocrSettings).Status != ocr.StatusPending {
+		tesseractEligible := ocrEnabled && eligibleForOCRMetadata(*item, ocrSettings).Status == ocr.StatusPending
+		vlmEligible := vlmEnabled && eligibleForVLMOCR(*item)
+		if !tesseractEligible && !vlmEligible {
 			continue
 		}
 		sum, algorithm, err := scanner.ContentHash(ctx, item.LocalPath)
@@ -677,18 +684,42 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 		item.HashAlgorithm = algorithm
 		s.updateCatalogOCRHash(*item)
 	}
-	results, err := s.store.OCRResults(catalog.Items, ocrSettings, s.ocrEngine.Name(), s.ocrEngine.Version())
-	if err != nil {
-		return scanner.Catalog{}, err
+
+	var vlmResults map[string]ocr.Result
+	if vlmEnabled {
+		engineVersion := settings.LLMProvider + "/" + settings.LLMVisionModel
+		settingsHash := vlmOCRSettingsHash(settings.LLMVisionModel)
+		vlmResults, err = s.store.VLMOCRResults(catalog.Items, engineVersion, settingsHash)
+		if err != nil {
+			return scanner.Catalog{}, err
+		}
 	}
+
+	var tesseractResults map[string]ocr.Result
+	if ocrEnabled {
+		tesseractResults, err = s.store.OCRResults(catalog.Items, ocrSettings, s.ocrEngine.Name(), s.ocrEngine.Version())
+		if err != nil {
+			return scanner.Catalog{}, err
+		}
+	}
+
 	for index := range catalog.Items {
-		result, ok := results[catalog.Items[index].ProjectID+"\x00"+catalog.Items[index].RepoPath]
-		if ok {
-			copy := result
+		key := catalog.Items[index].ProjectID + "\x00" + catalog.Items[index].RepoPath
+
+		if vlmResult, ok := vlmResults[key]; ok {
+			copy := vlmResult
 			catalog.Items[index].OCR = &copy
 			continue
 		}
-		if eligibleForOCRMetadata(catalog.Items[index], ocrSettings).Status == ocr.StatusPending {
+		if tesseractResult, ok := tesseractResults[key]; ok {
+			copy := tesseractResult
+			catalog.Items[index].OCR = &copy
+			continue
+		}
+
+		tesseractEligible := ocrEnabled && eligibleForOCRMetadata(catalog.Items[index], ocrSettings).Status == ocr.StatusPending
+		vlmEligible := vlmEnabled && eligibleForVLMOCR(catalog.Items[index])
+		if tesseractEligible || vlmEligible {
 			result := ocr.Result{Status: ocr.StatusPending}
 			catalog.Items[index].OCR = &result
 		}
