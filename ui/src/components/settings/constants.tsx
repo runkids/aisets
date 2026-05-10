@@ -132,6 +132,8 @@ export const defaultOptimizationStrategies: OptimizationStrategy[] = [
   },
 ];
 
+export const LLM_MAX_CONCURRENCY = 8;
+
 export const defaultSettings: SettingsUpdate = {
   workspaceName: "Aisets",
   defaultProjectRoot: "",
@@ -153,6 +155,7 @@ export const defaultSettings: SettingsUpdate = {
   llmEndpoint: "http://localhost:11434",
   llmVisionModel: "",
   llmEmbedModel: "",
+  llmConcurrency: 1,
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [

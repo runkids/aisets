@@ -54,6 +54,7 @@ type AppSettings struct {
 	LLMEmbedModel              string                               `json:"llmEmbedModel"`
 	LLMTagPrompt               string                               `json:"llmTagPrompt"`
 	LLMOcrPrompt               string                               `json:"llmOcrPrompt"`
+	LLMConcurrency             int                                  `json:"llmConcurrency"`
 }
 
 type SettingsUpdate struct {
@@ -88,6 +89,7 @@ type SettingsUpdate struct {
 	LLMEmbedModel              *string                              `json:"llmEmbedModel"`
 	LLMTagPrompt               *string                              `json:"llmTagPrompt"`
 	LLMOcrPrompt               *string                              `json:"llmOcrPrompt"`
+	LLMConcurrency             *int                                 `json:"llmConcurrency"`
 }
 
 type CustomAssetFilter struct {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"aisets/internal/apierr"
@@ -26,6 +27,12 @@ const vlmOCRPrompt = `Analyze this image and respond with a JSON object:
 - "languages": array of ISO 639-3 language codes detected in the text (e.g. ["eng"], ["zho", "eng"]). Empty array if no text.
 
 Respond ONLY with valid JSON, no markdown or explanation.`
+
+type vlmOcrWorkResult struct {
+	item     scanner.AssetItem
+	result   ocr.Result
+	chatResp llm.ChatResponse
+}
 
 type vlmOcrCounts struct {
 	Queued       int   `json:"queued"`
@@ -182,39 +189,73 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
 
-	// Single worker — process sequentially
-	for _, item := range candidates {
-		if r.Context().Err() != nil {
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(r.Context().Err(), "vlm_ocr_canceled"), "counts": counts})
-			return
-		}
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
-		result, chatResp := s.processVLMOCR(r.Context(), item, providerName, modelName, prompt)
-		if result.Status == ocr.StatusFailed {
+	concurrency := min(max(settings.LLMConcurrency, 1), llm.MaxConcurrency)
+	if concurrency > len(candidates) && len(candidates) > 0 {
+		concurrency = len(candidates)
+	}
+
+	jobs := make(chan scanner.AssetItem)
+	results := make(chan vlmOcrWorkResult)
+	var wg sync.WaitGroup
+	for range concurrency {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range jobs {
+				result, chatResp := s.processVLMOCR(ctx, item, providerName, modelName, prompt)
+				select {
+				case results <- vlmOcrWorkResult{item: item, result: result, chatResp: chatResp}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, item := range candidates {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- item:
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for work := range results {
+		if work.result.Status == ocr.StatusFailed {
 			counts.Failed++
 		} else {
 			counts.Ready++
 		}
 		counts.Processed++
-		counts.InputTokens += chatResp.InputTokens
-		counts.OutputTokens += chatResp.OutputTokens
+		counts.InputTokens += work.chatResp.InputTokens
+		counts.OutputTokens += work.chatResp.OutputTokens
 
-		if err := s.store.UpsertOCRResult(result); err != nil {
+		if err := s.store.UpsertOCRResult(work.result); err != nil {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed"), "counts": counts})
 			return
 		}
 
-		// Copy result to pending duplicates
-		key := contentHashKey(item)
+		key := contentHashKey(work.item)
 		for _, dup := range pendingDuplicates[key] {
-			copied := copyOCRResultForVLMItem(result, dup)
+			copied := copyOCRResultForVLMItem(work.result, dup)
 			if err := s.store.UpsertOCRResult(copied); err != nil {
 				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed"), "counts": counts})
 				return
 			}
 		}
 
-		sendNDJSON(w, map[string]any{"type": "progress", "assetId": item.ID, "repoPath": item.RepoPath, "status": result.Status, "counts": counts})
+		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts})
 	}
 
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})

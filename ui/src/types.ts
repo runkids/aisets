@@ -71,6 +71,7 @@ export type AppSettings = {
   llmEmbedModel: string;
   llmTagPrompt: string;
   llmOcrPrompt: string;
+  llmConcurrency: number;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";

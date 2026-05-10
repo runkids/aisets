@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ChevronRight,
   Info,
   LoaderCircle,
@@ -75,6 +76,7 @@ import {
   TextInput,
   Tooltip,
 } from "../ui";
+import { LLM_MAX_CONCURRENCY } from "./constants";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
 
@@ -364,6 +366,42 @@ export function AISection({
                   </Button>
                 </div>
               </FieldRow>
+              <div>
+                <FieldRow
+                  label={t("settings.llmConcurrency")}
+                  description={t("settings.llmConcurrencyHint")}
+                >
+                  <TextInput
+                    type="number"
+                    min={1}
+                    max={LLM_MAX_CONCURRENCY}
+                    value={String(draft.llmConcurrency)}
+                    disabled={aiBusy}
+                    onChange={(e) =>
+                      onUpdateDraft((current) => ({
+                        ...current,
+                        llmConcurrency: Math.max(
+                          1,
+                          Math.min(
+                            LLM_MAX_CONCURRENCY,
+                            Number(e.target.value) || 1,
+                          ),
+                        ),
+                      }))
+                    }
+                    aria-label={t("settings.llmConcurrency")}
+                    className="min-w-[400px]"
+                  />
+                </FieldRow>
+                {draft.llmConcurrency > 1 && (
+                  <div className="flex items-start gap-1.5 pb-4 text-g-amber">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span className="font-g text-[11px] leading-snug">
+                      {t("settings.llmConcurrencyWarning")}
+                    </span>
+                  </div>
+                )}
+              </div>
             </>
           )}
           {settingActions}

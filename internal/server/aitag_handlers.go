@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"aisets/internal/aitag"
@@ -47,6 +48,12 @@ func extToMIME(ext string) string {
 	default:
 		return "image/png"
 	}
+}
+
+type aiTagWorkResult struct {
+	item     scanner.AssetItem
+	result   aitag.Result
+	chatResp llm.ChatResponse
 }
 
 type aiTagCounts struct {
@@ -168,39 +175,73 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 
 	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
 
-	// Single worker — process sequentially
-	for _, item := range candidates {
-		if r.Context().Err() != nil {
-			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(r.Context().Err(), "aitag_canceled"), "counts": counts})
-			return
-		}
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
-		result, chatResp := s.processAITag(r.Context(), item, providerName, modelName, prompt)
-		if result.Status == aitag.StatusFailed {
+	concurrency := min(max(settings.LLMConcurrency, 1), llm.MaxConcurrency)
+	if concurrency > len(candidates) && len(candidates) > 0 {
+		concurrency = len(candidates)
+	}
+
+	jobs := make(chan scanner.AssetItem)
+	results := make(chan aiTagWorkResult)
+	var wg sync.WaitGroup
+	for range concurrency {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range jobs {
+				result, chatResp := s.processAITag(ctx, item, providerName, modelName, prompt)
+				select {
+				case results <- aiTagWorkResult{item: item, result: result, chatResp: chatResp}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, item := range candidates {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- item:
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for work := range results {
+		if work.result.Status == aitag.StatusFailed {
 			counts.Failed++
 		} else {
 			counts.Ready++
 		}
 		counts.Processed++
-		counts.InputTokens += chatResp.InputTokens
-		counts.OutputTokens += chatResp.OutputTokens
+		counts.InputTokens += work.chatResp.InputTokens
+		counts.OutputTokens += work.chatResp.OutputTokens
 
-		if err := s.store.UpsertAITagResult(result); err != nil {
+		if err := s.store.UpsertAITagResult(work.result); err != nil {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed"), "counts": counts})
 			return
 		}
 
-		// Copy result to pending duplicates
-		key := contentHashKey(item)
+		key := contentHashKey(work.item)
 		for _, dup := range pendingDuplicates[key] {
-			copied := copyAITagResultForItem(result, dup)
+			copied := copyAITagResultForItem(work.result, dup)
 			if err := s.store.UpsertAITagResult(copied); err != nil {
 				sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed"), "counts": counts})
 				return
 			}
 		}
 
-		sendNDJSON(w, map[string]any{"type": "progress", "assetId": item.ID, "repoPath": item.RepoPath, "status": result.Status, "counts": counts})
+		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts})
 	}
 
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})

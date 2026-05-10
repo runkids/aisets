@@ -10,6 +10,7 @@ import (
 
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
+	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
 )
@@ -207,6 +208,7 @@ func DefaultAppSettings() AppSettings {
 		LLMEndpoint:                defaultLLMEndpoint(),
 		LLMVisionModel:             "",
 		LLMEmbedModel:              "",
+		LLMConcurrency:             llm.DefaultConcurrency,
 	}
 }
 
@@ -429,6 +431,13 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.LLMOcrPrompt != nil {
 		settings.LLMOcrPrompt = *update.LLMOcrPrompt
+	}
+	if update.LLMConcurrency != nil {
+		if *update.LLMConcurrency < 1 || *update.LLMConcurrency > llm.MaxConcurrency {
+			return AppSettings{}, apierr.New("settings_llm_concurrency_invalid",
+				"LLM concurrency must be between 1 and 8")
+		}
+		settings.LLMConcurrency = *update.LLMConcurrency
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
