@@ -783,8 +783,27 @@ func TestImgtoolsThumbnailIntegration(t *testing.T) {
 	}
 }
 
-// TestSVGThumbnailUsesImgtools verifies that Thumbnail() prefers imgtools (resvg) for SVG
-// rasterization, including complex SVGs that oksvg cannot handle.
+func TestVisualSampleUsesImgtools(t *testing.T) {
+	findImgtoolsBinary(t)
+	root := t.TempDir()
+	pngPath := filepath.Join(root, "red.png")
+	redImg := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	draw.Draw(redImg, redImg.Bounds(), &image.Uniform{color.NRGBA{R: 255, A: 255}}, image.Point{}, draw.Src)
+	writePNG(t, pngPath, redImg)
+
+	sample, err := VisualSample(pngPath)
+	if err != nil {
+		t.Fatalf("VisualSample error: %v", err)
+	}
+	if sample.Bounds().Dx() != 16 || sample.Bounds().Dy() != 16 {
+		t.Fatalf("expected 16x16, got %dx%d", sample.Bounds().Dx(), sample.Bounds().Dy())
+	}
+	px := sample.NRGBAAt(0, 0)
+	if px.R < 200 || px.A < 200 {
+		t.Fatalf("expected red pixel, got R=%d A=%d", px.R, px.A)
+	}
+}
+
 func TestSVGThumbnailUsesImgtools(t *testing.T) {
 	findImgtoolsBinary(t) // skip if not available
 	root := t.TempDir()

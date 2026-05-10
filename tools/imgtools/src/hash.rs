@@ -17,6 +17,13 @@ pub struct DHashResult {
 }
 
 #[derive(Serialize)]
+pub struct VisualSampleResult {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: String,
+}
+
+#[derive(Serialize)]
 pub struct DistanceResult {
     pub distance: i32,
 }
@@ -38,6 +45,19 @@ pub fn run_distance(hash1: &str, hash2: &str) -> Result<()> {
     let b = u64::from_str_radix(hash2, 16).with_context(|| format!("invalid hex: {hash2}"))?;
     let distance = (a ^ b).count_ones() as i32;
     let result = DistanceResult { distance };
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(())
+}
+
+pub fn run_visual_sample(input: &str) -> Result<()> {
+    let img = open_image(input)?;
+    let sample = visual_sample(&img);
+    let hex: String = sample.as_raw().iter().map(|b| format!("{b:02x}")).collect();
+    let result = VisualSampleResult {
+        width: SAMPLE_SIZE,
+        height: SAMPLE_SIZE,
+        rgba: hex,
+    };
     println!("{}", serde_json::to_string(&result)?);
     Ok(())
 }

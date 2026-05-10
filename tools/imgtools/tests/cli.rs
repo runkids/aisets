@@ -345,6 +345,56 @@ fn vlm_normalize_svg_rasterizes_to_png() {
     assert_eq!((img.width(), img.height()), (200, 100));
 }
 
+#[test]
+fn visual_sample_outputs_16x16_rgba_hex() {
+    let temp = TempDir::new();
+    let input = temp.path("red.png");
+    write_rgba_png(&input, 64, 64, Rgba([255, 0, 0, 255]));
+
+    let stdout = assert_success(run(&["visual-sample", input.to_str().expect("path utf-8")]));
+    let json: Value = serde_json::from_str(&stdout).expect("parse visual-sample json");
+
+    assert_eq!(json["width"], 16);
+    assert_eq!(json["height"], 16);
+    let rgba = json["rgba"].as_str().expect("rgba should be string");
+    assert_eq!(
+        rgba.len(),
+        16 * 16 * 4 * 2,
+        "16x16 RGBA = 1024 bytes = 2048 hex chars"
+    );
+    let decoded: Vec<u8> = (0..rgba.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&rgba[i..i + 2], 16).expect("hex byte"))
+        .collect();
+    assert_eq!(decoded[0], 255, "R");
+    assert_eq!(decoded[1], 0, "G");
+    assert_eq!(decoded[2], 0, "B");
+    assert_eq!(decoded[3], 255, "A");
+}
+
+#[test]
+fn visual_sample_svg_works() {
+    let temp = TempDir::new();
+    let input = temp.path("icon.svg");
+    fs::write(
+        &input,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#00ff00" width="100" height="100"/></svg>"##,
+    )
+    .expect("write svg fixture");
+
+    let stdout = assert_success(run(&["visual-sample", input.to_str().expect("path utf-8")]));
+    let json: Value = serde_json::from_str(&stdout).expect("parse json");
+
+    assert_eq!(json["width"], 16);
+    assert_eq!(json["height"], 16);
+    let rgba = json["rgba"].as_str().expect("rgba");
+    let decoded: Vec<u8> = (0..rgba.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&rgba[i..i + 2], 16).expect("hex byte"))
+        .collect();
+    assert_eq!(decoded[1], 255, "green SVG should have G=255");
+}
+
 fn write_svg_fixture(path: &Path, fill: &str, width: u32, height: u32) {
     fs::write(
         path,

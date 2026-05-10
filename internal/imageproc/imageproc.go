@@ -223,6 +223,19 @@ func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
 }
 
 func VisualSample(path string) (*image.NRGBA, error) {
+	var result struct {
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+		RGBA   string `json:"rgba"`
+	}
+	if err := runImgtoolsJSON(&result, "visual-sample", path); err == nil {
+		raw, err := hex.DecodeString(result.RGBA)
+		if err == nil && len(raw) == result.Width*result.Height*4 {
+			img := image.NewNRGBA(image.Rect(0, 0, result.Width, result.Height))
+			copy(img.Pix, raw)
+			return img, nil
+		}
+	}
 	img, err := decodeRaster(path)
 	if err != nil {
 		return nil, err

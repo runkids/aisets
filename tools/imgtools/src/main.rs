@@ -64,6 +64,11 @@ enum Command {
         #[arg(long)]
         hash2: String,
     },
+    /// Compute 16×16 RGBA visual sample of an image (for near-duplicate pre-computation)
+    VisualSample {
+        /// Input file path
+        input: String,
+    },
     /// Compute pixel-level visual distance between two images
     VisualDistance {
         /// First image path
@@ -133,6 +138,7 @@ fn main() {
         Command::Probe { input } => probe::run(&input),
         Command::Dhash { input } => hash::run_dhash(&input),
         Command::Distance { hash1, hash2 } => hash::run_distance(&hash1, &hash2),
+        Command::VisualSample { input } => hash::run_visual_sample(&input),
         Command::VisualDistance {
             input_a,
             input_b,

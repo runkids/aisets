@@ -14,17 +14,25 @@ const binaryName = "aisets-imgtools"
 var (
 	resolveMu    sync.Mutex
 	resolvedPath string
+	resolvedErr  error
+	resolvedOnce bool
 )
 
 func Binary() (string, error) {
 	resolveMu.Lock()
 	defer resolveMu.Unlock()
-	if resolvedPath != "" {
-		return resolvedPath, nil
+	if resolvedOnce {
+		return resolvedPath, resolvedErr
 	}
+	resolvedOnce = true
 	path, err := resolve()
 	if err != nil {
+		resolvedErr = err
 		return "", err
+	}
+	if err := exec.Command(path, "version").Run(); err != nil {
+		resolvedErr = fmt.Errorf("%s found at %s but not executable: %w", binaryName, path, err)
+		return "", resolvedErr
 	}
 	resolvedPath = path
 	return resolvedPath, nil
