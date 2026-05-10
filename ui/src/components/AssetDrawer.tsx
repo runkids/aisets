@@ -570,6 +570,7 @@ export function AssetDrawer({
                   similarItems={similarItems}
                   nearDuplicates={nearDuplicates}
                   onOpenAsset={onOpenAsset}
+                  aiEnabled={settingsQuery.data?.settings.llmEnabled}
                 />
               )}
               {tab === "optimize" && (
