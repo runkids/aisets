@@ -1158,7 +1158,16 @@
     "aiTagDismiss": "閉じる",
     "aiTagRunSuccess": "AI タグ付け完了",
     "aiTagRunStopped": "AI タグ付けを停止しました",
-    "aiTagRunFailed": "AI タグ付けに失敗しました"
+    "aiTagRunFailed": "AI タグ付けに失敗しました",
+    "aiOcrGroup": "AI OCR",
+    "aiOcrDescription": "ビジョン AI モデルを使用して画像からテキストを抽出し、従来の OCR より高精度で読み取ります",
+    "aiOcrRun": "AI OCR を実行",
+    "aiOcrStop": "停止",
+    "aiOcrStopping": "停止中…",
+    "aiOcrSaving": "設定を保存中…",
+    "aiOcrDone": "完了 — {{ready}} 件抽出、{{skipped}} 件スキップ、{{cacheHit}} 件キャッシュ",
+    "aiOcrStopped": "停止済み",
+    "aiOcrFailed": "AI OCR に失敗"
   },
   "catalog": {
     "notComputed": {

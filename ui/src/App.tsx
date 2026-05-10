@@ -56,7 +56,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { APIError, runOCR, runAITagging } from "./api";
+import { APIError, runOCR, runAITagging, runVLMOcr } from "./api";
 import { errorMessage } from "./i18n/index";
 import {
   initialOCRActivityState,
@@ -75,6 +75,13 @@ import {
   aiTagActivityReducer,
   runAITagActivity,
 } from "./aiTagActivity";
+import {
+  initialVLMOcrActivityState,
+  isVLMOcrActivityBusy,
+  vlmOcrActivityReducer,
+  runVLMOcrActivity,
+  type VLMOcrActivityAbortRef,
+} from "./vlmOcrActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -182,6 +189,12 @@ export function App() {
   );
   const aiTagActivityAbortRef = useRef<AbortController | null>(null);
   const aiTagActivityRunRef = useRef<Promise<void> | null>(null);
+  const [vlmOcrActivity, dispatchVLMOcr] = useReducer(
+    vlmOcrActivityReducer,
+    initialVLMOcrActivityState,
+  );
+  const vlmOcrAbortRef = useRef<AbortController | null>(null) as VLMOcrActivityAbortRef;
+  const vlmOcrRunRef = useRef<Promise<void> | null>(null);
   const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
     optimizeActivityReducer,
     initialOptimizeActivityState,
@@ -435,6 +448,7 @@ export function App() {
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
   const aiTagActivityBusy = isAITagActivityBusy(aiTagActivity);
+  const vlmOcrActivityBusy = isVLMOcrActivityBusy(vlmOcrActivity);
   const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
   const catalogActionsDisabled =
     working || ocrActivityBusy || optimizeActivityBusy;
@@ -614,6 +628,35 @@ export function App() {
     dispatchAITagActivity({ type: "dismiss" });
   }
 
+  function onStartVLMOcrActivity(saveSettings: () => Promise<void>) {
+    if (vlmOcrRunRef.current) return;
+
+    const run = (async () => {
+      await runVLMOcrActivity({
+        abortRef: vlmOcrAbortRef,
+        dispatch: dispatchVLMOcr,
+        saveSettings,
+        run: ({ signal, onEvent }) => runVLMOcr({ signal, onEvent }),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+    })().finally(() => {
+      vlmOcrRunRef.current = null;
+    });
+
+    vlmOcrRunRef.current = run;
+  }
+
+  function onStopVLMOcrActivity() {
+    if (!vlmOcrAbortRef.current) return;
+    dispatchVLMOcr({ type: "stopping" });
+    vlmOcrAbortRef.current.abort();
+  }
+
+  function onDismissVLMOcrActivity() {
+    dispatchVLMOcr({ type: "dismiss" });
+  }
+
   function onOpenOCRSettings() {
     navigate({
       pathname: pathForMode("settings"),
@@ -777,6 +820,7 @@ export function App() {
           scanProgress={displayedScanProgress}
           ocrActivity={ocrActivity}
           aiTagActivity={aiTagActivity}
+          vlmOcrActivity={vlmOcrActivity}
           optimizeActivity={optimizeActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
           onRefresh={onRescan}
@@ -786,6 +830,8 @@ export function App() {
           onOpenOCRSettings={onOpenOCRSettings}
           onStopAITag={onStopAITagActivity}
           onDismissAITag={onDismissAITagActivity}
+          onStopVLMOcr={onStopVLMOcrActivity}
+          onDismissVLMOcr={onDismissVLMOcrActivity}
           onOpenAISettings={() => {
             navigate({
               pathname: pathForMode("settings"),
@@ -850,6 +896,7 @@ export function App() {
               imageBackgroundMode={imageBackgroundMode}
               ocrActivity={ocrActivity}
               aiTagActivity={aiTagActivity}
+              vlmOcrActivity={vlmOcrActivity}
               scanWorking={backendScanRunning || scanMutation.isPending}
               onThemeChange={setTheme}
               onImagePreviewEnabledChange={setImagePreviewEnabled}
@@ -860,6 +907,9 @@ export function App() {
               onStartAITag={onStartAITagActivity}
               onStopAITag={onStopAITagActivity}
               onDismissAITag={onDismissAITagActivity}
+              onStartVLMOcr={onStartVLMOcrActivity}
+              onStopVLMOcr={onStopVLMOcrActivity}
+              onDismissVLMOcr={onDismissVLMOcrActivity}
               onAddProject={() => setDirectoryPickerOpen(true)}
             />
           ) : mode === "duplicates" && catalogSummary ? (

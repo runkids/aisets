@@ -1163,7 +1163,16 @@
     "aiTagDismiss": "닫기",
     "aiTagRunSuccess": "AI 태그 완료",
     "aiTagRunStopped": "AI 태그가 중지되었습니다",
-    "aiTagRunFailed": "AI 태그 실패"
+    "aiTagRunFailed": "AI 태그 실패",
+    "aiOcrGroup": "AI OCR",
+    "aiOcrDescription": "비전 AI 모델을 사용해 이미지에서 텍스트를 추출하며, 기존 OCR보다 더 높은 정확도를 제공합니다",
+    "aiOcrRun": "AI OCR 실행",
+    "aiOcrStop": "중지",
+    "aiOcrStopping": "중지 중…",
+    "aiOcrSaving": "설정 저장 중…",
+    "aiOcrDone": "완료 — {{ready}}개 추출, {{skipped}}개 건너뜀, {{cacheHit}}개 캐시",
+    "aiOcrStopped": "중지됨",
+    "aiOcrFailed": "AI OCR 실패"
   },
   "catalog": {
     "notComputed": {

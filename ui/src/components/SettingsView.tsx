@@ -57,6 +57,7 @@ export function SettingsView({
   imageBackgroundMode,
   ocrActivity,
   aiTagActivity,
+  vlmOcrActivity,
   scanWorking = false,
   onThemeChange,
   onImagePreviewEnabledChange,
@@ -67,6 +68,9 @@ export function SettingsView({
   onStartAITag,
   onStopAITag,
   onDismissAITag,
+  onStartVLMOcr,
+  onStopVLMOcr,
+  onDismissVLMOcr,
   onAddProject,
 }: SettingsViewProps) {
   const { t } = useTranslation();
@@ -583,6 +587,7 @@ export function SettingsView({
               settings={settings}
               working={working}
               aiTagActivity={aiTagActivity}
+              vlmOcrActivity={vlmOcrActivity}
               settingActions={settingActionsFor("ai")}
               onUpdateDraft={updateDraft}
               onStartAITag={() =>
@@ -590,6 +595,11 @@ export function SettingsView({
               }
               onStopAITag={onStopAITag}
               onDismissAITag={onDismissAITag}
+              onStartVLMOcr={() =>
+                onStartVLMOcr(() => onSaveSettings({ silent: true }))
+              }
+              onStopVLMOcr={onStopVLMOcr}
+              onDismissVLMOcr={onDismissVLMOcr}
             />
           )}
 

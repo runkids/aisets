@@ -796,6 +796,7 @@
     "llmProviderOpenAICompat": "LM Studio (OpenAI Compatible)",
     "llmConnected": "Connected ({{count}} models available)",
     "llmDisconnected": "Disconnected",
+    "llmTesting": "Testing…",
     "llmTestConnection": "Test Connection",
     "llmSelectModel": "Select a model",
     "llmRefreshModels": "Refresh model list",
@@ -814,7 +815,16 @@
     "aiTagDismiss": "Dismiss",
     "aiTagRunSuccess": "AI tagging complete",
     "aiTagRunStopped": "AI tagging stopped",
-    "aiTagRunFailed": "AI tagging failed"
+    "aiTagRunFailed": "AI tagging failed",
+    "aiOcrGroup": "AI OCR",
+    "aiOcrDescription": "Use vision AI model to extract text from images with higher accuracy than traditional OCR",
+    "aiOcrRun": "Run AI OCR",
+    "aiOcrStop": "Stop",
+    "aiOcrStopping": "Stopping…",
+    "aiOcrSaving": "Saving settings…",
+    "aiOcrDone": "Done — {{ready}} extracted, {{skipped}} skipped, {{cacheHit}} cached",
+    "aiOcrStopped": "Stopped",
+    "aiOcrFailed": "AI OCR failed"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

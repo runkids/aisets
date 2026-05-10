@@ -1,6 +1,7 @@
 import type { ImageBackgroundMode } from "../../imageBackground";
 import type { AITagActivityState } from "../../aiTagActivity";
 import type { OCRActivityState } from "../../ocrActivity";
+import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import type {
   CustomAssetFilter,
   OptimizationExternalTool,
@@ -20,6 +21,7 @@ export type SettingsViewProps = {
   imageBackgroundMode: ImageBackgroundMode;
   ocrActivity: OCRActivityState;
   aiTagActivity: AITagActivityState;
+  vlmOcrActivity: VLMOcrActivityState;
   scanWorking?: boolean;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
@@ -30,6 +32,9 @@ export type SettingsViewProps = {
   onStartAITag: (saveSettings: () => Promise<void>) => void;
   onStopAITag: () => void;
   onDismissAITag: () => void;
+  onStartVLMOcr: (saveSettings: () => Promise<void>) => void;
+  onStopVLMOcr: () => void;
+  onDismissVLMOcr: () => void;
   onAddProject?: () => void;
 };
 

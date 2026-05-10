@@ -29,6 +29,13 @@ import {
   ocrActivityProgressPercent,
   type OCRActivityState,
 } from "../ocrActivity";
+import {
+  canDismissVLMOcrActivity,
+  isVLMOcrActivityBusy,
+  isVLMOcrActivityVisible,
+  vlmOcrActivityProgressPercent,
+  type VLMOcrActivityState,
+} from "../vlmOcrActivity";
 import { ActivityDropdown } from "./ActivityDropdown";
 import { Keycap, ScanProgressContent, TextInputButton, Tooltip } from "./ui";
 import { IconButton } from "./ui/Button";
@@ -39,6 +46,7 @@ type Props = {
   scanProgress?: ScanEvent | null;
   ocrActivity: OCRActivityState;
   aiTagActivity: AITagActivityState;
+  vlmOcrActivity: VLMOcrActivityState;
   optimizeActivity: OptimizeActivityState;
   onAddProject: () => void;
   onRefresh: () => void;
@@ -48,6 +56,8 @@ type Props = {
   onOpenOCRSettings: () => void;
   onStopAITag: () => void;
   onDismissAITag: () => void;
+  onStopVLMOcr: () => void;
+  onDismissVLMOcr: () => void;
   onOpenAISettings: () => void;
   onStopOptimize: () => void;
   onDismissOptimize: () => void;
@@ -60,6 +70,7 @@ export function AppTopbar({
   scanProgress,
   ocrActivity,
   aiTagActivity,
+  vlmOcrActivity,
   optimizeActivity,
   onAddProject,
   onRefresh,
@@ -69,6 +80,8 @@ export function AppTopbar({
   onOpenOCRSettings,
   onStopAITag,
   onDismissAITag,
+  onStopVLMOcr,
+  onDismissVLMOcr,
   onOpenAISettings,
   onStopOptimize,
   onDismissOptimize,
@@ -139,6 +152,25 @@ export function AppTopbar({
         skipped: aiTagActivity.counts.skipped,
         cacheHit: aiTagActivity.counts.cacheHit,
       })
+    : t("activity.aiTagPreparing");
+  const vlmOcrVisible = isVLMOcrActivityVisible(vlmOcrActivity);
+  const vlmOcrBusy = isVLMOcrActivityBusy(vlmOcrActivity);
+  const vlmOcrStatusLabels: Record<string, string> = {
+    saving: t("settings.aiOcrSaving"),
+    running: t("settings.aiOcrRun"),
+    stopping: t("settings.aiOcrStopping"),
+    done: t("settings.aiOcrDone", {
+      ready: vlmOcrActivity.counts?.ready ?? 0,
+      skipped: vlmOcrActivity.counts?.skipped ?? 0,
+      cacheHit: vlmOcrActivity.counts?.cacheHit ?? 0,
+    }),
+    stopped: t("settings.aiOcrStopped"),
+    error: t("settings.aiOcrFailed"),
+  };
+  const vlmOcrStatusLabel =
+    vlmOcrStatusLabels[vlmOcrActivity.phase] ?? t("settings.aiOcrGroup");
+  const vlmOcrCounts = vlmOcrActivity.counts
+    ? `${vlmOcrActivity.counts.processed}/${vlmOcrActivity.counts.queued + vlmOcrActivity.counts.cacheHit + vlmOcrActivity.counts.skipped}`
     : t("activity.aiTagPreparing");
   const catalogActionTooltip = ocrBusy
     ? t("activity.ocrLockedTooltip")
@@ -304,6 +336,40 @@ export function AppTopbar({
                 : undefined
             }
             onDismiss={onDismissAITag}
+          />
+        )}
+        {vlmOcrVisible && (
+          <ActivityDropdown
+            icon={<ScanText size={16} />}
+            ariaLabel={t("settings.aiOcrGroup")}
+            busy={vlmOcrBusy}
+            done={vlmOcrActivity.phase === "done"}
+            failed={vlmOcrActivity.phase === "error"}
+            stopped={vlmOcrActivity.phase === "stopped"}
+            canDismiss={canDismissVLMOcrActivity(vlmOcrActivity)}
+            statusLabel={vlmOcrStatusLabel}
+            countsLabel={vlmOcrCounts}
+            errorMessage={vlmOcrActivity.errorMessage}
+            progressPercent={vlmOcrActivityProgressPercent(vlmOcrActivity)}
+            primaryAction={{
+              label: t("activity.viewAISettings"),
+              onClick: onOpenAISettings,
+            }}
+            stopButton={
+              vlmOcrBusy
+                ? {
+                    label:
+                      vlmOcrActivity.phase === "stopping"
+                        ? t("settings.aiOcrStopping")
+                        : t("settings.aiOcrStop"),
+                    onClick: onStopVLMOcr,
+                    disabled:
+                      vlmOcrActivity.phase === "saving" ||
+                      vlmOcrActivity.phase === "stopping",
+                  }
+                : undefined
+            }
+            onDismiss={onDismissVLMOcr}
           />
         )}
         {ocrVisible && (

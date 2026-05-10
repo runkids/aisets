@@ -1491,6 +1491,7 @@
     "llmProviderOpenAICompat": "LM Studio（OpenAI 相容）",
     "llmConnected": "已連線（{{count}} 個模型可用）",
     "llmDisconnected": "未連線",
+    "llmTesting": "測試中…",
     "llmTestConnection": "測試連線",
     "llmSelectModel": "選擇模型",
     "llmRefreshModels": "重新整理模型列表",
@@ -1509,7 +1510,16 @@
     "aiTagDismiss": "關閉",
     "aiTagRunSuccess": "AI 標記完成",
     "aiTagRunStopped": "AI 標記已停止",
-    "aiTagRunFailed": "AI 標記失敗"
+    "aiTagRunFailed": "AI 標記失敗",
+    "aiOcrGroup": "AI OCR",
+    "aiOcrDescription": "使用視覺 AI 模型從圖片中提取文字，比傳統 OCR 精準度更高",
+    "aiOcrRun": "執行 AI OCR",
+    "aiOcrStop": "停止",
+    "aiOcrStopping": "停止中…",
+    "aiOcrSaving": "儲存設定中…",
+    "aiOcrDone": "完成 — {{ready}} 已提取、{{skipped}} 已略過、{{cacheHit}} 快取命中",
+    "aiOcrStopped": "已停止",
+    "aiOcrFailed": "AI OCR 失敗"
   },
   "catalog": {
     "notComputed": {

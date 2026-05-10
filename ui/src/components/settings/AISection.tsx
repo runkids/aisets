@@ -1,8 +1,10 @@
-import { LoaderCircle, Play, RefreshCw, Square, Tags } from "lucide-react";
+import { LoaderCircle, Play, RefreshCw, ScanText, Square, Tags } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
+import type { VLMOcrActivityState } from "../../vlmOcrActivity";
+import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
@@ -15,11 +17,15 @@ type AISectionProps = {
   settings?: SettingsInfo;
   working: boolean;
   aiTagActivity: AITagActivityState;
+  vlmOcrActivity: VLMOcrActivityState;
   settingActions: ReactNode;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
   onStartAITag: () => void;
   onStopAITag: () => void;
   onDismissAITag: () => void;
+  onStartVLMOcr: () => void;
+  onStopVLMOcr: () => void;
+  onDismissVLMOcr: () => void;
 };
 
 function deriveHost(endpoint: string | undefined): string {
@@ -35,11 +41,15 @@ export function AISection({
   settings,
   working,
   aiTagActivity,
+  vlmOcrActivity,
   settingActions,
   onUpdateDraft,
   onStartAITag,
   onStopAITag,
   onDismissAITag,
+  onStartVLMOcr,
+  onStopVLMOcr,
+  onDismissVLMOcr,
 }: AISectionProps) {
   const { t } = useTranslation();
 
@@ -304,6 +314,66 @@ export function AISection({
           </div>
         </Card>
       )}
+
+      {providerEnabled && (
+        <Card
+          className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          padding="none"
+        >
+          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+            <ScanText size={15} className="shrink-0 text-g-ink-3" />
+            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+              {t("settings.aiOcrGroup")}
+            </span>
+          </div>
+          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+            <FieldRow
+              label={t("settings.aiOcrGroup")}
+              description={t("settings.aiOcrDescription")}
+              icon={<ScanText size={15} />}
+              align="start"
+            >
+              <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
+                <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
+                  {isVLMOcrActivityBusy(vlmOcrActivity) ? (
+                    <Button
+                      variant="secondary"
+                      leadingIcon={
+                        vlmOcrActivity.phase === "stopping" ? (
+                          <LoaderCircle
+                            size={14}
+                            className="animate-[icon-spin_900ms_linear_infinite]"
+                          />
+                        ) : (
+                          <Square size={14} />
+                        )
+                      }
+                      onClick={onStopVLMOcr}
+                      disabled={vlmOcrActivity.phase === "stopping"}
+                    >
+                      {vlmOcrActivity.phase === "stopping"
+                        ? t("settings.aiOcrStopping")
+                        : t("settings.aiOcrStop")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      leadingIcon={<Play size={14} />}
+                      disabled={working || draft.llmVisionModel === ""}
+                      onClick={onStartVLMOcr}
+                    >
+                      {t("settings.aiOcrRun")}
+                    </Button>
+                  )}
+                </div>
+                {vlmOcrActivity.phase !== "idle" && (
+                  <VLMOcrProgressText activity={vlmOcrActivity} />
+                )}
+              </div>
+            </FieldRow>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -340,6 +410,54 @@ function AITagProgressText({ activity }: { activity: AITagActivityState }) {
   const { t } = useTranslation();
   const busy = isAITagActivityBusy(activity);
   const label = aiTagProgressLabel(activity, t);
+
+  return (
+    <div className="flex flex-col gap-0.5 items-end">
+      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+        {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
+        {label}
+      </p>
+      {busy && activity.currentFile && (
+        <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {activity.currentFile}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function vlmOcrProgressLabel(
+  activity: VLMOcrActivityState,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  const counts = activity.counts;
+  switch (activity.phase) {
+    case "saving":
+      return t("settings.aiOcrSaving");
+    case "running":
+    case "stopping":
+      return counts
+        ? `${counts.processed}/${counts.queued + counts.cacheHit + counts.skipped}`
+        : t("settings.aiOcrSaving");
+    case "done":
+      return t("settings.aiOcrDone", {
+        ready: counts?.ready ?? 0,
+        skipped: counts?.skipped ?? 0,
+        cacheHit: counts?.cacheHit ?? 0,
+      });
+    case "stopped":
+      return t("settings.aiOcrStopped");
+    case "error":
+      return activity.errorMessage ?? t("settings.aiOcrFailed");
+    default:
+      return "";
+  }
+}
+
+function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
+  const { t } = useTranslation();
+  const busy = isVLMOcrActivityBusy(activity);
+  const label = vlmOcrProgressLabel(activity, t);
 
   return (
     <div className="flex flex-col gap-0.5 items-end">

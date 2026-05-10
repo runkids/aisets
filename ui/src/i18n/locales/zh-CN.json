@@ -1158,7 +1158,16 @@
     "aiTagDismiss": "关闭",
     "aiTagRunSuccess": "AI 标记完成",
     "aiTagRunStopped": "AI 标记已停止",
-    "aiTagRunFailed": "AI 标记失败"
+    "aiTagRunFailed": "AI 标记失败",
+    "aiOcrGroup": "AI OCR",
+    "aiOcrDescription": "使用视觉 AI 模型从图片中提取文字，比传统 OCR 精准度更高",
+    "aiOcrRun": "执行 AI OCR",
+    "aiOcrStop": "停止",
+    "aiOcrStopping": "停止中…",
+    "aiOcrSaving": "保存设置中…",
+    "aiOcrDone": "完成 — {{ready}} 已提取、{{skipped}} 已跳过、{{cacheHit}} 缓存命中",
+    "aiOcrStopped": "已停止",
+    "aiOcrFailed": "AI OCR 失败"
   },
   "catalog": {
     "notComputed": {
