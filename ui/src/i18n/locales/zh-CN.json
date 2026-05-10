@@ -1864,9 +1864,9 @@
     "systemPresets": "系统",
     "systemDescription": "此 prompt 会自动合并到所有 AI 操作前面",
     "systemEmptyTitle": "创建系统 Prompt",
-    "systemEmptyDesc": "系统 prompt 会自动合并到所有 AI 操作（标签、OCR、优化、重复检测）的最前面。例如：「总是用中文回答」",
+    "systemEmptyDesc": "系统 prompt 会自动加在所有 AI 操作（标签、OCR、优化、重复检测）前面，适合设定响应语言、输出风格等全局指令",
     "systemEmptyAction": "创建第一个系统 prompt",
-    "systemNotice": "此 prompt 会自动合并到所有 AI 操作前面，设为默认即生效"
+    "systemNotice": "此 prompt 会自动加在所有 AI 操作前面，设为默认即生效"
   },
   "duplicateExplain": {
     "button": "解释差异",
