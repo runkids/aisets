@@ -33,8 +33,6 @@ type FilterRailProps = {
   extensionAllLabel?: string;
   customFilterOptions?: CustomFilterOption[];
   customFilterTotal?: number;
-  aiCategoryOptions?: FilterOption[];
-  aiCategoryTotal?: number;
   ocrReadyCount?: number;
   vlmOcrReadyCount?: number;
   aiTagReadyCount?: number;
@@ -67,8 +65,6 @@ export function FilterRail({
   extensionAllLabel,
   customFilterOptions,
   customFilterTotal,
-  aiCategoryOptions,
-  aiCategoryTotal,
   ocrReadyCount,
   vlmOcrReadyCount,
   aiTagReadyCount,

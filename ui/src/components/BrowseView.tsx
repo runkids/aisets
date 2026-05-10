@@ -57,7 +57,7 @@ import { BrowseList } from "./BrowseList";
 import { BrowseToolbar, type SortMode, type ViewMode } from "./BrowseToolbar";
 import { useImageBackgroundControls } from "../imageBackground";
 import { FilterRail } from "./FilterRail";
-import { Button, EmptyState, Tooltip } from "./ui";
+import { EmptyState } from "./ui";
 
 type StatusFilter =
   | ""
@@ -986,8 +986,6 @@ export function BrowseView({
         customFilterTotal={
           facets?.customFilterTotal ?? filteredWithoutCustom.length
         }
-        aiCategoryOptions={aiCategoryFacet.options}
-        aiCategoryTotal={aiCategoryFacet.total}
         ocrReadyCount={facets?.ocrReadyCount}
         vlmOcrReadyCount={facets?.vlmOcrReadyCount}
         aiTagReadyCount={facets?.aiTagReadyCount}

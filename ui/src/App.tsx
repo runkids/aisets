@@ -325,17 +325,16 @@ export function App() {
     );
   }, [imageBackgroundMode]);
 
+  const anyAIBusy =
+    isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
   useEffect(() => {
-    const busy =
-      isAITagActivityBusy(aiTagActivity) ||
-      isVLMOcrActivityBusy(vlmOcrActivity);
-    if (!busy) return undefined;
+    if (!anyAIBusy) return undefined;
     function onBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [aiTagActivity.phase, vlmOcrActivity.phase]);
+  }, [anyAIBusy]);
 
   useEffect(() => {
     if (scanMutation.isPending) return undefined;
