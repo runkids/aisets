@@ -334,7 +334,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 	}
 	meta, _ := imageproc.Probe(candidate.path)
 	item.Image = meta
-	if item.Ext == ".jpg" || item.Ext == ".jpeg" || item.Ext == ".tiff" || item.Ext == ".tif" {
+	if item.Ext == ".jpg" || item.Ext == ".jpeg" || item.Ext == ".tiff" || item.Ext == ".tif" || item.Ext == ".heic" || item.Ext == ".heif" {
 		if exifData, err := imageproc.ExtractEXIF(candidate.path); err == nil && exifData.HasEXIF {
 			item.EXIF = &exifData
 		}

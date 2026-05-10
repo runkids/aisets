@@ -30,7 +30,7 @@ func ExtractEXIF(path string) (EXIFData, error) {
 
 func extractEXIFGoFallback(path string) (EXIFData, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".tiff" && ext != ".tif" {
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".tiff" && ext != ".tif" && ext != ".heic" && ext != ".heif" {
 		return EXIFData{}, nil
 	}
 	f, err := os.Open(path)

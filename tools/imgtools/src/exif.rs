@@ -41,8 +41,10 @@ fn extract(path: &str) -> ExifResult {
         .unwrap_or("")
         .to_lowercase();
 
-    // Only JPEG and TIFF files can contain EXIF
-    if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
+    if !matches!(
+        ext.as_str(),
+        "jpg" | "jpeg" | "tif" | "tiff" | "heic" | "heif"
+    ) {
         return ExifResult::default();
     }
 
