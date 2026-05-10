@@ -59,7 +59,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+	systemPrompt := settings.LLMSystemPrompt
 
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{leftID, rightID})
 	if err != nil || len(items) < 2 {
@@ -104,12 +104,8 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(r.Context(), llm.ChatRequest{
-		Model: settings.LLMVisionModel,
-		Messages: []llm.ChatMessage{{
-			Role:    "user",
-			Content: prompt,
-			Images:  []string{leftURI, rightURI},
-		}},
+		Model:      settings.LLMVisionModel,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{leftURI, rightURI}),
 		TimeoutSec: timeoutSec,
 	})
 	durationMs := time.Since(start).Milliseconds()

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"aisets/internal/config"
+	"aisets/internal/llm"
 )
 
 func (s *Server) handleListPromptPresets(w http.ResponseWriter, r *http.Request) {
@@ -100,9 +101,11 @@ func (s *Server) handleSetPromptPresetDefault(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]any{"preset": preset})
 }
 
-func prependSystemPrompt(systemPrompt, prompt string) string {
-	if systemPrompt == "" {
-		return prompt
+func buildChatMessages(systemPrompt, userPrompt string, images []string) []llm.ChatMessage {
+	var msgs []llm.ChatMessage
+	if systemPrompt != "" {
+		msgs = append(msgs, llm.ChatMessage{Role: "system", Content: systemPrompt})
 	}
-	return systemPrompt + "\n\n" + prompt
+	msgs = append(msgs, llm.ChatMessage{Role: "user", Content: userPrompt, Images: images})
+	return msgs
 }

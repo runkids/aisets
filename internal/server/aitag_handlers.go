@@ -180,7 +180,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = aitag.TagPrompt
 	}
-	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+	systemPrompt := settings.LLMSystemPrompt
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {
@@ -309,7 +309,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for item := range jobs {
-				result, chatResp := s.processAITag(ctx, item, providerName, modelName, prompt, timeoutSec)
+				result, chatResp := s.processAITag(ctx, item, providerName, modelName, systemPrompt, prompt, timeoutSec)
 				select {
 				case results <- aiTagWorkResult{item: item, result: result, chatResp: chatResp}:
 				case <-ctx.Done():
@@ -377,7 +377,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string, timeoutSec int) (aitag.Result, llm.ChatResponse) {
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, systemPrompt, prompt string, timeoutSec int) (aitag.Result, llm.ChatResponse) {
 	result := aitag.Result{
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
@@ -398,12 +398,8 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model: modelName,
-		Messages: []llm.ChatMessage{{
-			Role:    "user",
-			Content: prompt,
-			Images:  []string{dataURI},
-		}},
+		Model:      modelName,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
 		TimeoutSec: timeoutSec,
 	})
 	result.DurationMs = time.Since(start).Milliseconds()

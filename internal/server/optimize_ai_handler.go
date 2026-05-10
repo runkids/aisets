@@ -93,7 +93,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+	systemPrompt := settings.LLMSystemPrompt
 
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{assetID})
 	if err != nil || len(items) == 0 {
@@ -122,12 +122,8 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(r.Context(), llm.ChatRequest{
-		Model: settings.LLMVisionModel,
-		Messages: []llm.ChatMessage{{
-			Role:    "user",
-			Content: prompt,
-			Images:  []string{dataURI},
-		}},
+		Model:      settings.LLMVisionModel,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
 		TimeoutSec: timeoutSec,
 	})
 	durationMs := time.Since(start).Milliseconds()

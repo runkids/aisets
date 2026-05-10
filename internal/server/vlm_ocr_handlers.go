@@ -127,7 +127,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = vlmOCRPrompt
 	}
-	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+	systemPrompt := settings.LLMSystemPrompt
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {
@@ -256,7 +256,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for item := range jobs {
-				result, chatResp := s.processVLMOCR(ctx, item, providerName, modelName, prompt, timeoutSec)
+				result, chatResp := s.processVLMOCR(ctx, item, providerName, modelName, systemPrompt, prompt, timeoutSec)
 				select {
 				case results <- vlmOcrWorkResult{item: item, result: result, chatResp: chatResp}:
 				case <-ctx.Done():
@@ -324,7 +324,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string, timeoutSec int) (ocr.Result, llm.ChatResponse) {
+func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, systemPrompt, prompt string, timeoutSec int) (ocr.Result, llm.ChatResponse) {
 	engineVersion := providerName + "/" + modelName
 	result := ocr.Result{
 		ProjectID:     item.ProjectID,
@@ -349,12 +349,8 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model: modelName,
-		Messages: []llm.ChatMessage{{
-			Role:    "user",
-			Content: prompt,
-			Images:  []string{dataURI},
-		}},
+		Model:      modelName,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
 		TimeoutSec: timeoutSec,
 	})
 	result.DurationMs = time.Since(start).Milliseconds()
