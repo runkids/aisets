@@ -852,6 +852,7 @@ export function App() {
           onStopOptimize={onStopOptimizeActivity}
           onDismissOptimize={onDismissOptimizeActivity}
           onOpenOptimize={onOpenOptimize}
+          onOpenSettings={() => navigate({ pathname: pathForMode("settings") })}
         />
       </div>
       <NavSidebar

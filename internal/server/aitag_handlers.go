@@ -50,12 +50,14 @@ func extToMIME(ext string) string {
 }
 
 type aiTagCounts struct {
-	Queued    int `json:"queued"`
-	Processed int `json:"processed"`
-	Ready     int `json:"ready"`
-	Failed    int `json:"failed"`
-	Skipped   int `json:"skipped"`
-	CacheHit  int `json:"cacheHit"`
+	Queued       int   `json:"queued"`
+	Processed    int   `json:"processed"`
+	Ready        int   `json:"ready"`
+	Failed       int   `json:"failed"`
+	Skipped      int   `json:"skipped"`
+	CacheHit     int   `json:"cacheHit"`
+	InputTokens  int64 `json:"inputTokens"`
+	OutputTokens int64 `json:"outputTokens"`
 }
 
 func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
@@ -173,13 +175,15 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result := s.processAITag(r.Context(), item, providerName, modelName, prompt)
+		result, chatResp := s.processAITag(r.Context(), item, providerName, modelName, prompt)
 		if result.Status == aitag.StatusFailed {
 			counts.Failed++
 		} else {
 			counts.Ready++
 		}
 		counts.Processed++
+		counts.InputTokens += chatResp.InputTokens
+		counts.OutputTokens += chatResp.OutputTokens
 
 		if err := s.store.UpsertAITagResult(result); err != nil {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_persist_failed"), "counts": counts})
@@ -202,7 +206,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
 }
 
-func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) aitag.Result {
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) (aitag.Result, llm.ChatResponse) {
 	result := aitag.Result{
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
@@ -218,7 +222,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_read_failed"
 		result.ErrorMessage = err.Error()
-		return result
+		return result, llm.ChatResponse{}
 	}
 
 	start := time.Now()
@@ -236,7 +240,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_llm_failed"
 		result.ErrorMessage = err.Error()
-		return result
+		return result, llm.ChatResponse{}
 	}
 
 	// Parse JSON from response, stripping markdown fences if present
@@ -253,7 +257,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_parse_failed"
 		result.ErrorMessage = "failed to parse VLM JSON response: " + err.Error()
-		return result
+		return result, resp
 	}
 
 	result.Category = strings.ToLower(strings.TrimSpace(parsed.Category))
@@ -266,7 +270,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	if result.Languages == nil {
 		result.Languages = []string{}
 	}
-	return result
+	return result, resp
 }
 
 func eligibleForAITag(item scanner.AssetItem) bool {

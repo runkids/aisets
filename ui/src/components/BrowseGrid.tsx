@@ -29,7 +29,7 @@ import {
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { AITagBadge } from "./AITagBadge";
 import { OCRStatusBadge } from "./OCRStatusBadge";
-import { Badge, Checkbox, ImagePreview, Tooltip } from "./ui";
+import { Checkbox, ImagePreview, Tooltip } from "./ui";
 
 type BrowseGridProps = {
   items: AssetItem[];
@@ -114,10 +114,6 @@ export function BrowseGrid({
     Math.floor((gridWidth + cfg.gap) / (cfg.min + cfg.gap)),
   );
   const rowCount = Math.ceil(items.length / columnCount);
-  const cardWidth =
-    gridWidth > 0
-      ? (gridWidth - cfg.gap * (columnCount - 1)) / columnCount
-      : cfg.min;
   const rowHeight = Math.ceil(cfg.thumbHeight + cfg.meta + cfg.gap);
   const rows = useMemo(
     () =>

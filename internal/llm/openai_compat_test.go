@@ -63,7 +63,7 @@ func TestOpenAICompatChat(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"Hello!"}}]}`)
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"Hello!"}}],"usage":{"prompt_tokens":8,"completion_tokens":3}}`)
 	}))
 	defer srv.Close()
 
@@ -79,6 +79,12 @@ func TestOpenAICompatChat(t *testing.T) {
 	}
 	if resp.Content != "Hello!" {
 		t.Errorf("Content = %q, want %q", resp.Content, "Hello!")
+	}
+	if resp.InputTokens != 8 {
+		t.Errorf("InputTokens = %d, want 8", resp.InputTokens)
+	}
+	if resp.OutputTokens != 3 {
+		t.Errorf("OutputTokens = %d, want 3", resp.OutputTokens)
 	}
 
 	// Verify stream=false was sent

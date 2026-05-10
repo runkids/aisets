@@ -28,12 +28,14 @@ const vlmOCRPrompt = `Analyze this image and respond with a JSON object:
 Respond ONLY with valid JSON, no markdown or explanation.`
 
 type vlmOcrCounts struct {
-	Queued    int `json:"queued"`
-	Processed int `json:"processed"`
-	Ready     int `json:"ready"`
-	Failed    int `json:"failed"`
-	Skipped   int `json:"skipped"`
-	CacheHit  int `json:"cacheHit"`
+	Queued       int   `json:"queued"`
+	Processed    int   `json:"processed"`
+	Ready        int   `json:"ready"`
+	Failed       int   `json:"failed"`
+	Skipped      int   `json:"skipped"`
+	CacheHit     int   `json:"cacheHit"`
+	InputTokens  int64 `json:"inputTokens"`
+	OutputTokens int64 `json:"outputTokens"`
 }
 
 func vlmOCRSettingsHash(modelName string) string {
@@ -187,13 +189,15 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result := s.processVLMOCR(r.Context(), item, providerName, modelName, prompt)
+		result, chatResp := s.processVLMOCR(r.Context(), item, providerName, modelName, prompt)
 		if result.Status == ocr.StatusFailed {
 			counts.Failed++
 		} else {
 			counts.Ready++
 		}
 		counts.Processed++
+		counts.InputTokens += chatResp.InputTokens
+		counts.OutputTokens += chatResp.OutputTokens
 
 		if err := s.store.UpsertOCRResult(result); err != nil {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_persist_failed"), "counts": counts})
@@ -216,7 +220,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
 }
 
-func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) ocr.Result {
+func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) (ocr.Result, llm.ChatResponse) {
 	engineVersion := providerName + "/" + modelName
 	result := ocr.Result{
 		ProjectID:     item.ProjectID,
@@ -236,7 +240,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		result.Status = ocr.StatusFailed
 		result.ErrorCode = "vlm_ocr_read_failed"
 		result.ErrorMessage = err.Error()
-		return result
+		return result, llm.ChatResponse{}
 	}
 
 	start := time.Now()
@@ -254,7 +258,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		result.Status = ocr.StatusFailed
 		result.ErrorCode = "vlm_ocr_llm_failed"
 		result.ErrorMessage = err.Error()
-		return result
+		return result, llm.ChatResponse{}
 	}
 
 	// Parse JSON from response, stripping markdown fences if present
@@ -269,7 +273,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		result.Status = ocr.StatusFailed
 		result.ErrorCode = "vlm_ocr_parse_failed"
 		result.ErrorMessage = "failed to parse VLM JSON response: " + err.Error()
-		return result
+		return result, resp
 	}
 
 	result.Text = parsed.Text
@@ -280,7 +284,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 	}
 	result.Scripts = ocr.DetectScripts(result.Text)
 	ocr.FinalizeResult(&result)
-	return result
+	return result, resp
 }
 
 func copyOCRResultForVLMItem(result ocr.Result, item scanner.AssetItem) ocr.Result {

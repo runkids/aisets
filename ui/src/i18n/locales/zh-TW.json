@@ -1626,7 +1626,10 @@
     "aiOcrSaving": "儲存設定中…",
     "aiOcrDone": "完成 — {{ready}} 已提取、{{skipped}} 已略過、{{cacheHit}} 快取命中",
     "aiOcrStopped": "已停止",
-    "aiOcrFailed": "AI OCR 失敗"
+    "aiOcrFailed": "AI OCR 失敗",
+    "aiLastRun": "上次執行 {{time}}",
+    "aiLastRunCounts": "{{ready}} 已標記、{{skipped}} 已略過、{{cacheHit}} 快取命中",
+    "aiTokenTooltip": "輸入 {{input}} / 輸出 {{output}} tokens"
   },
   "catalog": {
     "notComputed": {

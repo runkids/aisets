@@ -88,6 +88,8 @@ type ollamaChatResponse struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	} `json:"message"`
+	PromptEvalCount int64 `json:"prompt_eval_count"`
+	EvalCount       int64 `json:"eval_count"`
 }
 
 // Chat sends a chat request to POST /api/chat with a 60s timeout.
@@ -145,8 +147,10 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 	}
 
 	return ChatResponse{
-		Content:    raw.Message.Content,
-		DurationMs: durationMs,
+		Content:      raw.Message.Content,
+		DurationMs:   durationMs,
+		InputTokens:  raw.PromptEvalCount,
+		OutputTokens: raw.EvalCount,
 	}, nil
 }
 

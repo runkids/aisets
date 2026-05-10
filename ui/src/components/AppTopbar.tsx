@@ -4,6 +4,7 @@ import {
   RefreshCw,
   ScanText,
   Search,
+  Settings,
 } from "lucide-react";
 import { AiChipIcon } from "./ui/AiChipIcon";
 import { useTranslation } from "react-i18next";
@@ -64,6 +65,7 @@ type Props = {
   onStopOptimize: () => void;
   onDismissOptimize: () => void;
   onOpenOptimize: () => void;
+  onOpenSettings: () => void;
 };
 
 export function AppTopbar({
@@ -88,6 +90,7 @@ export function AppTopbar({
   onStopOptimize,
   onDismissOptimize,
   onOpenOptimize,
+  onOpenSettings,
 }: Props) {
   const { t } = useTranslation();
   const failed = scanProgress?.type === "error";
@@ -226,6 +229,13 @@ export function AppTopbar({
       </div>
 
       <div className="relative z-10 flex flex-1 basis-0 items-center justify-end gap-1 pl-4">
+        <Tooltip label={t("nav.settings")} placement="bottom">
+          <span className="inline-flex">
+            <IconButton aria-label={t("nav.settings")} onClick={onOpenSettings}>
+              <Settings size={16} />
+            </IconButton>
+          </span>
+        </Tooltip>
         <Tooltip
           label={catalogActionTooltip ?? t("action.addProject")}
           placement="bottom"

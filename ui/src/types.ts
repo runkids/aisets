@@ -644,6 +644,8 @@ export type AITagRunCounts = {
   failed: number;
   skipped: number;
   cacheHit: number;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 
 export type AITagRunEvent =
@@ -665,6 +667,8 @@ export type VLMOcrRunCounts = {
   failed: number;
   skipped: number;
   cacheHit: number;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 
 export type VLMOcrRunEvent =

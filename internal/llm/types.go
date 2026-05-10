@@ -18,8 +18,10 @@ type ChatRequest struct {
 }
 
 type ChatResponse struct {
-	Content    string `json:"content"`
-	DurationMs int64  `json:"durationMs"`
+	Content      string `json:"content"`
+	DurationMs   int64  `json:"durationMs"`
+	InputTokens  int64  `json:"inputTokens"`
+	OutputTokens int64  `json:"outputTokens"`
 }
 
 type EmbedRequest struct {

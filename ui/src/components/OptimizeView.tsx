@@ -456,16 +456,14 @@ export function OptimizeView({
     );
   }, [currentEstimateKey, actionIds, itemsById, cachedEstimateFor]);
 
+  const optimizeBusy =
+    optimizeActivity != null && isOptimizeActivityBusy(optimizeActivity);
   useEffect(() => {
-    if (!optimizeActivity) return;
-    if (
-      !isOptimizeActivityBusy(optimizeActivity) &&
-      (working === "estimate" || working === "preview")
-    ) {
+    if (!optimizeBusy && (working === "estimate" || working === "preview")) {
       setWorking(null);
       setProgress(0);
     }
-  }, [optimizeActivity?.phase, working]);
+  }, [optimizeBusy, working]);
 
   useEffect(() => {
     if (working != null || externalLockedIds.length > 0) return;

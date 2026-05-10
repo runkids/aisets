@@ -109,6 +109,10 @@ type openAIChatResponse struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int64 `json:"prompt_tokens"`
+		CompletionTokens int64 `json:"completion_tokens"`
+	} `json:"usage"`
 }
 
 // Chat sends a chat request to POST /v1/chat/completions with a 60s timeout.
@@ -171,8 +175,10 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 	}
 
 	return ChatResponse{
-		Content:    raw.Choices[0].Message.Content,
-		DurationMs: durationMs,
+		Content:      raw.Choices[0].Message.Content,
+		DurationMs:   durationMs,
+		InputTokens:  raw.Usage.PromptTokens,
+		OutputTokens: raw.Usage.CompletionTokens,
 	}, nil
 }
 

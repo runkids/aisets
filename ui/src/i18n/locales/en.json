@@ -911,7 +911,10 @@
     "aiOcrSaving": "Saving settings…",
     "aiOcrDone": "Done — {{ready}} extracted, {{skipped}} skipped, {{cacheHit}} cached",
     "aiOcrStopped": "Stopped",
-    "aiOcrFailed": "AI OCR failed"
+    "aiOcrFailed": "AI OCR failed",
+    "aiLastRun": "Last run {{time}}",
+    "aiLastRunCounts": "{{ready}} tagged, {{skipped}} skipped, {{cacheHit}} cached",
+    "aiTokenTooltip": "Input {{input}} / Output {{output}} tokens"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

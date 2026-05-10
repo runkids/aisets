@@ -10,14 +10,46 @@ import {
   Tags,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
+import type { AITagRunCounts, VLMOcrRunCounts } from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";
+
+const AI_TAG_LAST_RUN_KEY = "aisets:ai-tag:last-run";
+const VLM_OCR_LAST_RUN_KEY = "aisets:vlm-ocr:last-run";
+
+type LastRunRecord<T> = { counts: T; timestamp: number };
+
+function readLastRun<T>(key: string): LastRunRecord<T> | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as LastRunRecord<T>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastRun<T>(key: string, counts: T): void {
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ counts, timestamp: Date.now() }),
+    );
+  } catch {
+    // ignore storage errors (quota, private mode)
+  }
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
 
 const DEFAULT_TAG_PROMPT = `Analyze this image and respond with a JSON object containing:
 - "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
@@ -34,7 +66,15 @@ const DEFAULT_OCR_PROMPT = `Analyze this image and respond with a JSON object:
 Respond ONLY with valid JSON, no markdown or explanation.`;
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
-import { Button, Card, IconButton, Select, Switch, TextInput } from "../ui";
+import {
+  Button,
+  Card,
+  IconButton,
+  Select,
+  Switch,
+  TextInput,
+  Tooltip,
+} from "../ui";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
 
@@ -74,6 +114,51 @@ export function AISection({
   onStopVLMOcr,
 }: AISectionProps) {
   const { t } = useTranslation();
+
+  const [lastAITagRun, setLastAITagRun] =
+    useState<LastRunRecord<AITagRunCounts> | null>(() =>
+      readLastRun<AITagRunCounts>(AI_TAG_LAST_RUN_KEY),
+    );
+  const [lastVLMOcrRun, setLastVLMOcrRun] =
+    useState<LastRunRecord<VLMOcrRunCounts> | null>(() =>
+      readLastRun<VLMOcrRunCounts>(VLM_OCR_LAST_RUN_KEY),
+    );
+
+  const prevAITagPhase = useRef(aiTagActivity.phase);
+  useEffect(() => {
+    const prev = prevAITagPhase.current;
+    prevAITagPhase.current = aiTagActivity.phase;
+    if (
+      (prev === "running" || prev === "stopping" || prev === "saving") &&
+      (aiTagActivity.phase === "done" || aiTagActivity.phase === "stopped") &&
+      aiTagActivity.counts
+    ) {
+      const record: LastRunRecord<AITagRunCounts> = {
+        counts: aiTagActivity.counts,
+        timestamp: Date.now(),
+      };
+      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts);
+      setLastAITagRun(record);
+    }
+  }, [aiTagActivity.phase, aiTagActivity.counts]);
+
+  const prevVLMOcrPhase = useRef(vlmOcrActivity.phase);
+  useEffect(() => {
+    const prev = prevVLMOcrPhase.current;
+    prevVLMOcrPhase.current = vlmOcrActivity.phase;
+    if (
+      (prev === "running" || prev === "stopping" || prev === "saving") &&
+      (vlmOcrActivity.phase === "done" || vlmOcrActivity.phase === "stopped") &&
+      vlmOcrActivity.counts
+    ) {
+      const record: LastRunRecord<VLMOcrRunCounts> = {
+        counts: vlmOcrActivity.counts,
+        timestamp: Date.now(),
+      };
+      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts);
+      setLastVLMOcrRun(record);
+    }
+  }, [vlmOcrActivity.phase, vlmOcrActivity.counts]);
 
   const aiBusy =
     isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
@@ -336,9 +421,15 @@ export function AISection({
                     </Button>
                   )}
                 </div>
-                {aiTagActivity.phase !== "idle" && (
+                {isAITagActivityBusy(aiTagActivity) ||
+                aiTagActivity.phase === "error" ? (
                   <AITagProgressText activity={aiTagActivity} />
-                )}
+                ) : lastAITagRun ? (
+                  <LastRunText
+                    counts={lastAITagRun.counts}
+                    timestamp={lastAITagRun.timestamp}
+                  />
+                ) : null}
               </div>
             </FieldRow>
             <PromptEditor
@@ -406,9 +497,15 @@ export function AISection({
                     </Button>
                   )}
                 </div>
-                {vlmOcrActivity.phase !== "idle" && (
+                {isVLMOcrActivityBusy(vlmOcrActivity) ||
+                vlmOcrActivity.phase === "error" ? (
                   <VLMOcrProgressText activity={vlmOcrActivity} />
-                )}
+                ) : lastVLMOcrRun ? (
+                  <LastRunText
+                    counts={lastVLMOcrRun.counts}
+                    timestamp={lastVLMOcrRun.timestamp}
+                  />
+                ) : null}
               </div>
             </FieldRow>
             <PromptEditor
@@ -462,10 +559,79 @@ function aiTagProgressLabel(
   }
 }
 
+function TokenBadge({
+  inputTokens,
+  outputTokens,
+}: {
+  inputTokens: number;
+  outputTokens: number;
+}) {
+  const { t } = useTranslation();
+  if (inputTokens <= 0 && outputTokens <= 0) return null;
+  return (
+    <Tooltip
+      label={t("settings.aiTokenTooltip", {
+        input: inputTokens.toLocaleString(),
+        output: outputTokens.toLocaleString(),
+      })}
+    >
+      <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4 cursor-default">
+        ↑{formatTokenCount(inputTokens)} ↓{formatTokenCount(outputTokens)}
+      </span>
+    </Tooltip>
+  );
+}
+
+function LastRunText({
+  counts,
+  timestamp,
+}: {
+  counts: AITagRunCounts | VLMOcrRunCounts;
+  timestamp: number;
+}) {
+  const { t } = useTranslation();
+  const date = new Date(timestamp);
+  const timeStr = date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dateStr =
+    date.toDateString() === new Date().toDateString()
+      ? timeStr
+      : date.toLocaleDateString([], { month: "short", day: "numeric" }) +
+        " " +
+        timeStr;
+
+  return (
+    <div className="flex flex-col gap-0.5 items-end">
+      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-4 flex items-center gap-1.5">
+        <span>{t("settings.aiLastRun", { time: dateStr })}</span>
+        {"ready" in counts && (
+          <span>
+            {t("settings.aiLastRunCounts", {
+              ready: counts.ready,
+              skipped: counts.skipped,
+              cacheHit: counts.cacheHit,
+            })}
+          </span>
+        )}
+      </p>
+      {"inputTokens" in counts &&
+        (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
+          <TokenBadge
+            inputTokens={counts.inputTokens ?? 0}
+            outputTokens={counts.outputTokens ?? 0}
+          />
+        )}
+    </div>
+  );
+}
+
 function AITagProgressText({ activity }: { activity: AITagActivityState }) {
   const { t } = useTranslation();
   const busy = isAITagActivityBusy(activity);
   const label = aiTagProgressLabel(activity, t);
+  const counts = activity.counts;
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
@@ -477,6 +643,12 @@ function AITagProgressText({ activity }: { activity: AITagActivityState }) {
         <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
           {activity.currentFile}
         </p>
+      )}
+      {counts && (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
+        <TokenBadge
+          inputTokens={counts.inputTokens ?? 0}
+          outputTokens={counts.outputTokens ?? 0}
+        />
       )}
     </div>
   );
@@ -520,6 +692,7 @@ function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
   const { t } = useTranslation();
   const busy = isVLMOcrActivityBusy(activity);
   const label = vlmOcrProgressLabel(activity, t);
+  const counts = activity.counts;
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
@@ -531,6 +704,12 @@ function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
         <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
           {activity.currentFile}
         </p>
+      )}
+      {counts && (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
+        <TokenBadge
+          inputTokens={counts.inputTokens ?? 0}
+          outputTokens={counts.outputTokens ?? 0}
+        />
       )}
     </div>
   );

@@ -59,7 +59,7 @@ func TestOllamaChat(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"message":{"role":"assistant","content":"Hello!"}}`)
+		_, _ = io.WriteString(w, `{"message":{"role":"assistant","content":"Hello!"},"prompt_eval_count":10,"eval_count":5}`)
 	}))
 	defer srv.Close()
 
@@ -75,6 +75,12 @@ func TestOllamaChat(t *testing.T) {
 	}
 	if resp.Content != "Hello!" {
 		t.Errorf("Content = %q, want %q", resp.Content, "Hello!")
+	}
+	if resp.InputTokens != 10 {
+		t.Errorf("InputTokens = %d, want 10", resp.InputTokens)
+	}
+	if resp.OutputTokens != 5 {
+		t.Errorf("OutputTokens = %d, want 5", resp.OutputTokens)
 	}
 
 	// Verify stream=false was sent
