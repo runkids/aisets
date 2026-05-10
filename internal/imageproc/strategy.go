@@ -23,12 +23,13 @@ type OptimizationStrategy struct {
 }
 
 type OptimizationStrategyMatch struct {
-	Formats     []string `json:"formats"`
-	Alpha       string   `json:"alpha"`
-	Animated    string   `json:"animated"`
-	MinBytesKB  *int     `json:"minBytesKB,omitempty"`
-	MinWidthPx  *int     `json:"minWidthPx,omitempty"`
-	MinHeightPx *int     `json:"minHeightPx,omitempty"`
+	Formats      []string `json:"formats"`
+	Alpha        string   `json:"alpha"`
+	Animated     string   `json:"animated"`
+	AICategories []string `json:"aiCategories,omitempty"`
+	MinBytesKB   *int     `json:"minBytesKB,omitempty"`
+	MinWidthPx   *int     `json:"minWidthPx,omitempty"`
+	MinHeightPx  *int     `json:"minHeightPx,omitempty"`
 }
 
 type OptimizationStrategyAction struct {
@@ -122,6 +123,7 @@ func NormalizeOptimizationStrategies(strategies []OptimizationStrategy) []Optimi
 		if strategy.Match.Animated == "" {
 			strategy.Match.Animated = "any"
 		}
+		strategy.Match.AICategories = normalizeAICategories(strategy.Match.AICategories)
 		strategy.Action.OutputFormat = NormalizeOptimizationFormat(strategy.Action.OutputFormat)
 		out = append(out, strategy)
 	}
@@ -165,6 +167,26 @@ func OptimizationStrategyHash(strategies []OptimizationStrategy, thresholds Opti
 	raw, _ := json.Marshal(payload)
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:8])
+}
+
+func normalizeAICategories(categories []string) []string {
+	if len(categories) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, c := range categories {
+		c = strings.ToLower(strings.TrimSpace(c))
+		if c == "" || seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func intPtr(value int) *int {

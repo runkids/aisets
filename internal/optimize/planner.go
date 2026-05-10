@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"aisets/internal/actions"
+	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
 	"aisets/internal/imgtools"
@@ -284,6 +285,14 @@ func strategyMatchesItem(strategy imageproc.OptimizationStrategy, item scanner.A
 		}
 	case "false":
 		if item.Image.Animated {
+			return false
+		}
+	}
+	if len(strategy.Match.AICategories) > 0 {
+		if item.AITag == nil || item.AITag.Status != aitag.StatusReady {
+			return false
+		}
+		if !containsString(strategy.Match.AICategories, item.AITag.Category) {
 			return false
 		}
 	}

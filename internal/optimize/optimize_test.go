@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"aisets/internal/actions"
+	"aisets/internal/aitag"
 	"aisets/internal/imageproc"
 	"aisets/internal/scanner"
 )
@@ -825,4 +826,73 @@ func fileSize(t *testing.T, path string) int64 {
 		t.Fatal(err)
 	}
 	return info.Size()
+}
+
+func TestPlanAICategoryMatchFiltersStrategy(t *testing.T) {
+	screenshotItem := scanner.AssetItem{
+		ID:         "a",
+		RepoPath:   "src/screen.png",
+		Ext:        ".png",
+		Bytes:      500_000,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image:      imageproc.Metadata{Format: "png", Width: 800, Height: 600},
+		AITag:      &aitag.Result{Status: aitag.StatusReady, Category: "screenshot"},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category: "format", Severity: "info", SuggestionCode: "review_compression_or_modern_format",
+		}},
+	}
+	iconItem := scanner.AssetItem{
+		ID:         "b",
+		RepoPath:   "src/logo.png",
+		Ext:        ".png",
+		Bytes:      50_000,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image:      imageproc.Metadata{Format: "png", Width: 64, Height: 64},
+		AITag:      &aitag.Result{Status: aitag.StatusReady, Category: "icon"},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category: "format", Severity: "info", SuggestionCode: "review_compression_or_modern_format",
+		}},
+	}
+	noTagItem := scanner.AssetItem{
+		ID:         "c",
+		RepoPath:   "src/raw.png",
+		Ext:        ".png",
+		Bytes:      500_000,
+		ScanIntent: scanner.ProjectScanIntentCode,
+		Image:      imageproc.Metadata{Format: "png", Width: 800, Height: 600},
+		Optimization: []scanner.OptimizationSuggestion{{
+			Category: "format", Severity: "info", SuggestionCode: "review_compression_or_modern_format",
+		}},
+	}
+
+	q92 := 92
+	q80 := 80
+	strategies := []imageproc.OptimizationStrategy{
+		{
+			ID: "screenshot-webp", Name: "Screenshot WebP HQ", Enabled: true, Priority: 5,
+			Match:  imageproc.OptimizationStrategyMatch{Formats: []string{"png"}, Alpha: "any", Animated: "any", AICategories: []string{"screenshot", "diagram"}},
+			Action: imageproc.OptimizationStrategyAction{Operation: "convert", OutputFormat: "webp", Quality: &q92},
+		},
+		{
+			ID: "fallback-webp", Name: "PNG fallback", Enabled: true, Priority: 50,
+			Match:  imageproc.OptimizationStrategyMatch{Formats: []string{"png"}, Alpha: "any", Animated: "any"},
+			Action: imageproc.OptimizationStrategyAction{Operation: "convert", OutputFormat: "webp", Quality: &q80},
+		},
+	}
+
+	items := []scanner.AssetItem{screenshotItem, iconItem, noTagItem}
+	ops := planWithTools(items, Request{Strategies: strategies}, func(string) bool { return true })
+
+	if len(ops) != 3 {
+		t.Fatalf("expected 3 ops, got %d: %#v", len(ops), ops)
+	}
+	if ops[0].Quality != 92 {
+		t.Errorf("screenshot quality = %d, want 92", ops[0].Quality)
+	}
+	if ops[1].Quality != 80 {
+		t.Errorf("icon quality = %d, want 80", ops[1].Quality)
+	}
+	if ops[2].Quality != 80 {
+		t.Errorf("no-tag quality = %d, want 80", ops[2].Quality)
+	}
 }
