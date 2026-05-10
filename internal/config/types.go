@@ -94,6 +94,7 @@ type SettingsUpdate struct {
 	LLMEmbedModel              *string                              `json:"llmEmbedModel"`
 	LLMTagPrompt               *string                              `json:"llmTagPrompt"`
 	LLMOcrPrompt               *string                              `json:"llmOcrPrompt"`
+	LLMSystemPromptEnabled     *bool                                `json:"llmSystemPromptEnabled"`
 	LLMConcurrency             *int                                 `json:"llmConcurrency"`
 	LLMTimeout                 *int                                 `json:"llmTimeout"`
 }

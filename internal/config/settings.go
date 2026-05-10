@@ -436,6 +436,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.LLMOcrPrompt != nil {
 		settings.LLMOcrPrompt = *update.LLMOcrPrompt
 	}
+	if update.LLMSystemPromptEnabled != nil {
+		settings.LLMSystemPromptEnabled = *update.LLMSystemPromptEnabled
+	}
 	if update.LLMConcurrency != nil {
 		if *update.LLMConcurrency < 1 || *update.LLMConcurrency > llm.MaxConcurrency {
 			return AppSettings{}, apierr.New("settings_llm_concurrency_invalid",
