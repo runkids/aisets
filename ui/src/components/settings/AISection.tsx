@@ -50,7 +50,12 @@ export function AISection({
   };
 
   const providerEnabled = draft.llmEnabled && draft.llmProvider !== "";
-  const modelsQuery = useLLMModelsQuery(providerEnabled);
+  const modelsQuery = useLLMModelsQuery(
+    providerEnabled && draft.llmEndpoint !== "",
+    providerEnabled
+      ? { provider: draft.llmProvider, endpoint: draft.llmEndpoint }
+      : undefined,
+  );
   const healthMutation = useLLMHealthMutation();
 
   const models = modelsQuery.data?.models ?? [];
@@ -67,13 +72,15 @@ export function AISection({
     },
   ];
 
-  const runtime = settings?.llmRuntime;
+  const runtime = healthMutation.data ?? settings?.llmRuntime;
   const isConnected = runtime?.connected ?? false;
-  const statusText = isConnected
-    ? t("settings.llmConnected", { count: runtime?.models.length ?? 0 })
-    : runtime?.error
-      ? runtime.error
-      : t("settings.llmDisconnected");
+  const statusText = healthMutation.isPending
+    ? t("settings.llmTesting")
+    : isConnected
+      ? t("settings.llmConnected", { count: runtime?.models.length ?? 0 })
+      : runtime?.error
+        ? runtime.error
+        : t("settings.llmDisconnected");
 
   function handleProviderChange(value: string) {
     onUpdateDraft((current) => ({
@@ -86,7 +93,10 @@ export function AISection({
   }
 
   function handleTestConnection() {
-    void healthMutation.mutate(undefined);
+    void healthMutation.mutate({
+      provider: draft.llmProvider,
+      endpoint: draft.llmEndpoint,
+    });
   }
 
   return (
@@ -109,7 +119,18 @@ export function AISection({
             <Switch
               checked={draft.llmEnabled}
               onCheckedChange={(next) =>
-                onUpdateDraft((current) => ({ ...current, llmEnabled: next }))
+                onUpdateDraft((current) => ({
+                  ...current,
+                  llmEnabled: next,
+                  llmProvider:
+                    next && !current.llmProvider
+                      ? "ollama"
+                      : current.llmProvider,
+                  llmEndpoint:
+                    next && !current.llmEndpoint
+                      ? defaultEndpoints["ollama"]
+                      : current.llmEndpoint,
+                }))
               }
               aria-label={t("settings.llmEnabled")}
             />
@@ -321,9 +342,16 @@ function AITagProgressText({ activity }: { activity: AITagActivityState }) {
   const label = aiTagProgressLabel(activity, t);
 
   return (
-    <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
-      {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
-      {label}
-    </p>
+    <div className="flex flex-col gap-0.5 items-end">
+      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+        {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
+        {label}
+      </p>
+      {busy && activity.currentFile && (
+        <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {activity.currentFile}
+        </p>
+      )}
+    </div>
   );
 }

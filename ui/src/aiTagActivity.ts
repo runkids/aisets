@@ -12,6 +12,7 @@ export type AITagActivityPhase =
 export type AITagActivityState = {
   phase: AITagActivityPhase;
   counts: AITagRunCounts | null;
+  currentFile?: string;
   errorMessage?: string;
 };
 
@@ -43,10 +44,16 @@ export function aiTagActivityReducer(
       return { phase: "saving", counts: null };
     case "running":
       return { phase: "running", counts: state.counts };
-    case "event":
-      return "counts" in action.event && action.event.counts
-        ? { ...state, counts: action.event.counts }
-        : state;
+    case "event": {
+      const e = action.event;
+      if (!("counts" in e) || !e.counts) return state;
+      return {
+        ...state,
+        counts: e.counts,
+        currentFile:
+          "repoPath" in e && e.repoPath ? e.repoPath : state.currentFile,
+      };
+    }
     case "stopping":
       return isAITagActivityBusy(state)
         ? { ...state, phase: "stopping" }

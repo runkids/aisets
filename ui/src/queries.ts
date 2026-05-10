@@ -695,10 +695,13 @@ export function useBatchCopyMutation() {
   });
 }
 
-export function useLLMModelsQuery(enabled: boolean) {
+export function useLLMModelsQuery(
+  enabled: boolean,
+  params?: { provider: string; endpoint: string },
+) {
   return useQuery({
-    queryKey: ["llm-models"],
-    queryFn: fetchLLMModels,
+    queryKey: ["llm-models", params?.provider, params?.endpoint],
+    queryFn: () => fetchLLMModels(params),
     enabled,
     staleTime: 30_000,
   });

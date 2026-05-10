@@ -684,12 +684,26 @@ export function batchMovePreview(assetIds: string[], targetDir: string) {
   });
 }
 
-export function fetchLLMModels() {
-  return request<{ models: LLMModel[]; error?: string }>("/api/llm/models");
+export function fetchLLMModels(params?: {
+  provider: string;
+  endpoint: string;
+}) {
+  const qs = params
+    ? `?provider=${encodeURIComponent(params.provider)}&endpoint=${encodeURIComponent(params.endpoint)}`
+    : "";
+  return request<{ models: LLMModel[]; error?: string }>(
+    `/api/llm/models${qs}`,
+  );
 }
 
-export function checkLLMHealth() {
-  return request<LLMRuntime>("/api/llm/health", { method: "POST" });
+export function checkLLMHealth(params?: {
+  provider: string;
+  endpoint: string;
+}) {
+  return request<LLMRuntime>("/api/llm/health", {
+    method: "POST",
+    body: params ? JSON.stringify(params) : undefined,
+  });
 }
 
 export function batchRenamePreview(

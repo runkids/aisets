@@ -203,11 +203,11 @@ export function SettingsView({
     }
   }
 
-  async function onSaveSettings() {
+  async function onSaveSettings(options?: { silent?: boolean }) {
     try {
       const result = await updateMutation.mutateAsync(updateFromDraft(draft));
       setDraftOverride(draftFromSettings(result.settings));
-      toast.success(t("toast.settingsSaved"));
+      if (!options?.silent) toast.success(t("toast.settingsSaved"));
     } catch (error) {
       toast.error(errorMessage(error), {
         title: t("toast.settingsSaveFailed"),
@@ -585,7 +585,9 @@ export function SettingsView({
               aiTagActivity={aiTagActivity}
               settingActions={settingActionsFor("ai")}
               onUpdateDraft={updateDraft}
-              onStartAITag={() => onStartAITag(() => onSaveSettings())}
+              onStartAITag={() =>
+                onStartAITag(() => onSaveSettings({ silent: true }))
+              }
               onStopAITag={onStopAITag}
               onDismissAITag={onDismissAITag}
             />
