@@ -102,24 +102,13 @@ function VariableValueInput({
 
   if (variable.type === "text") {
     const val = variable.values[0] ?? "";
-    const isMultiline = val.includes("\n");
-    if (isMultiline) {
-      return (
-        <Textarea
-          rows={4}
-          placeholder={t("prompts.variableValues")}
-          value={val}
-          onChange={(e) => onChange({ ...variable, values: [e.target.value] })}
-          className="text-[12px]"
-        />
-      );
-    }
     return (
-      <TextInput
-        size="sm"
+      <Textarea
+        rows={val.includes("\n") ? 4 : 2}
         placeholder={t("prompts.variableValues")}
         value={val}
         onChange={(e) => onChange({ ...variable, values: [e.target.value] })}
+        className="text-[12px]"
       />
     );
   }
