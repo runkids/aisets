@@ -291,6 +291,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		if record.HashAlgorithm != "" {
 			item.HashAlgorithm = record.HashAlgorithm
 		}
+		item.EXIF = record.EXIF
 		if needsDHash {
 			item.DHash = record.Hashes.DHash
 			item.DHashFlipped = record.Hashes.DHashFlipped
@@ -333,6 +334,11 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 	}
 	meta, _ := imageproc.Probe(candidate.path)
 	item.Image = meta
+	if item.Ext == ".jpg" || item.Ext == ".jpeg" || item.Ext == ".tiff" || item.Ext == ".tif" {
+		if exifData, err := imageproc.ExtractEXIF(candidate.path); err == nil && exifData.HasEXIF {
+			item.EXIF = &exifData
+		}
+	}
 	var hashes imageproc.Hashes
 	if needsDHash {
 		hashes, _ = imageproc.DHash(candidate.path)
@@ -356,6 +362,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 		Optimization:   optimization,
 		ThresholdsHash: thresholdsHash,
 		ThumbKey:       cacheKey,
+		EXIF:           item.EXIF,
 	})
 	markExistingVariants(&item)
 	return item, false, nil

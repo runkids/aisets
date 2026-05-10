@@ -35,6 +35,7 @@ type Record struct {
 	Optimization   []imageproc.Optimization `json:"optimization,omitempty"`
 	ThresholdsHash string                   `json:"thresholdsHash,omitempty"`
 	ThumbKey       string                   `json:"thumbKey,omitempty"`
+	EXIF           *imageproc.EXIFData      `json:"exif,omitempty"`
 	UpdatedAt      string                   `json:"updatedAt"`
 }
 
