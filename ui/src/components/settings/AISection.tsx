@@ -1,4 +1,11 @@
-import { LoaderCircle, Play, RefreshCw, ScanText, Square, Tags } from "lucide-react";
+import {
+  LoaderCircle,
+  Play,
+  RefreshCw,
+  ScanText,
+  Square,
+  Tags,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AITagActivityState } from "../../aiTagActivity";
@@ -22,10 +29,8 @@ type AISectionProps = {
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
   onStartAITag: () => void;
   onStopAITag: () => void;
-  onDismissAITag: () => void;
   onStartVLMOcr: () => void;
   onStopVLMOcr: () => void;
-  onDismissVLMOcr: () => void;
 };
 
 function deriveHost(endpoint: string | undefined): string {
@@ -46,10 +51,8 @@ export function AISection({
   onUpdateDraft,
   onStartAITag,
   onStopAITag,
-  onDismissAITag,
   onStartVLMOcr,
   onStopVLMOcr,
-  onDismissVLMOcr,
 }: AISectionProps) {
   const { t } = useTranslation();
 

@@ -67,10 +67,8 @@ export function SettingsView({
   onDismissOCR,
   onStartAITag,
   onStopAITag,
-  onDismissAITag,
   onStartVLMOcr,
   onStopVLMOcr,
-  onDismissVLMOcr,
   onAddProject,
 }: SettingsViewProps) {
   const { t } = useTranslation();
@@ -594,12 +592,10 @@ export function SettingsView({
                 onStartAITag(() => onSaveSettings({ silent: true }))
               }
               onStopAITag={onStopAITag}
-              onDismissAITag={onDismissAITag}
               onStartVLMOcr={() =>
                 onStartVLMOcr(() => onSaveSettings({ silent: true }))
               }
               onStopVLMOcr={onStopVLMOcr}
-              onDismissVLMOcr={onDismissVLMOcr}
             />
           )}
 

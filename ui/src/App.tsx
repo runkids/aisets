@@ -71,13 +71,11 @@ import {
 } from "./optimizeActivity";
 import {
   initialAITagActivityState,
-  isAITagActivityBusy,
   aiTagActivityReducer,
   runAITagActivity,
 } from "./aiTagActivity";
 import {
   initialVLMOcrActivityState,
-  isVLMOcrActivityBusy,
   vlmOcrActivityReducer,
   runVLMOcrActivity,
   type VLMOcrActivityAbortRef,
@@ -193,7 +191,9 @@ export function App() {
     vlmOcrActivityReducer,
     initialVLMOcrActivityState,
   );
-  const vlmOcrAbortRef = useRef<AbortController | null>(null) as VLMOcrActivityAbortRef;
+  const vlmOcrAbortRef = useRef<AbortController | null>(
+    null,
+  ) as VLMOcrActivityAbortRef;
   const vlmOcrRunRef = useRef<Promise<void> | null>(null);
   const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
     optimizeActivityReducer,
@@ -447,8 +447,6 @@ export function App() {
     addProjectMutation.isPending ||
     switchWorkspaceMutation.isPending;
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
-  const aiTagActivityBusy = isAITagActivityBusy(aiTagActivity);
-  const vlmOcrActivityBusy = isVLMOcrActivityBusy(vlmOcrActivity);
   const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
   const catalogActionsDisabled =
     working || ocrActivityBusy || optimizeActivityBusy;
@@ -603,7 +601,7 @@ export function App() {
     if (aiTagActivityRunRef.current) return;
 
     const run = (async () => {
-      const result = await runAITagActivity({
+      await runAITagActivity({
         abortRef: aiTagActivityAbortRef,
         dispatch: dispatchAITagActivity,
         saveSettings,
