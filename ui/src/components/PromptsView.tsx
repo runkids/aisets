@@ -11,7 +11,7 @@ import {
   Tags,
   Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -331,6 +331,22 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       },
     );
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === "s") {
+        e.preventDefault();
+        if (isDirty) handleSave();
+      }
+      if (e.key === "c" && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        if (preview) navigator.clipboard.writeText(preview);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   function handleDelete() {
     if (preset.isDefault) return;
