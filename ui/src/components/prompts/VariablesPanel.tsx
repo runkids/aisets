@@ -6,8 +6,7 @@ import type {
   PromptVariable,
   PromptVariableType,
 } from "../../types";
-import { Select } from "../ui/Select";
-import { Textarea, TextInput } from "../ui/TextInput";
+import { Select, Textarea, TextInput } from "../ui";
 import { isBuiltinVariable, getBuiltinVariables } from "./builtinVariables";
 
 type Props = {

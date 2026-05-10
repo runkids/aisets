@@ -1056,9 +1056,9 @@ Respond ONLY with valid JSON, no markdown or explanation.`
 
 func (s *Store) seedOptimizePresetIfMissing() error {
 	// Widen the CHECK constraint to include 'optimize' — SQLite requires table rebuild.
-	var sql string
-	_ = s.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_presets'`).Scan(&sql)
-	if sql != "" && !strings.Contains(sql, "'optimize'") {
+	var ddl string
+	_ = s.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_presets'`).Scan(&ddl)
+	if ddl != "" && !strings.Contains(ddl, "'optimize'") {
 		tx, err := s.db.Begin()
 		if err != nil {
 			return err
@@ -1079,8 +1079,8 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 			`DROP TABLE _prompt_presets_old`,
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
 		}
-		for _, s := range stmts {
-			if _, err := tx.Exec(s); err != nil {
+		for _, stmt := range stmts {
+			if _, err := tx.Exec(stmt); err != nil {
 				return fmt.Errorf("prompt_presets schema update: %w", err)
 			}
 		}
@@ -1110,7 +1110,8 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 	now := nowUTC()
 	_, err = s.db.Exec(
 		`INSERT INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`,
+		 ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+		 WHERE prompt_presets.content != excluded.content`,
 		"optimize-built-in-default", "optimize", "Built-in Default", string(contentJSON), 1, now, now,
 	)
 	return err

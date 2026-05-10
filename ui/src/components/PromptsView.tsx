@@ -39,6 +39,7 @@ import {
   Card,
   CopyButton,
   EmptyState,
+  Keycap,
   Rail,
   RailItem,
   RailSection,
@@ -341,13 +342,15 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
         if (isDirty) handleSave();
       }
       if (e.key === "c" && !window.getSelection()?.toString()) {
+        const tag = (document.activeElement as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
         e.preventDefault();
         if (preview) navigator.clipboard.writeText(preview);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, [isDirty, preview]);
 
   function handleDelete() {
     if (preset.isDefault) return;
@@ -424,10 +427,12 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
   }
 
   function handleResetToDefault() {
-    const defaultTemplate =
-      preset.type === "tag"
-        ? `Analyze this image and respond with a JSON object containing:\n- "category": one of {{categories}}\n- "tags": {{tags}}\n- "description": {{description}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`
-        : `Analyze this image and respond with a JSON object:\n- "text": {{text}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`;
+    const templates: Record<string, string> = {
+      tag: `Analyze this image and respond with a JSON object containing:\n- "category": one of {{categories}}\n- "tags": {{tags}}\n- "description": {{description}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
+      ocr: `Analyze this image and respond with a JSON object:\n- "text": {{text}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
+      optimize: `Analyze this image and provide compression advice. Respond as JSON with these fields:\n{\n  "contentType": one of {{contentTypes}},\n  "recommendedFormat": one of {{formats}},\n  "recommendedQuality": <number 1-100 or null for lossless>,\n  "lossless": <true|false>,\n  "rationale": "<one sentence explaining why this format and quality>"\n}\n\n{{rules}}\n\nRespond ONLY with the JSON object, no other text.`,
+    };
+    const defaultTemplate = templates[preset.type] ?? templates.tag;
     setTemplate(defaultTemplate);
     const names = extractVariableNames(defaultTemplate);
     const defaults: Record<string, PromptVariable> = {};
@@ -627,16 +632,16 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
           >
             <Save size={14} />
             {t("prompts.save")}
-            <kbd className="ml-1 rounded bg-white/20 px-1 py-px font-g-mono text-[10px] opacity-70">
+            <Keycap size="sm" className="ml-1">
               ⌘S
-            </kbd>
+            </Keycap>
           </Button>
           <Button variant="secondary" onClick={handleDuplicate}>
             <Copy size={14} />
             {t("prompts.duplicate")}
-            <kbd className="ml-1 rounded border border-g-line bg-g-surface-2 px-1 py-px font-g-mono text-[10px] text-g-ink-4">
+            <Keycap size="sm" className="ml-1">
               ⌘C
-            </kbd>
+            </Keycap>
           </Button>
           <Button variant="secondary" onClick={handleResetToDefault}>
             <RotateCcw size={14} />
