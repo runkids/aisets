@@ -14,19 +14,27 @@ import (
 // /v1/models, /v1/chat/completions, and /v1/embeddings endpoints (e.g. LM Studio, llama.cpp, vLLM).
 type OpenAICompatProvider struct {
 	endpoint string
+	apiKey   string
 	client   *http.Client
 }
 
 // NewOpenAICompatProvider creates an OpenAICompatProvider targeting the given endpoint.
 // endpoint should include /v1, e.g. "http://localhost:1234/v1".
-func NewOpenAICompatProvider(endpoint string) *OpenAICompatProvider {
+func NewOpenAICompatProvider(endpoint, apiKey string) *OpenAICompatProvider {
 	return &OpenAICompatProvider{
 		endpoint: strings.TrimRight(endpoint, "/"),
+		apiKey:   apiKey,
 		client:   &http.Client{},
 	}
 }
 
 func (p *OpenAICompatProvider) Name() string { return "openai-compat" }
+
+func (p *OpenAICompatProvider) setAuth(req *http.Request) {
+	if p.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
+}
 
 // Available probes the server with a 5s timeout.
 func (p *OpenAICompatProvider) Available(ctx context.Context) error {
@@ -51,6 +59,7 @@ func (p *OpenAICompatProvider) ListModels(ctx context.Context) ([]Model, error) 
 	if err != nil {
 		return nil, fmt.Errorf("openai-compat: build request: %w", err)
 	}
+	p.setAuth(req)
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("openai-compat: list models: %w", err)
@@ -115,10 +124,10 @@ type openAIChatResponse struct {
 	} `json:"usage"`
 }
 
-// Chat sends a chat request to POST /v1/chat/completions with a 60s timeout.
+// Chat sends a chat request to POST /v1/chat/completions with a 120s timeout.
 // When a message has Images, the content is sent as an array with text + image_url parts.
 func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
 	msgs := make([]openAIChatMessage, len(req.Messages))
@@ -153,6 +162,7 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 		return ChatResponse{}, fmt.Errorf("openai-compat: build chat request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	p.setAuth(httpReq)
 
 	start := time.Now()
 	resp, err := p.client.Do(httpReq)
@@ -212,6 +222,7 @@ func (p *OpenAICompatProvider) Embed(ctx context.Context, req EmbedRequest) (Emb
 		return EmbedResponse{}, fmt.Errorf("openai-compat: build embed request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	p.setAuth(httpReq)
 
 	start := time.Now()
 	resp, err := p.client.Do(httpReq)

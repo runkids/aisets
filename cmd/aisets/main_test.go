@@ -300,7 +300,7 @@ func TestRunGlobalJSONStrictErrorsAndUnknownCommand(t *testing.T) {
 }
 
 func TestCmdProjectsRenameRemoveJSON(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
@@ -340,7 +340,7 @@ func TestCmdProjectsRenameRemoveJSON(t *testing.T) {
 }
 
 func TestCmdSettingsExportImportAndResetJSON(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
@@ -980,6 +980,16 @@ func decodeJSON(t *testing.T, raw string, target any) {
 	if err := json.Unmarshal([]byte(raw), target); err != nil {
 		t.Fatalf("decode JSON %q: %v", raw, err)
 	}
+}
+
+func resolvedTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
 }
 
 func captureStderr(t *testing.T, fn func()) string {

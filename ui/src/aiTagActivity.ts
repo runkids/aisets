@@ -9,11 +9,14 @@ export type AITagActivityPhase =
   | "stopped"
   | "error";
 
+export type ActivityError = { repoPath: string; message: string };
+
 export type AITagActivityState = {
   phase: AITagActivityPhase;
   counts: AITagRunCounts | null;
   currentFile?: string;
   errorMessage?: string;
+  errors: ActivityError[];
 };
 
 export type AITagActivityAction =
@@ -33,6 +36,7 @@ export type AITagActivityAbortRef = {
 export const initialAITagActivityState: AITagActivityState = {
   phase: "idle",
   counts: null,
+  errors: [],
 };
 
 export function aiTagActivityReducer(
@@ -41,17 +45,26 @@ export function aiTagActivityReducer(
 ): AITagActivityState {
   switch (action.type) {
     case "saving":
-      return { phase: "saving", counts: null };
+      return { phase: "saving", counts: null, errors: [] };
     case "running":
-      return { phase: "running", counts: state.counts };
+      return { phase: "running", counts: state.counts, errors: state.errors };
     case "event": {
       const e = action.event;
       if (!("counts" in e) || !e.counts) return state;
+      const errors = state.errors;
+      const hasItemError =
+        "errorMessage" in e && e.errorMessage && "repoPath" in e && e.repoPath;
       return {
         ...state,
         counts: e.counts,
         currentFile:
           "repoPath" in e && e.repoPath ? e.repoPath : state.currentFile,
+        errorMessage:
+          state.errorMessage ??
+          ("errorMessage" in e && e.errorMessage ? e.errorMessage : undefined),
+        errors: hasItemError
+          ? [...errors, { repoPath: e.repoPath!, message: e.errorMessage! }]
+          : errors,
       };
     }
     case "stopping":
@@ -59,14 +72,23 @@ export function aiTagActivityReducer(
         ? { ...state, phase: "stopping" }
         : state;
     case "done":
-      return { phase: "done", counts: action.counts ?? state.counts };
+      return {
+        phase: "done",
+        counts: action.counts ?? state.counts,
+        errors: state.errors,
+      };
     case "stopped":
-      return { phase: "stopped", counts: action.counts ?? state.counts };
+      return {
+        phase: "stopped",
+        counts: action.counts ?? state.counts,
+        errors: state.errors,
+      };
     case "error":
       return {
         phase: "error",
         counts: action.counts ?? state.counts,
         errorMessage: action.errorMessage,
+        errors: state.errors,
       };
     case "dismiss":
       return initialAITagActivityState;
@@ -138,6 +160,16 @@ export async function runAITagActivity({
     if (controller.signal.aborted) {
       dispatch({ type: "stopped", counts: result?.counts });
       return { status: "stopped" as const };
+    }
+
+    const counts = result?.counts;
+    if (counts && counts.ready === 0 && counts.failed > 0) {
+      dispatch({
+        type: "error",
+        errorMessage: result?.firstError ?? "",
+        counts,
+      });
+      return { status: "error" as const };
     }
 
     dispatch({ type: "done", counts: result?.counts });

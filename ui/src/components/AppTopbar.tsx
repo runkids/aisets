@@ -42,6 +42,7 @@ import {
 import { ActivityDropdown } from "./ActivityDropdown";
 import { Keycap, ScanProgressContent, TextInputButton, Tooltip } from "./ui";
 import { IconButton } from "./ui/Button";
+import { useVersionQuery } from "../queries";
 
 type Props = {
   working: boolean;
@@ -93,6 +94,8 @@ export function AppTopbar({
   onOpenSettings,
 }: Props) {
   const { t } = useTranslation();
+  const versionQuery = useVersionQuery();
+  const version = versionQuery.data?.currentVersion;
   const failed = scanProgress?.type === "error";
   const ocrVisible = isOCRActivityVisible(ocrActivity);
   const ocrBusy = isOCRActivityBusy(ocrActivity);
@@ -195,21 +198,31 @@ export function AppTopbar({
     <header className="relative z-10 flex h-[60px] min-w-0 shrink-0 items-center justify-between gap-2.5 bg-transparent px-5 max-[480px]:px-3">
       <div className="relative z-10 flex min-w-0 flex-1 basis-0 items-center pr-4">
         <div className="flex w-[220px] shrink-0 items-center gap-3 max-[960px]:w-[52px] max-[960px]:justify-center max-[960px]:gap-0">
-          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black shadow-g-sm">
-            <img
-              className="block size-full"
-              src="../../public/brand/aisets-app-icon.avif"
-              alt=""
-            />
-          </div>
-          <div className="min-w-0 max-[960px]:hidden">
-            <div className="truncate font-g-display text-[17px] font-[620] leading-[1.1] tracking-[-0.02em] text-g-ink">
-              Aisets
+          <a
+            href="https://github.com/runkids/aisets"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-g-sm transition-opacity duration-[120ms] ease-g hover:opacity-70 focus-visible:outline-none focus-visible:shadow-g-focus"
+            aria-label="Aisets on GitHub"
+          >
+            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black shadow-g-sm">
+              <img
+                className="block size-full"
+                src="../../public/brand/aisets-app-icon.avif"
+                alt=""
+              />
             </div>
-            <div className="mt-[3px] truncate text-[9.5px] font-[510] uppercase tracking-[0.08em] text-g-ink-4">
-              {t("nav.brandTag")}
+            <div className="min-w-0 max-[960px]:hidden">
+              <div className="truncate font-g-display text-[17px] font-[620] leading-[1.1] tracking-[-0.02em] text-g-ink">
+                Aisets
+              </div>
+              {version && (
+                <div className="mt-[3px] truncate font-g-mono text-[10px] text-g-ink-4">
+                  v{version}
+                </div>
+              )}
             </div>
-          </div>
+          </a>
         </div>
       </div>
 
@@ -330,6 +343,7 @@ export function AppTopbar({
             statusLabel={aiTagStatusLabel}
             countsLabel={aiTagCounts}
             errorMessage={aiTagActivity.errorMessage}
+            errors={aiTagActivity.errors}
             progressPercent={aiTagActivityProgressPercent(aiTagActivity)}
             primaryAction={{
               label: t("activity.viewAISettings"),
@@ -364,6 +378,7 @@ export function AppTopbar({
             statusLabel={vlmOcrStatusLabel}
             countsLabel={vlmOcrCounts}
             errorMessage={vlmOcrActivity.errorMessage}
+            errors={vlmOcrActivity.errors}
             progressPercent={vlmOcrActivityProgressPercent(vlmOcrActivity)}
             primaryAction={{
               label: t("activity.viewAISettings"),

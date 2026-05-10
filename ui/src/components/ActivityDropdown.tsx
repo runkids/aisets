@@ -1,6 +1,14 @@
-import { CheckCircle2, Loader2, Square, X, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  Square,
+  X,
+  XCircle,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { ActivityError } from "../aiTagActivity";
 import { Button } from "./ui";
 import { IconButton } from "./ui/Button";
 
@@ -15,6 +23,7 @@ type ActivityDropdownProps = {
   statusLabel: string;
   countsLabel: string;
   errorMessage?: string;
+  errors?: ActivityError[];
   progressPercent: number;
   showIndeterminate?: boolean;
   primaryAction: { label: string; onClick: () => void };
@@ -33,6 +42,7 @@ export function ActivityDropdown({
   statusLabel,
   countsLabel,
   errorMessage,
+  errors,
   progressPercent,
   showIndeterminate = false,
   primaryAction,
@@ -41,6 +51,8 @@ export function ActivityDropdown({
 }: ActivityDropdownProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [errorsExpanded, setErrorsExpanded] = useState(false);
+  const hasErrors = errors && errors.length > 0;
 
   const dotTone = failed ? "bg-g-red" : done ? "bg-g-green" : "bg-g-accent";
   const dropdownState = open
@@ -108,10 +120,48 @@ export function ActivityDropdown({
         <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
           {countsLabel}
         </p>
-        {errorMessage && (
-          <p className="mt-2 rounded-g-md border border-g-line bg-g-surface px-2 py-1.5 text-g-caption leading-[1.45] text-g-red">
-            {errorMessage}
-          </p>
+        {(errorMessage || hasErrors) && (
+          <div className="mt-2 rounded-g-md border border-g-line bg-g-surface text-g-caption leading-[1.45]">
+            {hasErrors ? (
+              <>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
+                  onClick={() => setErrorsExpanded((v) => !v)}
+                >
+                  <ChevronDown
+                    size={12}
+                    className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
+                  />
+                  <span className="flex-1 truncate">
+                    {t("activity.failedCount", {
+                      count: errors.length,
+                      defaultValue: "{{count}} failed",
+                    })}
+                  </span>
+                </button>
+                {errorsExpanded && (
+                  <ul className="max-h-[120px] overflow-y-auto border-t border-g-line">
+                    {errors.map((err, i) => (
+                      <li
+                        key={i}
+                        className="border-b border-g-line px-2 py-1 last:border-b-0"
+                      >
+                        <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
+                          {err.repoPath}
+                        </span>
+                        <span className="block truncate text-g-red">
+                          {err.message}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="px-2 py-1.5 text-g-red">{errorMessage}</p>
+            )}
+          </div>
         )}
         <span
           className="relative mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
