@@ -1832,10 +1832,14 @@
       "text": "文字提取格式",
       "contentTypes": "有效的內容類型分類",
       "formats": "推薦的輸出格式",
-      "rules": "各內容類型的壓縮規則"
+      "rules": "各內容類型的壓縮規則",
+      "fileMetadata": "檔案 metadata（格式、大小、尺寸）— 請求時自動注入",
+      "lintFindings": "該資產的 Lint 發現 — 請求時自動注入",
+      "optimizationFindings": "規則式最佳化分析 — 請求時自動注入"
     },
     "missingRequired": "缺少必要變數",
     "builtinBadge": "內建",
+    "systemBadge": "系統",
     "requiredBadge": "必要",
     "customVariable": "自訂變數…",
     "toastSaved": "預設已儲存",

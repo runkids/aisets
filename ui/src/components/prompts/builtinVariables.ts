@@ -6,6 +6,7 @@ export type BuiltinVariableDef = {
   defaultValues: string[];
   required: boolean;
   descriptionKey: string;
+  dynamic?: boolean;
 };
 
 export const TAG_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
@@ -110,6 +111,30 @@ export const OPTIMIZE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
     required: false,
     descriptionKey: "prompts.var.rules",
   },
+  {
+    name: "fileMetadata",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.fileMetadata",
+    dynamic: true,
+  },
+  {
+    name: "lintFindings",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.lintFindings",
+    dynamic: true,
+  },
+  {
+    name: "optimizationFindings",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.optimizationFindings",
+    dynamic: true,
+  },
 ];
 
 export function getBuiltinVariables(
@@ -150,4 +175,11 @@ export function isBuiltinVariable(
   varName: string,
 ): boolean {
   return getBuiltinVariables(type).some((v) => v.name === varName);
+}
+
+export function isDynamicVariable(
+  type: PromptPresetType,
+  varName: string,
+): boolean {
+  return getBuiltinVariables(type).some((v) => v.name === varName && v.dynamic);
 }

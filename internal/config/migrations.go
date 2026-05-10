@@ -1118,16 +1118,31 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 }
 
 func defaultOptimizePrompt() string {
-	return `Analyze this image and provide compression advice. Respond as JSON with these fields:
+	return `Analyze this image and provide compression advice.
+
+{{fileMetadata}}
+
+{{lintFindings}}
+
+{{optimizationFindings}}
+
+Based on the image content AND the analysis above, respond as JSON:
 {
   "contentType": one of {{contentTypes}},
   "recommendedFormat": one of {{formats}},
   "recommendedQuality": <number 1-100 or null for lossless>,
   "lossless": <true|false>,
-  "rationale": "<one sentence explaining why this format and quality>"
+  "rationale": "<2-3 sentences: explain your recommendation considering the lint findings and file characteristics>"
 }
 
 {{rules}}
+
+Important:
+- If lint findings identify structural issues (embedded bitmaps, oversized raster), address them in your rationale
+- Your recommendation should complement, not contradict, the lint findings
+- Be specific about expected savings when possible
+- Always name the concrete target format in the rationale (e.g. "extract the embedded bitmap and convert to WebP at quality 80")
+- For files with mixed content (e.g. SVG containing embedded raster), recommend a specific format for the extracted raster portion, not just the container format
 
 Respond ONLY with the JSON object, no other text.`
 }

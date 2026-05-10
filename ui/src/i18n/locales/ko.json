@@ -1821,10 +1821,14 @@
       "text": "텍스트 추출 형식",
       "contentTypes": "유효한 콘텐츠 유형 분류",
       "formats": "권장 출력 형식",
-      "rules": "콘텐츠 유형별 압축 규칙"
+      "rules": "콘텐츠 유형별 압축 규칙",
+      "fileMetadata": "파일 메타데이터(형식, 크기, 크기) — 요청 시 자동 주입",
+      "lintFindings": "이 에셋의 Lint 결과 — 요청 시 자동 주입",
+      "optimizationFindings": "규칙 기반 최적화 분석 — 요청 시 자동 주입"
     },
     "missingRequired": "필수 변수가 누락되었습니다",
     "builtinBadge": "내장",
+    "systemBadge": "시스템",
     "requiredBadge": "필수",
     "customVariable": "사용자 정의 변수…",
     "toastSaved": "프리셋 저장됨",

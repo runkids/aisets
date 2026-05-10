@@ -102,8 +102,8 @@ func (s *Store) CreatePromptPreset(p PromptPreset) (PromptPreset, error) {
 	if p.Name == "" {
 		return PromptPreset{}, fmt.Errorf("preset name is required")
 	}
-	if p.Type != "tag" && p.Type != "ocr" {
-		return PromptPreset{}, fmt.Errorf("preset type must be 'tag' or 'ocr'")
+	if p.Type != "tag" && p.Type != "ocr" && p.Type != "optimize" {
+		return PromptPreset{}, fmt.Errorf("preset type must be 'tag', 'ocr', or 'optimize'")
 	}
 
 	p.ID = uuid.NewString()

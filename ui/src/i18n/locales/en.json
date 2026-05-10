@@ -1811,10 +1811,14 @@
       "text": "Text extraction format",
       "contentTypes": "Valid content type classifications",
       "formats": "Recommended output formats",
-      "rules": "Compression rules per content type"
+      "rules": "Compression rules per content type",
+      "fileMetadata": "File metadata (format, size, dimensions) — injected automatically at request time",
+      "lintFindings": "Lint findings for this asset — injected automatically at request time",
+      "optimizationFindings": "Rule-based optimization analysis — injected automatically at request time"
     },
     "missingRequired": "Missing required variables",
     "builtinBadge": "Built-in",
+    "systemBadge": "System",
     "requiredBadge": "Required",
     "customVariable": "Custom variable...",
     "toastSaved": "Preset saved",

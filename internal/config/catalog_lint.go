@@ -193,6 +193,34 @@ func (s *Store) lintFacets(scanID int64, query CatalogLintQuery) (CatalogLintFac
 	}, nil
 }
 
+func (s *Store) LintFindingsByAssetID(assetID string) ([]lint.Finding, error) {
+	scanID, err := s.resolveScanID(0)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.rdb.Query(`
+		SELECT rule_id, severity, file, line, snippet, message, suggestion, asset_id
+		FROM lint_snapshots
+		WHERE scan_id = ? AND asset_id = ?
+		ORDER BY severity ASC, rule_id ASC
+		LIMIT 20
+	`, scanID, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var findings []lint.Finding
+	for rows.Next() {
+		var f lint.Finding
+		if err := rows.Scan(&f.RuleID, &f.Severity, &f.File, &f.Line, &f.Snippet, &f.Message, &f.Suggestion, &f.AssetID); err != nil {
+			return nil, err
+		}
+		findings = append(findings, f)
+	}
+	return findings, rows.Err()
+}
+
 func (s *Store) lintFacetQuery(sql string, args []any) ([]CatalogFacetOption, error) {
 	rows, err := s.rdb.Query(sql, args...)
 	if err != nil {

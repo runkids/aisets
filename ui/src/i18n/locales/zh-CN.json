@@ -1821,10 +1821,14 @@
       "text": "文字提取格式",
       "contentTypes": "有效的内容类型分类",
       "formats": "推荐的输出格式",
-      "rules": "各内容类型的压缩规则"
+      "rules": "各内容类型的压缩规则",
+      "fileMetadata": "文件元数据（格式、大小、尺寸）— 请求时自动注入",
+      "lintFindings": "该资产的 Lint 发现 — 请求时自动注入",
+      "optimizationFindings": "基于规则的优化分析 — 请求时自动注入"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",
+    "systemBadge": "系统",
     "requiredBadge": "必要",
     "customVariable": "自定义变量…",
     "toastSaved": "预设已保存",

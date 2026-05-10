@@ -12,13 +12,21 @@ import (
 	"aisets/internal/llm"
 )
 
-const optimizeAIPrompt = `Analyze this image and provide compression advice. Respond as JSON with these fields:
+const optimizeAIPrompt = `Analyze this image and provide compression advice.
+
+{{fileMetadata}}
+
+{{lintFindings}}
+
+{{optimizationFindings}}
+
+Based on the image content AND the analysis above, respond as JSON:
 {
   "contentType": "photo|icon|screenshot|diagram|illustration|gradient|pattern|text-heavy",
   "recommendedFormat": "avif|webp|png|svg|jpeg",
   "recommendedQuality": <number 1-100 or null for lossless>,
   "lossless": <true|false>,
-  "rationale": "<one sentence explaining why this format and quality>"
+  "rationale": "<2-3 sentences: explain your recommendation considering the lint findings and file characteristics>"
 }
 
 Rules:
@@ -28,6 +36,13 @@ Rules:
 - Diagrams with text → lossless compression, consider SVG if simple shapes
 - Decorative gradients → aggressive lossy, quality 60-70
 - Patterns → lossless PNG or WebP for tile accuracy
+
+Important:
+- If lint findings identify structural issues (embedded bitmaps, oversized raster), address them in your rationale
+- Your recommendation should complement, not contradict, the lint findings
+- Be specific about expected savings when possible
+- Always name the concrete target format in the rationale (e.g. "extract the embedded bitmap and convert to WebP at quality 80")
+- For files with mixed content (e.g. SVG containing embedded raster), recommend a specific format for the extracted raster portion, not just the container format
 
 Respond ONLY with the JSON object, no other text.`
 
@@ -78,12 +93,19 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	items, err := s.store.CatalogItemsByIDs(0, []string{assetID})
+	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{assetID})
 	if err != nil || len(items) == 0 {
 		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "Asset not found in catalog"))
 		return
 	}
 	item := items[0]
+
+	findings, _ := s.store.LintFindingsByAssetID(assetID)
+	prompt = replaceDynamicVars(prompt, map[string]string{
+		"fileMetadata":         formatFileMetadata(item),
+		"lintFindings":         formatLintFindings(findings),
+		"optimizationFindings": formatOptimizationFindings(item.Optimization),
+	})
 
 	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "tag")
 	if err != nil {

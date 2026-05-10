@@ -7,7 +7,11 @@ import type {
   PromptVariableType,
 } from "../../types";
 import { Select, Textarea, TextInput } from "../ui";
-import { isBuiltinVariable, getBuiltinVariables } from "./builtinVariables";
+import {
+  isBuiltinVariable,
+  isDynamicVariable,
+  getBuiltinVariables,
+} from "./builtinVariables";
 
 type Props = {
   variables: Record<string, PromptVariable>;
@@ -35,6 +39,7 @@ export function VariablesPanel({ variables, onChange, presetType }: Props) {
     <div className="flex flex-col gap-2.5">
       {entries.map(([name, variable]) => {
         const isBuiltin = isBuiltinVariable(presetType, name);
+        const isDynamic = isDynamicVariable(presetType, name);
         const builtinDef = builtins.find((b) => b.name === name);
         return (
           <div
@@ -44,10 +49,16 @@ export function VariablesPanel({ variables, onChange, presetType }: Props) {
             <div className="flex items-center gap-2">
               <span className="flex min-w-0 flex-1 items-center gap-1.5 font-g-mono text-[12px] text-g-ink">
                 <span className="truncate">{`{{${name}}}`}</span>
-                {isBuiltin && (
-                  <span className="shrink-0 rounded-g-sm bg-g-accent/10 px-1.5 py-0.5 font-sans text-[10px] font-medium text-g-accent">
-                    {t("prompts.builtinBadge")}
+                {isDynamic ? (
+                  <span className="shrink-0 rounded-g-sm bg-g-blue/10 px-1.5 py-0.5 font-sans text-[10px] font-medium text-g-blue">
+                    {t("prompts.systemBadge")}
                   </span>
+                ) : (
+                  isBuiltin && (
+                    <span className="shrink-0 rounded-g-sm bg-g-accent/10 px-1.5 py-0.5 font-sans text-[10px] font-medium text-g-accent">
+                      {t("prompts.builtinBadge")}
+                    </span>
+                  )
                 )}
                 {builtinDef?.required && (
                   <Star
@@ -56,24 +67,32 @@ export function VariablesPanel({ variables, onChange, presetType }: Props) {
                   />
                 )}
               </span>
-              <div className="w-[160px] shrink-0">
-                <Select
-                  size="sm"
-                  value={variable.type}
-                  options={[
-                    { value: "tags", label: t("prompts.typeTags") },
-                    { value: "text", label: t("prompts.typeText") },
-                    { value: "select", label: t("prompts.typeSelect") },
-                  ]}
-                  onChange={(v) => updateType(name, v as PromptVariableType)}
-                  aria-label={t("prompts.variableType")}
-                />
-              </div>
+              {!isDynamic && (
+                <div className="w-[160px] shrink-0">
+                  <Select
+                    size="sm"
+                    value={variable.type}
+                    options={[
+                      { value: "tags", label: t("prompts.typeTags") },
+                      { value: "text", label: t("prompts.typeText") },
+                      { value: "select", label: t("prompts.typeSelect") },
+                    ]}
+                    onChange={(v) => updateType(name, v as PromptVariableType)}
+                    aria-label={t("prompts.variableType")}
+                  />
+                </div>
+              )}
             </div>
-            <VariableValueInput
-              variable={variable}
-              onChange={(updated) => updateVariable(name, updated)}
-            />
+            {isDynamic ? (
+              <p className="text-[11px] text-g-ink-4">
+                {t(builtinDef?.descriptionKey ?? "")}
+              </p>
+            ) : (
+              <VariableValueInput
+                variable={variable}
+                onChange={(updated) => updateVariable(name, updated)}
+              />
+            )}
           </div>
         );
       })}

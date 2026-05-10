@@ -1821,10 +1821,14 @@
       "text": "テキスト抽出フォーマット",
       "contentTypes": "有効なコンテンツタイプの分類",
       "formats": "推奨出力フォーマット",
-      "rules": "コンテンツタイプ別の圧縮ルール"
+      "rules": "コンテンツタイプ別の圧縮ルール",
+      "fileMetadata": "ファイルメタデータ（形式、サイズ、寸法）— リクエスト時に自動注入",
+      "lintFindings": "このアセットの Lint 結果 — リクエスト時に自動注入",
+      "optimizationFindings": "ルールベースの最適化分析 — リクエスト時に自動注入"
     },
     "missingRequired": "必須変数が不足しています",
     "builtinBadge": "組み込み",
+    "systemBadge": "システム",
     "requiredBadge": "必須",
     "customVariable": "カスタム変数…",
     "toastSaved": "プリセットを保存しました",
