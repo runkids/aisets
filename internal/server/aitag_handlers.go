@@ -419,14 +419,14 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	content = stripMarkdownFences(content)
 
 	var parsed struct {
-		Category           string   `json:"category"`
-		Tags               []string `json:"tags"`
-		Description        string   `json:"description"`
-		Languages          []string `json:"languages"`
-		ContainsFace       bool     `json:"containsFace"`
-		SceneType          string   `json:"sceneType"`
-		EstimatedLocation  *string  `json:"estimatedLocation"`
-		LocationConfidence string   `json:"locationConfidence"`
+		Category           json.RawMessage `json:"category"`
+		Tags               []string        `json:"tags"`
+		Description        string          `json:"description"`
+		Languages          []string        `json:"languages"`
+		ContainsFace       bool            `json:"containsFace"`
+		SceneType          string          `json:"sceneType"`
+		EstimatedLocation  *string         `json:"estimatedLocation"`
+		LocationConfidence string          `json:"locationConfidence"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		result.Status = aitag.StatusFailed
@@ -435,7 +435,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		return result, resp
 	}
 
-	result.Category = strings.ToLower(strings.TrimSpace(parsed.Category))
+	result.Category = strings.ToLower(strings.TrimSpace(unmarshalStringOrFirst(parsed.Category)))
 	result.Tags = parsed.Tags
 	result.Description = strings.TrimSpace(parsed.Description)
 	result.Languages = parsed.Languages
@@ -489,6 +489,22 @@ func copyAITagResultForItem(result aitag.Result, item scanner.AssetItem) aitag.R
 	result.HashAlgorithm = item.HashAlgorithm
 	result.UpdatedAt = ""
 	return result
+}
+
+// unmarshalStringOrFirst tolerates LLMs returning either "value" or ["value", ...].
+func unmarshalStringOrFirst(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var arr []string
+	if json.Unmarshal(raw, &arr) == nil && len(arr) > 0 {
+		return arr[0]
+	}
+	return ""
 }
 
 func stripMarkdownFences(s string) string {

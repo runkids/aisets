@@ -64,6 +64,7 @@ export function displayTotalsForMode(
 export function optimizableBadgeCount(
   summary: CatalogSummary | null,
   selectedProjectStats: CatalogProjectStats | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fallbackCount: number,
 ) {
   if (summary?.analysis.optimization !== "computed") return 0;

@@ -265,7 +265,6 @@ export function DuplicatesView({
   const nearFirstPage = nearDuplicatesQuery.data?.pages[0];
   const nearTotal = nearFirstPage?.total ?? 0;
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- windowed virtual scroll for similar pairs
   const similarVirtualizer = useVirtualizer({
     count: nearTotal,
     getScrollElement: () => exactScrollRef.current,

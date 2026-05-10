@@ -65,10 +65,14 @@ export function ActivityDropdown({
   const [open, setOpen] = useState(false);
   const [errorsExpanded, setErrorsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  // eslint-disable-next-line react-hooks/purity -- Date.now() as initial state is standard React
   const [now, setNow] = useState(Date.now());
-  const [finalElapsedMs, setFinalElapsedMs] = useState<number | undefined>(undefined);
+  const [finalElapsedMs, setFinalElapsedMs] = useState<number | undefined>(
+    undefined,
+  );
   useEffect(() => {
     if (!busy || !startedAt) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset timer on new activity
     setFinalElapsedMs(undefined);
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => {
@@ -116,142 +120,160 @@ export function ActivityDropdown({
         role={failed ? "alert" : "status"}
         aria-live={failed ? "assertive" : "polite"}
       >
-      <div className="w-[340px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop">
-        <div className="flex items-center gap-2">
-          {done ? (
-            <CheckCircle2
-              className="shrink-0 text-g-green"
-              size={16}
-              aria-hidden="true"
-            />
-          ) : failed ? (
-            <XCircle
-              className="shrink-0 text-g-red"
-              size={16}
-              aria-hidden="true"
-            />
-          ) : stopped ? (
-            <Square
-              className="shrink-0 text-g-ink-3"
-              size={16}
-              aria-hidden="true"
-            />
-          ) : (
-            <Loader2
-              className="shrink-0 animate-spin text-g-accent"
-              size={16}
-              aria-hidden="true"
-            />
-          )}
-          <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
-            {statusLabel}
-          </span>
-        </div>
-        <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
-          {countsLabel}
-        </p>
-        {elapsedMs != null && (
-          <p className="font-g-mono text-[11px] tracking-g-mono text-g-ink-4 tabular-nums text-right">
-            {formatElapsed(elapsedMs)}
-          </p>
-        )}
-        {(errorMessage || hasErrors) && (
-          <div className="mt-2 rounded-g-md border border-g-line bg-g-surface text-g-caption leading-[1.45]">
-            {hasErrors ? (
-              <>
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    className="flex flex-1 items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
-                    onClick={() => setErrorsExpanded((v) => !v)}
-                  >
-                    <ChevronDown
-                      size={12}
-                      className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
-                    />
-                    <span className="flex-1 truncate">
-                      {t("activity.failedCount", {
-                        count: errors.length,
-                        defaultValue: "{{count}} failed",
-                      })}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={copied ? t("activity.errorsCopied", { defaultValue: "Copied" }) : t("activity.copyErrors", { defaultValue: "Copy errors" })}
-                    className="shrink-0 px-2 py-1.5 text-g-ink-4 hover:text-g-ink transition-colors duration-100"
-                    onClick={() => {
-                      const text = errors.map((e) => `${e.repoPath}\n${e.message}`).join("\n\n");
-                      navigator.clipboard.writeText(text).then(() => {
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      });
-                    }}
-                  >
-                    {copied ? <Check size={12} className="text-g-green" /> : <Copy size={12} />}
-                  </button>
-                </div>
-                {errorsExpanded && (
-                  <ul className="max-h-[120px] overflow-y-auto border-t border-g-line">
-                    {errors.map((err, i) => (
-                      <li
-                        key={i}
-                        className="border-b border-g-line px-2 py-1 last:border-b-0"
-                      >
-                        <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
-                          {err.repoPath}
-                        </span>
-                        <span className="block truncate text-g-red">
-                          {err.message}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
+        <div className="w-[340px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop">
+          <div className="flex items-center gap-2">
+            {done ? (
+              <CheckCircle2
+                className="shrink-0 text-g-green"
+                size={16}
+                aria-hidden="true"
+              />
+            ) : failed ? (
+              <XCircle
+                className="shrink-0 text-g-red"
+                size={16}
+                aria-hidden="true"
+              />
+            ) : stopped ? (
+              <Square
+                className="shrink-0 text-g-ink-3"
+                size={16}
+                aria-hidden="true"
+              />
             ) : (
-              <p className="px-2 py-1.5 text-g-red">{errorMessage}</p>
+              <Loader2
+                className="shrink-0 animate-spin text-g-accent"
+                size={16}
+                aria-hidden="true"
+              />
             )}
+            <span className="min-w-0 flex-1 truncate font-[590] text-g-ink">
+              {statusLabel}
+            </span>
           </div>
-        )}
-        <span
-          className="relative mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
-          aria-hidden="true"
-        >
-          <span
-            className={`block h-full rounded-g-pill ${progressBarTone} transition-[width] duration-150 ease-g`}
-            style={{ width: `${progressPercent}%` }}
-          />
-          {showIndeterminate && busy && (
-            <span className="absolute inset-y-0 left-0 block w-[28%] rounded-g-pill bg-g-accent opacity-70 motion-reduce:hidden animate-[progress-indeterminate_1.15s_ease-in-out_infinite]" />
+          <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
+            {countsLabel}
+          </p>
+          {elapsedMs != null && (
+            <p className="font-g-mono text-[11px] tracking-g-mono text-g-ink-4 tabular-nums text-right">
+              {formatElapsed(elapsedMs)}
+            </p>
           )}
-        </span>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" variant="secondary" onClick={primaryAction.onClick}>
-            {primaryAction.label}
-          </Button>
-          {busy && stopButton ? (
+          {(errorMessage || hasErrors) && (
+            <div className="mt-2 rounded-g-md border border-g-line bg-g-surface text-g-caption leading-[1.45]">
+              {hasErrors ? (
+                <>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
+                      onClick={() => setErrorsExpanded((v) => !v)}
+                    >
+                      <ChevronDown
+                        size={12}
+                        className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
+                      />
+                      <span className="flex-1 truncate">
+                        {t("activity.failedCount", {
+                          count: errors.length,
+                          defaultValue: "{{count}} failed",
+                        })}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={
+                        copied
+                          ? t("activity.errorsCopied", {
+                              defaultValue: "Copied",
+                            })
+                          : t("activity.copyErrors", {
+                              defaultValue: "Copy errors",
+                            })
+                      }
+                      className="shrink-0 px-2 py-1.5 text-g-ink-4 hover:text-g-ink transition-colors duration-100"
+                      onClick={() => {
+                        const text = errors
+                          .map((e) => `${e.repoPath}\n${e.message}`)
+                          .join("\n\n");
+                        navigator.clipboard.writeText(text).then(() => {
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        });
+                      }}
+                    >
+                      {copied ? (
+                        <Check size={12} className="text-g-green" />
+                      ) : (
+                        <Copy size={12} />
+                      )}
+                    </button>
+                  </div>
+                  {errorsExpanded && (
+                    <ul className="max-h-[120px] overflow-y-auto border-t border-g-line">
+                      {errors.map((err, i) => (
+                        <li
+                          key={i}
+                          className="border-b border-g-line px-2 py-1 last:border-b-0"
+                        >
+                          <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
+                            {err.repoPath}
+                          </span>
+                          <span className="block truncate text-g-red">
+                            {err.message}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="px-2 py-1.5 text-g-red">{errorMessage}</p>
+              )}
+            </div>
+          )}
+          <span
+            className="relative mt-2 block h-1.5 overflow-hidden rounded-g-pill bg-g-surface-3"
+            aria-hidden="true"
+          >
+            <span
+              className={`block h-full rounded-g-pill ${progressBarTone} transition-[width] duration-150 ease-g`}
+              style={{ width: `${progressPercent}%` }}
+            />
+            {showIndeterminate && busy && (
+              <span className="absolute inset-y-0 left-0 block w-[28%] rounded-g-pill bg-g-accent opacity-70 motion-reduce:hidden animate-[progress-indeterminate_1.15s_ease-in-out_infinite]" />
+            )}
+          </span>
+          <div className="mt-3 flex justify-end gap-2">
             <Button
               size="sm"
               variant="secondary"
-              leadingIcon={<Square size={13} />}
-              onClick={stopButton.onClick}
-              disabled={stopButton.disabled}
+              onClick={primaryAction.onClick}
             >
-              {stopButton.label}
+              {primaryAction.label}
             </Button>
-          ) : canDismiss ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<X size={13} />}
-              onClick={onDismiss}
-            >
-              {t("activity.dismiss")}
-            </Button>
-          ) : null}
+            {busy && stopButton ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                leadingIcon={<Square size={13} />}
+                onClick={stopButton.onClick}
+                disabled={stopButton.disabled}
+              >
+                {stopButton.label}
+              </Button>
+            ) : canDismiss ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                leadingIcon={<X size={13} />}
+                onClick={onDismiss}
+              >
+                {t("activity.dismiss")}
+              </Button>
+            ) : null}
+          </div>
         </div>
-      </div>
       </div>
     </span>
   );
