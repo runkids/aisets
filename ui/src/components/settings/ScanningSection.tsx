@@ -2,7 +2,7 @@ import {
   Download,
   Globe2,
   LoaderCircle,
-  Scan,
+  ScanText,
   Sliders,
   Square,
   Trash2,
@@ -135,7 +135,7 @@ export function ScanningSection({
           padding="none"
         >
           <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
-            <Scan size={15} className="shrink-0 text-g-ink-3" />
+            <ScanText size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.catalogGroup")}
             </span>
@@ -144,7 +144,7 @@ export function ScanningSection({
             <FieldRow
               label={t("settings.scanOnOpen")}
               description={t("settings.scanOnOpenHint")}
-              icon={<Scan size={15} />}
+              icon={<ScanText size={15} />}
             >
               <Switch
                 checked={draft.scanOnOpen}
@@ -276,7 +276,7 @@ export function ScanningSection({
           padding="none"
         >
           <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
-            <Scan size={15} className="shrink-0 text-g-ink-3" />
+            <ScanText size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.ocrGroup")}
             </span>
@@ -285,7 +285,7 @@ export function ScanningSection({
             <FieldRow
               label={t("settings.ocrEnabled")}
               description={t("settings.ocrEnabledHint")}
-              icon={<Scan size={15} />}
+              icon={<ScanText size={15} />}
             >
               <Switch
                 checked={draft.ocrEnabled}
@@ -409,7 +409,7 @@ export function ScanningSection({
                   ) : (
                     <Button
                       variant="primary"
-                      leadingIcon={<Scan size={14} />}
+                      leadingIcon={<ScanText size={14} />}
                       onClick={() => setRunOCRConfirmOpen(true)}
                       disabled={
                         working ||

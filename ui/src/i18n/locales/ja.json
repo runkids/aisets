@@ -1330,7 +1330,12 @@
     "aiTagCustomPromptHint": "画像分析のためにビジョンモデルに送るプロンプトをカスタマイズ",
     "aiTagResetPrompt": "デフォルトに戻す",
     "aiTagPromptGuide": "VLM は有効な JSON を返す必要があります。必須フィールド: \"category\"（文字列）、\"tags\"（文字列配列）、\"description\"（文字列）、\"languages\"（文字列配列）。余分なフィールドは無視されます。JSON の解析に失敗した場合、結果は失敗と表示されます——「デフォルトに戻す」で復元できます",
+    "aiTagPromptCustomized": "カスタム済み",
     "aiTagDefaultPromptLabel": "デフォルトのプロンプトを使用中",
+    "aiOcrCustomPrompt": "カスタムプロンプト",
+    "aiOcrResetPrompt": "デフォルトに戻す",
+    "aiOcrPromptGuide": "VLM は有効な JSON を返す必要があります。必須フィールド: \"text\"（文字列——表示テキストをレイアウトごと保持）、\"languages\"（文字列配列、ISO 639-3 言語コード）。余分なフィールドは無視されます。JSON の解析に失敗した場合、結果は失敗と表示されます",
+    "aiOcrPromptCustomized": "カスタム済み",
     "strategyAICategory": "AI カテゴリ",
     "strategyAICategoryHint": "AI タグで分類された画像のみ一致——空欄ですべてに一致",
     "aiCategory.icon": "アイコン",
@@ -1596,7 +1601,11 @@
     "aiDescription": "説明",
     "aiLanguages": "言語",
     "aiModel": "モデル",
-    "aiDuration": "処理時間"
+    "aiDuration": "処理時間",
+    "aiSection": {
+      "tag": "AI タグ付け",
+      "ocr": "AI OCR"
+    }
   },
   "scanProgress": {
     "starting": "スキャンを開始",

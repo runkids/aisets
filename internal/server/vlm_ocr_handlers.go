@@ -98,6 +98,11 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	engineVersion := providerName + "/" + modelName
 	settingsHash := vlmOCRSettingsHash(modelName)
 
+	prompt := settings.LLMOcrPrompt
+	if prompt == "" {
+		prompt = vlmOCRPrompt
+	}
+
 	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
 	for _, rawItem := range catalog.Items {
 		item := rawItem
@@ -182,7 +187,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result := s.processVLMOCR(r.Context(), item, providerName, modelName)
+		result := s.processVLMOCR(r.Context(), item, providerName, modelName, prompt)
 		if result.Status == ocr.StatusFailed {
 			counts.Failed++
 		} else {
@@ -211,7 +216,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
 }
 
-func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName string) ocr.Result {
+func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) ocr.Result {
 	engineVersion := providerName + "/" + modelName
 	result := ocr.Result{
 		ProjectID:     item.ProjectID,
@@ -239,7 +244,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		Model: modelName,
 		Messages: []llm.ChatMessage{{
 			Role:    "user",
-			Content: vlmOCRPrompt,
+			Content: prompt,
 			Images:  []string{dataURI},
 		}},
 	})

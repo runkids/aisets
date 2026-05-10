@@ -424,6 +424,12 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.LLMEmbedModel != nil {
 		settings.LLMEmbedModel = strings.TrimSpace(*update.LLMEmbedModel)
 	}
+	if update.LLMTagPrompt != nil {
+		settings.LLMTagPrompt = *update.LLMTagPrompt
+	}
+	if update.LLMOcrPrompt != nil {
+		settings.LLMOcrPrompt = *update.LLMOcrPrompt
+	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
 	}

@@ -13,6 +13,7 @@ import {
   canDismissAITagActivity,
   isAITagActivityBusy,
   isAITagActivityVisible,
+  type AITagActivityPhase,
   type AITagActivityState,
 } from "../aiTagActivity";
 import {
@@ -34,6 +35,7 @@ import {
   isVLMOcrActivityBusy,
   isVLMOcrActivityVisible,
   vlmOcrActivityProgressPercent,
+  type VLMOcrActivityPhase,
   type VLMOcrActivityState,
 } from "../vlmOcrActivity";
 import { ActivityDropdown } from "./ActivityDropdown";
@@ -134,7 +136,7 @@ export function AppTopbar({
     : t("activity.optimizePreparing");
   const aiTagVisible = isAITagActivityVisible(aiTagActivity);
   const aiTagBusy = isAITagActivityBusy(aiTagActivity);
-  const aiTagStatusLabels: Record<string, string> = {
+  const aiTagStatusLabels: Partial<Record<AITagActivityPhase, string>> = {
     saving: t("activity.aiTagSaving"),
     running: t("activity.aiTagRunning"),
     stopping: t("activity.aiTagStopping"),
@@ -155,23 +157,25 @@ export function AppTopbar({
     : t("activity.aiTagPreparing");
   const vlmOcrVisible = isVLMOcrActivityVisible(vlmOcrActivity);
   const vlmOcrBusy = isVLMOcrActivityBusy(vlmOcrActivity);
-  const vlmOcrStatusLabels: Record<string, string> = {
-    saving: t("settings.aiOcrSaving"),
-    running: t("settings.aiOcrRun"),
-    stopping: t("settings.aiOcrStopping"),
-    done: t("settings.aiOcrDone", {
-      ready: vlmOcrActivity.counts?.ready ?? 0,
-      skipped: vlmOcrActivity.counts?.skipped ?? 0,
-      cacheHit: vlmOcrActivity.counts?.cacheHit ?? 0,
-    }),
-    stopped: t("settings.aiOcrStopped"),
-    error: t("settings.aiOcrFailed"),
+  const vlmOcrStatusLabels: Partial<Record<VLMOcrActivityPhase, string>> = {
+    saving: t("activity.aiOcrSaving"),
+    running: t("activity.aiOcrRunning"),
+    stopping: t("activity.aiOcrStopping"),
+    done: t("activity.aiOcrDone"),
+    stopped: t("activity.aiOcrStopped"),
+    error: t("activity.aiOcrError"),
   };
   const vlmOcrStatusLabel =
-    vlmOcrStatusLabels[vlmOcrActivity.phase] ?? t("settings.aiOcrGroup");
+    vlmOcrStatusLabels[vlmOcrActivity.phase] ?? t("activity.aiOcrTitle");
   const vlmOcrCounts = vlmOcrActivity.counts
-    ? `${vlmOcrActivity.counts.processed}/${vlmOcrActivity.counts.queued + vlmOcrActivity.counts.cacheHit + vlmOcrActivity.counts.skipped}`
-    : t("activity.aiTagPreparing");
+    ? t("activity.aiOcrCounts", {
+        processed: vlmOcrActivity.counts.processed,
+        ready: vlmOcrActivity.counts.ready,
+        failed: vlmOcrActivity.counts.failed,
+        skipped: vlmOcrActivity.counts.skipped,
+        cacheHit: vlmOcrActivity.counts.cacheHit,
+      })
+    : t("activity.aiOcrPreparing");
   const catalogActionTooltip = ocrBusy
     ? t("activity.ocrLockedTooltip")
     : aiTagBusy

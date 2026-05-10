@@ -1341,7 +1341,12 @@
     "aiTagCustomPromptHint": "이미지 분석을 위해 비전 모델에 보내는 프롬프트를 맞춤 설정",
     "aiTagResetPrompt": "기본값으로 재설정",
     "aiTagPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"category\"(문자열), \"tags\"(문자열 배열), \"description\"(문자열), \"languages\"(문자열 배열). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다 — \"기본값으로 재설정\"으로 복원할 수 있습니다",
+    "aiTagPromptCustomized": "맞춤 설정됨",
     "aiTagDefaultPromptLabel": "기본 프롬프트 사용 중",
+    "aiOcrCustomPrompt": "맞춤 프롬프트",
+    "aiOcrResetPrompt": "기본값으로 재설정",
+    "aiOcrPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"text\"(문자열 — 레이아웃을 유지한 보이는 텍스트), \"languages\"(문자열 배열, ISO 639-3 언어 코드). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다",
+    "aiOcrPromptCustomized": "맞춤 설정됨",
     "strategyAICategory": "AI 카테고리",
     "strategyAICategoryHint": "AI 태그로 분류된 이미지만 일치 — 비워두면 전체 일치",
     "aiCategory.icon": "아이콘",
@@ -1614,7 +1619,11 @@
     "aiDescription": "설명",
     "aiLanguages": "언어",
     "aiModel": "모델",
-    "aiDuration": "처리 시간"
+    "aiDuration": "처리 시간",
+    "aiSection": {
+      "tag": "AI 태그",
+      "ocr": "AI OCR"
+    }
   },
   "projectIntent": {
     "code": {

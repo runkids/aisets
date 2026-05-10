@@ -817,7 +817,12 @@
     "aiTagCustomPromptHint": "Customize the prompt sent to the vision model for image analysis",
     "aiTagResetPrompt": "Reset to default",
     "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"description\" (string), \"languages\" (string array). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
+    "aiTagPromptCustomized": "Customized",
     "aiTagDefaultPromptLabel": "Using default prompt",
+    "aiOcrCustomPrompt": "Custom Prompt",
+    "aiOcrResetPrompt": "Reset to default",
+    "aiOcrPromptGuide": "The VLM must return valid JSON with these fields: \"text\" (string — all visible text preserving layout) and \"languages\" (string array of ISO 639-3 codes). Extra fields are ignored. If JSON parsing fails, the result is marked as failed.",
+    "aiOcrPromptCustomized": "Customized",
     "strategyAICategory": "AI Category",
     "strategyAICategoryHint": "Only match images classified by AI tagging — leave empty to match all",
     "aiCategory.icon": "Icon",
@@ -1661,6 +1666,10 @@
     "aiDescription": "Description",
     "aiLanguages": "Languages",
     "aiModel": "Model",
-    "aiDuration": "Processing time"
+    "aiDuration": "Processing time",
+    "aiSection": {
+      "tag": "AI Tagging",
+      "ocr": "AI OCR"
+    }
   }
 }

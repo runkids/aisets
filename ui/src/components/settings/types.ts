@@ -68,6 +68,7 @@ export type SettingsDraft = {
   llmVisionModel: string;
   llmEmbedModel: string;
   llmTagPrompt: string;
+  llmOcrPrompt: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;

@@ -65,6 +65,8 @@ type Result struct {
 	HashAlgorithm  string   `json:"hashAlgorithm,omitempty"`
 	EngineName     string   `json:"engineName,omitempty"`
 	EngineVersion  string   `json:"engineVersion,omitempty"`
+	ProviderName   string   `json:"providerName,omitempty"`
+	ModelName      string   `json:"modelName,omitempty"`
 	SettingsHash   string   `json:"settingsHash,omitempty"`
 	Status         string   `json:"status"`
 	Text           string   `json:"text,omitempty"`
@@ -199,6 +201,14 @@ func FinalizeResult(result *Result) {
 			result.TextStatus = TextStatusEmpty
 		} else {
 			result.TextStatus = TextStatusAvailable
+		}
+	}
+	if result.EngineName == "vlm" && result.EngineVersion != "" {
+		if idx := strings.Index(result.EngineVersion, "/"); idx >= 0 {
+			result.ProviderName = result.EngineVersion[:idx]
+			result.ModelName = result.EngineVersion[idx+1:]
+		} else {
+			result.ModelName = result.EngineVersion
 		}
 	}
 }

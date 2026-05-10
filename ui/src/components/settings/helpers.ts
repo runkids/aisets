@@ -127,6 +127,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmVisionModel: settings?.llmVisionModel ?? "",
     llmEmbedModel: settings?.llmEmbedModel ?? "",
     llmTagPrompt: settings?.llmTagPrompt ?? "",
+    llmOcrPrompt: settings?.llmOcrPrompt ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -174,6 +175,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmVisionModel: draft.llmVisionModel,
     llmEmbedModel: draft.llmEmbedModel,
     llmTagPrompt: draft.llmTagPrompt,
+    llmOcrPrompt: draft.llmOcrPrompt,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -233,6 +235,7 @@ export function resetSectionDraft(
         llmVisionModel: defaults.llmVisionModel,
         llmEmbedModel: defaults.llmEmbedModel,
         llmTagPrompt: defaults.llmTagPrompt,
+        llmOcrPrompt: defaults.llmOcrPrompt,
       };
     case "customFilters":
       return {

@@ -26,6 +26,7 @@ import {
 import type { AssetItem, NearDuplicate } from "../types";
 import { cn } from "../lib/cn";
 import { fileName, formatBytes } from "../ui";
+import { AssetDrawerAI } from "./AssetDrawerAI";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
 import { AssetDrawerOptimize } from "./AssetDrawerOptimize";
 import { useOptimizeVariants, type VariantInfo } from "./useOptimizeVariants";
@@ -582,73 +583,10 @@ export function AssetDrawer({
                 <AssetDrawerOCR ocr={asset.ocr} />
               )}
               {tab === "ai" && aiTagVisible && (
-                <div className="grid gap-4 p-4">
-                  {asset.aiTag && asset.aiTag.status === "ready" && (
-                    <>
-                      <div>
-                        <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                          {t("drawer.aiCategory")}
-                        </h4>
-                        <Badge tone="blue">{asset.aiTag.category}</Badge>
-                      </div>
-                      {asset.aiTag.tags && asset.aiTag.tags.length > 0 && (
-                        <div>
-                          <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                            {t("drawer.aiTags")}
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {asset.aiTag.tags.map((tag) => (
-                              <Badge key={tag} tone="line">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {asset.aiTag.description && (
-                        <div>
-                          <h4 className="mb-1.5 font-g text-g-caption font-[590] text-g-ink-3">
-                            {t("drawer.aiDescription")}
-                          </h4>
-                          <p className="font-g text-g-body text-g-ink-2">
-                            {asset.aiTag.description}
-                          </p>
-                        </div>
-                      )}
-                      {asset.aiTag.languages &&
-                        asset.aiTag.languages.length > 0 && (
-                          <div className="grid gap-1">
-                            <p className="font-g text-g-chip font-[590] uppercase tracking-[0.08em] text-g-ink-4">
-                              {t("drawer.aiLanguages")}
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {asset.aiTag.languages.map((lang) => (
-                                <Badge key={lang} tone="line">
-                                  {lang}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      <div className="flex items-center gap-4 border-t border-g-line pt-3 font-g text-g-caption text-g-ink-4">
-                        {asset.aiTag.durationMs != null && (
-                          <span>
-                            {t("drawer.aiDuration")}:{" "}
-                            {(asset.aiTag.durationMs / 1000).toFixed(1)}s
-                          </span>
-                        )}
-                        {asset.aiTag.updatedAt && (
-                          <span>
-                            {new Date(asset.aiTag.updatedAt).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
-                  {vlmOcrReady && asset.ocr && (
-                    <AssetDrawerOCR ocr={asset.ocr} />
-                  )}
-                </div>
+                <AssetDrawerAI
+                  aiTag={asset.aiTag}
+                  ocr={vlmOcrReady ? asset.ocr : undefined}
+                />
               )}
             </div>
           </DialogDrawerSurface>

@@ -72,10 +72,12 @@ import {
 import {
   initialAITagActivityState,
   aiTagActivityReducer,
+  isAITagActivityBusy,
   runAITagActivity,
 } from "./aiTagActivity";
 import {
   initialVLMOcrActivityState,
+  isVLMOcrActivityBusy,
   vlmOcrActivityReducer,
   runVLMOcrActivity,
   type VLMOcrActivityAbortRef,
@@ -322,6 +324,18 @@ export function App() {
       imageBackgroundMode,
     );
   }, [imageBackgroundMode]);
+
+  useEffect(() => {
+    const busy =
+      isAITagActivityBusy(aiTagActivity) ||
+      isVLMOcrActivityBusy(vlmOcrActivity);
+    if (!busy) return undefined;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [aiTagActivity.phase, vlmOcrActivity.phase]);
 
   useEffect(() => {
     if (scanMutation.isPending) return undefined;

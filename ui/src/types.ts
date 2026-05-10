@@ -70,6 +70,7 @@ export type AppSettings = {
   llmVisionModel: string;
   llmEmbedModel: string;
   llmTagPrompt: string;
+  llmOcrPrompt: string;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -301,6 +302,8 @@ export type AssetItem = {
   ocr?: {
     status: "pending" | "ready" | "failed" | "skipped";
     engineName?: string;
+    engineVersion?: string;
+    modelName?: string;
     text?: string;
     normalizedText?: string;
     textStatus?: "available" | "empty";
@@ -321,6 +324,7 @@ export type AssetItem = {
     tags?: string[];
     description?: string;
     languages?: string[];
+    modelName?: string;
     errorCode?: string;
     errorMessage?: string;
     durationMs?: number;

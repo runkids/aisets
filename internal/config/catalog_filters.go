@@ -114,6 +114,10 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	vlmOcrReadyCount, err := s.catalogVLMOcrReadyCount(scanID, query)
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	aiTagReadyCount, err := s.catalogAITagReadyCount(scanID, query, settings.LLMProvider, settings.LLMVisionModel)
 	if err != nil {
 		return CatalogItemFacets{}, err
@@ -156,6 +160,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		AICategories:             aiCategories,
 		AICategoryTotal:          aiCategoryTotal,
 		OCRReadyCount:            ocrReadyCount,
+		VLMOcrReadyCount:         vlmOcrReadyCount,
 		AITagReadyCount:          aiTagReadyCount,
 	}, nil
 }
@@ -311,11 +316,24 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery, pr
 }
 
 func (s *Store) catalogOCRReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
+	return s.catalogOCRReadyCountByEngine(scanID, query, "")
+}
+
+func (s *Store) catalogVLMOcrReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
+	return s.catalogOCRReadyCountByEngine(scanID, query, "vlm")
+}
+
+func (s *Store) catalogOCRReadyCountByEngine(scanID int64, query CatalogItemQuery, engineName string) (int, error) {
 	where, args, err := s.catalogItemWhere(scanID, query)
 	if err != nil {
 		return 0, err
 	}
+	engineClause := ""
 	facetArgs := append([]any{"ready"}, args...)
+	if engineName != "" {
+		engineClause = "\n\t\t\tAND ocr.engine_name = ?"
+		facetArgs = append([]any{"ready", engineName}, args...)
+	}
 	var count int
 	err = s.rdb.QueryRow(`
 		SELECT COUNT(DISTINCT a.asset_id)
@@ -324,7 +342,7 @@ func (s *Store) catalogOCRReadyCount(scanID int64, query CatalogItemQuery) (int,
 			AND ocr.repo_path = a.repo_path
 			AND ocr.content_hash = a.content_hash
 			AND ocr.hash_algorithm = a.hash_algorithm
-			AND ocr.status = ?
+			AND ocr.status = ?`+engineClause+`
 		`+where, facetArgs...).Scan(&count)
 	return count, err
 }
@@ -644,6 +662,20 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
 				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
 				AND ocr.status = 'ready'
+		)`)
+	case "vlmOcrReady":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM ocr_results ocr
+			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
+				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
+				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'
+		)`)
+	case "vlmOcrPending":
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM ocr_results ocr
+			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
+				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
+				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'
 		)`)
 	case "aiTagReady":
 		clauses = append(clauses, `EXISTS (

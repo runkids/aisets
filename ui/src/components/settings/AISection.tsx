@@ -1,13 +1,18 @@
 import {
+  ChevronRight,
+  Info,
   LoaderCircle,
   Play,
   RefreshCw,
+  RotateCcw,
   ScanText,
   Square,
   Tags,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/cn";
 import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
@@ -19,6 +24,12 @@ const DEFAULT_TAG_PROMPT = `Analyze this image and respond with a JSON object co
 - "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")
 - "description": one sentence describing the image content
 - "languages": array of ISO 639-3 language codes for any visible text (e.g. ["eng"]). Empty array if no text.
+
+Respond ONLY with valid JSON, no markdown or explanation.`;
+
+const DEFAULT_OCR_PROMPT = `Analyze this image and respond with a JSON object:
+- "text": all visible text exactly as it appears, preserving original layout, line breaks, indentation and formatting. If the image contains code, preserve indentation exactly. Empty string if no text is visible.
+- "languages": array of ISO 639-3 language codes detected in the text (e.g. ["eng"], ["zho", "eng"]). Empty array if no text.
 
 Respond ONLY with valid JSON, no markdown or explanation.`;
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
@@ -330,45 +341,16 @@ export function AISection({
                 )}
               </div>
             </FieldRow>
-            <div className="py-2">
-              <details className="border-t border-g-line pt-2 mt-1">
-                <summary className="cursor-pointer font-g text-g-chip tracking-g-ui text-g-ink-3 select-none">
-                  {t("settings.aiTagCustomPrompt")}
-                </summary>
-                <div className="mt-2 flex flex-col gap-2">
-                  <p className="font-g text-g-caption leading-[1.5] tracking-g-ui text-g-ink-3">
-                    {t("settings.aiTagPromptGuide")}
-                  </p>
-                  <textarea
-                    className="w-full min-h-[160px] rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 font-g-mono text-g-caption tracking-g-mono text-g-ink-1 focus:outline-none focus:ring-1 focus:ring-g-accent"
-                    value={draft.llmTagPrompt || DEFAULT_TAG_PROMPT}
-                    onChange={(e) =>
-                      onUpdateDraft((current) => ({
-                        ...current,
-                        llmTagPrompt:
-                          e.target.value === DEFAULT_TAG_PROMPT
-                            ? ""
-                            : e.target.value,
-                      }))
-                    }
-                  />
-                  {draft.llmTagPrompt !== "" && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        onUpdateDraft((current) => ({
-                          ...current,
-                          llmTagPrompt: "",
-                        }))
-                      }
-                    >
-                      {t("settings.aiTagResetPrompt")}
-                    </Button>
-                  )}
-                </div>
-              </details>
-            </div>
+            <PromptEditor
+              draftKey="llmTagPrompt"
+              defaultPrompt={DEFAULT_TAG_PROMPT}
+              labelKey="settings.aiTagCustomPrompt"
+              guideKey="settings.aiTagPromptGuide"
+              resetKey="settings.aiTagResetPrompt"
+              customizedKey="settings.aiTagPromptCustomized"
+              draft={draft}
+              onUpdateDraft={onUpdateDraft}
+            />
           </div>
         </Card>
       )}
@@ -429,6 +411,16 @@ export function AISection({
                 )}
               </div>
             </FieldRow>
+            <PromptEditor
+              draftKey="llmOcrPrompt"
+              defaultPrompt={DEFAULT_OCR_PROMPT}
+              labelKey="settings.aiOcrCustomPrompt"
+              guideKey="settings.aiOcrPromptGuide"
+              resetKey="settings.aiOcrResetPrompt"
+              customizedKey="settings.aiOcrPromptCustomized"
+              draft={draft}
+              onUpdateDraft={onUpdateDraft}
+            />
           </div>
         </Card>
       )}
@@ -540,6 +532,104 @@ function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
           {activity.currentFile}
         </p>
       )}
+    </div>
+  );
+}
+
+function PromptEditor({
+  draftKey,
+  defaultPrompt,
+  labelKey,
+  guideKey,
+  resetKey,
+  customizedKey,
+  draft,
+  onUpdateDraft,
+}: {
+  draftKey: "llmTagPrompt" | "llmOcrPrompt";
+  defaultPrompt: string;
+  labelKey: string;
+  guideKey: string;
+  resetKey: string;
+  customizedKey: string;
+  draft: SettingsDraft;
+  onUpdateDraft: AISectionProps["onUpdateDraft"];
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const isCustomized = draft[draftKey] !== "";
+
+  return (
+    <div className="py-1">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-g-sm px-1 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <ChevronRight
+          size={12}
+          className={cn(
+            "shrink-0 text-g-ink-4 transition-transform duration-150 ease-g motion-reduce:transition-none",
+            expanded && "rotate-90",
+          )}
+        />
+        <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2">
+          {t(labelKey)}
+        </span>
+        {isCustomized && (
+          <span className="rounded-full bg-g-accent/15 px-1.5 py-px font-g text-[10px] font-[590] tracking-[0.04em] text-g-accent">
+            {t(customizedKey)}
+          </span>
+        )}
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-150 ease-g motion-reduce:transition-none",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="flex flex-col gap-3 px-1 pb-3 pt-1">
+            <div className="flex items-start gap-2 rounded-g-md border border-g-blue-soft bg-g-blue-soft/20 px-3 py-2.5">
+              <Info size={14} className="mt-px shrink-0 text-g-blue" />
+              <p className="font-g text-g-caption leading-[1.55] tracking-g-ui text-g-ink-3">
+                {t(guideKey)}
+              </p>
+            </div>
+
+            <textarea
+              className="w-full min-h-[180px] resize-y rounded-g-md border border-g-ink-3/25 bg-g-surface-2 px-3.5 py-2.5 font-g-mono text-g-caption leading-[1.65] tracking-g-mono text-g-ink-1 placeholder:text-g-ink-4 focus:border-g-accent focus:outline-none focus:ring-1 focus:ring-g-accent"
+              value={draft[draftKey] || defaultPrompt}
+              onChange={(e) =>
+                onUpdateDraft((current) => ({
+                  ...current,
+                  [draftKey]:
+                    e.target.value === defaultPrompt ? "" : e.target.value,
+                }))
+              }
+            />
+
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<RotateCcw size={12} />}
+                disabled={!isCustomized}
+                onClick={() =>
+                  onUpdateDraft((current) => ({
+                    ...current,
+                    [draftKey]: "",
+                  }))
+                }
+              >
+                {t(resetKey)}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

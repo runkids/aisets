@@ -7,7 +7,7 @@ import { Badge, Tooltip } from "./ui";
 export function OCRStatusBadge({ item }: { item: AssetItem }) {
   const { t } = useTranslation();
   const label = ocrStatusLabel(t, item);
-  if (!item.ocr || !label) return null;
+  if (!item.ocr || item.ocr.status !== "ready" || !label) return null;
 
   const isVLM = item.ocr.engineName === "vlm";
   const readyTone = isVLM ? "purple" : "green";

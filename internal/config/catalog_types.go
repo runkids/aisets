@@ -86,6 +86,7 @@ type CatalogItemFacets struct {
 	AICategories             []CatalogFacetOption       `json:"aiCategories"`
 	AICategoryTotal          int                        `json:"aiCategoryTotal"`
 	OCRReadyCount            int                        `json:"ocrReadyCount"`
+	VLMOcrReadyCount         int                        `json:"vlmOcrReadyCount"`
 	AITagReadyCount          int                        `json:"aiTagReadyCount"`
 }
 

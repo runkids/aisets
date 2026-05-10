@@ -20,6 +20,7 @@ type Props = {
   "aria-label"?: string;
   size?: SelectSize;
   className?: string;
+  disabled?: boolean;
 };
 
 const triggerVariants = cva(
@@ -50,6 +51,7 @@ export function Select({
   "aria-label": ariaLabel,
   size = "md",
   className,
+  disabled,
 }: Props) {
   const internalValue = value === "" ? EMPTY_SENTINEL : value;
   const normalizedOptions = options.map((o) =>
@@ -62,7 +64,11 @@ export function Select({
   }
 
   return (
-    <SelectPrimitive.Root value={internalValue} onValueChange={handleChange}>
+    <SelectPrimitive.Root
+      value={internalValue}
+      onValueChange={handleChange}
+      disabled={disabled}
+    >
       <SelectPrimitive.Trigger
         className={cn(triggerVariants({ size }), className)}
         aria-label={ariaLabel}

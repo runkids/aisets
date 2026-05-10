@@ -989,6 +989,7 @@ export function BrowseView({
         aiCategoryOptions={aiCategoryFacet.options}
         aiCategoryTotal={aiCategoryFacet.total}
         ocrReadyCount={facets?.ocrReadyCount}
+        vlmOcrReadyCount={facets?.vlmOcrReadyCount}
         aiTagReadyCount={facets?.aiTagReadyCount}
         totalCount={facets?.projectTotal}
         ocrEnabled={ocrEnabled}

@@ -1530,7 +1530,12 @@
     "aiTagCustomPromptHint": "自訂送給視覺模型的圖片分析提示詞",
     "aiTagResetPrompt": "重設為預設值",
     "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"description\"（字串）、\"languages\"（字串陣列）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
+    "aiTagPromptCustomized": "已自訂",
     "aiTagDefaultPromptLabel": "使用預設提示詞",
+    "aiOcrCustomPrompt": "自訂提示詞",
+    "aiOcrResetPrompt": "重設為預設值",
+    "aiOcrPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"text\"（字串——保留原始排版的可見文字）、\"languages\"（字串陣列，ISO 639-3 語系碼）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗",
+    "aiOcrPromptCustomized": "已自訂",
     "strategyAICategory": "AI 分類",
     "strategyAICategoryHint": "僅匹配經 AI 標記分類的圖片——留空則匹配全部",
     "aiCategory.icon": "圖示",
@@ -1682,6 +1687,10 @@
     "aiDescription": "描述",
     "aiLanguages": "語言",
     "aiModel": "模型",
-    "aiDuration": "處理時間"
+    "aiDuration": "處理時間",
+    "aiSection": {
+      "tag": "AI 標記",
+      "ocr": "AI OCR"
+    }
   }
 }

@@ -36,6 +36,7 @@ type FilterRailProps = {
   aiCategoryOptions?: FilterOption[];
   aiCategoryTotal?: number;
   ocrReadyCount?: number;
+  vlmOcrReadyCount?: number;
   aiTagReadyCount?: number;
   totalCount?: number;
   ocrEnabled?: boolean;
@@ -69,6 +70,7 @@ export function FilterRail({
   aiCategoryOptions,
   aiCategoryTotal,
   ocrReadyCount,
+  vlmOcrReadyCount,
   aiTagReadyCount,
   totalCount,
   ocrEnabled = true,
@@ -197,16 +199,6 @@ export function FilterRail({
               }
             />
           )}
-          {aiEnabled && (
-            <RailItem
-              active={filters.aiOcrStatus === "aiTagReady"}
-              label={t("filterRail.aiTagReady")}
-              count={aiTagReadyCount ?? 0}
-              onClick={() =>
-                onFiltersChange({ ...filters, aiOcrStatus: "aiTagReady" })
-              }
-            />
-          )}
           {ocrEnabled && (
             <RailItem
               active={filters.aiOcrStatus === "ocrPending"}
@@ -214,6 +206,36 @@ export function FilterRail({
               count={(totalCount ?? 0) - (ocrReadyCount ?? 0)}
               onClick={() =>
                 onFiltersChange({ ...filters, aiOcrStatus: "ocrPending" })
+              }
+            />
+          )}
+          {aiEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "vlmOcrReady"}
+              label={t("filterRail.vlmOcrReady")}
+              count={vlmOcrReadyCount ?? 0}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "vlmOcrReady" })
+              }
+            />
+          )}
+          {aiEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "vlmOcrPending"}
+              label={t("filterRail.vlmOcrPending")}
+              count={(totalCount ?? 0) - (vlmOcrReadyCount ?? 0)}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "vlmOcrPending" })
+              }
+            />
+          )}
+          {aiEnabled && (
+            <RailItem
+              active={filters.aiOcrStatus === "aiTagReady"}
+              label={t("filterRail.aiTagReady")}
+              count={aiTagReadyCount ?? 0}
+              onClick={() =>
+                onFiltersChange({ ...filters, aiOcrStatus: "aiTagReady" })
               }
             />
           )}
