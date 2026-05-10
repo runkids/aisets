@@ -19,7 +19,8 @@
     "precheck": "Pre-Check",
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets navigation",
-    "projects": "Projects"
+    "projects": "Projects",
+    "prompts": "Prompts"
   },
   "mode": {
     "dashboard": "Dashboard",
@@ -41,7 +42,9 @@
     "lintDesc": "Code-level asset usage findings and hygiene rules.",
     "precheckDesc": "Check images before adding them to a project.",
     "projects": "Projects",
-    "projectsDesc": "Manage project roots, workspace health, and scan coverage."
+    "projectsDesc": "Manage project roots, workspace health, and scan coverage.",
+    "prompts": "Prompts",
+    "promptsDesc": "Create and manage AI prompt templates with variables."
   },
   "action": {
     "addProject": "Add Project",
@@ -870,7 +873,7 @@
     "llmConcurrencyHint": "Number of images to process simultaneously. Default is 1.",
     "llmConcurrencyWarning": "Higher values consume more GPU/CPU resources. Keep at 1 for local models (Ollama, LM Studio) unless you have a multi-GPU setup.",
     "aiTagGroup": "AI Tagging",
-    "aiTagDescription": "Automatically generate categories, tags, and descriptions for all assets using the vision model",
+    "aiTagDescription": "Select a workspace and project to generate categories, tags, and descriptions",
     "aiTagRun": "Run AI Tagging",
     "aiTagStop": "Stop",
     "aiTagStopping": "Stopping…",
@@ -889,6 +892,7 @@
     "aiOcrResetPrompt": "Reset to default",
     "aiOcrPromptGuide": "The VLM must return valid JSON with these fields: \"text\" (string — all visible text preserving layout) and \"languages\" (string array of ISO 639-3 codes). Extra fields are ignored. If JSON parsing fails, the result is marked as failed.",
     "aiOcrPromptCustomized": "Customized",
+    "managePrompts": "Manage Prompts",
     "strategyAICategory": "AI Category",
     "strategyAICategoryHint": "Only match images classified by AI tagging — leave empty to match all",
     "aiCategory.icon": "Icon",
@@ -907,7 +911,7 @@
     "aiTagRunStopped": "AI tagging stopped",
     "aiTagRunFailed": "AI tagging failed",
     "aiOcrGroup": "AI OCR",
-    "aiOcrDescription": "Use vision AI model to extract text from images with higher accuracy than traditional OCR",
+    "aiOcrDescription": "Select a workspace and project to extract text from images using vision AI",
     "aiOcrRun": "Run AI OCR",
     "aiOcrStop": "Stop",
     "aiOcrStopping": "Stopping…",
@@ -915,8 +919,11 @@
     "aiOcrDone": "Done — {{ready}} extracted, {{skipped}} skipped, {{cacheHit}} cached",
     "aiOcrStopped": "Stopped",
     "aiOcrFailed": "AI OCR failed",
+    "aiAllWorkspaces": "All Workspaces",
+    "aiAllProjects": "All Projects",
     "aiLastRun": "Last run {{time}}",
     "aiLastRunCounts": "{{ready}} tagged, {{skipped}} skipped, {{cacheHit}} cached",
+    "aiLastRunScopeAll": "All",
     "aiTokenTooltip": "Input {{input}} / Output {{output}} tokens"
   },
   "error": {
@@ -1742,5 +1749,56 @@
       "tag": "AI Tagging",
       "ocr": "AI OCR"
     }
+  },
+  "prompts": {
+    "title": "Prompt Editor",
+    "tagPresets": "AI Tag",
+    "ocrPresets": "AI OCR",
+    "addPreset": "Add Preset",
+    "newPresetName": "New Preset",
+    "nameLabel": "Name",
+    "templateLabel": "Template",
+    "templatePlaceholder": "Enter your prompt template...",
+    "variablesLabel": "Variables",
+    "variableType": "Type",
+    "typeTags": "List (multi-value)",
+    "typeText": "Text (single value)",
+    "typeSelect": "Options (comma-separated)",
+    "variableValues": "Values",
+    "preview": "Preview",
+    "save": "Save",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "setDefault": "Set Default",
+    "isDefault": "Default preset",
+    "emptyState": "Select a preset or create a new one",
+    "insertVariable": "Insert Variable",
+    "confirmDelete": "Delete this preset?",
+    "confirmYes": "Yes, delete",
+    "confirmNo": "Cancel",
+    "cannotDeleteDefault": "Cannot delete the default preset",
+    "resetToDefault": "Reset to Default",
+    "unsavedChanges": "You have unsaved changes",
+    "var": {
+      "categories": "List of valid categories for classification",
+      "tags": "Descriptive tags for the image",
+      "description": "Description format guidance",
+      "languages": "Language detection guidance",
+      "text": "Text extraction format"
+    },
+    "missingRequired": "Missing required variables",
+    "builtinBadge": "Built-in",
+    "requiredBadge": "Required",
+    "customVariable": "Custom variable...",
+    "toastSaved": "Preset saved",
+    "toastSaveFailed": "Save failed",
+    "toastDeleted": "Preset deleted",
+    "toastDeleteFailed": "Delete failed",
+    "toastDuplicated": "Preset duplicated",
+    "toastCreated": "Preset created",
+    "toastCreateFailed": "Create failed",
+    "toastDefaultSet": "Default preset updated",
+    "toastDefaultSetFailed": "Set default failed",
+    "toastReset": "Template reset to default"
   }
 }

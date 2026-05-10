@@ -4,15 +4,20 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"aisets/internal/aitag"
 	"aisets/internal/apierr"
+	"aisets/internal/config"
 	"aisets/internal/imageproc"
+	"aisets/internal/imgtools"
 	"aisets/internal/llm"
 	"aisets/internal/scanner"
 )
@@ -20,7 +25,13 @@ import (
 func prepareImageForVLM(localPath, ext string) (string, error) {
 	ext = strings.ToLower(ext)
 	switch ext {
-	case ".avif", ".svg":
+	case ".svg":
+		pngData, err := rasterizeSVGViaImgtools(localPath, 512)
+		if err != nil {
+			return "", err
+		}
+		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngData), nil
+	case ".avif":
 		pngData, err := imageproc.ImageToPNG(localPath, 512)
 		if err != nil {
 			return "", err
@@ -33,6 +44,26 @@ func prepareImageForVLM(localPath, ext string) (string, error) {
 		}
 		return "data:" + extToMIME(ext) + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 	}
+}
+
+func rasterizeSVGViaImgtools(path string, maxSize int) ([]byte, error) {
+	bin, err := imgtools.Binary()
+	if err != nil {
+		return nil, fmt.Errorf("imgtools not available: %w", err)
+	}
+	tmp, err := os.CreateTemp("", "svgpng-*.png")
+	if err != nil {
+		return nil, err
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+	defer os.Remove(tmpPath)
+
+	cmd := exec.Command(bin, "svg-to-png", "--max-size", strconv.Itoa(maxSize), path, tmpPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("imgtools svg-to-png: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return os.ReadFile(tmpPath)
 }
 
 func extToMIME(ext string) string {
@@ -93,14 +124,27 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 
 	providerName := settings.LLMProvider
 	modelName := settings.LLMVisionModel
+
 	prompt := settings.LLMTagPrompt
+	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
+		if preset, err := s.store.GetPromptPreset(presetID); err == nil {
+			prompt = config.FormatPrompt(preset.Content)
+		}
+	}
 	if prompt == "" {
 		prompt = aitag.TagPrompt
 	}
 
+	projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
+
 	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
 	for _, rawItem := range catalog.Items {
 		item := rawItem
+		if projectFilter != nil {
+			if _, ok := projectFilter[item.ProjectID]; !ok {
+				continue
+			}
+		}
 		if !eligibleForAITag(item) {
 			continue
 		}
@@ -217,9 +261,13 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		close(results)
 	}()
 
+	var firstError string
 	for work := range results {
 		if work.result.Status == aitag.StatusFailed {
 			counts.Failed++
+			if firstError == "" {
+				firstError = work.result.ErrorMessage
+			}
 		} else {
 			counts.Ready++
 		}
@@ -241,10 +289,18 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		sendNDJSON(w, map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts})
+		progressEvent := map[string]any{"type": "progress", "assetId": work.item.ID, "repoPath": work.item.RepoPath, "status": work.result.Status, "counts": counts}
+		if work.result.Status == aitag.StatusFailed && work.result.ErrorMessage != "" {
+			progressEvent["errorMessage"] = work.result.ErrorMessage
+		}
+		sendNDJSON(w, progressEvent)
 	}
 
-	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
+	doneEvent := map[string]any{"type": "done", "counts": counts}
+	if firstError != "" {
+		doneEvent["firstError"] = firstError
+	}
+	sendNDJSON(w, doneEvent)
 }
 
 func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) (aitag.Result, llm.ChatResponse) {

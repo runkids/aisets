@@ -586,14 +586,28 @@ export function SettingsView({
               working={working}
               aiTagActivity={aiTagActivity}
               vlmOcrActivity={vlmOcrActivity}
+              workspaces={workspaces}
+              projects={settingsProjects.map((p) => ({
+                ...p,
+                assetCount: assetCountByProject[p.id] ?? 0,
+              }))}
+              activeWorkspaceId={activeWorkspaceId}
               settingActions={settingActionsFor("ai")}
               onUpdateDraft={updateDraft}
-              onStartAITag={() =>
-                onStartAITag(() => onSaveSettings({ silent: true }))
+              onStartAITag={(presetId, projectIds) =>
+                onStartAITag(
+                  () => onSaveSettings({ silent: true }),
+                  presetId,
+                  projectIds,
+                )
               }
               onStopAITag={onStopAITag}
-              onStartVLMOcr={() =>
-                onStartVLMOcr(() => onSaveSettings({ silent: true }))
+              onStartVLMOcr={(presetId, projectIds) =>
+                onStartVLMOcr(
+                  () => onSaveSettings({ silent: true }),
+                  presetId,
+                  projectIds,
+                )
               }
               onStopVLMOcr={onStopVLMOcr}
             />

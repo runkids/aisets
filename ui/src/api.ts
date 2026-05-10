@@ -19,6 +19,9 @@ import type {
   Project,
   ProjectScanIntent,
   ProjectScanIntentDetection,
+  PromptPreset,
+  PromptPresetContent,
+  PromptPresetType,
   ScanAnalyses,
   ScanDiff,
   ScanEvent,
@@ -461,8 +464,15 @@ function isAITagDone(
 export async function runAITagging(options?: {
   onEvent?: (event: AITagRunEvent) => void;
   signal?: AbortSignal;
+  presetId?: string;
+  projectIds?: string[];
 }) {
-  const response = await fetch(`${basePath}/api/ai/tag/run`, {
+  const qp = new URLSearchParams();
+  if (options?.presetId) qp.set("presetId", options.presetId);
+  if (options?.projectIds?.length)
+    qp.set("projectIds", options.projectIds.join(","));
+  const params = qp.toString() ? `?${qp}` : "";
+  const response = await fetch(`${basePath}/api/ai/tag/run${params}`, {
     method: "POST",
     signal: options?.signal,
   });
@@ -505,8 +515,15 @@ function isVLMOcrDone(
 export async function runVLMOcr(options?: {
   onEvent?: (event: VLMOcrRunEvent) => void;
   signal?: AbortSignal;
+  presetId?: string;
+  projectIds?: string[];
 }) {
-  const response = await fetch(`${basePath}/api/ai/ocr/run`, {
+  const qp = new URLSearchParams();
+  if (options?.presetId) qp.set("presetId", options.presetId);
+  if (options?.projectIds?.length)
+    qp.set("projectIds", options.projectIds.join(","));
+  const params = qp.toString() ? `?${qp}` : "";
+  const response = await fetch(`${basePath}/api/ai/ocr/run${params}`, {
     method: "POST",
     signal: options?.signal,
   });
@@ -812,4 +829,48 @@ export async function batchExport(assetIds: string[]) {
     "assets-export.zip";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function listPromptPresets(type?: PromptPresetType) {
+  const params = type ? `?type=${type}` : "";
+  return request<{ presets: PromptPreset[] }>(`/api/prompt-presets${params}`);
+}
+
+export function createPromptPreset(data: {
+  type: PromptPresetType;
+  name: string;
+  content: PromptPresetContent;
+  isDefault?: boolean;
+}) {
+  return request<{ preset: PromptPreset }>("/api/prompt-presets", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updatePromptPreset(
+  id: string,
+  data: {
+    name?: string;
+    content?: PromptPresetContent;
+    isDefault?: boolean;
+  },
+) {
+  return request<{ preset: PromptPreset }>(`/api/prompt-presets/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deletePromptPreset(id: string) {
+  return request<{ ok: boolean }>(`/api/prompt-presets/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function setPromptPresetDefault(id: string) {
+  return request<{ preset: PromptPreset }>(
+    `/api/prompt-presets/${id}/default`,
+    { method: "POST" },
+  );
 }

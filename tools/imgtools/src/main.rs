@@ -1,6 +1,7 @@
 mod convert;
 mod hash;
 mod probe;
+mod svg;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -82,6 +83,16 @@ enum Command {
         /// Output file path
         output: String,
     },
+    /// Rasterize SVG to PNG using resvg
+    SvgToPng {
+        /// Max dimension (default 512)
+        #[arg(long, default_value_t = 512)]
+        max_size: u32,
+        /// Input SVG file path
+        input: String,
+        /// Output PNG file path
+        output: String,
+    },
     /// Print version
     Version,
 }
@@ -115,6 +126,11 @@ fn main() {
             input,
             output,
         } => thumbnail(&input, &output, size),
+        Command::SvgToPng {
+            max_size,
+            input,
+            output,
+        } => svg::svg_to_png(&input, &output, max_size),
         Command::Version => {
             println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));
             Ok(())

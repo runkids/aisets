@@ -166,20 +166,26 @@ export function DuplicatesView({
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const hasMoreData =
-    hasMoreDuplicateItems || hasMoreExactDuplicates || hasMoreNearDuplicates;
+    hasMoreDuplicateItems ||
+    (tab === "exact" ? hasMoreExactDuplicates : hasMoreNearDuplicates);
   const isFetchingMore =
     isFetchingMoreDuplicateItems ||
-    isFetchingMoreExactDuplicates ||
-    isFetchingMoreNearDuplicates;
+    (tab === "exact"
+      ? isFetchingMoreExactDuplicates
+      : isFetchingMoreNearDuplicates);
 
   const loadMorePages = useCallback(() => {
     if (hasMoreDuplicateItems && !isFetchingMoreDuplicateItems)
       void fetchNextDuplicateItemsPage();
-    if (hasMoreExactDuplicates && !isFetchingMoreExactDuplicates)
-      void fetchNextExactDuplicatesPage();
-    if (hasMoreNearDuplicates && !isFetchingMoreNearDuplicates)
-      void fetchNextNearDuplicatesPage();
+    if (tab === "exact") {
+      if (hasMoreExactDuplicates && !isFetchingMoreExactDuplicates)
+        void fetchNextExactDuplicatesPage();
+    } else {
+      if (hasMoreNearDuplicates && !isFetchingMoreNearDuplicates)
+        void fetchNextNearDuplicatesPage();
+    }
   }, [
+    tab,
     fetchNextDuplicateItemsPage,
     hasMoreDuplicateItems,
     isFetchingMoreDuplicateItems,
@@ -255,14 +261,33 @@ export function DuplicatesView({
     return groupViews.map((g) => ({ group: g }));
   }, [groupedByExt, groupViews]);
 
+  const visibleNearDuplicates = useMemo(
+    () =>
+      nearDuplicates.filter(
+        (nd) => itemById.has(nd.leftId) && itemById.has(nd.rightId),
+      ),
+    [nearDuplicates, itemById],
+  );
+
   // eslint-disable-next-line react-hooks/incompatible-library -- intentional virtual scroll for 900+ groups
   const exactVirtualizer = useVirtualizer({
     count: virtualRows.length,
     getScrollElement: () => exactScrollRef.current,
     estimateSize: () => 280,
     overscan: 6,
+    enabled: tab === "exact",
   });
   const exactVirtualItems = exactVirtualizer.getVirtualItems();
+
+  // eslint-disable-next-line react-hooks/incompatible-library -- virtual scroll for similar pairs
+  const similarVirtualizer = useVirtualizer({
+    count: visibleNearDuplicates.length,
+    getScrollElement: () => exactScrollRef.current,
+    estimateSize: () => 340,
+    overscan: 4,
+    enabled: tab === "similar",
+  });
+  const similarVirtualItems = similarVirtualizer.getVirtualItems();
 
   /* ── Selection callbacks ── */
 
@@ -776,29 +801,47 @@ export function DuplicatesView({
 
           {/* ── Similar tab ── */}
 
-          {!loading && tab === "similar" && (
-            <div className="grid gap-4">
-              {nearDuplicates.map((nd) => {
-                const left = itemById.get(nd.leftId);
-                const right = itemById.get(nd.rightId);
-                if (!left || !right) return null;
-                return (
-                  <SimilarPairCard
-                    key={nd.id}
-                    nd={nd}
-                    left={left}
-                    right={right}
-                  />
-                );
-              })}
-              {nearDuplicates.length === 0 && (
+          {!loading &&
+            tab === "similar" &&
+            (visibleNearDuplicates.length === 0 ? (
+              nearDuplicatesQuery.isLoading ||
+              duplicateItemsQuery.isLoading ||
+              nearDuplicatesQuery.isFetchingNextPage ||
+              duplicateItemsQuery.isFetchingNextPage ? (
+                <EmptyState title={t("common.loading")} />
+              ) : (
                 <EmptyState
                   title={t("duplicates.noSimilar")}
                   description={t("duplicates.noSimilarDesc")}
                 />
-              )}
-            </div>
-          )}
+              )
+            ) : (
+              <div
+                className="relative w-full"
+                style={{ height: similarVirtualizer.getTotalSize() }}
+              >
+                {similarVirtualItems.map((vItem) => {
+                  const nd = visibleNearDuplicates[vItem.index];
+                  const left = itemById.get(nd.leftId)!;
+                  const right = itemById.get(nd.rightId)!;
+                  return (
+                    <div
+                      key={vItem.key}
+                      className="absolute left-0 top-0 w-full"
+                      style={{
+                        transform: `translateY(${vItem.start}px)`,
+                      }}
+                      ref={similarVirtualizer.measureElement}
+                      data-index={vItem.index}
+                    >
+                      <div className="pb-4">
+                        <SimilarPairCard nd={nd} left={left} right={right} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
 
           {/* ── Delete confirmation ── */}
           {showDeleteConfirm && (

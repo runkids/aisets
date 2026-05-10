@@ -22,6 +22,7 @@ export type Mode =
   | "optimize"
   | "lint"
   | "precheck"
+  | "prompts"
   | "settings";
 
 export const modes: Mode[] = [
@@ -33,6 +34,7 @@ export const modes: Mode[] = [
   "optimize",
   "lint",
   "precheck",
+  "prompts",
   "settings",
 ];
 

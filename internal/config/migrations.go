@@ -256,6 +256,16 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_hash ON ocr_results(hash_algorithm, content_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_tags_category ON ai_tags (category) WHERE status = 'ready'`,
+		`CREATE TABLE IF NOT EXISTS prompt_presets (
+			id         TEXT    PRIMARY KEY,
+			type       TEXT    NOT NULL CHECK(type IN ('tag', 'ocr')),
+			name       TEXT    NOT NULL,
+			content    TEXT    NOT NULL DEFAULT '{}',
+			is_default INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT    NOT NULL,
+			updated_at TEXT    NOT NULL
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {
@@ -305,6 +315,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateOptimizationVariantColumn(); err != nil {
+		return err
+	}
+	if err := s.migratePromptPresetsSeed(); err != nil {
 		return err
 	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
@@ -932,4 +945,107 @@ func (s *Store) migrateAITagsDropPromptVersion() error {
 		}
 	}
 	return tx.Commit()
+}
+
+func (s *Store) migratePromptPresetsSeed() error {
+	const version = 8
+	var applied int
+	err := s.db.QueryRow(`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&applied)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	var settingsJSON string
+	err = s.db.QueryRow(`SELECT value FROM app_settings WHERE key = 'app'`).Scan(&settingsJSON)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	var raw map[string]any
+	if settingsJSON != "" {
+		_ = json.Unmarshal([]byte(settingsJSON), &raw)
+	}
+	if raw == nil {
+		raw = map[string]any{}
+	}
+
+	tagCustom, _ := raw["llmTagPrompt"].(string)
+	ocrCustom, _ := raw["llmOcrPrompt"].(string)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := nowUTC()
+
+	seedPreset := func(presetType, name, prompt string, isDefault bool) error {
+		content := PromptPresetContent{
+			Template:  prompt,
+			Variables: map[string]PromptVariable{},
+		}
+		contentJSON, err := json.Marshal(content)
+		if err != nil {
+			return err
+		}
+		id := presetType + "-" + strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		_, err = tx.Exec(
+			`INSERT OR IGNORE INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			id, presetType, name, string(contentJSON), boolToInt(isDefault), now, now,
+		)
+		return err
+	}
+
+	if tagCustom != "" {
+		if err := seedPreset("tag", "Custom", tagCustom, true); err != nil {
+			return err
+		}
+		if err := seedPreset("tag", "Built-in Default", defaultTagPrompt(), false); err != nil {
+			return err
+		}
+	} else {
+		if err := seedPreset("tag", "Built-in Default", defaultTagPrompt(), true); err != nil {
+			return err
+		}
+	}
+
+	if ocrCustom != "" {
+		if err := seedPreset("ocr", "Custom", ocrCustom, true); err != nil {
+			return err
+		}
+		if err := seedPreset("ocr", "Built-in Default", defaultOCRPrompt(), false); err != nil {
+			return err
+		}
+	} else {
+		if err := seedPreset("ocr", "Built-in Default", defaultOCRPrompt(), true); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func defaultTagPrompt() string {
+	return `Analyze this image and respond with a JSON object containing:
+- "category": one of {{categories}}
+- "tags": {{tags}}
+- "description": {{description}}
+- "languages": {{languages}}
+
+Respond ONLY with valid JSON, no markdown or explanation.`
+}
+
+func defaultOCRPrompt() string {
+	return `Analyze this image and respond with a JSON object:
+- "text": {{text}}
+- "languages": {{languages}}
+
+Respond ONLY with valid JSON, no markdown or explanation.`
 }

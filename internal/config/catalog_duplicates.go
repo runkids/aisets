@@ -20,7 +20,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 		nearJoin, nearWhere, nearArgs := s.nearDuplicateFilters(scanID, q.ProjectName, q.Ext)
 
 		var total int
-		countSQL := fmt.Sprintf(`SELECT COUNT(DISTINCT n.near_id) FROM near_duplicate_snapshots n%s WHERE n.scan_id = ?%s`, nearJoin, nearWhere)
+		countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM near_duplicate_snapshots n%s WHERE n.scan_id = ?%s`, nearJoin, nearWhere)
 		countArgs := make([]any, 0, 1+len(nearArgs))
 		countArgs = append(countArgs, scanID)
 		countArgs = append(countArgs, nearArgs...)
@@ -28,7 +28,7 @@ func (s *Store) CatalogDuplicates(q CatalogDuplicatesQuery) (CatalogDuplicatesPa
 			return CatalogDuplicatesPage{}, err
 		}
 		selectSQL := fmt.Sprintf(`
-			SELECT DISTINCT n.near_id, n.left_id, n.right_id, n.left_path, n.right_path, n.distance, n.flipped
+			SELECT n.near_id, n.left_id, n.right_id, n.left_path, n.right_path, n.distance, n.flipped
 			FROM near_duplicate_snapshots n%s
 			WHERE n.scan_id = ?%s
 			ORDER BY n.distance ASC, n.left_path ASC, n.right_path ASC

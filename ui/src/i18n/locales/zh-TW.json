@@ -19,7 +19,8 @@
     "settings": "設定",
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets 導覽",
-    "projects": "專案"
+    "projects": "專案",
+    "prompts": "提示詞"
   },
   "mode": {
     "dashboard": "總覽",
@@ -41,7 +42,9 @@
     "precheckDesc": "素材加入專案前先檢查圖片",
     "settingsDesc": "管理本機資料、外觀與儲存路徑",
     "projects": "專案",
-    "projectsDesc": "管理專案根目錄、工作區健康度與掃描覆蓋"
+    "projectsDesc": "管理專案根目錄、工作區健康度與掃描覆蓋",
+    "prompts": "提示詞",
+    "promptsDesc": "建立並管理 AI 提示詞範本與變數"
   },
   "action": {
     "addProject": "新增專案",
@@ -1585,7 +1588,7 @@
     "llmConcurrencyHint": "同時處理的圖片數量，預設為 1",
     "llmConcurrencyWarning": "較高的數值會消耗更多 GPU / CPU 資源。本地模型（Ollama、LM Studio）建議維持 1，除非有多 GPU 環境",
     "aiTagGroup": "AI 標記",
-    "aiTagDescription": "使用視覺模型自動為所有素材產生分類、標籤和描述",
+    "aiTagDescription": "選擇要處理的工作區與專案，自動產生分類、標籤和描述",
     "aiTagRun": "執行 AI 標記",
     "aiTagStop": "停止",
     "aiTagStopping": "停止中…",
@@ -1604,6 +1607,7 @@
     "aiOcrResetPrompt": "重設為預設值",
     "aiOcrPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"text\"（字串——保留原始排版的可見文字）、\"languages\"（字串陣列，ISO 639-3 語系碼）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗",
     "aiOcrPromptCustomized": "已自訂",
+    "managePrompts": "管理提示詞",
     "strategyAICategory": "AI 分類",
     "strategyAICategoryHint": "僅匹配經 AI 標記分類的圖片——留空則匹配全部",
     "aiCategory.icon": "圖示",
@@ -1622,7 +1626,7 @@
     "aiTagRunStopped": "AI 標記已停止",
     "aiTagRunFailed": "AI 標記失敗",
     "aiOcrGroup": "AI OCR",
-    "aiOcrDescription": "使用視覺 AI 模型從圖片中提取文字，比傳統 OCR 精準度更高",
+    "aiOcrDescription": "選擇要處理的工作區與專案，使用 AI 從圖片中提取文字",
     "aiOcrRun": "執行 AI OCR",
     "aiOcrStop": "停止",
     "aiOcrStopping": "停止中…",
@@ -1630,8 +1634,11 @@
     "aiOcrDone": "完成 — {{ready}} 已提取、{{skipped}} 已略過、{{cacheHit}} 快取命中",
     "aiOcrStopped": "已停止",
     "aiOcrFailed": "AI OCR 失敗",
+    "aiAllWorkspaces": "所有工作區",
+    "aiAllProjects": "所有專案",
     "aiLastRun": "上次執行 {{time}}",
     "aiLastRunCounts": "{{ready}} 已標記、{{skipped}} 已略過、{{cacheHit}} 快取命中",
+    "aiLastRunScopeAll": "全部",
     "aiTokenTooltip": "輸入 {{input}} / 輸出 {{output}} tokens"
   },
   "catalog": {
@@ -1763,5 +1770,56 @@
       "tag": "AI 標記",
       "ocr": "AI OCR"
     }
+  },
+  "prompts": {
+    "title": "提示詞編輯器",
+    "tagPresets": "AI 標記",
+    "ocrPresets": "AI OCR",
+    "addPreset": "新增預設",
+    "newPresetName": "新預設",
+    "nameLabel": "名稱",
+    "templateLabel": "範本",
+    "templatePlaceholder": "輸入提示詞範本…",
+    "variablesLabel": "變數",
+    "variableType": "類型",
+    "typeTags": "清單（多值）",
+    "typeText": "文字（單值）",
+    "typeSelect": "選項（逗號分隔）",
+    "variableValues": "值",
+    "preview": "預覽",
+    "save": "儲存",
+    "delete": "刪除",
+    "duplicate": "複製",
+    "setDefault": "設為預設",
+    "isDefault": "預設提示詞",
+    "emptyState": "選擇一個預設或建立新的",
+    "insertVariable": "插入變數",
+    "confirmDelete": "要刪除此預設嗎",
+    "confirmYes": "確定刪除",
+    "confirmNo": "取消",
+    "cannotDeleteDefault": "無法刪除預設提示詞",
+    "resetToDefault": "恢復預設",
+    "unsavedChanges": "有未儲存的變更",
+    "var": {
+      "categories": "用於分類的有效類別清單",
+      "tags": "圖片的描述性標籤",
+      "description": "描述格式指引",
+      "languages": "語言偵測指引",
+      "text": "文字提取格式"
+    },
+    "missingRequired": "缺少必要變數",
+    "builtinBadge": "內建",
+    "requiredBadge": "必要",
+    "customVariable": "自訂變數…",
+    "toastSaved": "預設已儲存",
+    "toastSaveFailed": "儲存失敗",
+    "toastDeleted": "預設已刪除",
+    "toastDeleteFailed": "刪除失敗",
+    "toastDuplicated": "預設已複製",
+    "toastCreated": "預設已建立",
+    "toastCreateFailed": "建立失敗",
+    "toastDefaultSet": "預設提示詞已更新",
+    "toastDefaultSetFailed": "設定預設失敗",
+    "toastReset": "範本已恢復預設"
   }
 }

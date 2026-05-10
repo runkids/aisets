@@ -1,4 +1,5 @@
 import type { ImageBackgroundMode } from "../../imageBackground";
+import type { Mode } from "../../ui";
 import type { AITagActivityState } from "../../aiTagActivity";
 import type { OCRActivityState } from "../../ocrActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
@@ -29,13 +30,22 @@ export type SettingsViewProps = {
   onStartOCR: (saveSettings: () => Promise<void>) => void;
   onStopOCR: () => void;
   onDismissOCR: () => void;
-  onStartAITag: (saveSettings: () => Promise<void>) => void;
+  onStartAITag: (
+    saveSettings: () => Promise<void>,
+    presetId?: string,
+    projectIds?: string[],
+  ) => void;
   onStopAITag: () => void;
   onDismissAITag: () => void;
-  onStartVLMOcr: (saveSettings: () => Promise<void>) => void;
+  onStartVLMOcr: (
+    saveSettings: () => Promise<void>,
+    presetId?: string,
+    projectIds?: string[],
+  ) => void;
   onStopVLMOcr: () => void;
   onDismissVLMOcr: () => void;
   onAddProject?: () => void;
+  onNavigate?: (mode: Mode) => void;
 };
 
 export type Section =

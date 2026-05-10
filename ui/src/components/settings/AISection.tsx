@@ -1,30 +1,30 @@
 import {
   AlertTriangle,
-  ChevronRight,
-  Info,
   LoaderCircle,
   Play,
   RefreshCw,
-  RotateCcw,
   ScanText,
   Square,
+  Star,
   Tags,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/cn";
+import { usePromptPresetsQuery } from "../../queries";
 import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
-import type { AITagRunCounts, VLMOcrRunCounts } from "../../types";
+import type { AITagRunCounts, VLMOcrRunCounts, Workspace } from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";
+import type { ScopeProject } from "./AIScopePicker";
+import { AIScopePicker } from "./AIScopePicker";
 
 const AI_TAG_LAST_RUN_KEY = "aisets:ai-tag:last-run";
 const VLM_OCR_LAST_RUN_KEY = "aisets:vlm-ocr:last-run";
 
-type LastRunRecord<T> = { counts: T; timestamp: number };
+type LastRunRecord<T> = { counts: T; timestamp: number; scopeLabel?: string };
 
 function readLastRun<T>(key: string): LastRunRecord<T> | null {
   try {
@@ -35,11 +35,11 @@ function readLastRun<T>(key: string): LastRunRecord<T> | null {
   }
 }
 
-function saveLastRun<T>(key: string, counts: T): void {
+function saveLastRun<T>(key: string, counts: T, scopeLabel?: string): void {
   try {
     localStorage.setItem(
       key,
-      JSON.stringify({ counts, timestamp: Date.now() }),
+      JSON.stringify({ counts, timestamp: Date.now(), scopeLabel }),
     );
   } catch {
     // ignore storage errors (quota, private mode)
@@ -52,19 +52,6 @@ function formatTokenCount(n: number): string {
   return String(n);
 }
 
-const DEFAULT_TAG_PROMPT = `Analyze this image and respond with a JSON object containing:
-- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
-- "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")
-- "description": one sentence describing the image content
-- "languages": array of ISO 639-3 language codes for any visible text (e.g. ["eng"]). Empty array if no text.
-
-Respond ONLY with valid JSON, no markdown or explanation.`;
-
-const DEFAULT_OCR_PROMPT = `Analyze this image and respond with a JSON object:
-- "text": all visible text exactly as it appears, preserving original layout, line breaks, indentation and formatting. If the image contains code, preserve indentation exactly. Empty string if no text is visible.
-- "languages": array of ISO 639-3 language codes detected in the text (e.g. ["eng"], ["zho", "eng"]). Empty array if no text.
-
-Respond ONLY with valid JSON, no markdown or explanation.`;
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
 import {
@@ -86,11 +73,14 @@ type AISectionProps = {
   working: boolean;
   aiTagActivity: AITagActivityState;
   vlmOcrActivity: VLMOcrActivityState;
+  workspaces: Workspace[];
+  projects: ScopeProject[];
+  activeWorkspaceId: string;
   settingActions: ReactNode;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
-  onStartAITag: () => void;
+  onStartAITag: (presetId?: string, projectIds?: string[]) => void;
   onStopAITag: () => void;
-  onStartVLMOcr: () => void;
+  onStartVLMOcr: (presetId?: string, projectIds?: string[]) => void;
   onStopVLMOcr: () => void;
 };
 
@@ -108,6 +98,9 @@ export function AISection({
   working,
   aiTagActivity,
   vlmOcrActivity,
+  workspaces,
+  projects,
+  activeWorkspaceId,
   settingActions,
   onUpdateDraft,
   onStartAITag,
@@ -116,6 +109,59 @@ export function AISection({
   onStopVLMOcr,
 }: AISectionProps) {
   const { t } = useTranslation();
+
+  const tagPresetsQuery = usePromptPresetsQuery("tag");
+  const ocrPresetsQuery = usePromptPresetsQuery("ocr");
+  const [selectedTagPresetIdOverride, setSelectedTagPresetId] =
+    useState<string>("");
+  const [selectedOcrPresetIdOverride, setSelectedOcrPresetId] =
+    useState<string>("");
+
+  const tagDefaultPresetId = useMemo(
+    () => tagPresetsQuery.data?.presets?.find((p) => p.isDefault)?.id ?? "",
+    [tagPresetsQuery.data?.presets],
+  );
+  const ocrDefaultPresetId = useMemo(
+    () => ocrPresetsQuery.data?.presets?.find((p) => p.isDefault)?.id ?? "",
+    [ocrPresetsQuery.data?.presets],
+  );
+  const selectedTagPresetId = selectedTagPresetIdOverride || tagDefaultPresetId;
+  const selectedOcrPresetId = selectedOcrPresetIdOverride || ocrDefaultPresetId;
+
+  const [tagWorkspaceId, setTagWorkspaceId] =
+    useState<string>(activeWorkspaceId);
+  const [tagProjectId, setTagProjectId] = useState<string>("");
+  const [ocrWorkspaceId, setOcrWorkspaceId] =
+    useState<string>(activeWorkspaceId);
+  const [ocrProjectId, setOcrProjectId] = useState<string>("");
+
+  function resolveProjectIds(
+    wsId: string,
+    projId: string,
+  ): string[] | undefined {
+    if (projId) return [projId];
+    if (wsId) {
+      const ids = projects
+        .filter((p) => p.workspaceId === wsId)
+        .map((p) => p.id);
+      return ids.length ? ids : undefined;
+    }
+    return undefined;
+  }
+
+  const resolveScopeLabel = useCallback(
+    (wsId: string, projId: string): string => {
+      const allLabel = t("settings.aiLastRunScopeAll");
+      const wsName = wsId
+        ? (workspaces.find((w) => w.id === wsId)?.name ?? wsId)
+        : allLabel;
+      const projName = projId
+        ? (projects.find((p) => p.id === projId)?.name ?? projId)
+        : allLabel;
+      return `${wsName} / ${projName}`;
+    },
+    [t, workspaces, projects],
+  );
 
   const [lastAITagRun, setLastAITagRun] =
     useState<LastRunRecord<AITagRunCounts> | null>(() =>
@@ -126,6 +172,21 @@ export function AISection({
       readLastRun<VLMOcrRunCounts>(VLM_OCR_LAST_RUN_KEY),
     );
 
+  const tagScopeLabelRef = useRef(
+    resolveScopeLabel(tagWorkspaceId, tagProjectId),
+  );
+  const ocrScopeLabelRef = useRef(
+    resolveScopeLabel(ocrWorkspaceId, ocrProjectId),
+  );
+
+  useEffect(() => {
+    tagScopeLabelRef.current = resolveScopeLabel(tagWorkspaceId, tagProjectId);
+  }, [tagWorkspaceId, tagProjectId, resolveScopeLabel]);
+
+  useEffect(() => {
+    ocrScopeLabelRef.current = resolveScopeLabel(ocrWorkspaceId, ocrProjectId);
+  }, [ocrWorkspaceId, ocrProjectId, resolveScopeLabel]);
+
   const prevAITagPhase = useRef(aiTagActivity.phase);
   useEffect(() => {
     const prev = prevAITagPhase.current;
@@ -135,11 +196,13 @@ export function AISection({
       (aiTagActivity.phase === "done" || aiTagActivity.phase === "stopped") &&
       aiTagActivity.counts
     ) {
+      const sl = tagScopeLabelRef.current;
       const record: LastRunRecord<AITagRunCounts> = {
         counts: aiTagActivity.counts,
         timestamp: Date.now(),
+        scopeLabel: sl,
       };
-      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts);
+      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts, sl);
       setLastAITagRun(record);
     }
   }, [aiTagActivity.phase, aiTagActivity.counts]);
@@ -153,11 +216,13 @@ export function AISection({
       (vlmOcrActivity.phase === "done" || vlmOcrActivity.phase === "stopped") &&
       vlmOcrActivity.counts
     ) {
+      const sl = ocrScopeLabelRef.current;
       const record: LastRunRecord<VLMOcrRunCounts> = {
         counts: vlmOcrActivity.counts,
         timestamp: Date.now(),
+        scopeLabel: sl,
       };
-      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts);
+      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts, sl);
       setLastVLMOcrRun(record);
     }
   }, [vlmOcrActivity.phase, vlmOcrActivity.counts]);
@@ -410,7 +475,7 @@ export function AISection({
 
       {providerEnabled && (
         <Card
-          className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
           padding="none"
         >
           <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
@@ -419,74 +484,98 @@ export function AISection({
               {t("settings.aiTagGroup")}
             </span>
           </div>
-          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-            <FieldRow
-              label={t("settings.aiTagGroup")}
-              description={t("settings.aiTagDescription")}
-              icon={<Tags size={15} />}
-              align="start"
-            >
-              <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
-                <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
-                  {isAITagActivityBusy(aiTagActivity) ? (
-                    <Button
-                      variant="secondary"
-                      leadingIcon={
-                        aiTagActivity.phase === "stopping" ? (
-                          <LoaderCircle
-                            size={14}
-                            className="animate-[icon-spin_900ms_linear_infinite]"
-                          />
-                        ) : (
-                          <Square size={14} />
-                        )
-                      }
-                      onClick={onStopAITag}
-                      disabled={aiTagActivity.phase === "stopping"}
-                    >
-                      {aiTagActivity.phase === "stopping"
-                        ? t("settings.aiTagStopping")
-                        : t("settings.aiTagStop")}
-                    </Button>
-                  ) : (
+          <div className="flex items-start justify-between gap-6 px-6 py-4 md:px-8">
+            <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
+              {t("settings.aiTagDescription")}
+            </p>
+            <div className="flex flex-col gap-1.5 shrink-0 w-[520px]">
+              {!isAITagActivityBusy(aiTagActivity) && (
+                <AIScopePicker
+                  workspaces={workspaces}
+                  projects={projects}
+                  selectedWorkspaceId={tagWorkspaceId}
+                  selectedProjectId={tagProjectId}
+                  disabled={isAITagActivityBusy(aiTagActivity)}
+                  onChangeWorkspace={setTagWorkspaceId}
+                  onChangeProject={setTagProjectId}
+                />
+              )}
+              <div className="flex items-center justify-end gap-1.5">
+                {isAITagActivityBusy(aiTagActivity) ? (
+                  <Button
+                    variant="secondary"
+                    leadingIcon={
+                      aiTagActivity.phase === "stopping" ? (
+                        <LoaderCircle
+                          size={14}
+                          className="animate-[icon-spin_900ms_linear_infinite]"
+                        />
+                      ) : (
+                        <Square size={14} />
+                      )
+                    }
+                    onClick={onStopAITag}
+                    disabled={aiTagActivity.phase === "stopping"}
+                  >
+                    {aiTagActivity.phase === "stopping"
+                      ? t("settings.aiTagStopping")
+                      : t("settings.aiTagStop")}
+                  </Button>
+                ) : (
+                  <>
+                    {tagPresetsQuery.data?.presets &&
+                      tagPresetsQuery.data.presets.length > 0 && (
+                        <Select
+                          value={selectedTagPresetId}
+                          options={tagPresetsQuery.data.presets.map((p) => ({
+                            value: p.id,
+                            label: p.name,
+                            icon: p.isDefault ? (
+                              <Star
+                                size={14}
+                                className="fill-current text-g-amber"
+                              />
+                            ) : undefined,
+                          }))}
+                          onChange={setSelectedTagPresetId}
+                          aria-label={t("settings.aiTagGroup")}
+                          className="min-w-0 flex-1"
+                        />
+                      )}
                     <Button
                       variant="primary"
                       leadingIcon={<Play size={14} />}
                       disabled={working || draft.llmVisionModel === ""}
-                      onClick={onStartAITag}
+                      onClick={() =>
+                        onStartAITag(
+                          selectedTagPresetId || undefined,
+                          resolveProjectIds(tagWorkspaceId, tagProjectId),
+                        )
+                      }
                     >
                       {t("settings.aiTagRun")}
                     </Button>
-                  )}
-                </div>
-                {isAITagActivityBusy(aiTagActivity) ||
-                aiTagActivity.phase === "error" ? (
-                  <AITagProgressText activity={aiTagActivity} />
-                ) : lastAITagRun ? (
-                  <LastRunText
-                    counts={lastAITagRun.counts}
-                    timestamp={lastAITagRun.timestamp}
-                  />
-                ) : null}
+                  </>
+                )}
               </div>
-            </FieldRow>
-            <PromptEditor
-              draftKey="llmTagPrompt"
-              defaultPrompt={DEFAULT_TAG_PROMPT}
-              labelKey="settings.aiTagCustomPrompt"
-              guideKey="settings.aiTagPromptGuide"
-              resetKey="settings.aiTagResetPrompt"
-              customizedKey="settings.aiTagPromptCustomized"
-              draft={draft}
-              onUpdateDraft={onUpdateDraft}
-            />
+              {isAITagActivityBusy(aiTagActivity) ||
+              aiTagActivity.phase === "error" ? (
+                <AITagProgressText activity={aiTagActivity} />
+              ) : lastAITagRun ? (
+                <LastRunText
+                  counts={lastAITagRun.counts}
+                  timestamp={lastAITagRun.timestamp}
+                  scopeLabel={lastAITagRun.scopeLabel}
+                />
+              ) : null}
+            </div>
           </div>
         </Card>
       )}
 
       {providerEnabled && (
         <Card
-          className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
           padding="none"
         >
           <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
@@ -495,67 +584,91 @@ export function AISection({
               {t("settings.aiOcrGroup")}
             </span>
           </div>
-          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-            <FieldRow
-              label={t("settings.aiOcrGroup")}
-              description={t("settings.aiOcrDescription")}
-              icon={<ScanText size={15} />}
-              align="start"
-            >
-              <div className="flex w-full flex-col items-start gap-2 min-[1200px]:w-[560px] min-[1200px]:items-end">
-                <div className="flex flex-wrap justify-start gap-2 min-[1200px]:justify-end">
-                  {isVLMOcrActivityBusy(vlmOcrActivity) ? (
-                    <Button
-                      variant="secondary"
-                      leadingIcon={
-                        vlmOcrActivity.phase === "stopping" ? (
-                          <LoaderCircle
-                            size={14}
-                            className="animate-[icon-spin_900ms_linear_infinite]"
-                          />
-                        ) : (
-                          <Square size={14} />
-                        )
-                      }
-                      onClick={onStopVLMOcr}
-                      disabled={vlmOcrActivity.phase === "stopping"}
-                    >
-                      {vlmOcrActivity.phase === "stopping"
-                        ? t("settings.aiOcrStopping")
-                        : t("settings.aiOcrStop")}
-                    </Button>
-                  ) : (
+          <div className="flex items-start justify-between gap-6 px-6 py-4 md:px-8">
+            <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
+              {t("settings.aiOcrDescription")}
+            </p>
+            <div className="flex flex-col gap-1.5 shrink-0 w-[520px]">
+              {!isVLMOcrActivityBusy(vlmOcrActivity) && (
+                <AIScopePicker
+                  workspaces={workspaces}
+                  projects={projects}
+                  selectedWorkspaceId={ocrWorkspaceId}
+                  selectedProjectId={ocrProjectId}
+                  disabled={isVLMOcrActivityBusy(vlmOcrActivity)}
+                  onChangeWorkspace={setOcrWorkspaceId}
+                  onChangeProject={setOcrProjectId}
+                />
+              )}
+              <div className="flex items-center justify-end gap-1.5">
+                {isVLMOcrActivityBusy(vlmOcrActivity) ? (
+                  <Button
+                    variant="secondary"
+                    leadingIcon={
+                      vlmOcrActivity.phase === "stopping" ? (
+                        <LoaderCircle
+                          size={14}
+                          className="animate-[icon-spin_900ms_linear_infinite]"
+                        />
+                      ) : (
+                        <Square size={14} />
+                      )
+                    }
+                    onClick={onStopVLMOcr}
+                    disabled={vlmOcrActivity.phase === "stopping"}
+                  >
+                    {vlmOcrActivity.phase === "stopping"
+                      ? t("settings.aiOcrStopping")
+                      : t("settings.aiOcrStop")}
+                  </Button>
+                ) : (
+                  <>
+                    {ocrPresetsQuery.data?.presets &&
+                      ocrPresetsQuery.data.presets.length > 0 && (
+                        <Select
+                          value={selectedOcrPresetId}
+                          options={ocrPresetsQuery.data.presets.map((p) => ({
+                            value: p.id,
+                            label: p.name,
+                            icon: p.isDefault ? (
+                              <Star
+                                size={14}
+                                className="fill-current text-g-amber"
+                              />
+                            ) : undefined,
+                          }))}
+                          onChange={setSelectedOcrPresetId}
+                          aria-label={t("settings.aiOcrGroup")}
+                          className="min-w-0 flex-1"
+                        />
+                      )}
                     <Button
                       variant="primary"
                       leadingIcon={<Play size={14} />}
                       disabled={working || draft.llmVisionModel === ""}
-                      onClick={onStartVLMOcr}
+                      onClick={() =>
+                        onStartVLMOcr(
+                          selectedOcrPresetId || undefined,
+                          resolveProjectIds(ocrWorkspaceId, ocrProjectId),
+                        )
+                      }
                     >
                       {t("settings.aiOcrRun")}
                     </Button>
-                  )}
-                </div>
-                {isVLMOcrActivityBusy(vlmOcrActivity) ||
-                vlmOcrActivity.phase === "error" ? (
-                  <VLMOcrProgressText activity={vlmOcrActivity} />
-                ) : lastVLMOcrRun ? (
-                  <LastRunText
-                    counts={lastVLMOcrRun.counts}
-                    timestamp={lastVLMOcrRun.timestamp}
-                  />
-                ) : null}
+                  </>
+                )}
               </div>
-            </FieldRow>
-            <PromptEditor
-              draftKey="llmOcrPrompt"
-              defaultPrompt={DEFAULT_OCR_PROMPT}
-              labelKey="settings.aiOcrCustomPrompt"
-              guideKey="settings.aiOcrPromptGuide"
-              resetKey="settings.aiOcrResetPrompt"
-              customizedKey="settings.aiOcrPromptCustomized"
-              draft={draft}
-              onUpdateDraft={onUpdateDraft}
-            />
+              {isVLMOcrActivityBusy(vlmOcrActivity) ||
+              vlmOcrActivity.phase === "error" ? (
+                <VLMOcrProgressText activity={vlmOcrActivity} />
+              ) : lastVLMOcrRun ? (
+                <LastRunText
+                  counts={lastVLMOcrRun.counts}
+                  timestamp={lastVLMOcrRun.timestamp}
+                  scopeLabel={lastVLMOcrRun.scopeLabel}
+                />
+              ) : null}
+            </div>
           </div>
         </Card>
       )}
@@ -623,9 +736,11 @@ function TokenBadge({
 function LastRunText({
   counts,
   timestamp,
+  scopeLabel,
 }: {
   counts: AITagRunCounts | VLMOcrRunCounts;
   timestamp: number;
+  scopeLabel?: string;
 }) {
   const { t } = useTranslation();
   const date = new Date(timestamp);
@@ -654,6 +769,11 @@ function LastRunText({
           </span>
         )}
       </p>
+      {scopeLabel && (
+        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {scopeLabel}
+        </span>
+      )}
       {"inputTokens" in counts &&
         (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
           <TokenBadge
@@ -749,104 +869,6 @@ function VLMOcrProgressText({ activity }: { activity: VLMOcrActivityState }) {
           outputTokens={counts.outputTokens ?? 0}
         />
       )}
-    </div>
-  );
-}
-
-function PromptEditor({
-  draftKey,
-  defaultPrompt,
-  labelKey,
-  guideKey,
-  resetKey,
-  customizedKey,
-  draft,
-  onUpdateDraft,
-}: {
-  draftKey: "llmTagPrompt" | "llmOcrPrompt";
-  defaultPrompt: string;
-  labelKey: string;
-  guideKey: string;
-  resetKey: string;
-  customizedKey: string;
-  draft: SettingsDraft;
-  onUpdateDraft: AISectionProps["onUpdateDraft"];
-}) {
-  const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const isCustomized = draft[draftKey] !== "";
-
-  return (
-    <div className="py-1">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 rounded-g-sm px-1 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-      >
-        <ChevronRight
-          size={12}
-          className={cn(
-            "shrink-0 text-g-ink-4 transition-transform duration-150 ease-g motion-reduce:transition-none",
-            expanded && "rotate-90",
-          )}
-        />
-        <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2">
-          {t(labelKey)}
-        </span>
-        {isCustomized && (
-          <span className="rounded-full bg-g-accent/15 px-1.5 py-px font-g text-[10px] font-[590] tracking-[0.04em] text-g-accent">
-            {t(customizedKey)}
-          </span>
-        )}
-      </button>
-
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows] duration-150 ease-g motion-reduce:transition-none",
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="flex flex-col gap-3 px-1 pb-3 pt-1">
-            <div className="flex items-start gap-2 rounded-g-md border border-g-blue-soft bg-g-blue-soft/20 px-3 py-2.5">
-              <Info size={14} className="mt-px shrink-0 text-g-blue" />
-              <p className="font-g text-g-caption leading-[1.55] tracking-g-ui text-g-ink-3">
-                {t(guideKey)}
-              </p>
-            </div>
-
-            <textarea
-              className="w-full min-h-[180px] resize-y rounded-g-md border border-g-ink-3/25 bg-g-surface-2 px-3.5 py-2.5 font-g-mono text-g-caption leading-[1.65] tracking-g-mono text-g-ink-1 placeholder:text-g-ink-4 focus:border-g-accent focus:outline-none focus:ring-1 focus:ring-g-accent"
-              value={draft[draftKey] || defaultPrompt}
-              onChange={(e) =>
-                onUpdateDraft((current) => ({
-                  ...current,
-                  [draftKey]:
-                    e.target.value === defaultPrompt ? "" : e.target.value,
-                }))
-              }
-            />
-
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                leadingIcon={<RotateCcw size={12} />}
-                disabled={!isCustomized}
-                onClick={() =>
-                  onUpdateDraft((current) => ({
-                    ...current,
-                    [draftKey]: "",
-                  }))
-                }
-              >
-                {t(resetKey)}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

@@ -186,3 +186,71 @@
     --ring: var(--g-accent);
   }
 }
+
+/* Tiptap prompt editor */
+.prompt-editor .tiptap {
+  outline: none;
+  min-height: 120px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--g-ink);
+}
+
+.prompt-editor .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--g-ink-4);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Tiptap read-only preview */
+.prompt-preview .tiptap {
+  outline: none;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--g-ink-2);
+}
+
+.prompt-preview .tiptap p {
+  margin-bottom: 0.35em;
+}
+
+.prompt-preview .tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.prompt-preview .tiptap ul {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin-bottom: 0.35em;
+}
+
+.prompt-preview .tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin-bottom: 0.35em;
+}
+
+.prompt-preview .tiptap li {
+  margin-bottom: 0.15em;
+}
+
+.prompt-preview .tiptap li p {
+  margin-bottom: 0;
+}
+
+.prompt-variable-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: var(--g-accent-soft);
+  color: var(--g-accent);
+  font-family: var(--g-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  vertical-align: baseline;
+  user-select: none;
+}

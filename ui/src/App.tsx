@@ -31,6 +31,7 @@ import { LintView } from "./components/LintView";
 import { NavSidebar } from "./components/NavSidebar";
 import { OptimizeView } from "./components/OptimizeView";
 import { PreCheckView } from "./components/PreCheckView";
+import { PromptsView } from "./components/PromptsView";
 import { PreviewModal } from "./components/PreviewModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { ScanHistoryView } from "./components/ScanHistoryView";
@@ -610,7 +611,11 @@ export function App() {
     dispatchOCRActivity({ type: "dismiss" });
   }
 
-  function onStartAITagActivity(saveSettings: () => Promise<void>) {
+  function onStartAITagActivity(
+    saveSettings: () => Promise<void>,
+    presetId?: string,
+    projectIds?: string[],
+  ) {
     if (aiTagActivityRunRef.current) return;
 
     const run = (async () => {
@@ -618,7 +623,8 @@ export function App() {
         abortRef: aiTagActivityAbortRef,
         dispatch: dispatchAITagActivity,
         saveSettings,
-        run: ({ signal, onEvent }) => runAITagging({ signal, onEvent }),
+        run: ({ signal, onEvent }) =>
+          runAITagging({ signal, onEvent, presetId, projectIds }),
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -639,7 +645,11 @@ export function App() {
     dispatchAITagActivity({ type: "dismiss" });
   }
 
-  function onStartVLMOcrActivity(saveSettings: () => Promise<void>) {
+  function onStartVLMOcrActivity(
+    saveSettings: () => Promise<void>,
+    presetId?: string,
+    projectIds?: string[],
+  ) {
     if (vlmOcrRunRef.current) return;
 
     const run = (async () => {
@@ -647,7 +657,8 @@ export function App() {
         abortRef: vlmOcrAbortRef,
         dispatch: dispatchVLMOcr,
         saveSettings,
-        run: ({ signal, onEvent }) => runVLMOcr({ signal, onEvent }),
+        run: ({ signal, onEvent }) =>
+          runVLMOcr({ signal, onEvent, presetId, projectIds }),
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -923,6 +934,7 @@ export function App() {
               onStopVLMOcr={onStopVLMOcrActivity}
               onDismissVLMOcr={onDismissVLMOcrActivity}
               onAddProject={() => setDirectoryPickerOpen(true)}
+              onNavigate={changeMode}
             />
           ) : mode === "duplicates" && catalogSummary ? (
             catalogSummary.analysis.nearDuplicates === "notComputed" ? (
@@ -1006,6 +1018,8 @@ export function App() {
             )
           ) : mode === "history" ? (
             <ScanHistoryView />
+          ) : mode === "prompts" ? (
+            <PromptsView />
           ) : (
             <div
               key={mode}

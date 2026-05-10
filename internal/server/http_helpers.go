@@ -41,6 +41,19 @@ func (s *Server) wrapBasePath(next http.Handler) http.Handler {
 	})
 }
 
+func parseProjectFilter(raw string) map[string]struct{} {
+	if raw == "" {
+		return nil
+	}
+	m := make(map[string]struct{})
+	for _, id := range strings.Split(raw, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			m[id] = struct{}{}
+		}
+	}
+	return m
+}
+
 func readJSON(r *http.Request, target any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(target)

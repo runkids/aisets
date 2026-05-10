@@ -215,6 +215,14 @@ These aren't taste preferences — each prevents a specific class of bugs:
 | **i18n tab label length** | English labels are 2–3× wider than CJK ("Dimensions" vs "尺寸"). When multiple `<Tabs>` groups share one row, keep EN labels to 3–6 chars (Fmt, Dims, Crit, Warn, Suggest). Always verify EN locale at 1440px — overflow invisible in zh-TW will break English. |
 | **No `max-h-full` on images in grid containers** | `max-height: 100%` inside `grid` with `place-items-center` resolves against the auto-sized grid track, not the container's explicit height — the image overflows and gets clipped by `overflow-hidden`. Use `absolute inset-0 h-full w-full object-contain` with a `relative` container instead. This is the standard pattern for fitting an image within a fixed-aspect-ratio box (e.g. `aspect-[4/3]`). |
 | **useEffect deps: derived booleans** | `useReducer` activity objects get a new reference on every dispatch (streaming counts). Effects watching `[activity]` re-run per event. Extract the derived value outside (`const busy = isBusy(activity)`) and watch only the boolean — reruns only when it actually changes. |
+| **Portal for dropdowns in scroll containers** | `position: absolute` dropdowns inside `overflow-y-auto` scroll containers get clipped. Use `createPortal(menu, document.body)` + `position: fixed` with `getBoundingClientRect()` positioning. Listen to scroll events (with `{ capture: true }`) to reposition on scroll. Include the portal element in click-outside detection via a separate ref. |
+| **Auto-flip dropdown on viewport edge** | Fixed-position dropdown menus must check `spaceBelow` vs `menuHeight`. If insufficient space below and more space above, flip the menu upward (`top = triggerRect.top - menuH - gap`). Use `requestAnimationFrame(updatePosition)` after first render to get accurate menu height for the flip calculation. |
+| **Action panel: left-right between layout** | AI run cards and similar action panels use `flex items-start justify-between` — description on the left (`max-w-[28ch]`), controls on the right (`shrink-0 w-[520px]`). Don't use FieldRow for action-oriented cards where the primary purpose is "pick scope → run" — FieldRow is for settings fields, not execution panels. |
+| **Use shared input primitives** | Never use raw `<input>`/`<textarea>` in page components. Use `TextInput`, `Textarea`, `Select` from `./ui`. Raw elements miss `--g-input-*` tokens and produce broken focus/hover states in light mode. |
+| **Tool/config pages follow Settings layout** | New tool/config pages must match the Settings pattern: `Rail variant="settings"` sidebar + content in a single `Card` at `max-w-[1040px]`. Data views follow the Browse pattern with `FilterRail` + three-layer structure. Never invent a new layout. |
+| **Sidebar nav must use RailItem** | All sidebar navigation uses `Rail` + `RailSection` + `RailItem`. The active state tokens (`--g-active-bg`, `--g-active-text`, `--g-active-weight`) are built into `RailItem` — custom button lists will mismatch both themes. |
+| **Toast for every mutation** | Every React Query mutation needs `onSuccess`/`onError` with `useToast()`. Use `errorMessage(err)` for error bodies. Add i18n keys to all 5 locales. |
+| **Verify both themes before delivery** | Dark mode (canonical) passes ≠ done. Light mode has different surface/border contrast — test both. White-on-white inputs and invisible borders only appear in light mode. |
 
 ---
 
@@ -228,8 +236,10 @@ Run through before reporting any UI task as done:
 - [ ] Status/severity combines color + icon + text
 - [ ] `aria-label` on every icon-only button
 - [ ] Overlays: ESC dismiss + focus trap (Radix Dialog/AlertDialog handles this)
-- [ ] Verified in dark mode (canonical theme)
+- [ ] Verified in **both dark mode (canonical) and light mode** — light mode has different surface contrast
 - [ ] Responsive check: 1440 / 1024 / 768 / 375
+- [ ] All text inputs use `TextInput`/`Textarea`/`Select` from `./ui` — no raw `<input>`
+- [ ] Layout matches an established page pattern (Settings or Browse blueprint)
 - [ ] `DESIGN.md` updated if you added a new token, component, or variant
 
 ---

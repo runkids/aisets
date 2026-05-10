@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"aisets/internal/apierr"
+	"aisets/internal/config"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
@@ -108,13 +109,25 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	settingsHash := vlmOCRSettingsHash(modelName)
 
 	prompt := settings.LLMOcrPrompt
+	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
+		if preset, err := s.store.GetPromptPreset(presetID); err == nil {
+			prompt = config.FormatPrompt(preset.Content)
+		}
+	}
 	if prompt == "" {
 		prompt = vlmOCRPrompt
 	}
 
+	projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
+
 	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
 	for _, rawItem := range catalog.Items {
 		item := rawItem
+		if projectFilter != nil {
+			if _, ok := projectFilter[item.ProjectID]; !ok {
+				continue
+			}
+		}
 		if !eligibleForVLMOCR(item) {
 			continue
 		}
