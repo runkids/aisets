@@ -77,6 +77,8 @@
     "batchMove": "Move",
     "batchRename": "Rename",
     "batchExport": "Export",
+    "batchAITag": "AI Tag",
+    "batchAIOcr": "AI OCR",
     "applying": "Applying…",
     "generating": "Generating…",
     "copy": "Copy",
@@ -311,7 +313,7 @@
     "section": {
       "workspace": "Workspace",
       "projects": "Projects",
-      "theme": "Appearance",
+      "appearance": "Appearance",
       "scanning": "Scanning",
       "ai": "AI",
       "customFilters": "Custom Filters",

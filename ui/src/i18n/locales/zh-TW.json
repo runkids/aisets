@@ -77,6 +77,8 @@
     "batchMove": "搬移",
     "batchRename": "重新命名",
     "batchExport": "匯出",
+    "batchAITag": "AI 標籤",
+    "batchAIOcr": "AI OCR",
     "applying": "套用中…",
     "generating": "產生中…",
     "copy": "複製",
@@ -1008,7 +1010,7 @@
     "section": {
       "workspace": "工作區",
       "projects": "專案",
-      "theme": "外觀",
+      "appearance": "外觀",
       "scanning": "掃描",
       "ai": "AI",
       "customFilters": "自訂篩選器",

@@ -51,7 +51,7 @@ export type SettingsViewProps = {
 export type Section =
   | "workspace"
   | "projects"
-  | "theme"
+  | "appearance"
   | "scanning"
   | "ai"
   | "customFilters"

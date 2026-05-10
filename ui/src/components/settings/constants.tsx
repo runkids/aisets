@@ -23,7 +23,7 @@ import type {
 import type { Section } from "./types";
 
 export const sectionMeta: { id: Section; icon: ReactNode }[] = [
-  { id: "theme", icon: <Paintbrush size={15} /> },
+  { id: "appearance", icon: <Paintbrush size={15} /> },
   { id: "workspace", icon: <Settings2 size={15} /> },
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },

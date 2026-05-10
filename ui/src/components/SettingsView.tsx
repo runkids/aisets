@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { exportSettings } from "../api";
@@ -77,8 +77,21 @@ export function SettingsView({
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = sectionFromParam(searchParams.get("section"));
-  const [localSection, setLocalSection] = useState<Section>("workspace");
+  const [localSection, setLocalSection] = useState<Section>("appearance");
   const activeSection = requestedSection ?? localSection;
+
+  useEffect(() => {
+    if (!searchParams.has("section")) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("section", "appearance");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
     null,
   );
@@ -460,8 +473,7 @@ export function SettingsView({
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (section === "workspace") next.delete("section");
-        else next.set("section", section);
+        next.set("section", section);
         next.delete("expand");
         return next;
       },
@@ -528,7 +540,7 @@ export function SettingsView({
             />
           )}
 
-          {activeSection === "theme" && (
+          {activeSection === "appearance" && (
             <ThemeSection
               theme={theme}
               imagePreviewEnabled={imagePreviewEnabled}

@@ -82,7 +82,9 @@
     "batchCopyPartial": "{{total}} 件中 {{succeeded}} 件をコピーしました（{{failed}} 件失敗、{{skipped}} 件スキップ）",
     "batchMove": "移動",
     "batchRename": "名前変更",
-    "batchExport": "エクスポート"
+    "batchExport": "エクスポート",
+    "batchAITag": "AI タグ",
+    "batchAIOcr": "AI OCR"
   },
   "search": {
     "placeholder": "パス、プロジェクト、フォーマット、コンテンツハッシュで検索…",
@@ -950,7 +952,7 @@
     "section": {
       "workspace": "ワークスペース",
       "projects": "プロジェクト",
-      "theme": "外観",
+      "appearance": "外観",
       "scanning": "スキャン",
       "ai": "AI",
       "customFilters": "カスタムフィルター",

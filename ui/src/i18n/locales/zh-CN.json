@@ -82,7 +82,9 @@
     "batchCopyPartial": "已复制 {{succeeded}} / {{total}} 个文件（{{failed}} 个失败、{{skipped}} 个跳过）",
     "batchMove": "移动",
     "batchRename": "重命名",
-    "batchExport": "导出"
+    "batchExport": "导出",
+    "batchAITag": "AI 标签",
+    "batchAIOcr": "AI OCR"
   },
   "search": {
     "placeholder": "搜索路径、项目、格式或 content hash…",
@@ -950,7 +952,7 @@
     "section": {
       "workspace": "工作区",
       "projects": "项目",
-      "theme": "外观",
+      "appearance": "外观",
       "scanning": "扫描",
       "ai": "AI",
       "customFilters": "自定义筛选器",
