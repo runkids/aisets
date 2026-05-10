@@ -13,6 +13,7 @@ type FilterState = {
   customFilter: string;
   aiCategory: string;
   aiOcrStatus: string;
+  hasGPS: string;
 };
 
 type FilterRailProps = {
@@ -29,6 +30,7 @@ type FilterRailProps = {
   vlmOcrReadyCount?: number;
   aiTagReadyCount?: number;
   totalCount?: number;
+  exifHasGpsCount?: number;
   ocrEnabled?: boolean;
   aiEnabled?: boolean;
   onFiltersChange: (filters: FilterState) => void;
@@ -59,6 +61,7 @@ export function FilterRail({
   vlmOcrReadyCount,
   aiTagReadyCount,
   totalCount,
+  exifHasGpsCount,
   ocrEnabled = true,
   aiEnabled = false,
   onFiltersChange,
@@ -122,6 +125,22 @@ export function FilterRail({
           />
         ))}
       </RailSection>
+
+      {(exifHasGpsCount ?? 0) > 0 && (
+        <RailSection heading={t("drawer.exif.title")}>
+          <RailItem
+            active={filters.hasGPS === "true"}
+            label={t("browse.filter.hasGps")}
+            count={exifHasGpsCount ?? 0}
+            onClick={() =>
+              onFiltersChange({
+                ...filters,
+                hasGPS: filters.hasGPS === "true" ? "" : "true",
+              })
+            }
+          />
+        </RailSection>
+      )}
 
       {ocrEnabled || aiEnabled ? (
         <RailSection heading={t("filterRail.aiStatus")}>
