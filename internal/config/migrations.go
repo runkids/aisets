@@ -1090,8 +1090,18 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 	}
 
 	content := PromptPresetContent{
-		Template:  defaultOptimizePrompt(),
-		Variables: map[string]PromptVariable{},
+		Template: defaultOptimizePrompt(),
+		Variables: map[string]PromptVariable{
+			"contentTypes": {Type: PromptVarTags, Values: []string{
+				"photo", "icon", "screenshot", "diagram", "illustration", "gradient", "pattern", "text-heavy",
+			}},
+			"formats": {Type: PromptVarTags, Values: []string{
+				"avif", "webp", "png", "svg", "jpeg",
+			}},
+			"rules": {Type: PromptVarText, Values: []string{
+				"- Icons with transparency: lossless WebP or AVIF, preserve alpha\n- Photos/banners: lossy WebP/AVIF, quality 70-85\n- Screenshots with text: lossless or quality 95+ to preserve sharpness\n- Diagrams with text: lossless compression, consider SVG if simple shapes\n- Decorative gradients: aggressive lossy, quality 60-70\n- Patterns: lossless PNG or WebP for tile accuracy",
+			}},
+		},
 	}
 	contentJSON, err := json.Marshal(content)
 	if err != nil {
@@ -1099,7 +1109,8 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 	}
 	now := nowUTC()
 	_, err = s.db.Exec(
-		`INSERT OR IGNORE INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`,
 		"optimize-built-in-default", "optimize", "Built-in Default", string(contentJSON), 1, now, now,
 	)
 	return err
@@ -1108,20 +1119,14 @@ func (s *Store) seedOptimizePresetIfMissing() error {
 func defaultOptimizePrompt() string {
 	return `Analyze this image and provide compression advice. Respond as JSON with these fields:
 {
-  "contentType": "photo|icon|screenshot|diagram|illustration|gradient|pattern|text-heavy",
-  "recommendedFormat": "avif|webp|png|svg|jpeg",
+  "contentType": one of {{contentTypes}},
+  "recommendedFormat": one of {{formats}},
   "recommendedQuality": <number 1-100 or null for lossless>,
   "lossless": <true|false>,
   "rationale": "<one sentence explaining why this format and quality>"
 }
 
-Rules:
-- Icons with transparency: lossless WebP or AVIF, preserve alpha
-- Photos/banners: lossy WebP/AVIF, quality 70-85
-- Screenshots with text: lossless or quality 95+ to preserve sharpness
-- Diagrams with text: lossless compression, consider SVG if simple shapes
-- Decorative gradients: aggressive lossy, quality 60-70
-- Patterns: lossless PNG or WebP for tile accuracy
+{{rules}}
 
 Respond ONLY with the JSON object, no other text.`
 }

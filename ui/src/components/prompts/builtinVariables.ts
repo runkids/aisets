@@ -77,11 +77,47 @@ export const OCR_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
+export const OPTIMIZE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
+  {
+    name: "contentTypes",
+    type: "tags",
+    defaultValues: [
+      "photo",
+      "icon",
+      "screenshot",
+      "diagram",
+      "illustration",
+      "gradient",
+      "pattern",
+      "text-heavy",
+    ],
+    required: true,
+    descriptionKey: "prompts.var.contentTypes",
+  },
+  {
+    name: "formats",
+    type: "tags",
+    defaultValues: ["avif", "webp", "png", "svg", "jpeg"],
+    required: true,
+    descriptionKey: "prompts.var.formats",
+  },
+  {
+    name: "rules",
+    type: "text",
+    defaultValues: [
+      "- Icons with transparency: lossless WebP or AVIF, preserve alpha\n- Photos/banners: lossy WebP/AVIF, quality 70-85\n- Screenshots with text: lossless or quality 95+ to preserve sharpness\n- Diagrams with text: lossless compression, consider SVG if simple shapes\n- Decorative gradients: aggressive lossy, quality 60-70\n- Patterns: lossless PNG or WebP for tile accuracy",
+    ],
+    required: false,
+    descriptionKey: "prompts.var.rules",
+  },
+];
+
 export function getBuiltinVariables(
   type: PromptPresetType,
 ): BuiltinVariableDef[] {
   if (type === "tag") return TAG_BUILTIN_VARIABLES;
   if (type === "ocr") return OCR_BUILTIN_VARIABLES;
+  if (type === "optimize") return OPTIMIZE_BUILTIN_VARIABLES;
   return [];
 }
 

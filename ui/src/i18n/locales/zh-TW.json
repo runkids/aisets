@@ -1829,7 +1829,10 @@
       "tags": "圖片的描述性標籤",
       "description": "描述格式指引",
       "languages": "語言偵測指引",
-      "text": "文字提取格式"
+      "text": "文字提取格式",
+      "contentTypes": "有效的內容類型分類",
+      "formats": "推薦的輸出格式",
+      "rules": "各內容類型的壓縮規則"
     },
     "missingRequired": "缺少必要變數",
     "builtinBadge": "內建",

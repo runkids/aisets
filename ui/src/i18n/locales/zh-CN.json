@@ -1818,7 +1818,10 @@
       "tags": "图片的描述性标签",
       "description": "描述格式指引",
       "languages": "语言检测指引",
-      "text": "文字提取格式"
+      "text": "文字提取格式",
+      "contentTypes": "有效的内容类型分类",
+      "formats": "推荐的输出格式",
+      "rules": "各内容类型的压缩规则"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",

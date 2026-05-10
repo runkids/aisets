@@ -1808,7 +1808,10 @@
       "tags": "Descriptive tags for the image",
       "description": "Description format guidance",
       "languages": "Language detection guidance",
-      "text": "Text extraction format"
+      "text": "Text extraction format",
+      "contentTypes": "Valid content type classifications",
+      "formats": "Recommended output formats",
+      "rules": "Compression rules per content type"
     },
     "missingRequired": "Missing required variables",
     "builtinBadge": "Built-in",
