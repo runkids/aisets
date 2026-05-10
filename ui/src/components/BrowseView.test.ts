@@ -60,6 +60,7 @@ const defaultBrowseState = {
     customFilter: "",
     aiCategory: "",
     aiOcrStatus: "",
+    hasGPS: "",
   },
   view: "grid" as const,
   gridSize: "m" as const,
@@ -89,6 +90,7 @@ describe("normalizeBrowseStoredState", () => {
         customFilter: "icons",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       view: "list",
       gridSize: "l",
@@ -131,6 +133,7 @@ describe("normalizeBrowseStoredState", () => {
         customFilter: "palette-filter",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
     });
   });
@@ -144,6 +147,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       customFilter: "",
       aiCategory: "",
       aiOcrStatus: "",
+      hasGPS: "",
     });
   });
 
@@ -154,6 +158,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       customFilter: "",
       aiCategory: "",
       aiOcrStatus: "",
+      hasGPS: "",
     });
   });
 });
@@ -205,6 +210,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "icons",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "home",
       statusFilter: "referenced",
@@ -233,6 +239,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "icons",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "",
       statusFilter: "",
@@ -290,6 +297,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "sale",
       statusFilter: "",
@@ -316,6 +324,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "",
       statusFilter: "notApplicable",
@@ -339,6 +348,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "",
       statusFilter: "duplicate",
@@ -370,6 +380,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "sale",
       statusFilter: "",
@@ -411,6 +422,7 @@ describe("applyBrowseFilters", () => {
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       },
       searchQuery: "party",
       statusFilter: "",
@@ -429,6 +441,7 @@ describe("applyBrowseFilters", () => {
           customFilter: "",
           aiCategory: "",
           aiOcrStatus: "",
+          hasGPS: "",
         },
         searchQuery: "party",
         statusFilter: "",

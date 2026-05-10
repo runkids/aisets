@@ -1,4 +1,5 @@
 mod convert;
+mod exif;
 mod hash;
 mod probe;
 mod svg;
@@ -115,6 +116,11 @@ enum Command {
         /// Output PNG file path
         output: String,
     },
+    /// Extract EXIF metadata (GPS, camera, date, orientation, DPI)
+    Exif {
+        /// Input file path
+        input: String,
+    },
     /// Print version
     Version,
 }
@@ -161,6 +167,7 @@ fn main() {
             input,
             output,
         } => vlm_normalize::run(&input, &output, &purpose, max_size, &background),
+        Command::Exif { input } => exif::run(&input),
         Command::Version => {
             println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));
             Ok(())

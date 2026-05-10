@@ -170,6 +170,7 @@ type AssetItem struct {
 	Optimization           []OptimizationSuggestion `json:"optimizationRecommendations"`
 	OCR                    *ocr.Result              `json:"ocr,omitempty"`
 	AITag                  *aitag.Result            `json:"aiTag,omitempty"`
+	EXIF                   *imageproc.EXIFData      `json:"exif,omitempty"`
 	ScanIntent             ProjectScanIntent        `json:"scanIntent"`
 	UsageClassification    UsageClassification      `json:"usageClassification"`
 	DeleteUnusedAllowed    bool                     `json:"deleteUnusedAllowed"`

@@ -70,6 +70,24 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 			AssetID:    item.ID,
 		})
 	}
+	for _, item := range items {
+		if item.EXIF == nil || item.EXIF.GPSLatitude == nil {
+			continue
+		}
+		if item.ScanIntent != ProjectScanIntentCode {
+			continue
+		}
+		findings = append(findings, lint.Finding{
+			RuleID:     "exif-gps-privacy",
+			Severity:   "advisory",
+			File:       item.RepoPath,
+			Line:       0,
+			Snippet:    "",
+			Message:    fmt.Sprintf("Image contains GPS coordinates (%.4f, %.4f) that may expose physical location", *item.EXIF.GPSLatitude, *item.EXIF.GPSLongitude),
+			Suggestion: "Strip EXIF GPS data before committing if the location is sensitive.",
+			AssetID:    item.ID,
+		})
+	}
 	return findings
 }
 

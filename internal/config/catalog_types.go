@@ -48,6 +48,7 @@ type CatalogItemQuery struct {
 	AICategory           string
 	AIOcrStatus          string
 	VLMEngineVersion     string
+	HasGPS               *bool
 	Limit                int
 	Cursor               string
 }
@@ -90,6 +91,8 @@ type CatalogItemFacets struct {
 	OCRReadyCount            int                        `json:"ocrReadyCount"`
 	VLMOcrReadyCount         int                        `json:"vlmOcrReadyCount"`
 	AITagReadyCount          int                        `json:"aiTagReadyCount"`
+	EXIFHasGPS               int                        `json:"exifHasGps"`
+	EXIFHasCamera            int                        `json:"exifHasCamera"`
 }
 
 type CatalogFolderQuery struct {

@@ -172,6 +172,7 @@ export type CatalogItemsParams = {
   operation?: string;
   aiCategory?: string;
   aiOcrStatus?: string;
+  hasGPS?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -229,6 +230,7 @@ export function getCatalogItems(
       operation: params.operation,
       aiCategory: params.aiCategory,
       aiOcrStatus: params.aiOcrStatus,
+      hasGPS: params.hasGPS,
       limit: params.limit,
       cursor: params.cursor,
     })}`,

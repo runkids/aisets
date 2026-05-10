@@ -80,6 +80,53 @@ export function AssetDrawerOverview({ asset }: Props) {
           )}
         </div>
       </section>
+
+      {asset.exif?.hasExif && (
+        <section className="rounded-g-md border border-g-line bg-g-surface px-4 pb-3.5 pt-3">
+          <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-g-ink-4">
+            {t("drawer.exif.title")}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {asset.exif.gpsLatitude != null &&
+              asset.exif.gpsLongitude != null && (
+                <div className="flex min-h-7 items-baseline gap-3 py-px">
+                  <span className="w-[72px] shrink-0 text-g-caption text-g-ink-4">
+                    {t("drawer.exif.gps")}
+                  </span>
+                  <a
+                    href={`https://maps.google.com/?q=${asset.exif.gpsLatitude},${asset.exif.gpsLongitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 flex-1 break-all text-g-caption text-g-link hover:underline"
+                  >
+                    {asset.exif.gpsLatitude.toFixed(4)},{" "}
+                    {asset.exif.gpsLongitude.toFixed(4)}
+                  </a>
+                </div>
+              )}
+            {(asset.exif.cameraMake || asset.exif.cameraModel) && (
+              <MetaRow
+                label={t("drawer.exif.camera")}
+                value={[asset.exif.cameraMake, asset.exif.cameraModel]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
+            )}
+            {asset.exif.dateTimeOriginal && (
+              <MetaRow
+                label={t("drawer.exif.date")}
+                value={asset.exif.dateTimeOriginal}
+              />
+            )}
+            {asset.exif.dpiX != null && asset.exif.dpiX > 0 && (
+              <MetaRow
+                label={t("drawer.exif.dpi")}
+                value={`${asset.exif.dpiX} × ${asset.exif.dpiY}`}
+              />
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

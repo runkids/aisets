@@ -76,6 +76,7 @@ type BrowseFilters = {
   customFilter: string;
   aiCategory: string;
   aiOcrStatus: string;
+  hasGPS: string;
 };
 type BrowseStoredState = {
   filters: BrowseFilters;
@@ -140,6 +141,7 @@ function defaultBrowseStoredState(
       customFilter: initialCustomFilterId,
       aiCategory: "",
       aiOcrStatus: "",
+      hasGPS: "",
     },
     view: "grid",
     gridSize: "m",
@@ -190,6 +192,7 @@ export function normalizeBrowseStoredState(
       rawFilters.aiOcrStatus,
       defaults.filters.aiOcrStatus,
     ),
+    hasGPS: stringOrDefault(rawFilters.hasGPS, defaults.filters.hasGPS),
   };
 
   if (pinned?.project) filters.project = pinned.project;
@@ -251,6 +254,7 @@ export function resetBrowseFiltersForStatusChange(
     customFilter: "",
     aiCategory: "",
     aiOcrStatus: "",
+    hasGPS: "",
   };
 }
 
@@ -700,6 +704,7 @@ export function BrowseView({
       customFilter: filters.customFilter || undefined,
       aiCategory: filters.aiCategory || undefined,
       aiOcrStatus: filters.aiOcrStatus || undefined,
+      hasGPS: filters.hasGPS || undefined,
       folder: activeSelectedFolder || undefined,
       limit: 100,
     }),
@@ -710,6 +715,7 @@ export function BrowseView({
       filters.aiOcrStatus,
       filters.customFilter,
       filters.ext,
+      filters.hasGPS,
       filters.project,
       focusAssetId,
       projectFilterId,
@@ -791,6 +797,7 @@ export function BrowseView({
         customFilter: "",
         aiCategory: "",
         aiOcrStatus: "",
+        hasGPS: "",
       });
       setSearchQuery(initialSearchQuery);
       setStatusFilter("");
@@ -1003,6 +1010,7 @@ export function BrowseView({
         projectScopeName={projectFilterName}
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
+        exifHasGpsCount={facets?.exifHasGps}
         ocrReadyCount={facets?.ocrReadyCount}
         vlmOcrReadyCount={facets?.vlmOcrReadyCount}
         aiTagReadyCount={facets?.aiTagReadyCount}
