@@ -1788,6 +1788,7 @@
     "tagPresets": "AI 태그",
     "ocrPresets": "AI OCR",
     "optimizePresets": "최적화 조언",
+    "duplicatePresets": "유사 중복",
     "addPreset": "프리셋 추가",
     "newPresetName": "새 프리셋",
     "nameLabel": "이름",
@@ -1824,7 +1825,10 @@
       "rules": "콘텐츠 유형별 압축 규칙",
       "fileMetadata": "파일 메타데이터(형식, 크기, 크기) — 요청 시 자동 주입",
       "lintFindings": "이 에셋의 Lint 결과 — 요청 시 자동 주입",
-      "optimizationFindings": "규칙 기반 최적화 분석 — 요청 시 자동 주입"
+      "optimizationFindings": "규칙 기반 최적화 분석 — 요청 시 자동 주입",
+      "leftMetadata": "첫 번째(왼쪽) 이미지의 메타데이터 — 자동 입력",
+      "rightMetadata": "두 번째(오른쪽) 이미지의 메타데이터 — 자동 입력",
+      "distance": "두 이미지의 dHash 거리(0-64) — 자동 입력"
     },
     "missingRequired": "필수 변수가 누락되었습니다",
     "builtinBadge": "내장",
@@ -1841,5 +1845,14 @@
     "toastDefaultSet": "기본 프리셋 업데이트됨",
     "toastDefaultSetFailed": "기본 설정 실패",
     "toastReset": "템플릿 기본값으로 초기화됨"
+  },
+  "duplicateExplain": {
+    "button": "차이점 설명",
+    "summary": "요약",
+    "differences": "차이점",
+    "recommendation": "권장",
+    "rationale": "이유",
+    "error": "설명을 가져올 수 없습니다",
+    "tokens": "{{input}} 입력 / {{output}} 출력"
   }
 }

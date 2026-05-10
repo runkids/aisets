@@ -1788,6 +1788,7 @@
     "tagPresets": "AI 标记",
     "ocrPresets": "AI OCR",
     "optimizePresets": "优化建议",
+    "duplicatePresets": "近似重复",
     "addPreset": "新增预设",
     "newPresetName": "新预设",
     "nameLabel": "名称",
@@ -1824,7 +1825,10 @@
       "rules": "各内容类型的压缩规则",
       "fileMetadata": "文件元数据（格式、大小、尺寸）— 请求时自动注入",
       "lintFindings": "该资产的 Lint 发现 — 请求时自动注入",
-      "optimizationFindings": "基于规则的优化分析 — 请求时自动注入"
+      "optimizationFindings": "基于规则的优化分析 — 请求时自动注入",
+      "leftMetadata": "第一张（左侧）图片的元数据 — 自动填入",
+      "rightMetadata": "第二张（右侧）图片的元数据 — 自动填入",
+      "distance": "两张图片的 dHash 距离（0-64） — 自动填入"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",
@@ -1841,5 +1845,14 @@
     "toastDefaultSet": "默认提示词已更新",
     "toastDefaultSetFailed": "设置默认失败",
     "toastReset": "模板已恢复默认"
+  },
+  "duplicateExplain": {
+    "button": "解释差异",
+    "summary": "摘要",
+    "differences": "差异",
+    "recommendation": "建议",
+    "rationale": "理由",
+    "error": "无法获取解释",
+    "tokens": "{{input}} 输入 / {{output}} 输出"
   }
 }

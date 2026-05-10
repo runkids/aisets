@@ -1788,6 +1788,7 @@
     "tagPresets": "AI タグ",
     "ocrPresets": "AI OCR",
     "optimizePresets": "最適化アドバイス",
+    "duplicatePresets": "類似重複",
     "addPreset": "プリセット追加",
     "newPresetName": "新規プリセット",
     "nameLabel": "名前",
@@ -1824,7 +1825,10 @@
       "rules": "コンテンツタイプ別の圧縮ルール",
       "fileMetadata": "ファイルメタデータ（形式、サイズ、寸法）— リクエスト時に自動注入",
       "lintFindings": "このアセットの Lint 結果 — リクエスト時に自動注入",
-      "optimizationFindings": "ルールベースの最適化分析 — リクエスト時に自動注入"
+      "optimizationFindings": "ルールベースの最適化分析 — リクエスト時に自動注入",
+      "leftMetadata": "1枚目（左側）の画像メタデータ — 自動入力",
+      "rightMetadata": "2枚目（右側）の画像メタデータ — 自動入力",
+      "distance": "2つの画像のdHash距離（0-64） — 自動入力"
     },
     "missingRequired": "必須変数が不足しています",
     "builtinBadge": "組み込み",
@@ -1841,5 +1845,14 @@
     "toastDefaultSet": "デフォルトプリセットを更新しました",
     "toastDefaultSetFailed": "デフォルト設定に失敗しました",
     "toastReset": "テンプレートをデフォルトにリセットしました"
+  },
+  "duplicateExplain": {
+    "button": "違いを説明",
+    "summary": "概要",
+    "differences": "違い",
+    "recommendation": "推奨",
+    "rationale": "理由",
+    "error": "説明を取得できませんでした",
+    "tokens": "{{input}} 入力 / {{output}} 出力"
   }
 }
