@@ -799,7 +799,10 @@
     "aiTagRunning": "AI 標記進行中…",
     "aiTagDisabledHint": "請在設定 → AI 中設定 AI 提供者",
     "aiTagProgress": "已標記 {{processed}}/{{queued}}（{{ready}} 完成、{{failed}} 失敗、{{skipped}} 跳過、{{cacheHit}} 快取）",
-    "aiTagDone": "AI 標記完成"
+    "aiTagDone": "AI 標記完成",
+    "filter": {
+      "hasGps": "含有 GPS"
+    }
   },
   "lint": {
     "title": "Lint",
@@ -863,6 +866,9 @@
         "name": "重複素材",
         "message": "與 {{path}} 為完全相同的副本",
         "suggestion": "移除此副本並更新引用至建議路徑"
+      },
+      "exifGpsPrivacy": {
+        "message": "圖片含有 GPS 座標，可能洩漏實際位置"
       }
     }
   },
@@ -1630,7 +1636,7 @@
     "aiTagCustomPrompt": "自訂提示詞",
     "aiTagCustomPromptHint": "自訂送給視覺模型的圖片分析提示詞",
     "aiTagResetPrompt": "重設為預設值",
-    "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"description\"（字串）、\"languages\"（字串陣列）、\"containsFace\"（布林值）、\"sceneType\"（字串）、\"estimatedLocation\"（字串或 null）、\"locationConfidence\"（字串）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
+    "aiTagPromptGuide": "VLM 必須回傳有效 JSON，包含以下欄位：\"category\"（字串）、\"tags\"（字串陣列）、\"tagsI18n\"（地區代碼對應翻譯標籤陣列的物件）、\"description\"（字串）、\"descriptionI18n\"（地區代碼對應翻譯描述的物件）、\"languages\"（字串陣列）、\"containsFace\"（布林值）、\"sceneType\"（字串）、\"estimatedLocation\"（字串或 null）、\"locationConfidence\"（字串）。多餘欄位會被忽略。若 JSON 解析失敗，結果標記為失敗——可按「重設為預設值」還原",
     "aiTagPromptCustomized": "已自訂",
     "aiTagDefaultPromptLabel": "使用預設提示詞",
     "aiOcrCustomPrompt": "自訂提示詞",
@@ -1807,6 +1813,13 @@
       "scene": "場景",
       "location": "位置",
       "confidence": "信心度"
+    },
+    "exif": {
+      "title": "EXIF 後設資料",
+      "gps": "位置",
+      "camera": "相機",
+      "date": "拍攝日期",
+      "dpi": "DPI"
     }
   },
   "prompts": {

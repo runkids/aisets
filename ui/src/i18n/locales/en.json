@@ -910,7 +910,7 @@
     "aiTagCustomPrompt": "Custom Prompt",
     "aiTagCustomPromptHint": "Customize the prompt sent to the vision model for image analysis",
     "aiTagResetPrompt": "Reset to default",
-    "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"description\" (string), \"languages\" (string array), \"containsFace\" (boolean), \"sceneType\" (string), \"estimatedLocation\" (string or null), \"locationConfidence\" (string). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
+    "aiTagPromptGuide": "The VLM must return valid JSON with these fields: \"category\" (string), \"tags\" (string array), \"tagsI18n\" (object mapping locale codes to translated tag arrays), \"description\" (string), \"descriptionI18n\" (object mapping locale codes to translated descriptions), \"languages\" (string array), \"containsFace\" (boolean), \"sceneType\" (string), \"estimatedLocation\" (string or null), \"locationConfidence\" (string). Extra fields are ignored. If JSON parsing fails, the result is marked as failed — use \"Reset to default\" to restore.",
     "aiTagPromptCustomized": "Customized",
     "aiTagDefaultPromptLabel": "Using default prompt",
     "aiOcrCustomPrompt": "Custom Prompt",
@@ -1442,7 +1442,10 @@
     "aiTagRunning": "AI tagging in progress...",
     "aiTagDisabledHint": "Configure AI provider in Settings → AI",
     "aiTagProgress": "Tagged {{processed}}/{{queued}} ({{ready}} ready, {{failed}} failed, {{skipped}} skipped, {{cacheHit}} cached)",
-    "aiTagDone": "AI tagging complete"
+    "aiTagDone": "AI tagging complete",
+    "filter": {
+      "hasGps": "Has GPS"
+    }
   },
   "lint": {
     "title": "Lint",
@@ -1506,6 +1509,9 @@
         "name": "Duplicate asset",
         "message": "Identical copy exists at {{path}}.",
         "suggestion": "Remove this copy and update references to use the preferred path."
+      },
+      "exifGpsPrivacy": {
+        "message": "Image contains GPS coordinates that may expose physical location"
       }
     }
   },
@@ -1786,6 +1792,13 @@
       "scene": "Scene",
       "location": "Location",
       "confidence": "Confidence"
+    },
+    "exif": {
+      "title": "EXIF Metadata",
+      "gps": "Location",
+      "camera": "Camera",
+      "date": "Date Taken",
+      "dpi": "DPI"
     }
   },
   "prompts": {
