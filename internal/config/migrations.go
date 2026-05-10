@@ -324,6 +324,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateAITagsEnrichFields(); err != nil {
 		return err
 	}
+	if err := s.migrateAITagsI18nColumns(); err != nil {
+		return err
+	}
 	if err := s.migrateScanPerformanceSchema(); err != nil {
 		return err
 	}
@@ -988,6 +991,29 @@ func (s *Store) migrateAITagsEnrichFields() error {
 		{"scene_type", `ALTER TABLE ai_tags ADD COLUMN scene_type TEXT NOT NULL DEFAULT ''`},
 		{"estimated_location", `ALTER TABLE ai_tags ADD COLUMN estimated_location TEXT NOT NULL DEFAULT ''`},
 		{"location_confidence", `ALTER TABLE ai_tags ADD COLUMN location_confidence TEXT NOT NULL DEFAULT ''`},
+	}
+	for _, statement := range statements {
+		if columns[statement.column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement.sql); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) migrateAITagsI18nColumns() error {
+	columns, err := s.tableColumns("ai_tags")
+	if err != nil {
+		return err
+	}
+	statements := []struct {
+		column string
+		sql    string
+	}{
+		{"tags_i18n_json", `ALTER TABLE ai_tags ADD COLUMN tags_i18n_json TEXT NOT NULL DEFAULT '{}'`},
+		{"description_i18n_json", `ALTER TABLE ai_tags ADD COLUMN description_i18n_json TEXT NOT NULL DEFAULT '{}'`},
 	}
 	for _, statement := range statements {
 		if columns[statement.column] {

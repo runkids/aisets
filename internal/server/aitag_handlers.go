@@ -419,14 +419,16 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	content = stripMarkdownFences(content)
 
 	var parsed struct {
-		Category           json.RawMessage `json:"category"`
-		Tags               []string        `json:"tags"`
-		Description        string          `json:"description"`
-		Languages          []string        `json:"languages"`
-		ContainsFace       bool            `json:"containsFace"`
-		SceneType          string          `json:"sceneType"`
-		EstimatedLocation  *string         `json:"estimatedLocation"`
-		LocationConfidence string          `json:"locationConfidence"`
+		Category           json.RawMessage     `json:"category"`
+		Tags               []string            `json:"tags"`
+		TagsI18n           map[string][]string `json:"tagsI18n"`
+		Description        string              `json:"description"`
+		DescriptionI18n    map[string]string   `json:"descriptionI18n"`
+		Languages          []string            `json:"languages"`
+		ContainsFace       bool                `json:"containsFace"`
+		SceneType          string              `json:"sceneType"`
+		EstimatedLocation  *string             `json:"estimatedLocation"`
+		LocationConfidence string              `json:"locationConfidence"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		result.Status = aitag.StatusFailed
@@ -437,7 +439,15 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 
 	result.Category = strings.ToLower(strings.TrimSpace(unmarshalStringOrFirst(parsed.Category)))
 	result.Tags = parsed.Tags
+	result.TagsI18n = parsed.TagsI18n
+	if result.TagsI18n == nil {
+		result.TagsI18n = map[string][]string{}
+	}
 	result.Description = strings.TrimSpace(parsed.Description)
+	result.DescriptionI18n = parsed.DescriptionI18n
+	if result.DescriptionI18n == nil {
+		result.DescriptionI18n = map[string]string{}
+	}
 	result.Languages = parsed.Languages
 	result.ContainsFace = parsed.ContainsFace
 	result.SceneType = strings.ToLower(strings.TrimSpace(parsed.SceneType))

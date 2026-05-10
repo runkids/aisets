@@ -25,6 +25,14 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 	if string(langsJSON) == "null" {
 		langsJSON = []byte("[]")
 	}
+	tagsI18nJSON, _ := json.Marshal(result.TagsI18n)
+	if string(tagsI18nJSON) == "null" {
+		tagsI18nJSON = []byte("{}")
+	}
+	descI18nJSON, _ := json.Marshal(result.DescriptionI18n)
+	if string(descI18nJSON) == "null" {
+		descI18nJSON = []byte("{}")
+	}
 	containsFace := 0
 	if result.ContainsFace {
 		containsFace = 1
@@ -33,16 +41,18 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 		INSERT INTO ai_tags (
 			project_id, repo_path, content_hash, hash_algorithm,
 			provider_name, model_name, status,
-			category, tags_json, description, languages_json,
+			category, tags_json, tags_i18n_json, description, description_i18n_json, languages_json,
 			contains_face, scene_type, estimated_location, location_confidence,
 			error_code, error_message, duration_ms, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name)
 		DO UPDATE SET
 			status = excluded.status,
 			category = excluded.category,
 			tags_json = excluded.tags_json,
+			tags_i18n_json = excluded.tags_i18n_json,
 			description = excluded.description,
+			description_i18n_json = excluded.description_i18n_json,
 			languages_json = excluded.languages_json,
 			contains_face = excluded.contains_face,
 			scene_type = excluded.scene_type,
@@ -54,7 +64,7 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 			updated_at = excluded.updated_at
 	`, result.ProjectID, result.RepoPath, result.ContentHash, result.HashAlgorithm,
 		result.ProviderName, result.ModelName, result.Status,
-		result.Category, string(tagsJSON), result.Description, string(langsJSON),
+		result.Category, string(tagsJSON), string(tagsI18nJSON), result.Description, string(descI18nJSON), string(langsJSON),
 		containsFace, result.SceneType, result.EstimatedLocation, result.LocationConfidence,
 		result.ErrorCode, result.ErrorMessage, result.DurationMs, result.UpdatedAt)
 	return err
@@ -71,7 +81,8 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 			continue
 		}
 		row := s.rdb.QueryRow(`
-			SELECT status, category, tags_json, description, COALESCE(languages_json, '[]'),
+			SELECT status, category, tags_json, COALESCE(tags_i18n_json, '{}'),
+				description, COALESCE(description_i18n_json, '{}'), COALESCE(languages_json, '[]'),
 				contains_face, scene_type, estimated_location, location_confidence,
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 			FROM ai_tags
@@ -87,10 +98,10 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 			ProviderName:  providerName,
 			ModelName:     modelName,
 		}
-		var tagsRaw, langsRaw string
+		var tagsRaw, tagsI18nRaw, descI18nRaw, langsRaw string
 		var containsFaceInt int
-		err := row.Scan(&result.Status, &result.Category, &tagsRaw,
-			&result.Description, &langsRaw,
+		err := row.Scan(&result.Status, &result.Category, &tagsRaw, &tagsI18nRaw,
+			&result.Description, &descI18nRaw, &langsRaw,
 			&containsFaceInt, &result.SceneType, &result.EstimatedLocation, &result.LocationConfidence,
 			&result.ErrorCode, &result.ErrorMessage,
 			&result.DurationMs, &result.UpdatedAt)
@@ -102,6 +113,8 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 		}
 		result.ContainsFace = containsFaceInt != 0
 		_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+		_ = json.Unmarshal([]byte(tagsI18nRaw), &result.TagsI18n)
+		_ = json.Unmarshal([]byte(descI18nRaw), &result.DescriptionI18n)
 		_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 		out[aiTagKey(item.ProjectID, item.RepoPath)] = result
 	}
@@ -120,7 +133,8 @@ func (s *Store) AITagResultsBestMatch(items []scanner.AssetItem, providerName, m
 			continue
 		}
 		row := s.rdb.QueryRow(`
-			SELECT status, category, tags_json, description, COALESCE(languages_json, '[]'),
+			SELECT status, category, tags_json, COALESCE(tags_i18n_json, '{}'),
+				description, COALESCE(description_i18n_json, '{}'), COALESCE(languages_json, '[]'),
 				contains_face, scene_type, estimated_location, location_confidence,
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at,
 				provider_name, model_name
@@ -139,10 +153,10 @@ func (s *Store) AITagResultsBestMatch(items []scanner.AssetItem, providerName, m
 			ContentHash:   item.ContentHash,
 			HashAlgorithm: item.HashAlgorithm,
 		}
-		var tagsRaw, langsRaw string
+		var tagsRaw, tagsI18nRaw, descI18nRaw, langsRaw string
 		var containsFaceInt int
-		err := row.Scan(&result.Status, &result.Category, &tagsRaw,
-			&result.Description, &langsRaw,
+		err := row.Scan(&result.Status, &result.Category, &tagsRaw, &tagsI18nRaw,
+			&result.Description, &descI18nRaw, &langsRaw,
 			&containsFaceInt, &result.SceneType, &result.EstimatedLocation, &result.LocationConfidence,
 			&result.ErrorCode, &result.ErrorMessage,
 			&result.DurationMs, &result.UpdatedAt, &result.ProviderName, &result.ModelName)
@@ -154,6 +168,8 @@ func (s *Store) AITagResultsBestMatch(items []scanner.AssetItem, providerName, m
 		}
 		result.ContainsFace = containsFaceInt != 0
 		_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+		_ = json.Unmarshal([]byte(tagsI18nRaw), &result.TagsI18n)
+		_ = json.Unmarshal([]byte(descI18nRaw), &result.DescriptionI18n)
 		_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 		out[aiTagKey(item.ProjectID, item.RepoPath)] = result
 	}
@@ -172,8 +188,8 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 		return aitag.Result{}, false, nil
 	}
 	row := s.rdb.QueryRow(`
-		SELECT project_id, repo_path, status, category, tags_json, description,
-			COALESCE(languages_json, '[]'),
+		SELECT project_id, repo_path, status, category, tags_json, COALESCE(tags_i18n_json, '{}'),
+			description, COALESCE(description_i18n_json, '{}'), COALESCE(languages_json, '[]'),
 			contains_face, scene_type, estimated_location, location_confidence,
 			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 		FROM ai_tags
@@ -189,10 +205,10 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 		ProviderName:  providerName,
 		ModelName:     modelName,
 	}
-	var tagsRaw, langsRaw string
+	var tagsRaw, tagsI18nRaw, descI18nRaw, langsRaw string
 	var containsFaceInt int
 	err := row.Scan(&result.ProjectID, &result.RepoPath, &result.Status,
-		&result.Category, &tagsRaw, &result.Description, &langsRaw,
+		&result.Category, &tagsRaw, &tagsI18nRaw, &result.Description, &descI18nRaw, &langsRaw,
 		&containsFaceInt, &result.SceneType, &result.EstimatedLocation, &result.LocationConfidence,
 		&result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -203,6 +219,8 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 	}
 	result.ContainsFace = containsFaceInt != 0
 	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+	_ = json.Unmarshal([]byte(tagsI18nRaw), &result.TagsI18n)
+	_ = json.Unmarshal([]byte(descI18nRaw), &result.DescriptionI18n)
 	_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 	return result, true, nil
 }

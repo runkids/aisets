@@ -781,10 +781,7 @@
     "flagUsageNotChecked": "참조 미분석",
     "flagPossiblyUnusedShort": "가능",
     "flagNotApplicableShort": "미확인",
-    "flagUsageNotCheckedShort": "참조 없음",
-    "filter": {
-      "hasGps": "GPS 포함"
-    }
+    "flagUsageNotCheckedShort": "참조 없음"
   },
   "lint": {
     "title": "Lint",
@@ -848,9 +845,6 @@
         "name": "중복 에셋",
         "message": "{{path}}에 동일한 복사본이 있습니다",
         "suggestion": "이 복사본을 제거하고 기본 경로를 사용하도록 참조를 업데이트하세요"
-      },
-      "exifGpsPrivacy": {
-        "message": "이미지에 실제 위치를 노출할 수 있는 GPS 좌표가 포함되어 있습니다"
       }
     }
   },
@@ -1441,7 +1435,7 @@
     "aiTagCustomPrompt": "사용자 정의 프롬프트",
     "aiTagCustomPromptHint": "이미지 분석을 위해 비전 모델에 보내는 프롬프트를 맞춤 설정",
     "aiTagResetPrompt": "기본값으로 재설정",
-    "aiTagPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"category\"(문자열), \"tags\"(문자열 배열), \"tagsI18n\"(로케일 코드를 번역된 태그 배열에 매핑하는 객체), \"description\"(문자열), \"descriptionI18n\"(로케일 코드를 번역된 설명에 매핑하는 객체), \"languages\"(문자열 배열), \"containsFace\"(불리언), \"sceneType\"(문자열), \"estimatedLocation\"(문자열 또는 null), \"locationConfidence\"(문자열). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다 — \"기본값으로 재설정\"으로 복원할 수 있습니다",
+    "aiTagPromptGuide": "VLM은 유효한 JSON을 반환해야 합니다. 필수 필드: \"category\"(문자열), \"tags\"(문자열 배열), \"description\"(문자열), \"languages\"(문자열 배열), \"containsFace\"(불리언), \"sceneType\"(문자열), \"estimatedLocation\"(문자열 또는 null), \"locationConfidence\"(문자열). 추가 필드는 무시됩니다. JSON 파싱에 실패하면 결과가 실패로 표시됩니다 — \"기본값으로 재설정\"으로 복원할 수 있습니다",
     "aiTagPromptCustomized": "맞춤 설정됨",
     "aiTagDefaultPromptLabel": "기본 프롬프트 사용 중",
     "aiOcrCustomPrompt": "맞춤 프롬프트",
@@ -1746,12 +1740,14 @@
       "location": "위치",
       "confidence": "신뢰도"
     },
-    "exif": {
-      "title": "EXIF 메타데이터",
-      "gps": "위치",
-      "camera": "카메라",
-      "date": "촬영 날짜",
-      "dpi": "DPI"
+    "aiAction": {
+      "tag": "AI 태그",
+      "ocr": "AI OCR",
+      "rerun": "재실행",
+      "tagSuccess": "AI 태그 완료",
+      "ocrSuccess": "AI OCR 완료",
+      "tagHint": "AI 태그를 실행하여 이미지 분석",
+      "ocrHint": "AI OCR을 실행하여 텍스트 추출"
     }
   },
   "projectIntent": {

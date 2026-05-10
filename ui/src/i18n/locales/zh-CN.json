@@ -763,10 +763,7 @@
     "flagUsageNotChecked": "未分析引用",
     "flagPossiblyUnusedShort": "可能",
     "flagNotApplicableShort": "未检查",
-    "flagUsageNotCheckedShort": "无引用",
-    "filter": {
-      "hasGps": "包含 GPS"
-    }
+    "flagUsageNotCheckedShort": "无引用"
   },
   "lint": {
     "title": "Lint",
@@ -830,9 +827,6 @@
         "name": "重复素材",
         "message": "存在相同副本：{{path}}",
         "suggestion": "删除此副本并更新引用以使用首选路径"
-      },
-      "exifGpsPrivacy": {
-        "message": "图片包含 GPS 坐标，可能泄露实际位置"
       }
     }
   },
@@ -1430,7 +1424,7 @@
     "aiTagCustomPrompt": "自定义提示词",
     "aiTagCustomPromptHint": "自定义发送给视觉模型的图片分析提示词",
     "aiTagResetPrompt": "重置为默认值",
-    "aiTagPromptGuide": "VLM 必须返回有效 JSON，包含以下字段：\"category\"（字符串）、\"tags\"（字符串数组）、\"tagsI18n\"（地区代码对应翻译标签数组的对象）、\"description\"（字符串）、\"descriptionI18n\"（地区代码对应翻译描述的对象）、\"languages\"（字符串数组）、\"containsFace\"（布尔值）、\"sceneType\"（字符串）、\"estimatedLocation\"（字符串或 null）、\"locationConfidence\"（字符串）。多余字段会被忽略。若 JSON 解析失败，结果标记为失败——可按「重置为默认值」还原",
+    "aiTagPromptGuide": "VLM 必须返回有效 JSON，包含以下字段：\"category\"（字符串）、\"tags\"（字符串数组）、\"description\"（字符串）、\"languages\"（字符串数组）、\"containsFace\"（布尔值）、\"sceneType\"（字符串）、\"estimatedLocation\"（字符串或 null）、\"locationConfidence\"（字符串）。多余字段会被忽略。若 JSON 解析失败，结果标记为失败——可按「重置为默认值」还原",
     "aiTagPromptCustomized": "已自定义",
     "aiTagDefaultPromptLabel": "使用默认提示词",
     "aiOcrCustomPrompt": "自定义提示词",
@@ -1728,12 +1722,14 @@
       "location": "位置",
       "confidence": "置信度"
     },
-    "exif": {
-      "title": "EXIF 元数据",
-      "gps": "位置",
-      "camera": "相机",
-      "date": "拍摄日期",
-      "dpi": "DPI"
+    "aiAction": {
+      "tag": "AI 标记",
+      "ocr": "AI OCR",
+      "rerun": "重新运行",
+      "tagSuccess": "AI 标记完成",
+      "ocrSuccess": "AI OCR 完成",
+      "tagHint": "运行 AI 标记以分析此图片",
+      "ocrHint": "运行 AI OCR 以提取图片文字"
     }
   },
   "scanProgress": {
