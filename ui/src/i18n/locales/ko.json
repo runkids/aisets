@@ -1805,7 +1805,7 @@
     "optimizePresets": "최적화 조언",
     "duplicatePresets": "유사 중복",
     "addPreset": "프리셋 추가",
-    "newPresetName": "New Preset",
+    "newPresetName": "새 프리셋",
     "nameLabel": "이름",
     "templateLabel": "템플릿",
     "templatePlaceholder": "프롬프트 템플릿을 입력하세요…",

@@ -1805,7 +1805,7 @@
     "optimizePresets": "优化建议",
     "duplicatePresets": "近似重复",
     "addPreset": "新增预设",
-    "newPresetName": "New Preset",
+    "newPresetName": "新预设",
     "nameLabel": "名称",
     "templateLabel": "模板",
     "templatePlaceholder": "输入提示词模板…",
