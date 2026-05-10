@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Copy,
+  GitCompareArrows,
   MessageSquarePlus,
   Plus,
   RotateCcw,
@@ -185,6 +186,13 @@ function PresetList({
             icon={<Gauge size={15} />}
             label={t("prompts.optimizePresets")}
             onClick={() => onTypeChange("optimize")}
+          />
+          <RailItem
+            variant="settings"
+            active={type === "duplicate"}
+            icon={<GitCompareArrows size={15} />}
+            label={t("prompts.duplicatePresets")}
+            onClick={() => onTypeChange("duplicate")}
           />
         </RailSection>
 
@@ -436,6 +444,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       tag: `Analyze this image and respond with a JSON object containing:\n- "category": one of {{categories}}\n- "tags": {{tags}}\n- "description": {{description}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
       ocr: `Analyze this image and respond with a JSON object:\n- "text": {{text}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
       optimize: `Analyze this image and provide compression advice.\n\n{{fileMetadata}}\n\n{{lintFindings}}\n\n{{optimizationFindings}}\n\nBased on the image content AND the analysis above, respond as JSON:\n{\n  "contentType": one of {{contentTypes}},\n  "recommendedFormat": one of {{formats}},\n  "recommendedQuality": <number 1-100 or null for lossless>,\n  "lossless": <true|false>,\n  "rationale": "<2-3 sentences: explain your recommendation considering the lint findings and file characteristics>"\n}\n\n{{rules}}\n\nImportant:\n- If lint findings identify structural issues (embedded bitmaps, oversized raster), address them in your rationale\n- Your recommendation should complement, not contradict, the lint findings\n- Be specific about expected savings when possible\n- Always name the concrete target format in the rationale (e.g. "extract the embedded bitmap and convert to WebP at quality 80")\n- For files with mixed content (e.g. SVG containing embedded raster), recommend a specific format for the extracted raster portion, not just the container format\n\nRespond ONLY with the JSON object, no other text.`,
+      duplicate: `Compare these two images that were flagged as near-duplicates (dHash distance: {{distance}}/64).\n\nImage 1: {{leftMetadata}}\nImage 2: {{rightMetadata}}\n\nExplain:\n1. What the images show\n2. The specific visual differences between them\n3. Which one to keep and why (consider: resolution, quality, file size)\n\nRespond ONLY with a JSON object:\n{\n  "summary": "one-sentence description of what these images are",\n  "differences": "specific visual differences between the two",\n  "recommendation": "keep image 1 or image 2, with the filename",\n  "rationale": "why this one is better to keep"\n}`,
     };
     const defaultTemplate = templates[preset.type] ?? "";
     setTemplate(defaultTemplate);

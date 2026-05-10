@@ -133,6 +133,29 @@ export function getOptimizeAIAdvice(assetId: string) {
   );
 }
 
+export type DuplicateExplanation = {
+  summary: string;
+  differences: string;
+  recommendation: string;
+  rationale: string;
+  durationMs: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+export function getDuplicateExplanation(
+  leftId: string,
+  rightId: string,
+  distance?: number,
+) {
+  const params = new URLSearchParams({ leftId, rightId });
+  if (distance != null) params.set("distance", String(distance));
+  return request<DuplicateExplanation>(
+    `/api/ai/duplicate-explain?${params.toString()}`,
+    { method: "POST" },
+  );
+}
+
 export type CatalogItemsParams = {
   scanId?: number;
   assetId?: string;

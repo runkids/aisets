@@ -137,12 +137,40 @@ export const OPTIMIZE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
+export const DUPLICATE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
+  {
+    name: "leftMetadata",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.leftMetadata",
+    dynamic: true,
+  },
+  {
+    name: "rightMetadata",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.rightMetadata",
+    dynamic: true,
+  },
+  {
+    name: "distance",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.distance",
+    dynamic: true,
+  },
+];
+
 export function getBuiltinVariables(
   type: PromptPresetType,
 ): BuiltinVariableDef[] {
   if (type === "tag") return TAG_BUILTIN_VARIABLES;
   if (type === "ocr") return OCR_BUILTIN_VARIABLES;
   if (type === "optimize") return OPTIMIZE_BUILTIN_VARIABLES;
+  if (type === "duplicate") return DUPLICATE_BUILTIN_VARIABLES;
   return [];
 }
 
