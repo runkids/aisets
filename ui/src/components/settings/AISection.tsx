@@ -1061,7 +1061,7 @@ function AITagProgressText({
   const busy = isAITagActivityBusy(activity);
   const label = aiTagProgressLabel(activity, t);
   const counts = activity.counts;
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!busy || !startedAt) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -1146,7 +1146,7 @@ function VLMOcrProgressText({
   const busy = isVLMOcrActivityBusy(activity);
   const label = vlmOcrProgressLabel(activity, t);
   const counts = activity.counts;
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!busy || !startedAt) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
