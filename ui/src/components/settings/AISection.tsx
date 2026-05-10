@@ -13,6 +13,14 @@ import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
 import { AiChipIcon } from "../ui/AiChipIcon";
+
+const DEFAULT_TAG_PROMPT = `Analyze this image and respond with a JSON object containing:
+- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
+- "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")
+- "description": one sentence describing the image content
+- "languages": array of ISO 639-3 language codes for any visible text (e.g. ["eng"]). Empty array if no text.
+
+Respond ONLY with valid JSON, no markdown or explanation.`;
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
 import { Button, Card, IconButton, Select, Switch, TextInput } from "../ui";
@@ -329,13 +337,15 @@ export function AISection({
                 </summary>
                 <div className="mt-2 flex flex-col gap-2">
                   <textarea
-                    className="w-full min-h-[120px] rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 font-g-mono text-g-caption tracking-g-mono text-g-ink-1 placeholder:text-g-ink-4 focus:outline-none focus:ring-1 focus:ring-g-accent"
-                    value={draft.llmTagPrompt}
-                    placeholder={t("settings.aiTagDefaultPromptLabel")}
+                    className="w-full min-h-[160px] rounded-g-md border border-g-line bg-g-surface-2 px-3 py-2 font-g-mono text-g-caption tracking-g-mono text-g-ink-1 focus:outline-none focus:ring-1 focus:ring-g-accent"
+                    value={draft.llmTagPrompt || DEFAULT_TAG_PROMPT}
                     onChange={(e) =>
                       onUpdateDraft((current) => ({
                         ...current,
-                        llmTagPrompt: e.target.value,
+                        llmTagPrompt:
+                          e.target.value === DEFAULT_TAG_PROMPT
+                            ? ""
+                            : e.target.value,
                       }))
                     }
                   />
