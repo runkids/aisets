@@ -744,7 +744,8 @@
     "requiresOCR": "需要 OCR",
     "requiresOCRHint": "這個自訂篩選器使用 OCR；目前 OCR 已關閉",
     "requiresAI": "需要 AI",
-    "requiresAIHint": "這個自訂篩選器使用 AI 標記；目前 AI 已關閉"
+    "requiresAIHint": "這個自訂篩選器使用 AI 標記；目前 AI 已關閉",
+    "hasGps": "含有 GPS"
   },
   "toolbar": {
     "gridView": "格狀檢視",
@@ -863,6 +864,11 @@
         "name": "重複素材",
         "message": "與 {{path}} 為完全相同的副本",
         "suggestion": "移除此副本並更新引用至建議路徑"
+      },
+      "exif-gps-privacy": {
+        "name": "EXIF GPS 隱私",
+        "message": "圖片含有 GPS 座標，可能洩漏實際位置",
+        "suggestion": "若位置敏感，提交前請移除 EXIF GPS 資料"
       }
     }
   },
@@ -1816,6 +1822,13 @@
       "ocrSuccess": "AI OCR 完成",
       "tagHint": "執行 AI 標記以分析此圖片",
       "ocrHint": "執行 AI OCR 以提取圖片文字"
+    },
+    "exif": {
+      "title": "EXIF 後設資料",
+      "gps": "位置",
+      "camera": "相機",
+      "date": "拍攝日期",
+      "dpi": "DPI"
     }
   },
   "prompts": {

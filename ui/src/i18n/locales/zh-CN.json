@@ -708,7 +708,8 @@
     "requiresOCR": "需要 OCR",
     "requiresOCRHint": "这个自定义筛选器使用 OCR；目前 OCR 已关闭",
     "requiresAI": "需要 AI",
-    "requiresAIHint": "这个自定义筛选器使用 AI 标记；目前 AI 已关闭"
+    "requiresAIHint": "这个自定义筛选器使用 AI 标记；目前 AI 已关闭",
+    "hasGps": "包含 GPS"
   },
   "toolbar": {
     "gridView": "网格视图",
@@ -827,6 +828,11 @@
         "name": "重复素材",
         "message": "存在相同副本：{{path}}",
         "suggestion": "删除此副本并更新引用以使用首选路径"
+      },
+      "exif-gps-privacy": {
+        "name": "EXIF GPS 隐私",
+        "message": "图片包含 GPS 坐标，可能泄露实际位置",
+        "suggestion": "若位置敏感，提交前请移除 EXIF GPS 数据"
       }
     }
   },
@@ -1730,6 +1736,13 @@
       "ocrSuccess": "AI OCR 完成",
       "tagHint": "运行 AI 标记以分析此图片",
       "ocrHint": "运行 AI OCR 以提取图片文字"
+    },
+    "exif": {
+      "title": "EXIF 元数据",
+      "gps": "位置",
+      "camera": "相机",
+      "date": "拍摄日期",
+      "dpi": "DPI"
     }
   },
   "scanProgress": {

@@ -130,7 +130,7 @@ export function FilterRail({
         <RailSection heading={t("drawer.exif.title")}>
           <RailItem
             active={filters.hasGPS === "true"}
-            label={t("browse.filter.hasGps")}
+            label={t("filter.hasGps")}
             count={exifHasGpsCount ?? 0}
             onClick={() =>
               onFiltersChange({
