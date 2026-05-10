@@ -7,7 +7,7 @@ import type {
   PromptVariableType,
 } from "../../types";
 import { Select } from "../ui/Select";
-import { TextInput } from "../ui/TextInput";
+import { Textarea, TextInput } from "../ui/TextInput";
 import { isBuiltinVariable, getBuiltinVariables } from "./builtinVariables";
 
 type Props = {
@@ -101,11 +101,24 @@ function VariableValueInput({
   }
 
   if (variable.type === "text") {
+    const val = variable.values[0] ?? "";
+    const isMultiline = val.includes("\n");
+    if (isMultiline) {
+      return (
+        <Textarea
+          rows={4}
+          placeholder={t("prompts.variableValues")}
+          value={val}
+          onChange={(e) => onChange({ ...variable, values: [e.target.value] })}
+          className="text-[12px]"
+        />
+      );
+    }
     return (
       <TextInput
         size="sm"
         placeholder={t("prompts.variableValues")}
-        value={variable.values[0] ?? ""}
+        value={val}
         onChange={(e) => onChange({ ...variable, values: [e.target.value] })}
       />
     );
