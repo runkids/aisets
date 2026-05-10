@@ -335,7 +335,9 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
   }
 
   const handleSaveRef = useRef(handleSave);
-  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  });
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
