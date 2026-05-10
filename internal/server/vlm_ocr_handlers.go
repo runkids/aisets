@@ -127,7 +127,10 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = vlmOCRPrompt
 	}
-	systemPrompt := settings.LLMSystemPrompt
+	systemPrompt := ""
+	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
+		systemPrompt = settings.LLMSystemPrompt
+	}
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {

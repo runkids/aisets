@@ -93,7 +93,10 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	systemPrompt := settings.LLMSystemPrompt
+	systemPrompt := ""
+	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
+		systemPrompt = settings.LLMSystemPrompt
+	}
 
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{assetID})
 	if err != nil || len(items) == 0 {

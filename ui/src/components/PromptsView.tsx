@@ -28,6 +28,8 @@ import {
   useUpdatePromptPresetMutation,
   useDeletePromptPresetMutation,
   useSetPromptPresetDefaultMutation,
+  useSettingsQuery,
+  useUpdateSettingsMutation,
 } from "../queries";
 import type {
   PromptPreset,
@@ -47,6 +49,7 @@ import {
   RailItem,
   RailSection,
   Select,
+  Switch,
   TextInput,
 } from "./ui";
 import {
@@ -261,6 +264,44 @@ function PresetList({
         </div>
       </Rail>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  System prompt notice with enable/disable toggle                    */
+/* ------------------------------------------------------------------ */
+
+function SystemPromptNotice() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const settingsQuery = useSettingsQuery();
+  const updateSettings = useUpdateSettingsMutation();
+  const enabled = settingsQuery.data?.settings?.llmSystemPromptEnabled ?? false;
+
+  function handleToggle(checked: boolean) {
+    updateSettings.mutate(
+      { llmSystemPromptEnabled: checked },
+      {
+        onError: (err) => {
+          toast.error(errorMessage(err));
+        },
+      },
+    );
+  }
+
+  return (
+    <Notice tone={enabled ? "info" : "warning"}>
+      <div className="flex w-full items-center justify-between gap-3">
+        <span>
+          {enabled
+            ? t("prompts.systemNotice")
+            : t("prompts.systemNoticeDisabled")}
+        </span>
+        <label className="flex shrink-0 items-center gap-2 text-g-ui">
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
+        </label>
+      </div>
+    </Notice>
   );
 }
 
@@ -500,9 +541,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       <div className="flex-1 px-5 py-4 pt-3">
         <Card padding="none" className="mx-auto max-w-[1040px] p-5">
           <div className="flex flex-col gap-6">
-            {preset.type === "system" && (
-              <Notice tone="info">{t("prompts.systemNotice")}</Notice>
-            )}
+            {preset.type === "system" && <SystemPromptNotice />}
             {/* ── Name ── */}
             <TextInput
               label={t("prompts.nameLabel")}

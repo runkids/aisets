@@ -1865,7 +1865,8 @@
     "systemEmptyTitle": "시스템 프롬프트 만들기",
     "systemEmptyDesc": "시스템 프롬프트는 모든 AI 작업(태그, OCR, 최적화, 중복 감지) 앞에 자동으로 추가됩니다. 응답 언어, 출력 스타일 등 글로벌 지시에 적합합니다",
     "systemEmptyAction": "첫 번째 시스템 프롬프트 만들기",
-    "systemNotice": "이 프롬프트는 모든 AI 작업에 자동으로 추가됩니다. 기본값으로 설정하면 활성화됩니다"
+    "systemNotice": "이 프롬프트는 모든 AI 작업에 자동으로 추가됩니다. 기본값으로 설정하면 활성화됩니다",
+    "systemNoticeDisabled": "시스템 프롬프트가 비활성화되었습니다. 활성화하면 모든 AI 작업에 추가됩니다"
   },
   "duplicateExplain": {
     "button": "차이점 설명",
@@ -1875,5 +1876,12 @@
     "rationale": "이유",
     "error": "설명을 가져올 수 없습니다",
     "tokens": "{{input}} 입력 / {{output}} 출력"
+  },
+  "ai": {
+    "thinking": "분석 중...",
+    "resultTitle": "AI 인사이트",
+    "regenerate": "재생성",
+    "copyResult": "결과 복사",
+    "tokenUsage": "{{input}} 입력 / {{output}} 출력"
   }
 }

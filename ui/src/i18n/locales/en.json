@@ -1855,7 +1855,8 @@
     "systemEmptyTitle": "Create a System Prompt",
     "systemEmptyDesc": "A system prompt is automatically prepended to all AI operations (Tag, OCR, Optimize, Duplicate). Use it to set response language, output style, or any global instruction.",
     "systemEmptyAction": "Create your first system prompt",
-    "systemNotice": "This prompt is automatically prepended to all AI operations. Set as default to activate."
+    "systemNotice": "This prompt is automatically prepended to all AI operations. Set as default to activate.",
+    "systemNoticeDisabled": "System prompt is disabled. Enable to prepend to all AI operations."
   },
   "duplicateExplain": {
     "button": "Explain Differences",
@@ -1865,5 +1866,12 @@
     "rationale": "Rationale",
     "error": "Failed to get explanation.",
     "tokens": "{{input}} in / {{output}} out"
+  },
+  "ai": {
+    "thinking": "Analyzing...",
+    "resultTitle": "AI INSIGHT",
+    "regenerate": "Regenerate",
+    "copyResult": "Copy result",
+    "tokenUsage": "{{input}} in / {{output}} out"
   }
 }

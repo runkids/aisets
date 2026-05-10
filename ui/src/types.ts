@@ -72,6 +72,7 @@ export type AppSettings = {
   llmEmbedModel: string;
   llmTagPrompt: string;
   llmOcrPrompt: string;
+  llmSystemPromptEnabled: boolean;
   llmConcurrency: number;
   llmTimeout: number;
 };

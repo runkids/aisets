@@ -56,6 +56,7 @@ type AppSettings struct {
 	LLMTagPrompt               string                               `json:"llmTagPrompt"`
 	LLMOcrPrompt               string                               `json:"llmOcrPrompt"`
 	LLMSystemPrompt            string                               `json:"llmSystemPrompt"`
+	LLMSystemPromptEnabled     bool                                 `json:"llmSystemPromptEnabled"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
 	LLMTimeout                 int                                  `json:"llmTimeout"`
 }

@@ -1865,7 +1865,8 @@
     "systemEmptyTitle": "创建系统 Prompt",
     "systemEmptyDesc": "系统 prompt 会自动加在所有 AI 操作（标签、OCR、优化、重复检测）前面，适合设定响应语言、输出风格等全局指令",
     "systemEmptyAction": "创建第一个系统 prompt",
-    "systemNotice": "此 prompt 会自动加在所有 AI 操作前面，设为默认即生效"
+    "systemNotice": "此 prompt 会自动加在所有 AI 操作前面，设为默认即生效",
+    "systemNoticeDisabled": "系统 prompt 已停用，启用后会自动加在所有 AI 操作前面"
   },
   "duplicateExplain": {
     "button": "解释差异",
@@ -1875,5 +1876,12 @@
     "rationale": "理由",
     "error": "无法获取解释",
     "tokens": "{{input}} 输入 / {{output}} 输出"
+  },
+  "ai": {
+    "thinking": "分析中...",
+    "resultTitle": "AI 洞察",
+    "regenerate": "重新生成",
+    "copyResult": "复制结果",
+    "tokenUsage": "{{input}} 输入 / {{output}} 输出"
   }
 }
