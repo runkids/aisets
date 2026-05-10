@@ -289,6 +289,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateOCRResultsSchema(); err != nil {
 		return err
 	}
+	if err := s.migrateAITagsSchema(); err != nil {
+		return err
+	}
 	if err := s.migrateScanPerformanceSchema(); err != nil {
 		return err
 	}
@@ -850,6 +853,28 @@ func (s *Store) migrateOptimizationVariantColumn() error {
 	}
 	if !cols["variant_bytes"] {
 		if _, err = s.db.Exec(`ALTER TABLE optimization_snapshots ADD COLUMN variant_bytes INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) migrateAITagsSchema() error {
+	columns, err := s.tableColumns("ai_tags")
+	if err != nil {
+		return err
+	}
+	statements := []struct {
+		column string
+		sql    string
+	}{
+		{"languages_json", `ALTER TABLE ai_tags ADD COLUMN languages_json TEXT NOT NULL DEFAULT '[]'`},
+	}
+	for _, statement := range statements {
+		if columns[statement.column] {
+			continue
+		}
+		if _, err := s.db.Exec(statement.sql); err != nil {
 			return err
 		}
 	}

@@ -21,26 +21,31 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 	if err != nil {
 		return err
 	}
+	langsJSON, _ := json.Marshal(result.Languages)
+	if string(langsJSON) == "null" {
+		langsJSON = []byte("[]")
+	}
 	_, err = s.db.Exec(`
 		INSERT INTO ai_tags (
 			project_id, repo_path, content_hash, hash_algorithm,
 			provider_name, model_name, prompt_version, status,
-			category, tags_json, description,
+			category, tags_json, description, languages_json,
 			error_code, error_message, duration_ms, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name, prompt_version)
 		DO UPDATE SET
 			status = excluded.status,
 			category = excluded.category,
 			tags_json = excluded.tags_json,
 			description = excluded.description,
+			languages_json = excluded.languages_json,
 			error_code = excluded.error_code,
 			error_message = excluded.error_message,
 			duration_ms = excluded.duration_ms,
 			updated_at = excluded.updated_at
 	`, result.ProjectID, result.RepoPath, result.ContentHash, result.HashAlgorithm,
 		result.ProviderName, result.ModelName, aitag.PromptVersion, result.Status,
-		result.Category, string(tagsJSON), result.Description,
+		result.Category, string(tagsJSON), result.Description, string(langsJSON),
 		result.ErrorCode, result.ErrorMessage, result.DurationMs, result.UpdatedAt)
 	return err
 }
@@ -56,7 +61,7 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 			continue
 		}
 		row := s.db.QueryRow(`
-			SELECT status, category, tags_json, description,
+			SELECT status, category, tags_json, description, COALESCE(languages_json, '[]'),
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 			FROM ai_tags
 			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
@@ -71,9 +76,9 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 			ProviderName:  providerName,
 			ModelName:     modelName,
 		}
-		var tagsRaw string
+		var tagsRaw, langsRaw string
 		err := row.Scan(&result.Status, &result.Category, &tagsRaw,
-			&result.Description, &result.ErrorCode, &result.ErrorMessage,
+			&result.Description, &langsRaw, &result.ErrorCode, &result.ErrorMessage,
 			&result.DurationMs, &result.UpdatedAt)
 		if err == sql.ErrNoRows {
 			continue
@@ -82,6 +87,7 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+		_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 		out[aiTagKey(item.ProjectID, item.RepoPath)] = result
 	}
 	return out, nil
@@ -100,6 +106,7 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 	}
 	row := s.db.QueryRow(`
 		SELECT project_id, repo_path, status, category, tags_json, description,
+			COALESCE(languages_json, '[]'),
 			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 		FROM ai_tags
 		WHERE content_hash = ? AND hash_algorithm = ?
@@ -114,9 +121,9 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 		ProviderName:  providerName,
 		ModelName:     modelName,
 	}
-	var tagsRaw string
+	var tagsRaw, langsRaw string
 	err := row.Scan(&result.ProjectID, &result.RepoPath, &result.Status,
-		&result.Category, &tagsRaw, &result.Description,
+		&result.Category, &tagsRaw, &result.Description, &langsRaw,
 		&result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return aitag.Result{}, false, nil
@@ -125,5 +132,6 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 		return aitag.Result{}, false, err
 	}
 	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+	_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 	return result, true, nil
 }

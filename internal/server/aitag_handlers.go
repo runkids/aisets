@@ -243,6 +243,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Category    string   `json:"category"`
 		Tags        []string `json:"tags"`
 		Description string   `json:"description"`
+		Languages   []string `json:"languages"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		result.Status = aitag.StatusFailed
@@ -254,8 +255,12 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	result.Category = strings.ToLower(strings.TrimSpace(parsed.Category))
 	result.Tags = parsed.Tags
 	result.Description = strings.TrimSpace(parsed.Description)
+	result.Languages = parsed.Languages
 	if result.Tags == nil {
 		result.Tags = []string{}
+	}
+	if result.Languages == nil {
+		result.Languages = []string{}
 	}
 	return result
 }
@@ -279,7 +284,6 @@ func eligibleForAITag(item scanner.AssetItem) bool {
 	}
 	return true
 }
-
 
 func (s *Server) handleAITagClear(w http.ResponseWriter, _ *http.Request) {
 	if err := s.store.RemoveAITagResults(); err != nil {
