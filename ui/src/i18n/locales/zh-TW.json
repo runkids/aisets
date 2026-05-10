@@ -1799,6 +1799,7 @@
     "tagPresets": "AI 標記",
     "ocrPresets": "AI OCR",
     "optimizePresets": "優化建議",
+    "duplicatePresets": "近似重複",
     "addPreset": "新增預設",
     "newPresetName": "新預設",
     "nameLabel": "名稱",
@@ -1835,7 +1836,10 @@
       "rules": "各內容類型的壓縮規則",
       "fileMetadata": "檔案 metadata（格式、大小、尺寸）— 請求時自動注入",
       "lintFindings": "該資產的 Lint 發現 — 請求時自動注入",
-      "optimizationFindings": "規則式最佳化分析 — 請求時自動注入"
+      "optimizationFindings": "規則式最佳化分析 — 請求時自動注入",
+      "leftMetadata": "第一張（左側）圖片的中繼資料 — 自動填入",
+      "rightMetadata": "第二張（右側）圖片的中繼資料 — 自動填入",
+      "distance": "兩張圖片的 dHash 距離（0-64） — 自動填入"
     },
     "missingRequired": "缺少必要變數",
     "builtinBadge": "內建",
@@ -1852,5 +1856,14 @@
     "toastDefaultSet": "預設提示詞已更新",
     "toastDefaultSetFailed": "設定預設失敗",
     "toastReset": "範本已恢復預設"
+  },
+  "duplicateExplain": {
+    "button": "解釋差異",
+    "summary": "摘要",
+    "differences": "差異",
+    "recommendation": "建議",
+    "rationale": "理由",
+    "error": "無法取得解釋",
+    "tokens": "{{input}} 輸入 / {{output}} 輸出"
   }
 }

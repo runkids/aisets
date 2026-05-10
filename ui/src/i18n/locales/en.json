@@ -1778,6 +1778,7 @@
     "tagPresets": "AI Tag",
     "ocrPresets": "AI OCR",
     "optimizePresets": "Optimize",
+    "duplicatePresets": "Duplicate",
     "addPreset": "Add Preset",
     "newPresetName": "New Preset",
     "nameLabel": "Name",
@@ -1814,7 +1815,10 @@
       "rules": "Compression rules per content type",
       "fileMetadata": "File metadata (format, size, dimensions) — injected automatically at request time",
       "lintFindings": "Lint findings for this asset — injected automatically at request time",
-      "optimizationFindings": "Rule-based optimization analysis — injected automatically at request time"
+      "optimizationFindings": "Rule-based optimization analysis — injected automatically at request time",
+      "leftMetadata": "Metadata for the first (left) image — filled automatically",
+      "rightMetadata": "Metadata for the second (right) image — filled automatically",
+      "distance": "dHash distance between the two images (0-64) — filled automatically"
     },
     "missingRequired": "Missing required variables",
     "builtinBadge": "Built-in",
@@ -1831,5 +1835,14 @@
     "toastDefaultSet": "Default preset updated",
     "toastDefaultSetFailed": "Set default failed",
     "toastReset": "Template reset to default"
+  },
+  "duplicateExplain": {
+    "button": "Explain Differences",
+    "summary": "Summary",
+    "differences": "Differences",
+    "recommendation": "Recommendation",
+    "rationale": "Rationale",
+    "error": "Failed to get explanation.",
+    "tokens": "{{input}} in / {{output}} out"
   }
 }
