@@ -93,6 +93,8 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{assetID})
 	if err != nil || len(items) == 0 {
 		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "Asset not found in catalog"))

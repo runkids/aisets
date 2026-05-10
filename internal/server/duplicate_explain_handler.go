@@ -59,6 +59,8 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
+
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{leftID, rightID})
 	if err != nil || len(items) < 2 {
 		writeError(w, http.StatusNotFound, apierr.New("asset_not_found", "One or both assets not found in catalog"))
