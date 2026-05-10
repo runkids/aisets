@@ -466,15 +466,21 @@ export async function runAITagging(options?: {
   signal?: AbortSignal;
   presetId?: string;
   projectIds?: string[];
+  assetIds?: string[];
 }) {
   const qp = new URLSearchParams();
   if (options?.presetId) qp.set("presetId", options.presetId);
   if (options?.projectIds?.length)
     qp.set("projectIds", options.projectIds.join(","));
   const params = qp.toString() ? `?${qp}` : "";
+  const fetchBody = options?.assetIds?.length
+    ? JSON.stringify({ assetIds: options.assetIds })
+    : undefined;
   const response = await fetch(`${basePath}/api/ai/tag/run${params}`, {
     method: "POST",
     signal: options?.signal,
+    body: fetchBody,
+    headers: fetchBody ? { "content-type": "application/json" } : undefined,
   });
   if (!response.ok) {
     const text = await response.text();
@@ -517,15 +523,21 @@ export async function runVLMOcr(options?: {
   signal?: AbortSignal;
   presetId?: string;
   projectIds?: string[];
+  assetIds?: string[];
 }) {
   const qp = new URLSearchParams();
   if (options?.presetId) qp.set("presetId", options.presetId);
   if (options?.projectIds?.length)
     qp.set("projectIds", options.projectIds.join(","));
   const params = qp.toString() ? `?${qp}` : "";
+  const fetchBody = options?.assetIds?.length
+    ? JSON.stringify({ assetIds: options.assetIds })
+    : undefined;
   const response = await fetch(`${basePath}/api/ai/ocr/run${params}`, {
     method: "POST",
     signal: options?.signal,
+    body: fetchBody,
+    headers: fetchBody ? { "content-type": "application/json" } : undefined,
   });
   if (!response.ok) {
     const text = await response.text();

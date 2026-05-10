@@ -19,6 +19,8 @@ import {
   FolderOutput,
   LoaderCircle,
   PenLine,
+  ScanText,
+  Tags,
   Trash2,
 } from "lucide-react";
 import { matchesCustomAssetFilter } from "../customAssetFilters";
@@ -120,6 +122,10 @@ type Props = {
   ocrFuzzySearch: boolean;
   onAutoScrollDone: () => void;
   onOpenAsset: (id: string) => void;
+  aiEnabled?: boolean;
+  aiBusy?: boolean;
+  onStartAITag?: (assetIds: string[]) => void;
+  onStartVLMOcr?: (assetIds: string[]) => void;
 };
 
 function defaultBrowseStoredState(
@@ -596,6 +602,10 @@ export function BrowseView({
   ocrFuzzySearch,
   onAutoScrollDone,
   onOpenAsset,
+  aiEnabled,
+  aiBusy,
+  onStartAITag,
+  onStartVLMOcr,
 }: Props) {
   const { t } = useTranslation();
   const [initialBrowseState] = useState(() =>
@@ -1079,6 +1089,28 @@ export function BrowseView({
                 <Download size={14} />
                 {t("action.batchExport")}
               </button>
+              {aiEnabled && onStartAITag && (
+                <button
+                  type="button"
+                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                  disabled={aiBusy}
+                  onClick={() => onStartAITag(Array.from(selected))}
+                >
+                  <Tags size={14} />
+                  {t("action.batchAITag")}
+                </button>
+              )}
+              {aiEnabled && onStartVLMOcr && (
+                <button
+                  type="button"
+                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                  disabled={aiBusy}
+                  onClick={() => onStartVLMOcr(Array.from(selected))}
+                >
+                  <ScanText size={14} />
+                  {t("action.batchAIOcr")}
+                </button>
+              )}
               <button
                 type="button"
                 className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"

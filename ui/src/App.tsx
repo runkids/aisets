@@ -612,6 +612,7 @@ export function App() {
     saveSettings: () => Promise<void>,
     presetId?: string,
     projectIds?: string[],
+    assetIds?: string[],
   ) {
     if (aiTagActivityRunRef.current) return;
 
@@ -621,7 +622,7 @@ export function App() {
         dispatch: dispatchAITagActivity,
         saveSettings,
         run: ({ signal, onEvent }) =>
-          runAITagging({ signal, onEvent, presetId, projectIds }),
+          runAITagging({ signal, onEvent, presetId, projectIds, assetIds }),
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -646,6 +647,7 @@ export function App() {
     saveSettings: () => Promise<void>,
     presetId?: string,
     projectIds?: string[],
+    assetIds?: string[],
   ) {
     if (vlmOcrRunRef.current) return;
 
@@ -655,7 +657,7 @@ export function App() {
         dispatch: dispatchVLMOcr,
         saveSettings,
         run: ({ signal, onEvent }) =>
-          runVLMOcr({ signal, onEvent, presetId, projectIds }),
+          runVLMOcr({ signal, onEvent, presetId, projectIds, assetIds }),
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -908,6 +910,24 @@ export function App() {
               stats={scopedStats}
               onAutoScrollDone={clearAutoScrollAssetId}
               onOpenAsset={setDrawerId}
+              aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
+              aiBusy={anyAIBusy}
+              onStartAITag={(assetIds) =>
+                onStartAITagActivity(
+                  async () => {},
+                  undefined,
+                  undefined,
+                  assetIds,
+                )
+              }
+              onStartVLMOcr={(assetIds) =>
+                onStartVLMOcrActivity(
+                  async () => {},
+                  undefined,
+                  undefined,
+                  assetIds,
+                )
+              }
             />
           ) : mode === "settings" ? (
             <SettingsView
