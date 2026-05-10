@@ -68,6 +68,7 @@ type CatalogCustomFilterFacet struct {
 	Label   string `json:"label"`
 	Count   int    `json:"count"`
 	UsesOCR bool   `json:"usesOCR"`
+	UsesAI  bool   `json:"usesAI"`
 }
 
 type CatalogItemFacets struct {

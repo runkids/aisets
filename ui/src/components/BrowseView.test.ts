@@ -248,8 +248,14 @@ describe("applyBrowseFilters", () => {
         result.filteredWithoutCustom,
       ),
     ).toEqual([
-      { id: "icons", label: "icons", count: 1, usesOCR: false },
-      { id: "photos", label: "photos", count: 1, usesOCR: false },
+      { id: "icons", label: "icons", count: 1, usesOCR: false, usesAI: false },
+      {
+        id: "photos",
+        label: "photos",
+        count: 1,
+        usesOCR: false,
+        usesAI: false,
+      },
     ]);
     expect(result.filtered.map((item) => item.id)).toEqual(["icon"]);
   });

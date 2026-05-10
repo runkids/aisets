@@ -142,6 +142,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 			Label:   filter.Name,
 			Count:   count,
 			UsesOCR: customFilterUsesOCR(filter),
+			UsesAI:  customFilterUsesAI(filter),
 		})
 	}
 	return CatalogItemFacets{
@@ -380,6 +381,18 @@ func customFilterUsesOCR(filter CustomAssetFilter) bool {
 	return false
 }
 
+func customFilterUsesAI(filter CustomAssetFilter) bool {
+	for _, group := range filter.Groups {
+		for _, clause := range group.Clauses {
+			switch clause.Field {
+			case "aiCategory", "aiTag", "aiDescription", "aiStatus":
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, error) {
 	value := strings.TrimSpace(clause.Value)
 	switch clause.Field {
@@ -434,6 +447,23 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return ocrExistsSQL("ocr.confidence <= ?", []any{value}, nil)
 	case "ocrStatus":
 		return ocrExistsSQL("ocr.status = ?", []any{value}, nil)
+	case "aiCategory":
+		return aiTagExistsSQL(textClauseSQL("ait.category", clause.Operator, value))
+	case "aiTag":
+		if clause.Operator == "oneOf" {
+			return aiTagJSONListContainsSQL("ait.tags_json", lowerList(value)), nil, nil
+		}
+		return aiTagJSONContainsSQL("ait.tags_json", strings.ToLower(value)), nil, nil
+	case "aiDescription":
+		if clause.Operator == "oneOf" {
+			return aiTagTextContainsAnySQL("COALESCE(ait.description, '')", lowerList(value)), nil, nil
+		}
+		return aiTagExistsSQL(textClauseSQL("COALESCE(ait.description, '')", clause.Operator, value))
+	case "aiStatus":
+		if value == "none" {
+			return aiTagNotExistsSQL(), nil, nil
+		}
+		return aiTagExistsSQL("ait.status = ?", []any{value}, nil)
 	default:
 		return "", nil, apierr.WithParams("custom_filter_field_invalid", "custom filter field is invalid", map[string]any{"field": clause.Field})
 	}
@@ -504,6 +534,78 @@ func ocrJSONListExistsSQL(expr string, values []string) string {
 			AND ocr.repo_path = a.repo_path
 			AND ocr.content_hash = a.content_hash
 			AND ocr.hash_algorithm = a.hash_algorithm
+			AND (` + strings.Join(parts, " OR ") + `)
+	)`
+}
+
+func aiTagExistsSQL(clause string, args []any, err error) (string, []any, error) {
+	if err != nil {
+		return "", nil, err
+	}
+	return `EXISTS (
+		SELECT 1 FROM ai_tags ait
+		WHERE ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+			AND ` + clause + `
+	)`, args, nil
+}
+
+func aiTagNotExistsSQL() string {
+	return `NOT EXISTS (
+		SELECT 1 FROM ai_tags ait
+		WHERE ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+	)`
+}
+
+func aiTagJSONContainsSQL(expr, value string) string {
+	return fmt.Sprintf(`EXISTS (
+		SELECT 1 FROM ai_tags ait
+		WHERE ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+			AND LOWER(%s) LIKE '%%"%s"%%'
+	)`, expr, strings.ReplaceAll(value, "'", "''"))
+}
+
+func aiTagTextContainsAnySQL(expr string, keywords []string) string {
+	if len(keywords) == 0 {
+		return "0 = 1"
+	}
+	parts := make([]string, 0, len(keywords))
+	for _, kw := range keywords {
+		escaped := strings.ReplaceAll(kw, "'", "''")
+		parts = append(parts, fmt.Sprintf("regexp_like(%s, '(?i)\\b%s\\b')", expr, escaped))
+	}
+	return `EXISTS (
+		SELECT 1 FROM ai_tags ait
+		WHERE ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
+			AND (` + strings.Join(parts, " OR ") + `)
+	)`
+}
+
+func aiTagJSONListContainsSQL(expr string, values []string) string {
+	if len(values) == 0 {
+		return "0 = 1"
+	}
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%'", expr, strings.ReplaceAll(value, "'", "''")))
+	}
+	return `EXISTS (
+		SELECT 1 FROM ai_tags ait
+		WHERE ait.project_id = a.project_id
+			AND ait.repo_path = a.repo_path
+			AND ait.content_hash = a.content_hash
+			AND ait.hash_algorithm = a.hash_algorithm
 			AND (` + strings.Join(parts, " OR ") + `)
 	)`
 }

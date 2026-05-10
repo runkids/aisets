@@ -839,6 +839,17 @@ export function BrowseView({
     [facets?.aiCategories, facets?.aiCategoryTotal],
   );
 
+  const customFilterSelectOptions = useMemo(() => {
+    if (customFilterFacet.length === 0) return [];
+    return [
+      { value: "", label: t("filter.allCustomFilters") },
+      ...customFilterFacet.map((f) => ({
+        value: f.id,
+        label: `${f.label} (${f.count})`,
+      })),
+    ];
+  }, [customFilterFacet, t]);
+
   const aiCategorySelectOptions = useMemo(() => {
     const cats = aiCategoryFacet.options;
     if (!cats || cats.length === 0) return [];
@@ -982,10 +993,6 @@ export function BrowseView({
         projectScopeName={projectFilterName}
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
-        customFilterOptions={customFilterFacet}
-        customFilterTotal={
-          facets?.customFilterTotal ?? filteredWithoutCustom.length
-        }
         ocrReadyCount={facets?.ocrReadyCount}
         vlmOcrReadyCount={facets?.vlmOcrReadyCount}
         aiTagReadyCount={facets?.aiTagReadyCount}
@@ -1005,6 +1012,8 @@ export function BrowseView({
             sortMode={sortMode}
             aiCategory={filters.aiCategory}
             aiCategoryOptions={aiCategorySelectOptions}
+            customFilter={filters.customFilter}
+            customFilterOptions={customFilterSelectOptions}
             bulkMode={bulkMode}
             onViewChange={setView}
             onGridSizeChange={setGridSize}
@@ -1014,6 +1023,9 @@ export function BrowseView({
             onSortChange={handleSortChange}
             onAICategoryChange={(v) =>
               handleFiltersChange({ ...filters, aiCategory: v })
+            }
+            onCustomFilterChange={(v) =>
+              handleFiltersChange({ ...filters, customFilter: v })
             }
             onBulkToggle={toggleBulkMode}
           />

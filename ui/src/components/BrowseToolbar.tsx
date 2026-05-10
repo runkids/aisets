@@ -40,6 +40,11 @@ type StatusFilter =
   | "optimized"
   | "referenced";
 
+type CustomFilterSelectOption = {
+  value: string;
+  label: string;
+};
+
 type BrowseToolbarProps = {
   view: ViewMode;
   gridSize: "s" | "m" | "l";
@@ -49,6 +54,8 @@ type BrowseToolbarProps = {
   sortMode: SortMode;
   aiCategory: string;
   aiCategoryOptions: Array<{ value: string; label: string }>;
+  customFilter: string;
+  customFilterOptions: CustomFilterSelectOption[];
   bulkMode: boolean;
   onViewChange: (view: ViewMode) => void;
   onGridSizeChange: (size: "s" | "m" | "l") => void;
@@ -57,6 +64,7 @@ type BrowseToolbarProps = {
   onStatusFilterChange: (status: StatusFilter) => void;
   onSortChange: (sort: SortMode) => void;
   onAICategoryChange: (category: string) => void;
+  onCustomFilterChange: (id: string) => void;
   onBulkToggle: () => void;
 };
 
@@ -69,6 +77,8 @@ export function BrowseToolbar({
   sortMode,
   aiCategory,
   aiCategoryOptions,
+  customFilter,
+  customFilterOptions,
   bulkMode,
   onViewChange,
   onGridSizeChange,
@@ -77,6 +87,7 @@ export function BrowseToolbar({
   onStatusFilterChange,
   onSortChange,
   onAICategoryChange,
+  onCustomFilterChange,
   onBulkToggle,
 }: BrowseToolbarProps) {
   const { t } = useTranslation();
@@ -204,6 +215,16 @@ export function BrowseToolbar({
             onChange={onAICategoryChange}
             aria-label={t("filterRail.aiCategory")}
             className="w-36 flex-none"
+          />
+        )}
+
+        {customFilterOptions.length > 0 && (
+          <Select
+            value={customFilter}
+            options={customFilterOptions}
+            onChange={onCustomFilterChange}
+            aria-label={t("filter.customFilters")}
+            className="w-44 flex-none"
           />
         )}
 

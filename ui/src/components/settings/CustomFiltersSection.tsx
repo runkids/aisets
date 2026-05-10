@@ -10,7 +10,10 @@ import type { ReactNode } from "react";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { customAssetFilterUsesOCR } from "../../customAssetFilters";
+import {
+  customAssetFilterUsesOCR,
+  customAssetFilterUsesAI,
+} from "../../customAssetFilters";
 import { errorMessage } from "../../i18n/index";
 import type { SettingsDraft } from "./types";
 import type {
@@ -26,6 +29,7 @@ import {
   defaultGroup,
   createCustomFilter,
   clauseValueOptions,
+  operatorDescription,
 } from "./helpers";
 import { sectionIcon } from "./helpers";
 import {
@@ -244,6 +248,8 @@ export function CustomFiltersSection({
               {draft.customAssetFilters.map((filter) => {
                 const ocrUnavailable =
                   customAssetFilterUsesOCR(filter) && !draft.ocrEnabled;
+                const aiUnavailable =
+                  customAssetFilterUsesAI(filter) && !draft.llmEnabled;
                 return (
                   <section
                     key={filter.id}
@@ -268,6 +274,11 @@ export function CustomFiltersSection({
                       {ocrUnavailable && (
                         <Badge tone="amber" className="shrink-0">
                           {t("settings.customFilterOCRDisabled")}
+                        </Badge>
+                      )}
+                      {aiUnavailable && (
+                        <Badge tone="amber" className="shrink-0">
+                          {t("settings.customFilterAIDisabled")}
                         </Badge>
                       )}
                       <Switch
@@ -351,10 +362,13 @@ export function CustomFiltersSection({
                                   key={`${filter.id}-${groupIndex}-${clauseIndex}`}
                                 >
                                   {clauseIndex > 0 && (
-                                    <div className="flex justify-center py-0.5">
-                                      <span className="font-g-mono text-g-chip font-[510] uppercase tracking-g-mono text-g-ink-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 border-t border-g-line/40" />
+                                      <span className="shrink-0 font-g-mono text-[10px] font-[510] uppercase tracking-[0.08em] text-g-ink-4/50">
                                         AND
                                       </span>
+                                      <div className="flex-1 border-t border-g-line/40" />
+                                      <div className="size-6 shrink-0" />
                                     </div>
                                   )}
                                   <div
@@ -406,6 +420,11 @@ export function CustomFiltersSection({
                                           value: operator,
                                           label: t(
                                             `settings.customFilterOperator.${operator}`,
+                                          ),
+                                          description: operatorDescription(
+                                            clause.field,
+                                            operator,
+                                            t,
                                           ),
                                         }))}
                                         onChange={(operator) =>
@@ -620,6 +639,30 @@ export function CustomFiltersSection({
                   [
                     t("settings.customFilterField.optimizable"),
                     t("settings.customFilterValue.true"),
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpAICategoryTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.aiCategory"),
+                    t("settings.customFilterOperator.equals"),
+                    "icon",
+                  ],
+                  [
+                    t("settings.customFilterField.aiStatus"),
+                    t("settings.customFilterValue.ready"),
+                  ],
+                ],
+              },
+              {
+                title: t("settings.customFiltersHelpAITagTitle"),
+                rows: [
+                  [
+                    t("settings.customFilterField.aiTag"),
+                    t("settings.customFilterOperator.oneOf"),
+                    "dark-mode,mobile,hero",
                   ],
                 ],
               },

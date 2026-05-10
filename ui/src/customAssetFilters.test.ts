@@ -195,7 +195,13 @@ describe("matchesCustomAssetFilter", () => {
 
     expect(matchesCustomAssetFilter(makeItem(), filters[0])).toBe(false);
     expect(customFilterOptions(filters, [makeItem()])).toEqual([
-      { id: "missing", label: "Missing", count: 0, usesOCR: false },
+      {
+        id: "missing",
+        label: "Missing",
+        count: 0,
+        usesOCR: false,
+        usesAI: false,
+      },
     ]);
   });
 
@@ -214,7 +220,7 @@ describe("matchesCustomAssetFilter", () => {
     expect(customAssetFilterUsesOCR(ocrFilter)).toBe(true);
     expect(customAssetFilterUsesOCR(pathFilter)).toBe(false);
     expect(customFilterOptions([ocrFilter], [makeItem()])).toEqual([
-      { id: "custom", label: "Custom", count: 0, usesOCR: true },
+      { id: "custom", label: "Custom", count: 0, usesOCR: true, usesAI: false },
     ]);
   });
 });

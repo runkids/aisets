@@ -45,6 +45,14 @@ export function defaultClauseValue(
   if (field === "ocrScript") return "han";
   if (field === "ocrConfidence") return "0.6";
   if (field === "ocrStatus") return "ready";
+  if (field === "aiCategory") return "icon";
+  if (field === "aiTag" && operator === "oneOf") return "dark-mode,mobile,hero";
+  if (field === "aiTag") return "dark-mode";
+  if (field === "aiDescription" && operator === "regex") return "login|auth";
+  if (field === "aiDescription" && operator === "oneOf")
+    return "elephant,dog,dogs,cat,cats";
+  if (field === "aiDescription") return "dashboard";
+  if (field === "aiStatus") return "ready";
   return "true";
 }
 
@@ -76,6 +84,16 @@ export function createCustomFilter(name: string): CustomAssetFilter {
   };
 }
 
+export function operatorDescription(
+  field: CustomAssetFilterField,
+  operator: string,
+  t: (key: string) => string,
+): string | undefined {
+  const key = `settings.customFilterOperatorDesc.${field}.${operator}`;
+  const val = t(key);
+  return val === key ? undefined : val;
+}
+
 export function clauseValueOptions(field: CustomAssetFilterField) {
   if (field === "status") return ["unused", "referenced"];
   if (
@@ -85,6 +103,8 @@ export function clauseValueOptions(field: CustomAssetFilterField) {
   )
     return ["true", "false"];
   if (field === "ocrStatus") return ["pending", "ready", "failed", "skipped"];
+  if (field === "aiStatus")
+    return ["pending", "ready", "failed", "skipped", "none"];
   return null;
 }
 

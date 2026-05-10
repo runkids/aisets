@@ -245,6 +245,10 @@ export const customFilterFields: CustomAssetFilterField[] = [
   "ocrScript",
   "ocrConfidence",
   "ocrStatus",
+  "aiCategory",
+  "aiTag",
+  "aiDescription",
+  "aiStatus",
 ];
 
 export const customFilterOperatorsByField: Record<
@@ -265,6 +269,10 @@ export const customFilterOperatorsByField: Record<
   ocrScript: ["equals", "oneOf"],
   ocrConfidence: ["gte", "lte"],
   ocrStatus: ["is"],
+  aiCategory: ["equals", "contains", "regex"],
+  aiTag: ["contains", "oneOf"],
+  aiDescription: ["contains", "oneOf", "regex"],
+  aiStatus: ["is"],
 };
 
 export const editorOptions = [

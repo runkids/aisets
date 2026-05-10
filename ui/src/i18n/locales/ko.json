@@ -714,7 +714,9 @@
     "allExtensions": "모든 확장자",
     "allCustomFilters": "모든 사용자 지정 필터",
     "requiresOCR": "OCR 필요",
-    "requiresOCRHint": "이 사용자 지정 필터는 OCR을 사용하지만 현재 OCR이 꺼져 있습니다."
+    "requiresOCRHint": "이 사용자 지정 필터는 OCR을 사용하지만 현재 OCR이 꺼져 있습니다.",
+    "requiresAI": "AI 필요",
+    "requiresAIHint": "이 사용자 지정 필터는 AI 태그를 사용하지만 현재 AI가 꺼져 있습니다."
   },
   "toolbar": {
     "gridView": "그리드 보기",
@@ -1030,6 +1032,7 @@
     "customFiltersDesc": "경로와 에셋 메타데이터를 기준으로 저장되는 Browse 필터입니다.",
     "customFiltersHint": "그룹끼리는 OR, 같은 그룹 안의 규칙은 AND입니다. OCR 규칙은 캐시된 로컬 OCR 결과만 비교합니다.",
     "customFilterOCRDisabled": "OCR 꺼짐",
+    "customFilterAIDisabled": "AI 꺼짐",
     "customFilterName": "필터 이름",
     "customFilterEnabled": "활성화",
     "customFilterNewName": "새 필터",
@@ -1051,7 +1054,11 @@
       "ocrLanguage": "OCR 언어",
       "ocrScript": "OCR 스크립트",
       "ocrConfidence": "OCR 신뢰도",
-      "ocrStatus": "OCR 상태"
+      "ocrStatus": "OCR 상태",
+      "aiCategory": "AI 카테고리",
+      "aiTag": "AI 태그",
+      "aiDescription": "AI 설명",
+      "aiStatus": "AI 상태"
     },
     "customFilterOperator": {
       "contains": "포함",
@@ -1064,6 +1071,57 @@
       "lte": "이하",
       "is": "임"
     },
+    "customFilterOperatorDesc": {
+      "path": {
+        "contains": "경로에 텍스트 포함",
+        "prefix": "경로가 값으로 시작",
+        "suffix": "경로가 값으로 끝남",
+        "equals": "경로 정확히 일치",
+        "regex": "정규 표현식"
+      },
+      "folder": {
+        "contains": "폴더에 텍스트 포함",
+        "prefix": "폴더가 값으로 시작",
+        "suffix": "폴더가 값으로 끝남",
+        "equals": "폴더 정확히 일치",
+        "regex": "정규 표현식"
+      },
+      "extension": {
+        "equals": "단일 확장자 (예: .png)",
+        "oneOf": "쉼표로 구분 (예: .png,.jpg,.webp)"
+      },
+      "project": {
+        "equals": "프로젝트 이름 정확히 일치",
+        "contains": "이름에 텍스트 포함",
+        "oneOf": "쉼표로 구분된 프로젝트 이름"
+      },
+      "ocrText": {
+        "contains": "OCR 텍스트에 부분 문자열 포함",
+        "regex": "정규 표현식"
+      },
+      "ocrLanguage": {
+        "equals": "단일 언어 코드 (예: eng)",
+        "oneOf": "쉼표로 구분 (예: eng,chi_tra)"
+      },
+      "ocrScript": {
+        "equals": "단일 스크립트 (예: han)",
+        "oneOf": "쉼표로 구분 (예: han,latin)"
+      },
+      "aiCategory": {
+        "contains": "카테고리에 텍스트 포함",
+        "equals": "카테고리 정확히 일치",
+        "regex": "정규 표현식"
+      },
+      "aiTag": {
+        "contains": "태그에 텍스트 포함",
+        "oneOf": "태그 중 하나와 정확히 일치 (쉼표로 구분)"
+      },
+      "aiDescription": {
+        "contains": "설명에 부분 문자열 포함",
+        "oneOf": "완전한 단어 중 하나와 일치 (쉼표로 구분)",
+        "regex": "정규 표현식"
+      }
+    },
     "customFilterValue": {
       "unused": "미사용",
       "referenced": "참조됨",
@@ -1072,7 +1130,8 @@
       "pending": "대기 중",
       "ready": "준비됨",
       "failed": "실패",
-      "skipped": "건너뜀"
+      "skipped": "건너뜀",
+      "none": "없음"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1100,6 +1159,8 @@
     "customFiltersHelpFolderSuffixTitle": "icons로 끝나는 폴더의 에셋",
     "customFiltersHelpLargeUnusedTitle": "사용하지 않는 큰 웹 이미지",
     "customFiltersHelpCleanupTitle": "정리 후보",
+    "customFiltersHelpAICategoryTitle": "AI 분류 아이콘",
+    "customFiltersHelpAITagTitle": "특정 AI 태그가 있는 에셋",
     "optimization": "최적화",
     "optimizationDesc": "최적화 미리보기와 적용 흐름의 기본값을 설정합니다.",
     "defaultQuality": "기본 품질",
@@ -1491,7 +1552,11 @@
       "ocrLanguage": "감지된 OCR 언어",
       "ocrScript": "감지된 OCR 스크립트 시스템",
       "ocrConfidence": "OCR 인식 신뢰도(0–1)",
-      "ocrStatus": "OCR 처리 상태"
+      "ocrStatus": "OCR 처리 상태",
+      "aiCategory": "AI가 분류한 이미지 카테고리",
+      "aiTag": "AI 생성 태그 목록의 임의 태그",
+      "aiDescription": "AI 생성 이미지 설명",
+      "aiStatus": "AI 태그 처리 상태"
     },
     "clearOCRCache": "OCR 캐시 지우기",
     "clearOCRCacheHint": "모든 OCR 결과(AI OCR 포함)를 제거합니다. 재처리하려면 OCR 또는 AI OCR을 다시 실행하세요",

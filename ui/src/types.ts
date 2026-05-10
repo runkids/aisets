@@ -97,7 +97,11 @@ export type CustomAssetFilterField =
   | "ocrLanguage"
   | "ocrScript"
   | "ocrConfidence"
-  | "ocrStatus";
+  | "ocrStatus"
+  | "aiCategory"
+  | "aiTag"
+  | "aiDescription"
+  | "aiStatus";
 
 export type CustomAssetFilterOperator =
   | "contains"
@@ -460,6 +464,7 @@ export type CatalogItemsPage = {
       label: string;
       count: number;
       usesOCR: boolean;
+      usesAI: boolean;
     }>;
     customFilterTotal: number;
     aiCategories: Array<{ id: string; count: number }>;

@@ -10,6 +10,7 @@ export type CustomFilterOption = {
   label: string;
   count: number;
   usesOCR: boolean;
+  usesAI: boolean;
 };
 
 const ocrFilterFields = new Set<CustomAssetFilterField>([
@@ -18,6 +19,13 @@ const ocrFilterFields = new Set<CustomAssetFilterField>([
   "ocrScript",
   "ocrConfidence",
   "ocrStatus",
+]);
+
+const aiFilterFields = new Set<CustomAssetFilterField>([
+  "aiCategory",
+  "aiTag",
+  "aiDescription",
+  "aiStatus",
 ]);
 
 function itemFolder(item: AssetItem) {
@@ -174,6 +182,37 @@ function matchesClause(
     }
     case "ocrStatus":
       return clause.operator === "is" && item.ocr?.status === value;
+    case "aiCategory":
+      if (!item.aiTag || item.aiTag.status !== "ready") return false;
+      return matchesText(item.aiTag.category ?? "", clause.operator, value);
+    case "aiTag": {
+      if (!item.aiTag || item.aiTag.status !== "ready") return false;
+      const tags = (item.aiTag.tags ?? []).map((t) => t.toLowerCase());
+      if (clause.operator === "oneOf") {
+        return listValue(value).some((v) => tags.includes(v.toLowerCase()));
+      }
+      return tags.some((tag) => tag.includes(value.toLowerCase()));
+    }
+    case "aiDescription": {
+      if (!item.aiTag || item.aiTag.status !== "ready") return false;
+      if (clause.operator === "oneOf") {
+        const desc = item.aiTag.description ?? "";
+        return listValue(value).some((kw) => {
+          try {
+            return new RegExp(
+              `\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+              "i",
+            ).test(desc);
+          } catch {
+            return false;
+          }
+        });
+      }
+      return matchesText(item.aiTag.description ?? "", clause.operator, value);
+    }
+    case "aiStatus":
+      if (value === "none") return !item.aiTag;
+      return item.aiTag?.status === value;
     default:
       return false;
   }
@@ -201,6 +240,12 @@ export function customAssetFilterUsesOCR(filter: CustomAssetFilter) {
   );
 }
 
+export function customAssetFilterUsesAI(filter: CustomAssetFilter) {
+  return filter.groups.some((group) =>
+    group.clauses.some((clause) => aiFilterFields.has(clause.field)),
+  );
+}
+
 export function customFilterOptions(
   filters: CustomAssetFilter[] = [],
   items: AssetItem[],
@@ -209,6 +254,7 @@ export function customFilterOptions(
     id: filter.id,
     label: filter.name,
     usesOCR: customAssetFilterUsesOCR(filter),
+    usesAI: customAssetFilterUsesAI(filter),
     count: items.filter((item) => matchesCustomAssetFilter(item, filter))
       .length,
   }));

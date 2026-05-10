@@ -696,7 +696,9 @@
     "allExtensions": "所有扩展名",
     "allCustomFilters": "所有自定义筛选器",
     "requiresOCR": "需要 OCR",
-    "requiresOCRHint": "这个自定义筛选器使用 OCR；目前 OCR 已关闭"
+    "requiresOCRHint": "这个自定义筛选器使用 OCR；目前 OCR 已关闭",
+    "requiresAI": "需要 AI",
+    "requiresAIHint": "这个自定义筛选器使用 AI 标记；目前 AI 已关闭"
   },
   "toolbar": {
     "gridView": "网格视图",
@@ -1012,6 +1014,7 @@
     "customFiltersDesc": "基于路径与素材元数据保存的浏览筛选器",
     "customFiltersHint": "分组之间是 OR；同一分组内的规则是 ANDOCR 规则只会匹配已缓存的本机 OCR 结果",
     "customFilterOCRDisabled": "OCR 已关闭",
+    "customFilterAIDisabled": "AI 已关闭",
     "customFilterName": "筛选器名称",
     "customFilterEnabled": "启用",
     "customFilterNewName": "新的筛选器",
@@ -1033,7 +1036,11 @@
       "ocrLanguage": "OCR 语言",
       "ocrScript": "OCR 文字系统",
       "ocrConfidence": "OCR 置信度",
-      "ocrStatus": "OCR 状态"
+      "ocrStatus": "OCR 状态",
+      "aiCategory": "AI 分类",
+      "aiTag": "AI 标签",
+      "aiDescription": "AI 描述",
+      "aiStatus": "AI 状态"
     },
     "customFilterOperator": {
       "contains": "包含",
@@ -1046,6 +1053,57 @@
       "lte": "至多",
       "is": "是"
     },
+    "customFilterOperatorDesc": {
+      "path": {
+        "contains": "路径包含文字",
+        "prefix": "路径开头为",
+        "suffix": "路径结尾为",
+        "equals": "完全匹配路径",
+        "regex": "正则表达式"
+      },
+      "folder": {
+        "contains": "文件夹包含文字",
+        "prefix": "文件夹开头为",
+        "suffix": "文件夹结尾为",
+        "equals": "完全匹配文件夹",
+        "regex": "正则表达式"
+      },
+      "extension": {
+        "equals": "单个扩展名，例如 .png",
+        "oneOf": "逗号分隔，例如 .png,.jpg,.webp"
+      },
+      "project": {
+        "equals": "精确项目名称",
+        "contains": "名称包含文字",
+        "oneOf": "逗号分隔的项目名称"
+      },
+      "ocrText": {
+        "contains": "OCR 文字包含子字符串",
+        "regex": "正则表达式"
+      },
+      "ocrLanguage": {
+        "equals": "单个语言代码，例如 eng",
+        "oneOf": "逗号分隔，例如 eng,chi_tra"
+      },
+      "ocrScript": {
+        "equals": "单个文字系统，例如 han",
+        "oneOf": "逗号分隔，例如 han,latin"
+      },
+      "aiCategory": {
+        "contains": "分类包含文字",
+        "equals": "精确匹配分类",
+        "regex": "正则表达式"
+      },
+      "aiTag": {
+        "contains": "标签包含文字",
+        "oneOf": "精确匹配任一标签（逗号分隔）"
+      },
+      "aiDescription": {
+        "contains": "描述包含子字符串",
+        "oneOf": "匹配任一完整单词（逗号分隔）",
+        "regex": "正则表达式"
+      }
+    },
     "customFilterValue": {
       "unused": "未使用",
       "referenced": "已引用",
@@ -1054,7 +1112,8 @@
       "pending": "待处理",
       "ready": "就绪",
       "failed": "失败",
-      "skipped": "已跳过"
+      "skipped": "已跳过",
+      "none": "无"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1082,6 +1141,8 @@
     "customFiltersHelpFolderSuffixTitle": "文件夹结尾是 icons 的素材",
     "customFiltersHelpLargeUnusedTitle": "未使用的大型网页图片",
     "customFiltersHelpCleanupTitle": "清理候选素材",
+    "customFiltersHelpAICategoryTitle": "AI 识别的图标",
+    "customFiltersHelpAITagTitle": "含有特定 AI 标签的素材",
     "optimization": "优化",
     "optimizationDesc": "设置优化预览与套用流程的默认偏好",
     "defaultQuality": "默认质量",
@@ -1480,7 +1541,11 @@
       "ocrLanguage": "检测到的 OCR 语言",
       "ocrScript": "检测到的 OCR 文字系统",
       "ocrConfidence": "OCR 识别置信度（0–1）",
-      "ocrStatus": "OCR 处理状态"
+      "ocrStatus": "OCR 处理状态",
+      "aiCategory": "AI 分类的图片类型",
+      "aiTag": "AI 生成标签列表中的任意标签",
+      "aiDescription": "AI 生成的图片描述",
+      "aiStatus": "AI 标记处理状态"
     },
     "clearOCRCache": "清除 OCR 缓存",
     "clearOCRCacheHint": "移除所有 OCR 结果（包括 AI OCR）。重新运行 OCR 或 AI OCR 可重新处理",

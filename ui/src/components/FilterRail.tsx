@@ -1,16 +1,10 @@
-import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
-import { Rail, RailItem, RailSection, Tooltip } from "./ui";
+import { Rail, RailItem, RailSection } from "./ui";
 
 type FilterOption = {
   id: string;
   count: number;
-};
-
-type CustomFilterOption = FilterOption & {
-  label: string;
-  usesOCR?: boolean;
 };
 
 type FilterState = {
@@ -31,8 +25,6 @@ type FilterRailProps = {
   extensionTotal?: number;
   extensionHeading?: string;
   extensionAllLabel?: string;
-  customFilterOptions?: CustomFilterOption[];
-  customFilterTotal?: number;
   ocrReadyCount?: number;
   vlmOcrReadyCount?: number;
   aiTagReadyCount?: number;
@@ -63,8 +55,6 @@ export function FilterRail({
   extensionTotal,
   extensionHeading,
   extensionAllLabel,
-  customFilterOptions,
-  customFilterTotal,
   ocrReadyCount,
   vlmOcrReadyCount,
   aiTagReadyCount,
@@ -79,10 +69,8 @@ export function FilterRail({
     ? allProjects.filter((p) => p.id === projectScopeName)
     : allProjects;
   const extensions = extensionOptions ?? countBy(items, "ext");
-  const customFilters = customFilterOptions ?? [];
   const allProjectsCount = projectTotal ?? items.length;
   const allExtensionsCount = extensionTotal ?? items.length;
-  const allCustomFiltersCount = customFilterTotal ?? items.length;
   const projectScopeLocked = Boolean(projectScopeName);
 
   function toggle(key: keyof FilterState, value: string) {
@@ -96,7 +84,7 @@ export function FilterRail({
   }
 
   return (
-    <Rail className="ml-3 px-0">
+    <Rail className="ml-3 max-h-full px-0">
       <RailSection heading={t("filter.project")}>
         {!projectScopeLocked && (
           <RailItem
@@ -134,48 +122,6 @@ export function FilterRail({
           />
         ))}
       </RailSection>
-
-      {customFilters.length > 0 && (
-        <RailSection heading={t("filter.customFilters")}>
-          <RailItem
-            active={filters.customFilter === ""}
-            label={t("filter.allCustomFilters")}
-            count={allCustomFiltersCount}
-            onClick={() => onFiltersChange({ ...filters, customFilter: "" })}
-          />
-          {customFilters.map((option) => {
-            const ocrUnavailable = option.usesOCR && !ocrEnabled;
-            return (
-              <RailItem
-                key={option.id}
-                active={filters.customFilter === option.id}
-                label={option.label}
-                count={
-                  ocrUnavailable ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Tooltip
-                        label={t("filter.requiresOCRHint")}
-                        placement="top"
-                      >
-                        <span
-                          className="inline-grid size-[18px] place-items-center rounded-g-sm text-g-amber"
-                          aria-label={t("filter.requiresOCR")}
-                        >
-                          <TriangleAlert size={13} />
-                        </span>
-                      </Tooltip>
-                      <span>{option.count}</span>
-                    </span>
-                  ) : (
-                    option.count
-                  )
-                }
-                onClick={() => toggle("customFilter", option.id)}
-              />
-            );
-          })}
-        </RailSection>
-      )}
 
       {ocrEnabled || aiEnabled ? (
         <RailSection heading={t("filterRail.aiStatus")}>

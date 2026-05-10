@@ -145,6 +145,38 @@ func normalizeCustomAssetFilterClause(clause CustomAssetFilterClause) (CustomAss
 		if !isOneOf(clause.Value, "pending", "ready", "failed", "skipped") {
 			return CustomAssetFilterClause{}, apierr.New("custom_filter_ocr_status_invalid", "custom filter OCR status is invalid")
 		}
+	case "aiCategory":
+		if !isOneOf(clause.Operator, "equals", "contains", "regex") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if err := validateCustomFilterTextValue(clause); err != nil {
+			return CustomAssetFilterClause{}, err
+		}
+	case "aiTag":
+		if !isOneOf(clause.Operator, "contains", "oneOf") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if clause.Value == "" || (clause.Operator == "oneOf" && len(splitCustomFilterList(clause.Value)) == 0) {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_value_required", "custom filter clause value is required")
+		}
+	case "aiDescription":
+		if !isOneOf(clause.Operator, "contains", "oneOf", "regex") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if clause.Operator == "oneOf" {
+			if clause.Value == "" || len(splitCustomFilterList(clause.Value)) == 0 {
+				return CustomAssetFilterClause{}, apierr.New("custom_filter_value_required", "custom filter clause value is required")
+			}
+		} else if err := validateCustomFilterTextValue(clause); err != nil {
+			return CustomAssetFilterClause{}, err
+		}
+	case "aiStatus":
+		if clause.Operator != "is" {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if !isOneOf(clause.Value, "pending", "ready", "failed", "skipped", "none") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_ai_status_invalid", "custom filter AI status is invalid")
+		}
 	default:
 		return CustomAssetFilterClause{}, apierr.New("custom_filter_field_invalid", "custom filter field is invalid")
 	}

@@ -732,7 +732,9 @@
     "allExtensions": "所有副檔名",
     "allCustomFilters": "所有自訂篩選器",
     "requiresOCR": "需要 OCR",
-    "requiresOCRHint": "這個自訂篩選器使用 OCR；目前 OCR 已關閉"
+    "requiresOCRHint": "這個自訂篩選器使用 OCR；目前 OCR 已關閉",
+    "requiresAI": "需要 AI",
+    "requiresAIHint": "這個自訂篩選器使用 AI 標記；目前 AI 已關閉"
   },
   "toolbar": {
     "gridView": "格狀檢視",
@@ -1174,6 +1176,7 @@
     "customFiltersDesc": "依路徑與素材中繼資料保存的瀏覽篩選器",
     "customFiltersHint": "群組之間是 OR；同一群組內的規則是 ANDOCR 規則只會比對已快取的本機 OCR 結果",
     "customFilterOCRDisabled": "OCR 已關閉",
+    "customFilterAIDisabled": "AI 已關閉",
     "customFilterName": "篩選器名稱",
     "customFilterEnabled": "啟用",
     "customFilterNewName": "新的篩選器",
@@ -1195,7 +1198,11 @@
       "ocrLanguage": "OCR 語言",
       "ocrScript": "OCR 文字系統",
       "ocrConfidence": "OCR 信心分數",
-      "ocrStatus": "OCR 狀態"
+      "ocrStatus": "OCR 狀態",
+      "aiCategory": "AI 分類",
+      "aiTag": "AI 標籤",
+      "aiDescription": "AI 描述",
+      "aiStatus": "AI 狀態"
     },
     "customFilterFieldDesc": {
       "path": "含檔名的完整檔案路徑",
@@ -1211,7 +1218,11 @@
       "ocrLanguage": "OCR 偵測的語言",
       "ocrScript": "OCR 偵測的文字系統",
       "ocrConfidence": "OCR 辨識信心分數（0–1）",
-      "ocrStatus": "OCR 處理狀態"
+      "ocrStatus": "OCR 處理狀態",
+      "aiCategory": "AI 分類的圖片類型",
+      "aiTag": "AI 生成標籤列表中的任意標籤",
+      "aiDescription": "AI 生成的圖片描述",
+      "aiStatus": "AI 標記處理狀態"
     },
     "customFilterOperator": {
       "contains": "包含",
@@ -1224,6 +1235,57 @@
       "lte": "至多",
       "is": "是"
     },
+    "customFilterOperatorDesc": {
+      "path": {
+        "contains": "路徑包含文字",
+        "prefix": "路徑開頭為",
+        "suffix": "路徑結尾為",
+        "equals": "完全符合路徑",
+        "regex": "正規表達式"
+      },
+      "folder": {
+        "contains": "資料夾包含文字",
+        "prefix": "資料夾開頭為",
+        "suffix": "資料夾結尾為",
+        "equals": "完全符合資料夾",
+        "regex": "正規表達式"
+      },
+      "extension": {
+        "equals": "單一副檔名，例如 .png",
+        "oneOf": "逗號分隔，例如 .png,.jpg,.webp"
+      },
+      "project": {
+        "equals": "精確專案名稱",
+        "contains": "名稱包含文字",
+        "oneOf": "逗號分隔的專案名稱"
+      },
+      "ocrText": {
+        "contains": "OCR 文字包含子字串",
+        "regex": "正規表達式"
+      },
+      "ocrLanguage": {
+        "equals": "單一語言代碼，例如 eng",
+        "oneOf": "逗號分隔，例如 eng,chi_tra"
+      },
+      "ocrScript": {
+        "equals": "單一文字系統，例如 han",
+        "oneOf": "逗號分隔，例如 han,latin"
+      },
+      "aiCategory": {
+        "contains": "分類包含文字",
+        "equals": "精確匹配分類",
+        "regex": "正規表達式"
+      },
+      "aiTag": {
+        "contains": "標籤包含文字",
+        "oneOf": "精確匹配任一標籤（逗號分隔）"
+      },
+      "aiDescription": {
+        "contains": "描述包含子字串",
+        "oneOf": "匹配任一完整單詞（逗號分隔）",
+        "regex": "正規表達式"
+      }
+    },
     "customFilterValue": {
       "unused": "未使用",
       "referenced": "已引用",
@@ -1232,7 +1294,8 @@
       "pending": "等待中",
       "ready": "完成",
       "failed": "失敗",
-      "skipped": "已略過"
+      "skipped": "已略過",
+      "none": "無"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1260,6 +1323,8 @@
     "customFiltersHelpFolderSuffixTitle": "資料夾結尾是 icons 的素材",
     "customFiltersHelpLargeUnusedTitle": "未使用的大型網頁圖片",
     "customFiltersHelpCleanupTitle": "清理候選素材",
+    "customFiltersHelpAICategoryTitle": "AI 辨識的圖示",
+    "customFiltersHelpAITagTitle": "含有特定 AI 標籤的素材",
     "optimization": "最佳化",
     "optimizationDesc": "設定最佳化預覽與套用流程的預設偏好",
     "defaultQuality": "預設品質",

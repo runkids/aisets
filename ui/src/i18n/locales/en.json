@@ -482,6 +482,7 @@
     "customFiltersDesc": "Saved Browse filters based on path and asset metadata.",
     "customFiltersHint": "Groups are ORed. Clauses inside a group are ANDed. OCR clauses match cached local OCR results only.",
     "customFilterOCRDisabled": "OCR off",
+    "customFilterAIDisabled": "AI off",
     "customFilterName": "Filter name",
     "customFilterEnabled": "Enabled",
     "customFilterNewName": "New filter",
@@ -503,7 +504,11 @@
       "ocrLanguage": "OCR language",
       "ocrScript": "OCR script",
       "ocrConfidence": "OCR confidence",
-      "ocrStatus": "OCR status"
+      "ocrStatus": "OCR status",
+      "aiCategory": "AI category",
+      "aiTag": "AI tag",
+      "aiDescription": "AI description",
+      "aiStatus": "AI status"
     },
     "customFilterFieldDesc": {
       "path": "Full file path including name",
@@ -519,7 +524,11 @@
       "ocrLanguage": "Detected OCR language",
       "ocrScript": "Detected OCR script system",
       "ocrConfidence": "OCR recognition confidence (0–1)",
-      "ocrStatus": "OCR processing state"
+      "ocrStatus": "OCR processing state",
+      "aiCategory": "AI-classified image category",
+      "aiTag": "Any tag in AI-generated tag list",
+      "aiDescription": "AI-generated image description",
+      "aiStatus": "AI tagging processing state"
     },
     "customFilterOperator": {
       "contains": "contains",
@@ -532,6 +541,57 @@
       "lte": "at most",
       "is": "is"
     },
+    "customFilterOperatorDesc": {
+      "path": {
+        "contains": "Path includes text anywhere",
+        "prefix": "Path starts with value",
+        "suffix": "Path ends with value",
+        "equals": "Exact path match",
+        "regex": "Regular expression"
+      },
+      "folder": {
+        "contains": "Folder includes text anywhere",
+        "prefix": "Folder starts with value",
+        "suffix": "Folder ends with value",
+        "equals": "Exact folder match",
+        "regex": "Regular expression"
+      },
+      "extension": {
+        "equals": "Single extension, e.g. .png",
+        "oneOf": "Comma-separated, e.g. .png,.jpg,.webp"
+      },
+      "project": {
+        "equals": "Exact project name",
+        "contains": "Name includes text",
+        "oneOf": "Comma-separated project names"
+      },
+      "ocrText": {
+        "contains": "OCR text includes substring",
+        "regex": "Regular expression"
+      },
+      "ocrLanguage": {
+        "equals": "Single language code, e.g. eng",
+        "oneOf": "Comma-separated, e.g. eng,chi_tra"
+      },
+      "ocrScript": {
+        "equals": "Single script, e.g. han",
+        "oneOf": "Comma-separated, e.g. han,latin"
+      },
+      "aiCategory": {
+        "contains": "Category includes text",
+        "equals": "Exact category match",
+        "regex": "Regular expression"
+      },
+      "aiTag": {
+        "contains": "Tag includes text",
+        "oneOf": "Match any tag exactly (comma-separated)"
+      },
+      "aiDescription": {
+        "contains": "Description includes substring",
+        "oneOf": "Match any whole word (comma-separated)",
+        "regex": "Regular expression"
+      }
+    },
     "customFilterValue": {
       "unused": "Unused",
       "referenced": "Referenced",
@@ -540,7 +600,8 @@
       "pending": "Pending",
       "ready": "Ready",
       "failed": "Failed",
-      "skipped": "Skipped"
+      "skipped": "Skipped",
+      "none": "None"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -568,6 +629,8 @@
     "customFiltersHelpFolderSuffixTitle": "Assets under folders ending in icons",
     "customFiltersHelpLargeUnusedTitle": "Large unused web images",
     "customFiltersHelpCleanupTitle": "Cleanup candidates",
+    "customFiltersHelpAICategoryTitle": "AI-tagged icons",
+    "customFiltersHelpAITagTitle": "Assets with specific AI tags",
     "optimization": "Optimization",
     "optimizationDesc": "Set defaults for optimization previews and apply workflows.",
     "defaultQuality": "Default quality",
@@ -1278,7 +1341,9 @@
     "allExtensions": "All extensions",
     "allCustomFilters": "All custom filters",
     "requiresOCR": "Needs OCR",
-    "requiresOCRHint": "This custom filter uses OCR, but OCR is currently off."
+    "requiresOCRHint": "This custom filter uses OCR, but OCR is currently off.",
+    "requiresAI": "Needs AI",
+    "requiresAIHint": "This custom filter uses AI tagging, but AI is currently off."
   },
   "toolbar": {
     "gridView": "Grid view",

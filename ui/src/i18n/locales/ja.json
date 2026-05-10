@@ -696,7 +696,9 @@
     "allExtensions": "すべての拡張子",
     "allCustomFilters": "すべてのカスタムフィルター",
     "requiresOCR": "OCR が必要",
-    "requiresOCRHint": "このカスタムフィルターは OCR を使用しますが、現在 OCR はオフです"
+    "requiresOCRHint": "このカスタムフィルターは OCR を使用しますが、現在 OCR はオフです",
+    "requiresAI": "AI が必要",
+    "requiresAIHint": "このカスタムフィルターは AI タグを使用しますが、現在 AI はオフです"
   },
   "toolbar": {
     "gridView": "グリッド表示",
@@ -1012,6 +1014,7 @@
     "customFiltersDesc": "パスとアセットメタデータに基づいて保存される Browse フィルターです",
     "customFiltersHint": "グループ間は OR、同じグループ内のルールは AND です。OCR ルールはキャッシュ済みのローカル OCR 結果だけを照合します",
     "customFilterOCRDisabled": "OCR オフ",
+    "customFilterAIDisabled": "AI オフ",
     "customFilterName": "フィルター名",
     "customFilterEnabled": "有効",
     "customFilterNewName": "新しいフィルター",
@@ -1033,7 +1036,11 @@
       "ocrLanguage": "OCR 言語",
       "ocrScript": "OCR スクリプト",
       "ocrConfidence": "OCR 信頼度",
-      "ocrStatus": "OCR ステータス"
+      "ocrStatus": "OCR ステータス",
+      "aiCategory": "AI カテゴリ",
+      "aiTag": "AI タグ",
+      "aiDescription": "AI 説明",
+      "aiStatus": "AI ステータス"
     },
     "customFilterOperator": {
       "contains": "含む",
@@ -1046,6 +1053,57 @@
       "lte": "以下",
       "is": "である"
     },
+    "customFilterOperatorDesc": {
+      "path": {
+        "contains": "パスにテキストを含む",
+        "prefix": "パスの先頭が一致",
+        "suffix": "パスの末尾が一致",
+        "equals": "パス完全一致",
+        "regex": "正規表現"
+      },
+      "folder": {
+        "contains": "フォルダにテキストを含む",
+        "prefix": "フォルダの先頭が一致",
+        "suffix": "フォルダの末尾が一致",
+        "equals": "フォルダ完全一致",
+        "regex": "正規表現"
+      },
+      "extension": {
+        "equals": "単一の拡張子（例：.png）",
+        "oneOf": "カンマ区切り（例：.png,.jpg,.webp）"
+      },
+      "project": {
+        "equals": "プロジェクト名完全一致",
+        "contains": "名前にテキストを含む",
+        "oneOf": "カンマ区切りのプロジェクト名"
+      },
+      "ocrText": {
+        "contains": "OCR テキストに部分文字列を含む",
+        "regex": "正規表現"
+      },
+      "ocrLanguage": {
+        "equals": "単一の言語コード（例：eng）",
+        "oneOf": "カンマ区切り（例：eng,chi_tra）"
+      },
+      "ocrScript": {
+        "equals": "単一のスクリプト（例：han）",
+        "oneOf": "カンマ区切り（例：han,latin）"
+      },
+      "aiCategory": {
+        "contains": "カテゴリにテキストを含む",
+        "equals": "カテゴリ完全一致",
+        "regex": "正規表現"
+      },
+      "aiTag": {
+        "contains": "タグにテキストを含む",
+        "oneOf": "いずれかのタグに完全一致（カンマ区切り）"
+      },
+      "aiDescription": {
+        "contains": "説明に部分文字列を含む",
+        "oneOf": "いずれかの単語に完全一致（カンマ区切り）",
+        "regex": "正規表現"
+      }
+    },
     "customFilterValue": {
       "unused": "未使用",
       "referenced": "参照あり",
@@ -1054,7 +1112,8 @@
       "pending": "保留中",
       "ready": "完了",
       "failed": "失敗",
-      "skipped": "スキップ"
+      "skipped": "スキップ",
+      "none": "なし"
     },
     "customFilterValuePlaceholder": {
       "path": "assets",
@@ -1082,6 +1141,8 @@
     "customFiltersHelpFolderSuffixTitle": "icons で終わるフォルダ内のアセット",
     "customFiltersHelpLargeUnusedTitle": "未使用の大きな Web 画像",
     "customFiltersHelpCleanupTitle": "整理候補",
+    "customFiltersHelpAICategoryTitle": "AI 分類のアイコン",
+    "customFiltersHelpAITagTitle": "特定の AI タグを持つアセット",
     "optimization": "最適化",
     "optimizationDesc": "最適化プレビューと適用フローの既定値を設定します",
     "defaultQuality": "既定の品質",
@@ -1480,7 +1541,11 @@
       "ocrLanguage": "検出された OCR 言語",
       "ocrScript": "検出された OCR スクリプトシステム",
       "ocrConfidence": "OCR 認識の信頼度（0–1）",
-      "ocrStatus": "OCR の処理状態"
+      "ocrStatus": "OCR の処理状態",
+      "aiCategory": "AI が分類した画像カテゴリ",
+      "aiTag": "AI 生成タグリスト内の任意のタグ",
+      "aiDescription": "AI 生成の画像説明",
+      "aiStatus": "AI タグ付けの処理状態"
     },
     "clearOCRCache": "OCR キャッシュをクリア",
     "clearOCRCacheHint": "すべての OCR 結果（AI OCR を含む）を削除します。再処理するには OCR または AI OCR を再実行してください",
