@@ -1828,7 +1828,8 @@
       "optimizationFindings": "基于规则的优化分析 — 请求时自动注入",
       "leftMetadata": "第一张（左侧）图片的元数据 — 自动填入",
       "rightMetadata": "第二张（右侧）图片的元数据 — 自动填入",
-      "distance": "两张图片的 dHash 距离（0-64） — 自动填入"
+      "distance": "两张图片的 dHash 距离（0-64） — 自动填入",
+      "language": "响应语言偏好"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",
@@ -1844,7 +1845,9 @@
     "toastCreateFailed": "创建失败",
     "toastDefaultSet": "默认提示词已更新",
     "toastDefaultSetFailed": "设置默认失败",
-    "toastReset": "模板已恢复默认"
+    "toastReset": "模板已恢复默认",
+    "systemPresets": "系统",
+    "systemDescription": "此 prompt 会自动合并到所有 AI 操作前面"
   },
   "duplicateExplain": {
     "button": "解释差异",

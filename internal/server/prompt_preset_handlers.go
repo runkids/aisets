@@ -99,3 +99,10 @@ func (s *Server) handleSetPromptPresetDefault(w http.ResponseWriter, r *http.Req
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"preset": preset})
 }
+
+func prependSystemPrompt(systemPrompt, prompt string) string {
+	if systemPrompt == "" {
+		return prompt
+	}
+	return systemPrompt + "\n\n" + prompt
+}

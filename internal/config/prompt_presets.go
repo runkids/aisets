@@ -102,8 +102,8 @@ func (s *Store) CreatePromptPreset(p PromptPreset) (PromptPreset, error) {
 	if p.Name == "" {
 		return PromptPreset{}, fmt.Errorf("preset name is required")
 	}
-	if p.Type != "tag" && p.Type != "ocr" && p.Type != "optimize" {
-		return PromptPreset{}, fmt.Errorf("preset type must be 'tag', 'ocr', or 'optimize'")
+	if p.Type != "tag" && p.Type != "ocr" && p.Type != "optimize" && p.Type != "duplicate" && p.Type != "system" {
+		return PromptPreset{}, fmt.Errorf("preset type must be 'tag', 'ocr', 'optimize', 'duplicate', or 'system'")
 	}
 
 	p.ID = uuid.NewString()
@@ -258,6 +258,8 @@ func (s *Store) syncDefaultToSettings(presetType string, content PromptPresetCon
 		settings.LLMTagPrompt = formatted
 	case "ocr":
 		settings.LLMOcrPrompt = formatted
+	case "system":
+		settings.LLMSystemPrompt = formatted
 	default:
 		return nil
 	}

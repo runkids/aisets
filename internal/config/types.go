@@ -55,6 +55,7 @@ type AppSettings struct {
 	LLMEmbedModel              string                               `json:"llmEmbedModel"`
 	LLMTagPrompt               string                               `json:"llmTagPrompt"`
 	LLMOcrPrompt               string                               `json:"llmOcrPrompt"`
+	LLMSystemPrompt            string                               `json:"llmSystemPrompt"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
 	LLMTimeout                 int                                  `json:"llmTimeout"`
 }

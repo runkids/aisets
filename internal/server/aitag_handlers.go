@@ -180,6 +180,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = aitag.TagPrompt
 	}
+	prompt = prependSystemPrompt(settings.LLMSystemPrompt, prompt)
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {

@@ -1818,7 +1818,8 @@
       "optimizationFindings": "Rule-based optimization analysis — injected automatically at request time",
       "leftMetadata": "Metadata for the first (left) image — filled automatically",
       "rightMetadata": "Metadata for the second (right) image — filled automatically",
-      "distance": "dHash distance between the two images (0-64) — filled automatically"
+      "distance": "dHash distance between the two images (0-64) — filled automatically",
+      "language": "Response language preference"
     },
     "missingRequired": "Missing required variables",
     "builtinBadge": "Built-in",
@@ -1834,7 +1835,9 @@
     "toastCreateFailed": "Create failed",
     "toastDefaultSet": "Default preset updated",
     "toastDefaultSetFailed": "Set default failed",
-    "toastReset": "Template reset to default"
+    "toastReset": "Template reset to default",
+    "systemPresets": "System",
+    "systemDescription": "This prompt is automatically prepended to all AI operations"
   },
   "duplicateExplain": {
     "button": "Explain Differences",
