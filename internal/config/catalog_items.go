@@ -20,8 +20,6 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	}
 	if settings.LLMProvider != "" && settings.LLMVisionModel != "" {
 		query.VLMEngineVersion = settings.LLMProvider + "/" + settings.LLMVisionModel
-		query.AITagProviderName = settings.LLMProvider
-		query.AITagModelName = settings.LLMVisionModel
 	}
 	limit := normalizeCatalogLimit(query.Limit)
 	offset := parseCursorOffset(query.Cursor)

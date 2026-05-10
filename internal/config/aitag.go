@@ -93,6 +93,53 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 	return out, nil
 }
 
+// AITagResultsBestMatch loads AI tag results preferring the given provider/model,
+// falling back to any model with a ready result.
+func (s *Store) AITagResultsBestMatch(items []scanner.AssetItem, providerName, modelName string) (map[string]aitag.Result, error) {
+	out := map[string]aitag.Result{}
+	if len(items) == 0 {
+		return out, nil
+	}
+	for _, item := range items {
+		if item.ContentHash == "" || item.HashAlgorithm == "" {
+			continue
+		}
+		row := s.rdb.QueryRow(`
+			SELECT status, category, tags_json, description, COALESCE(languages_json, '[]'),
+				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at,
+				provider_name, model_name
+			FROM ai_tags
+			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
+				AND status = ?
+			ORDER BY
+				CASE WHEN provider_name = ? AND model_name = ? THEN 0 ELSE 1 END,
+				updated_at DESC
+			LIMIT 1
+		`, item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm,
+			aitag.StatusReady, providerName, modelName)
+		result := aitag.Result{
+			ProjectID:     item.ProjectID,
+			RepoPath:      item.RepoPath,
+			ContentHash:   item.ContentHash,
+			HashAlgorithm: item.HashAlgorithm,
+		}
+		var tagsRaw, langsRaw string
+		err := row.Scan(&result.Status, &result.Category, &tagsRaw,
+			&result.Description, &langsRaw, &result.ErrorCode, &result.ErrorMessage,
+			&result.DurationMs, &result.UpdatedAt, &result.ProviderName, &result.ModelName)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+		_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
+		out[aiTagKey(item.ProjectID, item.RepoPath)] = result
+	}
+	return out, nil
+}
+
 func (s *Store) RemoveAITagResults() error {
 	_, err := s.db.Exec(`DELETE FROM ai_tags`)
 	return err

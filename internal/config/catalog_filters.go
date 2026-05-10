@@ -106,7 +106,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	}
 	aiCatQuery := query
 	aiCatQuery.AICategory = ""
-	aiCategories, aiCategoryTotal, err := s.catalogAITagFacetCounts(scanID, aiCatQuery, settings.LLMProvider, settings.LLMVisionModel)
+	aiCategories, aiCategoryTotal, err := s.catalogAITagFacetCounts(scanID, aiCatQuery)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -122,7 +122,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
-	aiTagReadyCount, err := s.catalogAITagReadyCount(scanID, query, settings.LLMProvider, settings.LLMVisionModel)
+	aiTagReadyCount, err := s.catalogAITagReadyCount(scanID, query)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -281,12 +281,12 @@ func (s *Store) catalogMaxSeverityFacetCounts(scanID int64, query CatalogItemQue
 	return options, 0, rows.Err()
 }
 
-func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery, providerName, modelName string) ([]CatalogFacetOption, int, error) {
+func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery) ([]CatalogFacetOption, int, error) {
 	where, args, err := s.catalogItemWhere(scanID, query)
 	if err != nil {
 		return nil, 0, err
 	}
-	facetArgs := append([]any{aitag.StatusReady, providerName, modelName}, args...)
+	facetArgs := append([]any{aitag.StatusReady}, args...)
 	rows, err := s.rdb.Query(`
 		SELECT ait.category AS id, COUNT(DISTINCT a.asset_id)
 		FROM asset_snapshots a
@@ -295,8 +295,6 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery, pr
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
 			AND ait.status = ?
-			AND ait.provider_name = ?
-			AND ait.model_name = ?
 		`+where+`
 		GROUP BY id
 		ORDER BY COUNT(DISTINCT a.asset_id) DESC, id ASC
@@ -373,12 +371,12 @@ func (s *Store) catalogOCRReadyCountByEngine(scanID int64, query CatalogItemQuer
 	return count, err
 }
 
-func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery, providerName, modelName string) (int, error) {
+func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery) (int, error) {
 	where, args, err := s.catalogItemWhere(scanID, query)
 	if err != nil {
 		return 0, err
 	}
-	facetArgs := append([]any{aitag.StatusReady, providerName, modelName}, args...)
+	facetArgs := append([]any{aitag.StatusReady}, args...)
 	var count int
 	err = s.rdb.QueryRow(`
 		SELECT COUNT(DISTINCT a.asset_id)
@@ -388,8 +386,6 @@ func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery, pro
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
 			AND ait.status = ?
-			AND ait.provider_name = ?
-			AND ait.model_name = ?
 		`+where, facetArgs...).Scan(&count)
 	return count, err
 }
@@ -815,33 +811,21 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ocr.engine_name = 'vlm' AND ocr.status = 'ready'`+versionClause+`
 		)`)
 	case "aiTagReady":
-		providerClause := ""
-		aiTagArgs := []any{aitag.StatusReady}
-		if query.AITagProviderName != "" && query.AITagModelName != "" {
-			providerClause = " AND ait2.provider_name = ? AND ait2.model_name = ?"
-			aiTagArgs = append(aiTagArgs, query.AITagProviderName, query.AITagModelName)
-		}
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM ai_tags ait2
 			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
 				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
-				AND ait2.status = ?`+providerClause+`
+				AND ait2.status = ?
 		)`)
-		args = append(args, aiTagArgs...)
+		args = append(args, aitag.StatusReady)
 	case "aiTagPending":
-		providerClause := ""
-		aiTagArgs := []any{aitag.StatusReady}
-		if query.AITagProviderName != "" && query.AITagModelName != "" {
-			providerClause = " AND ait2.provider_name = ? AND ait2.model_name = ?"
-			aiTagArgs = append(aiTagArgs, query.AITagProviderName, query.AITagModelName)
-		}
 		clauses = append(clauses, `NOT EXISTS (
 			SELECT 1 FROM ai_tags ait2
 			WHERE ait2.project_id = a.project_id AND ait2.repo_path = a.repo_path
 				AND ait2.content_hash = a.content_hash AND ait2.hash_algorithm = a.hash_algorithm
-				AND ait2.status = ?`+providerClause+`
+				AND ait2.status = ?
 		)`)
-		args = append(args, aiTagArgs...)
+		args = append(args, aitag.StatusReady)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

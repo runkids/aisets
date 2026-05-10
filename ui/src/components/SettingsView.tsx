@@ -654,6 +654,7 @@ export function SettingsView({
               settingActions={(extraDisabled) =>
                 settingActionsFor("optimization", extraDisabled)
               }
+              onSave={() => void onSaveSettings()}
               onUpdateDraft={updateDraft}
               onToggleTool={onToggleTool}
               onRefreshTools={() => void settingsQuery.refetch()}

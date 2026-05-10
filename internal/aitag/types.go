@@ -7,21 +7,6 @@ const (
 	StatusSkipped = "skipped"
 )
 
-var ValidCategories = map[string]bool{
-	"icon":         true,
-	"photo":        true,
-	"screenshot":   true,
-	"diagram":      true,
-	"illustration": true,
-	"pattern":      true,
-	"logo":         true,
-	"banner":       true,
-	"texture":      true,
-	"sprite":       true,
-	"mockup":       true,
-	"artwork":      true,
-}
-
 const TagPrompt = `Analyze this image and respond with a JSON object containing:
 - "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
 - "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")

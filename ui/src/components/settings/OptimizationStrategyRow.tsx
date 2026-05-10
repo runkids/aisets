@@ -1,24 +1,11 @@
 import { Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { usePromptPresetsQuery } from "../../queries";
 import type { OptimizationStrategy } from "../../types";
+import { TAG_BUILTIN_VARIABLES } from "../prompts/builtinVariables";
 import { Button, Select, Switch, TextInput, Tooltip } from "../ui";
 import type { StrategyFieldErrors } from "./optimizationStrategyValidation";
-
-const AI_CATEGORY_OPTIONS = [
-  "icon",
-  "photo",
-  "screenshot",
-  "diagram",
-  "illustration",
-  "pattern",
-  "logo",
-  "banner",
-  "texture",
-  "sprite",
-  "mockup",
-  "artwork",
-];
 
 const FORMAT_OPTIONS: { key: string; label: string; values: string[] }[] = [
   { key: "svg", label: "SVG", values: ["svg"] },
@@ -48,6 +35,10 @@ type OptimizationStrategyRowProps = {
   onDelete: () => void;
 };
 
+const BUILTIN_FALLBACK =
+  TAG_BUILTIN_VARIABLES.find((v) => v.name === "categories")?.defaultValues ??
+  [];
+
 export function OptimizationStrategyRow({
   strategy,
   disabled,
@@ -57,6 +48,26 @@ export function OptimizationStrategyRow({
 }: OptimizationStrategyRowProps) {
   const { t } = useTranslation();
   const op = strategy.action.operation;
+
+  const { data: presetsData } = usePromptPresetsQuery("tag");
+
+  const categoryOptions = useMemo(() => {
+    const presets = presetsData?.presets;
+    if (!presets || presets.length === 0) return BUILTIN_FALLBACK;
+    const union = new Set<string>();
+    for (const preset of presets) {
+      const cats = preset.content.variables["categories"];
+      if (cats?.values) {
+        for (const v of cats.values) union.add(v);
+      }
+    }
+    return union.size > 0 ? [...union].sort() : BUILTIN_FALLBACK;
+  }, [presetsData]);
+
+  const orphanedCategories = useMemo(() => {
+    const selected = strategy.match.aiCategories ?? [];
+    return selected.filter((c) => !categoryOptions.includes(c));
+  }, [strategy.match.aiCategories, categoryOptions]);
 
   function isFormatActive(option: (typeof FORMAT_OPTIONS)[number]) {
     return option.values.every((v) => strategy.match.formats.includes(v));
@@ -223,7 +234,7 @@ export function OptimizationStrategyRow({
             description={t("settings.strategyAICategoryHint")}
           />
           <div className="flex flex-wrap gap-1.5">
-            {AI_CATEGORY_OPTIONS.map((cat) => (
+            {categoryOptions.map((cat) => (
               <Button
                 key={cat}
                 variant="chip"
@@ -232,7 +243,20 @@ export function OptimizationStrategyRow({
                 disabled={disabled}
                 onClick={() => toggleAICategory(cat)}
               >
-                {t(`settings.aiCategory.${cat}`, { defaultValue: cat })}
+                {cat}
+              </Button>
+            ))}
+            {orphanedCategories.map((cat) => (
+              <Button
+                key={cat}
+                variant="chip"
+                size="md"
+                data-active
+                disabled={disabled}
+                className="line-through opacity-60"
+                onClick={() => toggleAICategory(cat)}
+              >
+                {cat}
               </Button>
             ))}
           </div>

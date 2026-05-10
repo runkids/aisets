@@ -127,3 +127,87 @@ func TestAITagCacheMissOnModelChange(t *testing.T) {
 		t.Fatal("expected cache miss for different model")
 	}
 }
+
+func TestAITagResultsBestMatchFallback(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	oldModel := aitag.Result{
+		ProjectID: "proj1", RepoPath: "img/logo.png",
+		ContentHash: "h1", HashAlgorithm: "sha256",
+		ProviderName: "ollama", ModelName: "llava",
+		Status: aitag.StatusReady, Category: "logo",
+		Tags: []string{"brand"}, Description: "Old model logo",
+		DurationMs: 1000,
+	}
+	newModel := aitag.Result{
+		ProjectID: "proj1", RepoPath: "img/icon.png",
+		ContentHash: "h2", HashAlgorithm: "sha256",
+		ProviderName: "openai", ModelName: "gpt-4o",
+		Status: aitag.StatusReady, Category: "icon",
+		Tags: []string{"nav"}, Description: "New model icon",
+		DurationMs: 500,
+	}
+	bothOld := aitag.Result{
+		ProjectID: "proj1", RepoPath: "img/both.png",
+		ContentHash: "h3", HashAlgorithm: "sha256",
+		ProviderName: "ollama", ModelName: "llava",
+		Status: aitag.StatusReady, Category: "photo",
+		Tags: []string{"old"}, DurationMs: 800,
+	}
+	bothNew := aitag.Result{
+		ProjectID: "proj1", RepoPath: "img/both.png",
+		ContentHash: "h3", HashAlgorithm: "sha256",
+		ProviderName: "openai", ModelName: "gpt-4o",
+		Status: aitag.StatusReady, Category: "screenshot",
+		Tags: []string{"new"}, DurationMs: 600,
+	}
+	for _, r := range []aitag.Result{oldModel, newModel, bothOld, bothNew} {
+		if err := store.UpsertAITagResult(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	items := []scanner.AssetItem{
+		{ProjectID: "proj1", RepoPath: "img/logo.png", ContentHash: "h1", HashAlgorithm: "sha256"},
+		{ProjectID: "proj1", RepoPath: "img/icon.png", ContentHash: "h2", HashAlgorithm: "sha256"},
+		{ProjectID: "proj1", RepoPath: "img/both.png", ContentHash: "h3", HashAlgorithm: "sha256"},
+	}
+
+	results, err := store.AITagResultsBestMatch(items, "openai", "gpt-4o")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// logo.png: only old model has it → should fallback
+	got, ok := results[aiTagKey("proj1", "img/logo.png")]
+	if !ok {
+		t.Fatal("expected fallback result for logo.png")
+	}
+	if got.Category != "logo" || got.ProviderName != "ollama" {
+		t.Fatalf("logo.png: expected fallback to ollama/logo, got %s/%s", got.ProviderName, got.Category)
+	}
+
+	// icon.png: current model has it → should use current
+	got, ok = results[aiTagKey("proj1", "img/icon.png")]
+	if !ok {
+		t.Fatal("expected result for icon.png")
+	}
+	if got.Category != "icon" || got.ProviderName != "openai" {
+		t.Fatalf("icon.png: expected openai/icon, got %s/%s", got.ProviderName, got.Category)
+	}
+
+	// both.png: both models have it → should prefer current model
+	got, ok = results[aiTagKey("proj1", "img/both.png")]
+	if !ok {
+		t.Fatal("expected result for both.png")
+	}
+	if got.Category != "screenshot" || got.ProviderName != "openai" {
+		t.Fatalf("both.png: expected current model (openai/screenshot), got %s/%s", got.ProviderName, got.Category)
+	}
+}

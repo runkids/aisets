@@ -16,6 +16,8 @@ type OptimizationStrategiesCardProps = {
   hasStrategyErrors: boolean;
   strategyErrors: Map<string, StrategyFieldErrors>;
   initialExpanded?: boolean;
+  onSave?: () => void;
+  saveDisabled?: boolean;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
 };
 
@@ -25,6 +27,8 @@ export function OptimizationStrategiesCard({
   hasStrategyErrors,
   strategyErrors,
   initialExpanded = false,
+  onSave,
+  saveDisabled,
   onUpdateDraft,
 }: OptimizationStrategiesCardProps) {
   const { t } = useTranslation();
@@ -210,6 +214,16 @@ export function OptimizationStrategiesCard({
                 >
                   {t("settings.addStrategy")}
                 </Button>
+                {onSave && (
+                  <Button
+                    size="md"
+                    variant="primary"
+                    disabled={disabled || saveDisabled}
+                    onClick={onSave}
+                  >
+                    {t("settings.save")}
+                  </Button>
+                )}
                 <Button
                   size="md"
                   variant="ghost"

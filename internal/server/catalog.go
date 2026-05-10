@@ -720,10 +720,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 }
 
 func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.AppSettings) (scanner.Catalog, error) {
-	if settings.LLMProvider == "" || settings.LLMVisionModel == "" {
-		return catalog, nil
-	}
-	results, err := s.store.AITagResults(catalog.Items, settings.LLMProvider, settings.LLMVisionModel)
+	results, err := s.store.AITagResultsBestMatch(catalog.Items, settings.LLMProvider, settings.LLMVisionModel)
 	if err != nil {
 		return scanner.Catalog{}, err
 	}

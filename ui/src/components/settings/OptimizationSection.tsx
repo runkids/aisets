@@ -16,6 +16,7 @@ type OptimizationSectionProps = {
   expandStrategies?: boolean;
   expandTools?: boolean;
   settingActions: (extraDisabled?: boolean) => ReactNode;
+  onSave?: () => void;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
   onToggleTool?: (toolId: string, enabled: boolean) => void;
   onRefreshTools?: () => void;
@@ -30,6 +31,7 @@ export function OptimizationSection({
   expandStrategies,
   expandTools,
   settingActions,
+  onSave,
   onUpdateDraft,
   onToggleTool,
   onRefreshTools,
@@ -62,6 +64,8 @@ export function OptimizationSection({
         hasStrategyErrors={hasStrategyErrors}
         strategyErrors={strategyErrors}
         initialExpanded={expandStrategies}
+        onSave={onSave}
+        saveDisabled={hasStrategyErrors}
         onUpdateDraft={onUpdateDraft}
       />
       <OptimizationExternalToolsCard
