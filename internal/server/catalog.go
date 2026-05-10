@@ -109,7 +109,7 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	page, err := s.store.CatalogItems(config.CatalogItemQuery{
+	query := config.CatalogItemQuery{
 		ScanID:               scanID,
 		AssetID:              r.URL.Query().Get("assetId"),
 		ProjectID:            r.URL.Query().Get("projectId"),
@@ -127,7 +127,12 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		AIOcrStatus:          r.URL.Query().Get("aiOcrStatus"),
 		Limit:                limit,
 		Cursor:               r.URL.Query().Get("cursor"),
-	})
+	}
+	if v := r.URL.Query().Get("hasGPS"); v != "" {
+		val := v == "true"
+		query.HasGPS = &val
+	}
+	page, err := s.store.CatalogItems(query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -144,6 +149,11 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		catalog, err = s.enrichCatalogAITag(catalog, settings)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		catalog, err = s.enrichCatalogEXIF(catalog, scanID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
@@ -206,6 +216,11 @@ func (s *Server) handleCatalogItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	catalog, err = s.enrichCatalogAITag(catalog, settings)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	catalog, err = s.enrichCatalogEXIF(catalog, scanID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -729,6 +744,33 @@ func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.App
 		if ok {
 			copy := result
 			catalog.Items[index].AITag = &copy
+		}
+	}
+	return catalog, nil
+}
+
+func (s *Server) enrichCatalogEXIF(catalog scanner.Catalog, scanID int64) (scanner.Catalog, error) {
+	if len(catalog.Items) == 0 {
+		return catalog, nil
+	}
+	if scanID == 0 {
+		scan, err := s.store.LatestScan()
+		if err != nil {
+			return catalog, err
+		}
+		scanID = scan.ID
+	}
+	ids := make([]string, len(catalog.Items))
+	for i, item := range catalog.Items {
+		ids[i] = item.ID
+	}
+	results, err := s.store.CatalogEXIFEnrich(scanID, ids)
+	if err != nil {
+		return catalog, err
+	}
+	for i := range catalog.Items {
+		if data, ok := results[catalog.Items[i].ID]; ok {
+			catalog.Items[i].EXIF = data
 		}
 	}
 	return catalog, nil

@@ -144,6 +144,7 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
     operation: params.operation ?? "",
     aiCategory: params.aiCategory ?? "",
     aiOcrStatus: params.aiOcrStatus ?? "",
+    hasGPS: params.hasGPS ?? "",
     limit: params.limit ?? 100,
   };
 }

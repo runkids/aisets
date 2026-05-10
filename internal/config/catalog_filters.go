@@ -126,6 +126,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	exifFacets, _ := s.CatalogEXIFFacetCounts(scanID, query.ProjectName, query.Ext)
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -167,6 +168,8 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		OCRReadyCount:            ocrReadyCount,
 		VLMOcrReadyCount:         vlmOcrReadyCount,
 		AITagReadyCount:          aiTagReadyCount,
+		EXIFHasGPS:               exifFacets.HasGPS,
+		EXIFHasCamera:            exifFacets.HasCamera,
 	}, nil
 }
 
@@ -842,6 +845,13 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait2.status = ?
 		)`)
 		args = append(args, aitag.StatusReady)
+	}
+	if query.HasGPS != nil {
+		if *query.HasGPS {
+			clauses = append(clauses, "EXISTS (SELECT 1 FROM exif_data e WHERE e.scan_id = a.scan_id AND e.asset_id = a.asset_id AND e.has_gps = 1)")
+		} else {
+			clauses = append(clauses, "NOT EXISTS (SELECT 1 FROM exif_data e WHERE e.scan_id = a.scan_id AND e.asset_id = a.asset_id AND e.has_gps = 1)")
+		}
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }
