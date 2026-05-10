@@ -52,6 +52,7 @@ type AppSettings struct {
 	LLMEndpoint                string                               `json:"llmEndpoint"`
 	LLMVisionModel             string                               `json:"llmVisionModel"`
 	LLMEmbedModel              string                               `json:"llmEmbedModel"`
+	LLMTagPrompt               string                               `json:"llmTagPrompt"`
 }
 
 type SettingsUpdate struct {
@@ -84,6 +85,7 @@ type SettingsUpdate struct {
 	LLMEndpoint                *string                              `json:"llmEndpoint"`
 	LLMVisionModel             *string                              `json:"llmVisionModel"`
 	LLMEmbedModel              *string                              `json:"llmEmbedModel"`
+	LLMTagPrompt               *string                              `json:"llmTagPrompt"`
 }
 
 type CustomAssetFilter struct {

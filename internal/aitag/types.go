@@ -1,7 +1,5 @@
 package aitag
 
-const PromptVersion = "aisets-tag-v2"
-
 const (
 	StatusPending = "pending"
 	StatusReady   = "ready"
@@ -18,10 +16,14 @@ var ValidCategories = map[string]bool{
 	"pattern":      true,
 	"logo":         true,
 	"banner":       true,
+	"texture":      true,
+	"sprite":       true,
+	"mockup":       true,
+	"artwork":      true,
 }
 
 const TagPrompt = `Analyze this image and respond with a JSON object containing:
-- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner"
+- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
 - "tags": array of 3-8 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "mobile", "login-form", "hero-section")
 - "description": one sentence describing the image content
 - "languages": array of ISO 639-3 language codes for any visible text (e.g. ["eng"]). Empty array if no text.

@@ -276,7 +276,7 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery, pr
 	if err != nil {
 		return nil, 0, err
 	}
-	facetArgs := append([]any{aitag.StatusReady, providerName, modelName, aitag.PromptVersion}, args...)
+	facetArgs := append([]any{aitag.StatusReady, providerName, modelName}, args...)
 	rows, err := s.rdb.Query(`
 		SELECT ait.category AS id, COUNT(DISTINCT a.asset_id)
 		FROM asset_snapshots a
@@ -287,7 +287,6 @@ func (s *Store) catalogAITagFacetCounts(scanID int64, query CatalogItemQuery, pr
 			AND ait.status = ?
 			AND ait.provider_name = ?
 			AND ait.model_name = ?
-			AND ait.prompt_version = ?
 		`+where+`
 		GROUP BY id
 		ORDER BY COUNT(DISTINCT a.asset_id) DESC, id ASC
@@ -335,7 +334,7 @@ func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery, pro
 	if err != nil {
 		return 0, err
 	}
-	facetArgs := append([]any{aitag.StatusReady, providerName, modelName, aitag.PromptVersion}, args...)
+	facetArgs := append([]any{aitag.StatusReady, providerName, modelName}, args...)
 	var count int
 	err = s.rdb.QueryRow(`
 		SELECT COUNT(DISTINCT a.asset_id)
@@ -347,7 +346,6 @@ func (s *Store) catalogAITagReadyCount(scanID int64, query CatalogItemQuery, pro
 			AND ait.status = ?
 			AND ait.provider_name = ?
 			AND ait.model_name = ?
-			AND ait.prompt_version = ?
 		`+where, facetArgs...).Scan(&count)
 	return count, err
 }

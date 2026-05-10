@@ -236,16 +236,16 @@ func (s *Store) migrate() error {
 			hash_algorithm  TEXT    NOT NULL,
 			provider_name   TEXT    NOT NULL,
 			model_name      TEXT    NOT NULL,
-			prompt_version  TEXT    NOT NULL,
 			status          TEXT    NOT NULL DEFAULT 'pending',
 			category        TEXT    NOT NULL DEFAULT '',
 			tags_json       TEXT    NOT NULL DEFAULT '[]',
 			description     TEXT    NOT NULL DEFAULT '',
+			languages_json  TEXT    NOT NULL DEFAULT '[]',
 			error_code      TEXT    NOT NULL DEFAULT '',
 			error_message   TEXT    NOT NULL DEFAULT '',
 			duration_ms     INTEGER NOT NULL DEFAULT 0,
 			updated_at      TEXT    NOT NULL,
-			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name, prompt_version)
+			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_scans_completed_at ON scans(completed_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_scan_project_snapshots_scan ON scan_project_snapshots(scan_id, project_id)`,
@@ -254,7 +254,7 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_project_path ON ocr_results(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_hash ON ocr_results(hash_algorithm, content_hash)`,
-		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name, prompt_version)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_tags_category ON ai_tags (category) WHERE status = 'ready'`,
 	}
 	for _, statement := range statements {
@@ -290,6 +290,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateAITagsSchema(); err != nil {
+		return err
+	}
+	if err := s.migrateAITagsDropPromptVersion(); err != nil {
 		return err
 	}
 	if err := s.migrateScanPerformanceSchema(); err != nil {
@@ -879,4 +882,54 @@ func (s *Store) migrateAITagsSchema() error {
 		}
 	}
 	return nil
+}
+
+func (s *Store) migrateAITagsDropPromptVersion() error {
+	columns, err := s.tableColumns("ai_tags")
+	if err != nil {
+		return err
+	}
+	if !columns["prompt_version"] {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, stmt := range []string{
+		`CREATE TABLE ai_tags_new (
+			project_id      TEXT    NOT NULL,
+			repo_path       TEXT    NOT NULL,
+			content_hash    TEXT    NOT NULL,
+			hash_algorithm  TEXT    NOT NULL,
+			provider_name   TEXT    NOT NULL,
+			model_name      TEXT    NOT NULL,
+			status          TEXT    NOT NULL DEFAULT 'pending',
+			category        TEXT    NOT NULL DEFAULT '',
+			tags_json       TEXT    NOT NULL DEFAULT '[]',
+			description     TEXT    NOT NULL DEFAULT '',
+			languages_json  TEXT    NOT NULL DEFAULT '[]',
+			error_code      TEXT    NOT NULL DEFAULT '',
+			error_message   TEXT    NOT NULL DEFAULT '',
+			duration_ms     INTEGER NOT NULL DEFAULT 0,
+			updated_at      TEXT    NOT NULL,
+			PRIMARY KEY (project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name)
+		)`,
+		`INSERT OR REPLACE INTO ai_tags_new
+			SELECT project_id, repo_path, content_hash, hash_algorithm,
+				provider_name, model_name, status, category, tags_json,
+				description, languages_json, error_code, error_message,
+				duration_ms, updated_at
+			FROM ai_tags`,
+		`DROP TABLE ai_tags`,
+		`ALTER TABLE ai_tags_new RENAME TO ai_tags`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_tags_category ON ai_tags (category) WHERE status = 'ready'`,
+	} {
+		if _, err := tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

@@ -84,6 +84,10 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 
 	providerName := settings.LLMProvider
 	modelName := settings.LLMVisionModel
+	prompt := settings.LLMTagPrompt
+	if prompt == "" {
+		prompt = aitag.TagPrompt
+	}
 
 	eligible := make([]scanner.AssetItem, 0, len(catalog.Items))
 	for _, rawItem := range catalog.Items {
@@ -169,7 +173,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result := s.processAITag(r.Context(), item, providerName, modelName)
+		result := s.processAITag(r.Context(), item, providerName, modelName, prompt)
 		if result.Status == aitag.StatusFailed {
 			counts.Failed++
 		} else {
@@ -198,7 +202,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "done", "counts": counts})
 }
 
-func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName string) aitag.Result {
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, prompt string) aitag.Result {
 	result := aitag.Result{
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
@@ -222,7 +226,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Model: modelName,
 		Messages: []llm.ChatMessage{{
 			Role:    "user",
-			Content: aitag.TagPrompt,
+			Content: prompt,
 			Images:  []string{dataURI},
 		}},
 	})

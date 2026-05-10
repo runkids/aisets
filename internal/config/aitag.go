@@ -28,11 +28,11 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 	_, err = s.db.Exec(`
 		INSERT INTO ai_tags (
 			project_id, repo_path, content_hash, hash_algorithm,
-			provider_name, model_name, prompt_version, status,
+			provider_name, model_name, status,
 			category, tags_json, description, languages_json,
 			error_code, error_message, duration_ms, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name, prompt_version)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name)
 		DO UPDATE SET
 			status = excluded.status,
 			category = excluded.category,
@@ -44,7 +44,7 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 			duration_ms = excluded.duration_ms,
 			updated_at = excluded.updated_at
 	`, result.ProjectID, result.RepoPath, result.ContentHash, result.HashAlgorithm,
-		result.ProviderName, result.ModelName, aitag.PromptVersion, result.Status,
+		result.ProviderName, result.ModelName, result.Status,
 		result.Category, string(tagsJSON), result.Description, string(langsJSON),
 		result.ErrorCode, result.ErrorMessage, result.DurationMs, result.UpdatedAt)
 	return err
@@ -65,9 +65,9 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 			FROM ai_tags
 			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
-				AND provider_name = ? AND model_name = ? AND prompt_version = ?
+				AND provider_name = ? AND model_name = ?
 		`, item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm,
-			providerName, modelName, aitag.PromptVersion)
+			providerName, modelName)
 		result := aitag.Result{
 			ProjectID:     item.ProjectID,
 			RepoPath:      item.RepoPath,
@@ -110,11 +110,11 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, updated_at
 		FROM ai_tags
 		WHERE content_hash = ? AND hash_algorithm = ?
-			AND provider_name = ? AND model_name = ? AND prompt_version = ?
+			AND provider_name = ? AND model_name = ?
 			AND status = ?
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, contentHash, hashAlgorithm, providerName, modelName, aitag.PromptVersion, aitag.StatusReady)
+	`, contentHash, hashAlgorithm, providerName, modelName, aitag.StatusReady)
 	result := aitag.Result{
 		ContentHash:   contentHash,
 		HashAlgorithm: hashAlgorithm,
