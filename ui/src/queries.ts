@@ -67,6 +67,7 @@ import type {
   OCRRunEvent,
   VLMOcrRunEvent,
   ProjectScanIntent,
+  PromptPresetType,
   RenameRules,
   ScanAnalyses,
   ScanEvent,
@@ -738,7 +739,7 @@ export function useLLMHealthMutation() {
   });
 }
 
-export function usePromptPresetsQuery(type?: "tag" | "ocr") {
+export function usePromptPresetsQuery(type?: PromptPresetType) {
   return useQuery({
     queryKey: ["prompt-presets", type ?? "all"],
     queryFn: () => listPromptPresets(type),

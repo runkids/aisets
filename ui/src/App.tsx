@@ -613,6 +613,7 @@ export function App() {
     presetId?: string,
     projectIds?: string[],
     assetIds?: string[],
+    scopeLabel?: string,
   ) {
     if (aiTagActivityRunRef.current) return;
 
@@ -623,6 +624,7 @@ export function App() {
         saveSettings,
         run: ({ signal, onEvent }) =>
           runAITagging({ signal, onEvent, presetId, projectIds, assetIds }),
+        scopeLabel,
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -648,6 +650,7 @@ export function App() {
     presetId?: string,
     projectIds?: string[],
     assetIds?: string[],
+    scopeLabel?: string,
   ) {
     if (vlmOcrRunRef.current) return;
 
@@ -658,6 +661,7 @@ export function App() {
         saveSettings,
         run: ({ signal, onEvent }) =>
           runVLMOcr({ signal, onEvent, presetId, projectIds, assetIds }),
+        scopeLabel,
       });
 
       await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
@@ -944,10 +948,26 @@ export function App() {
               onStartOCR={onStartOCRActivity}
               onStopOCR={onStopOCRActivity}
               onDismissOCR={onDismissOCRActivity}
-              onStartAITag={onStartAITagActivity}
+              onStartAITag={(saveSettings, presetId, projectIds, scopeLabel) =>
+                onStartAITagActivity(
+                  saveSettings,
+                  presetId,
+                  projectIds,
+                  undefined,
+                  scopeLabel,
+                )
+              }
               onStopAITag={onStopAITagActivity}
               onDismissAITag={onDismissAITagActivity}
-              onStartVLMOcr={onStartVLMOcrActivity}
+              onStartVLMOcr={(saveSettings, presetId, projectIds, scopeLabel) =>
+                onStartVLMOcrActivity(
+                  saveSettings,
+                  presetId,
+                  projectIds,
+                  undefined,
+                  scopeLabel,
+                )
+              }
               onStopVLMOcr={onStopVLMOcrActivity}
               onDismissVLMOcr={onDismissVLMOcrActivity}
               onAddProject={() => setDirectoryPickerOpen(true)}

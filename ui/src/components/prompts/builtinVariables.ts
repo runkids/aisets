@@ -1,4 +1,4 @@
-import type { PromptVariableType } from "../../types";
+import type { PromptPresetType, PromptVariableType } from "../../types";
 
 export type BuiltinVariableDef = {
   name: string;
@@ -77,18 +77,22 @@ export const OCR_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
-export function getBuiltinVariables(type: "tag" | "ocr"): BuiltinVariableDef[] {
-  return type === "tag" ? TAG_BUILTIN_VARIABLES : OCR_BUILTIN_VARIABLES;
+export function getBuiltinVariables(
+  type: PromptPresetType,
+): BuiltinVariableDef[] {
+  if (type === "tag") return TAG_BUILTIN_VARIABLES;
+  if (type === "ocr") return OCR_BUILTIN_VARIABLES;
+  return [];
 }
 
 export function getRequiredVariables(
-  type: "tag" | "ocr",
+  type: PromptPresetType,
 ): BuiltinVariableDef[] {
   return getBuiltinVariables(type).filter((v) => v.required);
 }
 
 export function getMissingRequired(
-  type: "tag" | "ocr",
+  type: PromptPresetType,
   template: string,
 ): BuiltinVariableDef[] {
   const required = getRequiredVariables(type);
@@ -96,7 +100,7 @@ export function getMissingRequired(
 }
 
 export function getDefaultValue(
-  type: "tag" | "ocr",
+  type: PromptPresetType,
   varName: string,
 ): { type: PromptVariableType; values: string[] } | null {
   const builtins = getBuiltinVariables(type);
@@ -106,7 +110,7 @@ export function getDefaultValue(
 }
 
 export function isBuiltinVariable(
-  type: "tag" | "ocr",
+  type: PromptPresetType,
   varName: string,
 ): boolean {
   return getBuiltinVariables(type).some((v) => v.name === varName);

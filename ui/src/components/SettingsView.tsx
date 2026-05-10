@@ -611,19 +611,21 @@ export function SettingsView({
               activeWorkspaceId={activeWorkspaceId}
               settingActions={settingActionsFor("ai")}
               onUpdateDraft={updateDraft}
-              onStartAITag={(presetId, projectIds) =>
+              onStartAITag={(presetId, projectIds, scopeLabel) =>
                 onStartAITag(
                   () => onSaveSettings({ silent: true }),
                   presetId,
                   projectIds,
+                  scopeLabel,
                 )
               }
               onStopAITag={onStopAITag}
-              onStartVLMOcr={(presetId, projectIds) =>
+              onStartVLMOcr={(presetId, projectIds, scopeLabel) =>
                 onStartVLMOcr(
                   () => onSaveSettings({ silent: true }),
                   presetId,
                   projectIds,
+                  scopeLabel,
                 )
               }
               onStopVLMOcr={onStopVLMOcr}

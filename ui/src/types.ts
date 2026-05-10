@@ -735,7 +735,7 @@ export type RenameRules = {
   suffix?: string;
 };
 
-export type PromptPresetType = "tag" | "ocr";
+export type PromptPresetType = "tag" | "ocr" | "optimize";
 export type PromptVariableType = "tags" | "text" | "select";
 
 export type PromptVariable = {

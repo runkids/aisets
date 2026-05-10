@@ -18,11 +18,12 @@ export type AITagActivityState = {
   errorMessage?: string;
   errors: ActivityError[];
   startedAt?: number;
+  scopeLabel?: string;
 };
 
 export type AITagActivityAction =
   | { type: "saving" }
-  | { type: "running"; startedAt: number }
+  | { type: "running"; startedAt: number; scopeLabel?: string }
   | { type: "event"; event: AITagRunEvent }
   | { type: "stopping" }
   | { type: "done"; counts?: AITagRunCounts }
@@ -48,7 +49,13 @@ export function aiTagActivityReducer(
     case "saving":
       return { phase: "saving", counts: null, errors: [] };
     case "running":
-      return { phase: "running", counts: state.counts, errors: state.errors, startedAt: action.startedAt };
+      return {
+        phase: "running",
+        counts: state.counts,
+        errors: state.errors,
+        startedAt: action.startedAt,
+        scopeLabel: action.scopeLabel,
+      };
     case "event": {
       const e = action.event;
       if (!("counts" in e) || !e.counts) return state;
@@ -78,6 +85,7 @@ export function aiTagActivityReducer(
         counts: action.counts ?? state.counts,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "stopped":
       return {
@@ -85,6 +93,7 @@ export function aiTagActivityReducer(
         counts: action.counts ?? state.counts,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "error":
       return {
@@ -93,6 +102,7 @@ export function aiTagActivityReducer(
         errorMessage: action.errorMessage,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "dismiss":
       return initialAITagActivityState;
@@ -133,6 +143,7 @@ export async function runAITagActivity({
   dispatch,
   saveSettings,
   run,
+  scopeLabel,
 }: {
   abortRef: AITagActivityAbortRef;
   dispatch: (action: AITagActivityAction) => void;
@@ -141,6 +152,7 @@ export async function runAITagActivity({
     signal: AbortSignal;
     onEvent: (event: AITagRunEvent) => void;
   }) => Promise<Extract<AITagRunEvent, { type: "done" }> | null>;
+  scopeLabel?: string;
 }) {
   dispatch({ type: "saving" });
 
@@ -153,7 +165,7 @@ export async function runAITagActivity({
 
   const controller = new AbortController();
   abortRef.current = controller;
-  dispatch({ type: "running", startedAt: Date.now() });
+  dispatch({ type: "running", startedAt: Date.now(), scopeLabel });
 
   try {
     const result = await run({

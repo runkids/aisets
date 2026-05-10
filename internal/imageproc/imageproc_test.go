@@ -782,3 +782,36 @@ func TestImgtoolsThumbnailIntegration(t *testing.T) {
 		t.Fatalf("thumbnail dimensions %dx%d exceed size 64", bounds.Dx(), bounds.Dy())
 	}
 }
+
+// TestSVGThumbnailUsesImgtools verifies that Thumbnail() prefers imgtools (resvg) for SVG
+// rasterization, including complex SVGs that oksvg cannot handle.
+func TestSVGThumbnailUsesImgtools(t *testing.T) {
+	findImgtoolsBinary(t) // skip if not available
+	root := t.TempDir()
+	cacheDir := filepath.Join(root, "thumbs")
+
+	// Simple SVG: imgtools path should produce a valid PNG.
+	simplePath := filepath.Join(root, "simple.svg")
+	mustWrite(t, simplePath, `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="#ff0000"/></svg>`)
+	thumb, err := Thumbnail(simplePath, cacheDir, "simple-key", 64)
+	if err != nil {
+		t.Fatalf("simple svg thumbnail error: %v", err)
+	}
+	if thumb.MimeType != "image/png" {
+		t.Fatalf("expected image/png, got %q", thumb.MimeType)
+	}
+
+	// Complex SVG with CSS <style> and class references that oksvg cannot render.
+	complexPath := filepath.Join(root, "complex.svg")
+	mustWrite(t, complexPath, `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><style>.a{fill:#0000ff}</style><rect class="a" width="100" height="100"/></svg>`)
+	thumb2, err := Thumbnail(complexPath, cacheDir, "complex-key", 64)
+	if err != nil {
+		t.Fatalf("complex svg thumbnail error: %v", err)
+	}
+	if thumb2.MimeType != "image/png" {
+		t.Fatalf("expected image/png, got %q", thumb2.MimeType)
+	}
+	if thumb2.SizeBytes == 0 {
+		t.Fatal("complex svg thumbnail is empty")
+	}
+}

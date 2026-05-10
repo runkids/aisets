@@ -106,9 +106,17 @@ type AISectionProps = {
   activeWorkspaceId: string;
   settingActions: ReactNode;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
-  onStartAITag: (presetId?: string, projectIds?: string[]) => void;
+  onStartAITag: (
+    presetId?: string,
+    projectIds?: string[],
+    scopeLabel?: string,
+  ) => void;
   onStopAITag: () => void;
-  onStartVLMOcr: (presetId?: string, projectIds?: string[]) => void;
+  onStartVLMOcr: (
+    presetId?: string,
+    projectIds?: string[],
+    scopeLabel?: string,
+  ) => void;
   onStopVLMOcr: () => void;
 };
 
@@ -201,21 +209,6 @@ export function AISection({
       readLastRun<VLMOcrRunCounts>(VLM_OCR_LAST_RUN_KEY),
     );
 
-  const tagScopeLabelRef = useRef(
-    resolveScopeLabel(tagWorkspaceId, tagProjectId),
-  );
-  const ocrScopeLabelRef = useRef(
-    resolveScopeLabel(ocrWorkspaceId, ocrProjectId),
-  );
-
-  useEffect(() => {
-    tagScopeLabelRef.current = resolveScopeLabel(tagWorkspaceId, tagProjectId);
-  }, [tagWorkspaceId, tagProjectId, resolveScopeLabel]);
-
-  useEffect(() => {
-    ocrScopeLabelRef.current = resolveScopeLabel(ocrWorkspaceId, ocrProjectId);
-  }, [ocrWorkspaceId, ocrProjectId, resolveScopeLabel]);
-
   const prevAITagPhase = useRef(aiTagActivity.phase);
   useEffect(() => {
     const prev = prevAITagPhase.current;
@@ -227,7 +220,7 @@ export function AISection({
         aiTagActivity.phase === "error") &&
       aiTagActivity.counts
     ) {
-      const sl = tagScopeLabelRef.current;
+      const sl = aiTagActivity.scopeLabel;
       const elapsedMs =
         aiTagActivity.startedAt != null
           ? Date.now() - aiTagActivity.startedAt
@@ -241,7 +234,12 @@ export function AISection({
       saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts, sl, elapsedMs);
       setLastAITagRun(record);
     }
-  }, [aiTagActivity.phase, aiTagActivity.counts, aiTagActivity.startedAt]);
+  }, [
+    aiTagActivity.phase,
+    aiTagActivity.counts,
+    aiTagActivity.startedAt,
+    aiTagActivity.scopeLabel,
+  ]);
 
   const prevVLMOcrPhase = useRef(vlmOcrActivity.phase);
   useEffect(() => {
@@ -254,7 +252,7 @@ export function AISection({
         vlmOcrActivity.phase === "error") &&
       vlmOcrActivity.counts
     ) {
-      const sl = ocrScopeLabelRef.current;
+      const sl = vlmOcrActivity.scopeLabel;
       const elapsedMs =
         vlmOcrActivity.startedAt != null
           ? Date.now() - vlmOcrActivity.startedAt
@@ -268,7 +266,12 @@ export function AISection({
       saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts, sl, elapsedMs);
       setLastVLMOcrRun(record);
     }
-  }, [vlmOcrActivity.phase, vlmOcrActivity.counts, vlmOcrActivity.startedAt]);
+  }, [
+    vlmOcrActivity.phase,
+    vlmOcrActivity.counts,
+    vlmOcrActivity.startedAt,
+    vlmOcrActivity.scopeLabel,
+  ]);
 
   const aiBusy =
     isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
@@ -705,6 +708,7 @@ export function AISection({
                         onStartAITag(
                           selectedTagPresetId || undefined,
                           resolveProjectIds(tagWorkspaceId, tagProjectId),
+                          resolveScopeLabel(tagWorkspaceId, tagProjectId),
                         )
                       }
                     >
@@ -809,6 +813,7 @@ export function AISection({
                         onStartVLMOcr(
                           selectedOcrPresetId || undefined,
                           resolveProjectIds(ocrWorkspaceId, ocrProjectId),
+                          resolveScopeLabel(ocrWorkspaceId, ocrProjectId),
                         )
                       }
                     >

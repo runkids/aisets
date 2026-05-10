@@ -576,6 +576,7 @@ export function AssetDrawer({
                 <AssetDrawerOptimize
                   asset={asset}
                   variants={variants}
+                  aiEnabled={settingsQuery.data?.settings.llmEnabled}
                   onOpenAsset={onOpenAsset}
                 />
               )}

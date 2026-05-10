@@ -113,6 +113,26 @@ export function clearAITagCache() {
   return request<{ ok: boolean }>("/api/ai/tag/clear", { method: "POST" });
 }
 
+export type OptimizeAIAdvice = {
+  contentType: string;
+  recommendedFormat: string;
+  recommendedQuality: number | null;
+  lossless: boolean;
+  rationale: string;
+  durationMs: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+export function getOptimizeAIAdvice(assetId: string) {
+  return request<OptimizeAIAdvice>(
+    `/api/ai/optimize-advice?assetId=${encodeURIComponent(assetId)}`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export type CatalogItemsParams = {
   scanId?: number;
   assetId?: string;

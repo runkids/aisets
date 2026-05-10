@@ -320,6 +320,9 @@ func (s *Store) migrate() error {
 	if err := s.migratePromptPresetsSeed(); err != nil {
 		return err
 	}
+	if err := s.migrateOptimizePresetSeed(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -1048,4 +1051,48 @@ func defaultOCRPrompt() string {
 - "languages": {{languages}}
 
 Respond ONLY with valid JSON, no markdown or explanation.`
+}
+
+func (s *Store) migrateOptimizePresetSeed() error {
+	var count int
+	err := s.rdb.QueryRow(`SELECT COUNT(*) FROM prompt_presets WHERE type = 'optimize'`).Scan(&count)
+	if err != nil || count > 0 {
+		return nil
+	}
+
+	content := PromptPresetContent{
+		Template:  defaultOptimizePrompt(),
+		Variables: map[string]PromptVariable{},
+	}
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	now := nowUTC()
+	_, err = s.db.Exec(
+		`INSERT OR IGNORE INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"optimize-built-in-default", "optimize", "Built-in Default", string(contentJSON), 1, now, now,
+	)
+	return err
+}
+
+func defaultOptimizePrompt() string {
+	return `Analyze this image and provide compression advice. Respond as JSON with these fields:
+{
+  "contentType": "photo|icon|screenshot|diagram|illustration|gradient|pattern|text-heavy",
+  "recommendedFormat": "avif|webp|png|svg|jpeg",
+  "recommendedQuality": <number 1-100 or null for lossless>,
+  "lossless": <true|false>,
+  "rationale": "<one sentence explaining why this format and quality>"
+}
+
+Rules:
+- Icons with transparency: lossless WebP or AVIF, preserve alpha
+- Photos/banners: lossy WebP/AVIF, quality 70-85
+- Screenshots with text: lossless or quality 95+ to preserve sharpness
+- Diagrams with text: lossless compression, consider SVG if simple shapes
+- Decorative gradients: aggressive lossy, quality 60-70
+- Patterns: lossless PNG or WebP for tile accuracy
+
+Respond ONLY with the JSON object, no other text.`
 }

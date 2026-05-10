@@ -17,11 +17,12 @@ export type VLMOcrActivityState = {
   errorMessage?: string;
   errors: ActivityError[];
   startedAt?: number;
+  scopeLabel?: string;
 };
 
 export type VLMOcrActivityAction =
   | { type: "saving" }
-  | { type: "running"; startedAt: number }
+  | { type: "running"; startedAt: number; scopeLabel?: string }
   | { type: "event"; event: VLMOcrRunEvent }
   | { type: "stopping" }
   | { type: "done"; counts?: VLMOcrRunCounts }
@@ -47,7 +48,13 @@ export function vlmOcrActivityReducer(
     case "saving":
       return { phase: "saving", counts: null, errors: [] };
     case "running":
-      return { phase: "running", counts: state.counts, errors: state.errors, startedAt: action.startedAt };
+      return {
+        phase: "running",
+        counts: state.counts,
+        errors: state.errors,
+        startedAt: action.startedAt,
+        scopeLabel: action.scopeLabel,
+      };
     case "event": {
       const e = action.event;
       if (!("counts" in e) || !e.counts) return state;
@@ -77,6 +84,7 @@ export function vlmOcrActivityReducer(
         counts: action.counts ?? state.counts,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "stopped":
       return {
@@ -84,6 +92,7 @@ export function vlmOcrActivityReducer(
         counts: action.counts ?? state.counts,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "error":
       return {
@@ -92,6 +101,7 @@ export function vlmOcrActivityReducer(
         errorMessage: action.errorMessage,
         errors: state.errors,
         startedAt: state.startedAt,
+        scopeLabel: state.scopeLabel,
       };
     case "dismiss":
       return initialVLMOcrActivityState;
@@ -132,6 +142,7 @@ export async function runVLMOcrActivity({
   dispatch,
   saveSettings,
   run,
+  scopeLabel,
 }: {
   abortRef: VLMOcrActivityAbortRef;
   dispatch: (action: VLMOcrActivityAction) => void;
@@ -140,6 +151,7 @@ export async function runVLMOcrActivity({
     signal: AbortSignal;
     onEvent: (event: VLMOcrRunEvent) => void;
   }) => Promise<Extract<VLMOcrRunEvent, { type: "done" }> | null>;
+  scopeLabel?: string;
 }) {
   dispatch({ type: "saving" });
 
@@ -152,7 +164,7 @@ export async function runVLMOcrActivity({
 
   const controller = new AbortController();
   abortRef.current = controller;
-  dispatch({ type: "running", startedAt: Date.now() });
+  dispatch({ type: "running", startedAt: Date.now(), scopeLabel });
 
   try {
     const result = await run({

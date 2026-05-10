@@ -161,11 +161,9 @@ func Probe(path string) (Metadata, error) {
 }
 
 func DHash(path string) (Hashes, error) {
-	if !strings.EqualFold(filepath.Ext(path), ".svg") {
-		var result Hashes
-		if err := runImgtoolsJSON(&result, "dhash", path); err == nil {
-			return result, nil
-		}
+	var result Hashes
+	if err := runImgtoolsJSON(&result, "dhash", path); err == nil {
+		return result, nil
 	}
 	img, err := decodeRaster(path)
 	if err != nil {
@@ -203,19 +201,15 @@ const (
 )
 
 func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
-	extA := strings.ToLower(filepath.Ext(pathA))
-	extB := strings.ToLower(filepath.Ext(pathB))
-	if extA != ".svg" && extB != ".svg" {
-		args := []string{"visual-distance", pathA, pathB}
-		if flipB {
-			args = append(args, "--flip-b")
-		}
-		var result struct {
-			Distance int `json:"distance"`
-		}
-		if err := runImgtoolsJSON(&result, args...); err == nil {
-			return result.Distance, nil
-		}
+	args := []string{"visual-distance", pathA, pathB}
+	if flipB {
+		args = append(args, "--flip-b")
+	}
+	var result struct {
+		Distance int `json:"distance"`
+	}
+	if err := runImgtoolsJSON(&result, args...); err == nil {
+		return result.Distance, nil
 	}
 	sA, err := VisualSample(pathA)
 	if err != nil {
@@ -325,6 +319,12 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 		target := filepath.Join(cacheDir, safeCacheName(cacheKey)+".png")
 		if info, err := os.Stat(target); err == nil {
 			return ThumbnailResult{Path: target, CacheHit: true, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
+		}
+		// Prefer imgtools (resvg) for broad SVG spec coverage; fall back to oksvg when unavailable
+		if err := runImgtoolsExec("svg-to-png", "--max-size", strconv.Itoa(size), path, target); err == nil {
+			if info, err := os.Stat(target); err == nil {
+				return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
+			}
 		}
 		img, err := rasterizeSVG(path, size)
 		if err != nil {
@@ -773,18 +773,26 @@ func parseSVGLength(value string) int {
 }
 
 func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
-	var img image.Image
-	var err error
 	if strings.EqualFold(filepath.Ext(path), ".svg") {
-		img, err = rasterizeSVG(path, svgMaxSize)
-	} else {
-		f, ferr := os.Open(path)
-		if ferr != nil {
-			return nil, ferr
+		if data, err := svgToPNGViaImgtools(path, svgMaxSize); err == nil {
+			return data, nil
 		}
-		defer f.Close()
-		img, _, err = image.Decode(f)
+		img, err := rasterizeSVG(path, svgMaxSize)
+		if err != nil {
+			return nil, fmt.Errorf("decode %s: %w", filepath.Base(path), err)
+		}
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, img); err != nil {
+			return nil, fmt.Errorf("encode png: %w", err)
+		}
+		return buf.Bytes(), nil
 	}
+	f, ferr := os.Open(path)
+	if ferr != nil {
+		return nil, ferr
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
 	if err != nil {
 		return nil, fmt.Errorf("decode %s: %w", filepath.Base(path), err)
 	}
@@ -793,6 +801,20 @@ func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
 		return nil, fmt.Errorf("encode png: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+func svgToPNGViaImgtools(path string, maxSize int) ([]byte, error) {
+	tmp, err := os.CreateTemp("", "imgtools-svg-*.png")
+	if err != nil {
+		return nil, err
+	}
+	target := tmp.Name()
+	tmp.Close()
+	defer os.Remove(target)
+	if err := runImgtoolsExec("svg-to-png", "--max-size", strconv.Itoa(maxSize), path, target); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(target)
 }
 
 func safeCacheName(key string) string {

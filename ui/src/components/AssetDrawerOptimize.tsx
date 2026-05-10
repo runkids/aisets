@@ -1,20 +1,45 @@
-import { CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle, Loader2, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AssetItem } from "../types";
 import { formatBytes } from "../ui";
+import { getOptimizeAIAdvice, type OptimizeAIAdvice } from "../api";
 import type { VariantInfo } from "./useOptimizeVariants";
 import { AssetThumbnail, Badge, Tooltip } from "./ui";
 
 type Props = {
   asset: AssetItem;
   variants: VariantInfo[];
+  aiEnabled?: boolean;
   onOpenAsset?: (id: string) => void;
 };
 
-export function AssetDrawerOptimize({ asset, variants, onOpenAsset }: Props) {
+export function AssetDrawerOptimize({
+  asset,
+  variants,
+  aiEnabled,
+  onOpenAsset,
+}: Props) {
   const { t } = useTranslation();
   const recs = asset.optimizationRecommendations;
   const allDone = recs.length > 0 && recs.every((r) => r.hasExistingVariant);
+
+  const [aiAdvice, setAiAdvice] = useState<OptimizeAIAdvice | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function handleAskAI() {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await getOptimizeAIAdvice(asset.id);
+      setAiAdvice(result);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   return (
     <div className="grid gap-3">
@@ -117,6 +142,59 @@ export function AssetDrawerOptimize({ asset, variants, onOpenAsset }: Props) {
           </p>
         </div>
       ))}
+
+      {aiEnabled && !aiAdvice && (
+        <button
+          type="button"
+          onClick={handleAskAI}
+          disabled={aiLoading}
+          className="flex items-center gap-1.5 rounded-g-md border border-g-line bg-g-surface px-3 py-2 text-g-body text-g-ink-2 transition-colors duration-[120ms] ease-g hover:border-g-ink-3 hover:text-g-ink disabled:opacity-50"
+        >
+          {aiLoading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Sparkles size={14} />
+          )}
+          {t("optimize.aiAdviceButton")}
+        </button>
+      )}
+
+      {aiError && (
+        <div className="rounded-g-md border border-g-red/20 bg-g-red/5 px-3 py-2 text-g-caption text-g-red">
+          {aiError}
+        </div>
+      )}
+
+      {aiAdvice && (
+        <div className="rounded-g-md border border-g-purple/20 bg-g-purple/5 p-3">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Sparkles size={13} className="text-g-purple" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-g-purple">
+              {t("optimize.aiAdviceTitle")}
+            </span>
+          </div>
+          <div className="grid gap-1.5">
+            <div className="flex items-center gap-2">
+              <Badge tone="purple" className="text-[10px]">
+                {aiAdvice.contentType}
+              </Badge>
+              <span className="font-g-mono text-g-caption text-g-ink">
+                → {aiAdvice.recommendedFormat.toUpperCase()}
+                {aiAdvice.lossless
+                  ? ` (lossless)`
+                  : aiAdvice.recommendedQuality != null
+                    ? ` (q${aiAdvice.recommendedQuality})`
+                    : ""}
+              </span>
+            </div>
+            <p className="text-g-caption text-g-ink-2">{aiAdvice.rationale}</p>
+            <p className="font-g-mono text-g-chip text-g-ink-4">
+              {aiAdvice.durationMs}ms ·{" "}
+              {aiAdvice.inputTokens + aiAdvice.outputTokens} tokens
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

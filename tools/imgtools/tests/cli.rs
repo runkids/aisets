@@ -345,6 +345,101 @@ fn vlm_normalize_svg_rasterizes_to_png() {
     assert_eq!((img.width(), img.height()), (200, 100));
 }
 
+fn write_svg_fixture(path: &Path, fill: &str, width: u32, height: u32) {
+    fs::write(
+        path,
+        format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"><rect fill="{fill}" width="{width}" height="{height}"/></svg>"#
+        ),
+    )
+    .expect("write svg fixture");
+}
+
+#[test]
+fn dhash_svg_produces_valid_hash() {
+    let temp = TempDir::new();
+    let input = temp.path("icon.svg");
+    write_svg_fixture(&input, "blue", 200, 100);
+
+    let stdout = assert_success(run(&["dhash", input.to_str().expect("path utf-8")]));
+    let json: Value = serde_json::from_str(&stdout).expect("parse dhash json");
+
+    let hash = json["dHash"].as_str().expect("dHash should be string");
+    assert_eq!(hash.len(), 16, "dHash should be 16 hex chars");
+    u64::from_str_radix(hash, 16).expect("dHash should be valid hex");
+
+    let flipped = json["dHashFlipped"]
+        .as_str()
+        .expect("dHashFlipped should be string");
+    assert_eq!(flipped.len(), 16);
+}
+
+#[test]
+fn dhash_svg_matches_rasterized_png() {
+    let temp = TempDir::new();
+    let svg_path = temp.path("rect.svg");
+    let png_path = temp.path("rect.png");
+    write_svg_fixture(&svg_path, "red", 100, 100);
+
+    assert_success(run(&[
+        "svg-to-png",
+        "--max-size",
+        "512",
+        svg_path.to_str().expect("path utf-8"),
+        png_path.to_str().expect("path utf-8"),
+    ]));
+
+    let svg_out = assert_success(run(&["dhash", svg_path.to_str().expect("path utf-8")]));
+    let png_out = assert_success(run(&["dhash", png_path.to_str().expect("path utf-8")]));
+    let svg_json: Value = serde_json::from_str(&svg_out).expect("svg json");
+    let png_json: Value = serde_json::from_str(&png_out).expect("png json");
+
+    assert_eq!(
+        svg_json["dHash"], png_json["dHash"],
+        "SVG and its rasterized PNG should produce the same dHash"
+    );
+}
+
+#[test]
+fn visual_distance_svg_vs_svg_identical_is_zero() {
+    let temp = TempDir::new();
+    let a = temp.path("a.svg");
+    let b = temp.path("b.svg");
+    write_svg_fixture(&a, "green", 80, 80);
+    write_svg_fixture(&b, "green", 80, 80);
+
+    let stdout = assert_success(run(&[
+        "visual-distance",
+        a.to_str().expect("path utf-8"),
+        b.to_str().expect("path utf-8"),
+    ]));
+    let json: Value = serde_json::from_str(&stdout).expect("parse json");
+
+    assert_eq!(json["distance"], 0, "identical SVGs should have distance 0");
+}
+
+#[test]
+fn visual_distance_svg_vs_png_works() {
+    let temp = TempDir::new();
+    let svg_path = temp.path("icon.svg");
+    let png_path = temp.path("icon.png");
+    write_svg_fixture(&svg_path, "#ff0000", 60, 60);
+    write_rgba_png(&png_path, 60, 60, Rgba([255, 0, 0, 255]));
+
+    let stdout = assert_success(run(&[
+        "visual-distance",
+        svg_path.to_str().expect("path utf-8"),
+        png_path.to_str().expect("path utf-8"),
+    ]));
+    let json: Value = serde_json::from_str(&stdout).expect("parse json");
+
+    let dist = json["distance"].as_i64().expect("distance should be int");
+    assert!(
+        dist < 5,
+        "red SVG vs red PNG should have very low distance, got {dist}"
+    );
+}
+
 #[test]
 fn vlm_normalize_gif_uses_first_frame() {
     let temp = TempDir::new();

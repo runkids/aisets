@@ -5,6 +5,7 @@ import {
   MessageSquarePlus,
   Plus,
   RotateCcw,
+  Gauge,
   ScanText,
   Star,
   Tags,
@@ -175,6 +176,13 @@ function PresetList({
             icon={<ScanText size={15} />}
             label={t("prompts.ocrPresets")}
             onClick={() => onTypeChange("ocr")}
+          />
+          <RailItem
+            variant="settings"
+            active={type === "optimize"}
+            icon={<Gauge size={15} />}
+            label={t("prompts.optimizePresets")}
+            onClick={() => onTypeChange("optimize")}
           />
         </RailSection>
 
@@ -420,7 +428,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
   return (
     <div className="flex min-h-full flex-col">
       {/* Editor content */}
-      <div className="flex-1 px-5 py-4">
+      <div className="flex-1 px-5 py-4 pt-3">
         <Card padding="none" className="mx-auto max-w-[1040px] p-5">
           <div className="flex flex-col gap-6">
             {/* ── Name ── */}

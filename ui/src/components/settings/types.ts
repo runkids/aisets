@@ -34,6 +34,7 @@ export type SettingsViewProps = {
     saveSettings: () => Promise<void>,
     presetId?: string,
     projectIds?: string[],
+    scopeLabel?: string,
   ) => void;
   onStopAITag: () => void;
   onDismissAITag: () => void;
@@ -41,6 +42,7 @@ export type SettingsViewProps = {
     saveSettings: () => Promise<void>,
     presetId?: string,
     projectIds?: string[],
+    scopeLabel?: string,
   ) => void;
   onStopVLMOcr: () => void;
   onDismissVLMOcr: () => void;
