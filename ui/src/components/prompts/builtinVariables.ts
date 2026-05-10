@@ -137,15 +137,7 @@ export const OPTIMIZE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
-export const SYSTEM_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
-  {
-    name: "language",
-    type: "select",
-    defaultValues: ["zh-TW"],
-    required: false,
-    descriptionKey: "prompts.var.language",
-  },
-];
+export const SYSTEM_BUILTIN_VARIABLES: BuiltinVariableDef[] = [];
 
 export const DUPLICATE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   {

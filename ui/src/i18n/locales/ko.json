@@ -1843,8 +1843,7 @@
       "optimizationFindings": "규칙 기반 최적화 분석 — 요청 시 자동 주입",
       "leftMetadata": "첫 번째(왼쪽) 이미지의 메타데이터 — 자동 입력",
       "rightMetadata": "두 번째(오른쪽) 이미지의 메타데이터 — 자동 입력",
-      "distance": "두 이미지의 dHash 거리(0-64) — 자동 입력",
-      "language": "응답 언어 설정"
+      "distance": "두 이미지의 dHash 거리(0-64) — 자동 입력"
     },
     "missingRequired": "필수 변수가 누락되었습니다",
     "builtinBadge": "내장",

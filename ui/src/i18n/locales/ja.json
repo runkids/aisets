@@ -1843,8 +1843,7 @@
       "optimizationFindings": "ルールベースの最適化分析 — リクエスト時に自動注入",
       "leftMetadata": "1枚目（左側）の画像メタデータ — 自動入力",
       "rightMetadata": "2枚目（右側）の画像メタデータ — 自動入力",
-      "distance": "2つの画像のdHash距離（0-64） — 自動入力",
-      "language": "応答言語設定"
+      "distance": "2つの画像のdHash距離（0-64） — 自動入力"
     },
     "missingRequired": "必須変数が不足しています",
     "builtinBadge": "組み込み",

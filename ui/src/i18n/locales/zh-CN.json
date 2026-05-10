@@ -1843,8 +1843,7 @@
       "optimizationFindings": "基于规则的优化分析 — 请求时自动注入",
       "leftMetadata": "第一张（左侧）图片的元数据 — 自动填入",
       "rightMetadata": "第二张（右侧）图片的元数据 — 自动填入",
-      "distance": "两张图片的 dHash 距离（0-64） — 自动填入",
-      "language": "响应语言偏好"
+      "distance": "两张图片的 dHash 距离（0-64） — 自动填入"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",
