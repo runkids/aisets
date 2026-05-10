@@ -789,7 +789,7 @@ export function BrowseView({
     return () => window.clearTimeout(resetId);
   }, [autoScrollAssetId, initialSearchQuery, projectFilterName]);
 
-  const { filteredWithoutCustom, emptyOCRTextCount } = useMemo(
+  const { emptyOCRTextCount } = useMemo(
     () =>
       applyBrowseFilters({
         items,
