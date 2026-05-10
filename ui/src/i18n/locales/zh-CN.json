@@ -1862,7 +1862,11 @@
     "toastDefaultSetFailed": "设置默认失败",
     "toastReset": "模板已恢复默认",
     "systemPresets": "系统",
-    "systemDescription": "此 prompt 会自动合并到所有 AI 操作前面"
+    "systemDescription": "此 prompt 会自动合并到所有 AI 操作前面",
+    "systemEmptyTitle": "创建系统 Prompt",
+    "systemEmptyDesc": "系统 prompt 会自动合并到所有 AI 操作（标签、OCR、优化、重复检测）的最前面。例如：「总是用中文回答」",
+    "systemEmptyAction": "创建第一个系统 prompt",
+    "systemNotice": "此 prompt 会自动合并到所有 AI 操作前面，设为默认即生效"
   },
   "duplicateExplain": {
     "button": "解释差异",

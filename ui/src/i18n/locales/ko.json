@@ -1862,7 +1862,11 @@
     "toastDefaultSetFailed": "기본 설정 실패",
     "toastReset": "템플릿 기본값으로 초기화됨",
     "systemPresets": "시스템",
-    "systemDescription": "이 프롬프트는 모든 AI 작업에 자동으로 추가됩니다"
+    "systemDescription": "이 프롬프트는 모든 AI 작업에 자동으로 추가됩니다",
+    "systemEmptyTitle": "시스템 프롬프트 만들기",
+    "systemEmptyDesc": "시스템 프롬프트는 모든 AI 작업(태그, OCR, 최적화, 중복 감지)의 앞에 자동으로 추가됩니다. 예: \"항상 한국어로 답변하세요\"",
+    "systemEmptyAction": "첫 번째 시스템 프롬프트 만들기",
+    "systemNotice": "이 프롬프트는 모든 AI 작업에 자동으로 추가됩니다. 기본값으로 설정하면 활성화됩니다"
   },
   "duplicateExplain": {
     "button": "차이점 설명",

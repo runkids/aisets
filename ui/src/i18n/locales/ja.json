@@ -1862,7 +1862,11 @@
     "toastDefaultSetFailed": "デフォルト設定に失敗しました",
     "toastReset": "テンプレートをデフォルトにリセットしました",
     "systemPresets": "システム",
-    "systemDescription": "このプロンプトはすべてのAI操作に自動的に付加されます"
+    "systemDescription": "このプロンプトはすべてのAI操作に自動的に付加されます",
+    "systemEmptyTitle": "システムプロンプトを作成",
+    "systemEmptyDesc": "システムプロンプトはすべてのAI操作（タグ、OCR、最適化、重複検出）の先頭に自動的に付加されます。例：「常に日本語で回答してください」",
+    "systemEmptyAction": "最初のシステムプロンプトを作成",
+    "systemNotice": "このプロンプトはすべてのAI操作に自動的に付加されます。デフォルトに設定すると有効になります"
   },
   "duplicateExplain": {
     "button": "違いを説明",

@@ -1852,7 +1852,11 @@
     "toastDefaultSetFailed": "Set default failed",
     "toastReset": "Template reset to default",
     "systemPresets": "System",
-    "systemDescription": "This prompt is automatically prepended to all AI operations"
+    "systemDescription": "This prompt is automatically prepended to all AI operations",
+    "systemEmptyTitle": "Create a System Prompt",
+    "systemEmptyDesc": "A system prompt is automatically prepended to all AI operations (Tag, OCR, Optimize, Duplicate). For example: \"Always respond in Chinese.\"",
+    "systemEmptyAction": "Create your first system prompt",
+    "systemNotice": "This prompt is automatically prepended to all AI operations. Set as default to activate."
   },
   "duplicateExplain": {
     "button": "Explain Differences",

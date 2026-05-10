@@ -1873,7 +1873,11 @@
     "toastDefaultSetFailed": "設定預設失敗",
     "toastReset": "範本已恢復預設",
     "systemPresets": "系統",
-    "systemDescription": "此 prompt 會自動合併到所有 AI 操作前面"
+    "systemDescription": "此 prompt 會自動合併到所有 AI 操作前面",
+    "systemEmptyTitle": "建立系統 Prompt",
+    "systemEmptyDesc": "系統 prompt 會自動合併到所有 AI 操作（標籤、OCR、優化、重複檢測）的最前面。例如：「總是用中文回答」",
+    "systemEmptyAction": "建立第一個系統 prompt",
+    "systemNotice": "此 prompt 會自動合併到所有 AI 操作前面，設為預設即生效"
   },
   "duplicateExplain": {
     "button": "解釋差異",

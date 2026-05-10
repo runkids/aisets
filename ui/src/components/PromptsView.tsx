@@ -42,6 +42,7 @@ import {
   CopyButton,
   EmptyState,
   Keycap,
+  Notice,
   Rail,
   RailItem,
   RailSection,
@@ -102,12 +103,35 @@ export function PromptsView() {
         {selectedPreset ? (
           <PresetEditor key={selectedPreset.id} preset={selectedPreset} />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <EmptyState
-              icon={<MessageSquarePlus />}
-              title={t("prompts.emptyState")}
-              size="sm"
-            />
+          <div className="flex h-full items-start justify-center pt-[15vh]">
+            {selectedType === "system" && presets.length === 0 ? (
+              <EmptyState
+                icon={<Settings2 />}
+                title={t("prompts.systemEmptyTitle")}
+                description={t("prompts.systemEmptyDesc")}
+                action={
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      const createBtn =
+                        document.querySelector<HTMLButtonElement>(
+                          "[data-testid='preset-add-btn']",
+                        );
+                      createBtn?.click();
+                    }}
+                  >
+                    {t("prompts.systemEmptyAction")}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<MessageSquarePlus />}
+                title={t("prompts.emptyState")}
+                size="sm"
+              />
+            )}
           </div>
         )}
       </div>
@@ -229,6 +253,7 @@ function PresetList({
             className="w-full justify-center gap-1.5 text-g-ui"
             onClick={handleAdd}
             disabled={createMutation.isPending}
+            data-testid="preset-add-btn"
           >
             <Plus size={14} />
             {t("prompts.addPreset")}
@@ -475,6 +500,9 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       <div className="flex-1 px-5 py-4 pt-3">
         <Card padding="none" className="mx-auto max-w-[1040px] p-5">
           <div className="flex flex-col gap-6">
+            {preset.type === "system" && (
+              <Notice tone="info">{t("prompts.systemNotice")}</Notice>
+            )}
             {/* ── Name ── */}
             <TextInput
               label={t("prompts.nameLabel")}
