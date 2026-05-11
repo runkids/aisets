@@ -6,6 +6,7 @@ import { useTagCategoriesQuery } from "../../tagsQueries";
 import type { OptimizationStrategy } from "../../types";
 import { TAG_BUILTIN_VARIABLES } from "../prompts/builtinVariables";
 import { Button, Select, Switch, TextInput, Tooltip } from "../ui";
+import { AICategorySelect } from "./AICategorySelect";
 import type { StrategyFieldErrors } from "./optimizationStrategyValidation";
 
 const FORMAT_OPTIONS: { key: string; label: string; values: string[] }[] = [
@@ -97,10 +98,6 @@ export function OptimizationStrategyRow({
         match: { ...current.match, formats: next },
       };
     });
-  }
-
-  function isAICategoryActive(category: string) {
-    return strategy.match.aiCategories?.includes(category) ?? false;
   }
 
   function toggleAICategory(category: string) {
@@ -236,39 +233,18 @@ export function OptimizationStrategyRow({
           ))}
         </div>
         {errors.formats && <FieldError>{errors.formats}</FieldError>}
-        <div className="grid gap-1">
-          <SectionLabel
-            label={t("settings.strategyAICategory")}
-            description={t("settings.strategyAICategoryHint")}
+        <SelectField
+          label={t("settings.strategyAICategory")}
+          hint={t("settings.strategyAICategoryHint")}
+        >
+          <AICategorySelect
+            value={strategy.match.aiCategories ?? []}
+            options={categoryOptions}
+            orphaned={orphanedCategories}
+            disabled={disabled}
+            onChange={toggleAICategory}
           />
-          <div className="flex flex-wrap gap-1.5">
-            {categoryOptions.map((cat) => (
-              <Button
-                key={cat}
-                variant="chip"
-                size="md"
-                data-active={isAICategoryActive(cat) || undefined}
-                disabled={disabled}
-                onClick={() => toggleAICategory(cat)}
-              >
-                {cat}
-              </Button>
-            ))}
-            {orphanedCategories.map((cat) => (
-              <Button
-                key={cat}
-                variant="chip"
-                size="md"
-                data-active
-                disabled={disabled}
-                className="line-through opacity-60"
-                onClick={() => toggleAICategory(cat)}
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-        </div>
+        </SelectField>
         <div className="grid gap-2 grid-cols-2">
           <SelectField
             label={t("settings.strategyAlpha")}
