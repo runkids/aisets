@@ -210,6 +210,8 @@ func DefaultAppSettings() AppSettings {
 		LLMEmbedModel:              "",
 		LLMConcurrency:             llm.DefaultConcurrency,
 		LLMTimeout:                 llm.DefaultChatTimeout,
+		AgentAdapter:               "auto",
+		AgentModel:                 "",
 	}
 }
 
@@ -452,6 +454,25 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 				"LLM timeout must be between 30 and 600")
 		}
 		settings.LLMTimeout = *update.LLMTimeout
+	}
+	if update.AgentEnabled != nil {
+		settings.AgentEnabled = *update.AgentEnabled
+	}
+	if update.AgentAdapter != nil {
+		a := strings.TrimSpace(*update.AgentAdapter)
+		validAdapters := map[string]bool{
+			"": true, "auto": true, "codex": true, "claude": true,
+			"cursor-agent": true, "gemini": true, "copilot": true,
+			"pi": true, "local-llm": true,
+		}
+		if !validAdapters[a] {
+			return AppSettings{}, apierr.New("settings_agent_adapter_invalid",
+				"invalid agent adapter value")
+		}
+		settings.AgentAdapter = a
+	}
+	if update.AgentModel != nil {
+		settings.AgentModel = strings.TrimSpace(*update.AgentModel)
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID

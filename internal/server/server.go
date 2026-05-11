@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"aisets/internal/actions"
+	"aisets/internal/agent"
 	"aisets/internal/config"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
@@ -34,6 +35,7 @@ type Server struct {
 	scanner     *scanner.Scanner
 	ocrEngine   ocr.Engine
 	llmProvider llm.Provider
+	agentStatus agent.RuntimeStatus
 	onReady     func()
 
 	mu            sync.Mutex
@@ -61,6 +63,7 @@ func New(opts Options) (*Server, error) {
 		batchPreviews: map[string]actions.BatchPreview{},
 	}
 	s.initLLMProvider()
+	s.initAgentStatus()
 	s.routes()
 	s.handler = s.wrapBasePath(s.mux)
 	return s, nil
@@ -170,6 +173,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/ai/ocr/run", s.handleVLMOCRRun)
 	s.mux.HandleFunc("POST /api/ai/optimize-advice", s.handleOptimizeAIAdvice)
 	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
+	s.mux.HandleFunc("GET /api/agent/status", s.handleAgentStatus)
 	s.mux.HandleFunc("GET /api/prompt-presets", s.handleListPromptPresets)
 	s.mux.HandleFunc("POST /api/prompt-presets", s.handleCreatePromptPreset)
 	s.mux.HandleFunc("PATCH /api/prompt-presets/{id}", s.handleUpdatePromptPreset)
@@ -199,6 +203,27 @@ func (s *Server) initLLMProvider() {
 	} else {
 		s.llmProvider = nil
 	}
+}
+
+func (s *Server) initAgentStatus() {
+	if s.store == nil {
+		return
+	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		return
+	}
+	adapter := settings.AgentAdapter
+	if !settings.AgentEnabled {
+		s.agentStatus = agent.RuntimeStatus{}
+		return
+	}
+	llmInfo := agent.LLMInfo{
+		Enabled:  settings.LLMEnabled,
+		Provider: settings.LLMProvider,
+		Model:    settings.LLMVisionModel,
+	}
+	s.agentStatus = agent.BuildRuntimeStatus(context.Background(), adapter, llmInfo)
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {

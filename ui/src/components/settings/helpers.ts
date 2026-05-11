@@ -151,6 +151,9 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmOcrPrompt: settings?.llmOcrPrompt ?? "",
     llmConcurrency: settings?.llmConcurrency ?? 1,
     llmTimeout: settings?.llmTimeout ?? 120,
+    agentEnabled: settings?.agentEnabled ?? false,
+    agentAdapter: settings?.agentAdapter ?? "auto",
+    agentModel: settings?.agentModel ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -202,6 +205,9 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmOcrPrompt: draft.llmOcrPrompt,
     llmConcurrency: draft.llmConcurrency,
     llmTimeout: draft.llmTimeout,
+    agentEnabled: draft.agentEnabled,
+    agentAdapter: draft.agentAdapter,
+    agentModel: draft.agentModel,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -264,6 +270,9 @@ export function resetSectionDraft(
         llmOcrPrompt: defaults.llmOcrPrompt,
         llmConcurrency: defaults.llmConcurrency,
         llmTimeout: defaults.llmTimeout,
+        agentEnabled: defaults.agentEnabled,
+        agentAdapter: defaults.agentAdapter,
+        agentModel: defaults.agentModel,
       };
     case "customFilters":
       return {

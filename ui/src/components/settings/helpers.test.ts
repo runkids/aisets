@@ -58,6 +58,9 @@ describe("settings draft helpers", () => {
       llmSystemPromptEnabled: false,
       llmConcurrency: 1,
       llmTimeout: 120,
+      agentEnabled: false,
+      agentAdapter: "auto",
+      agentModel: "",
       workspaces: [],
       projects: [],
       databasePath: "/tmp/aisets.db",
@@ -81,6 +84,11 @@ describe("settings draft helpers", () => {
         models: [],
         visionModel: "",
         embedModel: "",
+      },
+      agentRuntime: {
+        adapters: [],
+        active: "",
+        available: false,
       },
     });
 
@@ -168,6 +176,9 @@ describe("settings draft helpers", () => {
       llmSystemPromptEnabled: false,
       llmConcurrency: 4,
       llmTimeout: 120,
+      agentEnabled: false,
+      agentAdapter: "auto",
+      agentModel: "",
       workspaces: [],
       projects: [],
       databasePath: "/tmp/aisets.db",
@@ -191,6 +202,11 @@ describe("settings draft helpers", () => {
         models: [],
         visionModel: "llava",
         embedModel: "nomic-embed-text",
+      },
+      agentRuntime: {
+        adapters: [],
+        active: "",
+        available: false,
       },
     });
 

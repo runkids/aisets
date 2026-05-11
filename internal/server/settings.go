@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/imageproc"
@@ -31,6 +32,7 @@ type settingsInfo struct {
 	OptimizationToolRuntime  []optimize.ToolRuntime `json:"optimizationToolRuntime"`
 	OptimizationStrategyHash string                 `json:"optimizationStrategyHash"`
 	LLMRuntime               llm.RuntimeStatus      `json:"llmRuntime"`
+	AgentRuntime             agent.RuntimeStatus    `json:"agentRuntime"`
 }
 
 func (s *Server) currentSettingsInfo() (settingsInfo, error) {
@@ -49,6 +51,7 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 		OptimizationToolRuntime:  optimize.ToolRuntimeStatus(settings.OptimizationExternalTools),
 		OptimizationStrategyHash: imageproc.OptimizationStrategyHash(settings.OptimizationStrategies, settings.OptimizationThresholds),
 		LLMRuntime:               s.currentLLMRuntime(settings),
+		AgentRuntime:             s.agentStatus,
 	}, nil
 }
 
@@ -79,6 +82,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMEndpoint != nil {
 		s.initLLMProvider()
+	}
+	if body.AgentEnabled != nil || body.AgentAdapter != nil ||
+		body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMVisionModel != nil {
+		s.initAgentStatus()
 	}
 	settings, err := s.currentSettingsInfo()
 	if err != nil {

@@ -59,6 +59,9 @@ type AppSettings struct {
 	LLMSystemPromptEnabled     bool                                 `json:"llmSystemPromptEnabled"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
 	LLMTimeout                 int                                  `json:"llmTimeout"`
+	AgentEnabled               bool                                 `json:"agentEnabled"`
+	AgentAdapter               string                               `json:"agentAdapter"`
+	AgentModel                 string                               `json:"agentModel"`
 }
 
 type SettingsUpdate struct {
@@ -97,6 +100,9 @@ type SettingsUpdate struct {
 	LLMSystemPromptEnabled     *bool                                `json:"llmSystemPromptEnabled"`
 	LLMConcurrency             *int                                 `json:"llmConcurrency"`
 	LLMTimeout                 *int                                 `json:"llmTimeout"`
+	AgentEnabled               *bool                                `json:"agentEnabled"`
+	AgentAdapter               *string                              `json:"agentAdapter"`
+	AgentModel                 *string                              `json:"agentModel"`
 }
 
 type CustomAssetFilter struct {

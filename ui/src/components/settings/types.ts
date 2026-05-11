@@ -84,6 +84,9 @@ export type SettingsDraft = {
   llmOcrPrompt: string;
   llmConcurrency: number;
   llmTimeout: number;
+  agentEnabled: boolean;
+  agentAdapter: string;
+  agentModel: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;
