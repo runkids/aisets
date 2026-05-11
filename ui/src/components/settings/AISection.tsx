@@ -819,13 +819,13 @@ export function AISection({
           className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
           padding="none"
         >
-          <div className="flex items-center gap-2.5 px-6 py-3 md:px-8">
+          <div className="flex items-center gap-2.5 px-6 pt-3 pb-1 md:px-8">
             <Tags size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.aiTagGroup")}
             </span>
           </div>
-          <div className="flex items-start justify-between gap-6 px-6 py-4 md:px-8">
+          <div className="flex items-start justify-between gap-6 px-6 py-3 md:px-8">
             <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
               {t("settings.aiTagDescription")}
             </p>
@@ -916,13 +916,13 @@ export function AISection({
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2.5 border-t border-g-line px-6 py-3 md:px-8">
+          <div className="flex items-center gap-2.5 border-t border-g-line px-6 pt-3 pb-1 md:px-8">
             <ScanText size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.aiOcrGroup")}
             </span>
           </div>
-          <div className="flex items-start justify-between gap-6 px-6 py-4 md:px-8">
+          <div className="flex items-start justify-between gap-6 px-6 py-3 md:px-8">
             <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
               {t("settings.aiOcrDescription")}
             </p>
