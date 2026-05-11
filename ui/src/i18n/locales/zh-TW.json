@@ -293,7 +293,8 @@
     "yes": "是",
     "expand": "展開",
     "collapse": "收合",
-    "saving": "儲存中…"
+    "saving": "儲存中…",
+    "ok": "確定"
   },
   "status": {
     "scanning": "正在掃描",

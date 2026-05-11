@@ -293,7 +293,8 @@
     "yes": "はい",
     "expand": "展開",
     "collapse": "折りたたむ",
-    "saving": "保存中…"
+    "saving": "保存中…",
+    "ok": "OK"
   },
   "status": {
     "scanning": "スキャン中",

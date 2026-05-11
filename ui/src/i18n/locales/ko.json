@@ -293,7 +293,8 @@
     "yes": "예",
     "expand": "펼치기",
     "collapse": "접기",
-    "saving": "저장 중…"
+    "saving": "저장 중…",
+    "ok": "확인"
   },
   "status": {
     "scanning": "스캔 중",

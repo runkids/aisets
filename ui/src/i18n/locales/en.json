@@ -293,7 +293,8 @@
     "yes": "Yes",
     "expand": "Expand",
     "collapse": "Collapse",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "ok": "OK"
   },
   "status": {
     "scanning": "Scanning",
