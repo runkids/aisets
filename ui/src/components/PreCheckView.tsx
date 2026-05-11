@@ -226,12 +226,13 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
   );
 
   const runAI = useCallback(async () => {
-    if (files.length === 0) return;
+    const pending = files.filter((f) => !aiResults.has(f.name));
+    if (pending.length === 0) return;
     setAiWorking(true);
     setAiError(null);
     try {
       const form = new FormData();
-      files.forEach((f) => form.append("files", f, f.name));
+      pending.forEach((f) => form.append("files", f, f.name));
       const lang = i18n.language || "en";
       const res = await fetch(
         `/api/pre-check/ai?lang=${encodeURIComponent(lang)}`,
@@ -298,7 +299,7 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
     } finally {
       setAiWorking(false);
     }
-  }, [files, t, i18n.language, toast]);
+  }, [files, aiResults, t, i18n.language, toast]);
 
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
