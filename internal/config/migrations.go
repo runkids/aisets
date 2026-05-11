@@ -15,12 +15,6 @@ func (s *Store) init() error {
 	if _, err := s.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
-		return err
-	}
-	if _, err := s.db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
-		return err
-	}
 	if err := s.migrate(); err != nil {
 		return err
 	}

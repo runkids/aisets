@@ -123,18 +123,16 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 			COALESCE(SUM(CASE WHEN a.usage_classification = 'possiblyUnused' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN a.usage_classification = 'notApplicable' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN a.usage_classification = 'referenced' THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN EXISTS (
-				SELECT 1 FROM duplicate_group_assets d
-				WHERE d.scan_id = a.scan_id AND d.asset_id = a.asset_id
-			) THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN EXISTS (
-				SELECT 1 FROM optimization_snapshots o
-				WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id
-			) THEN 1 ELSE 0 END), 0)
+			COALESCE(SUM(CASE WHEN d.asset_id IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN o.asset_id IS NOT NULL THEN 1 ELSE 0 END), 0)
 		FROM asset_snapshots a
+		LEFT JOIN (SELECT DISTINCT asset_id FROM duplicate_group_assets WHERE scan_id = ?) d
+			ON d.asset_id = a.asset_id
+		LEFT JOIN (SELECT DISTINCT asset_id FROM optimization_snapshots WHERE scan_id = ?) o
+			ON o.asset_id = a.asset_id
 		WHERE a.scan_id = ?
 		GROUP BY a.project_id
-	`, scanID)
+	`, scanID, scanID, scanID)
 	if err != nil {
 		return nil, err
 	}

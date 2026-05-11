@@ -26,10 +26,11 @@ func (s *Store) CatalogFolders(query CatalogFolderQuery) (CatalogFoldersPage, er
 		return CatalogFoldersPage{}, err
 	}
 	rows, err := s.rdb.Query(`
-		SELECT a.repo_path
+		SELECT asset_folder(a.repo_path) AS folder, COUNT(*) AS cnt
 		FROM asset_snapshots a
 		`+where+`
-		ORDER BY a.repo_path COLLATE NOCASE ASC, a.repo_path ASC
+		GROUP BY folder
+		ORDER BY folder COLLATE NOCASE ASC, folder ASC
 	`, args...)
 	if err != nil {
 		return CatalogFoldersPage{}, err
@@ -44,12 +45,16 @@ func (s *Store) CatalogFolders(query CatalogFolderQuery) (CatalogFoldersPage, er
 	total := 0
 	folders := map[string]*folderAccumulator{}
 	for rows.Next() {
-		var repoPath string
-		if err := rows.Scan(&repoPath); err != nil {
+		var folder string
+		var cnt int
+		if err := rows.Scan(&folder, &cnt); err != nil {
 			return CatalogFoldersPage{}, err
 		}
-		total++
-		childPath, childName, hasNestedChild := immediateChildFolder(parent, repoPath)
+		total += cnt
+		if folder == "" {
+			continue
+		}
+		childPath, childName, hasNestedChild := immediateChildFolder(parent, folder+"/x")
 		if childPath == "" {
 			continue
 		}
@@ -58,7 +63,7 @@ func (s *Store) CatalogFolders(query CatalogFolderQuery) (CatalogFoldersPage, er
 			acc = &folderAccumulator{name: childName}
 			folders[childPath] = acc
 		}
-		acc.count++
+		acc.count += cnt
 		if hasNestedChild {
 			acc.hasChildren = true
 		}
