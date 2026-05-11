@@ -46,7 +46,7 @@ Aisets fixes this:
 - **Safe actions** — rename, merge duplicates, delete unused files with preview/apply workflow. Nothing changes until you confirm
 - **Multi-project aware** — manage assets across repos with project-type-aware analysis (code project, asset pack, library, mixed)
 - **Local & private** — single Go binary, SQLite database, no cloud, no telemetry. Your assets never leave your machine
-- **5-language UI** — English, 繁體中文, 简体中文, 日本語, 한국어
+
 
 ## Installation
 
