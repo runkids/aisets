@@ -1,15 +1,9 @@
 param(
   [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\Aisets"),
-  [switch]$SkipOcrEngine,
-  [switch]$InstallOcrEngine,
   [string]$Repo = $(if ($env:AISETS_REPO) { $env:AISETS_REPO } else { "runkids/aisets" })
 )
 
 $ErrorActionPreference = "Stop"
-
-if ($SkipOcrEngine -and $InstallOcrEngine) {
-  throw "Use only one of -SkipOcrEngine or -InstallOcrEngine."
-}
 
 $BinaryName = "aisets"
 $ExeName = "$BinaryName.exe"
@@ -63,83 +57,6 @@ function Get-AssetStudioArch {
   }
 }
 
-function Test-TesseractCommand {
-  return [bool](Get-Command "tesseract.exe" -ErrorAction SilentlyContinue)
-}
-
-function Find-KnownTesseractPath {
-  $candidates = @(
-    (Join-Path $env:ProgramFiles "Tesseract-OCR\tesseract.exe"),
-    (Join-Path ${env:ProgramFiles(x86)} "Tesseract-OCR\tesseract.exe"),
-    (Join-Path $env:LOCALAPPDATA "Programs\Tesseract-OCR\tesseract.exe")
-  )
-
-  foreach ($candidate in $candidates) {
-    if ($candidate -and (Test-Path $candidate)) {
-      return $candidate
-    }
-  }
-  return $null
-}
-
-function Confirm-TesseractInstall {
-  if ($InstallOcrEngine) {
-    return $true
-  }
-
-  try {
-    $answer = Read-Host "Install local OCR engine dependency (Tesseract) for image text search? [Y/n]"
-  } catch {
-    Write-Host "Skipping OCR engine install because no interactive prompt is available. Re-run with -InstallOcrEngine to install it."
-    return $false
-  }
-
-  return -not ($answer -match '^(?i:n|no)$')
-}
-
-function Install-Tesseract {
-  if ($SkipOcrEngine) {
-    Write-Host "Skipping OCR engine install because -SkipOcrEngine was provided."
-    return
-  }
-
-  if (Test-TesseractCommand) {
-    Write-Host "OCR engine already installed: $((Get-Command tesseract.exe).Source)"
-    return
-  }
-
-  if (-not (Confirm-TesseractInstall)) {
-    Write-Host "Skipping OCR engine install. OCR cache build will stay disabled until tesseract is installed."
-    return
-  }
-
-  Write-Host "Installing OCR engine dependency: tesseract"
-  if (Get-Command "winget.exe" -ErrorAction SilentlyContinue) {
-    winget install --id UB-Mannheim.TesseractOCR --exact --source winget --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) {
-      throw "winget failed to install Tesseract."
-    }
-  } elseif (Get-Command "choco.exe" -ErrorAction SilentlyContinue) {
-    choco install tesseract -y
-    if ($LASTEXITCODE -ne 0) {
-      throw "Chocolatey failed to install Tesseract."
-    }
-  } else {
-    throw "No supported Windows package manager found. Install winget or Chocolatey, then re-run this installer."
-  }
-
-  $knownPath = Find-KnownTesseractPath
-  if ($knownPath) {
-    Add-DirectoryToUserPath (Split-Path $knownPath -Parent)
-  }
-
-  if (Test-TesseractCommand) {
-    Write-Host "Installed OCR engine: $((Get-Command tesseract.exe).Source)"
-  } else {
-    throw "Tesseract install finished but tesseract.exe is still not on PATH. Restart the terminal or add the Tesseract-OCR directory to PATH."
-  }
-}
-
 $arch = Get-AssetStudioArch
 try {
   $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
@@ -166,8 +83,6 @@ try {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Path (Join-Path $tmp $ExeName) -Destination (Join-Path $InstallDir $ExeName) -Force
   Add-DirectoryToUserPath $InstallDir
-
-  Install-Tesseract
 
   $installed = Join-Path $InstallDir $ExeName
   Write-Host "Installed $(& $installed version) to $installed"

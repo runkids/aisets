@@ -1,14 +1,52 @@
 <p align="center">
-  <img src="./ui/public/brand/aisets-app-icon.avif" alt="Aisets" width="128" />
+  <img src="./ui/public/brand/aisets-logo.png" alt="Aisets" width="280">
 </p>
 
-# Aisets
+<h1 align="center">Aisets</h1>
 
-Aisets is a local-first asset management tool for multi-project workspaces.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://github.com/runkids/aisets/releases"><img src="https://img.shields.io/github/v/release/runkids/aisets" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue" alt="Platform">
+  <a href="https://goreportcard.com/report/github.com/runkids/aisets"><img src="https://goreportcard.com/badge/github.com/runkids/aisets" alt="Go Report Card"></a>
+  <a href="https://deepwiki.com/runkids/aisets"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+</p>
 
-It runs as a pure Go CLI binary and opens a localhost UI. Release builds download
-the UI bundle from GitHub Releases and cache it locally, following the same
-distribution model as Skillshare.
+<p align="center">
+  <a href="https://github.com/runkids/aisets/stargazers"><img src="https://img.shields.io/github/stars/runkids/aisets?style=social" alt="Star on GitHub"></a>
+</p>
+
+<p align="center">
+  <strong>Local-first asset hygiene for multi-project workspaces.</strong><br>
+  Scan, deduplicate, lint, optimize, AI-tag & clean up image assets — all from a single CLI binary with a localhost UI.
+</p>
+
+<!--
+<p align="center">
+  <img src=".github/assets/demo.gif" alt="Aisets demo" width="960">
+</p>
+-->
+
+<p align="center">
+  <a href="#installation">Install</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="#commands">Commands</a> •
+  <a href="#development">Development</a>
+</p>
+
+## Why Aisets
+
+Every codebase accumulates image debt: duplicates nobody notices, 4 MB PNGs that should be AVIF, unused assets that survive every refactor, inconsistent naming that breaks imports. Manual cleanup doesn't scale.
+
+Aisets fixes this:
+
+- **One scan, full picture** — duplicates, near-duplicates, unused files, lint issues, optimization opportunities, all in one pass
+- **AI-powered tagging & OCR** — auto-categorize and extract text from images using local LLMs or agent CLIs (Claude, Codex, Gemini & more)
+- **Safe actions** — rename, merge duplicates, delete unused files with preview/apply workflow. Nothing changes until you confirm
+- **Multi-project aware** — manage assets across repos with project-type-aware analysis (code project, asset pack, library, mixed)
+- **Local & private** — single Go binary, SQLite database, no cloud, no telemetry. Your assets never leave your machine
+- **5-language UI** — English, 繁體中文, 简体中文, 日本語, 한국어
 
 ## Installation
 
@@ -24,146 +62,198 @@ Windows PowerShell:
 iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | iex
 ```
 
-The installer downloads the latest `aisets` CLI, then asks whether to install the local Tesseract OCR engine dependency. Aisets still downloads OCR language packs from Settings so users can choose only the languages they need. For unattended installs, set `INSTALL_OCR_ENGINE=1` or `INSTALL_OCR_ENGINE=0` on macOS/Linux, or run the PowerShell installer with `-InstallOcrEngine` or `-SkipOcrEngine`. Before the public repository exists, point installers at a different release repo with `AISETS_REPO=owner/name` or PowerShell `-Repo owner/name`.
+Update to the latest version anytime:
+
+```bash
+aisets update
+```
+
+## Quick Start
+
+```bash
+# Add a project and open the UI
+aisets ui /path/to/your/project
+
+# Or scan from the CLI
+aisets scan /path/to/your/project --json
+```
+
+The UI opens at `http://127.0.0.1:5174`. Use `--app` to launch a desktop-style window (Chrome/Edge/Brave).
+
+## Features
+
+### Scan & Detect
+
+| Feature | Description |
+|---------|-------------|
+| **Exact duplicates** | BLAKE3 content hashing identifies 100% identical files across projects |
+| **Near-duplicates** | Perceptual hashing (dHash) finds visually similar images, including flipped variants |
+| **Unused assets** | Reference tracking across JS/TS/CSS/HTML to find assets no code imports |
+| **Image metadata** | Dimensions, format, alpha channel, animation, EXIF data extraction |
+| **Scan diff** | Compare two scans to see what changed over time |
+| **Scan profiles** | Fast (metadata + duplicates) or Full (+ references, near-duplicates, optimization) |
+
+### Lint
+
+7 built-in rules catch common asset issues in your codebase:
+
+| Rule | Severity | What it catches |
+|------|----------|-----------------|
+| `large-inline-import` | Critical | `?raw` / `?inline` imports over 10 KB bloating your bundle |
+| `missing-lazy-loading` | Warning | Large `<img>` without `loading="lazy"` or `fetchpriority` |
+| `missing-dimensions` | Warning | `<img>` without width/height causing CLS |
+| `bg-content-image` | Warning | Large raster in CSS `background-image` (can't lazy-load) |
+| `no-responsive-image` | Info | Raster images over 100 KB without `srcset` |
+| `svg-as-img` | Info | SVG via `<img>` tag (no CSS/animation control) |
+| `img-as-background` | Info | Large decorative `<img alt="">` better as CSS background |
+
+### Optimize
+
+Estimate savings and generate conversion scripts:
+
+- **Format conversion** — PNG → AVIF/WebP, JPEG → AVIF, GIF recompress
+- **SVG minification** — via svgo or built-in
+- **Resize oversized rasters** — configurable max dimensions
+- **7 built-in strategies** — fully customizable thresholds, quality, speed
+- **Script generation** — export a bash script using ffmpeg, cwebp, avifenc, gifsicle, or built-in imgtools
+- **Preview before apply** — see estimated savings before any file changes
+
+### AI Tagging & OCR
+
+Auto-categorize images and extract text using vision language models:
+
+- **AI Tags** — category (icon, photo, screenshot, diagram...), descriptive tags, scene type, face detection, language detection, location estimation
+- **AI OCR** — extract text from images via VLM, with 20+ language support
+- **Local Tesseract OCR** — offline text extraction for bulk processing
+- **Multi-provider** — Ollama, OpenAI-compatible APIs, or agent CLIs (Claude, Codex, Gemini, Cursor, Copilot & more)
+- **i18n tags** — AI-generated tags are translated across all 5 supported languages
+- **Content-hash dedup** — identical images share AI results, no redundant API calls
+
+### Actions
+
+Safe file operations with preview/apply workflow:
+
+| Action | What it does |
+|--------|-------------|
+| **Rename** | Move/rename an asset and update all code references |
+| **Merge duplicates** | Keep one copy, redirect all references, delete the rest |
+| **Delete unused** | Remove confirmed unused assets (code-project only) |
+
+Every action generates a preview first. Apply revalidates source files and rejects stale previews.
+
+### Pre-Check
+
+Verify files before adding them to your project:
+
+- Detect exact and near-duplicate matches against the existing catalog
+- Flag naming issues (spaces, uppercase, special characters)
+- Suggest optimizations before the file lands in your repo
+
+### Project Types
+
+Choose a project type to control how Aisets interprets usage and safety:
+
+| Type | Unused detection | Delete-unused | Lint |
+|------|-----------------|---------------|------|
+| **Code project** | Full reference tracking | Enabled (with preview) | Full |
+| **Asset pack** | N/A (assets used externally) | Disabled | Skipped |
+| **Library** | "Possibly unused" only | Disabled | Advisory |
+| **Mixed** | "Possibly unused" only | Conditional | Advisory |
+
+## Commands
+
+```
+aisets ui [paths...] [--port PORT] [--app]     Open the UI (background daemon)
+aisets ui once [paths...]                       Foreground server (Docker/CI)
+aisets ui stop [--port PORT]                    Stop background server
+aisets scan [paths...] [--json]                 Scan projects
+aisets scans list [--json]                      List scan history
+aisets scans diff --base ID --target ID         Compare two scans
+aisets pre-check [files...] [--json]            Check files before adding
+aisets optimize estimate [ids...] [--json]      Estimate optimization savings
+aisets optimize script [ids...] [--json]        Generate optimization script
+aisets actions rename preview ...               Preview a rename
+aisets actions merge-duplicates preview ...      Preview a duplicate merge
+aisets actions delete-unused preview ...         Preview unused deletion
+aisets actions apply --preview file.json        Apply a previewed action
+aisets projects [add|remove|rename|list]        Manage projects
+aisets settings [get|export|import|reset-*]     Manage settings
+aisets update [--dry-run] [--force]             Self-update to latest release
+aisets version [--json]                         Show version
+```
+
+All commands support `--json` for AI agent and automation integration.
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────────┐
+│                     CLI (Go)                           │
+│  cmd/aisets — UI server, scan, actions, pre-check      │
+├────────────────────────────────────────────────────────┤
+│                  Internal Packages                     │
+│  scanner · lint · optimize · actions · agent · ocr     │
+│  imageproc · precheck · version · uidist · config      │
+├──────────────┬─────────────────────────────────────────┤
+│ imgtools     │            SQLite (WAL)                 │
+│ (Rust)       │  Catalogs, scans, AI results, settings  │
+│ resvg, image │  Read pool (4) + Write pool (1)         │
+└──────────────┴─────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────┐
+│                    UI (React + TypeScript)              │
+│  Vite · Tailwind · CVA · @tanstack/react-virtual       │
+│  Browse · Duplicates · Lint · Optimize · Tags · Scans  │
+│  NDJSON streaming · Virtual scrolling · Dark/Light     │
+└────────────────────────────────────────────────────────┘
+```
+
+- **Go backend** — single binary, embedded or downloaded UI, NDJSON streaming for real-time scan progress
+- **Rust imgtools** — image probing, hashing, format conversion, SVG rasterization (resvg). Falls back to Go when unavailable
+- **SQLite WAL** — concurrent reads during writes, separated read/write pools
+- **React UI** — virtual scrolling for 10k+ assets, faceted filtering, keyboard-driven command palette
 
 ## Development
 
 ```bash
+# Build the CLI
 go build -o bin/aisets ./cmd/aisets
 ./bin/aisets ui /path/to/project --no-open
+
+# UI development (Vite + HMR)
+cd ui && pnpm install && pnpm run dev
 ```
 
-For UI development:
+The Go server runs on `127.0.0.1:19520` by default. Vite proxies `/api` to it.
+
+### Devcontainer
 
 ```bash
-cd ui
-pnpm install
-pnpm run dev
+make devc        # Start devcontainer and enter shell
+ui /workspace    # Start Go API (Air hot reload) + Vite UI
 ```
 
-The Go server runs on `127.0.0.1:19520` by default. Use `--port` to bind a
-different port. Vite proxies `/api` to it.
+Open `http://127.0.0.1:5174` from the host browser.
 
-## 專案類型
-
-新增專案時，Aisets 會請你選一個「專案類型」。這會影響它怎麼判斷
-「未使用」、「Lint」和「是否可以安全刪除」。
-
-Aisets 會先根據資料夾內容給一個建議，你也可以自己改。選好的類型會
-顯示在專案卡片和設定頁的專案列表上。如果之後改了專案類型，請重新掃描，
-因為原本的未使用與 Lint 結果可能已經不適合用。
-
-### 我該選哪個？
-
-| 類型 | 適合選這個的情況 | Aisets 會怎麼做 |
-|------|------------------|------------------------|
-| 程式碼專案 | 這是一個 app 或網站，圖片、icon、SVG 主要在同一個 repo 的程式碼裡使用。 | 會檢查哪些素材被程式碼引用，也會找出可以安全預覽刪除的未使用素材。 |
-| 素材包 | 這是一包素材，例如 icon pack、設計輸出、圖片資料夾、sprite、vendor assets。 | 不會把「沒有被程式碼引用」當成問題，因為這些素材本來就可能被別的地方使用。 |
-| 可重用 library | 這是一個會被其他專案引用的 package、component library 或 shared assets。 | 會顯示可能沒用到的檔案，但不會直接判定可以安全刪。 |
-| 混合 / 不確定 | 這個資料夾內容很混雜，或你不確定素材是在哪裡被使用。 | 採保守判斷：可以協助你檢查，但不會輕易開放安全刪除。 |
-
-### 哪些畫面會有差異？
-
-| 畫面 | 會有什麼差異 |
-|------|--------------|
-| 新增專案 | 選完資料夾後會出現「專案類型」。Aisets 會自動建議一個類型，但你可以手動改。 |
-| 專案卡片 | 卡片上會顯示類型 badge，例如「素材包」或「程式碼專案」。 |
-| 設定頁的專案列表 | 可以看到並編輯專案類型。改完後請重新掃描。 |
-| 瀏覽素材 | 「未使用」只代表可以安全進入 delete-unused preview 的項目；不安全的項目會顯示為「可能未使用」或不顯示未使用狀態。 |
-| 素材 drawer | Usage 區塊會說明是「未使用」、「可能未使用」或「不適用」，delete-unused 按鈕也會跟著啟用或停用。 |
-| 未使用 / 清理相關流程 | 素材包不會被整包列成未使用。Library、Mixed 只會提供人工確認用的「可能未使用」。 |
-| Lint | 程式碼專案才是正式適用；素材包會跳過引用相關 Lint；Library、Mixed 僅供參考。 |
-| 掃描進度 | 如果某些分析因專案類型被跳過，進度會顯示原因，例如素材包會跳過 references。 |
-
-重複素材、相似素材、圖片 metadata、最佳化建議、預檢上傳這類不依賴程式碼引用
-的功能，通常不會因專案類型而改變。
-
-### 哪些操作會被限制？
-
-| 類型 | 未使用狀態 | Delete-unused | Lint |
-|------|------------|---------------|------|
-| 程式碼專案 | 可顯示真正的「未使用」。 | 可用，但仍會先產生 preview，不會直接刪。 | 適用。 |
-| 素材包 | 不適用；不會把整包素材當成未使用。 | 停用。 | 不適用，會跳過引用相關 Lint。 |
-| 可重用 library | 只會顯示「可能未使用」。 | 停用。 | 僅供參考。 |
-| 混合 / 不確定 | 只會顯示「可能未使用」。 | 通常停用。 | 僅供參考。 |
-
-重點是：不要把「沒有找到引用」直接等同於「可以刪除」。只有畫面標示為
-「未使用」且 delete-unused action 可用時，才代表 Aisets 認為可以進入
-安全刪除預覽流程。
-
-## 排除規則
-
-設定頁的「排除規則」可以選擇不同範圍：
-
-- `Global`：套用到所有專案。
-- `程式碼專案`、`素材包`、`可重用 library`、`混合 / 不確定`：只追加到該類型的專案。
-
-實際掃描時，Aisets 會先套用 `Global`，再套用該專案類型自己的規則。
-例如 `Global` 有 `dist/**`，`程式碼專案` 有 `**/*.test.*`，那程式碼專案會同時
-排除 `dist/**` 和測試檔；素材包則只會吃到 `dist/**`，除非素材包範圍也另外填規則。
-
-規則是以「匯入的專案根目錄」為基準。單純檔名會匹配任何資料夾底下的同名檔案，
-例如 `./ui/public/brand/aisets-logo.avif` 會排除 `./ui/public/brand/aisets-logo.avif`。
-如果你匯入的專案路徑本身就是 `.../demo`，規則 `/demo/` 不會匹配該專案內所有檔案；
-要排除整個 `demo` 資料夾，應該在上一層作為 project 匯入時使用 `demo/**`，或直接不要
-把 `demo` 匯入成獨立 project。
-
-通常建議：
-
-- 所有專案都不想掃的資料夾放 `Global`，例如 `node_modules`、`.git`、`dist/**`。
-- 只跟程式碼專案有關的測試檔、story 檔，放在 `程式碼專案`。
-- 素材包預設不放排除規則，避免誤排掉素材本身。
-
-## Devcontainer
+### Rust imgtools
 
 ```bash
-make devc
-ui /workspace
+cd tools/imgtools
+cargo build --release
 ```
 
-`make devc` starts the devcontainer and enters a shell. Inside the container,
-`ui` starts the Go API with Air hot reload and the Vite UI. Browser/app-window
-opening is best-effort inside the container; if no opener exists, use the printed
-`http://127.0.0.1:5174` URL from the host browser.
-
-## Commands
+### Running Tests
 
 ```bash
-aisets ui [projectPaths...] [--port PORT] [--app]
-aisets ui once [projectPaths...] [--port PORT]
-aisets ui stop [--port PORT]
-aisets version [--json]
-aisets projects [--json]
-aisets projects add [projectPaths...] [--scan-intent code|assetPack|library|mixed] [--json]
-aisets projects detect-intent projectPath [--json]
-aisets projects rename --id ID --name NAME [--json]
-aisets projects remove --id ID [--json]
-aisets settings get [--json]
-aisets settings export [--output file.json] [--json]
-aisets settings import file.json [--json]
-aisets settings reset-database --confirm RESET [--json]
-aisets scan [projectPaths...] [--json]
-aisets scans list [--json]
-aisets scans diff --base ID --target ID [--json]
-aisets optimize estimate [assetIds...] [--json]
-aisets optimize script [assetIds...] [--json]
-aisets pre-check [filePaths...] [--json]
-aisets actions rename preview --asset-id ID --target-path PATH [--json]
-aisets actions merge-duplicates preview --asset-id ID --preferred-path PATH [--json]
-aisets actions delete-unused preview --asset-id ID [--json]
-aisets actions apply --preview preview.json [--json]
+go test ./...                              # Go tests
+pnpm --dir ui test                         # UI tests
+cargo test --manifest-path tools/imgtools/Cargo.toml  # Rust tests
 ```
-
-`--json` can be used before the command or after command arguments for AI/native automation.
-`aisets ui` starts or reuses a background UI server and opens it in the default
-browser. Use `--app` to open a desktop-style app window when Chrome, Edge, Brave, or
-Chromium is available. Use `aisets ui once` for the foreground server behavior used
-by Docker, Air, and long-running process managers. Use `aisets ui stop` to stop the
-background server for a port. `--base-path` keeps the same reverse-proxy hosting behavior
-as the Go-served UI.
 
 ## Safety
 
-File-changing operations use preview/apply APIs. Apply revalidates the source
-files before writing and rejects stale previews. CLI apply accepts preview JSON
-from a file or stdin via `--preview -`.
+File-changing operations use a preview/apply model. Apply revalidates source files before writing and rejects stale previews. CLI accepts preview JSON from a file or stdin via `--preview -`.
+
+## License
+
+[MIT](LICENSE) © Willie
