@@ -302,11 +302,13 @@ export function BrowseGrid({
             <span className="uppercase">{formatExt(item.ext)}</span>
             <span className="text-g-ink-4">·</span>
             <span>{formatBytes(item.bytes)}</span>
-            <Tooltip label={referenceLabel} placement="top">
-              <span className={cn("ml-auto", isUnused && "text-g-red")}>
-                {item.usedBy.length}↗
-              </span>
-            </Tooltip>
+            {!isNotApplicable && (
+              <Tooltip label={referenceLabel} placement="top">
+                <span className={cn("ml-auto", isUnused && "text-g-red")}>
+                  {item.usedBy.length}↗
+                </span>
+              </Tooltip>
+            )}
           </div>
           {gridSize !== "s" && (
             <div className="mt-1 flex flex-wrap items-center gap-1">

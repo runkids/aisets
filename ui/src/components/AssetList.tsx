@@ -1,6 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { canDeleteUnused } from "../projectScanIntent";
+import { canDeleteUnused, usageClassification } from "../projectScanIntent";
 import type { AssetItem } from "../types";
 import { fileName, formatBytes, primarySeverity } from "../ui";
 import { AssetCard } from "./AssetCard";
@@ -63,9 +63,11 @@ export function AssetList({ items, view, onRename, onDelete }: Props) {
               </div>
             </div>
             <div className="hidden flex-wrap gap-1 lg:flex">
-              <Badge tone={item.usedBy.length > 0 ? "green" : "amber"}>
-                {t("asset.refs", { count: item.usedBy.length })}
-              </Badge>
+              {usageClassification(item) !== "notApplicable" && (
+                <Badge tone={item.usedBy.length > 0 ? "green" : "amber"}>
+                  {t("asset.refs", { count: item.usedBy.length })}
+                </Badge>
+              )}
               {item.duplicateGroupId && (
                 <Badge tone="red">{t("status.duplicate")}</Badge>
               )}
