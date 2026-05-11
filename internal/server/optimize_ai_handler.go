@@ -109,10 +109,10 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
-	_, modelName := s.resolveVLMProvider(settings)
+	backend, _, modelName := s.resolveVLMProviderForFeature(settings, "optimize")
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, timeoutSec)
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {

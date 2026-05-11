@@ -705,7 +705,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 
 	var vlmResults map[string]ocr.Result
 	if vlmEnabled {
-		vlmProvider, vlmModel := s.resolveVLMProvider(settings)
+		_, vlmProvider, vlmModel := s.resolveVLMProviderForFeature(settings, "ocr")
 		engineVersion := vlmProvider + "/" + vlmModel
 		settingsHash := vlmOCRSettingsHash(vlmModel)
 		vlmResults, err = s.store.VLMOCRResults(catalog.Items, engineVersion, settingsHash)
@@ -747,7 +747,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 }
 
 func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.AppSettings) (scanner.Catalog, error) {
-	tagProvider, tagModel := s.resolveVLMProvider(settings)
+	_, tagProvider, tagModel := s.resolveVLMProviderForFeature(settings, "tag")
 	results, err := s.store.AITagResultsBestMatch(catalog.Items, tagProvider, tagModel)
 	if err != nil {
 		return scanner.Catalog{}, err

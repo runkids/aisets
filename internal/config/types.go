@@ -64,6 +64,12 @@ type AppSettings struct {
 	AgentEnabled               bool                                 `json:"agentEnabled"`
 	AgentAdapter               string                               `json:"agentAdapter"`
 	AgentModel                 string                               `json:"agentModel"`
+	VLMBackend                 string                               `json:"vlmBackend"`
+	VLMBackendTag              string                               `json:"vlmBackendTag"`
+	VLMBackendOcr              string                               `json:"vlmBackendOcr"`
+	VLMBackendOptimize         string                               `json:"vlmBackendOptimize"`
+	VLMBackendDuplicate        string                               `json:"vlmBackendDuplicate"`
+	VLMBackendPrecheck         string                               `json:"vlmBackendPrecheck"`
 }
 
 type SettingsUpdate struct {
@@ -107,6 +113,12 @@ type SettingsUpdate struct {
 	AgentEnabled               *bool                                `json:"agentEnabled"`
 	AgentAdapter               *string                              `json:"agentAdapter"`
 	AgentModel                 *string                              `json:"agentModel"`
+	VLMBackend                 *string                              `json:"vlmBackend"`
+	VLMBackendTag              *string                              `json:"vlmBackendTag"`
+	VLMBackendOcr              *string                              `json:"vlmBackendOcr"`
+	VLMBackendOptimize         *string                              `json:"vlmBackendOptimize"`
+	VLMBackendDuplicate        *string                              `json:"vlmBackendDuplicate"`
+	VLMBackendPrecheck         *string                              `json:"vlmBackendPrecheck"`
 }
 
 type CustomAssetFilter struct {

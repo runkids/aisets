@@ -126,33 +126,36 @@ type vlmImage struct {
 	Ext  string
 }
 
-func (s *Server) chatVLM(ctx context.Context, images []vlmImage, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
-	if s.agentChat != nil {
-		paths := make([]string, len(images))
-		for i, img := range images {
-			paths[i] = img.Path
+func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
+	if strings.HasPrefix(backend, "agent:") {
+		id := strings.TrimPrefix(backend, "agent:")
+		if provider, ok := s.agentProviders[id]; ok {
+			paths := make([]string, len(images))
+			for i, img := range images {
+				paths[i] = img.Path
+			}
+			cliModel := modelName
+			if cliModel == "default" {
+				cliModel = ""
+			}
+			var res agent.ChatResult
+			_ = provider.ChatBatch(ctx, []agent.ChatRequest{{
+				Model:        cliModel,
+				SystemPrompt: systemPrompt,
+				Prompt:       prompt,
+				ImagePaths:   paths,
+				TimeoutSec:   timeoutSec,
+			}}, func(_ int, r agent.ChatResult) { res = r })
+			if res.Err != nil {
+				return "", llm.ChatResponse{DurationMs: res.DurationMs}, res.Err
+			}
+			return res.Content, llm.ChatResponse{
+				Content:      res.Content,
+				InputTokens:  res.InputTokens,
+				OutputTokens: res.OutputTokens,
+				DurationMs:   res.DurationMs,
+			}, nil
 		}
-		cliModel := modelName
-		if cliModel == "default" {
-			cliModel = ""
-		}
-		var res agent.ChatResult
-		_ = s.agentChat.ChatBatch(ctx, []agent.ChatRequest{{
-			Model:        cliModel,
-			SystemPrompt: systemPrompt,
-			Prompt:       prompt,
-			ImagePaths:   paths,
-			TimeoutSec:   timeoutSec,
-		}}, func(_ int, r agent.ChatResult) { res = r })
-		if res.Err != nil {
-			return "", llm.ChatResponse{DurationMs: res.DurationMs}, res.Err
-		}
-		return res.Content, llm.ChatResponse{
-			Content:      res.Content,
-			InputTokens:  res.InputTokens,
-			OutputTokens: res.OutputTokens,
-			DurationMs:   res.DurationMs,
-		}, nil
 	}
 
 	var dataURIs []string
@@ -219,7 +222,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerName, modelName := s.resolveVLMProvider(settings)
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, "tag")
 
 	prompt := settings.LLMTagPrompt
 	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
@@ -364,7 +367,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for item := range jobs {
-				result, chatResp := s.processAITag(ctx, item, providerName, modelName, systemPrompt, prompt, timeoutSec)
+				result, chatResp := s.processAITag(ctx, item, backend, providerName, modelName, systemPrompt, prompt, timeoutSec)
 				select {
 				case results <- aiTagWorkResult{item: item, result: result, chatResp: chatResp}:
 				case <-ctx.Done():
@@ -432,7 +435,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, providerName, modelName, systemPrompt, prompt string, timeoutSec int) (aitag.Result, llm.ChatResponse) {
+func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backend, providerName, modelName, systemPrompt, prompt string, timeoutSec int) (aitag.Result, llm.ChatResponse) {
 	result := aitag.Result{
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
@@ -444,7 +447,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	}
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {

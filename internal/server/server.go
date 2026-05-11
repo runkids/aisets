@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,19 +26,19 @@ type Options struct {
 }
 
 type Server struct {
-	addr        string
-	basePath    string
-	store       *config.Store
-	uiDistDir   string
-	version     string
-	mux         *http.ServeMux
-	handler     http.Handler
-	scanner     *scanner.Scanner
-	ocrEngine   ocr.Engine
-	llmProvider llm.Provider
-	agentStatus agent.RuntimeStatus
-	agentChat   agent.ChatProvider
-	onReady     func()
+	addr           string
+	basePath       string
+	store          *config.Store
+	uiDistDir      string
+	version        string
+	mux            *http.ServeMux
+	handler        http.Handler
+	scanner        *scanner.Scanner
+	ocrEngine      ocr.Engine
+	llmProvider    llm.Provider
+	agentStatus    agent.RuntimeStatus
+	agentProviders map[string]agent.ChatProvider
+	onReady        func()
 
 	mu            sync.Mutex
 	catalog       scanner.Catalog
@@ -230,41 +231,60 @@ func (s *Server) initAgentStatus() {
 }
 
 func (s *Server) initAgentChat() {
-	if s.agentChat != nil {
-		_ = s.agentChat.Close()
-		s.agentChat = nil
+	for _, p := range s.agentProviders {
+		_ = p.Close()
 	}
-	if !s.agentStatus.Available || s.agentStatus.Active == "" {
-		return
-	}
-	var info agent.AdapterInfo
-	for _, a := range s.agentStatus.Adapters {
-		if a.ID == s.agentStatus.Active {
-			info = a
-			break
+	s.agentProviders = map[string]agent.ChatProvider{}
+	for _, info := range s.agentStatus.Adapters {
+		chat, err := agent.NewChatProvider(info.ID, info, s.llmProvider, prepareImageForVLM)
+		if err != nil {
+			continue
 		}
+		s.agentProviders[info.ID] = chat
 	}
-	chat, err := agent.NewChatProvider(s.agentStatus.Active, info, s.llmProvider, prepareImageForVLM)
-	if err != nil {
-		return
-	}
-	s.agentChat = chat
 }
 
 func (s *Server) hasVLMBackend(settings config.AppSettings) bool {
 	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
-	return hasLLM || (settings.AgentEnabled && s.agentChat != nil)
+	return hasLLM || len(s.agentProviders) > 0
 }
 
-func (s *Server) resolveVLMProvider(settings config.AppSettings) (providerName, modelName string) {
-	if settings.AgentEnabled && s.agentChat != nil {
-		model := settings.AgentModel
-		if model == "" {
-			model = "default"
-		}
-		return "agent:" + s.agentStatus.Active, model
+func (s *Server) featureBackend(settings config.AppSettings, feature string) string {
+	var perFeature string
+	switch feature {
+	case "tag":
+		perFeature = settings.VLMBackendTag
+	case "ocr":
+		perFeature = settings.VLMBackendOcr
+	case "optimize":
+		perFeature = settings.VLMBackendOptimize
+	case "duplicate":
+		perFeature = settings.VLMBackendDuplicate
+	case "precheck":
+		perFeature = settings.VLMBackendPrecheck
 	}
-	return settings.LLMProvider, settings.LLMVisionModel
+	if perFeature != "" {
+		return perFeature
+	}
+	if settings.VLMBackend != "" {
+		return settings.VLMBackend
+	}
+	return "local-llm"
+}
+
+func (s *Server) resolveVLMProviderForFeature(settings config.AppSettings, feature string) (backend, providerName, modelName string) {
+	backend = s.featureBackend(settings, feature)
+	if strings.HasPrefix(backend, "agent:") {
+		id := strings.TrimPrefix(backend, "agent:")
+		if _, ok := s.agentProviders[id]; ok {
+			model := settings.AgentModel
+			if model == "" {
+				model = "default"
+			}
+			return backend, "agent:" + id, model
+		}
+	}
+	return "local-llm", settings.LLMProvider, settings.LLMVisionModel
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {

@@ -511,7 +511,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 
 	catalog, _ := s.ensureCatalog(r.Context())
 
-	_, modelName := s.resolveVLMProvider(settings)
+	backend, _, modelName := s.resolveVLMProviderForFeature(settings, "precheck")
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec < llm.MinChatTimeout {
 		timeoutSec = llm.DefaultChatTimeout
@@ -541,7 +541,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "start", "total": total})
 
 	for _, header := range files {
-		result := s.analyzeUploadAI(r.Context(), header, modelName, timeoutSec, systemPrompt, prompt, catalog)
+		result := s.analyzeUploadAI(r.Context(), header, backend, modelName, timeoutSec, systemPrompt, prompt, catalog)
 		if result.Status == "ready" {
 			ready++
 		} else {
@@ -557,7 +557,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
-func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHeader, modelName string, timeoutSec int, systemPrompt, prompt string, catalog scanner.Catalog) precheck.AIResult {
+func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHeader, backend, modelName string, timeoutSec int, systemPrompt, prompt string, catalog scanner.Catalog) precheck.AIResult {
 	name := header.Filename
 	src, err := header.Open()
 	if err != nil {
@@ -584,7 +584,7 @@ func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHead
 	filePrompt := strings.ReplaceAll(prompt, "{{precheckFindings}}", findings)
 
 	start := time.Now()
-	rawContent, _, err := s.chatVLM(ctx, []vlmImage{{Path: tmpPath, Ext: ext}}, modelName, systemPrompt, filePrompt, timeoutSec)
+	rawContent, _, err := s.chatVLM(ctx, []vlmImage{{Path: tmpPath, Ext: ext}}, backend, modelName, systemPrompt, filePrompt, timeoutSec)
 	if err != nil {
 		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_llm_failed", ErrorMsg: err.Error()}
 	}

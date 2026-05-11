@@ -24,6 +24,16 @@ var validAgentAdapters = map[string]bool{
 	agent.AdapterLocalLLM: true,
 }
 
+func validVLMBackend(v string) bool {
+	if v == "" || v == "local-llm" {
+		return true
+	}
+	if strings.HasPrefix(v, "agent:") {
+		return validAgentAdapters[strings.TrimPrefix(v, "agent:")]
+	}
+	return false
+}
+
 func defaultGlobalExcludePatterns() []string {
 	return []string{
 		".git",
@@ -483,6 +493,26 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.AgentModel != nil {
 		settings.AgentModel = strings.TrimSpace(*update.AgentModel)
+	}
+	for _, pair := range []struct {
+		field *string
+		dst   *string
+	}{
+		{update.VLMBackend, &settings.VLMBackend},
+		{update.VLMBackendTag, &settings.VLMBackendTag},
+		{update.VLMBackendOcr, &settings.VLMBackendOcr},
+		{update.VLMBackendOptimize, &settings.VLMBackendOptimize},
+		{update.VLMBackendDuplicate, &settings.VLMBackendDuplicate},
+		{update.VLMBackendPrecheck, &settings.VLMBackendPrecheck},
+	} {
+		if pair.field != nil {
+			v := strings.TrimSpace(*pair.field)
+			if !validVLMBackend(v) {
+				return AppSettings{}, apierr.New("settings_vlm_backend_invalid",
+					"invalid VLM backend value")
+			}
+			*pair.dst = v
+		}
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID
