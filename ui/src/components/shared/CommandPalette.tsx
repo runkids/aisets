@@ -132,6 +132,7 @@ export function CommandPalette({
 }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [committedQuery, setCommittedQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [searchMode, setSearchMode] = useState<SearchMode>("catalog");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,14 +154,15 @@ export function CommandPalette({
   );
 
   const semanticQuery = useSemanticSearchQuery(
-    debouncedQuery,
-    open && isSemantic,
+    committedQuery,
+    open && isSemantic && committedQuery !== "",
   );
 
   useEffect(() => {
     if (!open) return undefined;
     const id = window.setTimeout(() => {
       setQuery("");
+      setCommittedQuery("");
       setActiveIndex(0);
       inputRef.current?.focus();
     }, 50);
@@ -170,6 +172,7 @@ export function CommandPalette({
   const toggleMode = useCallback(() => {
     if (!embedReady) return;
     setSearchMode((m) => (m === "catalog" ? "semantic" : "catalog"));
+    setCommittedQuery("");
     setActiveIndex(0);
   }, [embedReady]);
 
@@ -249,7 +252,16 @@ export function CommandPalette({
       if (totalItems > 0) setActiveIndex((index) => Math.max(index - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (totalItems > 0) selectItem(activeItemIndex);
+      if (isSemantic) {
+        if (query.trim() && query.trim() !== committedQuery) {
+          setCommittedQuery(query.trim());
+          setActiveIndex(0);
+        } else if (totalItems > 0) {
+          selectItem(activeItemIndex);
+        }
+      } else if (totalItems > 0) {
+        selectItem(activeItemIndex);
+      }
     } else if (e.key === "Escape") {
       onClose();
     }
@@ -316,7 +328,7 @@ export function CommandPalette({
   );
 
   const catalogFetching = assetQuery.isFetching || searchPending;
-  const semanticFetching = semanticQuery.isFetching || searchPending;
+  const semanticFetching = semanticQuery.isFetching;
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -384,7 +396,7 @@ export function CommandPalette({
                           <span>AI</span>
                         </button>
                       )}
-                      <Keycap>Esc</Keycap>
+                      {!isSemantic && <Keycap>Esc</Keycap>}
                     </span>
                   }
                   value={query}
@@ -406,7 +418,14 @@ export function CommandPalette({
               <div className="max-h-[480px] overflow-y-auto p-2">
                 {isSemantic ? (
                   <>
-                    {semanticFetching && debouncedQuery.trim() && (
+                    {query.trim() && query.trim() !== committedQuery && !semanticFetching && (
+                      <div className="flex items-center justify-center gap-2 px-4 py-5 text-g-ink-3 text-[13px]">
+                        <Keycap size="sm">↵</Keycap>
+                        <span>{t("commandPalette.semanticPressEnter")}</span>
+                      </div>
+                    )}
+
+                    {semanticFetching && committedQuery && (
                       <div className="flex items-center justify-center gap-2 px-4 py-5 text-g-ink-3 text-[13px]">
                         <LoaderCircle
                           size={14}
@@ -458,13 +477,13 @@ export function CommandPalette({
 
                     {!semanticFetching &&
                       semanticResults.length === 0 &&
-                      debouncedQuery.trim() !== "" && (
+                      committedQuery !== "" && (
                         <div className="px-4 py-5 text-g-ink-4 text-[13px] text-center">
                           {t("commandPalette.semanticNoResults")}
                         </div>
                       )}
 
-                    {!debouncedQuery.trim() && (
+                    {!query.trim() && (
                       <div className="flex flex-col items-center gap-1.5 px-4 py-6 text-center">
                         <Wand2 size={20} className="text-g-purple opacity-40" />
                         <span className="text-g-ink-3 text-[13px]">

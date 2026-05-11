@@ -130,15 +130,17 @@ export function TagsGrid({
               )}
 
               {/* Tag name — clickable to browse */}
-              <button
-                type="button"
-                className={`flex-shrink-0 w-[160px] max-[768px]:w-[100px] text-g-body font-medium truncate text-left cursor-pointer transition-colors ${isMissing(item.tag) ? "text-g-amber" : "text-g-ink hover:text-g-accent"}`}
-                onClick={() =>
-                  bulkMode ? onToggleSelect(item.tag) : onTagClick(item.tag)
-                }
-              >
-                {tagLabel(item.tag)}
-              </button>
+              <Tooltip label={tagLabel(item.tag)}>
+                <button
+                  type="button"
+                  className={`flex-shrink-0 w-[240px] max-[768px]:w-[120px] text-g-body font-medium truncate text-left cursor-pointer transition-colors ${isMissing(item.tag) ? "text-g-amber" : "text-g-ink hover:text-g-accent"}`}
+                  onClick={() =>
+                    bulkMode ? onToggleSelect(item.tag) : onTagClick(item.tag)
+                  }
+                >
+                  {tagLabel(item.tag)}
+                </button>
+              </Tooltip>
 
               {/* Count bar + number */}
               <div className="flex-1 flex items-center gap-2.5 min-w-0">

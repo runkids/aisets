@@ -64,10 +64,10 @@ export function displayTotalsForMode(
 export function optimizableBadgeCount(
   summary: CatalogSummary | null,
   selectedProjectStats: CatalogProjectStats | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fallbackCount: number,
 ) {
-  if (summary?.analysis.optimization !== "computed") return 0;
+  if (!summary) return fallbackCount;
+  if (summary.analysis.optimization !== "computed") return 0;
   if (selectedProjectStats) return selectedProjectStats.optimizableFiles;
   return summary.projectStats.reduce(
     (total, stat) => total + stat.optimizableFiles,

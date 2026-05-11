@@ -175,6 +175,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     vlmBackendOptimize: settings?.vlmBackendOptimize ?? "",
     vlmBackendDuplicate: settings?.vlmBackendDuplicate ?? "",
     vlmBackendPrecheck: settings?.vlmBackendPrecheck ?? "",
+    vlmBackendTranslate: settings?.vlmBackendTranslate ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -246,6 +247,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     vlmBackendOptimize: draft.vlmBackendOptimize,
     vlmBackendDuplicate: draft.vlmBackendDuplicate,
     vlmBackendPrecheck: draft.vlmBackendPrecheck,
+    vlmBackendTranslate: draft.vlmBackendTranslate,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -323,6 +325,7 @@ export function resetSectionDraft(
         vlmBackendOptimize: defaults.vlmBackendOptimize,
         vlmBackendDuplicate: defaults.vlmBackendDuplicate,
         vlmBackendPrecheck: defaults.vlmBackendPrecheck,
+        vlmBackendTranslate: defaults.vlmBackendTranslate,
       };
     case "customFilters":
       return {
@@ -375,6 +378,7 @@ export function ocrProgressLabel(
     failed: counts.failed,
     skipped: counts.skipped,
     cacheHit: counts.cacheHit,
+    dedup: counts.dedup,
     skipReason: skipReasonLabel,
     skipReasonCount: topSkipCount ?? 0,
   });

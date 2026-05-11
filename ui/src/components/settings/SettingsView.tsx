@@ -83,15 +83,21 @@ export function SettingsView({
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = sectionFromParam(searchParams.get("section"));
-  const [localSection, setLocalSection] = useState<Section>("appearance");
+  const savedSection = sectionFromParam(
+    localStorage.getItem("settings.lastSection"),
+  );
+  const [localSection, setLocalSection] = useState<Section>(
+    savedSection ?? "appearance",
+  );
   const activeSection = requestedSection ?? localSection;
 
   useEffect(() => {
     if (!searchParams.has("section")) {
+      const initial = savedSection ?? "appearance";
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          next.set("section", "appearance");
+          next.set("section", initial);
           return next;
         },
         { replace: true },
@@ -492,6 +498,7 @@ export function SettingsView({
 
   function selectSection(section: Section) {
     setLocalSection(section);
+    localStorage.setItem("settings.lastSection", section);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);

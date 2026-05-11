@@ -116,6 +116,7 @@ export function AppTopbar({
         failed: ocrActivity.counts.failed,
         skipped: ocrActivity.counts.skipped,
         cacheHit: ocrActivity.counts.cacheHit,
+        dedup: ocrActivity.counts.dedup,
       })
     : t("activity.ocrPreparing");
   const optimizeVisible = isOptimizeActivityVisible(optimizeActivity);
@@ -159,6 +160,7 @@ export function AppTopbar({
         failed: aiTagActivity.counts.failed,
         skipped: aiTagActivity.counts.skipped,
         cacheHit: aiTagActivity.counts.cacheHit,
+        dedup: aiTagActivity.counts.dedup,
       })
     : t("activity.aiTagPreparing");
   const vlmOcrVisible = isVLMOcrActivityVisible(vlmOcrActivity);
@@ -180,6 +182,7 @@ export function AppTopbar({
         failed: vlmOcrActivity.counts.failed,
         skipped: vlmOcrActivity.counts.skipped,
         cacheHit: vlmOcrActivity.counts.cacheHit,
+        dedup: vlmOcrActivity.counts.dedup,
       })
     : t("activity.aiOcrPreparing");
   const catalogActionTooltip = ocrBusy

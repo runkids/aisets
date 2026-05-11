@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/embedding"
@@ -75,6 +76,8 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sendNDJSON(w, map[string]any{"type": "phase", "phase": "loading"})
+
 	catalog, err := s.ensureCatalog(r.Context())
 	if err != nil {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "embed_catalog_failed")})
@@ -111,6 +114,8 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 
 	var candidates []embedJob
 	counts := embedCounts{}
+
+	sendNDJSON(w, map[string]any{"type": "phase", "phase": "filtering", "total": len(sourceItems)})
 
 	for i := range sourceItems {
 		item := sourceItems[i]
@@ -160,7 +165,8 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 			if len(targetLocales) == 0 {
 				targetLocales = []string{"en"}
 			}
-			s.backfillI18nBatch(r.Context(), w, hashes, visionModel, targetLocales)
+			translateBackend, _, translateModel := s.resolveVLMProviderForFeature(settings, agent.FeatureTranslate)
+			s.backfillI18nBatch(r.Context(), w, hashes, translateBackend, translateModel, targetLocales)
 		}
 	}
 
@@ -321,7 +327,7 @@ var localeDisplayNames = map[string]string{
 	"ja": "Japanese", "ko": "Korean",
 }
 
-func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, chatModel string, targetLocales []string) {
+func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, backend, modelName string, targetLocales []string) {
 	for _, locale := range targetLocales {
 		missing, err := s.store.AITagsMissingLocale(locale, contentHashes)
 		if err != nil || len(missing) == 0 {
@@ -354,18 +360,12 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 				prompt += strconv.Itoa(j+1) + ". " + text + "\n"
 			}
 
-			resp, cerr := s.llmProvider.Chat(ctx, llm.ChatRequest{
-				Model: chatModel,
-				Messages: []llm.ChatMessage{
-					{Role: "user", Content: prompt},
-				},
-				TimeoutSec: 30,
-			})
-			if cerr != nil {
+			content, err := s.chatText(ctx, backend, modelName, prompt, 30)
+			if err != nil {
 				continue
 			}
 
-			lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
+			lines := strings.Split(strings.TrimSpace(content), "\n")
 			for j, row := range batch {
 				if j >= len(lines) {
 					break
@@ -399,6 +399,38 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 	}
 }
 
+func (s *Server) chatText(ctx context.Context, backend, modelName, prompt string, timeoutSec int) (string, error) {
+	if id, ok := agent.AgentBackendID(backend); ok {
+		if provider, ok := s.agentProviders[id]; ok {
+			cliModel := modelName
+			if cliModel == "default" {
+				cliModel = ""
+			}
+			var res agent.ChatResult
+			_ = provider.ChatBatch(ctx, []agent.ChatRequest{{
+				Model:      cliModel,
+				Prompt:     prompt,
+				TimeoutSec: timeoutSec,
+			}}, func(_ int, r agent.ChatResult) { res = r })
+			if res.Err != nil {
+				return "", res.Err
+			}
+			return res.Content, nil
+		}
+	}
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model: modelName,
+		Messages: []llm.ChatMessage{
+			{Role: "user", Content: prompt},
+		},
+		TimeoutSec: timeoutSec,
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.Content, nil
+}
+
 func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("cache-control", "no-store")
@@ -408,10 +440,12 @@ func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "translate_settings_failed")})
 		return
 	}
-	if !settings.LLMEnabled || s.llmProvider == nil || settings.LLMVisionModel == "" {
+	if !s.hasVLMBackend(settings) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("translate_not_configured", "LLM provider not configured")})
 		return
 	}
+
+	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureTranslate)
 
 	targetLocales := settings.LLMTranslationLocales
 	if len(targetLocales) == 0 {
@@ -428,7 +462,7 @@ func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.backfillI18nBatch(r.Context(), w, hashes, settings.LLMVisionModel, targetLocales)
+	s.backfillI18nBatch(r.Context(), w, hashes, backend, modelName, targetLocales)
 	sendNDJSON(w, map[string]any{"type": "done"})
 }
 
@@ -508,7 +542,7 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	queryTexts := []string{q}
 	if containsNonLatin(q) {
 		if translated := s.translateToEnglish(r.Context(), q, settings.LLMVisionModel); translated != "" && translated != q {
-			queryTexts = append(queryTexts, translated)
+			queryTexts = []string{translated}
 		}
 	}
 

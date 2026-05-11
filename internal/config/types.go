@@ -71,6 +71,7 @@ type AppSettings struct {
 	VLMBackendOptimize         string                               `json:"vlmBackendOptimize"`
 	VLMBackendDuplicate        string                               `json:"vlmBackendDuplicate"`
 	VLMBackendPrecheck         string                               `json:"vlmBackendPrecheck"`
+	VLMBackendTranslate        string                               `json:"vlmBackendTranslate"`
 	EmbedSearchThreshold       float64                              `json:"embedSearchThreshold"`
 	EmbedSearchLimit           int                                  `json:"embedSearchLimit"`
 	EmbedSearchType            string                               `json:"embedSearchType"`
@@ -125,6 +126,7 @@ type SettingsUpdate struct {
 	VLMBackendOptimize         *string                              `json:"vlmBackendOptimize"`
 	VLMBackendDuplicate        *string                              `json:"vlmBackendDuplicate"`
 	VLMBackendPrecheck         *string                              `json:"vlmBackendPrecheck"`
+	VLMBackendTranslate        *string                              `json:"vlmBackendTranslate"`
 	EmbedSearchThreshold       *float64                             `json:"embedSearchThreshold"`
 	EmbedSearchLimit           *int                                 `json:"embedSearchLimit"`
 	EmbedSearchType            *string                              `json:"embedSearchType"`

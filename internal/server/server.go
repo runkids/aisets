@@ -271,6 +271,8 @@ func (s *Server) featureBackend(settings config.AppSettings, feature string) str
 		perFeature = settings.VLMBackendDuplicate
 	case agent.FeaturePrecheck:
 		perFeature = settings.VLMBackendPrecheck
+	case agent.FeatureTranslate:
+		perFeature = settings.VLMBackendTranslate
 	}
 	if perFeature != "" {
 		return perFeature

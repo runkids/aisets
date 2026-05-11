@@ -81,6 +81,7 @@ describe("runOCR", () => {
       failed: 0,
       skipped: 0,
       cacheHit: 0,
+      dedup: 0,
     };
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

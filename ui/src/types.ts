@@ -87,6 +87,7 @@ export type AppSettings = {
   vlmBackendOptimize: string;
   vlmBackendDuplicate: string;
   vlmBackendPrecheck: string;
+  vlmBackendTranslate: string;
   embedSearchThreshold: number;
   embedSearchLimit: number;
   embedSearchType: string;
@@ -684,6 +685,7 @@ export type OCRRunCounts = {
   failed: number;
   skipped: number;
   cacheHit: number;
+  dedup: number;
   skipReasons?: Record<string, number>;
 };
 
@@ -706,6 +708,7 @@ export type AITagRunCounts = {
   failed: number;
   skipped: number;
   cacheHit: number;
+  dedup: number;
   inputTokens?: number;
   outputTokens?: number;
 };
@@ -741,6 +744,7 @@ export type VLMOcrRunCounts = {
   failed: number;
   skipped: number;
   cacheHit: number;
+  dedup: number;
   inputTokens?: number;
   outputTokens?: number;
 };
@@ -801,7 +805,8 @@ export type EmbedRunEvent =
       providerName?: string;
       modelName?: string;
     }
-  | { type: "translating"; translated?: number; total: number }
+  | { type: "phase"; phase: string; total?: number }
+  | { type: "translating"; translated?: number; total: number; locale?: string }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: EmbedRunCounts };
 
 export type SemanticSearchResult = {

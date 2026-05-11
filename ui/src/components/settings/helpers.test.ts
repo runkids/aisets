@@ -70,6 +70,7 @@ describe("settings draft helpers", () => {
       vlmBackendOptimize: "",
       vlmBackendDuplicate: "",
       vlmBackendPrecheck: "",
+      vlmBackendTranslate: "",
       embedSearchThreshold: 0.5,
       embedSearchLimit: 20,
       embedSearchType: "hybrid",
@@ -201,6 +202,7 @@ describe("settings draft helpers", () => {
       vlmBackendOptimize: "",
       vlmBackendDuplicate: "",
       vlmBackendPrecheck: "",
+      vlmBackendTranslate: "",
       embedSearchThreshold: 0.5,
       embedSearchLimit: 20,
       embedSearchType: "hybrid",
@@ -264,7 +266,7 @@ describe("settings draft helpers", () => {
     expect(ai.llmVisionModel).toBe("");
     expect(ai.llmEmbedModel).toBe("");
     expect(ai.llmConcurrency).toBe(1);
-    expect(ai.llmTimeout).toBe(30);
+    expect(ai.llmTimeout).toBe(120);
     expect(ai.agentEnabled).toBe(false);
     expect(ai.agentAdapter).toBe("auto");
     expect(ai.ocrEnabled).toBe(true);

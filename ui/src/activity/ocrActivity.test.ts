@@ -15,6 +15,7 @@ const emptyCounts: OCRRunCounts = {
   failed: 0,
   skipped: 0,
   cacheHit: 0,
+  dedup: 0,
 };
 
 function reduce(actions: OCRActivityAction[]) {

@@ -570,6 +570,7 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 		{update.VLMBackendOptimize, &settings.VLMBackendOptimize},
 		{update.VLMBackendDuplicate, &settings.VLMBackendDuplicate},
 		{update.VLMBackendPrecheck, &settings.VLMBackendPrecheck},
+		{update.VLMBackendTranslate, &settings.VLMBackendTranslate},
 	} {
 		if pair.field != nil {
 			v := strings.TrimSpace(*pair.field)

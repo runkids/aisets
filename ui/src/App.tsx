@@ -865,7 +865,10 @@ export function App() {
       q: fileName(asset.repoPath),
     });
     setSelectedProjectId("");
-    setDrawerSeedAsset(asset);
+    // Only use as seed if fully populated; semantic search results are partial objects
+    if (asset.optimizationRecommendations !== undefined) {
+      setDrawerSeedAsset(asset);
+    }
     setAutoScrollAssetId(asset.id);
     navigate({
       pathname: pathForMode("browse"),
@@ -982,13 +985,6 @@ export function App() {
                   undefined,
                   assetIds,
                 )
-              }
-              embedEnabled={
-                (settingsQuery.data?.settings.llmEnabled ?? false) &&
-                !!settingsQuery.data?.settings.llmEmbedModel
-              }
-              onStartEmbed={(assetIds) =>
-                onStartEmbedActivity(undefined, assetIds)
               }
             />
           ) : mode === "settings" ? (

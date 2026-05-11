@@ -38,6 +38,7 @@ function aiTagProgressLabel(
             failed: counts.failed,
             skipped: counts.skipped,
             cacheHit: counts.cacheHit,
+            dedup: counts.dedup,
           })
         : t("settings.aiTagSaving");
     case "done":
@@ -45,6 +46,7 @@ function aiTagProgressLabel(
         ready: counts?.ready ?? 0,
         skipped: counts?.skipped ?? 0,
         cacheHit: counts?.cacheHit ?? 0,
+        dedup: counts?.dedup ?? 0,
       });
     case "stopped":
       return t("settings.aiTagStopped");
@@ -72,6 +74,7 @@ function vlmOcrProgressLabel(
             failed: counts.failed,
             skipped: counts.skipped,
             cacheHit: counts.cacheHit,
+            dedup: counts.dedup,
           })
         : t("settings.aiOcrSaving");
     case "done":
@@ -79,6 +82,7 @@ function vlmOcrProgressLabel(
         ready: counts?.ready ?? 0,
         skipped: counts?.skipped ?? 0,
         cacheHit: counts?.cacheHit ?? 0,
+        dedup: counts?.dedup ?? 0,
       });
     case "stopped":
       return t("settings.aiOcrStopped");
@@ -86,6 +90,42 @@ function vlmOcrProgressLabel(
       return activity.errorMessage ?? t("settings.aiOcrFailed");
     default:
       return "";
+  }
+}
+
+function embedStageLabel(
+  activity: EmbedActivityState,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  switch (activity.stage) {
+    case "loading":
+      return t("activity.embedPhaseLoading", {
+        defaultValue: "Loading catalog…",
+      });
+    case "filtering":
+      return activity.stageTotal
+        ? t("activity.embedPhaseFiltering", {
+            defaultValue: "Checking cache ({{total}} items)…",
+            total: activity.stageTotal,
+          })
+        : t("activity.embedPhaseFilteringSimple", {
+            defaultValue: "Checking cache…",
+          });
+    case "translating":
+      if (activity.translating) {
+        return t("activity.embedPhaseTranslating", {
+          defaultValue: "Translating tags ({{translated}}/{{total}})…",
+          translated: activity.translating.translated,
+          total: activity.translating.total,
+        });
+      }
+      return t("activity.embedPhaseTranslatingSimple", {
+        defaultValue: "Translating tags…",
+      });
+    default:
+      return t("activity.embedPhasePreparing", {
+        defaultValue: "Preparing…",
+      });
   }
 }
 
@@ -104,7 +144,7 @@ function embedProgressLabel(
             failed: counts.failed,
             skipped: counts.skipped,
           })
-        : t("settings.embedRun");
+        : embedStageLabel(activity, t);
     case "done":
       return counts
         ? t("activity.embedCounts", {
@@ -214,6 +254,11 @@ export function LastRunText({
           {counts.cacheHit > 0 && (
             <Badge>
               {t("settings.aiStatCached", { count: counts.cacheHit })}
+            </Badge>
+          )}
+          {"dedup" in counts && counts.dedup > 0 && (
+            <Badge>
+              {t("settings.aiStatDedup", { count: counts.dedup })}
             </Badge>
           )}
           {counts.failed > 0 && (

@@ -20,6 +20,7 @@ type ocrCounts struct {
 	Failed      int            `json:"failed"`
 	Skipped     int            `json:"skipped"`
 	CacheHit    int            `json:"cacheHit"`
+	Dedup       int            `json:"dedup"`
 	SkipReasons map[string]int `json:"skipReasons,omitempty"`
 }
 
@@ -187,7 +188,7 @@ func (s *Server) handleOCRRun(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, ok := inFlightHashes[key]; ok {
 			pendingDuplicates[key] = append(pendingDuplicates[key], item)
-			counts.CacheHit++
+			counts.Dedup++
 			continue
 		}
 		if !queueOCRCandidate(item, computedHash, ocrSettings.BatchSize, &workCount, &hasMore, &counts, &candidates, inFlightHashes, pendingDuplicates) {
@@ -272,7 +273,7 @@ func queueOCRCandidate(
 	key := contentHashKey(item)
 	if _, ok := inFlightHashes[key]; ok {
 		pendingDuplicates[key] = append(pendingDuplicates[key], item)
-		counts.CacheHit++
+		counts.Dedup++
 		return true
 	}
 	if *workCount >= batchSize && !hashComputed {

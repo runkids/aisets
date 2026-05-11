@@ -31,6 +31,7 @@ import {
   Button,
   Card,
   IconButton,
+  Range,
   Select,
   Switch,
   Tabs,
@@ -365,27 +366,25 @@ export function AISettingsCard({
                     label={t("settings.llmConcurrency")}
                     description={t("settings.llmConcurrencyHint")}
                   >
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={LLM_MAX_CONCURRENCY}
-                      value={String(draft.llmConcurrency)}
-                      disabled={aiBusy}
-                      onChange={(e) =>
-                        onUpdateDraft((current) => ({
-                          ...current,
-                          llmConcurrency: Math.max(
-                            1,
-                            Math.min(
-                              LLM_MAX_CONCURRENCY,
-                              Number(e.target.value) || 1,
-                            ),
-                          ),
-                        }))
-                      }
-                      aria-label={t("settings.llmConcurrency")}
-                      className="min-w-[400px]"
-                    />
+                    <div className="flex min-w-[320px] items-center gap-3">
+                      <Range
+                        min={1}
+                        max={LLM_MAX_CONCURRENCY}
+                        step={1}
+                        value={draft.llmConcurrency}
+                        disabled={aiBusy}
+                        onChange={(e) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmConcurrency: Number(e.target.value),
+                          }))
+                        }
+                        aria-label={t("settings.llmConcurrency")}
+                      />
+                      <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                        {draft.llmConcurrency}
+                      </span>
+                    </div>
                   </FieldRow>
                   {draft.llmConcurrency > 1 && (
                     <div className="flex items-start gap-1.5 pb-4 text-g-amber">
@@ -401,27 +400,25 @@ export function AISettingsCard({
                   label={t("settings.llmTimeout")}
                   description={t("settings.llmTimeoutHint")}
                 >
-                  <TextInput
-                    type="number"
-                    min={LLM_MIN_TIMEOUT}
-                    max={LLM_MAX_TIMEOUT}
-                    value={String(draft.llmTimeout)}
-                    disabled={aiBusy}
-                    onChange={(e) =>
-                      onUpdateDraft((current) => ({
-                        ...current,
-                        llmTimeout: Math.max(
-                          LLM_MIN_TIMEOUT,
-                          Math.min(
-                            LLM_MAX_TIMEOUT,
-                            Number(e.target.value) || LLM_MIN_TIMEOUT,
-                          ),
-                        ),
-                      }))
-                    }
-                    aria-label={t("settings.llmTimeout")}
-                    className="min-w-[400px]"
-                  />
+                  <div className="flex min-w-[320px] items-center gap-3">
+                    <Range
+                      min={LLM_MIN_TIMEOUT}
+                      max={LLM_MAX_TIMEOUT}
+                      step={10}
+                      value={draft.llmTimeout}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmTimeout: Number(e.target.value),
+                        }))
+                      }
+                      aria-label={t("settings.llmTimeout")}
+                    />
+                    <span className="inline-flex h-g-btn-sm min-w-[44px] items-center justify-center rounded-g-md border border-g-line bg-g-surface-2 font-g-mono text-g-ui font-[590] tabular-nums tracking-g-mono text-g-ink">
+                      {draft.llmTimeout}s
+                    </span>
+                  </div>
                 </FieldRow>
               </>
             )}
@@ -579,6 +576,11 @@ export function AISettingsCard({
               {
                 key: "vlmBackendPrecheck" as const,
                 label: t("settings.vlmBackendFeaturePrecheck"),
+                showInherit: true,
+              },
+              {
+                key: "vlmBackendTranslate" as const,
+                label: t("settings.vlmBackendFeatureTranslate"),
                 showInherit: true,
               },
             ].map((row) => (

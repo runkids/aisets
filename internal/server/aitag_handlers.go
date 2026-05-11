@@ -189,6 +189,7 @@ type aiTagCounts struct {
 	Failed       int   `json:"failed"`
 	Skipped      int   `json:"skipped"`
 	CacheHit     int   `json:"cacheHit"`
+	Dedup        int   `json:"dedup"`
 	InputTokens  int64 `json:"inputTokens"`
 	OutputTokens int64 `json:"outputTokens"`
 }
@@ -304,7 +305,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 			key := contentHashKey(item)
 			if _, ok := inFlightHashes[key]; ok {
 				pendingDuplicates[key] = append(pendingDuplicates[key], item)
-				counts.CacheHit++
+				counts.Dedup++
 				continue
 			}
 			candidates = append(candidates, item)
@@ -353,7 +354,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 
 			if _, ok := inFlightHashes[key]; ok {
 				pendingDuplicates[key] = append(pendingDuplicates[key], item)
-				counts.CacheHit++
+				counts.Dedup++
 				continue
 			}
 

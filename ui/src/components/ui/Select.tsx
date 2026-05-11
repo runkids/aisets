@@ -30,6 +30,7 @@ const triggerVariants = cva(
     "transition-[background,border-color,box-shadow] duration-[120ms] ease-g",
     "hover:border-g-input-hover hover:bg-g-input-hover-bg focus-visible:outline-none focus-visible:shadow-g-focus",
     "data-[placeholder]:text-g-ink-3",
+    "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38]",
   ],
   {
     variants: {

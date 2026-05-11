@@ -8,7 +8,7 @@ var ErrImageEmbedNotSupported = errors.New("provider does not support image embe
 const (
 	DefaultConcurrency = 1
 	MaxConcurrency     = 8
-	DefaultChatTimeout = 30
+	DefaultChatTimeout = 120
 	MinChatTimeout     = 30
 	MaxChatTimeout     = 600
 )

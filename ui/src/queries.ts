@@ -241,7 +241,7 @@ export function useCatalogItemsInfiniteQuery(
     getNextPageParam: (page) => page.nextCursor || undefined,
     ...(maxPages > 0 ? { maxPages } : {}),
     enabled: enabled && scanId != null,
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
@@ -262,7 +262,7 @@ export function useCatalogLintInfiniteQuery(
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor || undefined,
     enabled: enabled && scanId != null,
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
@@ -283,7 +283,7 @@ export function useCatalogDuplicatesInfiniteQuery(
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor || undefined,
     enabled: enabled && scanId != null,
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
@@ -298,7 +298,7 @@ export function useCatalogItemDetailQuery(
     queryKey: catalogKeys.item(scanId, assetId),
     queryFn: ({ signal }) => getCatalogItemDetail(scanId, assetId, { signal }),
     enabled: enabled && scanId != null && assetId !== "",
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: 10 * 60_000,
   });
 }
@@ -313,7 +313,7 @@ export function useCatalogFoldersQuery(
     queryFn: ({ signal }) =>
       getCatalogFolders({ ...params, scanId }, { signal }),
     enabled: enabled && scanId != null,
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });

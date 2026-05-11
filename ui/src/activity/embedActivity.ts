@@ -21,7 +21,9 @@ export type EmbedActivityState = {
   scopeLabel?: string;
   providerName?: string;
   modelName?: string;
-  translating?: { translated: number; total: number };
+  stage?: string;
+  stageTotal?: number;
+  translating?: { translated: number; total: number; locale?: string };
 };
 
 export type EmbedActivityAction =
@@ -61,10 +63,22 @@ export function embedActivityReducer(
       };
     case "event": {
       const e = action.event;
+      if (e.type === "phase") {
+        return {
+          ...state,
+          stage: e.phase,
+          stageTotal: e.total,
+        };
+      }
       if (e.type === "translating") {
         return {
           ...state,
-          translating: { translated: e.translated ?? 0, total: e.total },
+          stage: "translating",
+          translating: {
+            translated: e.translated ?? 0,
+            total: e.total,
+            locale: e.locale,
+          },
         };
       }
       if (!("counts" in e) || !e.counts) return state;
@@ -73,6 +87,8 @@ export function embedActivityReducer(
       return {
         ...state,
         counts: e.counts,
+        stage: e.type === "start" ? "processing" : state.stage,
+        translating: e.type === "start" ? undefined : state.translating,
         currentFile:
           "repoPath" in e && e.repoPath ? e.repoPath : state.currentFile,
         errorMessage:

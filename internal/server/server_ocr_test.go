@@ -217,7 +217,7 @@ func TestOCRRunDedupesIdenticalContentHashCandidates(t *testing.T) {
 	if engine.Calls() != 1 {
 		t.Fatalf("OCR calls = %d, want 1; body = %s", engine.Calls(), body)
 	}
-	if !strings.Contains(body, `"queued":1`) || !strings.Contains(body, `"cacheHit":1`) || !strings.Contains(body, `"ready":1`) {
+	if !strings.Contains(body, `"queued":1`) || !strings.Contains(body, `"dedup":1`) || !strings.Contains(body, `"ready":1`) {
 		t.Fatalf("deduped OCR counts missing: %s", body)
 	}
 	settings, err := store.Settings()
