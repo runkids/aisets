@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
-  CheckSquare,
   Hash,
   Layers,
   Merge,
@@ -35,6 +34,7 @@ import {
 } from "./ui";
 import { TagsGrid } from "./TagsGrid";
 import { useToast } from "./ToastProvider";
+import { BulkSelectButton } from "./BulkSelectButton";
 
 const SORT_ITEMS: SegmentedControlItem<"count" | "alpha">[] = [
   { value: "count", label: "#" },
@@ -120,6 +120,11 @@ export function TagsView() {
       setSelected(new Set(tags.map((tag) => tag.tag)));
     }
   }, [bulkMode, allSelected, tags]);
+
+  const cancelBulk = useCallback(() => {
+    setBulkMode(false);
+    setSelected(new Set());
+  }, []);
 
   // Rename
   function openRename(tag: string) {
@@ -263,19 +268,13 @@ export function TagsView() {
                 })}
               </span>
             )}
-            <Button
-              size="md"
-              variant={bulkMode ? "primary" : "secondary"}
-              leadingIcon={<CheckSquare size={14} />}
-              onClick={toggleBulkMode}
+            <BulkSelectButton
+              bulkMode={bulkMode}
+              allSelected={allSelected}
+              onToggle={toggleBulkMode}
+              onCancel={cancelBulk}
               className="shrink-0"
-            >
-              {!bulkMode
-                ? t("toolbar.bulkSelect")
-                : allSelected
-                  ? t("common.cancel")
-                  : t("action.selectAll")}
-            </Button>
+            />
             <SegmentedControl
               value={sort}
               items={SORT_ITEMS}

@@ -1,4 +1,9 @@
-import { ArrowLeftRight, Keyboard } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CheckSquare,
+  Keyboard,
+  MousePointerClick,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, Keycap } from "../ui";
 import { FieldRow } from "./FieldRow";
@@ -43,6 +48,40 @@ export function HotkeysSection() {
           </FieldRow>
           <FieldRow label={t("settings.hotkeyNextAsset")}>
             <Keycap>→</Keycap>
+          </FieldRow>
+        </div>
+      </Card>
+      <Card
+        className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+        padding="none"
+      >
+        <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+          <CheckSquare size={15} className="shrink-0 text-g-ink-3" />
+          <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+            {t("settings.hotkeyBulkSelect")}
+          </span>
+        </div>
+        <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+          <FieldRow label={t("settings.hotkeyBulkClick1")}>
+            <span className="inline-flex items-center gap-1">
+              <MousePointerClick size={13} className="text-g-ink-3" />
+              <Keycap>{t("toolbar.bulkSelect")}</Keycap>
+            </span>
+          </FieldRow>
+          <FieldRow label={t("settings.hotkeyBulkClick2")}>
+            <span className="inline-flex items-center gap-1">
+              <MousePointerClick size={13} className="text-g-ink-3" />
+              <Keycap>{t("action.selectAll")}</Keycap>
+            </span>
+          </FieldRow>
+          <FieldRow label={t("settings.hotkeyBulkClick3")}>
+            <span className="inline-flex items-center gap-1">
+              <MousePointerClick size={13} className="text-g-ink-3" />
+              <Keycap>{t("common.cancel")}</Keycap>
+            </span>
+          </FieldRow>
+          <FieldRow label={t("settings.hotkeyBulkEsc")}>
+            <Keycap>Esc</Keycap>
           </FieldRow>
         </div>
       </Card>

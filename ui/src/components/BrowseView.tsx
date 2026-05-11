@@ -908,6 +908,11 @@ export function BrowseView({
     }
   }, [bulkMode, allSelected, items]);
 
+  const cancelBulk = useCallback(() => {
+    setBulkMode(false);
+    setSelected(new Set());
+  }, []);
+
   const selectedBytes = useMemo(
     () =>
       items
@@ -1060,6 +1065,7 @@ export function BrowseView({
               handleFiltersChange({ ...filters, customFilter: v })
             }
             onBulkToggle={toggleBulkMode}
+            onBulkCancel={cancelBulk}
           />
 
           {bulkMode && (

@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle,
-  CheckSquare,
   FileArchive,
   ImageDown,
   Images,
@@ -68,6 +67,7 @@ import {
 } from "./optimizeCache";
 import { useElementHeight } from "../hooks/useElementHeight";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
+import { BulkSelectButton } from "./BulkSelectButton";
 import { cn } from "@/lib/cn";
 import { useToast } from "./ToastProvider";
 import type {
@@ -80,7 +80,6 @@ import {
 } from "../optimizeActivity";
 import {
   Badge,
-  Button,
   Checkbox,
   CopyButton,
   EmptyState,
@@ -1004,6 +1003,11 @@ export function OptimizeView({
     }
   }
 
+  const cancelBulk = useCallback(() => {
+    setBulkMode(false);
+    setSelected(new Set());
+  }, []);
+
   function toggleOne(id: string) {
     if (
       !bulkMode ||
@@ -1290,20 +1294,15 @@ export function OptimizeView({
                 className="min-w-[200px] flex-1"
                 inputClassName="font-g text-g-ui tracking-g-ui"
               />
-              <Button
-                size="md"
-                variant={bulkMode ? "primary" : "secondary"}
-                leadingIcon={<CheckSquare size={14} />}
-                onClick={toggleBulkMode}
+              <BulkSelectButton
+                bulkMode={bulkMode}
+                allSelected={allSelected}
+                onToggle={toggleBulkMode}
+                onCancel={cancelBulk}
                 disabled={selectionLocked}
+                locked={selectionLocked}
                 className="shrink-0"
-              >
-                {!bulkMode
-                  ? t("toolbar.bulkSelect")
-                  : allSelected
-                    ? t("common.cancel")
-                    : t("action.selectAll")}
-              </Button>
+              />
             </div>
 
             <div className="flex items-center gap-2.5 overflow-x-auto">

@@ -1,7 +1,6 @@
 import { Popover } from "radix-ui";
 import {
   ArrowDownAZ,
-  CheckSquare,
   CircleHelp,
   Grid3X3,
   List,
@@ -14,8 +13,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
+import { BulkSelectButton } from "./BulkSelectButton";
 import {
-  Button,
   Select,
   TextInput,
   TextInputClearButton,
@@ -67,6 +66,7 @@ type BrowseToolbarProps = {
   onAICategoryChange: (category: string) => void;
   onCustomFilterChange: (id: string) => void;
   onBulkToggle: () => void;
+  onBulkCancel: () => void;
 };
 
 export function BrowseToolbar({
@@ -91,6 +91,7 @@ export function BrowseToolbar({
   onAICategoryChange,
   onCustomFilterChange,
   onBulkToggle,
+  onBulkCancel,
 }: BrowseToolbarProps) {
   const { t } = useTranslation();
 
@@ -230,18 +231,12 @@ export function BrowseToolbar({
           />
         )}
 
-        <Button
-          variant={bulkMode ? "primary" : "secondary"}
-          size="md"
-          leadingIcon={<CheckSquare size={14} />}
-          onClick={onBulkToggle}
-        >
-          {!bulkMode
-            ? t("toolbar.bulkSelect")
-            : allSelected
-              ? t("common.cancel")
-              : t("action.selectAll")}
-        </Button>
+        <BulkSelectButton
+          bulkMode={bulkMode}
+          allSelected={allSelected}
+          onToggle={onBulkToggle}
+          onCancel={onBulkCancel}
+        />
       </div>
 
       <div className="flex min-w-0 items-center gap-1.5">

@@ -1,6 +1,5 @@
 import {
   Check,
-  CheckSquare,
   Copy,
   Eye,
   Files,
@@ -40,6 +39,7 @@ import {
   TextInput,
   TextInputClearButton,
 } from "./ui";
+import { BulkSelectButton } from "./BulkSelectButton";
 import { ComparePanel, useCompareTabs } from "./ComparePanel";
 import { toCompareAsset, type CompareMode } from "./compareTypes";
 import { useInfiniteScrollSentinel } from "../hooks/useInfiniteScrollSentinel";
@@ -352,6 +352,11 @@ export function DuplicatesView({
     [],
   );
 
+  const cancelBulk = useCallback(() => {
+    setBulkMode(false);
+    setSelected(new Set());
+  }, []);
+
   /* ── Copy paths ── */
 
   useEffect(() => {
@@ -660,19 +665,13 @@ export function DuplicatesView({
                   }
                   className="min-w-0 flex-1"
                 />
-                <Button
-                  variant={bulkMode ? "primary" : "secondary"}
-                  size="md"
-                  leadingIcon={<CheckSquare size={14} />}
-                  onClick={toggleBulkMode}
+                <BulkSelectButton
+                  bulkMode={bulkMode}
+                  allSelected={allSelected}
+                  onToggle={toggleBulkMode}
+                  onCancel={cancelBulk}
                   className="shrink-0"
-                >
-                  {!bulkMode
-                    ? t("toolbar.bulkSelect")
-                    : allSelected
-                      ? t("common.cancel")
-                      : t("action.selectAll")}
-                </Button>
+                />
               </div>
             )}
 
