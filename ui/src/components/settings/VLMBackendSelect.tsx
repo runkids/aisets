@@ -64,7 +64,9 @@ export function VLMBackendSelect({
           disabled={disabled}
           className="inline-flex h-g-btn-md w-[240px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2 shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
         >
-          <span className="min-w-0 truncate text-left">{displayLabel}</span>
+          <span className="min-w-0 flex-1 truncate text-left">
+            {displayLabel}
+          </span>
           <ChevronDown size={14} className="shrink-0 text-g-ink-3" />
         </button>
       </DropdownMenuPrimitive.Trigger>
