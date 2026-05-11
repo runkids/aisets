@@ -160,6 +160,7 @@ export const defaultSettings: SettingsUpdate = {
   llmTagPrompt: "",
   llmOcrPrompt: "",
   llmConcurrency: 1,
+  llmTimeout: 30,
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [

@@ -679,10 +679,14 @@ func rasterizeSVG(path string, maxSize int) (image.Image, error) {
 }
 
 func normalizeFormat(format, ext string) string {
+	extLower := strings.TrimPrefix(strings.ToLower(ext), ".")
+	if format == "heic" && extLower == "avif" {
+		return "avif"
+	}
 	if format != "" {
 		return format
 	}
-	return strings.TrimPrefix(strings.ToLower(ext), ".")
+	return extLower
 }
 
 func imageHasAlpha(img image.Image) bool {

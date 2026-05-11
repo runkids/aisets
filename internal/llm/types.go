@@ -3,7 +3,7 @@ package llm
 const (
 	DefaultConcurrency = 1
 	MaxConcurrency     = 8
-	DefaultChatTimeout = 120
+	DefaultChatTimeout = 30
 	MinChatTimeout     = 30
 	MaxChatTimeout     = 600
 )
