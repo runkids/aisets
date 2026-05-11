@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/llm"
@@ -112,7 +113,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, "ocr")
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOCR)
 	engineVersion := providerName + "/" + modelName
 	settingsHash := vlmOCRSettingsHash(modelName)
 

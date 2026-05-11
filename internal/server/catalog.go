@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"aisets/internal/actions"
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/imageproc"
@@ -705,7 +706,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 
 	var vlmResults map[string]ocr.Result
 	if vlmEnabled {
-		_, vlmProvider, vlmModel := s.resolveVLMProviderForFeature(settings, "ocr")
+		_, vlmProvider, vlmModel := s.resolveVLMProviderForFeature(settings, agent.FeatureOCR)
 		engineVersion := vlmProvider + "/" + vlmModel
 		settingsHash := vlmOCRSettingsHash(vlmModel)
 		vlmResults, err = s.store.VLMOCRResults(catalog.Items, engineVersion, settingsHash)
@@ -747,7 +748,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 }
 
 func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.AppSettings) (scanner.Catalog, error) {
-	_, tagProvider, tagModel := s.resolveVLMProviderForFeature(settings, "tag")
+	_, tagProvider, tagModel := s.resolveVLMProviderForFeature(settings, agent.FeatureTag)
 	results, err := s.store.AITagResultsBestMatch(catalog.Items, tagProvider, tagModel)
 	if err != nil {
 		return scanner.Catalog{}, err

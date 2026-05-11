@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -235,6 +234,9 @@ func (s *Server) initAgentChat() {
 		_ = p.Close()
 	}
 	s.agentProviders = map[string]agent.ChatProvider{}
+	if !s.agentStatus.Available {
+		return
+	}
 	for _, info := range s.agentStatus.Adapters {
 		chat, err := agent.NewChatProvider(info.ID, info, s.llmProvider, prepareImageForVLM)
 		if err != nil {
@@ -246,21 +248,21 @@ func (s *Server) initAgentChat() {
 
 func (s *Server) hasVLMBackend(settings config.AppSettings) bool {
 	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
-	return hasLLM || len(s.agentProviders) > 0
+	return hasLLM || (settings.AgentEnabled && len(s.agentProviders) > 0)
 }
 
 func (s *Server) featureBackend(settings config.AppSettings, feature string) string {
 	var perFeature string
 	switch feature {
-	case "tag":
+	case agent.FeatureTag:
 		perFeature = settings.VLMBackendTag
-	case "ocr":
+	case agent.FeatureOCR:
 		perFeature = settings.VLMBackendOcr
-	case "optimize":
+	case agent.FeatureOptimize:
 		perFeature = settings.VLMBackendOptimize
-	case "duplicate":
+	case agent.FeatureDuplicate:
 		perFeature = settings.VLMBackendDuplicate
-	case "precheck":
+	case agent.FeaturePrecheck:
 		perFeature = settings.VLMBackendPrecheck
 	}
 	if perFeature != "" {
@@ -274,14 +276,13 @@ func (s *Server) featureBackend(settings config.AppSettings, feature string) str
 
 func (s *Server) resolveVLMProviderForFeature(settings config.AppSettings, feature string) (backend, providerName, modelName string) {
 	backend = s.featureBackend(settings, feature)
-	if strings.HasPrefix(backend, "agent:") {
-		id := strings.TrimPrefix(backend, "agent:")
+	if id, ok := agent.AgentBackendID(backend); ok {
 		if _, ok := s.agentProviders[id]; ok {
 			model := settings.AgentModel
 			if model == "" {
 				model = "default"
 			}
-			return backend, "agent:" + id, model
+			return backend, agent.FormatAgentBackend(id), model
 		}
 	}
 	return "local-llm", settings.LLMProvider, settings.LLMVisionModel

@@ -14,7 +14,27 @@ const (
 	AdapterCopilot     = "copilot"
 	AdapterPi          = "pi"
 	AdapterLocalLLM    = "local-llm"
+
+	BackendLocalLLM = "local-llm"
+	backendPrefix   = "agent:"
+
+	FeatureTag       = "tag"
+	FeatureOCR       = "ocr"
+	FeatureOptimize  = "optimize"
+	FeatureDuplicate = "duplicate"
+	FeaturePrecheck  = "precheck"
 )
+
+func AgentBackendID(backend string) (id string, ok bool) {
+	if strings.HasPrefix(backend, backendPrefix) {
+		return strings.TrimPrefix(backend, backendPrefix), true
+	}
+	return "", false
+}
+
+func FormatAgentBackend(adapterID string) string {
+	return backendPrefix + adapterID
+}
 
 type Adapter interface {
 	ID() string

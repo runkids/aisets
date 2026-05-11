@@ -127,8 +127,7 @@ type vlmImage struct {
 }
 
 func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
-	if strings.HasPrefix(backend, "agent:") {
-		id := strings.TrimPrefix(backend, "agent:")
+	if id, ok := agent.AgentBackendID(backend); ok {
 		if provider, ok := s.agentProviders[id]; ok {
 			paths := make([]string, len(images))
 			for i, img := range images {
@@ -222,7 +221,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, "tag")
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureTag)
 
 	prompt := settings.LLMTagPrompt
 	if presetID := r.URL.Query().Get("presetId"); presetID != "" {

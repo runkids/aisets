@@ -28,8 +28,8 @@ func validVLMBackend(v string) bool {
 	if v == "" || v == "local-llm" {
 		return true
 	}
-	if strings.HasPrefix(v, "agent:") {
-		return validAgentAdapters[strings.TrimPrefix(v, "agent:")]
+	if id, ok := agent.AgentBackendID(v); ok {
+		return validAgentAdapters[id]
 	}
 	return false
 }

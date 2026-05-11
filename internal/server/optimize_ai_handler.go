@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/llm"
@@ -109,7 +110,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
-	backend, _, modelName := s.resolveVLMProviderForFeature(settings, "optimize")
+	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOptimize)
 
 	start := time.Now()
 	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, timeoutSec)

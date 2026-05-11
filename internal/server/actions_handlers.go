@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"aisets/internal/actions"
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/imageproc"
@@ -511,7 +512,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 
 	catalog, _ := s.ensureCatalog(r.Context())
 
-	backend, _, modelName := s.resolveVLMProviderForFeature(settings, "precheck")
+	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeaturePrecheck)
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec < llm.MinChatTimeout {
 		timeoutSec = llm.DefaultChatTimeout
