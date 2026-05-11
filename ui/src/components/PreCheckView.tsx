@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { fileName, formatBytes } from "../ui";
+import { useToast } from "./ToastProvider";
 import {
   AssetThumbnail,
   Badge,
@@ -125,7 +126,8 @@ let _files: File[] = [];
 let _aiResults = new Map<string, AIPreCheckResult>();
 
 export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [results, setResults] = useState<PreCheckResult[]>(_results);
   const [working, setWorking] = useState(false);
@@ -230,16 +232,21 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
     try {
       const form = new FormData();
       files.forEach((f) => form.append("files", f, f.name));
-      const res = await fetch("/api/pre-check/ai", {
-        method: "POST",
-        body: form,
-      });
+      const lang = i18n.language || "en";
+      const res = await fetch(
+        `/api/pre-check/ai?lang=${encodeURIComponent(lang)}`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
       if (!res.ok || !res.body) {
         throw new Error(t("precheck.aiError"));
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let readyCount = 0;
       while (true) {
         const { done, value } = await reader.read();
         if (value) buffer += decoder.decode(value, { stream: true });
@@ -255,6 +262,7 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
                 status: string;
               };
               if (ai.status === "ready") {
+                readyCount++;
                 setAiResults((prev) => new Map(prev).set(ai.name, ai));
                 const idx = resultsRef.current.findIndex(
                   (r) => r.name === ai.name,
@@ -272,12 +280,15 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
         }
         if (done) break;
       }
+      if (readyCount > 0) {
+        toast.success(t("precheck.aiDone", { count: readyCount }));
+      }
     } catch (err) {
       setAiError(err instanceof Error ? err.message : String(err));
     } finally {
       setAiWorking(false);
     }
-  }, [files, t]);
+  }, [files, t, i18n.language, toast]);
 
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
@@ -561,16 +572,20 @@ function PreCheckCard({
       id: `${index}-exact`,
       title: t("precheck.sections.exactMatches"),
       count: result.exactMatches.length,
-      render: () =>
-        result.exactMatches.map((m) => (
-          <MatchRow
-            key={m.assetId}
-            assetId={m.assetId}
-            repoPath={m.repoPath}
-            projectName={m.projectName}
-            onClick={onOpenAsset ? () => onOpenAsset(m.assetId) : undefined}
-          />
-        )),
+      render: () => (
+        <TruncatedMatchList
+          items={result.exactMatches}
+          renderItem={(m) => (
+            <MatchRow
+              key={m.assetId}
+              assetId={m.assetId}
+              repoPath={m.repoPath}
+              projectName={m.projectName}
+              onClick={onOpenAsset ? () => onOpenAsset(m.assetId) : undefined}
+            />
+          )}
+        />
+      ),
     });
   }
 
@@ -579,25 +594,29 @@ function PreCheckCard({
       id: `${index}-near`,
       title: t("precheck.sections.nearMatches"),
       count: result.nearMatches.length,
-      render: () =>
-        result.nearMatches.map((m) => (
-          <MatchRow
-            key={m.assetId}
-            assetId={m.assetId}
-            repoPath={m.repoPath}
-            projectName={m.projectName}
-            trailing={
-              m.flipped
-                ? t("precheck.nearDistanceFlipped", {
-                    pct: Math.round((1 - m.distance / 64) * 100),
-                  })
-                : t("precheck.nearDistance", {
-                    pct: Math.round((1 - m.distance / 64) * 100),
-                  })
-            }
-            onClick={onOpenAsset ? () => onOpenAsset(m.assetId) : undefined}
-          />
-        )),
+      render: () => (
+        <TruncatedMatchList
+          items={result.nearMatches}
+          renderItem={(m) => (
+            <MatchRow
+              key={m.assetId}
+              assetId={m.assetId}
+              repoPath={m.repoPath}
+              projectName={m.projectName}
+              trailing={
+                m.flipped
+                  ? t("precheck.nearDistanceFlipped", {
+                      pct: Math.round((1 - m.distance / 64) * 100),
+                    })
+                  : t("precheck.nearDistance", {
+                      pct: Math.round((1 - m.distance / 64) * 100),
+                    })
+              }
+              onClick={onOpenAsset ? () => onOpenAsset(m.assetId) : undefined}
+            />
+          )}
+        />
+      ),
     });
   }
 
@@ -798,6 +817,44 @@ function CollapsibleSection({
         </div>
       </div>
     </div>
+  );
+}
+
+const MATCH_PREVIEW_LIMIT = 5;
+
+function TruncatedMatchList<T>({
+  items,
+  renderItem,
+}: {
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+
+  if (items.length <= MATCH_PREVIEW_LIMIT) {
+    return <>{items.map(renderItem)}</>;
+  }
+
+  const visible = showAll ? items : items.slice(0, MATCH_PREVIEW_LIMIT);
+  const remaining = items.length - MATCH_PREVIEW_LIMIT;
+
+  return (
+    <>
+      {visible.map(renderItem)}
+      {!showAll && (
+        <button
+          type="button"
+          className="mt-1 w-full rounded-g-sm py-1.5 text-center text-g-caption font-[510] text-g-accent transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
+          onClick={() => setShowAll(true)}
+        >
+          {t("action.showAll", {
+            count: remaining,
+            defaultValue: `Show all {{count}} more`,
+          })}
+        </button>
+      )}
+    </>
   );
 }
 

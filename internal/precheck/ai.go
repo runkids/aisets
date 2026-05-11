@@ -6,6 +6,21 @@ import (
 	"strings"
 )
 
+var localeNames = map[string]string{
+	"en":    "English",
+	"zh-TW": "Traditional Chinese (繁體中文)",
+	"zh-CN": "Simplified Chinese (简体中文)",
+	"ja":    "Japanese (日本語)",
+	"ko":    "Korean (한국어)",
+}
+
+func LocaleDisplayName(lang string) string {
+	if name, ok := localeNames[lang]; ok {
+		return name
+	}
+	return ""
+}
+
 const PrecheckAIPrompt = `Analyze this image for an asset library pre-import check. Respond with a JSON object containing:
 - "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork", "other"
 - "tags": array of 3-5 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "hero-section")

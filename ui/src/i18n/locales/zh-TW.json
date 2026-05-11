@@ -129,7 +129,8 @@
     "copy": "複製",
     "downloadShell": "下載 .sh",
     "scrollToTop": "回到頂端",
-    "more": "更多操作"
+    "more": "更多操作",
+    "showAll": "顯示全部 {{count}} 個"
   },
   "search": {
     "placeholder": "搜尋路徑、專案、格式或 content hash…",
@@ -991,6 +992,7 @@
     "aiAnalyze": "AI 分析",
     "aiAnalyzing": "分析中…",
     "aiError": "AI 分析失敗",
+    "aiDone": "AI 分析完成 — 已分析 {{count}} 個檔案",
     "aiQuality": {
       "1": "無法使用",
       "2": "差",

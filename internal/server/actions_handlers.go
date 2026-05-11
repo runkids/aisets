@@ -522,6 +522,11 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = precheck.PrecheckAIPrompt
 	}
+	if lang := r.URL.Query().Get("lang"); lang != "" {
+		if name := precheck.LocaleDisplayName(lang); name != "" {
+			prompt += "\n\nIMPORTANT: Write the description, quality assessment, suitability reason, and format recommendation in " + name + "."
+		}
+	}
 
 	systemPrompt := ""
 	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {

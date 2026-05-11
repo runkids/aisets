@@ -129,7 +129,8 @@
     "copy": "Copy",
     "downloadShell": "Download .sh",
     "scrollToTop": "Scroll to top",
-    "more": "More actions"
+    "more": "More actions",
+    "showAll": "Show all {{count}} more"
   },
   "search": {
     "placeholder": "Search path, project, format, or content hash…",
@@ -1634,6 +1635,7 @@
     "aiAnalyze": "AI Analyze",
     "aiAnalyzing": "Analyzing…",
     "aiError": "AI analysis failed",
+    "aiDone": "AI analysis complete — {{count}} files analyzed",
     "aiQuality": {
       "1": "Unusable",
       "2": "Poor",

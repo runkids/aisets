@@ -129,7 +129,8 @@
     "batchRename": "이름 변경",
     "batchExport": "내보내기",
     "batchAITag": "AI 태그",
-    "batchAIOcr": "AI OCR"
+    "batchAIOcr": "AI OCR",
+    "showAll": "나머지 {{count}}개 표시"
   },
   "search": {
     "placeholder": "경로, 프로젝트, 형식 또는 콘텐츠 해시 검색…",
@@ -975,6 +976,7 @@
     "aiAnalyze": "AI 분석",
     "aiAnalyzing": "분석 중…",
     "aiError": "AI 분석 실패",
+    "aiDone": "AI 분석 완료 — {{count}}개 파일 분석됨",
     "aiQuality": {
       "1": "사용 불가",
       "2": "나쁨",

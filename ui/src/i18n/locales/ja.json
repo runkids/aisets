@@ -129,7 +129,8 @@
     "batchRename": "名前変更",
     "batchExport": "エクスポート",
     "batchAITag": "AI タグ",
-    "batchAIOcr": "AI OCR"
+    "batchAIOcr": "AI OCR",
+    "showAll": "残り {{count}} 件を表示"
   },
   "search": {
     "placeholder": "パス、プロジェクト、フォーマット、コンテンツハッシュで検索…",
@@ -957,6 +958,7 @@
     "aiAnalyze": "AI 分析",
     "aiAnalyzing": "分析中…",
     "aiError": "AI 分析に失敗しました",
+    "aiDone": "AI 分析完了 — {{count}} ファイルを分析しました",
     "aiQuality": {
       "1": "使用不可",
       "2": "低品質",
