@@ -819,7 +819,7 @@ export function AISection({
           className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
           padding="none"
         >
-          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+          <div className="flex items-center gap-2.5 px-6 py-3 md:px-8">
             <Tags size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.aiTagGroup")}
@@ -916,7 +916,7 @@ export function AISection({
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2.5 border-y border-g-line px-6 py-3 md:px-8">
+          <div className="flex items-center gap-2.5 border-t border-g-line px-6 py-3 md:px-8">
             <ScanText size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.aiOcrGroup")}
