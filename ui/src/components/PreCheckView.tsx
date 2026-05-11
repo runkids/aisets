@@ -249,14 +249,14 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
               );
               if (idx >= 0) {
                 setExpanded((prev) => new Set([...prev, `${idx}-ai`]));
-                requestAnimationFrame(() => {
+                setTimeout(() => {
                   document
-                    .querySelector(`[data-precheck-card="${idx}"]`)
+                    .querySelector(`[data-section-id="${idx}-ai"]`)
                     ?.scrollIntoView({
                       behavior: "smooth",
-                      block: "nearest",
+                      block: "start",
                     });
-                });
+                }, 180);
               }
             }
           } else if (event.type === "error") {
@@ -389,25 +389,35 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
               className="h-1.5 flex-1"
               ariaLabel={t("precheck.title")}
             />
-            {aiEnabled && (
-              <Button
-                size="sm"
-                variant="ghost"
-                leadingIcon={
-                  aiWorking ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={12} />
-                  )
-                }
-                onClick={runAI}
-                disabled={aiWorking || results.length === 0}
-              >
-                {aiWorking
-                  ? t("precheck.aiAnalyzing")
-                  : t("precheck.aiAnalyze")}
-              </Button>
-            )}
+            {aiEnabled &&
+              (() => {
+                const allAnalyzed =
+                  results.length > 0 &&
+                  results.every((r) => aiResults.has(r.name));
+                return (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    leadingIcon={
+                      aiWorking ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : allAnalyzed ? (
+                        <CheckCircle2 size={12} />
+                      ) : (
+                        <Sparkles size={12} />
+                      )
+                    }
+                    onClick={runAI}
+                    disabled={aiWorking || results.length === 0 || allAnalyzed}
+                  >
+                    {aiWorking
+                      ? t("precheck.aiAnalyzing")
+                      : allAnalyzed
+                        ? t("precheck.aiDoneLabel")
+                        : t("precheck.aiAnalyze")}
+                  </Button>
+                );
+              })()}
             <Button
               size="sm"
               variant="ghost"
@@ -491,6 +501,17 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
 
       {hasResults && (
         <div className="grid gap-3">
+          {aiWorking && (
+            <div className="sticky top-0 z-10 flex items-center gap-2 rounded-g-md border border-g-line bg-g-surface/90 px-3 py-1.5 shadow-g-sm backdrop-blur-sm">
+              <Loader2 size={12} className="animate-spin text-g-accent" />
+              <span className="text-g-chip font-[510] text-g-ink-3">
+                {t("precheck.aiAnalyzing")}
+              </span>
+              <span className="text-g-chip text-g-ink-4">
+                {aiResults.size}/{results.length}
+              </span>
+            </div>
+          )}
           {results.map((r, idx) => (
             <PreCheckCard
               key={`${r.contentHash}-${idx}`}
@@ -774,6 +795,7 @@ function CollapsibleSection({
     <div className="border-b border-dashed border-g-line last:border-b-0">
       <button
         type="button"
+        data-section-id={id}
         className="flex w-full items-center gap-1.5 px-3 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
         onClick={() => onToggle(id)}
         aria-expanded={expanded}

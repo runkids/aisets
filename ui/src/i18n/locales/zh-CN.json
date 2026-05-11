@@ -960,6 +960,7 @@
     "aiAnalyzing": "分析中…",
     "aiError": "AI 分析失败",
     "aiDone": "AI 分析完成 — 已分析 {{count}} 个文件",
+    "aiDoneLabel": "已分析",
     "aiQuality": {
       "1": "无法使用",
       "2": "差",

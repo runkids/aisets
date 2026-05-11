@@ -994,6 +994,7 @@
     "aiAnalyzing": "分析中…",
     "aiError": "AI 分析失敗",
     "aiDone": "AI 分析完成 — 已分析 {{count}} 個檔案",
+    "aiDoneLabel": "已分析",
     "aiQuality": {
       "1": "無法使用",
       "2": "差",
