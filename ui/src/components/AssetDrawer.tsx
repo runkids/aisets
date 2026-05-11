@@ -140,8 +140,15 @@ export function AssetDrawer({
   const toast = useToast();
   const [rawTab, setRawTab] = useState<DrawerTab>("overview");
   const [closing, setClosing] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
 
-  const requestClose = useCallback(() => setClosing(true), []);
+  const requestClose = useCallback(() => {
+    if (aiBusy) {
+      toast.info(t("drawer.aiAction.busyHint"));
+      return;
+    }
+    setClosing(true);
+  }, [aiBusy, toast, t]);
 
   useEffect(() => {
     if (!closing) return;
@@ -611,14 +618,17 @@ export function AssetDrawer({
                 <AssetDrawerOCR ocr={asset.ocr} />
               )}
               {tab === "tags" && <AssetDrawerTags asset={asset} />}
-              {tab === "ai" && aiTagVisible && (
-                <AssetDrawerAI
-                  asset={asset}
-                  scanId={scanId}
-                  aiTag={asset.aiTag}
-                  ocr={vlmOcrReady ? asset.ocr : undefined}
-                  llmEnabled={llmEnabled}
-                />
+              {aiTagVisible && (
+                <div className={tab !== "ai" ? "hidden" : undefined}>
+                  <AssetDrawerAI
+                    asset={asset}
+                    scanId={scanId}
+                    aiTag={asset.aiTag}
+                    ocr={vlmOcrReady ? asset.ocr : undefined}
+                    llmEnabled={llmEnabled}
+                    onBusyChange={setAiBusy}
+                  />
+                </div>
               )}
             </div>
           </DialogDrawerSurface>

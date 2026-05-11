@@ -14,13 +14,6 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	if err != nil {
 		return CatalogItemsPage{}, err
 	}
-	settings, err := s.Settings()
-	if err != nil {
-		return CatalogItemsPage{}, err
-	}
-	if settings.LLMProvider != "" && settings.LLMVisionModel != "" {
-		query.VLMEngineVersion = settings.LLMProvider + "/" + settings.LLMVisionModel
-	}
 	limit := normalizeCatalogLimit(query.Limit)
 	offset := parseCursorOffset(query.Cursor)
 	where, args, err := s.catalogItemWhere(scanID, query)

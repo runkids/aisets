@@ -19,6 +19,8 @@ export type AITagActivityState = {
   errors: ActivityError[];
   startedAt?: number;
   scopeLabel?: string;
+  providerName?: string;
+  modelName?: string;
 };
 
 export type AITagActivityAction =
@@ -73,6 +75,12 @@ export function aiTagActivityReducer(
         errors: hasItemError
           ? [...errors, { repoPath: e.repoPath!, message: e.errorMessage! }]
           : errors,
+        providerName:
+          "providerName" in e && e.providerName
+            ? e.providerName
+            : state.providerName,
+        modelName:
+          "modelName" in e && e.modelName ? e.modelName : state.modelName,
       };
     }
     case "stopping":
@@ -86,6 +94,8 @@ export function aiTagActivityReducer(
         errors: state.errors,
         startedAt: state.startedAt,
         scopeLabel: state.scopeLabel,
+        providerName: state.providerName,
+        modelName: state.modelName,
       };
     case "stopped":
       return {
@@ -94,6 +104,8 @@ export function aiTagActivityReducer(
         errors: state.errors,
         startedAt: state.startedAt,
         scopeLabel: state.scopeLabel,
+        providerName: state.providerName,
+        modelName: state.modelName,
       };
     case "error":
       return {
@@ -103,6 +115,8 @@ export function aiTagActivityReducer(
         errors: state.errors,
         startedAt: state.startedAt,
         scopeLabel: state.scopeLabel,
+        providerName: state.providerName,
+        modelName: state.modelName,
       };
     case "dismiss":
       return initialAITagActivityState;

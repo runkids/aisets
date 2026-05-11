@@ -33,6 +33,10 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 	if string(descI18nJSON) == "null" {
 		descI18nJSON = []byte("{}")
 	}
+	catI18nJSON, _ := json.Marshal(result.CategoryI18n)
+	if string(catI18nJSON) == "null" {
+		catI18nJSON = []byte("{}")
+	}
 	containsFace := 0
 	if result.ContainsFace {
 		containsFace = 1
@@ -41,14 +45,15 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 		INSERT INTO ai_tags (
 			project_id, repo_path, content_hash, hash_algorithm,
 			provider_name, model_name, status,
-			category, tags_json, tags_i18n_json, description, description_i18n_json, languages_json,
+			category, category_i18n_json, tags_json, tags_i18n_json, description, description_i18n_json, languages_json,
 			contains_face, scene_type, estimated_location, location_confidence,
 			error_code, error_message, duration_ms, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(project_id, repo_path, content_hash, hash_algorithm, provider_name, model_name)
 		DO UPDATE SET
 			status = excluded.status,
 			category = excluded.category,
+			category_i18n_json = excluded.category_i18n_json,
 			tags_json = excluded.tags_json,
 			tags_i18n_json = excluded.tags_i18n_json,
 			description = excluded.description,
@@ -64,7 +69,7 @@ func (s *Store) UpsertAITagResult(result aitag.Result) error {
 			updated_at = excluded.updated_at
 	`, result.ProjectID, result.RepoPath, result.ContentHash, result.HashAlgorithm,
 		result.ProviderName, result.ModelName, result.Status,
-		result.Category, string(tagsJSON), string(tagsI18nJSON), result.Description, string(descI18nJSON), string(langsJSON),
+		result.Category, string(catI18nJSON), string(tagsJSON), string(tagsI18nJSON), result.Description, string(descI18nJSON), string(langsJSON),
 		containsFace, result.SceneType, result.EstimatedLocation, result.LocationConfidence,
 		result.ErrorCode, result.ErrorMessage, result.DurationMs, result.UpdatedAt)
 	return err

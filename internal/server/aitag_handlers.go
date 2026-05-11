@@ -347,7 +347,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
+	sendNDJSON(w, map[string]any{"type": "start", "counts": counts, "providerName": providerName, "modelName": modelName})
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -427,7 +427,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, progressEvent)
 	}
 
-	doneEvent := map[string]any{"type": "done", "counts": counts}
+	doneEvent := map[string]any{"type": "done", "counts": counts, "providerName": providerName, "modelName": modelName}
 	if firstError != "" {
 		doneEvent["firstError"] = firstError
 	}
@@ -460,6 +460,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backe
 
 	var parsed struct {
 		Category           json.RawMessage `json:"category"`
+		CategoryI18n       json.RawMessage `json:"categoryI18n"`
 		Tags               json.RawMessage `json:"tags"`
 		TagsI18n           json.RawMessage `json:"tagsI18n"`
 		Description        string          `json:"description"`
@@ -478,6 +479,10 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backe
 	}
 
 	result.Category = strings.ToLower(strings.TrimSpace(unmarshalStringOrFirst(parsed.Category)))
+	_ = json.Unmarshal(parsed.CategoryI18n, &result.CategoryI18n)
+	if result.CategoryI18n == nil {
+		result.CategoryI18n = map[string]string{}
+	}
 	_ = json.Unmarshal(parsed.Tags, &result.Tags)
 	_ = json.Unmarshal(parsed.TagsI18n, &result.TagsI18n)
 	if result.Tags == nil {

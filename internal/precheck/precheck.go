@@ -47,20 +47,21 @@ type NamingIssue struct {
 }
 
 type Result struct {
-	Name          string                           `json:"name"`
-	Ext           string                           `json:"ext"`
-	Size          int64                            `json:"size"`
-	ContentHash   string                           `json:"contentHash"`
-	HashAlgorithm string                           `json:"hashAlgorithm"`
-	DHash         string                           `json:"dHash,omitempty"`
-	DHashFlipped  string                           `json:"dHashFlipped,omitempty"`
-	Image         imageproc.Metadata               `json:"image"`
-	ExactMatches  []ExactMatch                     `json:"exactMatches"`
-	NearMatches   []NearMatch                      `json:"nearMatches"`
-	NamingIssues  []NamingIssue                    `json:"namingIssues"`
-	Optimization  []scanner.OptimizationSuggestion `json:"optimizationRecommendations"`
-	Verdict       Verdict                          `json:"verdict"`
-	VerdictReason string                           `json:"verdictReason"`
+	Name             string                           `json:"name"`
+	Ext              string                           `json:"ext"`
+	Size             int64                            `json:"size"`
+	ContentHash      string                           `json:"contentHash"`
+	HashAlgorithm    string                           `json:"hashAlgorithm"`
+	DHash            string                           `json:"dHash,omitempty"`
+	DHashFlipped     string                           `json:"dHashFlipped,omitempty"`
+	Image            imageproc.Metadata               `json:"image"`
+	ExactMatches     []ExactMatch                     `json:"exactMatches"`
+	NearMatches      []NearMatch                      `json:"nearMatches"`
+	NamingIssues     []NamingIssue                    `json:"namingIssues"`
+	Optimization     []scanner.OptimizationSuggestion `json:"optimizationRecommendations"`
+	Verdict          Verdict                          `json:"verdict"`
+	VerdictReason    string                           `json:"verdictReason"`
+	ThumbnailDataURL string                           `json:"thumbnailDataURL,omitempty"`
 }
 
 // Analyze examines a single uploaded file (already saved to localPath) and

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FileText,
   Globe,
@@ -25,6 +25,7 @@ type Props = {
   aiTag?: AssetItem["aiTag"];
   ocr?: AssetItem["ocr"];
   llmEnabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 export function AssetDrawerAI({
@@ -33,6 +34,7 @@ export function AssetDrawerAI({
   aiTag: aiTagProp,
   ocr: ocrProp,
   llmEnabled,
+  onBusyChange,
 }: Props) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -42,29 +44,25 @@ export function AssetDrawerAI({
   const [localAiTag, setLocalAiTag] = useState<AssetItem["aiTag"]>();
   const [localOcr, setLocalOcr] = useState<AssetItem["ocr"]>();
 
+  const busy = tagging || ocrRunning;
+  useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
+
   const aiTag = localAiTag ?? aiTagProp;
   const ocr = localOcr ?? ocrProp;
   const hasAiTag = aiTag && aiTag.status === "ready";
   const hasVlmOcr = ocr && ocr.status === "ready" && ocr.engineName === "vlm";
 
   async function refreshItem() {
-    let fetched = false;
     try {
       const detail = await getCatalogItemDetail(scanId, asset.id);
-      if (detail.item.aiTag) {
-        setLocalAiTag(detail.item.aiTag);
-        fetched = true;
-      }
-      if (detail.item.ocr) {
-        setLocalOcr(detail.item.ocr);
-        fetched = true;
-      }
+      if (detail.item.aiTag) setLocalAiTag(detail.item.aiTag);
+      if (detail.item.ocr) setLocalOcr(detail.item.ocr);
     } catch {
       // detail fetch failed — fall through to invalidate
     }
     queryClient.invalidateQueries({
       queryKey: catalogQueryKey,
-      refetchType: fetched ? "none" : "active",
+      refetchType: "active",
     });
   }
 
@@ -111,7 +109,7 @@ export function AssetDrawerAI({
             {llmEnabled && (
               <button
                 type="button"
-                disabled={tagging}
+                disabled={busy}
                 onClick={handleTag}
                 className={runBtnCls}
                 aria-label={t("drawer.aiAction.tag")}
@@ -197,6 +195,7 @@ export function AssetDrawerAI({
               )}
 
               <AIMeta
+                providerName={aiTag.providerName}
                 modelName={aiTag.modelName}
                 durationMs={aiTag.durationMs}
                 updatedAt={aiTag.updatedAt}
@@ -226,7 +225,7 @@ export function AssetDrawerAI({
             {llmEnabled && (
               <button
                 type="button"
-                disabled={ocrRunning}
+                disabled={busy}
                 onClick={handleOcr}
                 className={runBtnCls}
                 aria-label={t("drawer.aiAction.ocr")}
@@ -283,6 +282,7 @@ export function AssetDrawerAI({
               </div>
 
               <AIMeta
+                providerName={ocr.providerName}
                 modelName={ocr.modelName}
                 durationMs={ocr.durationMs}
                 updatedAt={ocr.updatedAt}
@@ -300,17 +300,24 @@ export function AssetDrawerAI({
 }
 
 function AIMeta({
+  providerName,
   modelName,
   durationMs,
   updatedAt,
 }: {
+  providerName?: string;
   modelName?: string;
   durationMs?: number;
   updatedAt?: string;
 }) {
   const { t } = useTranslation();
-  const hasMeta = modelName || durationMs != null || updatedAt;
+  const hasMeta = providerName || modelName || durationMs != null || updatedAt;
   if (!hasMeta) return null;
+
+  const providerModel =
+    providerName && modelName
+      ? `${providerName} / ${modelName}`
+      : providerName || modelName;
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-g text-[11px] text-g-ink-4">
@@ -322,8 +329,10 @@ function AIMeta({
           </span>
         </Tooltip>
       )}
-      {modelName && (
-        <span className="truncate font-g-mono text-[10px]">{modelName}</span>
+      {providerModel && (
+        <span className="truncate font-g-mono text-[10px]">
+          {providerModel}
+        </span>
       )}
       {updatedAt && <span>{new Date(updatedAt).toLocaleString()}</span>}
     </div>

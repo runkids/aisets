@@ -24,6 +24,7 @@ import {
   useCreatePromptPresetMutation,
   useUpdatePromptPresetMutation,
   useUpdateSettingsMutation,
+  useDetectAgentCLIsMutation,
 } from "../../queries";
 import { useToast } from "../ToastProvider";
 import { errorMessage } from "../../i18n";
@@ -45,6 +46,8 @@ type LastRunRecord<T> = {
   timestamp: number;
   scopeLabel?: string;
   elapsedMs?: number;
+  providerName?: string;
+  modelName?: string;
 };
 
 function readLastRun<T>(key: string): LastRunRecord<T> | null {
@@ -61,11 +64,20 @@ function saveLastRun<T>(
   counts: T,
   scopeLabel?: string,
   elapsedMs?: number,
+  providerName?: string,
+  modelName?: string,
 ): void {
   try {
     localStorage.setItem(
       key,
-      JSON.stringify({ counts, timestamp: Date.now(), scopeLabel, elapsedMs }),
+      JSON.stringify({
+        counts,
+        timestamp: Date.now(),
+        scopeLabel,
+        elapsedMs,
+        providerName,
+        modelName,
+      }),
     );
   } catch {
     // ignore storage errors (quota, private mode)
@@ -181,6 +193,8 @@ export function AISection({
   const selectedOcrPresetId = selectedOcrPresetIdOverride || ocrDefaultPresetId;
 
   const vlmBackendMutation = useUpdateSettingsMutation();
+  const detectMutation = useDetectAgentCLIsMutation();
+  const toast = useToast();
   const [aiTab, setAiTab] = useState<"local" | "agent" | "backend" | "prompts">(
     "local",
   );
@@ -244,13 +258,24 @@ export function AISection({
         aiTagActivity.startedAt != null
           ? Date.now() - aiTagActivity.startedAt
           : undefined;
+      const pn = aiTagActivity.providerName;
+      const mn = aiTagActivity.modelName;
       const record: LastRunRecord<AITagRunCounts> = {
         counts: aiTagActivity.counts,
         timestamp: Date.now(),
         scopeLabel: sl,
         elapsedMs,
+        providerName: pn,
+        modelName: mn,
       };
-      saveLastRun(AI_TAG_LAST_RUN_KEY, aiTagActivity.counts, sl, elapsedMs);
+      saveLastRun(
+        AI_TAG_LAST_RUN_KEY,
+        aiTagActivity.counts,
+        sl,
+        elapsedMs,
+        pn,
+        mn,
+      );
       setLastAITagRun(record);
     }
   }, [
@@ -276,13 +301,24 @@ export function AISection({
         vlmOcrActivity.startedAt != null
           ? Date.now() - vlmOcrActivity.startedAt
           : undefined;
+      const pn = vlmOcrActivity.providerName;
+      const mn = vlmOcrActivity.modelName;
       const record: LastRunRecord<VLMOcrRunCounts> = {
         counts: vlmOcrActivity.counts,
         timestamp: Date.now(),
         scopeLabel: sl,
         elapsedMs,
+        providerName: pn,
+        modelName: mn,
       };
-      saveLastRun(VLM_OCR_LAST_RUN_KEY, vlmOcrActivity.counts, sl, elapsedMs);
+      saveLastRun(
+        VLM_OCR_LAST_RUN_KEY,
+        vlmOcrActivity.counts,
+        sl,
+        elapsedMs,
+        pn,
+        mn,
+      );
       setLastVLMOcrRun(record);
     }
   }, [
@@ -668,27 +704,55 @@ export function AISection({
                 />
               </FieldRow>
 
-              {settings?.agentRuntime && (
-                <FieldRow
-                  label={t("settings.agentAvailable")}
-                  description={
-                    settings.agentRuntime.adapters?.length
-                      ? undefined
-                      : t("settings.agentNoneDetected")
-                  }
-                >
-                  <div className="flex flex-wrap gap-1.5">
-                    {settings.agentRuntime.adapters
-                      ?.filter((a) => a.id !== "local-llm")
-                      .map((a) => (
-                        <Badge key={a.id} tone="green">
-                          {a.name}
-                          {a.version ? ` ${a.version}` : ""}
-                        </Badge>
-                      ))}
-                  </div>
-                </FieldRow>
-              )}
+              <FieldRow
+                label={t("settings.agentAvailable")}
+                description={
+                  settings?.agentRuntime?.adapters?.length
+                    ? undefined
+                    : t("settings.agentNoneDetected")
+                }
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {settings?.agentRuntime?.adapters
+                    ?.filter((a) => a.id !== "local-llm")
+                    .map((a) => (
+                      <Badge key={a.id} tone="green">
+                        {a.name}
+                        {a.version ? ` ${a.version}` : ""}
+                      </Badge>
+                    ))}
+                  <Tooltip label={t("settings.agentDetectTooltip")}>
+                    <IconButton
+                      size="sm"
+                      aria-label={t("settings.agentDetect")}
+                      disabled={detectMutation.isPending}
+                      onClick={() =>
+                        detectMutation.mutate(undefined, {
+                          onSuccess: (data) => {
+                            const count =
+                              data.settings.agentRuntime?.adapters?.filter(
+                                (a) => a.id !== "local-llm",
+                              ).length ?? 0;
+                            toast.success(
+                              t("settings.agentDetectDone", { count }),
+                            );
+                          },
+                          onError: (err) => {
+                            toast.error(errorMessage(err));
+                          },
+                        })
+                      }
+                    >
+                      <RefreshCw
+                        size={14}
+                        className={
+                          detectMutation.isPending ? "animate-spin" : undefined
+                        }
+                      />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+              </FieldRow>
 
               <FieldRow
                 label={t("settings.agentAdapter")}
@@ -912,6 +976,8 @@ export function AISection({
                   timestamp={lastAITagRun.timestamp}
                   scopeLabel={lastAITagRun.scopeLabel}
                   elapsedMs={lastAITagRun.elapsedMs}
+                  providerName={lastAITagRun.providerName}
+                  modelName={lastAITagRun.modelName}
                 />
               ) : null}
             </div>
@@ -1009,6 +1075,8 @@ export function AISection({
                   timestamp={lastVLMOcrRun.timestamp}
                   scopeLabel={lastVLMOcrRun.scopeLabel}
                   elapsedMs={lastVLMOcrRun.elapsedMs}
+                  providerName={lastVLMOcrRun.providerName}
+                  modelName={lastVLMOcrRun.modelName}
                 />
               ) : null}
             </div>
@@ -1081,11 +1149,15 @@ function LastRunText({
   timestamp,
   scopeLabel,
   elapsedMs,
+  providerName,
+  modelName,
 }: {
   counts: AITagRunCounts | VLMOcrRunCounts;
   timestamp: number;
   scopeLabel?: string;
   elapsedMs?: number;
+  providerName?: string;
+  modelName?: string;
 }) {
   const { t } = useTranslation();
   const date = new Date(timestamp);
@@ -1105,6 +1177,11 @@ function LastRunText({
       ·
     </span>
   );
+
+  const providerModel =
+    providerName && modelName
+      ? `${providerName} / ${modelName}`
+      : providerName || modelName;
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
@@ -1137,11 +1214,15 @@ function LastRunText({
           </>
         )}
       </p>
-      {scopeLabel && (
-        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-          {scopeLabel}
-        </span>
-      )}
+      <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4 flex items-center gap-1.5">
+        {scopeLabel && <span>{scopeLabel}</span>}
+        {providerModel && (
+          <>
+            {scopeLabel && sep}
+            <span>{providerModel}</span>
+          </>
+        )}
+      </span>
       {"inputTokens" in counts &&
         (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
           <TokenBadge
@@ -1263,6 +1344,12 @@ function AITagProgressText({
           {activity.currentFile}
         </p>
       )}
+      {activity.providerName && (
+        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {activity.providerName}
+          {activity.modelName ? ` / ${activity.modelName}` : ""}
+        </span>
+      )}
       {counts && (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
         <TokenBadge
           inputTokens={counts.inputTokens ?? 0}
@@ -1347,6 +1434,12 @@ function VLMOcrProgressText({
         <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
           {activity.currentFile}
         </p>
+      )}
+      {activity.providerName && (
+        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {activity.providerName}
+          {activity.modelName ? ` / ${activity.modelName}` : ""}
+        </span>
       )}
       {counts && (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
         <TokenBadge

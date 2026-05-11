@@ -238,7 +238,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sendNDJSON(w, map[string]any{"type": "start", "counts": counts})
+	sendNDJSON(w, map[string]any{"type": "start", "counts": counts, "providerName": providerName, "modelName": modelName})
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -318,7 +318,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, progressEvent)
 	}
 
-	doneEvent := map[string]any{"type": "done", "counts": counts}
+	doneEvent := map[string]any{"type": "done", "counts": counts, "providerName": providerName, "modelName": modelName}
 	if firstError != "" {
 		doneEvent["firstError"] = firstError
 	}

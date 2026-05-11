@@ -69,6 +69,7 @@ type PreCheckResult = {
   optimizationRecommendations: OptimizationRec[];
   verdict: Verdict;
   verdictReason: string;
+  thumbnailDataURL?: string;
 };
 
 type AIPreCheckResult = {
@@ -200,6 +201,13 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
         setThumbnails((prev) => {
           const next = new Map(prev);
           newThumbs.forEach((url, name) => next.set(name, url));
+          for (const r of incoming) {
+            if (r.thumbnailDataURL) {
+              const old = next.get(r.name);
+              if (old?.startsWith("blob:")) URL.revokeObjectURL(old);
+              next.set(r.name, r.thumbnailDataURL);
+            }
+          }
           return next;
         });
 

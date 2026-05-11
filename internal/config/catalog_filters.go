@@ -114,11 +114,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
-	vlmEngineVersion := ""
-	if settings.LLMProvider != "" && settings.LLMVisionModel != "" {
-		vlmEngineVersion = settings.LLMProvider + "/" + settings.LLMVisionModel
-	}
-	vlmOcrReadyCount, err := s.catalogVLMOcrReadyCount(scanID, query, vlmEngineVersion)
+	vlmOcrReadyCount, err := s.catalogVLMOcrReadyCount(scanID, query, query.VLMEngineVersion)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}

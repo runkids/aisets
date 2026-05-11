@@ -177,6 +177,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/ai/optimize-advice", s.handleOptimizeAIAdvice)
 	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
 	s.mux.HandleFunc("GET /api/agent/status", s.handleAgentStatus)
+	s.mux.HandleFunc("POST /api/agent/detect", s.handleAgentDetect)
 	s.mux.HandleFunc("GET /api/prompt-presets", s.handleListPromptPresets)
 	s.mux.HandleFunc("POST /api/prompt-presets", s.handleCreatePromptPreset)
 	s.mux.HandleFunc("PATCH /api/prompt-presets/{id}", s.handleUpdatePromptPreset)

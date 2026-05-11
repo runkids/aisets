@@ -338,6 +338,7 @@ export type AssetItem = {
     status: "pending" | "ready" | "failed" | "skipped";
     engineName?: string;
     engineVersion?: string;
+    providerName?: string;
     modelName?: string;
     text?: string;
     normalizedText?: string;
@@ -365,6 +366,7 @@ export type AssetItem = {
     sceneType?: string;
     estimatedLocation?: string;
     locationConfidence?: string;
+    providerName?: string;
     modelName?: string;
     errorCode?: string;
     errorMessage?: string;
@@ -704,7 +706,12 @@ export type AITagRunCounts = {
 };
 
 export type AITagRunEvent =
-  | { type: "start"; counts: AITagRunCounts }
+  | {
+      type: "start";
+      counts: AITagRunCounts;
+      providerName?: string;
+      modelName?: string;
+    }
   | {
       type: "progress";
       assetId: string;
@@ -713,7 +720,13 @@ export type AITagRunEvent =
       counts: AITagRunCounts;
       errorMessage?: string;
     }
-  | { type: "done"; counts: AITagRunCounts; firstError?: string }
+  | {
+      type: "done";
+      counts: AITagRunCounts;
+      firstError?: string;
+      providerName?: string;
+      modelName?: string;
+    }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: AITagRunCounts };
 
 export type VLMOcrRunCounts = {
@@ -728,7 +741,12 @@ export type VLMOcrRunCounts = {
 };
 
 export type VLMOcrRunEvent =
-  | { type: "start"; counts: VLMOcrRunCounts }
+  | {
+      type: "start";
+      counts: VLMOcrRunCounts;
+      providerName?: string;
+      modelName?: string;
+    }
   | {
       type: "progress";
       assetId: string;
@@ -737,7 +755,13 @@ export type VLMOcrRunEvent =
       counts: VLMOcrRunCounts;
       errorMessage?: string;
     }
-  | { type: "done"; counts: VLMOcrRunCounts; firstError?: string }
+  | {
+      type: "done";
+      counts: VLMOcrRunCounts;
+      firstError?: string;
+      providerName?: string;
+      modelName?: string;
+    }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: VLMOcrRunCounts };
 
 export type ActionPreview = {
@@ -829,4 +853,5 @@ export type TagListResponse = {
   totalTaggedAssets: number;
   topCategory: string;
   translations?: Record<string, string>;
+  categoryTranslations?: Record<string, string>;
 };

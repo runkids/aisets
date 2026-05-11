@@ -203,12 +203,15 @@ export function TagsView() {
 
   const isFiltered = debouncedSearch.length > 0 || category.length > 0;
 
+  const dbCatTr = data?.categoryTranslations;
   const categoryLabel = useCallback(
     (cat: string) => {
-      const tr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
-      return tr !== cat ? `${tr} (${cat})` : cat;
+      const dbTr = dbCatTr?.[cat];
+      if (dbTr && dbTr !== cat) return `${dbTr} (${cat})`;
+      const staticTr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
+      return staticTr !== cat ? `${staticTr} (${cat})` : cat;
     },
-    [t],
+    [t, dbCatTr],
   );
 
   const catCategories = catData?.categories;

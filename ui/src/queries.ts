@@ -18,6 +18,7 @@ import {
   checkLLMHealth,
   clearAITagCache,
   clearOCRCache,
+  detectAgentCLIs,
   clearScanHistory,
   deleteUnusedPreview,
   fetchLLMModels,
@@ -559,6 +560,16 @@ export function useUpdateSettingsMutation() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: settingsQueryKey });
       await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useDetectAgentCLIsMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: detectAgentCLIs,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: settingsQueryKey });
     },
   });
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -412,7 +413,29 @@ func analyzeUpload(ctx context.Context, header *multipart.FileHeader, catalog sc
 	if err := tmp.Close(); err != nil {
 		return precheck.Result{}, apierr.New("upload_close_failed", "failed to close upload")
 	}
-	return precheck.Analyze(ctx, header.Filename, tmpPath, catalog)
+	res, err := precheck.Analyze(ctx, header.Filename, tmpPath, catalog)
+	if err != nil {
+		return res, err
+	}
+	res.ThumbnailDataURL = generatePreCheckThumbnail(tmpPath, res.ContentHash)
+	return res, nil
+}
+
+func generatePreCheckThumbnail(path, contentHash string) string {
+	thumbDir, err := os.MkdirTemp("", "aisets-precheck-thumb-*")
+	if err != nil {
+		return ""
+	}
+	defer os.RemoveAll(thumbDir)
+	result, err := imageproc.Thumbnail(path, thumbDir, contentHash, 128)
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(result.Path)
+	if err != nil {
+		return ""
+	}
+	return "data:" + result.MimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
 func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {

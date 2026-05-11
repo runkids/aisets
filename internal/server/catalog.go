@@ -135,17 +135,21 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		val := v == "true"
 		query.HasGPS = &val
 	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	_, vlmProvider, vlmModel := s.resolveVLMProviderForFeature(settings, agent.FeatureOCR)
+	if vlmProvider != "" && vlmModel != "" {
+		query.VLMEngineVersion = vlmProvider + "/" + vlmModel
+	}
 	page, err := s.store.CatalogItems(query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if len(page.Items) > 0 {
-		settings, err := s.store.Settings()
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
 		catalog, err := s.enrichCatalogOCR(r.Context(), scanner.Catalog{Items: page.Items})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)

@@ -82,9 +82,9 @@ export function VLMBackendSelect({
             <DropdownMenuPrimitive.Item
               key={opt.value}
               onSelect={() => onChange(opt.value)}
-              className="group flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-g-md px-3 py-2 text-left font-g text-g-body leading-[1.4] font-[510] text-g-ink-2 outline-none transition-[background,color,box-shadow] duration-[120ms] ease-g focus-visible:shadow-g-focus data-[highlighted]:bg-g-surface-3 data-[highlighted]:text-g-ink"
+              className="group flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-g-md px-2 py-2 text-left font-g text-g-body leading-[1.4] font-[510] text-g-ink-2 outline-none transition-[background,color,box-shadow] duration-[120ms] ease-g focus-visible:shadow-g-focus data-[highlighted]:bg-g-surface-3 data-[highlighted]:text-g-ink"
             >
-              <span className="grid size-4 shrink-0 place-items-center">
+              <span className="grid size-3.5 shrink-0 place-items-center">
                 {opt.value === value && (
                   <Check size={14} className="text-g-active-text" />
                 )}

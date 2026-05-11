@@ -718,6 +718,12 @@ export function updateSettings(data: SettingsUpdate) {
   });
 }
 
+export function detectAgentCLIs() {
+  return request<{ settings: SettingsInfo }>("/api/agent/detect", {
+    method: "POST",
+  });
+}
+
 export function getVersionCheck() {
   return request<VersionCheck>("/api/version");
 }

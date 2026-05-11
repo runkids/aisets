@@ -27,11 +27,12 @@ type AITagListItem struct {
 
 // AITagListPage is the paginated result of AITagList.
 type AITagListPage struct {
-	Tags              []AITagListItem   `json:"tags"`
-	Total             int               `json:"total"`
-	TotalTaggedAssets int               `json:"totalTaggedAssets"`
-	TopCategory       string            `json:"topCategory"`
-	Translations      map[string]string `json:"translations,omitempty"`
+	Tags                 []AITagListItem   `json:"tags"`
+	Total                int               `json:"total"`
+	TotalTaggedAssets    int               `json:"totalTaggedAssets"`
+	TopCategory          string            `json:"topCategory"`
+	Translations         map[string]string `json:"translations,omitempty"`
+	CategoryTranslations map[string]string `json:"categoryTranslations,omitempty"`
 }
 
 // AITagList returns paginated unique tags aggregated from all ready ai_tags rows.
@@ -131,6 +132,9 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 		if tr, err := s.aiTagTranslations(tags, q.Locale); err == nil && len(tr) > 0 {
 			page.Translations = tr
 		}
+		if ctr, err := s.aiCategoryTranslations(q.Locale); err == nil && len(ctr) > 0 {
+			page.CategoryTranslations = ctr
+		}
 	}
 
 	return page, nil
@@ -167,6 +171,34 @@ func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[stri
 		}
 		if translation != nil && *translation != "" && result[tag] == "" {
 			result[tag] = *translation
+		}
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) aiCategoryTranslations(locale string) (map[string]string, error) {
+	rows, err := s.rdb.Query(`
+		SELECT category, json_extract(category_i18n_json, '$."` + locale + `"')
+		FROM ai_tags
+		WHERE status = 'ready'
+		  AND category != ''
+		  AND json_type(category_i18n_json, '$."` + locale + `"') = 'text'
+		GROUP BY category
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("ai category translations: %w", err)
+	}
+	defer rows.Close()
+
+	result := map[string]string{}
+	for rows.Next() {
+		var cat string
+		var translation *string
+		if err := rows.Scan(&cat, &translation); err != nil {
+			return nil, fmt.Errorf("ai category translations scan: %w", err)
+		}
+		if translation != nil && *translation != "" {
+			result[cat] = *translation
 		}
 	}
 	return result, rows.Err()

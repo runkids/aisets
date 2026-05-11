@@ -54,10 +54,6 @@ export function TagsGrid({
     return tr && tr !== tag ? `${tr} (${tag})` : tag;
   };
 
-  const categoryLabel = (cat: string) => {
-    const tr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
-    return tr !== cat ? `${tr} (${cat})` : cat;
-  };
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
 
   const containerRef = useCallback((node: HTMLDivElement | null) => {
@@ -152,15 +148,12 @@ export function TagsGrid({
               </div>
 
               {/* Category badges — desktop only */}
-              <div className="hidden min-[1024px]:flex items-center gap-1 w-[130px] justify-end">
-                {item.categories.slice(0, 2).map((cat) => (
+              <div className="hidden min-[1024px]:flex items-center gap-1 justify-end flex-wrap">
+                {item.categories.map((cat) => (
                   <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
-                    {categoryLabel(cat)}
+                    {cat}
                   </Badge>
                 ))}
-                {item.categories.length > 2 && (
-                  <Badge tone="default">+{item.categories.length - 2}</Badge>
-                )}
               </div>
 
               {/* Browse action — appears on hover */}
