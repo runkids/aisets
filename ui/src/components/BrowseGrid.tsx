@@ -14,6 +14,7 @@ import {
   Copy,
   Gauge,
   LoaderCircle,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../imageBackground";
@@ -29,6 +30,7 @@ import {
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../ui";
 import { AITagBadge } from "./AITagBadge";
 import { OCRStatusBadge } from "./OCRStatusBadge";
+import { TagPickerPopover } from "./TagPickerPopover";
 import { Checkbox, ImagePreview, Tooltip } from "./ui";
 
 type BrowseGridProps = {
@@ -106,6 +108,8 @@ export function BrowseGrid({
 }: BrowseGridProps) {
   const { t } = useTranslation();
   const cfg = SIZE_CONFIG[gridSize];
+  const [tagPickerAsset, setTagPickerAsset] = useState<AssetItem | null>(null);
+  const tagPickerTriggerRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [gridRef, gridWidth] = useElementWidth<HTMLElement>();
@@ -304,13 +308,30 @@ export function BrowseGrid({
               </span>
             </Tooltip>
           </div>
-          {gridSize !== "s" &&
-          (item.ocr?.status === "ready" || item.aiTag?.status === "ready") ? (
+          {gridSize !== "s" && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               <OCRStatusBadge item={item} />
               <AITagBadge item={item} />
+              <button
+                ref={
+                  tagPickerAsset?.id === item.id
+                    ? tagPickerTriggerRef
+                    : undefined
+                }
+                type="button"
+                className="inline-flex items-center justify-center size-5 rounded-g-pill border border-dashed border-g-line text-g-ink-4 hover:border-g-accent hover:text-g-accent transition-colors cursor-pointer opacity-0 group-hover/card:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTagPickerAsset((prev) =>
+                    prev?.id === item.id ? null : item,
+                  );
+                }}
+                aria-label={t("tags.addTag")}
+              >
+                <Plus size={10} />
+              </button>
             </div>
-          ) : null}
+          )}
         </div>
       </button>
     );
@@ -355,6 +376,13 @@ export function BrowseGrid({
           {loadingMore && <LoaderCircle size={13} className="animate-spin" />}
           {loadingMore ? t("common.loading") : null}
         </div>
+      )}
+      {tagPickerAsset && (
+        <TagPickerPopover
+          asset={tagPickerAsset}
+          triggerRef={tagPickerTriggerRef}
+          onClose={() => setTagPickerAsset(null)}
+        />
       )}
     </div>
   );

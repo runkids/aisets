@@ -75,7 +75,21 @@
     "selectTag": "選取 {{tag}}",
     "browseTag": "瀏覽素材",
     "emptyTitle": "尚無標籤",
-    "emptyDesc": "對素材執行 AI Tag 即可產生標籤"
+    "emptyDesc": "對素材執行 AI Tag 即可產生標籤",
+    "delete": "刪除",
+    "deleteTitle": "刪除標籤",
+    "deleteDesc": "從所有素材中移除 {{count}} 個標籤，此操作無法復原",
+    "deleteSuccess": "已從 {{affected}} 個素材中刪除 {{count}} 個標籤",
+    "selectAll": "全選",
+    "categoryFilter": "分類",
+    "allCategories": "所有分類",
+    "addTag": "新增標籤",
+    "removeTag": "移除",
+    "createNew": "建立「{{tag}}」",
+    "suggestEmpty": "輸入以搜尋或建立標籤",
+    "editTags": "編輯",
+    "doneTags": "完成",
+    "selectItems": "選取要管理的標籤"
   },
   "action": {
     "addProject": "新增專案",
@@ -278,7 +292,8 @@
     "retry": "重試",
     "yes": "是",
     "expand": "展開",
-    "collapse": "收合"
+    "collapse": "收合",
+    "saving": "儲存中…"
   },
   "status": {
     "scanning": "正在掃描",
@@ -545,6 +560,7 @@
     "bySize": "依大小"
   },
   "duplicates": {
+    "selectItems": "選取重複項目以執行操作",
     "title": "重複素材",
     "groupsCount": "{{count}} 個群組",
     "description": "散落在不同路徑的相同檔案合併後保留一份並重寫引用",
@@ -797,6 +813,7 @@
     "clearSearch": "清除搜尋"
   },
   "browse": {
+    "selectItems": "選取素材以執行操作",
     "empty": "沒有素材符合目前篩選",
     "emptyOCRTextHint": "{{count}} 張圖片已完成 OCR 但沒有辨識出文字，因此輸入圖片上的字不一定會命中",
     "unusedNotApplicableEmpty": "沒有可安全清理的未使用素材",
@@ -992,6 +1009,7 @@
     "tabSimilar": "相似",
     "tabOptimize": "最佳化",
     "tabOCR": "OCR",
+    "tabTags": "標籤",
     "chipUnused": "未使用",
     "chipPossiblyUnused": "可能未使用",
     "chipUsageNotApplicable": "不判斷未使用",

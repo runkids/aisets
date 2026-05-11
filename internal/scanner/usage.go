@@ -45,6 +45,7 @@ func classifyUsage(ctx context.Context, projects []Project, items []AssetItem, o
 		intent   ProjectScanIntent
 		coverage ReferenceCoverage
 		lint     LintApplicability
+		optimize OptimizeApplicability
 	}
 	policies := map[string]policy{}
 	for _, project := range projects {
@@ -54,12 +55,17 @@ func classifyUsage(ctx context.Context, projects []Project, items []AssetItem, o
 			intent:   intent,
 			coverage: coverage,
 			lint:     projectLintApplicability(coverage, intent),
+			optimize: projectOptimizeApplicability(intent),
 		}
 	}
 	for i := range items {
 		p := policies[items[i].ProjectID]
 		items[i].ScanIntent = NormalizeProjectScanIntent(items[i].ScanIntent)
 		items[i].LintApplicability = p.lint
+		items[i].OptimizeApplicability = p.optimize
+		if p.optimize == OptimizeNotApplicable {
+			items[i].Optimization = nil
+		}
 		items[i].UsageClassification = classifyItemUsage(items[i], p.intent, p.coverage, referencesComputed)
 		items[i].DeleteUnusedAllowed = items[i].UsageClassification == UsageUnused
 	}

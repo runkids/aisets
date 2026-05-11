@@ -79,6 +79,14 @@ const (
 	LintNotApplicable LintApplicability = "notApplicable"
 )
 
+type OptimizeApplicability string
+
+const (
+	OptimizeApplicable    OptimizeApplicability = "applicable"
+	OptimizeAdvisory      OptimizeApplicability = "advisory"
+	OptimizeNotApplicable OptimizeApplicability = "notApplicable"
+)
+
 type AnalysisOptions struct {
 	References     bool `json:"references"`
 	NearDuplicates bool `json:"nearDuplicates"`
@@ -175,6 +183,7 @@ type AssetItem struct {
 	UsageClassification    UsageClassification      `json:"usageClassification"`
 	DeleteUnusedAllowed    bool                     `json:"deleteUnusedAllowed"`
 	LintApplicability      LintApplicability        `json:"lintApplicability"`
+	OptimizeApplicability  OptimizeApplicability    `json:"optimizeApplicability"`
 }
 
 type AssetReference struct {

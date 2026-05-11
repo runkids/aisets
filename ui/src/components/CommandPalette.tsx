@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Tags,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -47,6 +48,7 @@ const MODE_ITEMS: ModeItem[] = [
     icon: <FolderKanban size={14} />,
   },
   { id: "browse", labelKey: "nav.browse", icon: <FolderOpen size={14} /> },
+  { id: "tags", labelKey: "nav.tags", icon: <Tags size={14} /> },
   { id: "duplicates", labelKey: "nav.duplicates", icon: <Recycle size={14} /> },
   { id: "unused", labelKey: "nav.unused", icon: <Trash2 size={14} /> },
   { id: "optimize", labelKey: "nav.optimize", icon: <Gauge size={14} /> },

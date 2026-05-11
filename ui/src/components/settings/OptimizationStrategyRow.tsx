@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { usePromptPresetsQuery } from "../../queries";
+import { useTagCategoriesQuery } from "../../tagsQueries";
 import type { OptimizationStrategy } from "../../types";
 import { TAG_BUILTIN_VARIABLES } from "../prompts/builtinVariables";
 import { Button, Select, Switch, TextInput, Tooltip } from "../ui";
@@ -50,19 +51,26 @@ export function OptimizationStrategyRow({
   const op = strategy.action.operation;
 
   const { data: presetsData } = usePromptPresetsQuery("tag");
+  const { data: catData } = useTagCategoriesQuery();
 
   const categoryOptions = useMemo(() => {
-    const presets = presetsData?.presets;
-    if (!presets || presets.length === 0) return BUILTIN_FALLBACK;
     const union = new Set<string>();
-    for (const preset of presets) {
-      const cats = preset.content.variables["categories"];
-      if (cats?.values) {
-        for (const v of cats.values) union.add(v);
+    // API categories (actual DB values, includes AI-invented ones)
+    for (const c of catData?.categories ?? []) union.add(c);
+    // Preset categories (configured in prompt variables)
+    const presets = presetsData?.presets;
+    if (presets && presets.length > 0) {
+      for (const preset of presets) {
+        const cats = preset.content.variables["categories"];
+        if (cats?.values) {
+          for (const v of cats.values) union.add(v);
+        }
       }
+    } else {
+      for (const v of BUILTIN_FALLBACK) union.add(v);
     }
-    return union.size > 0 ? [...union].sort() : BUILTIN_FALLBACK;
-  }, [presetsData]);
+    return [...union].sort();
+  }, [catData, presetsData]);
 
   const orphanedCategories = useMemo(() => {
     const selected = strategy.match.aiCategories ?? [];

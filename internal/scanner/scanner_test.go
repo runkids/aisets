@@ -85,8 +85,11 @@ func TestScanAssetPackMarksUsageNotApplicable(t *testing.T) {
 	if catalog.Analysis.References != AnalysisNotComputed || catalog.Stats.UnusedFiles != 0 || catalog.Stats.UsageNotApplicableFiles != 1 {
 		t.Fatalf("catalog analysis/stats = %#v %#v", catalog.Analysis, catalog.Stats)
 	}
-	if got := catalog.Items[0]; got.UsageClassification != UsageNotApplicable || got.DeleteUnusedAllowed || got.LintApplicability != LintNotApplicable {
+	if got := catalog.Items[0]; got.UsageClassification != UsageNotApplicable || got.DeleteUnusedAllowed || got.LintApplicability != LintNotApplicable || got.OptimizeApplicability != OptimizeNotApplicable {
 		t.Fatalf("item policy = %#v", got)
+	}
+	if len(catalog.Items[0].Optimization) != 0 {
+		t.Fatalf("asset pack item should have no optimization suggestions, got %d", len(catalog.Items[0].Optimization))
 	}
 }
 
@@ -103,7 +106,7 @@ func TestScanLibraryMarksZeroReferenceAssetsAdvisory(t *testing.T) {
 	if catalog.Stats.UnusedFiles != 0 || catalog.Stats.PossiblyUnusedFiles != 1 {
 		t.Fatalf("stats = %#v", catalog.Stats)
 	}
-	if got := catalog.Items[0]; got.UsageClassification != UsagePossiblyUnused || got.DeleteUnusedAllowed {
+	if got := catalog.Items[0]; got.UsageClassification != UsagePossiblyUnused || got.DeleteUnusedAllowed || got.OptimizeApplicability != OptimizeAdvisory {
 		t.Fatalf("item policy = %#v", got)
 	}
 }

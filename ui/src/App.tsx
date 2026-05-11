@@ -35,6 +35,7 @@ import { PromptsView } from "./components/PromptsView";
 import { PreviewModal } from "./components/PreviewModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { ScanHistoryView } from "./components/ScanHistoryView";
+import { TagsView } from "./components/TagsView";
 import {
   Button,
   EmptyState,
@@ -1055,6 +1056,8 @@ export function App() {
             )
           ) : mode === "history" ? (
             <ScanHistoryView />
+          ) : mode === "tags" ? (
+            <TagsView />
           ) : mode === "prompts" ? (
             <PromptsView />
           ) : (

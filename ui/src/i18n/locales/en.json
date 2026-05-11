@@ -75,7 +75,21 @@
     "selectTag": "Select {{tag}}",
     "browseTag": "Browse assets",
     "emptyTitle": "No tags yet",
-    "emptyDesc": "Run AI Tag on your assets to generate tags."
+    "emptyDesc": "Run AI Tag on your assets to generate tags.",
+    "delete": "Delete",
+    "deleteTitle": "Delete Tags",
+    "deleteDesc": "Remove {{count}} tag(s) from all assets. This cannot be undone.",
+    "deleteSuccess": "Deleted {{count}} tag(s) from {{affected}} assets",
+    "selectAll": "Select All",
+    "categoryFilter": "Category",
+    "allCategories": "All categories",
+    "addTag": "Add tag",
+    "removeTag": "Remove",
+    "createNew": "Create \"{{tag}}\"",
+    "suggestEmpty": "Type to search or create a tag",
+    "editTags": "Edit",
+    "doneTags": "Done",
+    "selectItems": "Select tags to manage"
   },
   "action": {
     "addProject": "Add Project",
@@ -278,7 +292,8 @@
     "retry": "Retry",
     "yes": "Yes",
     "expand": "Expand",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "saving": "Saving…"
   },
   "status": {
     "scanning": "Scanning",
@@ -1188,6 +1203,7 @@
     "bySize": "By Size"
   },
   "duplicates": {
+    "selectItems": "Select duplicates to act on",
     "title": "Duplicates",
     "groupsCount": "{{count}} groups",
     "description": "Identical files scattered across different paths. Merge to keep one copy and rewrite references.",
@@ -1440,6 +1456,7 @@
     "clearSearch": "Clear search"
   },
   "browse": {
+    "selectItems": "Select assets to act on",
     "empty": "No assets match the current filters",
     "emptyOCRTextHint": "{{count}} images finished OCR with no recognized text, so visible image text may not be searchable yet.",
     "unusedNotApplicableEmpty": "No cleanup-safe unused assets",
@@ -1635,6 +1652,7 @@
     "tabSimilar": "Similar",
     "tabOptimize": "Optimize",
     "tabOCR": "OCR",
+    "tabTags": "Tags",
     "chipUnused": "Unused",
     "chipPossiblyUnused": "Possibly Unused",
     "chipUsageNotApplicable": "Unused Not Checked",

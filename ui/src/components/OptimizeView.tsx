@@ -661,7 +661,11 @@ export function OptimizeView({
         onEvent: (event) => {
           if (event.type === "start") {
             emittedActivity = true;
-            onOptimizeActivity?.({ type: "start", total: event.total, startedAt: activityStartedAt });
+            onOptimizeActivity?.({
+              type: "start",
+              total: event.total,
+              startedAt: activityStartedAt,
+            });
           } else if (event.type === "operation") {
             emittedActivity = true;
             onOptimizeActivity?.({
@@ -971,12 +975,33 @@ export function OptimizeView({
     }
   }
 
+  const selectableItemIds = useMemo(
+    () =>
+      items
+        .filter((i) => estimatedOperationsByAsset.get(i.id)?.canApply !== false)
+        .map((i) => i.id),
+    [items, estimatedOperationsByAsset],
+  );
+
+  const allSelected = useMemo(
+    () =>
+      bulkMode &&
+      selectableItemIds.length > 0 &&
+      selected.size >= selectableItemIds.length &&
+      selectableItemIds.every((id) => selected.has(id)),
+    [bulkMode, selectableItemIds, selected],
+  );
+
   function toggleBulkMode() {
     if (selectionLocked) return;
-    setBulkMode((prev) => {
-      if (prev) setSelected(new Set());
-      return !prev;
-    });
+    if (!bulkMode) {
+      setBulkMode(true);
+    } else if (allSelected) {
+      setBulkMode(false);
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(selectableItemIds));
+    }
   }
 
   function toggleOne(id: string) {
@@ -1273,7 +1298,11 @@ export function OptimizeView({
                 disabled={selectionLocked}
                 className="shrink-0"
               >
-                {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+                {!bulkMode
+                  ? t("toolbar.bulkSelect")
+                  : allSelected
+                    ? t("common.cancel")
+                    : t("action.selectAll")}
               </Button>
             </div>
 

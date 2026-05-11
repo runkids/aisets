@@ -17,6 +17,7 @@ export type Mode =
   | "projects"
   | "history"
   | "browse"
+  | "tags"
   | "duplicates"
   | "unused"
   | "optimize"
@@ -29,6 +30,7 @@ export const modes: Mode[] = [
   "projects",
   "history",
   "browse",
+  "tags",
   "duplicates",
   "unused",
   "optimize",

@@ -60,7 +60,7 @@ type Tab = "exact" | "similar";
 type SortKey = "members" | "size";
 
 const ACTION_BTN =
-  "inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus";
+  "inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none";
 
 export function DuplicatesView({
   scanId,
@@ -306,12 +306,35 @@ export function DuplicatesView({
     });
   }, []);
 
+  const selectableGroupMemberIds = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        (g.members ?? [])
+          .filter((m) => m.repoPath !== g.preferredPath)
+          .map((m) => m.id),
+      ),
+    [groups],
+  );
+
+  const allSelected = useMemo(
+    () =>
+      bulkMode &&
+      selectableGroupMemberIds.length > 0 &&
+      selected.size >= selectableGroupMemberIds.length &&
+      selectableGroupMemberIds.every((id) => selected.has(id)),
+    [bulkMode, selectableGroupMemberIds, selected],
+  );
+
   const toggleBulkMode = useCallback(() => {
-    setBulkMode((prev) => {
-      if (prev) setSelected(new Set());
-      return !prev;
-    });
-  }, []);
+    if (!bulkMode) {
+      setBulkMode(true);
+    } else if (allSelected) {
+      setBulkMode(false);
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(selectableGroupMemberIds));
+    }
+  }, [bulkMode, allSelected, selectableGroupMemberIds]);
 
   const toggleGroupSelect = useCallback(
     (members: AssetItem[], preferredPath: string) => {
@@ -644,7 +667,11 @@ export function DuplicatesView({
                   onClick={toggleBulkMode}
                   className="shrink-0"
                 >
-                  {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+                  {!bulkMode
+                    ? t("toolbar.bulkSelect")
+                    : allSelected
+                      ? t("common.cancel")
+                      : t("action.selectAll")}
                 </Button>
               </div>
             )}
@@ -692,18 +719,21 @@ export function DuplicatesView({
               )}
             </div>
 
-            {bulkMode && selected.size > 0 && (
-              <div className="mt-2 flex min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
-                <span className="inline-flex min-h-[34px] items-center px-2.5 font-g-mono text-g-body text-g-ink-2">
-                  {t("selection.summary", {
-                    count: selected.size,
-                    size: formatBytes(selectedBytes),
-                  })}
+            {bulkMode && (
+              <div className="mt-2 flex min-h-[44px] items-center gap-0.5 overflow-x-auto rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
+                <span className="inline-flex min-h-[34px] shrink-0 items-center whitespace-nowrap px-2.5 font-g-mono text-g-body text-g-ink-2">
+                  {selected.size > 0
+                    ? t("selection.summary", {
+                        count: selected.size,
+                        size: formatBytes(selectedBytes),
+                      })
+                    : t("duplicates.selectItems")}
                 </span>
                 <span className="flex-1" />
                 <button
                   type="button"
                   className={ACTION_BTN}
+                  disabled={selected.size === 0}
                   onClick={copyPaths}
                 >
                   {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
@@ -712,8 +742,10 @@ export function DuplicatesView({
                 <button
                   type="button"
                   className={ACTION_BTN}
+                  disabled={
+                    selected.size === 0 || batchMergePreviewMut.isPending
+                  }
                   onClick={handleMergePreview}
-                  disabled={batchMergePreviewMut.isPending}
                 >
                   <GitMerge size={14} />
                   {t("action.merge")}
@@ -721,6 +753,7 @@ export function DuplicatesView({
                 <button
                   type="button"
                   className={ACTION_BTN}
+                  disabled={selected.size === 0}
                   onClick={() => setShowDeleteConfirm(true)}
                 >
                   <Trash2 size={14} />

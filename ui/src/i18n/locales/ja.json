@@ -75,7 +75,21 @@
     "selectTag": "{{tag}}を選択",
     "browseTag": "アセットを表示",
     "emptyTitle": "タグがありません",
-    "emptyDesc": "アセットに AI Tag を実行するとタグが生成されます"
+    "emptyDesc": "アセットに AI Tag を実行するとタグが生成されます",
+    "delete": "削除",
+    "deleteTitle": "タグの削除",
+    "deleteDesc": "すべてのアセットから{{count}}個のタグを削除します（元に戻せません）",
+    "deleteSuccess": "{{affected}}アセットから{{count}}個のタグを削除しました",
+    "selectAll": "すべて選択",
+    "categoryFilter": "カテゴリ",
+    "allCategories": "すべてのカテゴリ",
+    "addTag": "タグを追加",
+    "removeTag": "削除",
+    "createNew": "「{{tag}}」を作成",
+    "suggestEmpty": "入力してタグを検索・作成",
+    "editTags": "編集",
+    "doneTags": "完了",
+    "selectItems": "管理するタグを選択"
   },
   "action": {
     "addProject": "プロジェクト追加",
@@ -278,7 +292,8 @@
     "retry": "再試行",
     "yes": "はい",
     "expand": "展開",
-    "collapse": "折りたたむ"
+    "collapse": "折りたたむ",
+    "saving": "保存中…"
   },
   "status": {
     "scanning": "スキャン中",
@@ -509,6 +524,7 @@
     "bySize": "サイズ順"
   },
   "duplicates": {
+    "selectItems": "重複項目を選択して操作する",
     "title": "Duplicates",
     "groupsCount": "{{count}} groups",
     "description": "Identical files scattered across different paths. Merge to keep one copy and rewrite references.",
@@ -761,6 +777,7 @@
     "clearSearch": "検索をクリア"
   },
   "browse": {
+    "selectItems": "アセットを選択して操作する",
     "empty": "現在のフィルターに一致するアセットはありません",
     "flagDuplicate": "重複",
     "flagUnused": "未使用",
@@ -962,6 +979,7 @@
     "tabSimilar": "類似",
     "tabOptimize": "最適化",
     "tabOCR": "OCR",
+    "tabTags": "タグ",
     "chipUnused": "未使用",
     "chipPossiblyUnused": "おそらく未使用",
     "chipUsageNotApplicable": "未使用未確認",

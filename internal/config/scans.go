@@ -127,9 +127,9 @@ func (s *Store) recordScanAssetBatch(scanID int64, items []scanner.AssetItem) er
 			scan_id, asset_id, project_id, project_name, repo_path, file_name, local_path, ext,
 			bytes, modified_unix, content_hash, hash_algorithm, format, width, height, animated,
 			alpha, pages, dhash, dhash_flipped, used_count, scan_intent, usage_classification,
-			delete_unused_allowed, lint_applicability
+			delete_unused_allowed, lint_applicability, optimize_applicability
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -164,7 +164,7 @@ func (s *Store) recordScanAssetBatch(scanID int64, items []scanner.AssetItem) er
 			item.Bytes, item.ModifiedUnix, item.ContentHash, item.HashAlgorithm, item.Image.Format, item.Image.Width,
 			item.Image.Height, boolInt(item.Image.Animated), boolInt(item.Image.Alpha), item.Image.Pages,
 			item.DHash, item.DHashFlipped, usedCount, item.ScanIntent, item.UsageClassification,
-			boolInt(item.DeleteUnusedAllowed), item.LintApplicability); err != nil {
+			boolInt(item.DeleteUnusedAllowed), item.LintApplicability, item.OptimizeApplicability); err != nil {
 			return err
 		}
 		for _, ref := range item.References {
@@ -466,6 +466,9 @@ func normalizeSnapshotItem(item scanner.AssetItem) scanner.AssetItem {
 	}
 	if item.LintApplicability == "" {
 		item.LintApplicability = scanner.LintApplicable
+	}
+	if item.OptimizeApplicability == "" {
+		item.OptimizeApplicability = scanner.OptimizeApplicable
 	}
 	if item.UsageClassification == scanner.UsageUnused {
 		item.DeleteUnusedAllowed = true

@@ -12,6 +12,7 @@ const catalogAssetSelectColumns = `
 	a.width, a.height, a.animated, a.alpha, a.pages, COALESCE(a.dhash, ''), COALESCE(a.dhash_flipped, ''),
 	a.used_count, COALESCE(a.scan_intent, 'code'), COALESCE(a.usage_classification, 'notApplicable'),
 	COALESCE(a.delete_unused_allowed, 0), COALESCE(a.lint_applicability, 'advisory'),
+	COALESCE(a.optimize_applicability, 'applicable'),
 	COALESCE(d.group_id, ''), COALESCE(g.preferred_path, '')
 `
 
@@ -29,7 +30,8 @@ func scanAssetFromRow(row assetRowScanner) (scanner.AssetItem, error) {
 	err := row.Scan(&scanID, &item.ID, &item.ProjectID, &item.ProjectName, &item.RepoPath, &item.LocalPath, &item.Ext,
 		&item.Bytes, &item.ModifiedUnix, &item.ContentHash, &item.HashAlgorithm, &item.Image.Format, &item.Image.Width, &item.Image.Height,
 		&animated, &alpha, &item.Image.Pages, &item.DHash, &item.DHashFlipped, &usedCount, &item.ScanIntent,
-		&item.UsageClassification, &deleteUnusedAllowed, &item.LintApplicability, &groupID, &preferredPath)
+		&item.UsageClassification, &deleteUnusedAllowed, &item.LintApplicability, &item.OptimizeApplicability,
+		&groupID, &preferredPath)
 	if err != nil {
 		return scanner.AssetItem{}, err
 	}

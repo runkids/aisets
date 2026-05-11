@@ -8,6 +8,7 @@ import {
   Recycle,
   Settings,
   ShieldCheck,
+  Tags,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../types";
@@ -123,6 +124,11 @@ export function NavSidebar({
           id: "history",
           label: t("nav.history"),
           icon: <History size={18} />,
+        },
+        {
+          id: "tags",
+          label: t("nav.tags"),
+          icon: <Tags size={18} />,
         },
       ],
     },

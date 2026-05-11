@@ -550,12 +550,42 @@ func unmarshalStringArray(raw json.RawMessage) []string {
 }
 
 func fixVLMJSON(s string) string {
-	if i := strings.Index(s, "{"); i >= 0 {
-		s = s[i:]
+	start := strings.Index(s, "{")
+	if start < 0 {
+		return s
 	}
-	if i := strings.LastIndex(s, "}"); i >= 0 {
-		s = s[:i+1]
+	s = s[start:]
+	depth := 0
+	inStr := false
+	esc := false
+	end := len(s)
+	for i, c := range s {
+		if esc {
+			esc = false
+			continue
+		}
+		if c == '\\' && inStr {
+			esc = true
+			continue
+		}
+		if c == '"' {
+			inStr = !inStr
+			continue
+		}
+		if inStr {
+			continue
+		}
+		if c == '{' {
+			depth++
+		} else if c == '}' {
+			depth--
+			if depth == 0 {
+				end = i + 1
+				break
+			}
+		}
 	}
+	s = s[:end]
 	s = regexp.MustCompile(`,\s*([}\]])`).ReplaceAllString(s, "$1")
 	s = regexp.MustCompile(`(["\d\]}\w])\s*\n\s*"`).ReplaceAllString(s, `$1,"`)
 	return s

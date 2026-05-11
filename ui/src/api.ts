@@ -30,6 +30,7 @@ import type {
   ScanProfile,
   SettingsInfo,
   SettingsUpdate,
+  TagListResponse,
   UpdateAppResult,
   VersionCheck,
 } from "./types";
@@ -936,5 +937,74 @@ export function setPromptPresetDefault(id: string) {
   return request<{ preset: PromptPreset }>(
     `/api/prompt-presets/${id}/default`,
     { method: "POST" },
+  );
+}
+
+// --- Tag Management ---
+
+export function getTagList(params: {
+  q?: string;
+  sort?: string;
+  project?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  return request<TagListResponse>(
+    `/api/tags${queryString({
+      q: params.q,
+      sort: params.sort,
+      project: params.project,
+      category: params.category,
+      limit: params.limit,
+      offset: params.offset,
+    })}`,
+  );
+}
+
+export function renameTag(from: string, to: string) {
+  return request<{ ok: boolean; affected: number }>("/api/tags/rename", {
+    method: "POST",
+    body: JSON.stringify({ from, to }),
+  });
+}
+
+export function mergeTags(source: string[], target: string) {
+  return request<{ ok: boolean; affected: number }>("/api/tags/merge", {
+    method: "POST",
+    body: JSON.stringify({ source, target }),
+  });
+}
+
+export function deleteTags(tags: string[]) {
+  return request<{ ok: boolean; affected: number }>("/api/tags/delete", {
+    method: "POST",
+    body: JSON.stringify({ tags }),
+  });
+}
+
+export function setAssetTags(params: {
+  projectId: string;
+  repoPath: string;
+  contentHash: string;
+  hashAlgorithm: string;
+  tags: string[];
+}) {
+  return request<{ ok: boolean; tags: string[] }>("/api/assets/tags", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function getTagCategories() {
+  return request<{ categories: string[] }>("/api/tags/categories");
+}
+
+export function getTagSuggestions(q: string, limit = 10) {
+  const searchParams = new URLSearchParams();
+  if (q) searchParams.set("q", q);
+  searchParams.set("limit", String(limit));
+  return request<{ suggestions: string[] }>(
+    `/api/tags/suggest?${searchParams.toString()}`,
   );
 }

@@ -602,7 +602,7 @@ export function ScanHistoryView() {
 
           <div
             ref={toolbarRef}
-            className="sticky top-0 z-10 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] pb-3 backdrop-blur-[12px]"
+            className="sticky top-0 z-[4] bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] pb-3 backdrop-blur-[12px]"
           >
             <div className="flex flex-wrap items-center gap-2">
               <Select
@@ -692,7 +692,7 @@ export function ScanHistoryView() {
                 />
                 <div className="border-t border-g-line text-g-ui" role="table">
                   <div
-                    className={`sticky z-[5] grid ${diffGridCols} items-center border-b border-g-line border-l-[3px] border-l-transparent bg-g-surface-2 pl-5 text-g-caption uppercase tracking-[0.06em] text-g-ink-4`}
+                    className={`sticky z-[2] grid ${diffGridCols} items-center border-b border-g-line border-l-[3px] border-l-transparent bg-g-surface-2 pl-5 text-g-caption uppercase tracking-[0.06em] text-g-ink-4`}
                     style={{ top: `${toolbarH}px` }}
                     role="row"
                   >

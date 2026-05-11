@@ -29,6 +29,7 @@ import { fileName, formatBytes } from "../ui";
 import { AssetDrawerAI } from "./AssetDrawerAI";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
 import { AssetDrawerOptimize } from "./AssetDrawerOptimize";
+import { AssetDrawerTags } from "./AssetDrawerTags";
 import { useOptimizeVariants, type VariantInfo } from "./useOptimizeVariants";
 import { AssetDrawerOverview } from "./AssetDrawerOverview";
 import { AssetDrawerSimilar } from "./AssetDrawerSimilar";
@@ -95,7 +96,14 @@ function projectRoot(localPath: string, repoPath: string) {
   return "";
 }
 
-type DrawerTab = "overview" | "usage" | "similar" | "optimize" | "ocr" | "ai";
+type DrawerTab =
+  | "overview"
+  | "usage"
+  | "similar"
+  | "optimize"
+  | "ocr"
+  | "tags"
+  | "ai";
 
 type Props = {
   asset: AssetItem;
@@ -210,6 +218,21 @@ export function AssetDrawer({
     }
     if (ocrVisible) {
       items.push({ value: "ocr", label: t("assetDrawer.tabOCR") });
+    }
+    const hasAiTags = asset.aiTag && asset.aiTag.status === "ready";
+    if (hasAiTags || llmEnabled) {
+      const tagCount = asset.aiTag?.tags?.length ?? 0;
+      items.push({
+        value: "tags",
+        label: t("assetDrawer.tabTags"),
+        ...(tagCount > 0 && {
+          badge: (
+            <Badge tone="line" className="h-[18px] px-1.5 text-[10px]">
+              {tagCount}
+            </Badge>
+          ),
+        }),
+      });
     }
     if (aiTagVisible) {
       items.push({ value: "ai", label: t("drawer.tab.ai") });
@@ -587,6 +610,7 @@ export function AssetDrawer({
               {tab === "ocr" && ocrVisible && asset.ocr && (
                 <AssetDrawerOCR ocr={asset.ocr} />
               )}
+              {tab === "tags" && <AssetDrawerTags asset={asset} />}
               {tab === "ai" && aiTagVisible && (
                 <AssetDrawerAI
                   asset={asset}

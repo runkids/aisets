@@ -75,7 +75,21 @@
     "selectTag": "{{tag}} 선택",
     "browseTag": "에셋 보기",
     "emptyTitle": "태그 없음",
-    "emptyDesc": "에셋에 AI Tag를 실행하면 태그가 생성됩니다"
+    "emptyDesc": "에셋에 AI Tag를 실행하면 태그가 생성됩니다",
+    "delete": "삭제",
+    "deleteTitle": "태그 삭제",
+    "deleteDesc": "모든 에셋에서 {{count}}개 태그를 제거합니다 (되돌릴 수 없음)",
+    "deleteSuccess": "{{affected}}개 에셋에서 {{count}}개 태그를 삭제했습니다",
+    "selectAll": "모두 선택",
+    "categoryFilter": "카테고리",
+    "allCategories": "모든 카테고리",
+    "addTag": "태그 추가",
+    "removeTag": "제거",
+    "createNew": "\"{{tag}}\" 만들기",
+    "suggestEmpty": "입력하여 태그 검색 또는 생성",
+    "editTags": "편집",
+    "doneTags": "완료",
+    "selectItems": "관리할 태그를 선택"
   },
   "action": {
     "addProject": "프로젝트 추가",
@@ -278,7 +292,8 @@
     "retry": "다시 시도",
     "yes": "예",
     "expand": "펼치기",
-    "collapse": "접기"
+    "collapse": "접기",
+    "saving": "저장 중…"
   },
   "status": {
     "scanning": "스캔 중",
@@ -527,6 +542,7 @@
     "bySize": "크기순"
   },
   "duplicates": {
+    "selectItems": "중복 항목을 선택하여 작업하기",
     "title": "Duplicates",
     "groupsCount": "{{count}} groups",
     "description": "Identical files scattered across different paths. Merge to keep one copy and rewrite references.",
@@ -779,6 +795,7 @@
     "clearSearch": "검색 지우기"
   },
   "browse": {
+    "selectItems": "에셋을 선택하여 작업하기",
     "empty": "현재 필터와 일치하는 에셋이 없습니다",
     "flagDuplicate": "중복",
     "flagUnused": "미사용",
@@ -980,6 +997,7 @@
     "tabSimilar": "유사",
     "tabOptimize": "최적화",
     "tabOCR": "OCR",
+    "tabTags": "태그",
     "chipUnused": "미사용",
     "chipPossiblyUnused": "가능한 미사용",
     "chipUsageNotApplicable": "미사용 미확인",

@@ -188,6 +188,10 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 		return err
 	}
 	for index := range items {
+		if items[index].OptimizeApplicability == scanner.OptimizeNotApplicable {
+			items[index].Optimization = []scanner.OptimizationSuggestion{}
+			continue
+		}
 		opts := optsByID[items[index].ID]
 		if opts == nil {
 			opts = []scanner.OptimizationSuggestion{}

@@ -888,12 +888,25 @@ export function BrowseView({
     });
   }, []);
 
+  const allSelected = useMemo(
+    () =>
+      bulkMode &&
+      items.length > 0 &&
+      selected.size >= items.length &&
+      items.every((i) => selected.has(i.id)),
+    [bulkMode, items, selected],
+  );
+
   const toggleBulkMode = useCallback(() => {
-    setBulkMode((prev) => {
-      if (prev) setSelected(new Set());
-      return !prev;
-    });
-  }, []);
+    if (!bulkMode) {
+      setBulkMode(true);
+    } else if (allSelected) {
+      setBulkMode(false);
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(items.map((i) => i.id)));
+    }
+  }, [bulkMode, allSelected, items]);
 
   const selectedBytes = useMemo(
     () =>
@@ -1033,6 +1046,7 @@ export function BrowseView({
             customFilter={filters.customFilter}
             customFilterOptions={customFilterSelectOptions}
             bulkMode={bulkMode}
+            allSelected={allSelected}
             onViewChange={setView}
             onGridSizeChange={setGridSize}
             onBgModeChange={setBgMode}
@@ -1048,18 +1062,21 @@ export function BrowseView({
             onBulkToggle={toggleBulkMode}
           />
 
-          {bulkMode && selected.size > 0 && (
-            <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
-              <span className="inline-flex min-h-[34px] items-center px-2.5 font-g-mono text-g-body text-g-ink-2">
-                {t("selection.summary", {
-                  count: selected.size,
-                  size: formatBytes(selectedBytes),
-                })}
+          {bulkMode && (
+            <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 overflow-x-auto rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
+              <span className="inline-flex min-h-[34px] shrink-0 items-center whitespace-nowrap px-2.5 font-g-mono text-g-body text-g-ink-2">
+                {selected.size > 0
+                  ? t("selection.summary", {
+                      count: selected.size,
+                      size: formatBytes(selectedBytes),
+                    })
+                  : t("browse.selectItems")}
               </span>
               <span className="flex-1" />
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={copyPaths}
               >
                 {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
@@ -1067,7 +1084,8 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={() => setShowCopyDir(true)}
               >
                 <FolderOutput size={14} />
@@ -1075,7 +1093,8 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={() => setShowMoveDir(true)}
               >
                 <FolderInput size={14} />
@@ -1083,7 +1102,8 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={() => setShowRenameRules(true)}
               >
                 <PenLine size={14} />
@@ -1091,7 +1111,8 @@ export function BrowseView({
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={() => batchExport(Array.from(selected))}
               >
                 <Download size={14} />
@@ -1100,8 +1121,8 @@ export function BrowseView({
               {aiEnabled && onStartAITag && (
                 <button
                   type="button"
-                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
-                  disabled={aiBusy}
+                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                  disabled={aiBusy || selected.size === 0}
                   onClick={() => onStartAITag(Array.from(selected))}
                 >
                   <Tags size={14} />
@@ -1111,8 +1132,8 @@ export function BrowseView({
               {aiEnabled && onStartVLMOcr && (
                 <button
                   type="button"
-                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
-                  disabled={aiBusy}
+                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                  disabled={aiBusy || selected.size === 0}
                   onClick={() => onStartVLMOcr(Array.from(selected))}
                 >
                   <ScanText size={14} />
@@ -1121,7 +1142,8 @@ export function BrowseView({
               )}
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus"
+                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                disabled={selected.size === 0}
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 size={14} />

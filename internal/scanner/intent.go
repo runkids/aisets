@@ -84,6 +84,16 @@ func projectLintApplicability(coverage ReferenceCoverage, intent ProjectScanInte
 	return LintAdvisory
 }
 
+func projectOptimizeApplicability(intent ProjectScanIntent) OptimizeApplicability {
+	switch NormalizeProjectScanIntent(intent) {
+	case ProjectScanIntentAssetPack:
+		return OptimizeNotApplicable
+	case ProjectScanIntentLibrary, ProjectScanIntentMixed:
+		return OptimizeAdvisory
+	}
+	return OptimizeApplicable
+}
+
 var frontendReferenceManifestNames = map[string]bool{
 	"angular.json": true, "astro.config.js": true, "astro.config.mjs": true, "astro.config.ts": true,
 	"next.config.js": true, "next.config.ts": true, "nuxt.config.js": true, "nuxt.config.ts": true,

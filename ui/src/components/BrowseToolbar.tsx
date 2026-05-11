@@ -57,6 +57,7 @@ type BrowseToolbarProps = {
   customFilter: string;
   customFilterOptions: CustomFilterSelectOption[];
   bulkMode: boolean;
+  allSelected: boolean;
   onViewChange: (view: ViewMode) => void;
   onGridSizeChange: (size: "s" | "m" | "l") => void;
   onBgModeChange: (mode: ImageBackgroundMode) => void;
@@ -80,6 +81,7 @@ export function BrowseToolbar({
   customFilter,
   customFilterOptions,
   bulkMode,
+  allSelected,
   onViewChange,
   onGridSizeChange,
   onBgModeChange,
@@ -234,7 +236,11 @@ export function BrowseToolbar({
           leadingIcon={<CheckSquare size={14} />}
           onClick={onBulkToggle}
         >
-          {bulkMode ? t("action.deselectAll") : t("toolbar.bulkSelect")}
+          {!bulkMode
+            ? t("toolbar.bulkSelect")
+            : allSelected
+              ? t("common.cancel")
+              : t("action.selectAll")}
         </Button>
       </div>
 

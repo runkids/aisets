@@ -132,45 +132,6 @@ export function AssetDrawerAI({
 
           {hasAiTag ? (
             <>
-              <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3">
-                <div className="flex flex-col gap-3">
-                  {aiTag.category && (
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 shrink-0 font-g text-g-caption font-[510] text-g-ink-3">
-                        {t("drawer.aiCategory")}
-                      </span>
-                      <Badge tone="purple">{aiTag.category}</Badge>
-                    </div>
-                  )}
-                  {(() => {
-                    const localeTags = aiTag.tagsI18n?.[i18n.language];
-                    const displayTags =
-                      localeTags && localeTags.length > 0
-                        ? localeTags
-                        : aiTag.tags;
-                    return displayTags && displayTags.length > 0 ? (
-                      <div className="flex items-start gap-3">
-                        <Tags
-                          size={12}
-                          className="mt-1 shrink-0 text-g-ink-4"
-                        />
-                        <div className="flex flex-wrap gap-1">
-                          {displayTags.map((tag, idx) => (
-                            <Badge
-                              key={`${tag}-${idx}`}
-                              tone="line"
-                              className="text-g-ink-2"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-
               {(() => {
                 const localeDesc = aiTag.descriptionI18n?.[i18n.language];
                 const displayDesc = localeDesc || aiTag.description;
