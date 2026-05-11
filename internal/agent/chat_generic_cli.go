@@ -45,9 +45,13 @@ func (p *CLIChatProvider) chatOne(ctx context.Context, req ChatRequest) ChatResu
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {
+		detail := truncate(stderr.String(), 500)
+		if detail == "" {
+			detail = truncate(stdout.String(), 500)
+		}
 		return ChatResult{
 			DurationMs: durationMs,
-			Err:        fmt.Errorf("%s cli: %w (stderr: %s)", p.name, err, truncate(stderr.String(), 500)),
+			Err:        fmt.Errorf("%s cli: %w (output: %s)", p.name, err, detail),
 		}
 	}
 
@@ -79,12 +83,18 @@ func newCLIChatProvider(binPath, name string, buildArgs func(ChatRequest) []stri
 
 func newClaudeChatProvider(binPath string) *CLIChatProvider {
 	p := newCLIChatProvider(binPath, "claude", func(req ChatRequest) []string {
-		args := []string{"-p", "--bare", "--output-format", "text", "--allowedTools", "Read"}
+		args := []string{"-p", "--output-format", "text", "--allowedTools", "Read"}
+		if req.SystemPrompt != "" {
+			args = append(args, "--system-prompt", req.SystemPrompt)
+		}
 		if req.Model != "" {
 			args = append(args, "--model", req.Model)
 		}
 		return args
 	})
+	p.buildPrompt = func(req ChatRequest) string {
+		return buildCLIPrompt("", req.Prompt, req.ImagePaths)
+	}
 	return p
 }
 
@@ -134,11 +144,18 @@ func newCursorChatProvider(binPath string) *CLIChatProvider {
 }
 
 func newPiChatProvider(binPath string) *CLIChatProvider {
-	return newCLIChatProvider(binPath, "pi", func(req ChatRequest) []string {
+	p := newCLIChatProvider(binPath, "pi", func(req ChatRequest) []string {
 		args := []string{"-p"}
+		if req.SystemPrompt != "" {
+			args = append(args, "--system-prompt", req.SystemPrompt)
+		}
 		if req.Model != "" {
 			args = append(args, "--model", req.Model)
 		}
 		return args
 	})
+	p.buildPrompt = func(req ChatRequest) string {
+		return buildCLIPrompt("", req.Prompt, req.ImagePaths)
+	}
+	return p
 }
