@@ -947,6 +947,7 @@
     "promptsHeading": "Prompts & Locale",
     "systemPrompt": "System Prompt",
     "systemPromptHint": "Prepended to all AI operations. Edit in Prompt Manager.",
+    "systemPromptPlaceholder": "Enter system prompt... (applied to all AI operations)",
     "llmAutoLocale": "Auto locale response",
     "llmAutoLocaleHint": "AI responds in the language matching your UI locale setting.",
     "aiTagGroup": "AI Tagging",

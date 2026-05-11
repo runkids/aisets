@@ -18,6 +18,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   usePromptPresetsQuery,
+  useCreatePromptPresetMutation,
+  useUpdatePromptPresetMutation,
   useUpdateSettingsMutation,
 } from "../../queries";
 import { useToast } from "../ToastProvider";
@@ -90,6 +92,7 @@ import {
   IconButton,
   Select,
   Switch,
+  Textarea,
   TextInput,
   Tooltip,
 } from "../ui";
@@ -1204,6 +1207,83 @@ function VLMOcrProgressText({
   );
 }
 
+function SystemPromptInline() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const presetsQuery = usePromptPresetsQuery("system");
+  const createMutation = useCreatePromptPresetMutation();
+  const updateMutation = useUpdatePromptPresetMutation();
+
+  const preset = presetsQuery.data?.presets?.[0];
+  const serverValue = preset?.content?.template ?? "";
+  const [localValue, setLocalValue] = useState<string | null>(null);
+
+  const value = localValue ?? serverValue;
+  const isDirty = localValue != null && localValue !== serverValue;
+
+  function handleSave() {
+    if (preset) {
+      updateMutation.mutate(
+        {
+          id: preset.id,
+          name: preset.name,
+          content: {
+            template: value,
+            variables: preset.content.variables ?? {},
+          },
+        },
+        {
+          onSuccess: () => {
+            setLocalValue(null);
+            toast.success(t("prompts.toastSaved"));
+          },
+          onError: (err) => toast.error(errorMessage(err)),
+        },
+      );
+    } else {
+      createMutation.mutate(
+        {
+          name: "System",
+          type: "system",
+          content: { template: value, variables: {} },
+          isDefault: true,
+        },
+        {
+          onSuccess: () => {
+            setLocalValue(null);
+            toast.success(t("prompts.toastCreated"));
+          },
+          onError: (err) => toast.error(errorMessage(err)),
+        },
+      );
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        value={value}
+        onChange={(e) => setLocalValue(e.target.value)}
+        rows={4}
+        placeholder={t("settings.systemPromptPlaceholder")}
+        className="font-g-mono text-g-caption"
+      />
+      {isDirty && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleSave}
+            disabled={updateMutation.isPending || createMutation.isPending}
+          >
+            {t("action.saveChanges")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PromptsLocaleCard({
   draft,
   systemPromptEnabled,
@@ -1248,6 +1328,11 @@ function PromptsLocaleCard({
             aria-label={t("settings.systemPrompt")}
           />
         </FieldRow>
+        {systemPromptEnabled && (
+          <div className="py-3">
+            <SystemPromptInline />
+          </div>
+        )}
         <FieldRow
           label={t("settings.llmAutoLocale")}
           description={t("settings.llmAutoLocaleHint")}

@@ -1496,6 +1496,7 @@
     "promptsHeading": "プロンプトと言語",
     "systemPrompt": "システムプロンプト",
     "systemPromptHint": "すべての AI 操作に自動的に付加されます。プロンプトマネージャーで編集できます",
+    "systemPromptPlaceholder": "システムプロンプトを入力…（すべての AI 操作に適用）",
     "llmAutoLocale": "自動言語応答",
     "llmAutoLocaleHint": "UI の言語設定に合わせて AI が対応する言語で応答します",
     "aiTagGroup": "AI タグ付け",

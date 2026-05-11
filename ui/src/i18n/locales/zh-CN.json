@@ -1496,6 +1496,7 @@
     "promptsHeading": "提示词与语言",
     "systemPrompt": "系统提示词",
     "systemPromptHint": "自动添加到所有 AI 操作之前，可在提示词管理器中编辑",
+    "systemPromptPlaceholder": "输入系统提示词…（应用于所有 AI 操作）",
     "llmAutoLocale": "自动语言回复",
     "llmAutoLocaleHint": "AI 根据界面语言自动以对应语言回复",
     "aiTagGroup": "AI 标记",
