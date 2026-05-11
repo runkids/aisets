@@ -131,7 +131,7 @@ func (s *Store) AITagRename(from, to string) (int, error) {
 	return s.AITagMerge([]string{from}, to)
 }
 
-// AITagMerge merges all source tags into target in tags_json across all ready ai_tags rows.
+// AITagMerge merges all source tags into target in tags_json and tags_i18n_json across all ready ai_tags rows.
 func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	if len(source) == 0 || target == "" {
 		return 0, fmt.Errorf("aitag merge: source and target must be non-empty")
@@ -146,7 +146,7 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	defer tx.Rollback() //nolint:errcheck
 
 	querySQL := fmt.Sprintf(`
-		SELECT rowid, tags_json FROM ai_tags
+		SELECT rowid, tags_json, COALESCE(tags_i18n_json, '{}') FROM ai_tags
 		WHERE status = 'ready'
 		  AND EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)
 	`, inExpr)
@@ -159,6 +159,7 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	type rowUpdate struct {
 		rowid   int64
 		newJSON string
+		newI18n string
 	}
 	var updates []rowUpdate
 
@@ -169,8 +170,8 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 
 	for rows.Next() {
 		var rowid int64
-		var tagsRaw string
-		if err := rows.Scan(&rowid, &tagsRaw); err != nil {
+		var tagsRaw, i18nRaw string
+		if err := rows.Scan(&rowid, &tagsRaw, &i18nRaw); err != nil {
 			rows.Close()
 			return 0, fmt.Errorf("aitag merge scan: %w", err)
 		}
@@ -181,7 +182,6 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 			return 0, fmt.Errorf("aitag merge unmarshal rowid=%d: %w", rowid, err)
 		}
 
-		// Replace source tags with target, dedup
 		seen := make(map[string]struct{}, len(tags))
 		var result []string
 		for _, tag := range tags {
@@ -203,7 +203,11 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 			rows.Close()
 			return 0, fmt.Errorf("aitag merge marshal rowid=%d: %w", rowid, err)
 		}
-		updates = append(updates, rowUpdate{rowid: rowid, newJSON: string(newRaw)})
+		updates = append(updates, rowUpdate{
+			rowid:   rowid,
+			newJSON: string(newRaw),
+			newI18n: syncI18nTags(tagsRaw, i18nRaw, result),
+		})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -211,7 +215,7 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	}
 
 	for _, u := range updates {
-		if _, err := tx.Exec("UPDATE ai_tags SET tags_json = ? WHERE rowid = ?", u.newJSON, u.rowid); err != nil {
+		if _, err := tx.Exec("UPDATE ai_tags SET tags_json = ?, tags_i18n_json = ? WHERE rowid = ?", u.newJSON, u.newI18n, u.rowid); err != nil {
 			return 0, fmt.Errorf("aitag merge update rowid=%d: %w", u.rowid, err)
 		}
 	}
@@ -222,7 +226,7 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	return len(updates), nil
 }
 
-// AITagDelete removes specified tags from all ready ai_tags rows' tags_json.
+// AITagDelete removes specified tags from all ready ai_tags rows' tags_json and tags_i18n_json.
 func (s *Store) AITagDelete(tags []string) (int, error) {
 	if len(tags) == 0 {
 		return 0, fmt.Errorf("aitag delete: tags must be non-empty")
@@ -237,7 +241,7 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 	defer tx.Rollback() //nolint:errcheck
 
 	querySQL := fmt.Sprintf(`
-		SELECT rowid, tags_json FROM ai_tags
+		SELECT rowid, tags_json, COALESCE(tags_i18n_json, '{}') FROM ai_tags
 		WHERE status = 'ready'
 		  AND EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)
 	`, inExpr)
@@ -250,6 +254,7 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 	type rowUpdate struct {
 		rowid   int64
 		newJSON string
+		newI18n string
 	}
 	var updates []rowUpdate
 
@@ -260,8 +265,8 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 
 	for rows.Next() {
 		var rowid int64
-		var tagsRaw string
-		if err := rows.Scan(&rowid, &tagsRaw); err != nil {
+		var tagsRaw, i18nRaw string
+		if err := rows.Scan(&rowid, &tagsRaw, &i18nRaw); err != nil {
 			rows.Close()
 			return 0, fmt.Errorf("aitag delete scan: %w", err)
 		}
@@ -287,7 +292,11 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 			rows.Close()
 			return 0, fmt.Errorf("aitag delete marshal rowid=%d: %w", rowid, err)
 		}
-		updates = append(updates, rowUpdate{rowid: rowid, newJSON: string(newRaw)})
+		updates = append(updates, rowUpdate{
+			rowid:   rowid,
+			newJSON: string(newRaw),
+			newI18n: syncI18nTags(tagsRaw, i18nRaw, result),
+		})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -295,7 +304,7 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 	}
 
 	for _, u := range updates {
-		if _, err := tx.Exec("UPDATE ai_tags SET tags_json = ? WHERE rowid = ?", u.newJSON, u.rowid); err != nil {
+		if _, err := tx.Exec("UPDATE ai_tags SET tags_json = ?, tags_i18n_json = ? WHERE rowid = ?", u.newJSON, u.newI18n, u.rowid); err != nil {
 			return 0, fmt.Errorf("aitag delete update rowid=%d: %w", u.rowid, err)
 		}
 	}
@@ -335,15 +344,17 @@ func (s *Store) AITagSetForAsset(key AITagSetForAssetKey, tags []string) error {
 	defer tx.Rollback() //nolint:errcheck
 
 	var rowid int64
+	var oldTagsRaw, oldI18nRaw string
 	err = tx.QueryRow(`
-		SELECT rowid FROM ai_tags
+		SELECT rowid, tags_json, COALESCE(tags_i18n_json, '{}') FROM ai_tags
 		WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ? AND status = 'ready'
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, key.ProjectID, key.RepoPath, key.ContentHash, key.HashAlgorithm).Scan(&rowid)
+	`, key.ProjectID, key.RepoPath, key.ContentHash, key.HashAlgorithm).Scan(&rowid, &oldTagsRaw, &oldI18nRaw)
 
 	if err == nil {
-		_, err = tx.Exec("UPDATE ai_tags SET tags_json = ?, updated_at = datetime('now') WHERE rowid = ?", string(tagsJSON), rowid)
+		newI18nJSON := syncI18nTags(oldTagsRaw, oldI18nRaw, tags)
+		_, err = tx.Exec("UPDATE ai_tags SET tags_json = ?, tags_i18n_json = ?, updated_at = datetime('now') WHERE rowid = ?", string(tagsJSON), newI18nJSON, rowid)
 		if err != nil {
 			return fmt.Errorf("aitag set update: %w", err)
 		}
@@ -361,6 +372,43 @@ func (s *Store) AITagSetForAsset(key AITagSetForAssetKey, tags []string) error {
 		return fmt.Errorf("aitag set commit: %w", err)
 	}
 	return nil
+}
+
+// syncI18nTags rebuilds tags_i18n_json to match a new tags list.
+// It preserves i18n entries at positions whose English tag is still present.
+func syncI18nTags(oldTagsRaw, oldI18nRaw string, newTags []string) string {
+	var oldTags []string
+	_ = json.Unmarshal([]byte(oldTagsRaw), &oldTags)
+
+	var oldI18n map[string][]string
+	_ = json.Unmarshal([]byte(oldI18nRaw), &oldI18n)
+	if len(oldI18n) == 0 {
+		return "{}"
+	}
+
+	oldIndex := make(map[string]int, len(oldTags))
+	for i, t := range oldTags {
+		oldIndex[t] = i
+	}
+
+	newI18n := make(map[string][]string, len(oldI18n))
+	for lang, vals := range oldI18n {
+		kept := make([]string, 0, len(newTags))
+		for _, tag := range newTags {
+			if idx, ok := oldIndex[tag]; ok && idx < len(vals) {
+				kept = append(kept, vals[idx])
+			}
+		}
+		if len(kept) > 0 {
+			newI18n[lang] = kept
+		}
+	}
+
+	out, _ := json.Marshal(newI18n)
+	if string(out) == "null" {
+		return "{}"
+	}
+	return string(out)
 }
 
 // AITagSuggest returns tag values matching the given prefix for autocomplete.

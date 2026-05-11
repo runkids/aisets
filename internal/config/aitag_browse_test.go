@@ -622,3 +622,97 @@ func TestAITagList_CategoryFilter(t *testing.T) {
 		t.Fatalf("expected 4 tags for category 'photo', got %d", page.Total)
 	}
 }
+
+func readI18n(t *testing.T, store *Store, projectID, repoPath string) map[string][]string {
+	t.Helper()
+	var raw string
+	err := store.rdb.QueryRow(
+		`SELECT COALESCE(tags_i18n_json, '{}') FROM ai_tags WHERE project_id = ? AND repo_path = ? AND status = 'ready' ORDER BY updated_at DESC LIMIT 1`,
+		projectID, repoPath,
+	).Scan(&raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string][]string
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func TestAITagSetForAsset_SyncsI18n(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	key := AITagSetForAssetKey{
+		ProjectID: "proj1", RepoPath: "e.jpg",
+		ContentHash: "h5", HashAlgorithm: "sha256",
+	}
+	// Remove "sports" (index 1), keep "boxing" (index 0)
+	if err := store.AITagSetForAsset(key, []string{"boxing"}); err != nil {
+		t.Fatal(err)
+	}
+
+	i18n := readI18n(t, store, "proj1", "e.jpg")
+	if got := i18n["zh-TW"]; len(got) != 1 || got[0] != "拳擊" {
+		t.Fatalf("zh-TW should be [拳擊], got %v", got)
+	}
+	if got := i18n["ja"]; len(got) != 1 || got[0] != "ボクシング" {
+		t.Fatalf("ja should be [ボクシング], got %v", got)
+	}
+}
+
+func TestAITagDelete_SyncsI18n(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	if _, err := store.AITagDelete([]string{"sports"}); err != nil {
+		t.Fatal(err)
+	}
+
+	i18n := readI18n(t, store, "proj1", "e.jpg")
+	if got := i18n["zh-TW"]; len(got) != 1 || got[0] != "拳擊" {
+		t.Fatalf("zh-TW should be [拳擊], got %v", got)
+	}
+	if got := i18n["ja"]; len(got) != 1 || got[0] != "ボクシング" {
+		t.Fatalf("ja should be [ボクシング], got %v", got)
+	}
+}
+
+func TestAITagMerge_SyncsI18n(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	// Merge "boxing" → "combat-sports"; "sports" remains
+	if _, err := store.AITagMerge([]string{"boxing"}, "combat-sports"); err != nil {
+		t.Fatal(err)
+	}
+
+	i18n := readI18n(t, store, "proj1", "e.jpg")
+	// "boxing" (idx 0) was merged away, "sports" (idx 1) kept
+	// combat-sports is new, has no old i18n entry → only "sports" i18n remains
+	if got := i18n["zh-TW"]; len(got) != 1 || got[0] != "運動" {
+		t.Fatalf("zh-TW should be [運動], got %v", got)
+	}
+	if got := i18n["ja"]; len(got) != 1 || got[0] != "スポーツ" {
+		t.Fatalf("ja should be [スポーツ], got %v", got)
+	}
+}
