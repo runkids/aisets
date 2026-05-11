@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Copy,
   LoaderCircle,
+  MessageSquareText,
   Play,
   RefreshCw,
   ScanText,
@@ -92,6 +93,7 @@ import {
   LLM_MIN_TIMEOUT,
   LLM_MAX_TIMEOUT,
 } from "./constants";
+import type { Mode } from "../../ui";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
 
@@ -118,6 +120,7 @@ type AISectionProps = {
     scopeLabel?: string,
   ) => void;
   onStopVLMOcr: () => void;
+  onNavigate?: (mode: Mode) => void;
 };
 
 function deriveHost(endpoint: string | undefined): string {
@@ -143,6 +146,7 @@ export function AISection({
   onStopAITag,
   onStartVLMOcr,
   onStopVLMOcr,
+  onNavigate,
 }: AISectionProps) {
   const { t } = useTranslation();
 
@@ -630,6 +634,46 @@ export function AISection({
           {settingActions}
         </div>
       </Card>
+
+      {providerEnabled && (
+        <Card
+          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          padding="none"
+        >
+          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+            <MessageSquareText size={15} className="shrink-0 text-g-ink-3" />
+            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+              {t("settings.promptsHeading")}
+            </span>
+          </div>
+          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+            <FieldRow
+              label={t("settings.llmAutoLocale")}
+              description={t("settings.llmAutoLocaleHint")}
+            >
+              <Switch
+                checked={draft.llmAutoLocale}
+                onCheckedChange={(next) =>
+                  onUpdateDraft((current) => ({
+                    ...current,
+                    llmAutoLocale: next,
+                  }))
+                }
+                aria-label={t("settings.llmAutoLocale")}
+              />
+            </FieldRow>
+            <div className="py-3">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onNavigate?.("prompts")}
+              >
+                {t("settings.managePrompts")}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {providerEnabled && (
         <Card

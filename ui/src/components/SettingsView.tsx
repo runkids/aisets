@@ -72,6 +72,7 @@ export function SettingsView({
   onStopVLMOcr,
   onDismissVLMOcr,
   onAddProject,
+  onNavigate,
 }: SettingsViewProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -629,6 +630,7 @@ export function SettingsView({
                 )
               }
               onStopVLMOcr={onStopVLMOcr}
+              onNavigate={onNavigate}
             />
           )}
 

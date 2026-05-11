@@ -21,6 +21,7 @@ import (
 	"aisets/internal/imageproc"
 	"aisets/internal/imgtools"
 	"aisets/internal/llm"
+	"aisets/internal/precheck"
 	"aisets/internal/scanner"
 )
 
@@ -185,6 +186,13 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	prompt = replaceDynamicVars(prompt, map[string]string{
 		"translations": aitag.TagTranslationsBlock,
 	})
+	if settings.LLMAutoLocale {
+		if lang := r.URL.Query().Get("lang"); lang != "" {
+			if name := precheck.LocaleDisplayName(lang); name != "" {
+				prompt += "\n\nIMPORTANT: Write the description, tags, and all human-readable text in " + name + "."
+			}
+		}
+	}
 	systemPrompt := ""
 	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
 		systemPrompt = settings.LLMSystemPrompt

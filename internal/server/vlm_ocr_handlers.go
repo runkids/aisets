@@ -14,6 +14,7 @@ import (
 	"aisets/internal/config"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
+	"aisets/internal/precheck"
 	"aisets/internal/scanner"
 )
 
@@ -129,6 +130,13 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	}
 	if prompt == "" {
 		prompt = vlmOCRPrompt
+	}
+	if settings.LLMAutoLocale {
+		if lang := r.URL.Query().Get("lang"); lang != "" {
+			if name := precheck.LocaleDisplayName(lang); name != "" {
+				prompt += "\n\nIMPORTANT: Write the extracted text transcription as-is, but write any labels, descriptions, or commentary in " + name + "."
+			}
+		}
 	}
 	systemPrompt := ""
 	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {

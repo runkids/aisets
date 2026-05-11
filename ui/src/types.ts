@@ -74,6 +74,7 @@ export type AppSettings = {
   llmOcrPrompt: string;
   llmPrecheckPrompt: string;
   llmSystemPromptEnabled: boolean;
+  llmAutoLocale: boolean;
   llmConcurrency: number;
   llmTimeout: number;
 };

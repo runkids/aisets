@@ -150,6 +150,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmTagPrompt: settings?.llmTagPrompt ?? "",
     llmOcrPrompt: settings?.llmOcrPrompt ?? "",
     llmPrecheckPrompt: settings?.llmPrecheckPrompt ?? "",
+    llmAutoLocale: settings?.llmAutoLocale ?? false,
     llmConcurrency: settings?.llmConcurrency ?? 1,
     llmTimeout: settings?.llmTimeout ?? 120,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
@@ -202,6 +203,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmTagPrompt: draft.llmTagPrompt,
     llmOcrPrompt: draft.llmOcrPrompt,
     llmPrecheckPrompt: draft.llmPrecheckPrompt,
+    llmAutoLocale: draft.llmAutoLocale,
     llmConcurrency: draft.llmConcurrency,
     llmTimeout: draft.llmTimeout,
     excludePatterns: splitPatterns(draft.excludePatternsText),
@@ -265,6 +267,7 @@ export function resetSectionDraft(
         llmTagPrompt: defaults.llmTagPrompt,
         llmOcrPrompt: defaults.llmOcrPrompt,
         llmPrecheckPrompt: defaults.llmPrecheckPrompt,
+        llmAutoLocale: defaults.llmAutoLocale,
         llmConcurrency: defaults.llmConcurrency,
         llmTimeout: defaults.llmTimeout,
       };

@@ -58,6 +58,7 @@ type AppSettings struct {
 	LLMPrecheckPrompt          string                               `json:"llmPrecheckPrompt"`
 	LLMSystemPrompt            string                               `json:"llmSystemPrompt"`
 	LLMSystemPromptEnabled     bool                                 `json:"llmSystemPromptEnabled"`
+	LLMAutoLocale              bool                                 `json:"llmAutoLocale"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
 	LLMTimeout                 int                                  `json:"llmTimeout"`
 }
@@ -97,6 +98,7 @@ type SettingsUpdate struct {
 	LLMOcrPrompt               *string                              `json:"llmOcrPrompt"`
 	LLMPrecheckPrompt          *string                              `json:"llmPrecheckPrompt"`
 	LLMSystemPromptEnabled     *bool                                `json:"llmSystemPromptEnabled"`
+	LLMAutoLocale              *bool                                `json:"llmAutoLocale"`
 	LLMConcurrency             *int                                 `json:"llmConcurrency"`
 	LLMTimeout                 *int                                 `json:"llmTimeout"`
 }

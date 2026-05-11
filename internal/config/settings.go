@@ -442,6 +442,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.LLMSystemPromptEnabled != nil {
 		settings.LLMSystemPromptEnabled = *update.LLMSystemPromptEnabled
 	}
+	if update.LLMAutoLocale != nil {
+		settings.LLMAutoLocale = *update.LLMAutoLocale
+	}
 	if update.LLMConcurrency != nil {
 		if *update.LLMConcurrency < 1 || *update.LLMConcurrency > llm.MaxConcurrency {
 			return AppSettings{}, apierr.New("settings_llm_concurrency_invalid",
