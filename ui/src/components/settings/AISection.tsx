@@ -699,22 +699,25 @@ export function AISection({
               </FieldRow>
 
               {settings?.agentRuntime && (
-                <div className="py-3">
+                <FieldRow
+                  label={t("settings.agentAvailable")}
+                  description={
+                    settings.agentRuntime.adapters?.length
+                      ? undefined
+                      : t("settings.agentNoneDetected")
+                  }
+                >
                   <div className="flex flex-wrap gap-1.5">
-                    {settings.agentRuntime.adapters?.length ? (
-                      settings.agentRuntime.adapters.map((a) => (
+                    {settings.agentRuntime.adapters
+                      ?.filter((a) => a.id !== "local-llm")
+                      .map((a) => (
                         <Badge key={a.id} tone="green">
                           {a.name}
                           {a.version ? ` ${a.version}` : ""}
                         </Badge>
-                      ))
-                    ) : (
-                      <Badge tone="default">
-                        {t("settings.agentNoneDetected")}
-                      </Badge>
-                    )}
+                      ))}
                   </div>
-                </div>
+                </FieldRow>
               )}
 
               <FieldRow
@@ -734,7 +737,6 @@ export function AISection({
                     { value: "gemini", label: "Gemini CLI" },
                     { value: "copilot", label: "Copilot CLI" },
                     { value: "pi", label: "Pi" },
-                    { value: "local-llm", label: "Local LLM" },
                   ]}
                   disabled={aiBusy || !draft.agentEnabled}
                   onChange={(value) =>
@@ -761,7 +763,7 @@ export function AISection({
                       agentModel: e.target.value,
                     }))
                   }
-                  placeholder=""
+                  placeholder="gpt-5.5, claude-sonnet-4-6"
                   aria-label={t("settings.agentModel")}
                   className="min-w-[400px]"
                 />
