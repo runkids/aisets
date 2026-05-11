@@ -1902,6 +1902,7 @@
     "ocrPresets": "AI OCR",
     "optimizePresets": "Optimize",
     "duplicatePresets": "Duplicate",
+    "precheckPresets": "Pre-Check",
     "addPreset": "Add Preset",
     "newPresetName": "New Preset",
     "nameLabel": "Name",
@@ -1942,6 +1943,8 @@
       "leftMetadata": "Metadata for the first (left) image — filled automatically",
       "rightMetadata": "Metadata for the second (right) image — filled automatically",
       "distance": "dHash distance between the two images (0-64) — filled automatically",
+      "precheckFindings": "Pre-check analysis results (duplicates, naming, optimization) — injected automatically",
+      "qualityIssues": "Image quality issue codes for detection",
       "translations": "Multilingual translations (tags + description) — injected automatically at request time"
     },
     "missingRequired": "Missing required variables",

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"aisets/internal/precheck"
 )
 
 func (s *Store) init() error {
@@ -353,6 +355,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateTagPresetTranslationsVar(); err != nil {
+		return err
+	}
+	if err := s.seedPrecheckBuiltInDefault(); err != nil {
 		return err
 	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
@@ -1400,4 +1405,61 @@ func (s *Store) migrateTagPresetTranslationsVar() error {
 
 	_, err = s.db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, nowUTC())
 	return err
+}
+
+func (s *Store) seedPrecheckBuiltInDefault() error {
+	// Widen the CHECK constraint to include 'precheck' — SQLite requires table rebuild.
+	var ddl string
+	_ = s.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_presets'`).Scan(&ddl)
+	if ddl != "" && !strings.Contains(ddl, "'precheck'") {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		stmts := []string{
+			`ALTER TABLE prompt_presets RENAME TO _prompt_presets_old`,
+			`CREATE TABLE prompt_presets (
+				id         TEXT    PRIMARY KEY,
+				type       TEXT    NOT NULL CHECK(type IN ('tag', 'ocr', 'optimize', 'duplicate', 'system', 'precheck')),
+				name       TEXT    NOT NULL,
+				content    TEXT    NOT NULL DEFAULT '{}',
+				is_default INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT    NOT NULL,
+				updated_at TEXT    NOT NULL
+			)`,
+			`INSERT INTO prompt_presets SELECT * FROM _prompt_presets_old`,
+			`DROP TABLE _prompt_presets_old`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
+		}
+		for _, stmt := range stmts {
+			if _, err := tx.Exec(stmt); err != nil {
+				return fmt.Errorf("prompt_presets precheck type migration: %w", err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+
+	content := PromptPresetContent{
+		Template:  defaultPrecheckPrompt(),
+		Variables: map[string]PromptVariable{},
+	}
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	now := nowUTC()
+	_, err = s.db.Exec(
+		`INSERT INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+		 WHERE prompt_presets.content != excluded.content`,
+		"precheck-built-in-default", "precheck", "Built-in Default", string(contentJSON), 1, now, now,
+	)
+	return err
+}
+
+func defaultPrecheckPrompt() string {
+	return precheck.PrecheckAIPrompt
 }

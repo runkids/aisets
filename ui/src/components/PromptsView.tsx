@@ -9,6 +9,7 @@ import {
   Gauge,
   Save,
   ScanText,
+  ShieldCheck,
   Star,
   Tags,
   Trash2,
@@ -193,6 +194,13 @@ function PresetList({
             icon={<GitCompareArrows size={15} />}
             label={t("prompts.duplicatePresets")}
             onClick={() => onTypeChange("duplicate")}
+          />
+          <RailItem
+            variant="settings"
+            active={type === "precheck"}
+            icon={<ShieldCheck size={15} />}
+            label={t("prompts.precheckPresets")}
+            onClick={() => onTypeChange("precheck")}
           />
         </RailSection>
 

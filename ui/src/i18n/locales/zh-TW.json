@@ -1923,6 +1923,7 @@
     "ocrPresets": "AI OCR",
     "optimizePresets": "優化建議",
     "duplicatePresets": "近似重複",
+    "precheckPresets": "預檢",
     "addPreset": "新增預設",
     "newPresetName": "新預設",
     "nameLabel": "名稱",
@@ -1963,6 +1964,8 @@
       "leftMetadata": "第一張（左側）圖片的中繼資料 — 自動填入",
       "rightMetadata": "第二張（右側）圖片的中繼資料 — 自動填入",
       "distance": "兩張圖片的 dHash 距離（0-64） — 自動填入",
+      "precheckFindings": "預檢分析結果（重複、命名、優化）— 自動注入",
+      "qualityIssues": "圖片品質問題代碼",
       "translations": "多語系翻譯（tags + description） — 請求時自動注入"
     },
     "missingRequired": "缺少必要變數",

@@ -1912,6 +1912,7 @@
     "ocrPresets": "AI OCR",
     "optimizePresets": "优化建议",
     "duplicatePresets": "近似重复",
+    "precheckPresets": "预检",
     "addPreset": "新增预设",
     "newPresetName": "新预设",
     "nameLabel": "名称",
@@ -1952,6 +1953,8 @@
       "leftMetadata": "第一张（左侧）图片的元数据 — 自动填入",
       "rightMetadata": "第二张（右侧）图片的元数据 — 自动填入",
       "distance": "两张图片的 dHash 距离（0-64） — 自动填入",
+      "precheckFindings": "预检分析结果（重复、命名、优化）— 自动注入",
+      "qualityIssues": "图片质量问题代码",
       "translations": "多语言翻译（tags + description） — 请求时自动注入"
     },
     "missingRequired": "缺少必要变量",

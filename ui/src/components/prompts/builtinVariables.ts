@@ -174,6 +174,51 @@ export const DUPLICATE_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
+export const PRECHECK_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
+  {
+    name: "precheckFindings",
+    type: "text",
+    defaultValues: [],
+    required: false,
+    descriptionKey: "prompts.var.precheckFindings",
+    dynamic: true,
+  },
+  {
+    name: "categories",
+    type: "tags",
+    defaultValues: [
+      "icon",
+      "photo",
+      "screenshot",
+      "diagram",
+      "illustration",
+      "pattern",
+      "logo",
+      "banner",
+      "texture",
+      "sprite",
+      "mockup",
+      "artwork",
+      "other",
+    ],
+    required: true,
+    descriptionKey: "prompts.var.categories",
+  },
+  {
+    name: "qualityIssues",
+    type: "tags",
+    defaultValues: [
+      "blurry",
+      "low_resolution",
+      "noisy",
+      "truncated",
+      "watermarked",
+    ],
+    required: true,
+    descriptionKey: "prompts.var.qualityIssues",
+  },
+];
+
 export function getBuiltinVariables(
   type: PromptPresetType,
 ): BuiltinVariableDef[] {
@@ -182,6 +227,7 @@ export function getBuiltinVariables(
   if (type === "ocr") return OCR_BUILTIN_VARIABLES;
   if (type === "optimize") return OPTIMIZE_BUILTIN_VARIABLES;
   if (type === "duplicate") return DUPLICATE_BUILTIN_VARIABLES;
+  if (type === "precheck") return PRECHECK_BUILTIN_VARIABLES;
   return [];
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"aisets/internal/actions"
 	"aisets/internal/apierr"
+	"aisets/internal/config"
 	"aisets/internal/imageproc"
 	"aisets/internal/llm"
 	"aisets/internal/optimize"
@@ -521,8 +522,17 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prompt := settings.LLMPrecheckPrompt
+	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
+		if preset, perr := s.store.GetPromptPreset(presetID); perr == nil {
+			prompt = config.FormatPrompt(preset.Content)
+		}
+	}
 	if prompt == "" {
 		prompt = precheck.PrecheckAIPrompt
+		prompt = replaceDynamicVars(prompt, map[string]string{
+			"categories":    `"icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork", "other"`,
+			"qualityIssues": `"blurry", "low_resolution", "noisy", "truncated", "watermarked"`,
+		})
 	}
 	if settings.LLMAutoLocale {
 		if lang := r.URL.Query().Get("lang"); lang != "" {

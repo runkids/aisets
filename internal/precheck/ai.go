@@ -28,12 +28,12 @@ const PrecheckAIPrompt = `You are reviewing an image file for an asset library p
 
 Based on the image content AND the analysis above, respond as JSON:
 {
-  "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork", "other",
+  "category": one of {{categories}},
   "tags": array of 3-5 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "hero-section"),
   "description": one sentence describing the image content,
   "quality": {
     "score": integer 1-5 (1=unusable, 2=poor, 3=acceptable, 4=good, 5=excellent),
-    "issues": array of applicable codes from ["blurry", "low_resolution", "noisy", "truncated", "watermarked"] (empty if none),
+    "issues": array of applicable codes from {{qualityIssues}} (empty if none),
     "assessment": one sentence quality summary
   },
   "suggestion": {

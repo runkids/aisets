@@ -1912,6 +1912,7 @@
     "ocrPresets": "AI OCR",
     "optimizePresets": "最適化アドバイス",
     "duplicatePresets": "類似重複",
+    "precheckPresets": "プリチェック",
     "addPreset": "プリセット追加",
     "newPresetName": "新規プリセット",
     "nameLabel": "名前",
@@ -1952,6 +1953,8 @@
       "leftMetadata": "1枚目（左側）の画像メタデータ — 自動入力",
       "rightMetadata": "2枚目（右側）の画像メタデータ — 自動入力",
       "distance": "2つの画像のdHash距離（0-64） — 自動入力",
+      "precheckFindings": "プリチェック分析結果（重複・命名・最適化）— 自動注入",
+      "qualityIssues": "画像品質問題コード",
       "translations": "多言語翻訳（tags + description） — リクエスト時に自動注入"
     },
     "missingRequired": "必須変数が不足しています",

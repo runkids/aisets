@@ -767,7 +767,8 @@ export type PromptPresetType =
   | "tag"
   | "ocr"
   | "optimize"
-  | "duplicate";
+  | "duplicate"
+  | "precheck";
 export type PromptVariableType = "tags" | "text" | "select";
 
 export type PromptVariable = {
