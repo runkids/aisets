@@ -265,11 +265,11 @@ export function AboutSection({
                   <Button
                     variant="danger"
                     size="sm"
-                    leadingIcon={<Trash2 size={13} />}
                     onClick={() => setClearScanHistoryOpen(true)}
                     disabled={working}
-                    className="shrink-0 self-start"
+                    className="relative min-w-[12rem] shrink-0 self-start"
                   >
+                    <Trash2 size={13} className="absolute left-2.5" />
                     {t("settings.clearScanHistory")}
                   </Button>
                 </div>
@@ -286,11 +286,11 @@ export function AboutSection({
                   <Button
                     variant="danger"
                     size="sm"
-                    leadingIcon={<Trash2 size={13} />}
                     onClick={() => setClearOCRCacheOpen(true)}
                     disabled={working}
-                    className="shrink-0 self-start"
+                    className="relative min-w-[12rem] shrink-0 self-start"
                   >
+                    <Trash2 size={13} className="absolute left-2.5" />
                     {t("settings.clearOCRCache")}
                   </Button>
                 </div>
@@ -307,11 +307,11 @@ export function AboutSection({
                   <Button
                     variant="danger"
                     size="sm"
-                    leadingIcon={<Trash2 size={13} />}
                     onClick={() => setClearAITagCacheOpen(true)}
                     disabled={working}
-                    className="shrink-0 self-start"
+                    className="relative min-w-[12rem] shrink-0 self-start"
                   >
+                    <Trash2 size={13} className="absolute left-2.5" />
                     {t("settings.clearAITagCache")}
                   </Button>
                 </div>
@@ -328,11 +328,11 @@ export function AboutSection({
                   <Button
                     variant="danger"
                     size="sm"
-                    leadingIcon={<RotateCcw size={13} />}
                     onClick={() => setResetDatabaseOpen(true)}
                     disabled={working}
-                    className="shrink-0 self-start"
+                    className="relative min-w-[12rem] shrink-0 self-start"
                   >
+                    <RotateCcw size={13} className="absolute left-2.5" />
                     {t("settings.resetDatabase")}
                   </Button>
                 </div>
