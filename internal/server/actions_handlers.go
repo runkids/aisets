@@ -534,18 +534,9 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 			"qualityIssues": `"blurry", "low_resolution", "noisy", "truncated", "watermarked"`,
 		})
 	}
-	if settings.LLMAutoLocale {
-		if lang := r.URL.Query().Get("lang"); lang != "" {
-			if name := precheck.LocaleDisplayName(lang); name != "" {
-				prompt += "\n\nIMPORTANT: Write the description, quality assessment, suitability reason, and format recommendation in " + name + "."
-			}
-		}
-	}
-
-	systemPrompt := ""
-	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
-		systemPrompt = settings.LLMSystemPrompt
-	}
+	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+		r.URL.Query().Get("lang"), "Write the description, quality assessment, suitability reason, and format recommendation in")
+	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	total := len(files)
 	ready := 0

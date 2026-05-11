@@ -14,7 +14,6 @@ import (
 	"aisets/internal/config"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
-	"aisets/internal/precheck"
 	"aisets/internal/scanner"
 )
 
@@ -131,17 +130,9 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		prompt = vlmOCRPrompt
 	}
-	if settings.LLMAutoLocale {
-		if lang := r.URL.Query().Get("lang"); lang != "" {
-			if name := precheck.LocaleDisplayName(lang); name != "" {
-				prompt += "\n\nIMPORTANT: Write the extracted text transcription as-is, but write any labels, descriptions, or commentary in " + name + "."
-			}
-		}
-	}
-	systemPrompt := ""
-	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
-		systemPrompt = settings.LLMSystemPrompt
-	}
+	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+		r.URL.Query().Get("lang"), "Write the extracted text transcription as-is, but write any labels, descriptions, or commentary in")
+	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {
@@ -376,9 +367,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 		return result, llm.ChatResponse{}
 	}
 
-	// Parse JSON from response, stripping markdown fences if present
-	content := strings.TrimSpace(resp.Content)
-	content = stripMarkdownFences(content)
+	content := llm.CleanJSON(resp.Content)
 
 	var parsed struct {
 		Text      string   `json:"text"`

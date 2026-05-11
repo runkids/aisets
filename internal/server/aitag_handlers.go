@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +20,6 @@ import (
 	"aisets/internal/imageproc"
 	"aisets/internal/imgtools"
 	"aisets/internal/llm"
-	"aisets/internal/precheck"
 	"aisets/internal/scanner"
 )
 
@@ -186,17 +184,9 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	prompt = replaceDynamicVars(prompt, map[string]string{
 		"translations": aitag.TagTranslationsBlock,
 	})
-	if settings.LLMAutoLocale {
-		if lang := r.URL.Query().Get("lang"); lang != "" {
-			if name := precheck.LocaleDisplayName(lang); name != "" {
-				prompt += "\n\nIMPORTANT: Write the description, tags, and all human-readable text in " + name + "."
-			}
-		}
-	}
-	systemPrompt := ""
-	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
-		systemPrompt = settings.LLMSystemPrompt
-	}
+	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+		r.URL.Query().Get("lang"), "Write the description, tags, and all human-readable text in")
+	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {
@@ -427,10 +417,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		return result, llm.ChatResponse{}
 	}
 
-	// Parse JSON from response, stripping markdown fences if present
-	content := strings.TrimSpace(resp.Content)
-	content = stripMarkdownFences(content)
-	content = fixVLMJSON(content)
+	content := llm.CleanJSON(resp.Content)
 
 	var parsed struct {
 		Category           json.RawMessage `json:"category"`
@@ -555,59 +542,4 @@ func unmarshalStringArray(raw json.RawMessage) []string {
 		return out
 	}
 	return nil
-}
-
-func fixVLMJSON(s string) string {
-	start := strings.Index(s, "{")
-	if start < 0 {
-		return s
-	}
-	s = s[start:]
-	depth := 0
-	inStr := false
-	esc := false
-	end := len(s)
-	for i, c := range s {
-		if esc {
-			esc = false
-			continue
-		}
-		if c == '\\' && inStr {
-			esc = true
-			continue
-		}
-		if c == '"' {
-			inStr = !inStr
-			continue
-		}
-		if inStr {
-			continue
-		}
-		if c == '{' {
-			depth++
-		} else if c == '}' {
-			depth--
-			if depth == 0 {
-				end = i + 1
-				break
-			}
-		}
-	}
-	s = s[:end]
-	s = regexp.MustCompile(`,\s*([}\]])`).ReplaceAllString(s, "$1")
-	s = regexp.MustCompile(`(["\d\]}\w])\s*\n\s*"`).ReplaceAllString(s, `$1,"`)
-	return s
-}
-
-func stripMarkdownFences(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "```json") {
-		s = strings.TrimPrefix(s, "```json")
-	} else if strings.HasPrefix(s, "```") {
-		s = strings.TrimPrefix(s, "```")
-	}
-	if strings.HasSuffix(s, "```") {
-		s = strings.TrimSuffix(s, "```")
-	}
-	return strings.TrimSpace(s)
 }

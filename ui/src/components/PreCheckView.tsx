@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
+import { runPreCheckAI } from "../api";
 import { fileName, formatBytes } from "../ui";
 import { useToast } from "./ToastProvider";
 import {
@@ -231,64 +232,38 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
     setAiWorking(true);
     setAiError(null);
     try {
-      const form = new FormData();
-      pending.forEach((f) => form.append("files", f, f.name));
-      const lang = i18n.language || "en";
-      const res = await fetch(
-        `/api/pre-check/ai?lang=${encodeURIComponent(lang)}`,
-        {
-          method: "POST",
-          body: form,
-        },
-      );
-      if (!res.ok || !res.body) {
-        throw new Error(t("precheck.aiError"));
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let readyCount = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (value) buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            if (event.type === "result" && event.ai) {
-              const ai = event.ai as AIPreCheckResult & {
-                name: string;
-                status: string;
-              };
-              if (ai.status === "ready") {
-                readyCount++;
-                setAiResults((prev) => new Map(prev).set(ai.name, ai));
-                const idx = resultsRef.current.findIndex(
-                  (r) => r.name === ai.name,
-                );
-                if (idx >= 0) {
-                  setExpanded((prev) => new Set([...prev, `${idx}-ai`]));
-                  requestAnimationFrame(() => {
-                    document
-                      .querySelector(`[data-precheck-card="${idx}"]`)
-                      ?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "nearest",
-                      });
-                  });
-                }
+      const lang = i18n.language || "en";
+      await runPreCheckAI(pending, lang, {
+        onEvent: (event) => {
+          if (event.type === "result" && event.ai) {
+            const ai = event.ai as AIPreCheckResult & {
+              name: string;
+              status: string;
+            };
+            if (ai.status === "ready") {
+              readyCount++;
+              setAiResults((prev) => new Map(prev).set(ai.name, ai));
+              const idx = resultsRef.current.findIndex(
+                (r) => r.name === ai.name,
+              );
+              if (idx >= 0) {
+                setExpanded((prev) => new Set([...prev, `${idx}-ai`]));
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector(`[data-precheck-card="${idx}"]`)
+                    ?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "nearest",
+                    });
+                });
               }
-            } else if (event.type === "error") {
-              setAiError(event.error?.message ?? t("precheck.aiError"));
             }
-          } catch {
-            // skip malformed NDJSON lines
+          } else if (event.type === "error") {
+            setAiError(event.error?.message ?? t("precheck.aiError"));
           }
-        }
-        if (done) break;
-      }
+        },
+      });
       if (readyCount > 0) {
         toast.success(t("precheck.aiDone", { count: readyCount }));
       } else if (readyCount === 0 && files.length > 0) {

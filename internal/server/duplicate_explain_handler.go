@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"aisets/internal/apierr"
@@ -59,10 +58,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	systemPrompt := ""
-	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
-		systemPrompt = settings.LLMSystemPrompt
-	}
+	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	items, err := s.store.CatalogItemsWithOptimizationByIDs(0, []string{leftID, rightID})
 	if err != nil || len(items) < 2 {
@@ -118,8 +114,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	content := strings.TrimSpace(resp.Content)
-	content = stripMarkdownFences(content)
+	content := llm.CleanJSON(resp.Content)
 
 	var parsed struct {
 		Summary        string `json:"summary"`

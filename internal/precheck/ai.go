@@ -3,24 +3,10 @@ package precheck
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
+
+	"aisets/internal/llm"
 )
-
-var localeNames = map[string]string{
-	"en":    "English",
-	"zh-TW": "Traditional Chinese (繁體中文)",
-	"zh-CN": "Simplified Chinese (简体中文)",
-	"ja":    "Japanese (日本語)",
-	"ko":    "Korean (한국어)",
-}
-
-func LocaleDisplayName(lang string) string {
-	if name, ok := localeNames[lang]; ok {
-		return name
-	}
-	return ""
-}
 
 const PrecheckAIPrompt = `You are reviewing an image file for an asset library pre-import check.
 
@@ -143,9 +129,7 @@ type AIResult struct {
 }
 
 func ParseAIResponse(name, raw string) AIResult {
-	content := strings.TrimSpace(raw)
-	content = stripFences(content)
-	content = fixJSON(content)
+	content := llm.CleanJSON(raw)
 
 	var parsed struct {
 		Category    string       `json:"category"`
@@ -181,64 +165,4 @@ func ParseAIResponse(name, raw string) AIResult {
 	}
 	result.Suggestion.Suitability = strings.ToLower(strings.TrimSpace(result.Suggestion.Suitability))
 	return result
-}
-
-func stripFences(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "```json") {
-		s = strings.TrimPrefix(s, "```json")
-	} else if strings.HasPrefix(s, "```") {
-		s = strings.TrimPrefix(s, "```")
-	}
-	if strings.HasSuffix(s, "```") {
-		s = strings.TrimSuffix(s, "```")
-	}
-	return strings.TrimSpace(s)
-}
-
-var (
-	trailingCommaRe = regexp.MustCompile(`,\s*([}\]])`)
-	missingCommaRe  = regexp.MustCompile(`(["\d\]}\w])\s*\n\s*"`)
-)
-
-func fixJSON(s string) string {
-	start := strings.Index(s, "{")
-	if start < 0 {
-		return s
-	}
-	s = s[start:]
-	depth := 0
-	inStr := false
-	esc := false
-	end := len(s)
-	for i, c := range s {
-		if esc {
-			esc = false
-			continue
-		}
-		if c == '\\' && inStr {
-			esc = true
-			continue
-		}
-		if c == '"' {
-			inStr = !inStr
-			continue
-		}
-		if inStr {
-			continue
-		}
-		if c == '{' {
-			depth++
-		} else if c == '}' {
-			depth--
-			if depth == 0 {
-				end = i + 1
-				break
-			}
-		}
-	}
-	s = s[:end]
-	s = trailingCommaRe.ReplaceAllString(s, "$1")
-	s = missingCommaRe.ReplaceAllString(s, `$1,"`)
-	return s
 }

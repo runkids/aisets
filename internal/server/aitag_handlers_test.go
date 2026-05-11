@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"testing"
+
+	"aisets/internal/llm"
 )
 
 func TestUnmarshalStringOrFirst(t *testing.T) {
@@ -42,7 +44,7 @@ func TestParseAITagI18nFields(t *testing.T) {
 		"estimatedLocation": null,
 		"locationConfidence": "none"
 	}`
-	content := stripMarkdownFences(input)
+	content := llm.StripFences(input)
 	var parsed struct {
 		TagsI18n        map[string][]string `json:"tagsI18n"`
 		DescriptionI18n map[string]string   `json:"descriptionI18n"`
