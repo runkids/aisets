@@ -11,10 +11,10 @@ import (
 )
 
 type CLIChatProvider struct {
-	binPath      string
-	name         string
-	buildArgs    func(req ChatRequest) []string
-	buildPrompt  func(req ChatRequest) string
+	binPath     string
+	name        string
+	buildArgs   func(req ChatRequest) []string
+	buildPrompt func(req ChatRequest) string
 }
 
 func (p *CLIChatProvider) ChatBatch(ctx context.Context, reqs []ChatRequest, onResult func(int, ChatResult)) error {

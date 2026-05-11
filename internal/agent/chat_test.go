@@ -12,9 +12,9 @@ type mockProvider struct {
 	chatFunc func(ctx context.Context, req llm.ChatRequest) (llm.ChatResponse, error)
 }
 
-func (m *mockProvider) Name() string                                                   { return "mock" }
-func (m *mockProvider) Available(_ context.Context) error                              { return nil }
-func (m *mockProvider) ListModels(_ context.Context) ([]llm.Model, error)              { return nil, nil }
+func (m *mockProvider) Name() string                                      { return "mock" }
+func (m *mockProvider) Available(_ context.Context) error                 { return nil }
+func (m *mockProvider) ListModels(_ context.Context) ([]llm.Model, error) { return nil, nil }
 func (m *mockProvider) Embed(_ context.Context, _ llm.EmbedRequest) (llm.EmbedResponse, error) {
 	return llm.EmbedResponse{}, nil
 }
