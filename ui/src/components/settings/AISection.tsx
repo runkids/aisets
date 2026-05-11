@@ -783,15 +783,6 @@ export function AISection({
         </div>
       </Card>
 
-      {providerEnabled && (
-        <PromptsLocaleCard
-          draft={draft}
-          systemPromptEnabled={settings?.llmSystemPromptEnabled ?? false}
-          onUpdateDraft={onUpdateDraft}
-          onNavigate={onNavigate}
-        />
-      )}
-
       {vlmAvailable && (
         <div className="flex items-center gap-3 rounded-g-md border border-g-line bg-g-surface px-6 py-2.5 shadow-g-sm md:px-8">
           <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
@@ -831,6 +822,15 @@ export function AISection({
             </button>
           </div>
         </div>
+      )}
+
+      {providerEnabled && (
+        <PromptsLocaleCard
+          draft={draft}
+          systemPromptEnabled={settings?.llmSystemPromptEnabled ?? false}
+          onUpdateDraft={onUpdateDraft}
+          onNavigate={onNavigate}
+        />
       )}
 
       {vlmAvailable && (
