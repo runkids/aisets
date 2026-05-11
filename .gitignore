@@ -16,3 +16,4 @@
 /tools/imgtools/target/
 .claude/worktrees/
 .devcontainer/.env
+aisets

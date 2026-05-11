@@ -320,7 +320,7 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 	return embedWorkResult{item: item, embedType: embedType, result: result, vector: resp.Embedding}
 }
 
-const i18nBatchSize = 20
+const i18nBatchSize = 50
 
 var localeDisplayNames = map[string]string{
 	"en": "English", "zh-TW": "Traditional Chinese", "zh-CN": "Simplified Chinese",

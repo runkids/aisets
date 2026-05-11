@@ -10,7 +10,7 @@ const dialogOverlayVariants = cva(
         modal: "z-[120] bg-[rgba(8,9,10,0.6)] backdrop-blur-[4px]",
         command: "z-[100] bg-[rgba(8,9,10,0.5)] backdrop-blur-[8px]",
         drawer:
-          "z-50 bg-[rgba(8,9,10,0.6)] backdrop-blur-[4px] animate-[fadeIn_180ms_var(--g-ease)]",
+          "z-100 bg-[rgba(8,9,10,0.6)] backdrop-blur-[4px] animate-[fadeIn_180ms_var(--g-ease)]",
       },
     },
     defaultVariants: { layer: "modal" },
@@ -114,7 +114,7 @@ const DialogDrawerSurface = forwardRef<
     <aside
       ref={ref}
       className={cn(
-        "fixed inset-y-0 right-0 z-[51] flex w-[800px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)] max-[600px]:w-screen max-[600px]:max-w-none",
+        "fixed inset-y-0 right-0 z-101 flex w-[800px] max-w-[95vw] flex-col overflow-hidden border-l border-g-line bg-g-surface shadow-g-pop animate-[slideInR_240ms_var(--g-ease-out)] max-[600px]:w-screen max-[600px]:max-w-none",
         className,
       )}
       {...props}

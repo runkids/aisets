@@ -32,11 +32,27 @@ func StripFences(s string) string {
 }
 
 func FixJSON(s string) string {
-	start := strings.Index(s, "{")
+	start := strings.Index(s, `{"`)
+	if start < 0 {
+		start = strings.Index(s, "{\n")
+		if start < 0 {
+			start = strings.Index(s, "{ ")
+			if start < 0 {
+				start = strings.Index(s, "{")
+			}
+		}
+	}
 	if start < 0 {
 		return s
 	}
 	s = s[start:]
+	s = extractBalancedJSON(s)
+	s = trailingCommaRe.ReplaceAllString(s, "$1")
+	s = missingCommaRe.ReplaceAllString(s, `$1,"`)
+	return s
+}
+
+func extractBalancedJSON(s string) string {
 	depth := 0
 	inStr := false
 	esc := false
@@ -67,10 +83,7 @@ func FixJSON(s string) string {
 			}
 		}
 	}
-	s = s[:end]
-	s = trailingCommaRe.ReplaceAllString(s, "$1")
-	s = missingCommaRe.ReplaceAllString(s, `$1,"`)
-	return s
+	return s[:end]
 }
 
 func CleanJSON(s string) string {

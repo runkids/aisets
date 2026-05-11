@@ -58,7 +58,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { APIError, runOCR, runAITagging, runVLMOcr, runEmbedding } from "./api";
+import { APIError, runOCR, runAITagging, runVLMOcr, runEmbedding, runAITagTranslate } from "./api";
 import { errorMessage } from "./i18n";
 import {
   initialOCRActivityState,
@@ -90,6 +90,13 @@ import {
   embedActivityReducer,
   runEmbedActivity,
 } from "./activity/embedActivity";
+import {
+  initialTranslateActivityState,
+  isTranslateActivityBusy,
+  translateActivityReducer,
+  runTranslateActivity,
+  type TranslateActivityAbortRef,
+} from "./activity/translateActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -211,6 +218,14 @@ export function App() {
   );
   const embedAbortRef = useRef<AbortController | null>(null);
   const embedRunRef = useRef<Promise<void> | null>(null);
+  const [translateActivity, dispatchTranslateActivity] = useReducer(
+    translateActivityReducer,
+    initialTranslateActivityState,
+  );
+  const translateAbortRef = useRef<AbortController | null>(
+    null,
+  ) as TranslateActivityAbortRef;
+  const translateRunRef = useRef<Promise<void> | null>(null);
   const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
     optimizeActivityReducer,
     initialOptimizeActivityState,
@@ -342,7 +357,8 @@ export function App() {
   const anyAIBusy =
     isAITagActivityBusy(aiTagActivity) ||
     isVLMOcrActivityBusy(vlmOcrActivity) ||
-    isEmbedActivityBusy(embedActivity);
+    isEmbedActivityBusy(embedActivity) ||
+    isTranslateActivityBusy(translateActivity);
   useEffect(() => {
     if (!anyAIBusy) return undefined;
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -735,6 +751,35 @@ export function App() {
     dispatchEmbedActivity({ type: "dismiss" });
   }
 
+  function onStartTranslateActivity() {
+    if (translateRunRef.current) return;
+
+    const run = (async () => {
+      await runTranslateActivity({
+        abortRef: translateAbortRef,
+        dispatch: dispatchTranslateActivity,
+        run: ({ signal, onEvent }) =>
+          runAITagTranslate({ signal, onEvent }),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["tags"] });
+    })().finally(() => {
+      translateRunRef.current = null;
+    });
+
+    translateRunRef.current = run;
+  }
+
+  function onStopTranslateActivity() {
+    if (!translateAbortRef.current) return;
+    dispatchTranslateActivity({ type: "stopping" });
+    translateAbortRef.current.abort();
+  }
+
+  function onDismissTranslateActivity() {
+    dispatchTranslateActivity({ type: "dismiss" });
+  }
+
   function onOpenOCRSettings() {
     navigate({
       pathname: pathForMode("settings"),
@@ -894,7 +939,7 @@ export function App() {
 
   const appShell = (
     <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
-      <div className="col-span-2 row-start-1">
+      <div className="col-span-2 row-start-1 z-[100]">
         <AppTopbar
           working={working}
           catalogActionsDisabled={catalogActionsDisabled}
@@ -902,6 +947,7 @@ export function App() {
           ocrActivity={ocrActivity}
           aiTagActivity={aiTagActivity}
           vlmOcrActivity={vlmOcrActivity}
+          embedActivity={embedActivity}
           optimizeActivity={optimizeActivity}
           onAddProject={() => setDirectoryPickerOpen(true)}
           onRefresh={onRescan}
@@ -913,6 +959,11 @@ export function App() {
           onDismissAITag={onDismissAITagActivity}
           onStopVLMOcr={onStopVLMOcrActivity}
           onDismissVLMOcr={onDismissVLMOcrActivity}
+          onStopEmbed={onStopEmbedActivity}
+          onDismissEmbed={onDismissEmbedActivity}
+          translateActivity={translateActivity}
+          onStopTranslate={onStopTranslateActivity}
+          onDismissTranslate={onDismissTranslateActivity}
           onOpenAISettings={() => {
             navigate({
               pathname: pathForMode("settings"),
@@ -1124,7 +1175,11 @@ export function App() {
           ) : mode === "history" ? (
             <ScanHistoryView />
           ) : mode === "tags" ? (
-            <TagsView />
+            <TagsView
+              translateActivity={translateActivity}
+              onStartTranslate={onStartTranslateActivity}
+              onStopTranslate={onStopTranslateActivity}
+            />
           ) : mode === "prompts" ? (
             <PromptsView />
           ) : (

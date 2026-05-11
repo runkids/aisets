@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -359,6 +360,11 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, back
 		Languages []string `json:"languages"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		preview := rawContent
+		if len(preview) > 300 {
+			preview = preview[:300] + "..."
+		}
+		log.Printf("[warn] vlm-ocr: failed to parse VLM response for %s: %v\n  raw(%d bytes): %s", item.RepoPath, err, len(rawContent), preview)
 		result.Status = ocr.StatusFailed
 		result.ErrorCode = "vlm_ocr_parse_failed"
 		result.ErrorMessage = "failed to parse VLM JSON response: " + err.Error()

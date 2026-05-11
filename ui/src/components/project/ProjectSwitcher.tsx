@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Layers3 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDown, Layers3 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Project, Workspace } from "../../types";
@@ -134,8 +134,10 @@ export function ProjectSwitcher({
 }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const selectedProject = projects.find(
     (project) => project.id === selectedProjectId,
@@ -165,6 +167,23 @@ export function ProjectSwitcher({
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = menuRef.current;
+    if (!el) return;
+
+    const check = () => {
+      setCanScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
+    };
+
+    const raf = requestAnimationFrame(check);
+    el.addEventListener("scroll", check, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", check);
     };
   }, [open]);
 
@@ -223,6 +242,7 @@ export function ProjectSwitcher({
 
       {open && (
         <div
+          ref={menuRef}
           className={menuClass}
           id={menuId}
           role="menu"
@@ -365,6 +385,23 @@ export function ProjectSwitcher({
               </button>
             );
           })}
+
+          <div
+            aria-hidden="true"
+            className={cn(
+              "sticky bottom-0 flex justify-center pt-4 pb-2 pointer-events-none",
+              "transition-opacity duration-200 ease-g",
+              canScrollDown ? "opacity-100" : "opacity-0",
+            )}
+            style={{
+              background:
+                "linear-gradient(to top, var(--g-surface-2) 40%, transparent)",
+            }}
+          >
+            <span className="flex items-center justify-center size-6 rounded-full bg-g-surface-3 shadow-g-sm">
+              <ChevronsDown size={14} className="text-g-ink-2 animate-bounce" />
+            </span>
+          </div>
         </div>
       )}
     </div>

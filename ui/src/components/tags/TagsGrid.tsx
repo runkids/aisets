@@ -155,13 +155,32 @@ export function TagsGrid({
                 </span>
               </div>
 
-              {/* Category badges — desktop only */}
-              <div className="hidden min-[1024px]:flex items-center gap-1 justify-end flex-wrap">
-                {item.categories.map((cat) => (
-                  <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
-                    {categoryTranslations?.[cat] || cat}
-                  </Badge>
-                ))}
+              {/* Category badges — desktop only, max 6 visible */}
+              <div className="hidden min-[1024px]:flex items-center gap-1 justify-end flex-shrink-0">
+                {item.categories.slice(0, 4).map((cat) => {
+                  const tr = categoryTranslations?.[cat];
+                  const label = tr && tr !== cat ? `${tr} (${cat})` : cat;
+                  return (
+                    <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
+                      {label}
+                    </Badge>
+                  );
+                })}
+                {item.categories.length > 4 && (
+                  <Tooltip
+                    label={item.categories
+                      .slice(4)
+                      .map((c) => {
+                        const tr = categoryTranslations?.[c];
+                        return tr && tr !== c ? `${tr} (${c})` : c;
+                      })
+                      .join(", ")}
+                  >
+                    <Badge tone="default">
+                      +{item.categories.length - 4}
+                    </Badge>
+                  </Tooltip>
+                )}
               </div>
 
               {/* Browse action — appears on hover */}

@@ -1,10 +1,12 @@
 import {
   FolderPlus,
   ImageDown,
+  Languages,
   RefreshCw,
   ScanText,
   Search,
   Settings,
+  Waypoints,
 } from "lucide-react";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import { useTranslation } from "react-i18next";
@@ -39,10 +41,49 @@ import {
   type VLMOcrActivityPhase,
   type VLMOcrActivityState,
 } from "../../activity/vlmOcrActivity";
+import {
+  canDismissEmbedActivity,
+  isEmbedActivityBusy,
+  isEmbedActivityVisible,
+  embedActivityProgressPercent,
+  type EmbedActivityPhase,
+  type EmbedActivityState,
+} from "../../activity/embedActivity";
+import {
+  canDismissTranslateActivity,
+  isTranslateActivityBusy,
+  isTranslateActivityVisible,
+  translateActivityProgressPercent,
+  type TranslateActivityState,
+} from "../../activity/translateActivity";
 import { ActivityDropdown } from "./ActivityDropdown";
 import { Keycap, ScanProgressContent, TextInputButton, Tooltip } from "../ui";
 import { IconButton } from "../ui/Button";
 import { useVersionQuery } from "../../queries";
+
+function embedStageLabel(
+  activity: EmbedActivityState,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  switch (activity.stage) {
+    case "loading":
+      return t("activity.embedPhaseLoading");
+    case "filtering":
+      return activity.stageTotal
+        ? t("activity.embedPhaseFiltering", { total: activity.stageTotal })
+        : t("activity.embedPhaseFilteringSimple");
+    case "translating":
+      if (activity.translating) {
+        return t("activity.embedPhaseTranslating", {
+          translated: activity.translating.translated,
+          total: activity.translating.total,
+        });
+      }
+      return t("activity.embedPhaseTranslatingSimple");
+    default:
+      return t("activity.embedPhasePreparing");
+  }
+}
 
 type Props = {
   working: boolean;
@@ -51,6 +92,8 @@ type Props = {
   ocrActivity: OCRActivityState;
   aiTagActivity: AITagActivityState;
   vlmOcrActivity: VLMOcrActivityState;
+  embedActivity: EmbedActivityState;
+  translateActivity: TranslateActivityState;
   optimizeActivity: OptimizeActivityState;
   onAddProject: () => void;
   onRefresh: () => void;
@@ -62,6 +105,10 @@ type Props = {
   onDismissAITag: () => void;
   onStopVLMOcr: () => void;
   onDismissVLMOcr: () => void;
+  onStopEmbed: () => void;
+  onDismissEmbed: () => void;
+  onStopTranslate: () => void;
+  onDismissTranslate: () => void;
   onOpenAISettings: () => void;
   onStopOptimize: () => void;
   onDismissOptimize: () => void;
@@ -76,6 +123,8 @@ export function AppTopbar({
   ocrActivity,
   aiTagActivity,
   vlmOcrActivity,
+  embedActivity,
+  translateActivity,
   optimizeActivity,
   onAddProject,
   onRefresh,
@@ -87,6 +136,10 @@ export function AppTopbar({
   onDismissAITag,
   onStopVLMOcr,
   onDismissVLMOcr,
+  onStopEmbed,
+  onDismissEmbed,
+  onStopTranslate,
+  onDismissTranslate,
   onOpenAISettings,
   onStopOptimize,
   onDismissOptimize,
@@ -185,13 +238,51 @@ export function AppTopbar({
         dedup: vlmOcrActivity.counts.dedup,
       })
     : t("activity.aiOcrPreparing");
+  const embedVisible = isEmbedActivityVisible(embedActivity);
+  const embedBusy = isEmbedActivityBusy(embedActivity);
+  const embedStatusLabels: Partial<Record<EmbedActivityPhase, string>> = {
+    running: t("activity.embedRunning"),
+    stopping: t("activity.embedStopping"),
+    done: t("activity.embedDone"),
+    stopped: t("activity.embedStopped"),
+    error: t("activity.embedError"),
+  };
+  const embedStatusLabel =
+    embedStatusLabels[embedActivity.phase] ?? t("activity.embedTitle");
+  const embedCounts = embedActivity.counts
+    ? t("activity.embedCounts", {
+        processed: embedActivity.counts.processed,
+        ready: embedActivity.counts.ready,
+        failed: embedActivity.counts.failed,
+        skipped: embedActivity.counts.skipped,
+      })
+    : embedStageLabel(embedActivity, t);
+  const translateVisible = isTranslateActivityVisible(translateActivity);
+  const translateBusy = isTranslateActivityBusy(translateActivity);
+  const translateStatusLabel = translateBusy
+    ? translateActivity.locale
+      ? t("activity.translateRunningLocale", { locale: translateActivity.locale })
+      : t("activity.translateRunning")
+    : translateActivity.phase === "done"
+      ? t("activity.translateDone")
+      : translateActivity.phase === "error"
+        ? t("activity.translateError")
+        : translateActivity.phase === "stopped"
+          ? t("activity.translateStopped")
+          : t("activity.translateTitle");
+  const translateCounts =
+    translateActivity.total > 0
+      ? `${translateActivity.translated} / ${translateActivity.total}`
+      : "";
   const catalogActionTooltip = ocrBusy
     ? t("activity.ocrLockedTooltip")
     : aiTagBusy
       ? t("activity.aiTagLockedTooltip")
-      : optimizeBusy
-        ? t("activity.optimizeLockedTooltip")
-        : undefined;
+      : embedBusy
+        ? t("activity.embedLockedTooltip")
+        : optimizeBusy
+          ? t("activity.optimizeLockedTooltip")
+          : undefined;
 
   function onScanClick() {
     onRefresh();
@@ -404,6 +495,73 @@ export function AppTopbar({
                 : undefined
             }
             onDismiss={onDismissVLMOcr}
+          />
+        )}
+        {embedVisible && (
+          <ActivityDropdown
+            icon={<Waypoints size={16} />}
+            ariaLabel={t("activity.embedTitle")}
+            busy={embedBusy}
+            done={embedActivity.phase === "done"}
+            failed={embedActivity.phase === "error"}
+            stopped={embedActivity.phase === "stopped"}
+            canDismiss={canDismissEmbedActivity(embedActivity)}
+            statusLabel={embedStatusLabel}
+            countsLabel={embedCounts}
+            errorMessage={embedActivity.errorMessage}
+            errors={embedActivity.errors}
+            progressPercent={embedActivityProgressPercent(embedActivity)}
+            startedAt={embedActivity.startedAt}
+            primaryAction={{
+              label: t("activity.viewAISettings"),
+              onClick: onOpenAISettings,
+            }}
+            stopButton={
+              embedBusy
+                ? {
+                    label:
+                      embedActivity.phase === "stopping"
+                        ? t("activity.embedStopping")
+                        : t("settings.embedStop"),
+                    onClick: onStopEmbed,
+                    disabled: embedActivity.phase === "stopping",
+                  }
+                : undefined
+            }
+            onDismiss={onDismissEmbed}
+          />
+        )}
+        {translateVisible && (
+          <ActivityDropdown
+            icon={<Languages size={16} />}
+            ariaLabel={t("activity.translateTitle")}
+            busy={translateBusy}
+            done={translateActivity.phase === "done"}
+            failed={translateActivity.phase === "error"}
+            stopped={translateActivity.phase === "stopped"}
+            canDismiss={canDismissTranslateActivity(translateActivity)}
+            statusLabel={translateStatusLabel}
+            countsLabel={translateCounts}
+            errorMessage={translateActivity.errorMessage}
+            progressPercent={translateActivityProgressPercent(translateActivity)}
+            startedAt={translateActivity.startedAt}
+            primaryAction={{
+              label: t("activity.viewAISettings"),
+              onClick: onOpenAISettings,
+            }}
+            stopButton={
+              translateBusy
+                ? {
+                    label:
+                      translateActivity.phase === "stopping"
+                        ? t("activity.translateStopping")
+                        : t("activity.translateStop"),
+                    onClick: onStopTranslate,
+                    disabled: translateActivity.phase === "stopping",
+                  }
+                : undefined
+            }
+            onDismiss={onDismissTranslate}
           />
         )}
         {ocrVisible && (

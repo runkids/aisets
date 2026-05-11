@@ -200,7 +200,9 @@ export function AssetDrawerSimilar({
                     },
                     {
                       label: t("duplicateExplain.recommendation"),
-                      content: explanation.recommendation,
+                      content: explanation.keepFilename
+                        ? `${t("duplicateExplain.keep")} ${explanation.keepFilename}\n${explanation.recommendation}`
+                        : explanation.recommendation,
                     },
                     {
                       label: t("duplicateExplain.rationale"),

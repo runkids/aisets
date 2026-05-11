@@ -489,6 +489,11 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backe
 		LocationConfidence string          `json:"locationConfidence"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		preview := rawContent
+		if len(preview) > 300 {
+			preview = preview[:300] + "..."
+		}
+		log.Printf("[warn] aitag: failed to parse VLM response for %s: %v\n  raw(%d bytes): %s", item.RepoPath, err, len(rawContent), preview)
 		result.Status = aitag.StatusFailed
 		result.ErrorCode = "aitag_parse_failed"
 		result.ErrorMessage = "failed to parse VLM JSON response: " + err.Error()

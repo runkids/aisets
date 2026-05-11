@@ -51,6 +51,7 @@ export function useTagsQuery(params: TagListParams, enabled = true) {
     queryFn: () => getTagList(normalizeTagListParams(params)),
     enabled,
     staleTime: 30_000,
+    refetchInterval: 30_000,
     placeholderData: keepPreviousData,
   });
 }
@@ -60,6 +61,7 @@ export function useTagCategoriesQuery() {
     queryKey: tagKeys.categories,
     queryFn: getTagCategories,
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }
 

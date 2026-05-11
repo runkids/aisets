@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"aisets/internal/agent"
@@ -15,6 +16,7 @@ import (
 type DuplicateExplanationResponse struct {
 	Summary        string `json:"summary"`
 	Differences    string `json:"differences"`
+	KeepFilename   string `json:"keepFilename,omitempty"`
 	Recommendation string `json:"recommendation"`
 	Rationale      string `json:"rationale"`
 	DurationMs     int64  `json:"durationMs"`
@@ -76,11 +78,18 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 	if distance == "" {
 		distance = "?"
 	}
+	leftName := filepath.Base(left.RepoPath)
+	rightName := filepath.Base(right.RepoPath)
 	prompt = replaceDynamicVars(prompt, map[string]string{
 		"leftMetadata":  formatFileMetadata(left),
 		"rightMetadata": formatFileMetadata(right),
+		"leftFilename":  leftName,
+		"rightFilename": rightName,
 		"distance":      distance,
 	})
+
+	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+		r.URL.Query().Get("lang"), "Write the summary, differences, recommendation, and rationale in")
 
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec == 0 {
@@ -106,6 +115,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 	var parsed struct {
 		Summary        string `json:"summary"`
 		Differences    string `json:"differences"`
+		KeepFilename   string `json:"keepFilename"`
 		Recommendation string `json:"recommendation"`
 		Rationale      string `json:"rationale"`
 	}
@@ -117,6 +127,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, DuplicateExplanationResponse{
 		Summary:        parsed.Summary,
 		Differences:    parsed.Differences,
+		KeepFilename:   parsed.KeepFilename,
 		Recommendation: parsed.Recommendation,
 		Rationale:      parsed.Rationale,
 		DurationMs:     durationMs,
@@ -125,20 +136,23 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-const defaultDuplicateExplainPrompt = `Compare these two images that were flagged as near-duplicates (dHash distance: {{distance}}/64).
+const defaultDuplicateExplainPrompt = `Compare these two images flagged as near-duplicates (dHash distance: {{distance}}/64).
 
-Image 1: {{leftMetadata}}
-Image 2: {{rightMetadata}}
+"{{leftFilename}}": {{leftMetadata}}
+"{{rightFilename}}": {{rightMetadata}}
 
 Explain:
 1. What the images show
 2. The specific visual differences between them
 3. Which one to keep and why (consider: resolution, quality, file size)
 
+IMPORTANT: Always refer to each image by its filename ("{{leftFilename}}" or "{{rightFilename}}"). Never use generic labels like "image 1", "image 2", "left image", "圖像 1", etc.
+
 Respond ONLY with a JSON object:
 {
   "summary": "one-sentence description of what these images are",
-  "differences": "specific visual differences between the two",
-  "recommendation": "keep image 1 or image 2, with the filename",
-  "rationale": "why this one is better to keep"
+  "differences": "specific visual differences — reference each file by name",
+  "keepFilename": "{{leftFilename}}" or "{{rightFilename}}",
+  "recommendation": "one sentence: why keep that file over the other",
+  "rationale": "detailed reasoning — use filenames, not generic labels"
 }`

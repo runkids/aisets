@@ -287,14 +287,21 @@ func (s *Server) resolveVLMProviderForFeature(settings config.AppSettings, featu
 	backend = s.featureBackend(settings, feature)
 	if id, ok := agent.AgentBackendID(backend); ok {
 		if _, ok := s.agentProviders[id]; ok {
-			model := settings.AgentModel
+			model := agent.AgentBackendModel(backend)
+			if model == "" {
+				model = settings.AgentModel
+			}
 			if model == "" {
 				model = "default"
 			}
 			return backend, agent.FormatAgentBackend(id), model
 		}
 	}
-	return "local-llm", settings.LLMProvider, settings.LLMVisionModel
+	model := agent.LocalLLMBackendModel(backend)
+	if model == "" {
+		model = settings.LLMVisionModel
+	}
+	return "local-llm", settings.LLMProvider, model
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {

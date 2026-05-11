@@ -595,11 +595,19 @@ export function AISettingsCard({
                   value={draft[row.key]}
                   agentRuntime={settings?.agentRuntime}
                   llmRuntime={settings?.llmRuntime}
+                  models={models}
                   showInherit={row.showInherit}
                   disabled={aiBusy}
                   onChange={(v) => {
                     onUpdateDraft((c) => ({ ...c, [row.key]: v }));
-                    vlmBackendMutation.mutate({ [row.key]: v });
+                    vlmBackendMutation.mutate(
+                      { [row.key]: v },
+                      {
+                        onSuccess: () =>
+                          toast.success(t("toast.settingsSaved")),
+                        onError: (err) => toast.error(errorMessage(err)),
+                      },
+                    );
                   }}
                 />
               </div>

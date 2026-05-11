@@ -49,6 +49,21 @@ func TestFixJSON(t *testing.T) {
 			`{"a":{"b":1,},"c":[3,]}`,
 			`{"a":{"b":1},"c":[3]}`,
 		},
+		{
+			"non-JSON brace before real JSON",
+			`{æ¯å‹•} {"tags":["icon"]}`,
+			`{"tags":["icon"]}`,
+		},
+		{
+			"CJK text with braces before JSON",
+			`這是分析結果{結果}：{"category":"ui"}`,
+			`{"category":"ui"}`,
+		},
+		{
+			"only non-JSON braces",
+			`{æ¯å‹•ç•«}`,
+			`{æ¯å‹•ç•«}`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

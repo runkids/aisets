@@ -130,17 +130,17 @@ export type OptimizeAIAdvice = {
 };
 
 export function getOptimizeAIAdvice(assetId: string) {
-  return request<OptimizeAIAdvice>(
-    `/api/ai/optimize-advice?assetId=${encodeURIComponent(assetId)}`,
-    {
-      method: "POST",
-    },
-  );
+  const qp = new URLSearchParams({ assetId });
+  if (i18n.language) qp.set("lang", i18n.language);
+  return request<OptimizeAIAdvice>(`/api/ai/optimize-advice?${qp}`, {
+    method: "POST",
+  });
 }
 
 export type DuplicateExplanation = {
   summary: string;
   differences: string;
+  keepFilename?: string;
   recommendation: string;
   rationale: string;
   durationMs: number;
@@ -155,6 +155,7 @@ export function getDuplicateExplanation(
 ) {
   const params = new URLSearchParams({ leftId, rightId });
   if (distance != null) params.set("distance", String(distance));
+  if (i18n.language) params.set("lang", i18n.language);
   return request<DuplicateExplanation>(
     `/api/ai/duplicate-explain?${params.toString()}`,
     { method: "POST" },

@@ -30,6 +30,9 @@ func validVLMBackend(v string) bool {
 	if v == "" || v == "local-llm" {
 		return true
 	}
+	if strings.HasPrefix(v, "local-llm/") {
+		return len(v) > len("local-llm/")
+	}
 	if id, ok := agent.AgentBackendID(v); ok {
 		return validAgentAdapters[id]
 	}

@@ -331,7 +331,11 @@ func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AI
 	if !validI18nLocales[locale] {
 		return nil, nil
 	}
-	likePattern := `%"` + locale + `"%`
+	jsonPath := `'$."` + locale + `"'`
+	missingAny := `(json_extract(description_i18n_json, ` + jsonPath + `) IS NULL
+			   OR json_extract(category_i18n_json, ` + jsonPath + `) IS NULL
+			   OR json_extract(category_i18n_json, ` + jsonPath + `) = category
+			   OR json_extract(tags_i18n_json, ` + jsonPath + `) IS NULL)`
 	var query string
 	var args []any
 	if len(contentHashes) > 0 {
@@ -340,18 +344,16 @@ func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AI
 			placeholders[i] = "?"
 			args = append(args, h)
 		}
-		args = append(args, likePattern)
 		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
 			FROM ai_tags
 			WHERE status = 'ready'
 			  AND content_hash IN (` + joinStrings(placeholders, ",") + `)
-			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE ?)`
+			  AND ` + missingAny
 	} else {
-		args = append(args, likePattern)
 		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
 			FROM ai_tags
 			WHERE status = 'ready'
-			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE ?)`
+			  AND ` + missingAny
 	}
 	rows, err := s.rdb.Query(query, args...)
 	if err != nil {

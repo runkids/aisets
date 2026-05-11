@@ -105,6 +105,9 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		"optimizationFindings": formatOptimizationFindings(item.Optimization),
 	})
 
+	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+		r.URL.Query().Get("lang"), "Write the rationale in")
+
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec == 0 {
 		timeoutSec = llm.DefaultChatTimeout

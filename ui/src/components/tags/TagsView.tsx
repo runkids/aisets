@@ -22,7 +22,10 @@ import {
 } from "../../tagsQueries";
 import { useDebouncedValue } from "../../useDebouncedValue";
 import { errorMessage } from "../../i18n";
-import { runAITagTranslate } from "../../api";
+import {
+  isTranslateActivityBusy,
+  type TranslateActivityState,
+} from "../../activity/translateActivity";
 import { batchActionButtonClassName } from "../optimize/optimizeTypes";
 import {
   Button,
@@ -52,7 +55,17 @@ const LOCALE_OPTIONS = [
   { value: "ko", label: "한국어" },
 ];
 
-export function TagsView() {
+type TagsViewProps = {
+  translateActivity: TranslateActivityState;
+  onStartTranslate: () => void;
+  onStopTranslate: () => void;
+};
+
+export function TagsView({
+  translateActivity,
+  onStartTranslate,
+  onStopTranslate,
+}: TagsViewProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -63,7 +76,7 @@ export function TagsView() {
   const [viewLocale, setViewLocale] = useState(i18n.language || "en");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [translating, setTranslating] = useState(false);
+  const translating = isTranslateActivityBusy(translateActivity);
 
   // Dialogs
   const [renameTag, setRenameTag] = useState<string | null>(null);
@@ -106,23 +119,8 @@ export function TagsView() {
     navigate(`/browse?q=${encodeURIComponent(tag)}`);
   }
 
-  async function handleTranslate() {
-    setTranslating(true);
-    try {
-      await runAITagTranslate({
-        onEvent: (event) => {
-          if (event.type === "error") {
-            toast.error(errorMessage(event));
-          }
-        },
-      });
-      toast.success(t("tags.translateDone"));
-      void refetchTags();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setTranslating(false);
-    }
+  function handleTranslate() {
+    onStartTranslate();
   }
 
   const toggleSelect = useCallback((tag: string) => {

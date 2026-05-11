@@ -28,9 +28,31 @@ const (
 
 func AgentBackendID(backend string) (id string, ok bool) {
 	if strings.HasPrefix(backend, backendPrefix) {
-		return strings.TrimPrefix(backend, backendPrefix), true
+		rest := strings.TrimPrefix(backend, backendPrefix)
+		if idx := strings.Index(rest, "/"); idx >= 0 {
+			return rest[:idx], true
+		}
+		return rest, true
 	}
 	return "", false
+}
+
+func AgentBackendModel(backend string) string {
+	if strings.HasPrefix(backend, backendPrefix) {
+		rest := strings.TrimPrefix(backend, backendPrefix)
+		if idx := strings.Index(rest, "/"); idx >= 0 {
+			return rest[idx+1:]
+		}
+	}
+	return ""
+}
+
+func LocalLLMBackendModel(backend string) string {
+	const prefix = BackendLocalLLM + "/"
+	if strings.HasPrefix(backend, prefix) {
+		return strings.TrimPrefix(backend, prefix)
+	}
+	return ""
 }
 
 func FormatAgentBackend(adapterID string) string {

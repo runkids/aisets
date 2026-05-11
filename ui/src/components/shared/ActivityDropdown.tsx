@@ -116,7 +116,7 @@ export function ActivityDropdown({
         </span>
       </IconButton>
       <div
-        className={`pointer-events-none absolute right-0 top-full z-[60] pt-2 transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${dropdownState}`}
+        className={`pointer-events-none absolute right-0 top-full z-[200] pt-2 transition-[opacity,transform] duration-[120ms] ease-g group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${dropdownState}`}
         role={failed ? "alert" : "status"}
         aria-live={failed ? "assertive" : "polite"}
       >
