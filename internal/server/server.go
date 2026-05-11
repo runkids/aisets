@@ -250,6 +250,22 @@ func (s *Server) initAgentChat() {
 	s.agentChat = chat
 }
 
+func (s *Server) hasVLMBackend(settings config.AppSettings) bool {
+	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
+	return hasLLM || (settings.AgentEnabled && s.agentChat != nil)
+}
+
+func (s *Server) resolveVLMProvider(settings config.AppSettings) (providerName, modelName string) {
+	if settings.AgentEnabled && s.agentChat != nil {
+		model := settings.AgentModel
+		if model == "" {
+			model = s.agentStatus.Active
+		}
+		return "agent:" + s.agentStatus.Active, model
+	}
+	return settings.LLMProvider, settings.LLMVisionModel
+}
+
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {
 	switch provider {
 	case "ollama":

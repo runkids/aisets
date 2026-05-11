@@ -8,12 +8,21 @@ import (
 	"path/filepath"
 	"strings"
 
+	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
 )
+
+var validAgentAdapters = map[string]bool{
+	"": true, "auto": true,
+	agent.AdapterCodex: true, agent.AdapterClaude: true,
+	agent.AdapterCursorAgent: true, agent.AdapterGemini: true,
+	agent.AdapterCopilot: true, agent.AdapterPi: true,
+	agent.AdapterLocalLLM: true,
+}
 
 func defaultGlobalExcludePatterns() []string {
 	return []string{
@@ -460,12 +469,7 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.AgentAdapter != nil {
 		a := strings.TrimSpace(*update.AgentAdapter)
-		validAdapters := map[string]bool{
-			"": true, "auto": true, "codex": true, "claude": true,
-			"cursor-agent": true, "gemini": true, "copilot": true,
-			"pi": true, "local-llm": true,
-		}
-		if !validAdapters[a] {
+		if !validAgentAdapters[a] {
 			return AppSettings{}, apierr.New("settings_agent_adapter_invalid",
 				"invalid agent adapter value")
 		}

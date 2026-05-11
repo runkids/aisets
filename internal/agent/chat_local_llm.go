@@ -20,15 +20,8 @@ func NewLocalLLMChatProvider(provider llm.Provider, prepareImage PrepareImageFun
 	return &LocalLLMChatProvider{provider: provider, prepareImage: prepareImage}
 }
 
-func (p *LocalLLMChatProvider) ChatBatch(ctx context.Context, reqs []ChatRequest, onResult func(idx int, res ChatResult)) error {
-	for i, req := range reqs {
-		res := p.chatOne(ctx, req)
-		onResult(i, res)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-	}
-	return nil
+func (p *LocalLLMChatProvider) ChatBatch(ctx context.Context, reqs []ChatRequest, onResult func(int, ChatResult)) error {
+	return runBatch(ctx, reqs, onResult, p.chatOne)
 }
 
 func (p *LocalLLMChatProvider) Close() error { return nil }
@@ -37,7 +30,7 @@ func (p *LocalLLMChatProvider) chatOne(ctx context.Context, req ChatRequest) Cha
 	var images []string
 	for _, imgPath := range req.ImagePaths {
 		ext := strings.ToLower(filepath.Ext(imgPath))
-		dataURI, err := p.prepareImage(imgPath, ext, "tag")
+		dataURI, err := p.prepareImage(imgPath, ext, "vlm")
 		if err != nil {
 			return ChatResult{Err: fmt.Errorf("prepare image %s: %w", imgPath, err)}
 		}

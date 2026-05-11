@@ -93,9 +93,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_settings_failed")})
 		return
 	}
-	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
-	hasAgent := settings.AgentEnabled && s.agentChat != nil
-	if !hasLLM && !hasAgent {
+	if !s.hasVLMBackend(settings) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("vlm_ocr_not_configured", "AI provider or agent adapter not configured")})
 		return
 	}
@@ -114,17 +112,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var providerName, modelName string
-	if hasAgent {
-		providerName = "agent:" + s.agentStatus.Active
-		modelName = settings.AgentModel
-		if modelName == "" {
-			modelName = s.agentStatus.Active
-		}
-	} else {
-		providerName = settings.LLMProvider
-		modelName = settings.LLMVisionModel
-	}
+	providerName, modelName := s.resolveVLMProvider(settings)
 	engineVersion := providerName + "/" + modelName
 	settingsHash := vlmOCRSettingsHash(modelName)
 

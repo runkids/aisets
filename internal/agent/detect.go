@@ -6,12 +6,12 @@ import (
 )
 
 var defaultAdapters = []Adapter{
-	&CodexAdapter{},
-	&ClaudeAdapter{},
-	&CursorAdapter{},
-	&GeminiAdapter{},
-	&CopilotAdapter{},
-	&PiAdapter{},
+	&CLIAdapter{AdapterCodex, "Codex CLI", "codex"},
+	&CLIAdapter{AdapterClaude, "Claude Code", "claude"},
+	&CLIAdapter{AdapterCursorAgent, "Cursor Agent", "cursor-agent"},
+	&CLIAdapter{AdapterGemini, "Gemini CLI", "gemini"},
+	&CLIAdapter{AdapterCopilot, "Copilot CLI", "copilot"},
+	&CLIAdapter{AdapterPi, "Pi", "pi"},
 }
 
 func DetectAll(ctx context.Context, llm LLMInfo) []AdapterInfo {

@@ -69,9 +69,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, apierr.From(err, "settings_failed"))
 		return
 	}
-	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
-	hasAgent := settings.AgentEnabled && s.agentChat != nil
-	if !hasLLM && !hasAgent {
+	if !s.hasVLMBackend(settings) {
 		writeError(w, http.StatusBadRequest, apierr.New("ai_not_configured", "AI provider or agent adapter not configured"))
 		return
 	}
@@ -115,15 +113,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
-	var modelName string
-	if hasAgent {
-		modelName = settings.AgentModel
-		if modelName == "" {
-			modelName = s.agentStatus.Active
-		}
-	} else {
-		modelName = settings.LLMVisionModel
-	}
+	_, modelName := s.resolveVLMProvider(settings)
 
 	start := time.Now()
 	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)

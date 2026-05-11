@@ -83,8 +83,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMEndpoint != nil {
 		s.initLLMProvider()
 	}
-	if body.AgentEnabled != nil || body.AgentAdapter != nil ||
-		body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMVisionModel != nil {
+	agentChanged := body.AgentEnabled != nil || body.AgentAdapter != nil
+	llmAffectsAgent := s.agentStatus.Active == agent.AdapterLocalLLM &&
+		(body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMVisionModel != nil)
+	if agentChanged || llmAffectsAgent {
 		s.initAgentStatus()
 		s.initAgentChat()
 	}

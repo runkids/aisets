@@ -22,23 +22,16 @@ func (m *mockProvider) Chat(ctx context.Context, req llm.ChatRequest) (llm.ChatR
 	return m.chatFunc(ctx, req)
 }
 
-func TestNewChatProvider_Claude(t *testing.T) {
-	p, err := NewChatProvider("claude", AdapterInfo{Path: "/usr/bin/claude"}, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := p.(*ClaudeChatProvider); !ok {
-		t.Error("expected ClaudeChatProvider")
-	}
-}
-
-func TestNewChatProvider_Codex(t *testing.T) {
-	p, err := NewChatProvider("codex", AdapterInfo{Path: "/usr/bin/codex"}, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := p.(*CodexChatProvider); !ok {
-		t.Error("expected CodexChatProvider")
+func TestNewChatProvider_CLIAdapters(t *testing.T) {
+	for _, id := range []string{"claude", "codex", "gemini", "copilot", "cursor-agent", "pi"} {
+		p, err := NewChatProvider(id, AdapterInfo{Path: "/usr/bin/" + id}, nil, nil)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", id, err)
+			continue
+		}
+		if _, ok := p.(*CLIChatProvider); !ok {
+			t.Errorf("%s: expected CLIChatProvider", id)
+		}
 	}
 }
 
@@ -65,19 +58,6 @@ func TestNewChatProvider_Unsupported(t *testing.T) {
 	_, err := NewChatProvider("unknown", AdapterInfo{}, nil, nil)
 	if err == nil {
 		t.Error("expected error for unknown adapter")
-	}
-}
-
-func TestNewChatProvider_GenericCLIs(t *testing.T) {
-	for _, id := range []string{"gemini", "copilot", "cursor-agent", "pi"} {
-		p, err := NewChatProvider(id, AdapterInfo{Path: "/usr/bin/" + id}, nil, nil)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", id, err)
-			continue
-		}
-		if _, ok := p.(*GenericCLIChatProvider); !ok {
-			t.Errorf("%s: expected GenericCLIChatProvider", id)
-		}
 	}
 }
 

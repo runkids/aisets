@@ -5,81 +5,25 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-type GenericCLIChatProvider struct {
-	binPath   string
-	buildArgs func(req ChatRequest) []string
+type CLIChatProvider struct {
+	binPath      string
+	name         string
+	buildArgs    func(req ChatRequest) []string
+	buildPrompt  func(req ChatRequest) string
 }
 
-func NewGeminiChatProvider(binPath string) *GenericCLIChatProvider {
-	return &GenericCLIChatProvider{
-		binPath: binPath,
-		buildArgs: func(req ChatRequest) []string {
-			args := []string{"--output-format", "text", "--yolo"}
-			if req.Model != "" {
-				args = append(args, "--model", req.Model)
-			}
-			return args
-		},
-	}
+func (p *CLIChatProvider) ChatBatch(ctx context.Context, reqs []ChatRequest, onResult func(int, ChatResult)) error {
+	return runBatch(ctx, reqs, onResult, p.chatOne)
 }
 
-func NewCopilotChatProvider(binPath string) *GenericCLIChatProvider {
-	return &GenericCLIChatProvider{
-		binPath: binPath,
-		buildArgs: func(req ChatRequest) []string {
-			args := []string{"--allow-all-tools", "--output-format", "text"}
-			if req.Model != "" {
-				args = append(args, "--model", req.Model)
-			}
-			return args
-		},
-	}
-}
+func (p *CLIChatProvider) Close() error { return nil }
 
-func NewCursorChatProvider(binPath string) *GenericCLIChatProvider {
-	return &GenericCLIChatProvider{
-		binPath: binPath,
-		buildArgs: func(req ChatRequest) []string {
-			args := []string{"--print", "--force", "--trust"}
-			if req.Model != "" {
-				args = append(args, "--model", req.Model)
-			}
-			return args
-		},
-	}
-}
-
-func NewPiChatProvider(binPath string) *GenericCLIChatProvider {
-	return &GenericCLIChatProvider{
-		binPath: binPath,
-		buildArgs: func(req ChatRequest) []string {
-			args := []string{"-p"}
-			if req.Model != "" {
-				args = append(args, "--model", req.Model)
-			}
-			return args
-		},
-	}
-}
-
-func (p *GenericCLIChatProvider) ChatBatch(ctx context.Context, reqs []ChatRequest, onResult func(idx int, res ChatResult)) error {
-	for i, req := range reqs {
-		res := p.chatOne(ctx, req)
-		onResult(i, res)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-	}
-	return nil
-}
-
-func (p *GenericCLIChatProvider) Close() error { return nil }
-
-func (p *GenericCLIChatProvider) chatOne(ctx context.Context, req ChatRequest) ChatResult {
+func (p *CLIChatProvider) chatOne(ctx context.Context, req ChatRequest) ChatResult {
 	timeout := time.Duration(req.TimeoutSec) * time.Second
 	if timeout <= 0 {
 		timeout = 120 * time.Second
@@ -88,7 +32,7 @@ func (p *GenericCLIChatProvider) chatOne(ctx context.Context, req ChatRequest) C
 	defer cancel()
 
 	args := p.buildArgs(req)
-	prompt := buildCLIPrompt(req.SystemPrompt, req.Prompt, req.ImagePaths)
+	prompt := p.buildPrompt(req)
 
 	cmd := exec.CommandContext(ctx, p.binPath, args...)
 	cmd.Stdin = strings.NewReader(prompt)
@@ -103,7 +47,7 @@ func (p *GenericCLIChatProvider) chatOne(ctx context.Context, req ChatRequest) C
 	if err != nil {
 		return ChatResult{
 			DurationMs: durationMs,
-			Err:        fmt.Errorf("%s cli: %w (stderr: %s)", p.binPath, err, truncate(stderr.String(), 500)),
+			Err:        fmt.Errorf("%s cli: %w (stderr: %s)", p.name, err, truncate(stderr.String(), 500)),
 		}
 	}
 
@@ -111,4 +55,90 @@ func (p *GenericCLIChatProvider) chatOne(ctx context.Context, req ChatRequest) C
 		Content:    strings.TrimSpace(stdout.String()),
 		DurationMs: durationMs,
 	}
+}
+
+func defaultCLIPrompt(req ChatRequest) string {
+	return buildCLIPrompt(req.SystemPrompt, req.Prompt, req.ImagePaths)
+}
+
+func plainPrompt(req ChatRequest) string {
+	if req.SystemPrompt != "" {
+		return req.SystemPrompt + "\n\n" + req.Prompt
+	}
+	return req.Prompt
+}
+
+func newCLIChatProvider(binPath, name string, buildArgs func(ChatRequest) []string) *CLIChatProvider {
+	return &CLIChatProvider{
+		binPath:     binPath,
+		name:        filepath.Base(binPath),
+		buildArgs:   buildArgs,
+		buildPrompt: defaultCLIPrompt,
+	}
+}
+
+func newClaudeChatProvider(binPath string) *CLIChatProvider {
+	p := newCLIChatProvider(binPath, "claude", func(req ChatRequest) []string {
+		args := []string{"-p", "--bare", "--output-format", "text", "--allowedTools", "Read"}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
+	return p
+}
+
+func newCodexChatProvider(binPath string) *CLIChatProvider {
+	p := newCLIChatProvider(binPath, "codex", func(req ChatRequest) []string {
+		args := []string{"exec"}
+		for _, img := range req.ImagePaths {
+			args = append(args, "-i", img)
+		}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
+	p.buildPrompt = plainPrompt
+	return p
+}
+
+func newGeminiChatProvider(binPath string) *CLIChatProvider {
+	return newCLIChatProvider(binPath, "gemini", func(req ChatRequest) []string {
+		args := []string{"--output-format", "text", "--yolo"}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
+}
+
+func newCopilotChatProvider(binPath string) *CLIChatProvider {
+	return newCLIChatProvider(binPath, "copilot", func(req ChatRequest) []string {
+		args := []string{"--allow-all-tools", "--output-format", "text"}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
+}
+
+func newCursorChatProvider(binPath string) *CLIChatProvider {
+	return newCLIChatProvider(binPath, "cursor-agent", func(req ChatRequest) []string {
+		args := []string{"--print", "--force", "--trust"}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
+}
+
+func newPiChatProvider(binPath string) *CLIChatProvider {
+	return newCLIChatProvider(binPath, "pi", func(req ChatRequest) []string {
+		args := []string{"-p"}
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		return args
+	})
 }
