@@ -216,6 +216,58 @@ func TestOpenAICompatEmbed(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatEmbedDimensions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"data":[{"embedding":[0.4,0.5,0.6]}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Embed(context.Background(), EmbedRequest{
+		Model: "nomic-embed-text",
+		Input: "hello",
+	})
+	if err != nil {
+		t.Fatalf("Embed error: %v", err)
+	}
+	if resp.Dimensions != 3 {
+		t.Errorf("expected Dimensions=3, got %d", resp.Dimensions)
+	}
+}
+
+func TestOpenAICompatEmbedRejectsImageOnly(t *testing.T) {
+	p := NewOpenAICompatProvider("http://localhost:1/v1", "")
+	_, err := p.Embed(context.Background(), EmbedRequest{
+		Model:  "clip-model",
+		Images: []string{"data:image/png;base64,AQID"},
+	})
+	if err != ErrImageEmbedNotSupported {
+		t.Errorf("expected ErrImageEmbedNotSupported, got %v", err)
+	}
+}
+
+func TestOpenAICompatEmbedTextWithImagesIgnoresImages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"data":[{"embedding":[0.1]}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Embed(context.Background(), EmbedRequest{
+		Model:  "nomic-embed-text",
+		Input:  "hello",
+		Images: []string{"data:image/png;base64,AQID"},
+	})
+	if err != nil {
+		t.Fatalf("expected success when Input is set, got %v", err)
+	}
+	if resp.Dimensions != 1 {
+		t.Errorf("expected Dimensions=1, got %d", resp.Dimensions)
+	}
+}
+
 func TestOpenAICompatChatTimeoutSec(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {

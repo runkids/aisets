@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+func stripDataURIBase64(s string) string {
+	if _, after, ok := strings.Cut(s, ";base64,"); ok {
+		return after
+	}
+	return s
+}
+
 // OllamaProvider implements Provider for a local Ollama instance.
 type OllamaProvider struct {
 	endpoint string
@@ -108,11 +115,7 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 		if len(m.Images) > 0 {
 			stripped := make([]string, len(m.Images))
 			for j, img := range m.Images {
-				if idx := strings.Index(img, ";base64,"); idx >= 0 {
-					stripped[j] = img[idx+8:]
-				} else {
-					stripped[j] = img
-				}
+				stripped[j] = stripDataURIBase64(img)
 			}
 			msgs[i].Images = stripped
 		}
@@ -162,8 +165,9 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 
 // ollamaEmbedRequest is the body sent to POST /api/embed.
 type ollamaEmbedRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
+	Model  string   `json:"model"`
+	Input  string   `json:"input,omitempty"`
+	Images []string `json:"images,omitempty"`
 }
 
 // ollamaEmbedResponse is the shape returned by POST /api/embed.
@@ -178,6 +182,9 @@ func (p *OllamaProvider) Embed(ctx context.Context, req EmbedRequest) (EmbedResp
 	defer cancel()
 
 	body := ollamaEmbedRequest{Model: req.Model, Input: req.Input}
+	for _, img := range req.Images {
+		body.Images = append(body.Images, stripDataURIBase64(img))
+	}
 	b, err := json.Marshal(body)
 	if err != nil {
 		return EmbedResponse{}, fmt.Errorf("ollama: marshal embed request: %w", err)
@@ -210,8 +217,10 @@ func (p *OllamaProvider) Embed(ctx context.Context, req EmbedRequest) (EmbedResp
 		return EmbedResponse{}, fmt.Errorf("ollama: embed: empty embeddings in response")
 	}
 
+	vec := raw.Embeddings[0]
 	return EmbedResponse{
-		Embedding:  raw.Embeddings[0],
+		Embedding:  vec,
+		Dimensions: len(vec),
 		DurationMs: durationMs,
 	}, nil
 }

@@ -124,6 +124,59 @@ func TestOllamaEmbed(t *testing.T) {
 	}
 }
 
+func TestOllamaEmbedWithImages(t *testing.T) {
+	var gotImages []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/embed" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		var body struct {
+			Images []string `json:"images"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotImages = body.Images
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"embeddings":[[0.7,0.8]]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOllamaProvider(srv.URL)
+	resp, err := p.Embed(context.Background(), EmbedRequest{
+		Model:  "nomic-embed-vision",
+		Images: []string{"data:image/png;base64,AQID"},
+	})
+	if err != nil {
+		t.Fatalf("Embed error: %v", err)
+	}
+	if len(gotImages) != 1 || gotImages[0] != "AQID" {
+		t.Errorf("expected stripped base64 [AQID], got %v", gotImages)
+	}
+	if resp.Dimensions != 2 {
+		t.Errorf("expected Dimensions=2, got %d", resp.Dimensions)
+	}
+}
+
+func TestOllamaEmbedDimensions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"embeddings":[[0.1,0.2,0.3]]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOllamaProvider(srv.URL)
+	resp, err := p.Embed(context.Background(), EmbedRequest{
+		Model: "nomic-embed-text",
+		Input: "test",
+	})
+	if err != nil {
+		t.Fatalf("Embed error: %v", err)
+	}
+	if resp.Dimensions != 3 {
+		t.Errorf("expected Dimensions=3, got %d", resp.Dimensions)
+	}
+}
+
 func TestOllamaAvailableSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

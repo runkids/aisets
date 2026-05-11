@@ -687,6 +687,8 @@ func (s *Store) ResetData() error {
 	tables := []string{
 		"action_history",
 		"tasks",
+		"embedding_vectors",
+		"embeddings",
 		"ocr_results",
 		"ai_tags",
 		"asset_notes",

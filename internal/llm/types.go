@@ -1,5 +1,10 @@
 package llm
 
+import "errors"
+
+// ErrImageEmbedNotSupported is returned by Embed when the provider cannot embed images.
+var ErrImageEmbedNotSupported = errors.New("provider does not support image embedding")
+
 const (
 	DefaultConcurrency = 1
 	MaxConcurrency     = 8
@@ -34,12 +39,14 @@ type ChatResponse struct {
 }
 
 type EmbedRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
+	Model  string   `json:"model"`
+	Input  string   `json:"input"`
+	Images []string `json:"images,omitempty"`
 }
 
 type EmbedResponse struct {
 	Embedding  []float32 `json:"embedding"`
+	Dimensions int       `json:"dimensions"`
 	DurationMs int64     `json:"durationMs"`
 }
 

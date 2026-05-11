@@ -355,6 +355,9 @@ func (s *Store) migrate() error {
 	if err := s.seedPrecheckBuiltInDefault(); err != nil {
 		return err
 	}
+	if err := s.migrateEmbeddingsTable(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}
@@ -1462,4 +1465,41 @@ func (s *Store) seedPrecheckBuiltInDefault() error {
 
 func defaultPrecheckPrompt() string {
 	return precheck.PrecheckAIPrompt
+}
+
+func (s *Store) migrateEmbeddingsTable() error {
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS embeddings (
+			id             INTEGER PRIMARY KEY,
+			asset_id       TEXT    NOT NULL,
+			project_id     TEXT    NOT NULL,
+			repo_path      TEXT    NOT NULL,
+			content_hash   TEXT    NOT NULL,
+			hash_algorithm TEXT    NOT NULL DEFAULT 'xxh3',
+			embed_type     TEXT    NOT NULL CHECK(embed_type IN ('text', 'image')),
+			provider_name  TEXT    NOT NULL,
+			model_name     TEXT    NOT NULL,
+			dimensions     INTEGER NOT NULL,
+			status         TEXT    NOT NULL DEFAULT 'ready',
+			error_code     TEXT    NOT NULL DEFAULT '',
+			error_message  TEXT    NOT NULL DEFAULT '',
+			duration_ms    INTEGER NOT NULL DEFAULT 0,
+			created_at     TEXT    NOT NULL,
+			UNIQUE (project_id, repo_path, content_hash, hash_algorithm,
+			        embed_type, provider_name, model_name)
+		)`,
+		`CREATE TABLE IF NOT EXISTS embedding_vectors (
+			embedding_id   INTEGER PRIMARY KEY
+			               REFERENCES embeddings(id) ON DELETE CASCADE,
+			vector         BLOB    NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_embeddings_type_ready
+			ON embeddings (embed_type) WHERE status = 'ready'`,
+	}
+	for _, stmt := range statements {
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("migrateEmbeddingsTable: %w", err)
+		}
+	}
+	return nil
 }

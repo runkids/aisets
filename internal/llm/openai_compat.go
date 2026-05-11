@@ -213,6 +213,9 @@ type openAIEmbedResponse struct {
 // Embed sends an embed request to POST /v1/embeddings with a 30s timeout.
 // It returns the first embedding vector from the response.
 func (p *OpenAICompatProvider) Embed(ctx context.Context, req EmbedRequest) (EmbedResponse, error) {
+	if len(req.Images) > 0 && req.Input == "" {
+		return EmbedResponse{}, ErrImageEmbedNotSupported
+	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -250,8 +253,10 @@ func (p *OpenAICompatProvider) Embed(ctx context.Context, req EmbedRequest) (Emb
 		return EmbedResponse{}, fmt.Errorf("openai-compat: embed: empty data in response")
 	}
 
+	vec := raw.Data[0].Embedding
 	return EmbedResponse{
-		Embedding:  raw.Data[0].Embedding,
+		Embedding:  vec,
+		Dimensions: len(vec),
 		DurationMs: durationMs,
 	}, nil
 }
