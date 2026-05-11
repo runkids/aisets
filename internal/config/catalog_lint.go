@@ -25,13 +25,16 @@ func (s *Store) CatalogLint(query CatalogLintQuery) (CatalogLintPage, error) {
 		return CatalogLintPage{}, err
 	}
 
-	facets, err := s.lintFacets(scanID, query)
-	if err != nil {
-		return CatalogLintPage{}, err
-	}
-
 	limit := normalizeCatalogLimit(query.Limit)
 	offset := parseCursorOffset(query.Cursor)
+
+	var facets CatalogLintFacets
+	if offset == 0 {
+		facets, err = s.lintFacets(scanID, query)
+		if err != nil {
+			return CatalogLintPage{}, err
+		}
+	}
 	pagingArgs := append(append([]any{}, allArgs...), limit+1, offset)
 	rows, err := s.rdb.Query(`
 		SELECT l.rule_id, l.severity, l.file, l.line, l.snippet, l.message, l.suggestion, l.asset_id

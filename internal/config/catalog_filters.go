@@ -188,10 +188,6 @@ func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr st
 	if err != nil {
 		return nil, 0, err
 	}
-	var total int
-	if err := s.rdb.QueryRow("SELECT COUNT(*) FROM asset_snapshots a "+where, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
 	rows, err := s.rdb.Query(`
 		SELECT `+expr+` AS id, COUNT(*)
 		FROM asset_snapshots a
@@ -204,11 +200,13 @@ func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr st
 	}
 	defer rows.Close()
 	options := []CatalogFacetOption{}
+	total := 0
 	for rows.Next() {
 		var option CatalogFacetOption
 		if err := rows.Scan(&option.ID, &option.Count); err != nil {
 			return nil, 0, err
 		}
+		total += option.Count
 		if option.ID != "" {
 			options = append(options, option)
 		}
@@ -422,9 +420,9 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return textClauseSQL("asset_folder(a.repo_path)", clause.Operator, value)
 	case "extension":
 		if clause.Operator == "equals" {
-			return "LOWER(a.ext) = ?", []any{normalizeCatalogExt(value)}, nil
+			return "a.ext = ?", []any{normalizeCatalogExt(value)}, nil
 		}
-		sqlClause, args := inClauseSQL("LOWER(a.ext)", normalizedExtList(value))
+		sqlClause, args := inClauseSQL("a.ext", normalizedExtList(value))
 		return sqlClause, args, nil
 	case "project":
 		if clause.Operator == "oneOf" {
@@ -678,7 +676,7 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		args = append(args, strings.TrimSpace(query.ProjectName))
 	}
 	if ext := normalizeCatalogExt(query.Ext); ext != "" {
-		clauses = append(clauses, "LOWER(a.ext) = ?")
+		clauses = append(clauses, "a.ext = ?")
 		args = append(args, ext)
 	}
 	if folder := normalizeCatalogFolder(query.Folder); folder != "" {

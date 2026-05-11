@@ -59,9 +59,12 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	if err := s.hydrateAssetOptimization(scanID, items); err != nil {
 		return CatalogItemsPage{}, err
 	}
-	facets, err := s.catalogItemFacets(scanID, query)
-	if err != nil {
-		return CatalogItemsPage{}, err
+	var facets CatalogItemFacets
+	if offset == 0 {
+		facets, err = s.catalogItemFacets(scanID, query)
+		if err != nil {
+			return CatalogItemsPage{}, err
+		}
 	}
 	return CatalogItemsPage{Items: items, Total: total, NextCursor: next, Facets: facets}, nil
 }
