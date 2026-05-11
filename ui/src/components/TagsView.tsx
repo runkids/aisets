@@ -42,7 +42,7 @@ const SORT_ITEMS: SegmentedControlItem<"count" | "alpha">[] = [
 ];
 
 export function TagsView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -65,6 +65,7 @@ export function TagsView() {
     q: debouncedSearch,
     sort,
     category,
+    locale: i18n.language,
     limit: 500,
     offset: 0,
   };
@@ -202,13 +203,24 @@ export function TagsView() {
 
   const isFiltered = debouncedSearch.length > 0 || category.length > 0;
 
+  const categoryLabel = useCallback(
+    (cat: string) => {
+      const tr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
+      return tr !== cat ? `${tr} (${cat})` : cat;
+    },
+    [t],
+  );
+
   const catCategories = catData?.categories;
   const categorySelectOptions = useMemo(
     () => [
       { value: "", label: t("tags.allCategories") },
-      ...(catCategories ?? []).map((c) => ({ value: c, label: c })),
+      ...(catCategories ?? []).map((c) => ({
+        value: c,
+        label: categoryLabel(c),
+      })),
     ],
-    [t, catCategories],
+    [t, catCategories, categoryLabel],
   );
 
   return (
@@ -229,7 +241,7 @@ export function TagsView() {
           />
           <StatCard
             label={t("tags.topCategory")}
-            value={topCategory}
+            value={topCategory !== "—" ? categoryLabel(topCategory) : "—"}
             icon={<Layers size={14} />}
             tone="blue"
           />
@@ -334,6 +346,7 @@ export function TagsView() {
           maxCount={maxCount}
           isLoading={isLoading}
           selected={selected}
+          translations={data?.translations}
           onTagClick={handleTagClick}
           onToggleSelect={toggleSelect}
           bulkMode={bulkMode}

@@ -21,7 +21,8 @@ const TagPrompt = `Analyze this image and respond with a JSON object containing:
 
 Respond ONLY with valid JSON, no markdown or explanation.`
 
-const TagTranslationsBlock = `- "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
+const TagTranslationsBlock = `- "categoryI18n": object mapping locale codes to translated category name: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the category value naturally into each locale.
+- "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
 - "descriptionI18n": object mapping locale codes to translated descriptions: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the description naturally into each locale.`
 
 type Result struct {
@@ -33,6 +34,7 @@ type Result struct {
 	ModelName          string              `json:"modelName"`
 	Status             string              `json:"status"`
 	Category           string              `json:"category"`
+	CategoryI18n       map[string]string   `json:"categoryI18n,omitempty"`
 	Tags               []string            `json:"tags"`
 	TagsI18n           map[string][]string `json:"tagsI18n,omitempty"`
 	Description        string              `json:"description"`

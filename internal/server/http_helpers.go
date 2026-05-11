@@ -119,3 +119,14 @@ func spaHandlerFromDisk(dir, basePath string) http.Handler {
 		_, _ = w.Write(index)
 	})
 }
+
+var validLocales = map[string]bool{
+	"en": true, "zh-TW": true, "zh-CN": true, "ja": true, "ko": true,
+}
+
+func sanitizeLocale(raw string) string {
+	if validLocales[raw] {
+		return raw
+	}
+	return ""
+}

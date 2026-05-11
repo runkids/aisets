@@ -28,6 +28,7 @@ type Props = {
   maxCount: number;
   isLoading: boolean;
   selected: Set<string>;
+  translations?: Record<string, string>;
   onTagClick: (tag: string) => void;
   onToggleSelect: (tag: string) => void;
   bulkMode?: boolean;
@@ -41,11 +42,22 @@ export function TagsGrid({
   maxCount,
   isLoading,
   selected,
+  translations,
   onTagClick,
   onToggleSelect,
   bulkMode = false,
 }: Props) {
   const { t } = useTranslation();
+
+  const tagLabel = (tag: string) => {
+    const tr = translations?.[tag];
+    return tr && tr !== tag ? `${tr} (${tag})` : tag;
+  };
+
+  const categoryLabel = (cat: string) => {
+    const tr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
+    return tr !== cat ? `${tr} (${cat})` : cat;
+  };
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
 
   const containerRef = useCallback((node: HTMLDivElement | null) => {
@@ -123,7 +135,7 @@ export function TagsGrid({
                   bulkMode ? onToggleSelect(item.tag) : onTagClick(item.tag)
                 }
               >
-                {item.tag}
+                {tagLabel(item.tag)}
               </button>
 
               {/* Count bar + number */}
@@ -143,7 +155,7 @@ export function TagsGrid({
               <div className="hidden min-[1024px]:flex items-center gap-1 w-[130px] justify-end">
                 {item.categories.slice(0, 2).map((cat) => (
                   <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
-                    {cat}
+                    {categoryLabel(cat)}
                   </Badge>
                 ))}
                 {item.categories.length > 2 && (

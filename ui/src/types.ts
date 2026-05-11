@@ -828,4 +828,5 @@ export type TagListResponse = {
   total: number;
   totalTaggedAssets: number;
   topCategory: string;
+  translations?: Record<string, string>;
 };

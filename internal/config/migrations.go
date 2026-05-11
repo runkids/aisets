@@ -1024,6 +1024,7 @@ func (s *Store) migrateAITagsI18nColumns() error {
 	}{
 		{"tags_i18n_json", `ALTER TABLE ai_tags ADD COLUMN tags_i18n_json TEXT NOT NULL DEFAULT '{}'`},
 		{"description_i18n_json", `ALTER TABLE ai_tags ADD COLUMN description_i18n_json TEXT NOT NULL DEFAULT '{}'`},
+		{"category_i18n_json", `ALTER TABLE ai_tags ADD COLUMN category_i18n_json TEXT NOT NULL DEFAULT '{}'`},
 	}
 	for _, statement := range statements {
 		if columns[statement.column] {

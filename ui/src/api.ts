@@ -950,6 +950,7 @@ export function getTagList(params: {
   sort?: string;
   project?: string;
   category?: string;
+  locale?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -959,6 +960,7 @@ export function getTagList(params: {
       sort: params.sort,
       project: params.project,
       category: params.category,
+      locale: params.locale,
       limit: params.limit,
       offset: params.offset,
     })}`,

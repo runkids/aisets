@@ -20,6 +20,7 @@ export type TagListParams = {
   sort?: string;
   project?: string;
   category?: string;
+  locale?: string;
   limit?: number;
   offset?: number;
 };
@@ -30,6 +31,7 @@ function normalizeTagListParams(params: TagListParams) {
     sort: params.sort || "count",
     project: params.project || "",
     category: params.category || "",
+    locale: params.locale || "",
     limit: params.limit || 100,
     offset: params.offset || 0,
   };

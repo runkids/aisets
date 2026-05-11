@@ -12,6 +12,7 @@ type AITagListQuery struct {
 	Sort     string // "count" (default) or "alpha"
 	Project  string
 	Category string
+	Locale   string
 	Limit    int
 	Offset   int
 }
@@ -26,10 +27,11 @@ type AITagListItem struct {
 
 // AITagListPage is the paginated result of AITagList.
 type AITagListPage struct {
-	Tags              []AITagListItem `json:"tags"`
-	Total             int             `json:"total"`
-	TotalTaggedAssets int             `json:"totalTaggedAssets"`
-	TopCategory       string          `json:"topCategory"`
+	Tags              []AITagListItem   `json:"tags"`
+	Total             int               `json:"total"`
+	TotalTaggedAssets int               `json:"totalTaggedAssets"`
+	TopCategory       string            `json:"topCategory"`
+	Translations      map[string]string `json:"translations,omitempty"`
 }
 
 // AITagList returns paginated unique tags aggregated from all ready ai_tags rows.
@@ -118,12 +120,56 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 		return AITagListPage{}, err
 	}
 
-	return AITagListPage{
+	page := AITagListPage{
 		Tags:              tags,
 		Total:             total,
 		TotalTaggedAssets: taggedAssets,
 		TopCategory:       topCategory,
-	}, nil
+	}
+
+	if q.Locale != "" && q.Locale != "en" && len(tags) > 0 {
+		if tr, err := s.aiTagTranslations(tags, q.Locale); err == nil && len(tr) > 0 {
+			page.Translations = tr
+		}
+	}
+
+	return page, nil
+}
+
+// aiTagTranslations aggregates translations from per-asset tags_i18n_json for the given tags and locale.
+func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[string]string, error) {
+	placeholders := make([]string, len(tags))
+	args := make([]any, len(tags))
+	for i, t := range tags {
+		placeholders[i] = "?"
+		args[i] = t.Tag
+	}
+
+	rows, err := s.rdb.Query(fmt.Sprintf(`
+		SELECT t.value,
+		       json_extract(at.tags_i18n_json, '$."`+locale+`"[' || t.key || ']')
+		FROM ai_tags at, json_each(at.tags_json) t
+		WHERE at.status = 'ready'
+		  AND t.value IN (%s)
+		  AND json_type(at.tags_i18n_json, '$."`+locale+`"') = 'array'
+	`, strings.Join(placeholders, ",")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("aitag translations: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]string, len(tags))
+	for rows.Next() {
+		var tag string
+		var translation *string
+		if err := rows.Scan(&tag, &translation); err != nil {
+			return nil, fmt.Errorf("aitag translations scan: %w", err)
+		}
+		if translation != nil && *translation != "" && result[tag] == "" {
+			result[tag] = *translation
+		}
+	}
+	return result, rows.Err()
 }
 
 // AITagRename renames all occurrences of `from` to `to` in tags_json across all ready ai_tags rows.

@@ -26,6 +26,7 @@ func (s *Server) handleTagList(w http.ResponseWriter, r *http.Request) {
 		Sort:     q.Get("sort"),
 		Project:  q.Get("project"),
 		Category: q.Get("category"),
+		Locale:   sanitizeLocale(q.Get("locale")),
 		Limit:    limit,
 		Offset:   offset,
 	}
