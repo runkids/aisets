@@ -88,7 +88,6 @@ function formatTokenCount(n: number): string {
 
 import { useLLMModelsQuery, useLLMHealthMutation } from "../../queries";
 import type { SettingsInfo } from "../../types";
-import { cn } from "../../lib/cn";
 import {
   Badge,
   Button,
@@ -338,9 +337,6 @@ export function AISection({
       label: t("settings.llmProviderOMLX"),
     },
   ];
-  const providerLabel =
-    providerOptions.find((o) => o.value === draft.llmProvider)?.label ?? "";
-
   const runtime = healthMutation.data ?? settings?.llmRuntime;
   const isConnected = runtime?.connected ?? false;
   const statusText = healthMutation.isPending
@@ -384,7 +380,11 @@ export function AISection({
             <Tabs
               value={aiTab}
               items={[
-                { value: "local" as const, label: t("settings.aiTabLocal"), icon: <Settings2 /> },
+                {
+                  value: "local" as const,
+                  label: t("settings.aiTabLocal"),
+                  icon: <Settings2 />,
+                },
                 {
                   value: "agent" as const,
                   label: t("settings.aiTabAgent"),
@@ -395,8 +395,16 @@ export function AISection({
                     </Badge>
                   ) : undefined,
                 },
-                { value: "backend" as const, label: t("settings.aiTabBackend"), icon: <Shuffle /> },
-                { value: "prompts" as const, label: t("settings.aiTabPrompts"), icon: <MessageSquareText /> },
+                {
+                  value: "backend" as const,
+                  label: t("settings.aiTabBackend"),
+                  icon: <Shuffle />,
+                },
+                {
+                  value: "prompts" as const,
+                  label: t("settings.aiTabPrompts"),
+                  icon: <MessageSquareText />,
+                },
               ]}
               onChange={setAiTab}
               ariaLabel="AI settings tab"
@@ -435,210 +443,207 @@ export function AISection({
 
               {draft.llmEnabled && (
                 <>
-                      <FieldRow
-                        label={t("settings.llmProvider")}
-                        description={
-                          draft.llmProvider === "omlx"
-                            ? t("settings.llmOmlxGrammarHint")
-                            : undefined
+                  <FieldRow
+                    label={t("settings.llmProvider")}
+                    description={
+                      draft.llmProvider === "omlx"
+                        ? t("settings.llmOmlxGrammarHint")
+                        : undefined
+                    }
+                  >
+                    <Select
+                      value={draft.llmProvider || "ollama"}
+                      options={providerOptions}
+                      onChange={handleProviderChange}
+                      disabled={aiBusy}
+                      aria-label={t("settings.llmProvider")}
+                      className="min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow label={t("settings.llmEndpoint")}>
+                    <TextInput
+                      value={draft.llmEndpoint}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmEndpoint: e.target.value,
+                        }))
+                      }
+                      aria-label={t("settings.llmEndpoint")}
+                      className="w-full min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmApiKey")}
+                    description={t("settings.llmApiKeyHint")}
+                  >
+                    <TextInput
+                      type="password"
+                      value={draft.llmApiKey}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmApiKey: e.target.value,
+                        }))
+                      }
+                      placeholder={t("settings.llmApiKeyPlaceholder")}
+                      aria-label={t("settings.llmApiKey")}
+                      className="w-full min-w-[400px]"
+                    />
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmVisionModel")}
+                    description={t(
+                      `settings.llmVisionModelHint_${draft.llmProvider.replace("-", "_")}`,
+                      { defaultValue: t("settings.llmVisionModelHint") },
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-[400px]">
+                      <Select
+                        value={draft.llmVisionModel}
+                        options={modelOptions}
+                        disabled={aiBusy}
+                        onChange={(value) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmVisionModel: value,
+                          }))
                         }
+                        aria-label={t("settings.llmVisionModel")}
+                        className="flex-1"
+                      />
+                      <IconButton
+                        aria-label={t("settings.llmRefreshModels")}
+                        onClick={() => void modelsQuery.refetch()}
+                        disabled={modelsQuery.isFetching}
+                        data-loading={modelsQuery.isFetching || undefined}
                       >
-                        <Select
-                          value={draft.llmProvider || "ollama"}
-                          options={providerOptions}
-                          onChange={handleProviderChange}
-                          disabled={aiBusy}
-                          aria-label={t("settings.llmProvider")}
-                          className="min-w-[400px]"
+                        <RefreshCw size={14} />
+                      </IconButton>
+                    </div>
+                  </FieldRow>
+
+                  <FieldRow
+                    label={t("settings.llmEmbedModel")}
+                    description={t(
+                      `settings.llmEmbedModelHint_${draft.llmProvider.replace("-", "_")}`,
+                      { defaultValue: t("settings.llmEmbedModelHint") },
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-[400px]">
+                      <Select
+                        value={draft.llmEmbedModel}
+                        options={modelOptions}
+                        disabled={aiBusy}
+                        onChange={(value) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmEmbedModel: value,
+                          }))
+                        }
+                        aria-label={t("settings.llmEmbedModel")}
+                        className="flex-1"
+                      />
+                      <IconButton
+                        aria-label={t("settings.llmRefreshModels")}
+                        onClick={() => void modelsQuery.refetch()}
+                        disabled={modelsQuery.isFetching}
+                        data-loading={modelsQuery.isFetching || undefined}
+                      >
+                        <RefreshCw size={14} />
+                      </IconButton>
+                    </div>
+                  </FieldRow>
+
+                  <FieldRow label={t("settings.llmStatus")}>
+                    <div className="flex items-center gap-3 min-w-[400px]">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span
+                          className={`size-2 shrink-0 rounded-full ${isConnected ? "bg-g-green" : "bg-g-red"}`}
+                          aria-hidden="true"
                         />
-                      </FieldRow>
-
-                      <FieldRow label={t("settings.llmEndpoint")}>
-                        <TextInput
-                          value={draft.llmEndpoint}
-                          disabled={aiBusy}
-                          onChange={(e) =>
-                            onUpdateDraft((current) => ({
-                              ...current,
-                              llmEndpoint: e.target.value,
-                            }))
-                          }
-                          aria-label={t("settings.llmEndpoint")}
-                          className="w-full min-w-[400px]"
-                        />
-                      </FieldRow>
-
-                      <FieldRow
-                        label={t("settings.llmApiKey")}
-                        description={t("settings.llmApiKeyHint")}
-                      >
-                        <TextInput
-                          type="password"
-                          value={draft.llmApiKey}
-                          disabled={aiBusy}
-                          onChange={(e) =>
-                            onUpdateDraft((current) => ({
-                              ...current,
-                              llmApiKey: e.target.value,
-                            }))
-                          }
-                          placeholder={t("settings.llmApiKeyPlaceholder")}
-                          aria-label={t("settings.llmApiKey")}
-                          className="w-full min-w-[400px]"
-                        />
-                      </FieldRow>
-
-                      <FieldRow
-                        label={t("settings.llmVisionModel")}
-                        description={t(
-                          `settings.llmVisionModelHint_${draft.llmProvider.replace("-", "_")}`,
-                          { defaultValue: t("settings.llmVisionModelHint") },
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-[400px]">
-                          <Select
-                            value={draft.llmVisionModel}
-                            options={modelOptions}
-                            disabled={aiBusy}
-                            onChange={(value) =>
-                              onUpdateDraft((current) => ({
-                                ...current,
-                                llmVisionModel: value,
-                              }))
-                            }
-                            aria-label={t("settings.llmVisionModel")}
-                            className="flex-1"
-                          />
-                          <IconButton
-                            aria-label={t("settings.llmRefreshModels")}
-                            onClick={() => void modelsQuery.refetch()}
-                            disabled={modelsQuery.isFetching}
-                            data-loading={modelsQuery.isFetching || undefined}
-                          >
-                            <RefreshCw size={14} />
-                          </IconButton>
-                        </div>
-                      </FieldRow>
-
-                      <FieldRow
-                        label={t("settings.llmEmbedModel")}
-                        description={t(
-                          `settings.llmEmbedModelHint_${draft.llmProvider.replace("-", "_")}`,
-                          { defaultValue: t("settings.llmEmbedModelHint") },
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-[400px]">
-                          <Select
-                            value={draft.llmEmbedModel}
-                            options={modelOptions}
-                            disabled={aiBusy}
-                            onChange={(value) =>
-                              onUpdateDraft((current) => ({
-                                ...current,
-                                llmEmbedModel: value,
-                              }))
-                            }
-                            aria-label={t("settings.llmEmbedModel")}
-                            className="flex-1"
-                          />
-                          <IconButton
-                            aria-label={t("settings.llmRefreshModels")}
-                            onClick={() => void modelsQuery.refetch()}
-                            disabled={modelsQuery.isFetching}
-                            data-loading={modelsQuery.isFetching || undefined}
-                          >
-                            <RefreshCw size={14} />
-                          </IconButton>
-                        </div>
-                      </FieldRow>
-
-                      <FieldRow label={t("settings.llmStatus")}>
-                        <div className="flex items-center gap-3 min-w-[400px]">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span
-                              className={`size-2 shrink-0 rounded-full ${isConnected ? "bg-g-green" : "bg-g-red"}`}
-                              aria-hidden="true"
-                            />
-                            <span className="font-g text-g-ui tracking-g-ui text-g-ink-2 truncate">
-                              {statusText}
-                            </span>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleTestConnection}
-                            disabled={working || healthMutation.isPending}
-                          >
-                            {t("settings.llmTestConnection")}
-                          </Button>
-                        </div>
-                      </FieldRow>
-                      <div>
-                        <FieldRow
-                          label={t("settings.llmConcurrency")}
-                          description={t("settings.llmConcurrencyHint")}
-                        >
-                          <TextInput
-                            type="number"
-                            min={1}
-                            max={LLM_MAX_CONCURRENCY}
-                            value={String(draft.llmConcurrency)}
-                            disabled={aiBusy}
-                            onChange={(e) =>
-                              onUpdateDraft((current) => ({
-                                ...current,
-                                llmConcurrency: Math.max(
-                                  1,
-                                  Math.min(
-                                    LLM_MAX_CONCURRENCY,
-                                    Number(e.target.value) || 1,
-                                  ),
-                                ),
-                              }))
-                            }
-                            aria-label={t("settings.llmConcurrency")}
-                            className="min-w-[400px]"
-                          />
-                        </FieldRow>
-                        {draft.llmConcurrency > 1 && (
-                          <div className="flex items-start gap-1.5 pb-4 text-g-amber">
-                            <AlertTriangle
-                              size={14}
-                              className="mt-0.5 shrink-0"
-                            />
-                            <span className="font-g text-[11px] leading-snug">
-                              {t("settings.llmConcurrencyWarning")}
-                            </span>
-                          </div>
-                        )}
+                        <span className="font-g text-g-ui tracking-g-ui text-g-ink-2 truncate">
+                          {statusText}
+                        </span>
                       </div>
-
-                      <FieldRow
-                        label={t("settings.llmTimeout")}
-                        description={t("settings.llmTimeoutHint")}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleTestConnection}
+                        disabled={working || healthMutation.isPending}
                       >
-                        <TextInput
-                          type="number"
-                          min={LLM_MIN_TIMEOUT}
-                          max={LLM_MAX_TIMEOUT}
-                          value={String(draft.llmTimeout)}
-                          disabled={aiBusy}
-                          onChange={(e) =>
-                            onUpdateDraft((current) => ({
-                              ...current,
-                              llmTimeout: Math.max(
-                                LLM_MIN_TIMEOUT,
-                                Math.min(
-                                  LLM_MAX_TIMEOUT,
-                                  Number(e.target.value) || LLM_MIN_TIMEOUT,
-                                ),
+                        {t("settings.llmTestConnection")}
+                      </Button>
+                    </div>
+                  </FieldRow>
+                  <div>
+                    <FieldRow
+                      label={t("settings.llmConcurrency")}
+                      description={t("settings.llmConcurrencyHint")}
+                    >
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={LLM_MAX_CONCURRENCY}
+                        value={String(draft.llmConcurrency)}
+                        disabled={aiBusy}
+                        onChange={(e) =>
+                          onUpdateDraft((current) => ({
+                            ...current,
+                            llmConcurrency: Math.max(
+                              1,
+                              Math.min(
+                                LLM_MAX_CONCURRENCY,
+                                Number(e.target.value) || 1,
                               ),
-                            }))
-                          }
-                          aria-label={t("settings.llmTimeout")}
-                          className="min-w-[400px]"
-                        />
-                      </FieldRow>
+                            ),
+                          }))
+                        }
+                        aria-label={t("settings.llmConcurrency")}
+                        className="min-w-[400px]"
+                      />
+                    </FieldRow>
+                    {draft.llmConcurrency > 1 && (
+                      <div className="flex items-start gap-1.5 pb-4 text-g-amber">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                        <span className="font-g text-[11px] leading-snug">
+                          {t("settings.llmConcurrencyWarning")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <FieldRow
+                    label={t("settings.llmTimeout")}
+                    description={t("settings.llmTimeoutHint")}
+                  >
+                    <TextInput
+                      type="number"
+                      min={LLM_MIN_TIMEOUT}
+                      max={LLM_MAX_TIMEOUT}
+                      value={String(draft.llmTimeout)}
+                      disabled={aiBusy}
+                      onChange={(e) =>
+                        onUpdateDraft((current) => ({
+                          ...current,
+                          llmTimeout: Math.max(
+                            LLM_MIN_TIMEOUT,
+                            Math.min(
+                              LLM_MAX_TIMEOUT,
+                              Number(e.target.value) || LLM_MIN_TIMEOUT,
+                            ),
+                          ),
+                        }))
+                      }
+                      aria-label={t("settings.llmTimeout")}
+                      className="min-w-[400px]"
+                    />
+                  </FieldRow>
                 </>
               )}
             </>
