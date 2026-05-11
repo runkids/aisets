@@ -436,6 +436,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.LLMOcrPrompt != nil {
 		settings.LLMOcrPrompt = *update.LLMOcrPrompt
 	}
+	if update.LLMPrecheckPrompt != nil {
+		settings.LLMPrecheckPrompt = *update.LLMPrecheckPrompt
+	}
 	if update.LLMSystemPromptEnabled != nil {
 		settings.LLMSystemPromptEnabled = *update.LLMSystemPromptEnabled
 	}

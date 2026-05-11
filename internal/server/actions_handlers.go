@@ -8,10 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 
 	"aisets/internal/actions"
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
+	"aisets/internal/llm"
 	"aisets/internal/optimize"
 	"aisets/internal/precheck"
 	"aisets/internal/scanner"
@@ -474,4 +477,118 @@ func (s *Server) takePreview(id string) (actions.Preview, bool) {
 		delete(s.previews, id)
 	}
 	return preview, ok
+}
+
+func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("cache-control", "no-store")
+
+	settings, err := s.store.Settings()
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "precheck_ai_settings_failed")})
+		return
+	}
+	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("llm_not_configured", "AI provider or vision model not configured")})
+		return
+	}
+	if s.llmProvider == nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("llm_not_configured", "LLM provider is not available")})
+		return
+	}
+
+	const maxUploadBytes = 64 << 20
+	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("upload_parse_failed", "failed to parse upload")})
+		return
+	}
+	if r.MultipartForm == nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("upload_missing", "no files uploaded")})
+		return
+	}
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("upload_missing", "no files uploaded")})
+		return
+	}
+
+	modelName := settings.LLMVisionModel
+	timeoutSec := settings.LLMTimeout
+	if timeoutSec < llm.MinChatTimeout {
+		timeoutSec = llm.DefaultChatTimeout
+	}
+
+	prompt := settings.LLMPrecheckPrompt
+	if prompt == "" {
+		prompt = precheck.PrecheckAIPrompt
+	}
+
+	systemPrompt := ""
+	if settings.LLMSystemPromptEnabled && settings.LLMSystemPrompt != "" {
+		systemPrompt = settings.LLMSystemPrompt
+	}
+
+	total := len(files)
+	ready := 0
+	failed := 0
+
+	sendNDJSON(w, map[string]any{"type": "start", "total": total})
+
+	for _, header := range files {
+		result := s.analyzeUploadAI(r.Context(), header, modelName, timeoutSec, systemPrompt, prompt)
+		if result.Status == "ready" {
+			ready++
+		} else {
+			failed++
+		}
+		sendNDJSON(w, map[string]any{"type": "result", "ai": result})
+	}
+
+	sendNDJSON(w, map[string]any{"type": "done", "counts": map[string]int{
+		"total":  total,
+		"ready":  ready,
+		"failed": failed,
+	}})
+}
+
+func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHeader, modelName string, timeoutSec int, systemPrompt, prompt string) precheck.AIResult {
+	name := header.Filename
+	src, err := header.Open()
+	if err != nil {
+		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "upload_open_failed", ErrorMsg: "failed to open upload"}
+	}
+	defer src.Close()
+
+	ext := strings.ToLower(filepath.Ext(name))
+	tmp, err := os.CreateTemp("", "aisets-precheck-ai-*"+ext)
+	if err != nil {
+		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "upload_tempfile_failed", ErrorMsg: "failed to allocate temp file"}
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := io.Copy(tmp, src); err != nil {
+		tmp.Close()
+		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "upload_write_failed", ErrorMsg: "failed to write upload"}
+	}
+	tmp.Close()
+
+	dataURI, err := prepareImageForVLM(tmpPath, ext, "tag")
+	if err != nil {
+		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_image_failed", ErrorMsg: "failed to prepare image: " + err.Error()}
+	}
+
+	start := time.Now()
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model:      modelName,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
+		TimeoutSec: timeoutSec,
+	})
+	if err != nil {
+		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_llm_failed", ErrorMsg: err.Error()}
+	}
+
+	result := precheck.ParseAIResponse(name, resp.Content)
+	result.DurationMs = time.Since(start).Milliseconds()
+	return result
 }
