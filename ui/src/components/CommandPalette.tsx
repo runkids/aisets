@@ -1,4 +1,5 @@
 import {
+  Clock,
   FileWarning,
   Filter,
   FolderKanban,
@@ -11,6 +12,7 @@ import {
   ShieldCheck,
   Tags,
   Trash2,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +21,7 @@ import type { AssetItem, CustomAssetFilter } from "../types";
 import { cn } from "@/lib/cn";
 import { useCatalogItemsInfiniteQuery } from "../queries";
 import { useDebouncedValue } from "../useDebouncedValue";
+import { useSearchHistory } from "../useSearchHistory";
 import { fileName, type Mode } from "../ui";
 import { AssetThumbnail, Keycap, TextInput, TextInputClearButton } from "./ui";
 import { DialogOverlay, DialogSurface, DialogViewport } from "./ui/DialogShell";
@@ -74,6 +77,7 @@ export function CommandPalette({
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const debouncedQuery = useDebouncedValue(query, 180);
   const searchPending = query.trim() !== debouncedQuery.trim();
+  const searchHistory = useSearchHistory();
   const assetQuery = useCatalogItemsInfiniteQuery(
     scanId,
     { q: debouncedQuery.trim() || undefined, limit: 20 },
@@ -94,6 +98,8 @@ export function CommandPalette({
     return () => window.clearTimeout(id);
   }, [open]);
 
+  const showHistory = query.trim() === "" && searchHistory.history.length > 0;
+
   const results = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
     const modesWithLabels = MODE_ITEMS.map((mode) => ({
@@ -101,7 +107,11 @@ export function CommandPalette({
       label: t(mode.labelKey),
     }));
     if (!q)
-      return { modes: modesWithLabels.slice(0, 5), filters: [], assets: [] };
+      return {
+        modes: modesWithLabels.slice(0, 5),
+        filters: [],
+        assets: [],
+      };
 
     const modes = modesWithLabels.filter((mode) =>
       mode.label.toLowerCase().includes(q),
@@ -124,8 +134,12 @@ export function CommandPalette({
     return { modes, filters, assets: matched };
   }, [debouncedQuery, searchedAssets, customFilters, ocrEnabled, t]);
 
+  const historyCount = showHistory ? searchHistory.history.length : 0;
   const totalItems =
-    results.modes.length + results.filters.length + results.assets.length;
+    historyCount +
+    results.modes.length +
+    results.filters.length +
+    results.assets.length;
   const activeItemIndex =
     totalItems === 0 ? 0 : Math.min(activeIndex, totalItems - 1);
 
@@ -154,17 +168,33 @@ export function CommandPalette({
     }
   }
 
+  function selectHistoryItem(entry: string) {
+    setQuery(entry);
+    setActiveIndex(0);
+    inputRef.current?.focus();
+  }
+
   function selectItem(index: number) {
     if (index < 0 || index >= totalItems) return;
 
-    if (index < results.modes.length) {
-      onNavigate(results.modes[index].id);
-    } else if (index < results.modes.length + results.filters.length) {
-      const filter = results.filters[index - results.modes.length];
+    if (index < historyCount) {
+      selectHistoryItem(searchHistory.history[index]);
+      return;
+    }
+
+    const adjusted = index - historyCount;
+    if (query.trim()) searchHistory.add(query.trim());
+
+    if (adjusted < results.modes.length) {
+      onNavigate(results.modes[adjusted].id);
+    } else if (adjusted < results.modes.length + results.filters.length) {
+      const filter = results.filters[adjusted - results.modes.length];
       if (filter) onOpenCustomFilter(filter.id);
     } else {
       const asset =
-        results.assets[index - results.modes.length - results.filters.length];
+        results.assets[
+          adjusted - results.modes.length - results.filters.length
+        ];
       if (asset) onOpenAsset(asset.asset);
     }
     onClose();
@@ -232,56 +262,108 @@ export function CommandPalette({
                 />
               </div>
 
-              <div className="max-h-[400px] overflow-y-auto p-2">
+              <div className="max-h-[480px] overflow-y-auto p-2">
+                {showHistory && (
+                  <>
+                    <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+                      <span className="text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
+                        {t("commandPalette.recentSearches")}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[-0.01em] hover:text-g-ink-2 transition-colors duration-[120ms]"
+                        onClick={searchHistory.clear}
+                      >
+                        {t("commandPalette.clearAll")}
+                      </button>
+                    </div>
+                    {searchHistory.history.map((entry, index) => (
+                      <div key={entry} className="flex items-center group">
+                        <button
+                          ref={(node) => {
+                            itemRefs.current[index] = node;
+                          }}
+                          type="button"
+                          className={cn(itemCls, "flex-1 min-w-0")}
+                          data-active={activeItemIndex === index || undefined}
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onClick={() => selectItem(index)}
+                        >
+                          <span
+                            className="inline-flex text-current opacity-[0.52] shrink-0"
+                            aria-hidden="true"
+                          >
+                            <Clock size={14} />
+                          </span>
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {entry}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="shrink-0 size-7 inline-flex items-center justify-center rounded-g-md text-g-ink-4 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-g-ink-2 hover:bg-g-surface-2 transition-[opacity,color,background] duration-[120ms] focus-visible:outline-none focus-visible:shadow-g-focus"
+                          aria-label={t("commandPalette.removeHistory", {
+                            query: entry,
+                          })}
+                          onClick={() => searchHistory.remove(entry)}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 {results.modes.length > 0 && (
                   <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
                     {t("commandPalette.pages")}
                   </div>
                 )}
-                {results.modes.map((mode, index) => (
-                  <button
-                    key={mode.id}
-                    ref={(node) => {
-                      itemRefs.current[index] = node;
-                    }}
-                    type="button"
-                    className={itemCls}
-                    data-active={activeItemIndex === index || undefined}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => selectItem(index)}
-                  >
-                    <span
-                      className="inline-flex text-current opacity-[0.82] shrink-0"
-                      aria-hidden="true"
+                {results.modes.map((mode, i) => {
+                  const index = historyCount + i;
+                  return (
+                    <button
+                      key={mode.id}
+                      ref={(node) => {
+                        itemRefs.current[index] = node;
+                      }}
+                      type="button"
+                      className={itemCls}
+                      data-active={activeItemIndex === index || undefined}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => selectItem(index)}
                     >
-                      {mode.icon}
-                    </span>
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {mode.label}
-                    </span>
-                  </button>
-                ))}
+                      <span
+                        className="inline-flex text-current opacity-[0.82] shrink-0"
+                        aria-hidden="true"
+                      >
+                        {mode.icon}
+                      </span>
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {mode.label}
+                      </span>
+                    </button>
+                  );
+                })}
 
                 {results.filters.length > 0 && (
                   <>
                     <div className="px-3 pt-2.5 pb-1 text-g-ink-4 text-[10px] font-[510] leading-[1.4] tracking-[0.06em] uppercase">
                       {t("commandPalette.customFilters")}
                     </div>
-                    {results.filters.map((filter, index) => {
-                      const resultIndex = results.modes.length + index;
+                    {results.filters.map((filter, i) => {
+                      const index = historyCount + results.modes.length + i;
                       return (
                         <button
                           key={filter.id}
                           ref={(node) => {
-                            itemRefs.current[resultIndex] = node;
+                            itemRefs.current[index] = node;
                           }}
                           type="button"
                           className={itemCls}
-                          data-active={
-                            activeItemIndex === resultIndex || undefined
-                          }
-                          onMouseEnter={() => setActiveIndex(resultIndex)}
-                          onClick={() => selectItem(resultIndex)}
+                          data-active={activeItemIndex === index || undefined}
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onClick={() => selectItem(index)}
                         >
                           <span
                             className="inline-flex text-current opacity-[0.82] shrink-0"
@@ -306,21 +388,24 @@ export function CommandPalette({
                     )}
                   </div>
                 )}
-                {results.assets.map((result, index) => {
+                {results.assets.map((result, i) => {
                   const { asset } = result;
-                  const resultIndex =
-                    results.modes.length + results.filters.length + index;
+                  const index =
+                    historyCount +
+                    results.modes.length +
+                    results.filters.length +
+                    i;
                   return (
                     <button
                       key={asset.id}
                       ref={(node) => {
-                        itemRefs.current[resultIndex] = node;
+                        itemRefs.current[index] = node;
                       }}
                       type="button"
                       className={itemCls}
-                      data-active={activeItemIndex === resultIndex || undefined}
-                      onMouseEnter={() => setActiveIndex(resultIndex)}
-                      onClick={() => selectItem(resultIndex)}
+                      data-active={activeItemIndex === index || undefined}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => selectItem(index)}
                     >
                       <AssetThumbnail
                         src={asset.thumbnailUrl || asset.url}

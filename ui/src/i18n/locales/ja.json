@@ -894,7 +894,10 @@
     "ariaLabel": "コマンドパレット",
     "searchAriaLabel": "コマンドとアセットを検索",
     "ocrMatch": "OCR テキスト一致",
-    "aiMatch": "AI タグ一致"
+    "aiMatch": "AI タグ一致",
+    "recentSearches": "最近の検索",
+    "clearAll": "すべてクリア",
+    "removeHistory": "検索履歴から「{{query}}」を削除"
   },
   "precheck": {
     "title": "プリチェック",
@@ -1523,6 +1526,9 @@
     "agentModelHint": "Agent CLI のモデル名（例: gpt-5.5、claude-sonnet-4-6、gemini-3-pro）。空欄の場合は CLI デフォルトを使用",
     "agentAvailable": "利用可能",
     "agentNoneDetected": "未検出",
+    "agentDetect": "検出",
+    "agentDetectTooltip": "利用可能な Agent CLI を再検出",
+    "agentDetectDone": "{{count}} 件の Agent CLI を検出",
     "agentLocalLLMHint": "上記の LLM 接続設定を使用",
     "agentLocalLLMNotConfigured": "LLM 未設定 — 先に Connection Settings を設定してください",
     "aiTagGroup": "AI タグ付け",
@@ -1860,7 +1866,8 @@
       "tagSuccess": "AI タグ完了",
       "ocrSuccess": "AI OCR 完了",
       "tagHint": "AI タグを実行して画像を分析",
-      "ocrHint": "AI OCR を実行してテキストを抽出"
+      "ocrHint": "AI OCR を実行してテキストを抽出",
+      "busyHint": "AI タスクの完了をお待ちください"
     },
     "exif": {
       "title": "EXIF メタデータ",
@@ -1994,7 +2001,7 @@
       "distance": "2つの画像のdHash距離（0-64） — 自動入力",
       "precheckFindings": "プリチェック分析結果（重複・命名・最適化）— 自動注入",
       "qualityIssues": "画像品質問題コード",
-      "translations": "多言語翻訳（tags + description） — リクエスト時に自動注入"
+      "translations": "多言語翻訳（category + tags + description） — リクエスト時に自動注入"
     },
     "missingRequired": "必須変数が不足しています",
     "builtinBadge": "組み込み",

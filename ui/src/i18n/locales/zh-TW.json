@@ -930,7 +930,10 @@
     "ocrMatch": "命中 OCR 文字",
     "aiMatch": "命中 AI 標記",
     "ariaLabel": "指令面板",
-    "searchAriaLabel": "搜尋指令與素材"
+    "searchAriaLabel": "搜尋指令與素材",
+    "recentSearches": "最近搜尋",
+    "clearAll": "清除全部",
+    "removeHistory": "從搜尋紀錄移除「{{query}}」"
   },
   "precheck": {
     "title": "預檢",
@@ -1729,6 +1732,9 @@
     "agentModelHint": "Agent CLI 使用的模型名稱（例如 gpt-5.5、claude-sonnet-4-6、gemini-3-pro）。留空則使用 CLI 預設",
     "agentAvailable": "可用",
     "agentNoneDetected": "未偵測到",
+    "agentDetect": "偵測",
+    "agentDetectTooltip": "重新偵測可用的 Agent CLI",
+    "agentDetectDone": "偵測到 {{count}} 個 Agent CLI",
     "agentLocalLLMHint": "使用上方設定的 LLM 連線",
     "agentLocalLLMNotConfigured": "LLM 尚未設定 — 請先設定 Connection Settings",
     "aiTagGroup": "AI 標記",
@@ -1946,7 +1952,8 @@
       "tagSuccess": "AI 標記完成",
       "ocrSuccess": "AI OCR 完成",
       "tagHint": "執行 AI 標記以分析此圖片",
-      "ocrHint": "執行 AI OCR 以提取圖片文字"
+      "ocrHint": "執行 AI OCR 以提取圖片文字",
+      "busyHint": "請等待 AI 任務完成"
     },
     "exif": {
       "title": "EXIF 後設資料",
@@ -2005,7 +2012,7 @@
       "distance": "兩張圖片的 dHash 距離（0-64） — 自動填入",
       "precheckFindings": "預檢分析結果（重複、命名、優化）— 自動注入",
       "qualityIssues": "圖片品質問題代碼",
-      "translations": "多語系翻譯（tags + description） — 請求時自動注入"
+      "translations": "多語系翻譯（category + tags + description） — 請求時自動注入"
     },
     "missingRequired": "缺少必要變數",
     "builtinBadge": "內建",

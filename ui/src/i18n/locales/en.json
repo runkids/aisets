@@ -973,6 +973,9 @@
     "agentModelHint": "Model name for the agent CLI (e.g. gpt-5.5, claude-sonnet-4-6, gemini-3-pro). Leave empty for CLI default.",
     "agentAvailable": "Available",
     "agentNoneDetected": "None detected",
+    "agentDetect": "Detect",
+    "agentDetectTooltip": "Re-detect available agent CLIs",
+    "agentDetectDone": "Detected {{count}} agent CLI(s)",
     "agentLocalLLMHint": "Uses the LLM connection configured above.",
     "agentLocalLLMNotConfigured": "LLM not configured — set up Connection Settings first",
     "aiTagGroup": "AI Tagging",
@@ -1620,7 +1623,10 @@
     "ocrMatch": "Matched OCR text",
     "aiMatch": "Matched AI tag",
     "ariaLabel": "Command palette",
-    "searchAriaLabel": "Search commands and assets"
+    "searchAriaLabel": "Search commands and assets",
+    "recentSearches": "Recent Searches",
+    "clearAll": "Clear all",
+    "removeHistory": "Remove \"{{query}}\" from search history"
   },
   "precheck": {
     "title": "Pre-Check",
@@ -1925,7 +1931,8 @@
       "tagSuccess": "AI Tag completed",
       "ocrSuccess": "AI OCR completed",
       "tagHint": "Run AI Tag to analyze this image",
-      "ocrHint": "Run AI OCR to extract text from this image"
+      "ocrHint": "Run AI OCR to extract text from this image",
+      "busyHint": "Please wait for the AI task to finish"
     },
     "exif": {
       "title": "EXIF Metadata",
@@ -1984,7 +1991,7 @@
       "distance": "dHash distance between the two images (0-64) — filled automatically",
       "precheckFindings": "Pre-check analysis results (duplicates, naming, optimization) — injected automatically",
       "qualityIssues": "Image quality issue codes for detection",
-      "translations": "Multilingual translations (tags + description) — injected automatically at request time"
+      "translations": "Multilingual translations (category + tags + description) — injected automatically at request time"
     },
     "missingRequired": "Missing required variables",
     "builtinBadge": "Built-in",

@@ -912,7 +912,10 @@
     "ariaLabel": "명령 팔레트",
     "searchAriaLabel": "명령과 에셋 검색",
     "ocrMatch": "OCR 텍스트 일치",
-    "aiMatch": "AI 태그 일치"
+    "aiMatch": "AI 태그 일치",
+    "recentSearches": "최근 검색",
+    "clearAll": "모두 지우기",
+    "removeHistory": "검색 기록에서 \"{{query}}\" 제거"
   },
   "precheck": {
     "title": "사전 점검",
@@ -1534,6 +1537,9 @@
     "agentModelHint": "Agent CLI 모델 이름 (예: gpt-5.5, claude-sonnet-4-6, gemini-3-pro). 비워두면 CLI 기본값 사용",
     "agentAvailable": "사용 가능",
     "agentNoneDetected": "감지되지 않음",
+    "agentDetect": "감지",
+    "agentDetectTooltip": "사용 가능한 Agent CLI 재감지",
+    "agentDetectDone": "{{count}}개의 Agent CLI 감지됨",
     "agentLocalLLMHint": "위에서 설정한 LLM 연결을 사용",
     "agentLocalLLMNotConfigured": "LLM 미설정 — 먼저 Connection Settings를 설정하세요",
     "aiTagGroup": "AI 태그",
@@ -1878,7 +1884,8 @@
       "tagSuccess": "AI 태그 완료",
       "ocrSuccess": "AI OCR 완료",
       "tagHint": "AI 태그를 실행하여 이미지 분석",
-      "ocrHint": "AI OCR을 실행하여 텍스트 추출"
+      "ocrHint": "AI OCR을 실행하여 텍스트 추출",
+      "busyHint": "AI 작업이 완료될 때까지 기다려 주세요"
     },
     "exif": {
       "title": "EXIF 메타데이터",
@@ -1994,7 +2001,7 @@
       "distance": "두 이미지의 dHash 거리(0-64) — 자동 입력",
       "precheckFindings": "사전 검사 분석 결과(중복, 명명, 최적화) — 자동 주입",
       "qualityIssues": "이미지 품질 문제 코드",
-      "translations": "다국어 번역(tags + description) — 요청 시 자동 주입"
+      "translations": "다국어 번역(category + tags + description) — 요청 시 자동 주입"
     },
     "missingRequired": "필수 변수가 누락되었습니다",
     "builtinBadge": "내장",

@@ -894,7 +894,10 @@
     "ariaLabel": "命令面板",
     "searchAriaLabel": "搜索命令与素材",
     "ocrMatch": "命中 OCR 文字",
-    "aiMatch": "命中 AI 标记"
+    "aiMatch": "命中 AI 标记",
+    "recentSearches": "最近搜索",
+    "clearAll": "清除全部",
+    "removeHistory": "从搜索记录移除「{{query}}」"
   },
   "precheck": {
     "title": "预检",
@@ -1523,6 +1526,9 @@
     "agentModelHint": "Agent CLI 使用的模型名称（例如 gpt-5.5、claude-sonnet-4-6、gemini-3-pro）。留空则使用 CLI 默认",
     "agentAvailable": "可用",
     "agentNoneDetected": "未检测到",
+    "agentDetect": "检测",
+    "agentDetectTooltip": "重新检测可用的 Agent CLI",
+    "agentDetectDone": "检测到 {{count}} 个 Agent CLI",
     "agentLocalLLMHint": "使用上方设定的 LLM 连接",
     "agentLocalLLMNotConfigured": "LLM 尚未设定 — 请先设定 Connection Settings",
     "aiTagGroup": "AI 标记",
@@ -1860,7 +1866,8 @@
       "tagSuccess": "AI 标记完成",
       "ocrSuccess": "AI OCR 完成",
       "tagHint": "运行 AI 标记以分析此图片",
-      "ocrHint": "运行 AI OCR 以提取图片文字"
+      "ocrHint": "运行 AI OCR 以提取图片文字",
+      "busyHint": "请等待 AI 任务完成"
     },
     "exif": {
       "title": "EXIF 元数据",
@@ -1994,7 +2001,7 @@
       "distance": "两张图片的 dHash 距离（0-64） — 自动填入",
       "precheckFindings": "预检分析结果（重复、命名、优化）— 自动注入",
       "qualityIssues": "图片质量问题代码",
-      "translations": "多语言翻译（tags + description） — 请求时自动注入"
+      "translations": "多语言翻译（category + tags + description） — 请求时自动注入"
     },
     "missingRequired": "缺少必要变量",
     "builtinBadge": "内置",
