@@ -232,6 +232,7 @@ function LightboxDialog({
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isPinching, setIsPinching] = useState(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const scaleRef = useRef(scale);
@@ -334,6 +335,7 @@ function LightboxDialog({
           dist: pointerDist(pointersRef.current),
           scale: scaleRef.current,
         };
+        setIsPinching(true);
         setIsDragging(false);
         return;
       }
@@ -369,30 +371,37 @@ function LightboxDialog({
     [isDragging],
   );
 
-  const handlePointerUp = useCallback((e: PointerEvent) => {
-    const down = downPosRef.current;
-    const wasDrag =
-      !down ||
-      Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_THRESHOLD;
-    pointersRef.current.delete(e.pointerId);
-    if (pointersRef.current.size < 2) pinchRef.current = null;
-    downPosRef.current = null;
-    setIsDragging(false);
-
-    // single-pointer click on image → toggle zoom
-    if (
-      !wasDrag &&
-      pointersRef.current.size === 0 &&
-      e.target instanceof HTMLImageElement
-    ) {
-      const cur = scaleRef.current;
-      if (cur > 1) {
-        applyZoom(1);
-      } else {
-        applyZoom(CLICK_ZOOM);
+  const handlePointerUp = useCallback(
+    (e: PointerEvent) => {
+      const down = downPosRef.current;
+      const wasDrag =
+        !down ||
+        Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_THRESHOLD;
+      const wasPinching = pinchRef.current !== null;
+      pointersRef.current.delete(e.pointerId);
+      if (pointersRef.current.size < 2) {
+        pinchRef.current = null;
+        setIsPinching(false);
       }
-    }
-  }, [applyZoom]);
+      downPosRef.current = null;
+      setIsDragging(false);
+
+      if (
+        !wasDrag &&
+        !wasPinching &&
+        pointersRef.current.size === 0 &&
+        e.target instanceof HTMLImageElement
+      ) {
+        const cur = scaleRef.current;
+        if (cur > 1) {
+          applyZoom(1);
+        } else {
+          applyZoom(CLICK_ZOOM);
+        }
+      }
+    },
+    [applyZoom],
+  );
 
   const zoomed = scale > 1;
 
@@ -430,7 +439,7 @@ function LightboxDialog({
               className={cn(
                 "max-h-[85vh] max-w-[90vw] select-none object-contain",
                 !isDragging &&
-                  !pinchRef.current &&
+                  !isPinching &&
                   "transition-transform duration-150 ease-g",
               )}
               style={{
