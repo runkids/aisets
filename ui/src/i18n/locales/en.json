@@ -1811,7 +1811,8 @@
     "modified": "Modified",
     "animated": "Animated",
     "alphaChannel": "Alpha",
-    "imagePages": "Pages"
+    "imagePages": "Pages",
+    "clickToZoom": "Click to zoom"
   },
   "ocr": {
     "badge": {
@@ -1988,7 +1989,8 @@
       "gps": "Location",
       "camera": "Camera",
       "date": "Date Taken",
-      "dpi": "DPI"
+      "dpi": "DPI",
+      "openMap": "Open in Maps"
     }
   },
   "prompts": {

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import type { AITagActivityState } from "../../aiTagActivity";
-import type { VLMOcrActivityState } from "../../vlmOcrActivity";
-import type { EmbedActivityState } from "../../embedActivity";
+import type { AITagActivityState } from "../../activity/aiTagActivity";
+import type { VLMOcrActivityState } from "../../activity/vlmOcrActivity";
+import type { EmbedActivityState } from "../../activity/embedActivity";
 import type { SettingsInfo, Workspace } from "../../types";
 import type { Mode } from "../../ui";
 import type { ScopeProject } from "./AIScopePicker";

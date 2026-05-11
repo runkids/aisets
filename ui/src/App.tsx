@@ -20,22 +20,22 @@ import {
   optimizableBadgeCount,
   scopedStatsForProject,
 } from "./appScope";
-import { AppTopbar } from "./components/AppTopbar";
-import { AssetDrawer } from "./components/AssetDrawer";
-import { BrowseView } from "./components/BrowseView";
-import { CommandPalette } from "./components/CommandPalette";
-import { ProjectsView } from "./components/ProjectsView";
-import { DirectoryPickerModal } from "./components/DirectoryPickerModal";
-import { DuplicatesView } from "./components/DuplicatesView";
-import { LintView } from "./components/LintView";
-import { NavSidebar } from "./components/NavSidebar";
-import { OptimizeView } from "./components/OptimizeView";
-import { PreCheckView } from "./components/PreCheckView";
-import { PromptsView } from "./components/PromptsView";
-import { PreviewModal } from "./components/PreviewModal";
-import { ScrollToTop } from "./components/ScrollToTop";
-import { ScanHistoryView } from "./components/ScanHistoryView";
-import { TagsView } from "./components/TagsView";
+import { AppTopbar } from "./components/shared/AppTopbar";
+import { AssetDrawer } from "./components/drawer/AssetDrawer";
+import { BrowseView } from "./components/browse/BrowseView";
+import { CommandPalette } from "./components/shared/CommandPalette";
+import { ProjectsView } from "./components/project/ProjectsView";
+import { DirectoryPickerModal } from "./components/project/DirectoryPickerModal";
+import { DuplicatesView } from "./components/duplicates/DuplicatesView";
+import { LintView } from "./components/lint/LintView";
+import { NavSidebar } from "./components/shared/NavSidebar";
+import { OptimizeView } from "./components/optimize/OptimizeView";
+import { PreCheckView } from "./components/scan/PreCheckView";
+import { PromptsView } from "./components/prompts/PromptsView";
+import { PreviewModal } from "./components/shared/PreviewModal";
+import { ScrollToTop } from "./components/shared/ScrollToTop";
+import { ScanHistoryView } from "./components/scan/ScanHistoryView";
+import { TagsView } from "./components/tags/TagsView";
 import {
   Button,
   EmptyState,
@@ -43,8 +43,8 @@ import {
   PromptDialog,
   ScanProgressContent,
 } from "./components/ui";
-import { SettingsView } from "./components/SettingsView";
-import { useToast } from "./components/ToastProvider";
+import { SettingsView } from "./components/settings/SettingsView";
+import { useToast } from "./components/shared/ToastProvider";
 import {
   catalogQueryKey,
   useAddProjectMutation,
@@ -59,37 +59,37 @@ import {
   useSettingsQuery,
 } from "./queries";
 import { APIError, runOCR, runAITagging, runVLMOcr, runEmbedding } from "./api";
-import { errorMessage } from "./i18n/index";
+import { errorMessage } from "./i18n";
 import {
   initialOCRActivityState,
   isOCRActivityBusy,
   ocrActivityReducer,
   runOCRActivity,
-} from "./ocrActivity";
+} from "./activity/ocrActivity";
 import {
   initialOptimizeActivityState,
   isOptimizeActivityBusy,
   optimizeActivityReducer,
-} from "./optimizeActivity";
+} from "./activity/optimizeActivity";
 import {
   initialAITagActivityState,
   aiTagActivityReducer,
   isAITagActivityBusy,
   runAITagActivity,
-} from "./aiTagActivity";
+} from "./activity/aiTagActivity";
 import {
   initialVLMOcrActivityState,
   isVLMOcrActivityBusy,
   vlmOcrActivityReducer,
   runVLMOcrActivity,
   type VLMOcrActivityAbortRef,
-} from "./vlmOcrActivity";
+} from "./activity/vlmOcrActivity";
 import {
   initialEmbedActivityState,
   isEmbedActivityBusy,
   embedActivityReducer,
   runEmbedActivity,
-} from "./embedActivity";
+} from "./activity/embedActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -103,7 +103,7 @@ import type {
   ScanEvent,
 } from "./types";
 import { fileName, modeForPath, pathForMode, type Mode } from "./ui";
-import { clearEstimateCaches } from "./components/optimizeCache";
+import { clearEstimateCaches } from "./components/optimize/optimizeCache";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";

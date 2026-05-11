@@ -1037,6 +1037,7 @@
     "animated": "애니메이션",
     "alphaChannel": "알파",
     "imagePages": "페이지",
+    "clickToZoom": "클릭하여 확대",
     "ocr": "OCR",
     "ocrNoText": "OCR 텍스트가 아직 없습니다",
     "ocrEmptyText": "스캔 완료, 하지만 검색 가능한 텍스트가 인식되지 않았습니다",
@@ -1941,7 +1942,8 @@
       "gps": "위치",
       "camera": "카메라",
       "date": "촬영 날짜",
-      "dpi": "DPI"
+      "dpi": "DPI",
+      "openMap": "지도에서 열기"
     }
   },
   "projectIntent": {

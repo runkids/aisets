@@ -11,9 +11,9 @@ import { cn } from "@/lib/cn";
 import { projectScanIntentLabel } from "../../projectScanIntent";
 import type { Project, ProjectScanIntent, Workspace } from "../../types";
 import { Badge, Button, Card, ConfirmDialog, EmptyState } from "../ui";
-import { ProjectAvatar } from "../ProjectAvatar";
-import { ProjectDialog } from "../ProjectDialog";
-import { WorkspaceAvatar } from "../WorkspaceAvatar";
+import { ProjectAvatar } from "../project/ProjectAvatar";
+import { ProjectDialog } from "../project/ProjectDialog";
+import { WorkspaceAvatar } from "../project/WorkspaceAvatar";
 import { SectionHeading, sectionIcon } from "./index";
 import {
   activeWorkspaceBadgeClass,

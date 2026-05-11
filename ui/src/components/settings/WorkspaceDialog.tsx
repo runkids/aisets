@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2, Upload } from "lucide-react";
 import { Button, Modal, Notice, TextInput } from "../ui";
-import { WorkspaceAvatar } from "../WorkspaceAvatar";
+import { WorkspaceAvatar } from "../project/WorkspaceAvatar";
 import type { Workspace } from "../../types";
 import {
   workspaceDialogButtonClass,

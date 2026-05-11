@@ -1,12 +1,12 @@
 import { Check, ChevronDown, Copy, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AITagActivityState } from "../../aiTagActivity";
-import { isAITagActivityBusy } from "../../aiTagActivity";
-import type { VLMOcrActivityState } from "../../vlmOcrActivity";
-import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
-import type { EmbedActivityState } from "../../embedActivity";
-import { isEmbedActivityBusy } from "../../embedActivity";
+import type { AITagActivityState } from "../../activity/aiTagActivity";
+import { isAITagActivityBusy } from "../../activity/aiTagActivity";
+import type { VLMOcrActivityState } from "../../activity/vlmOcrActivity";
+import { isVLMOcrActivityBusy } from "../../activity/vlmOcrActivity";
+import type { EmbedActivityState } from "../../activity/embedActivity";
+import { isEmbedActivityBusy } from "../../activity/embedActivity";
 import type {
   AITagRunCounts,
   EmbedRunCounts,

@@ -1019,6 +1019,7 @@
     "animated": "动画",
     "alphaChannel": "透明通道",
     "imagePages": "页数",
+    "clickToZoom": "点击放大",
     "ocr": "OCR",
     "ocrNoText": "暂无 OCR 文字",
     "ocrEmptyText": "已扫描，但未识别到可搜索的文字",
@@ -1923,7 +1924,8 @@
       "gps": "位置",
       "camera": "相机",
       "date": "拍摄日期",
-      "dpi": "DPI"
+      "dpi": "DPI",
+      "openMap": "在地图中打开"
     }
   },
   "scanProgress": {

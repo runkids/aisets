@@ -1,6 +1,6 @@
-import { isAITagActivityBusy } from "../../aiTagActivity";
-import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
-import { isEmbedActivityBusy } from "../../embedActivity";
+import { isAITagActivityBusy } from "../../activity/aiTagActivity";
+import { isVLMOcrActivityBusy } from "../../activity/vlmOcrActivity";
+import { isEmbedActivityBusy } from "../../activity/embedActivity";
 import type { AISectionProps } from "./aiSectionUtils";
 import { AISettingsCard } from "./AISettingsCard";
 import { AIOperationsCard } from "./AIOperationsCard";

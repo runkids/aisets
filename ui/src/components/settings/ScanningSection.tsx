@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { errorMessage } from "../../i18n/index";
+import { errorMessage } from "../../i18n";
 import { projectScanIntentLabel } from "../../projectScanIntent";
 import type { ProjectScanIntent } from "../../types";
 import type { SettingsDraft, OCRLanguagePack } from "./types";

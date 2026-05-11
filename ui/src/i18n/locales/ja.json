@@ -1019,6 +1019,7 @@
     "animated": "アニメーション",
     "alphaChannel": "アルファ",
     "imagePages": "ページ数",
+    "clickToZoom": "クリックして拡大",
     "ocr": "OCR",
     "ocrNoText": "OCR テキストはまだありません",
     "ocrEmptyText": "スキャン済みですが、検索可能なテキストは認識されませんでした",
@@ -1923,7 +1924,8 @@
       "gps": "位置情報",
       "camera": "カメラ",
       "date": "撮影日",
-      "dpi": "DPI"
+      "dpi": "DPI",
+      "openMap": "マップで開く"
     }
   },
   "scanProgress": {

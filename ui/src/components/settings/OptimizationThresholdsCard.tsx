@@ -2,7 +2,7 @@ import { ChevronDown, Gauge } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
-import { errorMessage } from "../../i18n/index";
+import { errorMessage } from "../../i18n";
 import type { SettingsDraft } from "./types";
 import { Badge, Button, Card, Notice, Range, Switch } from "../ui";
 import { FieldRow } from "./FieldRow";

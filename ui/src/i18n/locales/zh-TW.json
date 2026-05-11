@@ -1086,7 +1086,8 @@
     "modified": "修改日期",
     "animated": "動畫",
     "alphaChannel": "透明通道",
-    "imagePages": "頁數"
+    "imagePages": "頁數",
+    "clickToZoom": "點擊放大"
   },
   "ocr": {
     "badge": {
@@ -2009,7 +2010,8 @@
       "gps": "位置",
       "camera": "相機",
       "date": "拍攝日期",
-      "dpi": "DPI"
+      "dpi": "DPI",
+      "openMap": "在地圖中開啟"
     }
   },
   "prompts": {

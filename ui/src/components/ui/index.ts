@@ -46,4 +46,4 @@ export {
 } from "./TextInput";
 export { Toast, toastVariants } from "./Toast";
 export { Tooltip } from "./Tooltip";
-export { ZoomableImage } from "./ZoomableImage";
+export { ZoomableImage, ImageLightbox } from "./ZoomableImage";

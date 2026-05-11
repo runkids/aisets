@@ -1,7 +1,7 @@
 import { Gauge } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { errorMessage } from "../../i18n/index";
+import { errorMessage } from "../../i18n";
 import type { SettingsDraft } from "./types";
 import { Button, Notice, Range, Switch } from "../ui";
 import { FieldRow } from "./FieldRow";

@@ -14,7 +14,7 @@ import {
   customAssetFilterUsesOCR,
   customAssetFilterUsesAI,
 } from "../../customAssetFilters";
-import { errorMessage } from "../../i18n/index";
+import { errorMessage } from "../../i18n";
 import type { SettingsDraft } from "./types";
 import type {
   CustomAssetFilter,

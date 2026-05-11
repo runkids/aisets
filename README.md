@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="./ui/public/brand/aisets-logo.png" alt="Aisets" width="280">
+  <img src="./ui/public/brand/aisets-logo.png" alt="Aisets" width="100%">
 </p>
-
-<h1 align="center">Aisets</h1>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>

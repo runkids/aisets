@@ -21,7 +21,7 @@ import {
   useLLMModelsQuery,
   useLLMHealthMutation,
 } from "../../queries";
-import { useToast } from "../ToastProvider";
+import { useToast } from "../shared/ToastProvider";
 import { errorMessage } from "../../i18n";
 import type { SettingsInfo } from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";

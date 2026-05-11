@@ -38,17 +38,17 @@ const vendorChunkGroups: Record<string, string[]> = {
 
 const appChunkGroups: Record<string, string[]> = {
   "app-shell": [
-    "/src/components/AppTopbar.tsx",
-    "/src/components/CommandPalette.tsx",
-    "/src/components/NavSidebar.tsx",
-    "/src/components/ScrollToTop.tsx",
+    "/src/components/shared/AppTopbar.tsx",
+    "/src/components/shared/CommandPalette.tsx",
+    "/src/components/shared/NavSidebar.tsx",
+    "/src/components/shared/ScrollToTop.tsx",
   ],
   "app-data": [
     "/src/api.ts",
+    "/src/activity/",
     "/src/appScope.ts",
     "/src/customAssetFilters.ts",
     "/src/imageBackground.ts",
-    "/src/ocrActivity.ts",
     "/src/ocrSearch.ts",
     "/src/ocrStatus.ts",
     "/src/projectScanIntent.ts",
@@ -60,46 +60,20 @@ const appChunkGroups: Record<string, string[]> = {
   "app-i18n": ["/src/i18n/"],
   "app-ui": [
     "/src/components/ui/",
-    "/src/components/BatchConfirmModal.tsx",
-    "/src/components/BatchPreviewModal.tsx",
-    "/src/components/DirectoryPickerModal.tsx",
-    "/src/components/OCRStatusBadge.tsx",
-    "/src/components/PreviewModal.tsx",
-    "/src/components/ProjectAvatar.tsx",
-    "/src/components/ProjectSwitcher.tsx",
-    "/src/components/ToastProvider.tsx",
-    "/src/components/WorkspaceAvatar.tsx",
+    "/src/components/shared/",
   ],
-  "feature-assets": [
-    "/src/components/AssetDrawer",
-    "/src/components/AssetCard.tsx",
-    "/src/components/AssetList.tsx",
-    "/src/components/ComparePanel.tsx",
-    "/src/components/SimilarCompare.tsx",
-  ],
-  "feature-browse": [
-    "/src/components/Browse",
-    "/src/components/FilterRail.tsx",
-  ],
-  "feature-duplicates": [
-    "/src/components/DuplicatesView.tsx",
-    "/src/components/duplicateGroupViews.ts",
-  ],
-  "feature-lint": ["/src/components/LintView.tsx"],
-  "feature-optimize": ["/src/components/OptimizeView.tsx"],
-  "feature-precheck": ["/src/components/PreCheckView.tsx"],
-  "feature-projects": [
-    "/src/components/ProjectDialog.tsx",
-    "/src/components/ProjectsView.tsx",
-  ],
-  "feature-history": [
-    "/src/components/ScanHistoryView.tsx",
-    "/src/scanHistory.ts",
-  ],
-  "feature-settings": [
-    "/src/components/settings/",
-    "/src/components/SettingsView.tsx",
-  ],
+  "feature-browse": ["/src/components/browse/"],
+  "feature-drawer": ["/src/components/drawer/"],
+  "feature-duplicates": ["/src/components/duplicates/"],
+  "feature-lint": ["/src/components/lint/"],
+  "feature-optimize": ["/src/components/optimize/"],
+  "feature-tags": ["/src/components/tags/"],
+  "feature-scan": ["/src/components/scan/"],
+  "feature-projects": ["/src/components/project/"],
+  "feature-history": ["/src/scanHistory.ts"],
+  "feature-settings": ["/src/components/settings/"],
+  "feature-prompts": ["/src/components/prompts/"],
+  "feature-dashboard": ["/src/components/dashboard/"],
 };
 
 function normalizeModuleId(id: string): string {

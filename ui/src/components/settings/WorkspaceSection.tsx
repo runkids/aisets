@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type { Workspace } from "../../types";
 import { Badge, Button, Card, ConfirmDialog, TextInput } from "../ui";
-import { WorkspaceAvatar } from "../WorkspaceAvatar";
+import { WorkspaceAvatar } from "../project/WorkspaceAvatar";
 import { FieldRow, SectionHeading, sectionIcon } from "./index";
 import {
   activeWorkspaceBadgeClass,

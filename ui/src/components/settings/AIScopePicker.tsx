@@ -3,8 +3,8 @@ import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { ProjectAvatar } from "../ProjectAvatar";
-import { WorkspaceAvatar } from "../WorkspaceAvatar";
+import { ProjectAvatar } from "../project/ProjectAvatar";
+import { WorkspaceAvatar } from "../project/WorkspaceAvatar";
 
 export type ScopeProject = {
   id: string;

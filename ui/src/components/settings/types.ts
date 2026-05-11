@@ -1,9 +1,9 @@
 import type { ImageBackgroundMode } from "../../imageBackground";
 import type { Mode } from "../../ui";
-import type { AITagActivityState } from "../../aiTagActivity";
-import type { OCRActivityState } from "../../ocrActivity";
-import type { VLMOcrActivityState } from "../../vlmOcrActivity";
-import type { EmbedActivityState } from "../../embedActivity";
+import type { AITagActivityState } from "../../activity/aiTagActivity";
+import type { OCRActivityState } from "../../activity/ocrActivity";
+import type { VLMOcrActivityState } from "../../activity/vlmOcrActivity";
+import type { EmbedActivityState } from "../../activity/embedActivity";
 import type {
   CustomAssetFilter,
   OptimizationExternalTool,

@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImageBackgroundMode } from "../../imageBackground";
-import { languageOptionsForLocale } from "../../i18n/index";
+import { languageOptionsForLocale } from "../../i18n";
 import { Card, Select, Switch, Tabs } from "../ui";
-import { useToast } from "../ToastProvider";
+import { useToast } from "../shared/ToastProvider";
 import { FieldRow } from "./index";
 import { editorOptions } from "./constants";
 import type { ThemePreference } from "./types";
