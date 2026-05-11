@@ -62,7 +62,7 @@ export function VLMBackendSelect({
         <button
           type="button"
           disabled={disabled}
-          className="inline-flex h-g-btn-md items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+          className="inline-flex h-g-btn-md w-[240px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2 shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
         >
           <span className="min-w-0 truncate text-left">{displayLabel}</span>
           <ChevronDown size={14} className="shrink-0 text-g-ink-3" />
@@ -73,7 +73,7 @@ export function VLMBackendSelect({
         <DropdownMenuPrimitive.Content
           align="end"
           sideOffset={6}
-          className="z-[60] min-w-[220px] overflow-auto rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
+          className="z-[60] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
           style={{ maxHeight: 320 }}
         >
           {options.map((opt) => (
