@@ -140,8 +140,11 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 	return page, nil
 }
 
-// aiTagTranslations aggregates translations from per-asset tags_i18n_json for the given tags and locale.
 func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[string]string, error) {
+	locale = validLocaleOrEmpty(locale)
+	if locale == "" {
+		return nil, nil
+	}
 	placeholders := make([]string, len(tags))
 	args := make([]any, len(tags))
 	for i, t := range tags {
@@ -177,6 +180,10 @@ func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[stri
 }
 
 func (s *Store) aiCategoryTranslations(locale string) (map[string]string, error) {
+	locale = validLocaleOrEmpty(locale)
+	if locale == "" {
+		return nil, nil
+	}
 	rows, err := s.rdb.Query(`
 		SELECT category, json_extract(category_i18n_json, '$."` + locale + `"')
 		FROM ai_tags

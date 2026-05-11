@@ -108,9 +108,11 @@ func (s *Store) CatalogEXIFFacetCounts(scanID int64, projectName, ext string) (E
 		args = append(args, ext)
 	}
 	var facets EXIFFacets
-	row := s.rdb.QueryRow(`SELECT COUNT(*) FROM exif_data e WHERE `+baseWhere+` AND e.has_gps = 1`, args...)
-	_ = row.Scan(&facets.HasGPS)
-	row = s.rdb.QueryRow(`SELECT COUNT(*) FROM exif_data e WHERE `+baseWhere+` AND (e.camera_make != '' OR e.camera_model != '')`, args...)
-	_ = row.Scan(&facets.HasCamera)
+	_ = s.rdb.QueryRow(`
+		SELECT
+			COUNT(CASE WHEN e.has_gps = 1 THEN 1 END),
+			COUNT(CASE WHEN e.camera_make != '' OR e.camera_model != '' THEN 1 END)
+		FROM exif_data e WHERE `+baseWhere,
+		args...).Scan(&facets.HasGPS, &facets.HasCamera)
 	return facets, nil
 }

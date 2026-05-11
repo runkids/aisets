@@ -4,18 +4,44 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"aisets/internal/scanner"
 )
+
+var validLocales = map[string]bool{
+	"en": true, "zh-TW": true, "zh-CN": true, "ja": true, "ko": true,
+}
+
+func validLocaleOrEmpty(locale string) string {
+	if validLocales[locale] {
+		return locale
+	}
+	return ""
+}
 
 func (s *Store) resolveScanID(scanID int64) (int64, error) {
 	if scanID > 0 {
 		return scanID, nil
 	}
+	s.latestScanMu.RLock()
+	if s.latestScanID > 0 && time.Since(s.latestScanTime) < 5*time.Second {
+		id := s.latestScanID
+		s.latestScanMu.RUnlock()
+		return id, nil
+	}
+	s.latestScanMu.RUnlock()
+
 	scan, err := s.LatestScan()
 	if err != nil {
 		return 0, err
 	}
+
+	s.latestScanMu.Lock()
+	s.latestScanID = scan.ID
+	s.latestScanTime = time.Now()
+	s.latestScanMu.Unlock()
+
 	return scan.ID, nil
 }
 

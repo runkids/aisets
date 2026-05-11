@@ -252,6 +252,7 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_project_path ON ocr_results(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_hash ON ocr_results(hash_algorithm, content_hash)`,
+		`CREATE INDEX IF NOT EXISTS idx_ocr_results_engine_hash ON ocr_results(engine_name, engine_version, content_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_tags_content_hash ON ai_tags (content_hash, hash_algorithm, provider_name, model_name)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_tags_category ON ai_tags (category) WHERE status = 'ready'`,
 		`CREATE TABLE IF NOT EXISTS prompt_presets (

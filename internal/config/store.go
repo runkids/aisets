@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -13,6 +15,10 @@ type Store struct {
 	path string
 	db   *sql.DB // write connection (MaxOpenConns=1)
 	rdb  *sql.DB // read pool (MaxOpenConns=4), WAL concurrent reads
+
+	latestScanID   int64
+	latestScanMu   sync.RWMutex
+	latestScanTime time.Time
 }
 
 func DataDir() string {

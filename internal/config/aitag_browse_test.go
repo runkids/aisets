@@ -716,3 +716,73 @@ func TestAITagMerge_SyncsI18n(t *testing.T) {
 		t.Fatalf("ja should be [スポーツ], got %v", got)
 	}
 }
+
+func TestValidLocaleOrEmpty(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"en", "en"},
+		{"zh-TW", "zh-TW"},
+		{"zh-CN", "zh-CN"},
+		{"ja", "ja"},
+		{"ko", "ko"},
+		{"", ""},
+		{"fr", ""},
+		{"'; DROP TABLE --", ""},
+		{"en' OR '1'='1", ""},
+	}
+	for _, tt := range tests {
+		if got := validLocaleOrEmpty(tt.input); got != tt.want {
+			t.Errorf("validLocaleOrEmpty(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestAITagTranslations_InvalidLocale(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	tags := []AITagListItem{{Tag: "boxing", Count: 1}}
+
+	result, err := store.aiTagTranslations(tags, "'; DROP TABLE ai_tags --")
+	if err != nil {
+		t.Fatalf("expected no error for invalid locale, got %v", err)
+	}
+	if result != nil {
+		t.Fatalf("expected nil for invalid locale, got %v", result)
+	}
+
+	result, err = store.aiTagTranslations(tags, "zh-TW")
+	if err != nil {
+		t.Fatalf("valid locale should not error: %v", err)
+	}
+	if result["boxing"] != "拳擊" {
+		t.Fatalf("expected zh-TW translation '拳擊', got %q", result["boxing"])
+	}
+}
+
+func TestAICategoryTranslations_InvalidLocale(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	result, err := store.aiCategoryTranslations("invalid-locale")
+	if err != nil {
+		t.Fatalf("expected no error for invalid locale, got %v", err)
+	}
+	if result != nil {
+		t.Fatalf("expected nil for invalid locale, got %v", result)
+	}
+}

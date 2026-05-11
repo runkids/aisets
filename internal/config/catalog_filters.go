@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"regexp"
 	"strings"
 
 	"aisets/internal/aitag"
@@ -92,15 +92,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
-	optimizationTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimizable")
-	if err != nil {
-		return CatalogItemFacets{}, err
-	}
-	optimizationPendingTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimizationPending")
-	if err != nil {
-		return CatalogItemFacets{}, err
-	}
-	optimizationDoneTotal, err := s.catalogItemTotalForStatus(scanID, query, "optimized")
+	optimizationTotal, optimizationPendingTotal, optimizationDoneTotal, err := s.catalogOptimizationStatusTotals(scanID, query)
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
@@ -181,6 +173,25 @@ func (s *Store) catalogItemTotalForStatus(scanID int64, query CatalogItemQuery, 
 		return 0, err
 	}
 	return total, nil
+}
+
+func (s *Store) catalogOptimizationStatusTotals(scanID int64, query CatalogItemQuery) (optimizable, pending, done int, err error) {
+	baseQuery := query
+	baseQuery.Status = ""
+	where, args, err := s.catalogItemWhere(scanID, baseQuery)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	hasOpt := "EXISTS (SELECT 1 FROM optimization_snapshots o WHERE o.scan_id = a.scan_id AND o.asset_id = a.asset_id)"
+	hasPending := "EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id AND o2.has_existing_variant = 0)"
+	err = s.rdb.QueryRow(`
+		SELECT
+			COUNT(CASE WHEN `+hasOpt+` THEN 1 END),
+			COUNT(CASE WHEN `+hasOpt+` AND `+hasPending+` THEN 1 END),
+			COUNT(CASE WHEN `+hasOpt+` AND NOT `+hasPending+` THEN 1 END)
+		FROM asset_snapshots a
+		`+where, args...).Scan(&optimizable, &pending, &done)
+	return
 }
 
 func (s *Store) catalogFacetCounts(scanID int64, query CatalogItemQuery, expr string) ([]CatalogFacetOption, int, error) {
@@ -450,14 +461,18 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return ocrExistsSQL(textClauseSQL("COALESCE(ocr.normalized_text, ocr.text, '')", clause.Operator, value))
 	case "ocrLanguage":
 		if clause.Operator == "oneOf" {
-			return ocrJSONListExistsSQL("ocr.languages_json", lowerList(value)), nil, nil
+			sql, args := ocrJSONListExistsSQL("ocr.languages_json", lowerList(value))
+			return sql, args, nil
 		}
-		return ocrJSONListExistsSQL("ocr.languages_json", []string{strings.ToLower(value)}), nil, nil
+		sql, args := ocrJSONListExistsSQL("ocr.languages_json", []string{strings.ToLower(value)})
+		return sql, args, nil
 	case "ocrScript":
 		if clause.Operator == "oneOf" {
-			return ocrJSONListExistsSQL("ocr.scripts_json", lowerList(value)), nil, nil
+			sql, args := ocrJSONListExistsSQL("ocr.scripts_json", lowerList(value))
+			return sql, args, nil
 		}
-		return ocrJSONListExistsSQL("ocr.scripts_json", []string{strings.ToLower(value)}), nil, nil
+		sql, args := ocrJSONListExistsSQL("ocr.scripts_json", []string{strings.ToLower(value)})
+		return sql, args, nil
 	case "ocrConfidence":
 		if clause.Operator == "gte" {
 			return ocrExistsSQL("ocr.confidence >= ?", []any{value}, nil)
@@ -469,12 +484,15 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 		return aiTagExistsSQL(textClauseSQL("ait.category", clause.Operator, value))
 	case "aiTag":
 		if clause.Operator == "oneOf" {
-			return aiTagJSONListContainsSQL("ait.tags_json", lowerList(value)), nil, nil
+			sql, args := aiTagJSONListContainsSQL("ait.tags_json", lowerList(value))
+			return sql, args, nil
 		}
-		return aiTagJSONContainsSQL("ait.tags_json", strings.ToLower(value)), nil, nil
+		sql, args := aiTagJSONContainsSQL("ait.tags_json", strings.ToLower(value))
+		return sql, args, nil
 	case "aiDescription":
 		if clause.Operator == "oneOf" {
-			return aiTagTextContainsAnySQL("COALESCE(ait.description, '') || ' ' || COALESCE(ait.description_i18n_json, '')", lowerList(value)), nil, nil
+			sql, args := aiTagTextContainsAnySQL("COALESCE(ait.description, '') || ' ' || COALESCE(ait.description_i18n_json, '')", lowerList(value))
+			return sql, args, nil
 		}
 		return aiTagExistsSQL(textClauseSQL("COALESCE(ait.description, '') || ' ' || COALESCE(ait.description_i18n_json, '')", clause.Operator, value))
 	case "aiStatus":
@@ -545,13 +563,15 @@ func ocrExistsSQL(clause string, args []any, err error) (string, []any, error) {
 	)`, args, nil
 }
 
-func ocrJSONListExistsSQL(expr string, values []string) string {
+func ocrJSONListExistsSQL(expr string, values []string) (string, []any) {
 	if len(values) == 0 {
-		return "0 = 1"
+		return "0 = 1", nil
 	}
 	parts := make([]string, 0, len(values))
+	args := make([]any, 0, len(values))
 	for _, value := range values {
-		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%'", expr, strings.ReplaceAll(value, "'", "''")))
+		parts = append(parts, "LOWER("+expr+") LIKE ?")
+		args = append(args, "%\""+value+"\"%")
 	}
 	return `EXISTS (
 		SELECT 1 FROM ocr_results ocr
@@ -560,7 +580,7 @@ func ocrJSONListExistsSQL(expr string, values []string) string {
 			AND ocr.content_hash = a.content_hash
 			AND ocr.hash_algorithm = a.hash_algorithm
 			AND (` + strings.Join(parts, " OR ") + `)
-	)`
+	)`, args
 }
 
 func aiTagExistsSQL(clause string, args []any, err error) (string, []any, error) {
@@ -587,26 +607,27 @@ func aiTagNotExistsSQL() string {
 	)`
 }
 
-func aiTagJSONContainsSQL(expr, value string) string {
-	escaped := strings.ReplaceAll(value, "'", "''")
-	return fmt.Sprintf(`EXISTS (
+func aiTagJSONContainsSQL(expr, value string) (string, []any) {
+	pattern := "%\"" + value + "\"%"
+	return `EXISTS (
 		SELECT 1 FROM ai_tags ait
 		WHERE ait.project_id = a.project_id
 			AND ait.repo_path = a.repo_path
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
-			AND (LOWER(%s) LIKE '%%"%s"%%' OR LOWER(ait.tags_i18n_json) LIKE '%%"%s"%%')
-	)`, expr, escaped, escaped)
+			AND (LOWER(` + expr + `) LIKE ? OR LOWER(ait.tags_i18n_json) LIKE ?)
+	)`, []any{pattern, pattern}
 }
 
-func aiTagTextContainsAnySQL(expr string, keywords []string) string {
+func aiTagTextContainsAnySQL(expr string, keywords []string) (string, []any) {
 	if len(keywords) == 0 {
-		return "0 = 1"
+		return "0 = 1", nil
 	}
 	parts := make([]string, 0, len(keywords))
+	args := make([]any, 0, len(keywords))
 	for _, kw := range keywords {
-		escaped := strings.ReplaceAll(kw, "'", "''")
-		parts = append(parts, fmt.Sprintf("regexp_like(%s, '(?i)\\b%s\\b')", expr, escaped))
+		parts = append(parts, "regexp_like("+expr+", ?)")
+		args = append(args, "(?i)\\b"+regexp.QuoteMeta(kw)+"\\b")
 	}
 	return `EXISTS (
 		SELECT 1 FROM ai_tags ait
@@ -615,17 +636,19 @@ func aiTagTextContainsAnySQL(expr string, keywords []string) string {
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
 			AND (` + strings.Join(parts, " OR ") + `)
-	)`
+	)`, args
 }
 
-func aiTagJSONListContainsSQL(expr string, values []string) string {
+func aiTagJSONListContainsSQL(expr string, values []string) (string, []any) {
 	if len(values) == 0 {
-		return "0 = 1"
+		return "0 = 1", nil
 	}
 	parts := make([]string, 0, len(values))
+	args := make([]any, 0, len(values)*2)
 	for _, value := range values {
-		escaped := strings.ReplaceAll(value, "'", "''")
-		parts = append(parts, fmt.Sprintf("LOWER(%s) LIKE '%%\"%s\"%%' OR LOWER(ait.tags_i18n_json) LIKE '%%\"%s\"%%'", expr, escaped, escaped))
+		pattern := "%\"" + value + "\"%"
+		parts = append(parts, "LOWER("+expr+") LIKE ? OR LOWER(ait.tags_i18n_json) LIKE ?")
+		args = append(args, pattern, pattern)
 	}
 	return `EXISTS (
 		SELECT 1 FROM ai_tags ait
@@ -634,7 +657,7 @@ func aiTagJSONListContainsSQL(expr string, values []string) string {
 			AND ait.content_hash = a.content_hash
 			AND ait.hash_algorithm = a.hash_algorithm
 			AND (` + strings.Join(parts, " OR ") + `)
-	)`
+	)`, args
 }
 
 func normalizedExtList(value string) []string {

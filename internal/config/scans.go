@@ -379,8 +379,15 @@ func (s *Store) finalizeScan(scanID int64, analysis scanner.CatalogAnalysis) err
 		return err
 	}
 
-	err = tx.Commit()
-	return err
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	s.latestScanMu.Lock()
+	s.latestScanID = 0
+	s.latestScanMu.Unlock()
+
+	return nil
 }
 
 func carryForwardAnalysis(tx *sql.Tx, scanID int64, analysis scanner.CatalogAnalysis) error {
@@ -580,19 +587,15 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 	if err != nil {
 		return ScanDiff{}, err
 	}
-	baseAssets, err := s.scanAssets(baseID)
-	if err != nil {
-		return ScanDiff{}, err
-	}
-	targetAssets, err := s.scanAssets(targetID)
-	if err != nil {
-		return ScanDiff{}, err
-	}
-	baseSavings, err := s.optimizationSavings(baseID)
-	if err != nil {
-		return ScanDiff{}, err
-	}
-	targetSavings, err := s.optimizationSavings(targetID)
+
+	var baseBytes, targetBytes, baseSavings, targetSavings int64
+	err = s.rdb.QueryRow(`
+		SELECT
+			COALESCE((SELECT SUM(bytes) FROM asset_snapshots WHERE scan_id = ?), 0),
+			COALESCE((SELECT SUM(bytes) FROM asset_snapshots WHERE scan_id = ?), 0),
+			COALESCE((SELECT SUM(savings_bytes) FROM optimization_snapshots WHERE scan_id = ?), 0),
+			COALESCE((SELECT SUM(savings_bytes) FROM optimization_snapshots WHERE scan_id = ?), 0)
+	`, baseID, targetID, baseID, targetID).Scan(&baseBytes, &targetBytes, &baseSavings, &targetSavings)
 	if err != nil {
 		return ScanDiff{}, err
 	}
@@ -606,33 +609,17 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 		ReferenceChanges:  []ScanAssetDiff{},
 		UnusedTransitions: []UnusedTransition{},
 	}
-	var baseBytes, targetBytes int64
-	for key, before := range baseAssets {
-		baseBytes += before.Bytes
-		after, ok := targetAssets[key]
-		if !ok {
-			diff.Removed = append(diff.Removed, removedDiff(before))
-			continue
-		}
-		if before.ContentHash != after.ContentHash || before.Bytes != after.Bytes {
-			diff.Modified = append(diff.Modified, beforeAfterDiff(before, after))
-		}
-		if before.UsedCount != after.UsedCount {
-			diff.ReferenceChanges = append(diff.ReferenceChanges, beforeAfterDiff(before, after))
-		}
-		if before.UsageClassification == scanner.UsageReferenced && after.UsageClassification == scanner.UsageUnused {
-			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "becameUnused", before.UsedCount, after.UsedCount))
-		}
-		if before.UsageClassification == scanner.UsageUnused && after.UsageClassification == scanner.UsageReferenced {
-			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "noLongerUnused", before.UsedCount, after.UsedCount))
-		}
+
+	if err := s.diffAdded(&diff, baseID, targetID); err != nil {
+		return ScanDiff{}, err
 	}
-	for key, after := range targetAssets {
-		targetBytes += after.Bytes
-		if _, ok := baseAssets[key]; !ok {
-			diff.Added = append(diff.Added, addedDiff(after))
-		}
+	if err := s.diffRemoved(&diff, baseID, targetID); err != nil {
+		return ScanDiff{}, err
 	}
+	if err := s.diffChanged(&diff, baseID, targetID); err != nil {
+		return ScanDiff{}, err
+	}
+
 	sortScanDiff(diff.Added)
 	sortScanDiff(diff.Removed)
 	sortScanDiff(diff.Modified)
@@ -664,40 +651,106 @@ func (s *Store) DiffScans(baseID, targetID int64) (ScanDiff, error) {
 	return diff, nil
 }
 
-func (s *Store) scanAssets(scanID int64) (map[string]scanAssetSnapshot, error) {
+const diffAssetCols = `project_id, project_name, repo_path, ext, bytes, COALESCE(content_hash, ''), used_count, COALESCE(usage_classification, 'notApplicable')`
+
+func scanDiffAsset(sc interface{ Scan(...any) error }) (scanAssetSnapshot, error) {
+	var a scanAssetSnapshot
+	err := sc.Scan(&a.ProjectID, &a.ProjectName, &a.RepoPath, &a.Ext, &a.Bytes, &a.ContentHash, &a.UsedCount, &a.UsageClassification)
+	return a, err
+}
+
+func (s *Store) diffAdded(diff *ScanDiff, baseID, targetID int64) error {
 	rows, err := s.rdb.Query(`
-		SELECT project_id, project_name, repo_path, ext, bytes, COALESCE(content_hash, ''), used_count,
-			COALESCE(usage_classification, 'notApplicable')
-		FROM asset_snapshots
-		WHERE scan_id = ?
-	`, scanID)
+		SELECT `+diffAssetCols+`
+		FROM asset_snapshots t
+		WHERE t.scan_id = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM asset_snapshots b
+			WHERE b.scan_id = ? AND b.project_id = t.project_id AND b.repo_path = t.repo_path
+		  )
+	`, targetID, baseID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
-	out := map[string]scanAssetSnapshot{}
 	for rows.Next() {
-		var asset scanAssetSnapshot
-		if err := rows.Scan(&asset.ProjectID, &asset.ProjectName, &asset.RepoPath, &asset.Ext, &asset.Bytes, &asset.ContentHash, &asset.UsedCount, &asset.UsageClassification); err != nil {
-			return nil, err
+		a, err := scanDiffAsset(rows)
+		if err != nil {
+			return err
 		}
-		out[scanAssetKey(asset.ProjectID, asset.RepoPath)] = asset
+		diff.Added = append(diff.Added, addedDiff(a))
 	}
-	return out, rows.Err()
+	return rows.Err()
 }
 
-func (s *Store) optimizationSavings(scanID int64) (int64, error) {
-	var total int64
-	err := s.rdb.QueryRow(`
-		SELECT COALESCE(SUM(savings_bytes), 0)
-		FROM optimization_snapshots
-		WHERE scan_id = ?
-	`, scanID).Scan(&total)
-	return total, err
+func (s *Store) diffRemoved(diff *ScanDiff, baseID, targetID int64) error {
+	rows, err := s.rdb.Query(`
+		SELECT `+diffAssetCols+`
+		FROM asset_snapshots b
+		WHERE b.scan_id = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM asset_snapshots t
+			WHERE t.scan_id = ? AND t.project_id = b.project_id AND t.repo_path = b.repo_path
+		  )
+	`, baseID, targetID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		a, err := scanDiffAsset(rows)
+		if err != nil {
+			return err
+		}
+		diff.Removed = append(diff.Removed, removedDiff(a))
+	}
+	return rows.Err()
 }
 
-func scanAssetKey(projectID, repoPath string) string {
-	return projectID + "\x00" + repoPath
+func (s *Store) diffChanged(diff *ScanDiff, baseID, targetID int64) error {
+	rows, err := s.rdb.Query(`
+		SELECT
+			t.project_id, t.project_name, t.repo_path, t.ext,
+			b.bytes, COALESCE(b.content_hash, ''), b.used_count, COALESCE(b.usage_classification, 'notApplicable'),
+			t.bytes, COALESCE(t.content_hash, ''), t.used_count, COALESCE(t.usage_classification, 'notApplicable')
+		FROM asset_snapshots t
+		JOIN asset_snapshots b ON b.scan_id = ? AND b.project_id = t.project_id AND b.repo_path = t.repo_path
+		WHERE t.scan_id = ?
+		  AND (t.content_hash != b.content_hash OR t.bytes != b.bytes
+			OR t.used_count != b.used_count OR t.usage_classification != b.usage_classification)
+	`, baseID, targetID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var before, after scanAssetSnapshot
+		if err := rows.Scan(
+			&after.ProjectID, &after.ProjectName, &after.RepoPath, &after.Ext,
+			&before.Bytes, &before.ContentHash, &before.UsedCount, &before.UsageClassification,
+			&after.Bytes, &after.ContentHash, &after.UsedCount, &after.UsageClassification,
+		); err != nil {
+			return err
+		}
+		before.ProjectID = after.ProjectID
+		before.ProjectName = after.ProjectName
+		before.RepoPath = after.RepoPath
+		before.Ext = after.Ext
+
+		if before.ContentHash != after.ContentHash || before.Bytes != after.Bytes {
+			diff.Modified = append(diff.Modified, beforeAfterDiff(before, after))
+		}
+		if before.UsedCount != after.UsedCount {
+			diff.ReferenceChanges = append(diff.ReferenceChanges, beforeAfterDiff(before, after))
+		}
+		if before.UsageClassification == scanner.UsageReferenced && after.UsageClassification == scanner.UsageUnused {
+			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "becameUnused", before.UsedCount, after.UsedCount))
+		}
+		if before.UsageClassification == scanner.UsageUnused && after.UsageClassification == scanner.UsageReferenced {
+			diff.UnusedTransitions = append(diff.UnusedTransitions, unusedTransition(after, "noLongerUnused", before.UsedCount, after.UsedCount))
+		}
+	}
+	return rows.Err()
 }
 
 func addedDiff(asset scanAssetSnapshot) ScanAssetDiff {
