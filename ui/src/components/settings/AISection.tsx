@@ -825,7 +825,7 @@ export function AISection({
               {t("settings.aiTagGroup")}
             </span>
           </div>
-          <div className="flex items-start justify-between gap-6 px-6 py-3 md:px-8">
+          <div className="flex items-start justify-between gap-6 px-6 pt-1 pb-3 md:px-8">
             <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
               {t("settings.aiTagDescription")}
             </p>
@@ -922,7 +922,7 @@ export function AISection({
               {t("settings.aiOcrGroup")}
             </span>
           </div>
-          <div className="flex items-start justify-between gap-6 px-6 py-3 md:px-8">
+          <div className="flex items-start justify-between gap-6 px-6 pt-1 pb-3 md:px-8">
             <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
               {t("settings.aiOcrDescription")}
             </p>
