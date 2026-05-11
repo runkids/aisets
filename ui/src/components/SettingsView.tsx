@@ -504,7 +504,7 @@ export function SettingsView({
         </RailSection>
       </Rail>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pb-8">
+      <div className="content-scroll flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-12 max-[768px]:mt-3 max-[768px]:px-3 max-[768px]:pb-8">
         <div className="flex flex-col gap-6 ml-0 mr-auto max-w-[1040px] w-full">
           {activeSection === "workspace" && (
             <WorkspaceSection
