@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   LoaderCircle,
   MessageSquareText,
@@ -1349,13 +1350,14 @@ function PromptsLocaleCard({
           />
         </FieldRow>
         <div className="py-3">
-          <Button
-            size="sm"
-            variant="ghost"
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-g-sm px-1.5 py-2 text-left text-g-ui font-[510] text-g-ink-2 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
             onClick={() => onNavigate?.("prompts")}
           >
-            {t("settings.managePrompts")}
-          </Button>
+            <span className="flex-1">{t("settings.managePrompts")}</span>
+            <ChevronRight size={14} className="shrink-0 text-g-ink-4" />
+          </button>
         </div>
       </div>
     </Card>
