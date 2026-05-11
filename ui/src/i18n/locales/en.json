@@ -955,7 +955,7 @@
     "autoLocaleDisabled": "Auto locale response disabled",
     "llmAutoLocale": "Auto locale response",
     "llmAutoLocaleHint": "AI responds in the language matching your UI locale setting.",
-    "agentHeading": "Agent Adapter",
+    "agentHeading": "Agent CLI",
     "agentEnabled": "Enable agent",
     "agentEnabledHint": "Allow coding agents (Codex CLI, Claude Code) to generate cleanup plans from scan findings.",
     "agentAdapter": "Adapter",

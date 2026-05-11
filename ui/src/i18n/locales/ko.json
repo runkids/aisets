@@ -1515,7 +1515,7 @@
     "autoLocaleDisabled": "자동 언어 응답 비활성화됨",
     "llmAutoLocale": "자동 언어 응답",
     "llmAutoLocaleHint": "UI 언어 설정에 맞춰 AI가 해당 언어로 응답합니다",
-    "agentHeading": "Agent 어댑터",
+    "agentHeading": "Agent CLI",
     "agentEnabled": "Agent 활성화",
     "agentEnabledHint": "코딩 에이전트(Codex CLI, Claude Code)가 스캔 결과를 기반으로 정리 계획을 생성하도록 허용",
     "agentAdapter": "어댑터",

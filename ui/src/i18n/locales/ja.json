@@ -1504,7 +1504,7 @@
     "autoLocaleDisabled": "自動言語応答を無効にしました",
     "llmAutoLocale": "自動言語応答",
     "llmAutoLocaleHint": "UI の言語設定に合わせて AI が対応する言語で応答します",
-    "agentHeading": "Agent アダプタ",
+    "agentHeading": "Agent CLI",
     "agentEnabled": "Agent を有効化",
     "agentEnabledHint": "コーディングエージェント（Codex CLI、Claude Code）がスキャン結果からクリーンアッププランを生成することを許可",
     "agentAdapter": "アダプタ",

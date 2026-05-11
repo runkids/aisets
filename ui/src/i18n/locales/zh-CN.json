@@ -1504,7 +1504,7 @@
     "autoLocaleDisabled": "已停用自动语言回复",
     "llmAutoLocale": "自动语言回复",
     "llmAutoLocaleHint": "AI 根据界面语言自动以对应语言回复",
-    "agentHeading": "Agent 适配器",
+    "agentHeading": "Agent CLI",
     "agentEnabled": "启用 Agent",
     "agentEnabledHint": "允许代码代理（Codex CLI、Claude Code）根据扫描结果生成清理计划",
     "agentAdapter": "适配器",
