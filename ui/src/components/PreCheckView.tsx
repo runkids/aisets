@@ -5,6 +5,7 @@ import {
   FileImage,
   Loader2,
   ShieldCheck,
+  Sparkles,
   Upload,
   X,
   XCircle,
@@ -68,8 +69,26 @@ type PreCheckResult = {
   verdictReason: string;
 };
 
+type AIPreCheckResult = {
+  category: string;
+  tags: string[];
+  description: string;
+  quality: {
+    score: number;
+    issues: string[];
+    assessment: string;
+  };
+  suggestion: {
+    recommendedFilename: string;
+    formatRecommendation: string;
+    suitability: "good" | "acceptable" | "poor";
+    suitabilityReason: string;
+  };
+};
+
 type Props = {
   onOpenAsset?: (id: string) => void;
+  aiEnabled?: boolean;
 };
 
 const VERDICT_BADGE_TONE: Record<Verdict, "green" | "warning" | "danger"> = {
@@ -102,8 +121,10 @@ function verdictReasonKey(r: PreCheckResult): string {
 let _results: PreCheckResult[] = [];
 let _thumbnails = new Map<string, string>();
 let _expanded = new Set<string>();
+let _files: File[] = [];
+let _aiResults = new Map<string, AIPreCheckResult>();
 
-export function PreCheckView({ onOpenAsset }: Props) {
+export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [results, setResults] = useState<PreCheckResult[]>(_results);
@@ -113,6 +134,11 @@ export function PreCheckView({ onOpenAsset }: Props) {
   const [thumbnails, setThumbnails] =
     useState<Map<string, string>>(_thumbnails);
   const [expanded, setExpanded] = useState<Set<string>>(_expanded);
+  const [files, setFiles] = useState<File[]>(_files);
+  const [aiResults, setAiResults] =
+    useState<Map<string, AIPreCheckResult>>(_aiResults);
+  const [aiWorking, setAiWorking] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const resultsRef = useRef<PreCheckResult[]>(_results);
 
   useEffect(() => {
@@ -124,11 +150,18 @@ export function PreCheckView({ onOpenAsset }: Props) {
   useEffect(() => {
     _expanded = expanded;
   }, [expanded]);
+  useEffect(() => {
+    _files = files;
+  }, [files]);
+  useEffect(() => {
+    _aiResults = aiResults;
+  }, [aiResults]);
 
   const upload = useCallback(
     async (files: FileList | File[]) => {
       const list = Array.from(files);
       if (list.length === 0) return;
+      setFiles((prev) => [...prev, ...list]);
 
       const newThumbs = new Map<string, string>();
       for (const f of list) {
@@ -190,6 +223,62 @@ export function PreCheckView({ onOpenAsset }: Props) {
     [t],
   );
 
+  const runAI = useCallback(async () => {
+    if (files.length === 0) return;
+    setAiWorking(true);
+    setAiError(null);
+    try {
+      const form = new FormData();
+      files.forEach((f) => form.append("files", f, f.name));
+      const res = await fetch("/api/pre-check/ai", {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(t("precheck.aiError"));
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (value) buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === "result" && event.ai) {
+              const ai = event.ai as AIPreCheckResult & {
+                name: string;
+                status: string;
+              };
+              if (ai.status === "ready") {
+                setAiResults((prev) => new Map(prev).set(ai.name, ai));
+                const idx = resultsRef.current.findIndex(
+                  (r) => r.name === ai.name,
+                );
+                if (idx >= 0) {
+                  setExpanded((prev) => new Set([...prev, `${idx}-ai`]));
+                }
+              }
+            } else if (event.type === "error") {
+              setAiError(event.error?.message ?? t("precheck.aiError"));
+            }
+          } catch {
+            // skip malformed NDJSON lines
+          }
+        }
+        if (done) break;
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiWorking(false);
+    }
+  }, [files, t]);
+
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
       const items = e.clipboardData?.items;
@@ -235,6 +324,9 @@ export function PreCheckView({ onOpenAsset }: Props) {
     setResults([]);
     setError(null);
     setExpanded(new Set());
+    setFiles([]);
+    setAiResults(new Map());
+    setAiError(null);
   }
 
   function toggleSection(key: string) {
@@ -300,6 +392,25 @@ export function PreCheckView({ onOpenAsset }: Props) {
               className="h-1.5 flex-1"
               ariaLabel={t("precheck.title")}
             />
+            {aiEnabled && (
+              <Button
+                size="sm"
+                variant="ghost"
+                leadingIcon={
+                  aiWorking ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={12} />
+                  )
+                }
+                onClick={runAI}
+                disabled={aiWorking || results.length === 0}
+              >
+                {aiWorking
+                  ? t("precheck.aiAnalyzing")
+                  : t("precheck.aiAnalyze")}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -375,6 +486,12 @@ export function PreCheckView({ onOpenAsset }: Props) {
         </Notice>
       )}
 
+      {aiError && (
+        <Notice tone="danger" className="mb-4" title={t("precheck.aiError")}>
+          {aiError}
+        </Notice>
+      )}
+
       {hasResults && (
         <div className="grid gap-3">
           {results.map((r, idx) => (
@@ -386,6 +503,8 @@ export function PreCheckView({ onOpenAsset }: Props) {
               expanded={expanded}
               onToggle={toggleSection}
               onOpenAsset={onOpenAsset}
+              aiResult={aiResults.get(r.name)}
+              aiWorking={aiWorking}
             />
           ))}
         </div>
@@ -401,6 +520,8 @@ function PreCheckCard({
   expanded,
   onToggle,
   onOpenAsset,
+  aiResult,
+  aiWorking,
 }: {
   result: PreCheckResult;
   index: number;
@@ -408,10 +529,25 @@ function PreCheckCard({
   expanded: Set<string>;
   onToggle: (key: string) => void;
   onOpenAsset?: (id: string) => void;
+  aiResult?: AIPreCheckResult;
+  aiWorking?: boolean;
 }) {
   const { t } = useTranslation();
-  const badgeTone = VERDICT_BADGE_TONE[result.verdict];
-  const VerdictIcon = VERDICT_ICON[result.verdict];
+
+  const aiUpgrade =
+    aiResult &&
+    result.verdict === "ok" &&
+    (aiResult.quality.score <= 2 || aiResult.suggestion.suitability === "poor");
+
+  const effectiveVerdict: Verdict = aiUpgrade ? "warning" : result.verdict;
+  const effectiveReasonKey = aiUpgrade
+    ? aiResult.quality.score <= 2
+      ? "precheck.verdictReason.aiQuality"
+      : "precheck.verdictReason.aiSuitability"
+    : verdictReasonKey(result);
+
+  const badgeTone = VERDICT_BADGE_TONE[effectiveVerdict];
+  const VerdictIcon = VERDICT_ICON[effectiveVerdict];
 
   const sections: {
     id: string;
@@ -521,6 +657,27 @@ function PreCheckCard({
     });
   }
 
+  if (aiResult) {
+    sections.push({
+      id: `${index}-ai`,
+      title: t("precheck.sections.ai"),
+      count: aiResult.tags.length,
+      render: () => <AIResultSection ai={aiResult} />,
+    });
+  } else if (aiWorking) {
+    sections.push({
+      id: `${index}-ai`,
+      title: t("precheck.sections.ai"),
+      count: 0,
+      render: () => (
+        <div className="flex items-center gap-2 py-2 text-g-caption text-g-ink-4">
+          <Loader2 size={12} className="animate-spin" />
+          {t("precheck.aiAnalyzing")}
+        </div>
+      ),
+    });
+  }
+
   return (
     <Card padding="none">
       <div className="p-3">
@@ -561,11 +718,11 @@ function PreCheckCard({
               </div>
               <Badge tone={badgeTone} className="shrink-0">
                 <VerdictIcon size={10} />
-                {t(`precheck.verdict.${result.verdict}`)}
+                {t(`precheck.verdict.${effectiveVerdict}`)}
               </Badge>
             </div>
             <p className="mt-1.5 text-g-caption text-g-ink-3">
-              {t(verdictReasonKey(result), {
+              {t(effectiveReasonKey, {
                 defaultValue: result.verdictReason,
               })}
             </p>
@@ -689,4 +846,80 @@ function MatchRow({
     );
   }
   return <div className={base}>{contents}</div>;
+}
+
+const SUITABILITY_TONE: Record<string, "green" | "warning" | "danger"> = {
+  good: "green",
+  acceptable: "warning",
+  poor: "danger",
+};
+
+function AIResultSection({ ai }: { ai: AIPreCheckResult }) {
+  const { t } = useTranslation();
+  const dots = Array.from({ length: 5 }, (_, i) => i < ai.quality.score);
+
+  return (
+    <div className="space-y-2 py-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge tone="line">{ai.category}</Badge>
+        {ai.tags.map((tag) => (
+          <Badge key={tag} tone="line" className="text-[10px]">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+
+      <p className="text-g-caption text-g-ink-2">{ai.description}</p>
+
+      <div className="flex items-center gap-2">
+        <span className="flex gap-0.5">
+          {dots.map((filled, i) => (
+            <span
+              key={i}
+              className={cn(
+                "inline-block size-1.5 rounded-full",
+                filled ? "bg-g-accent" : "bg-g-line",
+              )}
+            />
+          ))}
+        </span>
+        <span className="text-g-chip text-g-ink-4">
+          {t(`precheck.aiQuality.${ai.quality.score}`)}
+        </span>
+      </div>
+
+      {ai.quality.issues.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {ai.quality.issues.map((issue) => (
+            <Badge key={issue} tone="warning" className="text-[10px]">
+              {t(`precheck.aiIssue.${issue}`, { defaultValue: issue })}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {ai.suggestion.recommendedFilename && (
+        <div className="text-g-caption text-g-ink-3">
+          <span className="font-g-mono">
+            {ai.suggestion.recommendedFilename}
+          </span>
+        </div>
+      )}
+
+      {ai.suggestion.formatRecommendation && (
+        <p className="text-g-caption text-g-ink-3">
+          {ai.suggestion.formatRecommendation}
+        </p>
+      )}
+
+      <div className="flex items-center gap-1.5">
+        <Badge tone={SUITABILITY_TONE[ai.suggestion.suitability] ?? "line"}>
+          {t(`precheck.aiSuitability.${ai.suggestion.suitability}`)}
+        </Badge>
+        <span className="text-g-caption text-g-ink-3">
+          {ai.suggestion.suitabilityReason}
+        </span>
+      </div>
+    </div>
+  );
 }
