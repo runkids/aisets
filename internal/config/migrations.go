@@ -449,6 +449,7 @@ func (s *Store) migrateScanPerformanceSchema() error {
 		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_left ON near_duplicate_snapshots(scan_id, left_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_near_duplicates_scan_right ON near_duplicate_snapshots(scan_id, right_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_lint_snapshots_scan_severity ON lint_snapshots(scan_id, severity)`,
+		`CREATE INDEX IF NOT EXISTS idx_lint_snapshots_scan_asset ON lint_snapshots(scan_id, asset_id)`,
 	}
 	if _, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS lint_snapshots (

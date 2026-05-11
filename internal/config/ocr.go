@@ -64,36 +64,38 @@ func (s *Store) OCRResults(items []scanner.AssetItem, settings ocr.Settings, eng
 	if len(items) == 0 {
 		return out, nil
 	}
+	hashes := contentHashes(items)
+	if len(hashes) == 0 {
+		return out, nil
+	}
 	settingsHash := ocr.SettingsHash(settings)
-	for _, item := range items {
-		if item.ContentHash == "" || item.HashAlgorithm == "" {
-			continue
-		}
-		row := s.rdb.QueryRow(`
-			SELECT status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
-				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
-			FROM ocr_results
-			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
-				AND engine_name = ? AND engine_version = ? AND settings_hash = ?
-		`, item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm, engineName, engineVersion, settingsHash)
-		result := ocr.Result{
-			ProjectID:     item.ProjectID,
-			RepoPath:      item.RepoPath,
-			ContentHash:   item.ContentHash,
-			HashAlgorithm: item.HashAlgorithm,
-			EngineName:    engineName,
-			EngineVersion: engineVersion,
-			SettingsHash:  settingsHash,
-		}
+	hashClause, hashArgs := inClauseSQL("content_hash", hashes)
+	args := []any{engineName, engineVersion, settingsHash}
+	args = append(args, hashArgs...)
+	rows, err := s.rdb.Query(`
+		SELECT project_id, repo_path, content_hash, hash_algorithm,
+			status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
+			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
+		FROM ocr_results
+		WHERE engine_name = ? AND engine_version = ? AND settings_hash = ?
+			AND `+hashClause+`
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var result ocr.Result
 		var languagesRaw, scriptsRaw string
 		var confidence sql.NullFloat64
-		err := row.Scan(&result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence, &result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt)
-		if err == sql.ErrNoRows {
-			continue
-		}
-		if err != nil {
+		if err := rows.Scan(&result.ProjectID, &result.RepoPath, &result.ContentHash, &result.HashAlgorithm,
+			&result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence,
+			&result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt); err != nil {
 			return nil, err
 		}
+		result.EngineName = engineName
+		result.EngineVersion = engineVersion
+		result.SettingsHash = settingsHash
 		if confidence.Valid {
 			value := confidence.Float64
 			result.Confidence = &value
@@ -101,9 +103,9 @@ func (s *Store) OCRResults(items []scanner.AssetItem, settings ocr.Settings, eng
 		_ = json.Unmarshal([]byte(languagesRaw), &result.Languages)
 		_ = json.Unmarshal([]byte(scriptsRaw), &result.Scripts)
 		ocr.FinalizeResult(&result)
-		out[ocrKey(item.ProjectID, item.RepoPath)] = result
+		out[ocrKey(result.ProjectID, result.RepoPath)] = result
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 func (s *Store) OCRResultForItem(item scanner.AssetItem, settings ocr.Settings, engineName, engineVersion string) (ocr.Result, bool, error) {
@@ -161,35 +163,37 @@ func (s *Store) VLMOCRResults(items []scanner.AssetItem, engineVersion, settings
 	if len(items) == 0 {
 		return out, nil
 	}
-	for _, item := range items {
-		if item.ContentHash == "" || item.HashAlgorithm == "" {
-			continue
-		}
-		row := s.rdb.QueryRow(`
-			SELECT status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
-				COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
-			FROM ocr_results
-			WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ?
-				AND engine_name = 'vlm' AND engine_version = ? AND settings_hash = ?
-		`, item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm, engineVersion, settingsHash)
-		result := ocr.Result{
-			ProjectID:     item.ProjectID,
-			RepoPath:      item.RepoPath,
-			ContentHash:   item.ContentHash,
-			HashAlgorithm: item.HashAlgorithm,
-			EngineName:    "vlm",
-			EngineVersion: engineVersion,
-			SettingsHash:  settingsHash,
-		}
+	hashes := contentHashes(items)
+	if len(hashes) == 0 {
+		return out, nil
+	}
+	hashClause, hashArgs := inClauseSQL("content_hash", hashes)
+	args := []any{engineVersion, settingsHash}
+	args = append(args, hashArgs...)
+	rows, err := s.rdb.Query(`
+		SELECT project_id, repo_path, content_hash, hash_algorithm,
+			status, text, normalized_text, COALESCE(text_status, ''), languages_json, scripts_json, confidence,
+			COALESCE(error_code, ''), COALESCE(error_message, ''), duration_ms, COALESCE(mode, ''), attempts, updated_at
+		FROM ocr_results
+		WHERE engine_name = 'vlm' AND engine_version = ? AND settings_hash = ?
+			AND `+hashClause+`
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var result ocr.Result
 		var languagesRaw, scriptsRaw string
 		var confidence sql.NullFloat64
-		err := row.Scan(&result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence, &result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt)
-		if err == sql.ErrNoRows {
-			continue
-		}
-		if err != nil {
+		if err := rows.Scan(&result.ProjectID, &result.RepoPath, &result.ContentHash, &result.HashAlgorithm,
+			&result.Status, &result.Text, &result.NormalizedText, &result.TextStatus, &languagesRaw, &scriptsRaw, &confidence,
+			&result.ErrorCode, &result.ErrorMessage, &result.DurationMs, &result.Mode, &result.Attempts, &result.UpdatedAt); err != nil {
 			return nil, err
 		}
+		result.EngineName = "vlm"
+		result.EngineVersion = engineVersion
+		result.SettingsHash = settingsHash
 		if confidence.Valid {
 			value := confidence.Float64
 			result.Confidence = &value
@@ -197,9 +201,9 @@ func (s *Store) VLMOCRResults(items []scanner.AssetItem, engineVersion, settings
 		_ = json.Unmarshal([]byte(languagesRaw), &result.Languages)
 		_ = json.Unmarshal([]byte(scriptsRaw), &result.Scripts)
 		ocr.FinalizeResult(&result)
-		out[ocrKey(item.ProjectID, item.RepoPath)] = result
+		out[ocrKey(result.ProjectID, result.RepoPath)] = result
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 func (s *Store) VLMOCRResultForContentHash(contentHash, hashAlgorithm, engineVersion, settingsHash string) (ocr.Result, bool, error) {

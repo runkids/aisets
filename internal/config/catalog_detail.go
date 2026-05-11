@@ -134,10 +134,12 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 func (s *Store) assetNearDuplicates(scanID int64, assetID string) ([]scanner.NearDuplicate, error) {
 	rows, err := s.rdb.Query(`
 		SELECT near_id, left_id, right_id, left_path, right_path, distance, flipped
-		FROM near_duplicate_snapshots
-		WHERE scan_id = ? AND (left_id = ? OR right_id = ?)
+		FROM near_duplicate_snapshots WHERE scan_id = ? AND left_id = ?
+		UNION ALL
+		SELECT near_id, left_id, right_id, left_path, right_path, distance, flipped
+		FROM near_duplicate_snapshots WHERE scan_id = ? AND right_id = ?
 		ORDER BY distance ASC, left_path ASC, right_path ASC
-	`, scanID, assetID, assetID)
+	`, scanID, assetID, scanID, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +158,7 @@ func (s *Store) assetNearDuplicates(scanID int64, assetID string) ([]scanner.Nea
 }
 
 func (s *Store) assetSimilarItems(scanID int64, assetID string, near []scanner.NearDuplicate) ([]scanner.AssetItem, error) {
-	items := []scanner.AssetItem{}
+	ids := make([]string, 0, len(near))
 	seen := map[string]bool{}
 	for _, pair := range near {
 		otherID := pair.LeftID
@@ -167,11 +169,7 @@ func (s *Store) assetSimilarItems(scanID int64, assetID string, near []scanner.N
 			continue
 		}
 		seen[otherID] = true
-		item, err := s.CatalogItem(scanID, otherID)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+		ids = append(ids, otherID)
 	}
-	return items, nil
+	return s.catalogItemsByIDs(scanID, ids)
 }

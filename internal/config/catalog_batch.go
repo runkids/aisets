@@ -201,6 +201,19 @@ func (s *Store) hydrateAssetOptimization(scanID int64, items []scanner.AssetItem
 	return nil
 }
 
+func contentHashes(items []scanner.AssetItem) []string {
+	hashes := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		if item.ContentHash == "" || item.HashAlgorithm == "" || seen[item.ContentHash] {
+			continue
+		}
+		seen[item.ContentHash] = true
+		hashes = append(hashes, item.ContentHash)
+	}
+	return hashes
+}
+
 func itemIDs(items []scanner.AssetItem) []string {
 	ids := make([]string, 0, len(items))
 	seen := map[string]bool{}

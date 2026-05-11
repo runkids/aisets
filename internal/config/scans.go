@@ -272,9 +272,19 @@ func (s *Store) recordScanDuplicates(scanID int64, catalog scanner.Catalog) erro
 }
 
 func (s *Store) recordScanNearDuplicates(scanID int64, nearDuplicates []scanner.NearDuplicate) error {
-	if len(nearDuplicates) == 0 {
-		return nil
+	for i := 0; i < len(nearDuplicates); i += recordBatchSize {
+		end := i + recordBatchSize
+		if end > len(nearDuplicates) {
+			end = len(nearDuplicates)
+		}
+		if err := s.recordScanNearDuplicatesBatch(scanID, nearDuplicates[i:end]); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func (s *Store) recordScanNearDuplicatesBatch(scanID int64, nearDuplicates []scanner.NearDuplicate) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -306,9 +316,19 @@ func (s *Store) recordScanNearDuplicates(scanID int64, nearDuplicates []scanner.
 }
 
 func (s *Store) recordScanLintFindings(scanID int64, findings []lint.Finding) error {
-	if len(findings) == 0 {
-		return nil
+	for i := 0; i < len(findings); i += recordBatchSize {
+		end := i + recordBatchSize
+		if end > len(findings) {
+			end = len(findings)
+		}
+		if err := s.recordScanLintFindingsBatch(scanID, findings[i:end]); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func (s *Store) recordScanLintFindingsBatch(scanID int64, findings []lint.Finding) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
