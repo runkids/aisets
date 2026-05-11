@@ -64,10 +64,28 @@ func FormatPrecheckFindings(r Result) string {
 	b.WriteString("\n")
 
 	if len(r.ExactMatches) > 0 {
-		b.WriteString(fmt.Sprintf("\nExact duplicates found: %d match(es) already in catalog.\n", len(r.ExactMatches)))
+		b.WriteString(fmt.Sprintf("\nExact duplicates: %d identical file(s) already in catalog:\n", len(r.ExactMatches)))
+		for _, m := range r.ExactMatches {
+			b.WriteString(fmt.Sprintf("  - %s (project: %s)\n", m.RepoPath, m.ProjectName))
+		}
 	}
 	if len(r.NearMatches) > 0 {
-		b.WriteString(fmt.Sprintf("\nNear-duplicate matches: %d visually similar asset(s) found.\n", len(r.NearMatches)))
+		b.WriteString(fmt.Sprintf("\nNear-duplicate matches: %d visually similar asset(s):\n", len(r.NearMatches)))
+		limit := len(r.NearMatches)
+		if limit > 10 {
+			limit = 10
+		}
+		for _, m := range r.NearMatches[:limit] {
+			pct := 100 * (64 - m.Distance) / 64
+			label := fmt.Sprintf("%d%% similar", pct)
+			if m.Flipped {
+				label += " (flipped)"
+			}
+			b.WriteString(fmt.Sprintf("  - %s — %s (project: %s)\n", m.RepoPath, label, m.ProjectName))
+		}
+		if len(r.NearMatches) > 10 {
+			b.WriteString(fmt.Sprintf("  ... and %d more\n", len(r.NearMatches)-10))
+		}
 	}
 	if len(r.NamingIssues) > 0 {
 		b.WriteString("\nNaming issues:\n")
