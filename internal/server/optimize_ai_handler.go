@@ -113,7 +113,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOptimize)
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, "tag", timeoutSec)
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {

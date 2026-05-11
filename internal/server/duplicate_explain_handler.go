@@ -93,7 +93,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{
 		{Path: left.LocalPath, Ext: left.Ext},
 		{Path: right.LocalPath, Ext: right.Ext},
-	}, backend, modelName, systemPrompt, prompt, timeoutSec)
+	}, backend, modelName, systemPrompt, prompt, "tag", timeoutSec)
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {

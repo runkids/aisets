@@ -585,7 +585,7 @@ func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHead
 	filePrompt := strings.ReplaceAll(prompt, "{{precheckFindings}}", findings)
 
 	start := time.Now()
-	rawContent, _, err := s.chatVLM(ctx, []vlmImage{{Path: tmpPath, Ext: ext}}, backend, modelName, systemPrompt, filePrompt, timeoutSec)
+	rawContent, _, err := s.chatVLM(ctx, []vlmImage{{Path: tmpPath, Ext: ext}}, backend, modelName, systemPrompt, filePrompt, "tag", timeoutSec)
 	if err != nil {
 		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_llm_failed", ErrorMsg: err.Error()}
 	}

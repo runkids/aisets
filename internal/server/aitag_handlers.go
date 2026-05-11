@@ -126,7 +126,7 @@ type vlmImage struct {
 	Ext  string
 }
 
-func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
+func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt, purpose string, timeoutSec int) (string, llm.ChatResponse, error) {
 	if id, ok := agent.AgentBackendID(backend); ok {
 		if provider, ok := s.agentProviders[id]; ok {
 			paths := make([]string, len(images))
@@ -159,7 +159,7 @@ func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelN
 
 	var dataURIs []string
 	for _, img := range images {
-		dataURI, err := prepareImageForVLM(img.Path, img.Ext, "tag")
+		dataURI, err := prepareImageForVLM(img.Path, img.Ext, purpose)
 		if err != nil {
 			return "", llm.ChatResponse{}, err
 		}
@@ -446,7 +446,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backe
 	}
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, "tag", timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {
