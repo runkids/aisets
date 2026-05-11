@@ -1270,10 +1270,7 @@ function SystemPromptInline() {
         className="font-g-mono text-g-caption"
       />
       {isDirty && (
-        <div className="flex justify-end gap-2">
-          <Button size="md" variant="ghost" onClick={() => setLocalValue(null)}>
-            {t("action.reset")}
-          </Button>
+        <div className="flex justify-end">
           <Button
             size="md"
             variant="primary"
@@ -1306,7 +1303,15 @@ function PromptsLocaleCard({
   function handleSystemPromptToggle(checked: boolean) {
     updateSettings.mutate(
       { llmSystemPromptEnabled: checked },
-      { onError: (err) => toast.error(errorMessage(err)) },
+      {
+        onSuccess: () =>
+          toast.success(
+            checked
+              ? t("settings.systemPromptEnabled")
+              : t("settings.systemPromptDisabled"),
+          ),
+        onError: (err) => toast.error(errorMessage(err)),
+      },
     );
   }
 
@@ -1343,12 +1348,24 @@ function PromptsLocaleCard({
         >
           <Switch
             checked={draft.llmAutoLocale}
-            onCheckedChange={(next) =>
+            onCheckedChange={(next) => {
               onUpdateDraft((current) => ({
                 ...current,
                 llmAutoLocale: next,
-              }))
-            }
+              }));
+              updateSettings.mutate(
+                { llmAutoLocale: next },
+                {
+                  onSuccess: () =>
+                    toast.success(
+                      next
+                        ? t("settings.autoLocaleEnabled")
+                        : t("settings.autoLocaleDisabled"),
+                    ),
+                  onError: (err) => toast.error(errorMessage(err)),
+                },
+              );
+            }}
             aria-label={t("settings.llmAutoLocale")}
           />
         </FieldRow>
