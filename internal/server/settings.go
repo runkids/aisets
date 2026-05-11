@@ -40,6 +40,7 @@ func (s *Server) currentSettingsInfo() (settingsInfo, error) {
 	if err != nil {
 		return settingsInfo{}, err
 	}
+	settings.LLMEndpoint = config.ResolveEndpointForRuntime(settings.LLMEndpoint)
 	return settingsInfo{
 		AppSettings:              settings,
 		Workspaces:               s.store.Workspaces(),

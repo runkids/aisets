@@ -21,18 +21,25 @@ const TagPrompt = `Analyze this image and respond with a JSON object containing:
 
 Respond ONLY with valid JSON, no markdown or explanation.`
 
-var allI18nLocales = []string{"en", "zh-TW", "zh-CN", "ja", "ko"}
+var AllI18nLocales = []string{"en", "zh-TW", "zh-CN", "ja", "ko"}
 
 const TagTranslationsBlock = `- "categoryI18n": object mapping locale codes to translated category name: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the category value naturally into each locale.
 - "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
 - "descriptionI18n": object mapping locale codes to translated descriptions: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the description naturally into each locale.`
 
 func TagTranslationsBlockForLocale(primaryLocale string) string {
+	return TagTranslationsBlockForLocales(primaryLocale, AllI18nLocales)
+}
+
+func TagTranslationsBlockForLocales(primaryLocale string, targetLocales []string) string {
 	name := localeDisplayNames[primaryLocale]
 	if name == "" {
 		name = primaryLocale
 	}
-	locales := excludeLocale(allI18nLocales, primaryLocale)
+	locales := excludeLocale(targetLocales, primaryLocale)
+	if len(locales) == 0 {
+		return ""
+	}
 	example := buildLocaleExample(locales)
 	arrayExample := buildLocaleArrayExample(locales)
 	return `NOTE: Write tags as natural-language words in ` + name + `, NOT English kebab-case.
@@ -44,6 +51,18 @@ func TagTranslationsBlockForLocale(primaryLocale string) string {
 categoryI18n, tagsI18n, and descriptionI18n are REQUIRED fields — do not omit them.`
 }
 
+func TagTranslationsBlockDefault(targetLocales []string) string {
+	locales := excludeLocale(targetLocales, "en")
+	if len(locales) == 0 {
+		return ""
+	}
+	example := buildLocaleExample(locales)
+	arrayExample := buildLocaleArrayExample(locales)
+	return `- "categoryI18n": ` + example + `. Translate the category value naturally into each locale.
+- "tagsI18n": ` + arrayExample + `. Each array must have the same length and order as "tags", translated naturally into that locale.
+- "descriptionI18n": ` + example + `. Translate the description naturally into each locale.`
+}
+
 var localeDisplayNames = map[string]string{
 	"en":    "English",
 	"zh-TW": "Traditional Chinese (繁體中文)",
@@ -52,17 +71,17 @@ var localeDisplayNames = map[string]string{
 	"ko":    "Korean (한국어)",
 }
 
-// TagPromptLocalized returns a complete tag prompt for non-English primary
-// locales. It interleaves i18n fields next to their base fields so smaller
-// models treat them as equally required, and removes the English-only
-// "kebab-case" instruction that conflicts with a non-English locale.
 func TagPromptLocalized(primaryLocale string) string {
+	return TagPromptLocalizedForLocales(primaryLocale, AllI18nLocales)
+}
+
+func TagPromptLocalizedForLocales(primaryLocale string, targetLocales []string) string {
 	name := localeDisplayNames[primaryLocale]
 	if name == "" {
 		name = primaryLocale
 	}
 
-	locales := excludeLocale(allI18nLocales, primaryLocale)
+	locales := excludeLocale(targetLocales, primaryLocale)
 	example := buildLocaleExample(locales)
 	arrayExample := buildLocaleArrayExample(locales)
 

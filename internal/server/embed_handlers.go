@@ -148,7 +148,6 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Pre-step: batch-translate AI tags missing English i18n.
 	if requestedTypes["text"] && visionModel != "" {
 		var hashes []string
 		for _, job := range candidates {
@@ -157,7 +156,11 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(hashes) > 0 {
-			s.backfillEnglishI18nBatch(r.Context(), w, hashes, visionModel)
+			targetLocales := settings.LLMTranslationLocales
+			if len(targetLocales) == 0 {
+				targetLocales = []string{"en"}
+			}
+			s.backfillI18nBatch(r.Context(), w, hashes, visionModel, targetLocales)
 		}
 	}
 
@@ -313,77 +316,120 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 
 const i18nBatchSize = 20
 
-func (s *Server) backfillEnglishI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, chatModel string) {
-	missing, err := s.store.AITagsMissingEnglish(contentHashes)
-	if err != nil || len(missing) == 0 {
-		return
-	}
+var localeDisplayNames = map[string]string{
+	"en": "English", "zh-TW": "Traditional Chinese", "zh-CN": "Simplified Chinese",
+	"ja": "Japanese", "ko": "Korean",
+}
 
-	sendNDJSON(w, map[string]any{"type": "translating", "total": len(missing)})
-
-	for i := 0; i < len(missing); i += i18nBatchSize {
-		if ctx.Err() != nil {
-			return
-		}
-		end := min(i+i18nBatchSize, len(missing))
-		batch := missing[i:end]
-
-		prompt := "Translate each numbered item to English. Return ONLY the translations, one per line, same numbering. Keep category on the first word, tags comma-separated, description as-is.\n\n"
-		for j, row := range batch {
-			text := row.Category
-			if len(row.Tags) > 0 {
-				text += " | " + strings.Join(row.Tags, ", ")
-			}
-			if row.Description != "" {
-				text += " | " + row.Description
-			}
-			prompt += strconv.Itoa(j+1) + ". " + text + "\n"
-		}
-
-		resp, cerr := s.llmProvider.Chat(ctx, llm.ChatRequest{
-			Model: chatModel,
-			Messages: []llm.ChatMessage{
-				{Role: "user", Content: prompt},
-			},
-			TimeoutSec: 30,
-		})
-		if cerr != nil {
+func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, chatModel string, targetLocales []string) {
+	for _, locale := range targetLocales {
+		missing, err := s.store.AITagsMissingLocale(locale, contentHashes)
+		if err != nil || len(missing) == 0 {
 			continue
 		}
 
-		lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
-		for j, row := range batch {
-			if j >= len(lines) {
-				break
-			}
-			line := strings.TrimSpace(lines[j])
-			// Strip leading "N. " numbering
-			if idx := strings.Index(line, ". "); idx >= 0 && idx <= 3 {
-				line = strings.TrimSpace(line[idx+2:])
-			}
-
-			parts := strings.SplitN(line, "|", 3)
-			enCategory := strings.TrimSpace(parts[0])
-			var enTags []string
-			var enDesc string
-			if len(parts) >= 2 {
-				for _, t := range strings.Split(parts[1], ",") {
-					if t = strings.TrimSpace(t); t != "" {
-						enTags = append(enTags, t)
-					}
-				}
-			}
-			if len(parts) >= 3 {
-				enDesc = strings.TrimSpace(parts[2])
-			}
-			if enCategory == "" {
-				continue
-			}
-			_ = s.store.BackfillEnglishI18n(row.ContentHash, row.HashAlgorithm, enCategory, enTags, enDesc)
+		langName := localeDisplayNames[locale]
+		if langName == "" {
+			langName = locale
 		}
 
-		sendNDJSON(w, map[string]any{"type": "translating", "translated": min(end, len(missing)), "total": len(missing)})
+		sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "total": len(missing)})
+
+		for i := 0; i < len(missing); i += i18nBatchSize {
+			if ctx.Err() != nil {
+				return
+			}
+			end := min(i+i18nBatchSize, len(missing))
+			batch := missing[i:end]
+
+			prompt := "Translate each numbered item to " + langName + ". Return ONLY the translations, one per line, same numbering. Format: category | tag1, tag2, ... | description\n\n"
+			for j, row := range batch {
+				text := row.Category
+				if len(row.Tags) > 0 {
+					text += " | " + strings.Join(row.Tags, ", ")
+				}
+				if row.Description != "" {
+					text += " | " + row.Description
+				}
+				prompt += strconv.Itoa(j+1) + ". " + text + "\n"
+			}
+
+			resp, cerr := s.llmProvider.Chat(ctx, llm.ChatRequest{
+				Model: chatModel,
+				Messages: []llm.ChatMessage{
+					{Role: "user", Content: prompt},
+				},
+				TimeoutSec: 30,
+			})
+			if cerr != nil {
+				continue
+			}
+
+			lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
+			for j, row := range batch {
+				if j >= len(lines) {
+					break
+				}
+				line := strings.TrimSpace(lines[j])
+				if idx := strings.Index(line, ". "); idx >= 0 && idx <= 3 {
+					line = strings.TrimSpace(line[idx+2:])
+				}
+				parts := strings.SplitN(line, "|", 3)
+				cat := strings.TrimSpace(parts[0])
+				var tags []string
+				var desc string
+				if len(parts) >= 2 {
+					for _, t := range strings.Split(parts[1], ",") {
+						if t = strings.TrimSpace(t); t != "" {
+							tags = append(tags, t)
+						}
+					}
+				}
+				if len(parts) >= 3 {
+					desc = strings.TrimSpace(parts[2])
+				}
+				if cat == "" {
+					continue
+				}
+				_ = s.store.BackfillLocaleI18n(row.ContentHash, row.HashAlgorithm, locale, cat, tags, desc)
+			}
+
+			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": min(end, len(missing)), "total": len(missing)})
+		}
 	}
+}
+
+func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("cache-control", "no-store")
+
+	settings, err := s.store.Settings()
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "translate_settings_failed")})
+		return
+	}
+	if !settings.LLMEnabled || s.llmProvider == nil || settings.LLMVisionModel == "" {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("translate_not_configured", "LLM provider not configured")})
+		return
+	}
+
+	targetLocales := settings.LLMTranslationLocales
+	if len(targetLocales) == 0 {
+		targetLocales = []string{"en"}
+	}
+
+	hashes, err := s.store.AllReadyAITagHashes()
+	if err != nil {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "translate_hash_failed")})
+		return
+	}
+	if len(hashes) == 0 {
+		sendNDJSON(w, map[string]any{"type": "done", "translated": 0})
+		return
+	}
+
+	s.backfillI18nBatch(r.Context(), w, hashes, settings.LLMVisionModel, targetLocales)
+	sendNDJSON(w, map[string]any{"type": "done"})
 }
 
 func (s *Server) handleEmbedClear(w http.ResponseWriter, _ *http.Request) {

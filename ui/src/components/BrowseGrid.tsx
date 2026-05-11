@@ -109,7 +109,7 @@ export function BrowseGrid({
   const { t } = useTranslation();
   const cfg = SIZE_CONFIG[gridSize];
   const [tagPickerAsset, setTagPickerAsset] = useState<AssetItem | null>(null);
-  const tagPickerTriggerRef = useRef<HTMLButtonElement>(null);
+  const tagPickerTriggerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [gridRef, gridWidth] = useElementWidth<HTMLElement>();

@@ -250,7 +250,10 @@ export function DirectoryPickerModal({
                   </span>
                 ) : detection ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <Badge tone="green" className="gap-1">
+                    <Badge
+                      tone="green"
+                      className="gap-1 shrink-0 whitespace-nowrap"
+                    >
                       <CheckCircle2 size={10} aria-hidden="true" />
                       {t("directoryPicker.detectedIntent", {
                         intent: projectScanIntentLabel(

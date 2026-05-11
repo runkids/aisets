@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { ImageBackgroundMode } from "../../imageBackground";
 import { languageOptionsForLocale } from "../../i18n/index";
 import { Card, Select, Switch, Tabs } from "../ui";
+import { useToast } from "../ToastProvider";
 import { FieldRow } from "./index";
 import { editorOptions } from "./constants";
 import type { ThemePreference } from "./types";
@@ -21,6 +22,7 @@ type ThemeSectionProps = {
   imagePreviewEnabled: boolean;
   imageBackgroundMode: ImageBackgroundMode;
   preferredEditor?: string;
+  translationLocales?: string[];
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
   onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
@@ -32,12 +34,14 @@ export function ThemeSection({
   imagePreviewEnabled,
   imageBackgroundMode,
   preferredEditor,
+  translationLocales,
   onThemeChange,
   onImagePreviewEnabledChange,
   onImageBackgroundModeChange,
   onEditorChange,
 }: ThemeSectionProps) {
   const { i18n, t } = useTranslation();
+  const toast = useToast();
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,7 +63,17 @@ export function ThemeSection({
                 value: lang.code,
                 label: lang.label,
               }))}
-              onChange={(value) => i18n.changeLanguage(value)}
+              onChange={(value) => {
+                i18n.changeLanguage(value);
+                if (
+                  translationLocales &&
+                  translationLocales.length > 0 &&
+                  value !== "en" &&
+                  !translationLocales.includes(value)
+                ) {
+                  toast.info(t("settings.localeChangeAffectsTranslation"));
+                }
+              }}
               aria-label={t("settings.language")}
             />
           </FieldRow>

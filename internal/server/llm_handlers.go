@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"aisets/internal/config"
 	"aisets/internal/llm"
 )
 
@@ -61,9 +62,10 @@ func (s *Server) handleLLMHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	resolved := config.ResolveEndpointForRuntime(body.Endpoint)
 	status := llm.RuntimeStatus{
 		Provider: body.Provider,
-		Endpoint: body.Endpoint,
+		Endpoint: resolved,
 	}
 
 	provider := newLLMProvider(body.Provider, body.Endpoint, body.ApiKey)

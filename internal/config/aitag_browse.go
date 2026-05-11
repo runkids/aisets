@@ -128,7 +128,7 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 		TopCategory:       topCategory,
 	}
 
-	if q.Locale != "" && q.Locale != "en" && len(tags) > 0 {
+	if q.Locale != "" && len(tags) > 0 {
 		if tr, err := s.aiTagTranslations(tags, q.Locale); err == nil && len(tr) > 0 {
 			page.Translations = tr
 		}

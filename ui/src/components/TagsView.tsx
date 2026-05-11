@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
   Hash,
+  Languages,
   Layers,
+  LoaderCircle,
   Merge,
   Pencil,
   Tags as TagsIcon,
@@ -20,6 +22,7 @@ import {
 } from "../tagsQueries";
 import { useDebouncedValue } from "../useDebouncedValue";
 import { errorMessage } from "../i18n";
+import { runAITagTranslate } from "../api";
 import { batchActionButtonClassName } from "./optimizeTypes";
 import {
   Button,
@@ -41,6 +44,14 @@ const SORT_ITEMS: SegmentedControlItem<"count" | "alpha">[] = [
   { value: "alpha", label: "A-Z" },
 ];
 
+const LOCALE_OPTIONS = [
+  { value: "en", label: "EN" },
+  { value: "zh-TW", label: "繁中" },
+  { value: "zh-CN", label: "简中" },
+  { value: "ja", label: "日本語" },
+  { value: "ko", label: "한국어" },
+];
+
 export function TagsView() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -49,8 +60,10 @@ export function TagsView() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"count" | "alpha">("count");
   const [category, setCategory] = useState("");
+  const [viewLocale, setViewLocale] = useState(i18n.language || "en");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [translating, setTranslating] = useState(false);
 
   // Dialogs
   const [renameTag, setRenameTag] = useState<string | null>(null);
@@ -65,12 +78,12 @@ export function TagsView() {
     q: debouncedSearch,
     sort,
     category,
-    locale: i18n.language,
+    locale: viewLocale,
     limit: 500,
     offset: 0,
   };
 
-  const { data, isLoading } = useTagsQuery(params);
+  const { data, isLoading, refetch: refetchTags } = useTagsQuery(params);
   const { data: catData } = useTagCategoriesQuery();
   const renameMutation = useTagRenameMutation();
   const mergeMutation = useTagMergeMutation();
@@ -91,6 +104,25 @@ export function TagsView() {
 
   function handleTagClick(tag: string) {
     navigate(`/browse?q=${encodeURIComponent(tag)}`);
+  }
+
+  async function handleTranslate() {
+    setTranslating(true);
+    try {
+      await runAITagTranslate({
+        onEvent: (event) => {
+          if (event.type === "error") {
+            toast.error(errorMessage(event));
+          }
+        },
+      });
+      toast.success(t("tags.translateDone"));
+      void refetchTags();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setTranslating(false);
+    }
   }
 
   const toggleSelect = useCallback((tag: string) => {
@@ -275,6 +307,30 @@ export function TagsView() {
               size="md"
               className="w-44 flex-none"
             />
+            <Select
+              value={viewLocale}
+              options={LOCALE_OPTIONS}
+              onChange={setViewLocale}
+              aria-label={t("tags.viewLocale")}
+              size="md"
+              className="w-24 flex-none"
+            />
+            <Button
+              variant="secondary"
+              size="md"
+              leadingIcon={
+                translating ? (
+                  <LoaderCircle size={14} className="animate-spin" />
+                ) : (
+                  <Languages size={14} />
+                )
+              }
+              disabled={translating}
+              onClick={handleTranslate}
+              className="shrink-0"
+            >
+              {translating ? t("tags.translating") : t("tags.translateAll")}
+            </Button>
             {isFiltered && !isLoading && (
               <span className="text-g-caption text-g-ink-3 tabular-nums shrink-0">
                 {t("tags.filterCount", {
@@ -350,6 +406,8 @@ export function TagsView() {
           isLoading={isLoading}
           selected={selected}
           translations={data?.translations}
+          categoryTranslations={data?.categoryTranslations}
+          highlightMissing={viewLocale !== i18n.language}
           onTagClick={handleTagClick}
           onToggleSelect={toggleSelect}
           bulkMode={bulkMode}

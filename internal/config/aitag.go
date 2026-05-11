@@ -321,9 +321,17 @@ type AITagI18nRow struct {
 	Description   string
 }
 
-// AITagsMissingEnglish returns AI tag rows whose description_i18n_json does not contain an "en" key.
-// contentHashes limits the result to specific hashes (pass nil for all).
 func (s *Store) AITagsMissingEnglish(contentHashes []string) ([]AITagI18nRow, error) {
+	return s.AITagsMissingLocale("en", contentHashes)
+}
+
+var validI18nLocales = map[string]bool{"en": true, "zh-TW": true, "zh-CN": true, "ja": true, "ko": true}
+
+func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AITagI18nRow, error) {
+	if !validI18nLocales[locale] {
+		return nil, nil
+	}
+	likePattern := `%"` + locale + `"%`
 	var query string
 	var args []any
 	if len(contentHashes) > 0 {
@@ -332,16 +340,18 @@ func (s *Store) AITagsMissingEnglish(contentHashes []string) ([]AITagI18nRow, er
 			placeholders[i] = "?"
 			args = append(args, h)
 		}
+		args = append(args, likePattern)
 		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
 			FROM ai_tags
 			WHERE status = 'ready'
 			  AND content_hash IN (` + joinStrings(placeholders, ",") + `)
-			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE '%"en"%')`
+			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE ?)`
 	} else {
+		args = append(args, likePattern)
 		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
 			FROM ai_tags
 			WHERE status = 'ready'
-			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE '%"en"%')`
+			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE ?)`
 	}
 	rows, err := s.rdb.Query(query, args...)
 	if err != nil {
@@ -372,11 +382,12 @@ func joinStrings(ss []string, sep string) string {
 	return out
 }
 
-// BackfillEnglishI18n writes English translations into the i18n columns of an ai_tags row.
 func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory string, enTags []string, enDescription string) error {
-	var catI18n, tagsI18n, descI18n string
+	return s.BackfillLocaleI18n(contentHash, hashAlgorithm, "en", enCategory, enTags, enDescription)
+}
 
-	// Read existing i18n JSON to merge.
+func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category string, tags []string, description string) error {
+	var catI18n, tagsI18n, descI18n string
 	_ = s.rdb.QueryRow(`SELECT COALESCE(category_i18n_json,'{}'), COALESCE(tags_i18n_json,'{}'), COALESCE(description_i18n_json,'{}')
 		FROM ai_tags WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'
 		ORDER BY updated_at DESC LIMIT 1`,
@@ -389,11 +400,11 @@ func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory strin
 	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
 	_ = json.Unmarshal([]byte(descI18n), &descMap)
 
-	catMap["en"] = enCategory
-	if len(enTags) > 0 {
-		tagsMap["en"] = enTags
+	catMap[locale] = category
+	if len(tags) > 0 {
+		tagsMap[locale] = tags
 	}
-	descMap["en"] = enDescription
+	descMap[locale] = description
 
 	catBytes, _ := json.Marshal(catMap)
 	tagsBytes, _ := json.Marshal(tagsMap)
@@ -405,4 +416,22 @@ func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory strin
 		string(catBytes), string(tagsBytes), string(descBytes),
 		contentHash, hashAlgorithm)
 	return err
+}
+
+// AllReadyContentHashes returns content hashes of all ready AI tag rows.
+func (s *Store) AllReadyAITagHashes() ([]string, error) {
+	rows, err := s.rdb.Query(`SELECT DISTINCT content_hash FROM ai_tags WHERE status = 'ready'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var hashes []string
+	for rows.Next() {
+		var h string
+		if err := rows.Scan(&h); err != nil {
+			return nil, err
+		}
+		hashes = append(hashes, h)
+	}
+	return hashes, rows.Err()
 }

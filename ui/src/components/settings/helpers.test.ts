@@ -58,6 +58,7 @@ describe("settings draft helpers", () => {
       llmPrecheckPrompt: "",
       llmSystemPromptEnabled: false,
       llmAutoLocale: false,
+      llmTranslationLocales: ["en"],
       llmConcurrency: 1,
       llmTimeout: 120,
       agentEnabled: false,
@@ -188,6 +189,7 @@ describe("settings draft helpers", () => {
       llmPrecheckPrompt: "",
       llmSystemPromptEnabled: false,
       llmAutoLocale: false,
+      llmTranslationLocales: ["en"],
       llmConcurrency: 4,
       llmTimeout: 120,
       agentEnabled: false,
@@ -255,6 +257,18 @@ describe("settings draft helpers", () => {
 
     const customFilters = resetSectionDraft(draft, "customFilters");
     expect(customFilters.customAssetFilters).toEqual([]);
+
+    const ai = resetSectionDraft(draft, "ai");
+    expect(ai.llmProvider).toBe("");
+    expect(ai.llmEndpoint).toBe("http://localhost:11434");
+    expect(ai.llmVisionModel).toBe("");
+    expect(ai.llmEmbedModel).toBe("");
+    expect(ai.llmConcurrency).toBe(1);
+    expect(ai.llmTimeout).toBe(30);
+    expect(ai.agentEnabled).toBe(false);
+    expect(ai.agentAdapter).toBe("auto");
+    expect(ai.ocrEnabled).toBe(true);
+    expect(ai.ocrLanguages).toEqual(["eng", "chi_tra"]);
 
     const optimization = resetSectionDraft(draft, "optimization");
     expect(optimization.optimizationDefaultQuality).toBe(80);

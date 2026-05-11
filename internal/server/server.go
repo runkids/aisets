@@ -173,6 +173,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/assets/tags", s.handleAssetSetTags)
 	s.mux.HandleFunc("POST /api/ai/tag/run", s.handleAITagRun)
 	s.mux.HandleFunc("POST /api/ai/tag/clear", s.handleAITagClear)
+	s.mux.HandleFunc("POST /api/ai/tag/translate", s.handleAITagTranslate)
 	s.mux.HandleFunc("POST /api/ai/ocr/run", s.handleVLMOCRRun)
 	s.mux.HandleFunc("POST /api/ai/optimize-advice", s.handleOptimizeAIAdvice)
 	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
@@ -295,6 +296,7 @@ func (s *Server) resolveVLMProviderForFeature(settings config.AppSettings, featu
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {
+	endpoint = config.ResolveEndpointForRuntime(endpoint)
 	switch provider {
 	case "ollama":
 		return llm.NewOllamaProvider(endpoint)

@@ -675,6 +675,51 @@ export async function runEmbedding(options?: {
   });
 }
 
+export async function runAITagTranslate(options?: {
+  signal?: AbortSignal;
+  onEvent?: (event: {
+    type: string;
+    locale?: string;
+    translated?: number;
+    total?: number;
+  }) => void;
+}) {
+  const response = await fetch(`${basePath}/api/ai/tag/translate`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code)
+      throw new APIError(error.code, error.message, error.params);
+    throw new APIError("http_error", `HTTP ${response.status}`, {
+      status: response.status,
+    });
+  }
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        options?.onEvent?.(event);
+      } catch {
+        /* skip malformed */
+      }
+    }
+  }
+}
+
 export function clearEmbeddings() {
   return request<{ ok: boolean }>("/api/ai/embed/clear", { method: "POST" });
 }

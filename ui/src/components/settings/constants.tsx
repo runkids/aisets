@@ -27,10 +27,10 @@ export const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "workspace", icon: <Settings2 size={15} /> },
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
-  { id: "ai", icon: <AiChipIcon size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "customFilters", icon: <Filter size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },
+  { id: "ai", icon: <AiChipIcon size={15} /> },
   { id: "about", icon: <Info size={15} /> },
 ];
 
@@ -172,6 +172,7 @@ export const defaultSettings: SettingsUpdate = {
   vlmBackendOptimize: "",
   vlmBackendDuplicate: "",
   vlmBackendPrecheck: "",
+  llmTranslationLocales: ["en"],
   embedSearchThreshold: 0.5,
   embedSearchLimit: 20,
   embedSearchType: "hybrid",

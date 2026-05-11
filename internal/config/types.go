@@ -59,6 +59,7 @@ type AppSettings struct {
 	LLMSystemPrompt            string                               `json:"llmSystemPrompt"`
 	LLMSystemPromptEnabled     bool                                 `json:"llmSystemPromptEnabled"`
 	LLMAutoLocale              bool                                 `json:"llmAutoLocale"`
+	LLMTranslationLocales      []string                             `json:"llmTranslationLocales"`
 	LLMConcurrency             int                                  `json:"llmConcurrency"`
 	LLMTimeout                 int                                  `json:"llmTimeout"`
 	AgentEnabled               bool                                 `json:"agentEnabled"`
@@ -112,6 +113,7 @@ type SettingsUpdate struct {
 	LLMPrecheckPrompt          *string                              `json:"llmPrecheckPrompt"`
 	LLMSystemPromptEnabled     *bool                                `json:"llmSystemPromptEnabled"`
 	LLMAutoLocale              *bool                                `json:"llmAutoLocale"`
+	LLMTranslationLocales      []string                             `json:"llmTranslationLocales"`
 	LLMConcurrency             *int                                 `json:"llmConcurrency"`
 	LLMTimeout                 *int                                 `json:"llmTimeout"`
 	AgentEnabled               *bool                                `json:"agentEnabled"`

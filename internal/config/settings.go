@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"aisets/internal/agent"
 	"aisets/internal/apierr"
@@ -229,6 +231,7 @@ func DefaultAppSettings() AppSettings {
 		LLMEmbedModel:              "",
 		LLMConcurrency:             llm.DefaultConcurrency,
 		LLMTimeout:                 llm.DefaultChatTimeout,
+		LLMTranslationLocales:      nil,
 		AgentAdapter:               "auto",
 		AgentModel:                 "",
 		EmbedSearchThreshold:       0.5,
@@ -265,6 +268,49 @@ func normalizeLLMEndpoint(endpoint string) string {
 	endpoint = strings.TrimSpace(endpoint)
 	endpoint = strings.TrimRight(endpoint, "/")
 	return endpoint
+}
+
+var containerOnce sync.Once
+var containerFlag bool
+
+func isRunningInContainer() bool {
+	containerOnce.Do(func() {
+		if _, err := os.Stat("/.dockerenv"); err == nil {
+			containerFlag = true
+			return
+		}
+		if _, err := os.Stat("/run/.containerenv"); err == nil {
+			containerFlag = true
+		}
+	})
+	return containerFlag
+}
+
+// ResolveEndpointForRuntime rewrites localhost/127.0.0.1 to
+// host.docker.internal when running inside a container.
+func ResolveEndpointForRuntime(endpoint string) string {
+	if !isRunningInContainer() {
+		return endpoint
+	}
+	return rewriteLocalhostEndpoint(endpoint)
+}
+
+func rewriteLocalhostEndpoint(endpoint string) string {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return endpoint
+	}
+	host := u.Hostname()
+	if host != "localhost" && host != "127.0.0.1" {
+		return endpoint
+	}
+	port := u.Port()
+	if port != "" {
+		u.Host = "host.docker.internal:" + port
+	} else {
+		u.Host = "host.docker.internal"
+	}
+	return u.String()
 }
 
 func normalizeScanSettings(settings AppSettings) AppSettings {
@@ -469,6 +515,22 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.LLMAutoLocale != nil {
 		settings.LLMAutoLocale = *update.LLMAutoLocale
+	}
+	if update.LLMTranslationLocales != nil {
+		validLocales := map[string]bool{"en": true, "zh-TW": true, "zh-CN": true, "ja": true, "ko": true}
+		hasEn := false
+		for _, l := range update.LLMTranslationLocales {
+			if !validLocales[l] {
+				return AppSettings{}, apierr.New("settings_translation_locale_invalid", "invalid translation locale")
+			}
+			if l == "en" {
+				hasEn = true
+			}
+		}
+		if !hasEn {
+			update.LLMTranslationLocales = append([]string{"en"}, update.LLMTranslationLocales...)
+		}
+		settings.LLMTranslationLocales = update.LLMTranslationLocales
 	}
 	if update.LLMConcurrency != nil {
 		if *update.LLMConcurrency < 1 || *update.LLMConcurrency > llm.MaxConcurrency {

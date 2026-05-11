@@ -1,4 +1,5 @@
 import type { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import type {
   CustomAssetFilter,
   CustomAssetFilterClause,
@@ -116,6 +117,15 @@ export function isStandaloneApp() {
   );
 }
 
+function withCurrentLocaleDefault(
+  saved: string[] | undefined | null,
+): string[] {
+  if (saved && saved.length > 0) return saved;
+  const lang = i18n.language || "en";
+  if (lang === "en") return ["en"];
+  return ["en", lang];
+}
+
 export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
   const excludePatternsByIntent =
     settings?.excludePatternsByIntent ??
@@ -151,8 +161,11 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmOcrPrompt: settings?.llmOcrPrompt ?? "",
     llmPrecheckPrompt: settings?.llmPrecheckPrompt ?? "",
     llmAutoLocale: settings?.llmAutoLocale ?? false,
+    llmTranslationLocales: withCurrentLocaleDefault(
+      settings?.llmTranslationLocales,
+    ),
     llmConcurrency: settings?.llmConcurrency ?? 1,
-    llmTimeout: settings?.llmTimeout ?? 120,
+    llmTimeout: settings?.llmTimeout ?? defaultSettings.llmTimeout ?? 30,
     agentEnabled: settings?.agentEnabled ?? false,
     agentAdapter: settings?.agentAdapter ?? "auto",
     agentModel: settings?.agentModel ?? "",
@@ -221,6 +234,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmOcrPrompt: draft.llmOcrPrompt,
     llmPrecheckPrompt: draft.llmPrecheckPrompt,
     llmAutoLocale: draft.llmAutoLocale,
+    llmTranslationLocales: draft.llmTranslationLocales,
     llmConcurrency: draft.llmConcurrency,
     llmTimeout: draft.llmTimeout,
     agentEnabled: draft.agentEnabled,

@@ -19,3 +19,5 @@ echo "▸ Installing UI dependencies ..."
 (cd /workspace/ui && CI=true pnpm install --frozen-lockfile)
 
 touch "$HOME/.devcontainer-initialized"
+
+/workspace/.devcontainer/start-dev.sh

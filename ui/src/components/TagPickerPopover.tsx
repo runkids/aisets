@@ -11,7 +11,7 @@ import { useToast } from "./ToastProvider";
 
 type Props = {
   asset: AssetItem;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
 };
 

@@ -568,6 +568,7 @@ export function SettingsView({
               imagePreviewEnabled={imagePreviewEnabled}
               imageBackgroundMode={imageBackgroundMode}
               preferredEditor={settings?.preferredEditor}
+              translationLocales={settings?.llmTranslationLocales}
               onThemeChange={onThemeChange}
               onImagePreviewEnabledChange={onImagePreviewEnabledChange}
               onImageBackgroundModeChange={onImageBackgroundModeChange}

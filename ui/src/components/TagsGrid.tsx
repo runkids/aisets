@@ -29,6 +29,8 @@ type Props = {
   isLoading: boolean;
   selected: Set<string>;
   translations?: Record<string, string>;
+  categoryTranslations?: Record<string, string>;
+  highlightMissing?: boolean;
   onTagClick: (tag: string) => void;
   onToggleSelect: (tag: string) => void;
   bulkMode?: boolean;
@@ -43,6 +45,8 @@ export function TagsGrid({
   isLoading,
   selected,
   translations,
+  categoryTranslations,
+  highlightMissing = false,
   onTagClick,
   onToggleSelect,
   bulkMode = false,
@@ -53,6 +57,8 @@ export function TagsGrid({
     const tr = translations?.[tag];
     return tr && tr !== tag ? `${tr} (${tag})` : tag;
   };
+
+  const isMissing = (tag: string) => highlightMissing && !translations?.[tag];
 
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
 
@@ -126,7 +132,7 @@ export function TagsGrid({
               {/* Tag name — clickable to browse */}
               <button
                 type="button"
-                className="flex-shrink-0 w-[160px] max-[768px]:w-[100px] text-g-body font-medium text-g-ink truncate text-left cursor-pointer hover:text-g-accent transition-colors"
+                className={`flex-shrink-0 w-[160px] max-[768px]:w-[100px] text-g-body font-medium truncate text-left cursor-pointer transition-colors ${isMissing(item.tag) ? "text-g-amber" : "text-g-ink hover:text-g-accent"}`}
                 onClick={() =>
                   bulkMode ? onToggleSelect(item.tag) : onTagClick(item.tag)
                 }
@@ -151,7 +157,7 @@ export function TagsGrid({
               <div className="hidden min-[1024px]:flex items-center gap-1 justify-end flex-wrap">
                 {item.categories.map((cat) => (
                   <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
-                    {cat}
+                    {categoryTranslations?.[cat] || cat}
                   </Badge>
                 ))}
               </div>

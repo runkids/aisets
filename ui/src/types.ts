@@ -75,6 +75,7 @@ export type AppSettings = {
   llmPrecheckPrompt: string;
   llmSystemPromptEnabled: boolean;
   llmAutoLocale: boolean;
+  llmTranslationLocales: string[];
   llmConcurrency: number;
   llmTimeout: number;
   agentEnabled: boolean;

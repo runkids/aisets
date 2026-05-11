@@ -93,6 +93,7 @@ export type SettingsDraft = {
   llmOcrPrompt: string;
   llmPrecheckPrompt: string;
   llmAutoLocale: boolean;
+  llmTranslationLocales: string[];
   llmConcurrency: number;
   llmTimeout: number;
   agentEnabled: boolean;

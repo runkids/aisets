@@ -231,15 +231,21 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	}
 	lang := r.URL.Query().Get("lang")
 	isLocalized := settings.LLMAutoLocale && lang != "" && lang != "en"
+	targetLocales := settings.LLMTranslationLocales
+	if len(targetLocales) == 0 {
+		targetLocales = aitag.AllI18nLocales
+	}
 	if prompt == "" && isLocalized {
-		prompt = aitag.TagPromptLocalized(lang)
+		prompt = aitag.TagPromptLocalizedForLocales(lang, targetLocales)
 	} else {
 		if prompt == "" {
 			prompt = aitag.TagPrompt
 		}
-		translationsBlock := aitag.TagTranslationsBlock
+		var translationsBlock string
 		if isLocalized {
-			translationsBlock = aitag.TagTranslationsBlockForLocale(lang)
+			translationsBlock = aitag.TagTranslationsBlockForLocales(lang, targetLocales)
+		} else {
+			translationsBlock = aitag.TagTranslationsBlockDefault(targetLocales)
 		}
 		prompt = replaceDynamicVars(prompt, map[string]string{
 			"translations": translationsBlock,
