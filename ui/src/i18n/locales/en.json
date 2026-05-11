@@ -20,7 +20,8 @@
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets navigation",
     "projects": "Projects",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "tags": "Tags"
   },
   "mode": {
     "dashboard": "Dashboard",
@@ -44,7 +45,37 @@
     "projects": "Projects",
     "projectsDesc": "Manage project roots, workspace health, and scan coverage.",
     "prompts": "Prompts",
-    "promptsDesc": "Create and manage AI prompt templates with variables."
+    "promptsDesc": "Create and manage AI prompt templates with variables.",
+    "tags": "Tags",
+    "tagsDesc": "Browse and manage AI-generated tags across all projects."
+  },
+  "tags": {
+    "totalTags": "Total Tags",
+    "taggedAssets": "Tagged Assets",
+    "topCategory": "Top Category",
+    "searchPlaceholder": "Search tags...",
+    "sortByCount": "By count",
+    "sortByAlpha": "A-Z",
+    "assets": "{{count}} assets",
+    "filterCount": "{{shown}} of {{total}}",
+    "sortLabel": "Sort order",
+    "browseAll": "Browse all assets",
+    "loading": "Loading tags...",
+    "selectionCount": "{{count}} selected",
+    "rename": "Rename",
+    "merge": "Merge",
+    "renameTitle": "Rename Tag",
+    "renameDesc": "Rename \"{{tag}}\" across all assets.",
+    "renamePlaceholder": "New tag name",
+    "renameSuccess": "Renamed \"{{from}}\" → \"{{to}}\" ({{count}} assets)",
+    "mergeTitle": "Merge Tags",
+    "mergeDesc": "Merge {{count}} tags into one.",
+    "mergeTargetPlaceholder": "Target tag name",
+    "mergeSuccess": "Merged {{count}} tags → \"{{target}}\" ({{affected}} assets)",
+    "selectTag": "Select {{tag}}",
+    "browseTag": "Browse assets",
+    "emptyTitle": "No tags yet",
+    "emptyDesc": "Run AI Tag on your assets to generate tags."
   },
   "action": {
     "addProject": "Add Project",

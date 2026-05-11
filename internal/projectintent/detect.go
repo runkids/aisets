@@ -60,10 +60,10 @@ type signals struct {
 }
 
 var assetExts = map[string]bool{
-	".ai": true, ".avif": true, ".fig": true, ".gif": true, ".ico": true,
-	".jpeg": true, ".jpg": true, ".m4v": true, ".mkv": true, ".mov": true,
-	".mp4": true, ".png": true, ".psd": true, ".sketch": true, ".svg": true,
-	".webm": true, ".webp": true,
+	".ai": true, ".avif": true, ".fig": true, ".gif": true, ".heic": true,
+	".heif": true, ".ico": true, ".jpeg": true, ".jpg": true, ".m4v": true,
+	".mkv": true, ".mov": true, ".mp4": true, ".png": true, ".psd": true,
+	".sketch": true, ".svg": true, ".webm": true, ".webp": true,
 }
 
 var codeExts = map[string]bool{

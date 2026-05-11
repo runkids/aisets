@@ -4,6 +4,11 @@ import type { AssetItem } from "../types";
 import { fileName } from "../ui";
 import { CopyButton, ZoomableImage } from "./ui";
 
+const unsupportedBrowserExts = new Set([".heic", ".heif", ".tiff", ".tif"]);
+function browserUnsupportedExt(ext: string) {
+  return unsupportedBrowserExts.has(ext.toLowerCase());
+}
+
 type Props = {
   asset: AssetItem;
 };
@@ -24,7 +29,11 @@ export function AssetDrawerOverview({ asset }: Props) {
     <div className="flex flex-col gap-4">
       <ZoomableImage
         key={asset.url}
-        src={asset.url}
+        src={
+          browserUnsupportedExt(asset.ext)
+            ? asset.thumbnailUrl || asset.url
+            : asset.url
+        }
         alt={fileName(asset.repoPath)}
         className="max-h-[420px] w-full"
       />

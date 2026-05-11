@@ -54,8 +54,9 @@ func prepareImageForVLM(localPath, ext, purpose string) (string, error) {
 		"--max-size", strconv.Itoa(maxSize),
 		"--background", "white",
 		localPath, tmpPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("vlm-normalize: %s: %w", strings.TrimSpace(string(out)), err)
+	if _, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(tmpPath)
+		return prepareImageForVLMFallback(localPath, ext)
 	}
 
 	data, err := os.ReadFile(tmpPath)
@@ -427,7 +428,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		TagsI18n           map[string][]string `json:"tagsI18n"`
 		Description        string              `json:"description"`
 		DescriptionI18n    map[string]string   `json:"descriptionI18n"`
-		Languages          []string            `json:"languages"`
+		Languages          json.RawMessage     `json:"languages"`
 		ContainsFace       bool                `json:"containsFace"`
 		SceneType          string              `json:"sceneType"`
 		EstimatedLocation  *string             `json:"estimatedLocation"`
@@ -451,7 +452,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	if result.DescriptionI18n == nil {
 		result.DescriptionI18n = map[string]string{}
 	}
-	result.Languages = parsed.Languages
+	result.Languages = unmarshalStringArray(parsed.Languages)
 	result.ContainsFace = parsed.ContainsFace
 	result.SceneType = strings.ToLower(strings.TrimSpace(parsed.SceneType))
 	if parsed.EstimatedLocation != nil {
@@ -478,7 +479,10 @@ func eligibleForAITag(item scanner.AssetItem) bool {
 		return false
 	}
 	if item.Image.Width <= 0 || item.Image.Height <= 0 {
-		return false
+		ext2 := strings.ToLower(item.Ext)
+		if ext2 != ".heic" && ext2 != ".heif" {
+			return false
+		}
 	}
 	const maxBytes = 20 * 1024 * 1024 // 20MB
 	if item.Bytes > maxBytes {
@@ -518,6 +522,26 @@ func unmarshalStringOrFirst(raw json.RawMessage) string {
 		return arr[0]
 	}
 	return ""
+}
+
+// unmarshalStringArray tolerates LLMs returning languages as ["eng"], {"en":"English"}, or other shapes.
+func unmarshalStringArray(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var arr []string
+	if json.Unmarshal(raw, &arr) == nil {
+		return arr
+	}
+	var obj map[string]any
+	if json.Unmarshal(raw, &obj) == nil {
+		out := make([]string, 0, len(obj))
+		for k := range obj {
+			out = append(out, k)
+		}
+		return out
+	}
+	return nil
 }
 
 func stripMarkdownFences(s string) string {

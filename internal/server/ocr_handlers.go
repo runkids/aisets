@@ -393,7 +393,7 @@ func eligibleForOCRMetadata(item scanner.AssetItem, settings ocr.Settings) ocr.R
 		return result
 	}
 	ext := strings.ToLower(item.Ext)
-	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" {
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" && ext != ".heic" && ext != ".heif" {
 		result.Status = ocr.StatusSkipped
 		result.ErrorCode = "ocr_extension_unsupported"
 		result.ErrorMessage = "asset extension is not supported for OCR"

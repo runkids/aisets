@@ -12,7 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetItem } from "../types";
-import { runAITagging, runVLMOcr } from "../api";
+import { getCatalogItemDetail, runAITagging, runVLMOcr } from "../api";
 import { catalogQueryKey } from "../queries";
 import { errorMessage } from "../i18n";
 import { AiChipIcon } from "./ui/AiChipIcon";
@@ -21,25 +21,58 @@ import { useToast } from "./ToastProvider";
 
 type Props = {
   asset: AssetItem;
+  scanId?: number;
   aiTag?: AssetItem["aiTag"];
   ocr?: AssetItem["ocr"];
   llmEnabled?: boolean;
 };
 
-export function AssetDrawerAI({ asset, aiTag, ocr, llmEnabled }: Props) {
+export function AssetDrawerAI({
+  asset,
+  scanId,
+  aiTag: aiTagProp,
+  ocr: ocrProp,
+  llmEnabled,
+}: Props) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [tagging, setTagging] = useState(false);
   const [ocrRunning, setOcrRunning] = useState(false);
+  const [localAiTag, setLocalAiTag] = useState<AssetItem["aiTag"]>();
+  const [localOcr, setLocalOcr] = useState<AssetItem["ocr"]>();
+
+  const aiTag = localAiTag ?? aiTagProp;
+  const ocr = localOcr ?? ocrProp;
   const hasAiTag = aiTag && aiTag.status === "ready";
   const hasVlmOcr = ocr && ocr.status === "ready" && ocr.engineName === "vlm";
+
+  async function refreshItem() {
+    let fetched = false;
+    try {
+      const detail = await getCatalogItemDetail(scanId, asset.id);
+      if (detail.item.aiTag) {
+        setLocalAiTag(detail.item.aiTag);
+        fetched = true;
+      }
+      if (detail.item.ocr) {
+        setLocalOcr(detail.item.ocr);
+        fetched = true;
+      }
+    } catch {
+      // detail fetch failed — fall through to invalidate
+    }
+    queryClient.invalidateQueries({
+      queryKey: catalogQueryKey,
+      refetchType: fetched ? "none" : "active",
+    });
+  }
 
   async function handleTag() {
     setTagging(true);
     try {
       await runAITagging({ assetIds: [asset.id] });
-      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      await refreshItem();
       toast.success(t("drawer.aiAction.tagSuccess"));
     } catch (err) {
       toast.error(errorMessage(err));
@@ -52,7 +85,7 @@ export function AssetDrawerAI({ asset, aiTag, ocr, llmEnabled }: Props) {
     setOcrRunning(true);
     try {
       await runVLMOcr({ assetIds: [asset.id] });
-      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      await refreshItem();
       toast.success(t("drawer.aiAction.ocrSuccess"));
     } catch (err) {
       toast.error(errorMessage(err));
@@ -62,10 +95,10 @@ export function AssetDrawerAI({ asset, aiTag, ocr, llmEnabled }: Props) {
   }
 
   const runBtnCls =
-    "inline-flex items-center gap-1 rounded-g-sm px-2 py-1 font-g text-[10px] font-[590] text-g-purple transition-[background,color] duration-[120ms] ease-g hover:bg-g-purple/[0.08] disabled:opacity-[0.38] disabled:cursor-not-allowed";
+    "inline-flex items-center gap-1.5 rounded-g-md px-2.5 py-1.5 font-g text-g-caption font-[590] text-g-purple transition-[background,color] duration-[120ms] ease-g hover:bg-g-purple/[0.08] disabled:opacity-[0.38] disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5">
       {(hasAiTag || llmEnabled) && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">

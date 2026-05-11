@@ -271,6 +271,12 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 	}
 
 	if record, ok := s.cache.Get(cacheKey, info.Size(), info.ModTime().UnixNano()); ok && record.ContentHash == contentHash {
+		meta := record.Metadata
+		if meta.Width <= 0 || meta.Height <= 0 {
+			if fresh, err := imageproc.Probe(candidate.path); err == nil && fresh.Width > 0 {
+				meta = fresh
+			}
+		}
 		// Cache hit: skip Probe, DHash, and Optimization re-computation
 		item := AssetItem{
 			ID:            assetID,
@@ -286,7 +292,7 @@ func (s *Scanner) buildItem(ctx context.Context, candidate fileCandidate, needsD
 			ThumbnailURL:  "/api/thumbs/" + assetID + "?v=" + contentHash,
 			HashAlgorithm: contentHashAlgorithm,
 			ScanIntent:    NormalizeProjectScanIntent(candidate.project.ScanIntent),
-			Image:         record.Metadata,
+			Image:         meta,
 		}
 		if record.HashAlgorithm != "" {
 			item.HashAlgorithm = record.HashAlgorithm

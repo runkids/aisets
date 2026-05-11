@@ -590,6 +590,7 @@ export function AssetDrawer({
               {tab === "ai" && aiTagVisible && (
                 <AssetDrawerAI
                   asset={asset}
+                  scanId={scanId}
                   aiTag={asset.aiTag}
                   ocr={vlmOcrReady ? asset.ocr : undefined}
                   llmEnabled={llmEnabled}

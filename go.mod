@@ -17,6 +17,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.3 // indirect
+	github.com/jdeng/goheif v0.0.0-20260407171156-9bf5264f67af // indirect
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

@@ -64,7 +64,7 @@ func vlmOCRSettingsHash(modelName string) string {
 func eligibleForVLMOCR(item scanner.AssetItem) bool {
 	ext := strings.ToLower(item.Ext)
 	switch ext {
-	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg":
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg", ".heic", ".heif":
 	default:
 		return false
 	}
@@ -72,7 +72,10 @@ func eligibleForVLMOCR(item scanner.AssetItem) bool {
 		return false
 	}
 	if item.Image.Width <= 0 || item.Image.Height <= 0 {
-		return false
+		ext2 := strings.ToLower(item.Ext)
+		if ext2 != ".heic" && ext2 != ".heif" {
+			return false
+		}
 	}
 	const maxBytes = 20 * 1024 * 1024 // 20MB
 	if item.Bytes > maxBytes {

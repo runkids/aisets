@@ -64,7 +64,7 @@ export function AssetDrawerUsage({
     const usage = usageClassification(asset);
     if (usage === "notApplicable") {
       return (
-        <div className="rounded-g-md border border-g-line bg-g-surface-2 p-4 text-center font-g text-g-caption tracking-g-ui text-g-ink-3">
+        <div className="rounded-g-md border border-g-line bg-g-surface-2 p-4 text-left font-g text-g-caption tracking-g-ui text-g-ink-3">
           {asset.scanIntent === "assetPack"
             ? t("assetDrawer.usageAssetPack")
             : t("assetDrawer.usageNotApplicable")}
@@ -73,13 +73,13 @@ export function AssetDrawerUsage({
     }
     if (usage === "possiblyUnused") {
       return (
-        <div className="rounded-g-md border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft p-4 text-center font-g text-g-caption tracking-g-ui text-g-amber">
+        <div className="rounded-g-md border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft p-4 text-left font-g text-g-caption tracking-g-ui text-g-amber">
           {t("assetDrawer.usagePossiblyUnused")}
         </div>
       );
     }
     return (
-      <div className="rounded-g-md border border-g-line bg-g-red/8 p-4 text-center text-g-caption text-g-red">
+      <div className="rounded-g-md border border-g-line bg-g-red/8 p-4 text-left text-g-caption text-g-red">
         {t("assetDrawer.usageEmpty")}
       </div>
     );

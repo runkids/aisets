@@ -20,7 +20,8 @@
     "brandTag": "Local asset ops",
     "navigationAria": "Aisets 導覽",
     "projects": "專案",
-    "prompts": "提示詞"
+    "prompts": "提示詞",
+    "tags": "標籤"
   },
   "mode": {
     "dashboard": "總覽",
@@ -44,7 +45,37 @@
     "projects": "專案",
     "projectsDesc": "管理專案根目錄、工作區健康度與掃描覆蓋",
     "prompts": "提示詞",
-    "promptsDesc": "建立並管理 AI 提示詞範本與變數"
+    "promptsDesc": "建立並管理 AI 提示詞範本與變數",
+    "tags": "標籤",
+    "tagsDesc": "瀏覽和管理所有專案的 AI 生成標籤"
+  },
+  "tags": {
+    "totalTags": "標籤總數",
+    "taggedAssets": "已標記素材",
+    "topCategory": "最多分類",
+    "searchPlaceholder": "搜尋標籤…",
+    "sortByCount": "依數量",
+    "sortByAlpha": "字母序",
+    "assets": "{{count}} 個素材",
+    "filterCount": "{{shown}} / {{total}}",
+    "sortLabel": "排序方式",
+    "browseAll": "瀏覽所有素材",
+    "loading": "載入標籤中…",
+    "selectionCount": "已選 {{count}} 個",
+    "rename": "重命名",
+    "merge": "合併",
+    "renameTitle": "重命名標籤",
+    "renameDesc": "將「{{tag}}」在所有素材中重新命名",
+    "renamePlaceholder": "新標籤名稱",
+    "renameSuccess": "已將「{{from}}」重命名為「{{to}}」（{{count}} 個素材）",
+    "mergeTitle": "合併標籤",
+    "mergeDesc": "將 {{count}} 個標籤合併為一個",
+    "mergeTargetPlaceholder": "目標標籤名稱",
+    "mergeSuccess": "已合併 {{count}} 個標籤為「{{target}}」（{{affected}} 個素材）",
+    "selectTag": "選取 {{tag}}",
+    "browseTag": "瀏覽素材",
+    "emptyTitle": "尚無標籤",
+    "emptyDesc": "對素材執行 AI Tag 即可產生標籤"
   },
   "action": {
     "addProject": "新增專案",

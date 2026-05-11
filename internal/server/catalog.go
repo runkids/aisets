@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"aisets/internal/actions"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
+	"aisets/internal/imageproc"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
 )
@@ -432,6 +434,15 @@ func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
+	}
+	ext := strings.ToLower(item.Ext)
+	if ext == ".heic" || ext == ".heif" {
+		if data, err := imageproc.HeicToPNG(item.LocalPath); err == nil {
+			w.Header().Set("Content-Type", "image/png")
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+			w.Write(data)
+			return
+		}
 	}
 	http.ServeFile(w, r, item.LocalPath)
 }

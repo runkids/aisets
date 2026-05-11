@@ -354,6 +354,7 @@ export type AssetItem = {
     | "notApplicable";
   deleteUnusedAllowed?: boolean;
   lintApplicability?: "applicable" | "advisory" | "notApplicable";
+  optimizeApplicability?: "applicable" | "advisory" | "notApplicable";
   exif?: EXIFData;
 };
 
@@ -785,4 +786,20 @@ export type PromptPreset = {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+// --- Tag Management ---
+
+export type TagItem = {
+  tag: string;
+  count: number;
+  categories: string[];
+  projects: string[];
+};
+
+export type TagListResponse = {
+  tags: TagItem[];
+  total: number;
+  totalTaggedAssets: number;
+  topCategory: string;
 };

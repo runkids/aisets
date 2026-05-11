@@ -157,6 +157,8 @@ export const defaultSettings: SettingsUpdate = {
   llmEndpoint: "http://localhost:11434",
   llmVisionModel: "",
   llmEmbedModel: "",
+  llmTagPrompt: "",
+  llmOcrPrompt: "",
   llmConcurrency: 1,
   excludePatterns: [],
   excludePatternsByIntent: {

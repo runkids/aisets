@@ -8,7 +8,7 @@ FROM golang:${GO_VERSION}-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl git procps tini tesseract-ocr \
-    ffmpeg webp libavif-bin gifsicle imagemagick \
+    ffmpeg webp libavif-bin gifsicle imagemagick libheif-examples \
   && ln -sf /usr/bin/convert /usr/local/bin/magick \
   && rm -rf /var/lib/apt/lists/*
 

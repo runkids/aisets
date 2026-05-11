@@ -26,6 +26,7 @@ import (
 	"aisets/internal/imgtools"
 	"github.com/corona10/goimagehash"
 	_ "github.com/gen2brain/avif"
+	"github.com/jdeng/goheif"
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 	minify "github.com/tdewolff/minify/v2"
@@ -141,6 +142,10 @@ func Probe(path string) (Metadata, error) {
 		return meta, nil
 	}
 
+	if ext == ".heic" || ext == ".heif" {
+		return probeHEIC(path, ext)
+	}
+
 	file, err := os.Open(path)
 	if err != nil {
 		return Metadata{ErrorCode: "image_open_failed", Error: err.Error()}, err
@@ -157,6 +162,21 @@ func Probe(path string) (Metadata, error) {
 	if decodeErr == nil {
 		meta.Alpha = imageHasAlpha(img)
 	}
+	return meta, nil
+}
+
+func probeHEIC(path, ext string) (Metadata, error) {
+	meta := Metadata{Format: strings.TrimPrefix(ext, "."), Pages: 1}
+	img, err := decodeHEIC(path)
+	if err != nil {
+		meta.ErrorCode = "image_probe_failed"
+		meta.Error = err.Error()
+		return meta, err
+	}
+	bounds := img.Bounds()
+	meta.Width = bounds.Dx()
+	meta.Height = bounds.Dy()
+	meta.Alpha = imageHasAlpha(img)
 	return meta, nil
 }
 
@@ -620,8 +640,12 @@ func probeSVG(path string) (Metadata, error) {
 }
 
 func decodeRaster(path string) (image.Image, error) {
-	if strings.EqualFold(filepath.Ext(path), ".svg") {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".svg" {
 		return rasterizeSVG(path, 256)
+	}
+	if ext == ".heic" || ext == ".heif" {
+		return decodeHEIC(path)
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -786,7 +810,8 @@ func parseSVGLength(value string) int {
 }
 
 func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
-	if strings.EqualFold(filepath.Ext(path), ".svg") {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".svg" {
 		if data, err := svgToPNGViaImgtools(path, svgMaxSize); err == nil {
 			return data, nil
 		}
@@ -800,6 +825,11 @@ func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
 		}
 		return buf.Bytes(), nil
 	}
+	if ext == ".heic" || ext == ".heif" {
+		if data, err := HeicToPNG(path); err == nil {
+			return data, nil
+		}
+	}
 	f, ferr := os.Open(path)
 	if ferr != nil {
 		return nil, ferr
@@ -808,6 +838,58 @@ func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
 	img, _, err := image.Decode(f)
 	if err != nil {
 		return nil, fmt.Errorf("decode %s: %w", filepath.Base(path), err)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, fmt.Errorf("encode png: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func decodeHEIC(path string) (image.Image, error) {
+	if data, err := heicToPNGSystem(path); err == nil {
+		return png.Decode(bytes.NewReader(data))
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	img, err := goheif.Decode(f)
+	if err != nil {
+		return nil, fmt.Errorf("decode HEIC %s: %w", filepath.Base(path), err)
+	}
+	return img, nil
+}
+
+func heicToPNGSystem(path string) ([]byte, error) {
+	tmp, err := os.CreateTemp("", "heicpng-*.png")
+	if err != nil {
+		return nil, err
+	}
+	target := tmp.Name()
+	tmp.Close()
+	defer os.Remove(target)
+	if bin, err := exec.LookPath("sips"); err == nil {
+		if _, err := exec.Command(bin, "--setProperty", "format", "png", path, "--out", target).CombinedOutput(); err == nil {
+			return os.ReadFile(target)
+		}
+	}
+	if bin, err := exec.LookPath("heif-convert"); err == nil {
+		if _, err := exec.Command(bin, "-q", "100", path, target).CombinedOutput(); err == nil {
+			return os.ReadFile(target)
+		}
+	}
+	return nil, fmt.Errorf("no system HEIC tool available")
+}
+
+func HeicToPNG(path string) ([]byte, error) {
+	if data, err := heicToPNGSystem(path); err == nil {
+		return data, nil
+	}
+	img, err := decodeHEIC(path)
+	if err != nil {
+		return nil, err
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {

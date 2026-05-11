@@ -40,8 +40,8 @@ type codeCandidate struct {
 }
 
 var imageExts = map[string]bool{
-	".avif": true, ".gif": true, ".jpeg": true, ".jpg": true,
-	".png": true, ".svg": true, ".webp": true,
+	".avif": true, ".gif": true, ".heic": true, ".heif": true,
+	".jpeg": true, ".jpg": true, ".png": true, ".svg": true, ".webp": true,
 }
 
 var codeExts = map[string]bool{
@@ -52,8 +52,8 @@ var codeExts = map[string]bool{
 	".yaml": true, ".yml": true, ".toml": true,
 }
 
-var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\}|[*{}])?[^'"\x60]*\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'"\x60]*)?)['"\x60]`)
-var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
+var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\}|[*{}])?[^'"\x60]*\.(?:avif|gif|heic|heif|jpe?g|png|svg|webp)(?:\?[^'"\x60]*)?)['"\x60]`)
+var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|heic|heif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
 
 func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[string][]Reference, error) {
 	return BuildMapWithProgress(ctx, projects, assets, nil, nil)
