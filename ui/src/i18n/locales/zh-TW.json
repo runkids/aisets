@@ -1713,7 +1713,7 @@
     "agentHeading": "Agent CLI",
     "agentEnabled": "啟用 Agent",
     "agentEnabledHint": "允許程式碼代理（Codex CLI、Claude Code）根據掃描結果產生清理計畫",
-    "agentAdapter": "配接器",
+    "agentAdapter": "CLI",
     "agentAdapterHint": "使用哪個程式碼代理 CLI。Auto 會自動偵測第一個可用的",
     "agentAdapterAuto": "自動（建議）",
     "agentModel": "Agent 模型",
