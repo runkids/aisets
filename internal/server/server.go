@@ -260,7 +260,7 @@ func (s *Server) resolveVLMProvider(settings config.AppSettings) (providerName, 
 	if settings.AgentEnabled && s.agentChat != nil {
 		model := settings.AgentModel
 		if model == "" {
-			model = s.agentStatus.Active
+			model = "default"
 		}
 		return "agent:" + s.agentStatus.Active, model
 	}

@@ -132,9 +132,13 @@ func (s *Server) chatVLM(ctx context.Context, images []vlmImage, modelName, syst
 		for i, img := range images {
 			paths[i] = img.Path
 		}
+		cliModel := modelName
+		if cliModel == "default" {
+			cliModel = ""
+		}
 		var res agent.ChatResult
 		_ = s.agentChat.ChatBatch(ctx, []agent.ChatRequest{{
-			Model:        modelName,
+			Model:        cliModel,
 			SystemPrompt: systemPrompt,
 			Prompt:       prompt,
 			ImagePaths:   paths,
