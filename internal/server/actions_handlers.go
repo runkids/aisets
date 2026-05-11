@@ -489,12 +489,8 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "precheck_ai_settings_failed")})
 		return
 	}
-	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("llm_not_configured", "AI provider or vision model not configured")})
-		return
-	}
-	if s.llmProvider == nil {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("llm_not_configured", "LLM provider is not available")})
+	if !s.hasVLMBackend(settings) {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("llm_not_configured", "AI provider or agent adapter not configured")})
 		return
 	}
 
@@ -515,7 +511,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 
 	catalog, _ := s.ensureCatalog(r.Context())
 
-	modelName := settings.LLMVisionModel
+	_, modelName := s.resolveVLMProvider(settings)
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec < llm.MinChatTimeout {
 		timeoutSec = llm.DefaultChatTimeout
@@ -587,22 +583,13 @@ func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHead
 	findings := precheck.FormatPrecheckFindings(precheckResult)
 	filePrompt := strings.ReplaceAll(prompt, "{{precheckFindings}}", findings)
 
-	dataURI, err := prepareImageForVLM(tmpPath, ext, "tag")
-	if err != nil {
-		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_image_failed", ErrorMsg: "failed to prepare image: " + err.Error()}
-	}
-
 	start := time.Now()
-	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, filePrompt, []string{dataURI}),
-		TimeoutSec: timeoutSec,
-	})
+	rawContent, _, err := s.chatVLM(ctx, []vlmImage{{Path: tmpPath, Ext: ext}}, modelName, systemPrompt, filePrompt, timeoutSec)
 	if err != nil {
 		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_llm_failed", ErrorMsg: err.Error()}
 	}
 
-	result := precheck.ParseAIResponse(name, resp.Content)
+	result := precheck.ParseAIResponse(name, rawContent)
 	result.DurationMs = time.Since(start).Milliseconds()
 	return result
 }
