@@ -159,6 +159,7 @@ export const defaultSettings: SettingsUpdate = {
   llmEmbedModel: "",
   llmTagPrompt: "",
   llmOcrPrompt: "",
+  llmPrecheckPrompt: "",
   llmConcurrency: 1,
   llmTimeout: 30,
   excludePatterns: [],

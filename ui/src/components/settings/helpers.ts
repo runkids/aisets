@@ -149,6 +149,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     llmEmbedModel: settings?.llmEmbedModel ?? "",
     llmTagPrompt: settings?.llmTagPrompt ?? "",
     llmOcrPrompt: settings?.llmOcrPrompt ?? "",
+    llmPrecheckPrompt: settings?.llmPrecheckPrompt ?? "",
     llmConcurrency: settings?.llmConcurrency ?? 1,
     llmTimeout: settings?.llmTimeout ?? 120,
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
@@ -200,6 +201,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     llmEmbedModel: draft.llmEmbedModel,
     llmTagPrompt: draft.llmTagPrompt,
     llmOcrPrompt: draft.llmOcrPrompt,
+    llmPrecheckPrompt: draft.llmPrecheckPrompt,
     llmConcurrency: draft.llmConcurrency,
     llmTimeout: draft.llmTimeout,
     excludePatterns: splitPatterns(draft.excludePatternsText),
@@ -262,6 +264,7 @@ export function resetSectionDraft(
         llmEmbedModel: defaults.llmEmbedModel,
         llmTagPrompt: defaults.llmTagPrompt,
         llmOcrPrompt: defaults.llmOcrPrompt,
+        llmPrecheckPrompt: defaults.llmPrecheckPrompt,
         llmConcurrency: defaults.llmConcurrency,
         llmTimeout: defaults.llmTimeout,
       };

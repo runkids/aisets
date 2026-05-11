@@ -82,6 +82,7 @@ export type SettingsDraft = {
   llmEmbedModel: string;
   llmTagPrompt: string;
   llmOcrPrompt: string;
+  llmPrecheckPrompt: string;
   llmConcurrency: number;
   llmTimeout: number;
   excludePatternsText: string;
