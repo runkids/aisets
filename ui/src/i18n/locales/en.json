@@ -1595,7 +1595,8 @@
       "exactMatches": "Exact matches",
       "nearMatches": "Near matches",
       "optimization": "Optimization",
-      "naming": "Naming"
+      "naming": "Naming",
+      "ai": "AI Analysis"
     },
     "nearDistance": "{{pct}}% similar",
     "nearDistanceFlipped": "{{pct}}% similar · flipped",
@@ -1604,7 +1605,9 @@
       "exactMatch": "An asset with identical content already exists in the catalog.",
       "nearMatch": "Visually similar assets exist; review before adding.",
       "criticalOpt": "Asset has critical optimization recommendations.",
-      "naming": "Filename has style issues."
+      "naming": "Filename has style issues.",
+      "aiQuality": "AI detected quality issues with this image.",
+      "aiSuitability": "AI considers this image unsuitable for the asset library."
     },
     "optReason": {
       "image_dimensions_large": "Image dimensions are unusually large for a UI asset.",
@@ -1627,6 +1630,28 @@
       "uppercase_letters": "Filename contains uppercase letters; prefer lowercase.",
       "special_chars": "Filename contains special characters that may cause URL/path issues.",
       "leading_punctuation": "Filename starts with punctuation."
+    },
+    "aiAnalyze": "AI Analyze",
+    "aiAnalyzing": "Analyzing…",
+    "aiError": "AI analysis failed",
+    "aiQuality": {
+      "1": "Unusable",
+      "2": "Poor",
+      "3": "Acceptable",
+      "4": "Good",
+      "5": "Excellent"
+    },
+    "aiSuitability": {
+      "good": "Good",
+      "acceptable": "Acceptable",
+      "poor": "Poor"
+    },
+    "aiIssue": {
+      "blurry": "Blurry",
+      "low_resolution": "Low resolution",
+      "noisy": "Noisy",
+      "truncated": "Truncated",
+      "watermarked": "Watermarked"
     }
   },
   "assetDrawer": {

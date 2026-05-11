@@ -952,7 +952,8 @@
       "exactMatches": "完全符合",
       "nearMatches": "相似符合",
       "optimization": "最佳化",
-      "naming": "命名"
+      "naming": "命名",
+      "ai": "AI 分析"
     },
     "nearDistance": "相似度 {{pct}}%",
     "nearDistanceFlipped": "相似度 {{pct}}% · 翻轉",
@@ -961,7 +962,9 @@
       "exactMatch": "目錄中已存在內容完全相同的素材",
       "nearMatch": "存在視覺相似的素材，建議加入前先確認",
       "criticalOpt": "素材有嚴重的最佳化建議",
-      "naming": "檔名有風格問題"
+      "naming": "檔名有風格問題",
+      "aiQuality": "AI 偵測到此圖片有品質問題",
+      "aiSuitability": "AI 認為此圖片不適合納入資產庫"
     },
     "optReason": {
       "image_dimensions_large": "圖片尺寸對 UI 素材而言異常大",
@@ -984,6 +987,28 @@
       "uppercase_letters": "檔名含有大寫字母，建議使用小寫",
       "special_chars": "檔名含有特殊字元，可能導致 URL 或路徑問題",
       "leading_punctuation": "檔名以標點符號開頭"
+    },
+    "aiAnalyze": "AI 分析",
+    "aiAnalyzing": "分析中…",
+    "aiError": "AI 分析失敗",
+    "aiQuality": {
+      "1": "無法使用",
+      "2": "差",
+      "3": "尚可",
+      "4": "良好",
+      "5": "優秀"
+    },
+    "aiSuitability": {
+      "good": "適合",
+      "acceptable": "尚可",
+      "poor": "不適合"
+    },
+    "aiIssue": {
+      "blurry": "模糊",
+      "low_resolution": "解析度低",
+      "noisy": "雜訊",
+      "truncated": "截斷",
+      "watermarked": "含浮水印"
     }
   },
   "assetDrawer": {

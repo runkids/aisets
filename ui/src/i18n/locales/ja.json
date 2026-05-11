@@ -916,7 +916,8 @@
       "exactMatches": "完全一致",
       "nearMatches": "近似一致",
       "optimization": "最適化",
-      "naming": "命名"
+      "naming": "命名",
+      "ai": "AI 分析"
     },
     "nearDistance": "類似度 {{pct}}%",
     "nearDistanceFlipped": "類似度 {{pct}}% · 反転",
@@ -925,7 +926,9 @@
       "exactMatch": "カタログに同一内容のアセットが既に存在します",
       "nearMatch": "視覚的に類似するアセットが存在します。追加前にご確認ください",
       "criticalOpt": "アセットに重大な最適化の推奨事項があります",
-      "naming": "ファイル名にスタイルの問題があります"
+      "naming": "ファイル名にスタイルの問題があります",
+      "aiQuality": "AI がこの画像の品質問題を検出しました",
+      "aiSuitability": "AI がこの画像をアセットライブラリに不適合と判断しました"
     },
     "optReason": {
       "image_dimensions_large": "画像のサイズがUIアセットとしては異常に大きいです",
@@ -950,6 +953,28 @@
       "uppercase_letters": "ファイル名に大文字が含まれています。小文字を推奨します",
       "special_chars": "ファイル名にURL/パスの問題を引き起こす可能性のある特殊文字が含まれています",
       "leading_punctuation": "ファイル名が句読点で始まっています"
+    },
+    "aiAnalyze": "AI 分析",
+    "aiAnalyzing": "分析中…",
+    "aiError": "AI 分析に失敗しました",
+    "aiQuality": {
+      "1": "使用不可",
+      "2": "低品質",
+      "3": "許容範囲",
+      "4": "良好",
+      "5": "優秀"
+    },
+    "aiSuitability": {
+      "good": "適合",
+      "acceptable": "許容範囲",
+      "poor": "不適合"
+    },
+    "aiIssue": {
+      "blurry": "ぼやけ",
+      "low_resolution": "低解像度",
+      "noisy": "ノイズ",
+      "truncated": "切り取り",
+      "watermarked": "ウォーターマーク"
     }
   },
   "assetDrawer": {
