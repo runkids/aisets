@@ -16,7 +16,12 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePromptPresetsQuery } from "../../queries";
+import {
+  usePromptPresetsQuery,
+  useUpdateSettingsMutation,
+} from "../../queries";
+import { useToast } from "../ToastProvider";
+import { errorMessage } from "../../i18n";
 import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
@@ -636,43 +641,12 @@ export function AISection({
       </Card>
 
       {providerEnabled && (
-        <Card
-          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
-          padding="none"
-        >
-          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
-            <MessageSquareText size={15} className="shrink-0 text-g-ink-3" />
-            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-              {t("settings.promptsHeading")}
-            </span>
-          </div>
-          <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-            <FieldRow
-              label={t("settings.llmAutoLocale")}
-              description={t("settings.llmAutoLocaleHint")}
-            >
-              <Switch
-                checked={draft.llmAutoLocale}
-                onCheckedChange={(next) =>
-                  onUpdateDraft((current) => ({
-                    ...current,
-                    llmAutoLocale: next,
-                  }))
-                }
-                aria-label={t("settings.llmAutoLocale")}
-              />
-            </FieldRow>
-            <div className="py-3">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onNavigate?.("prompts")}
-              >
-                {t("settings.managePrompts")}
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <PromptsLocaleCard
+          draft={draft}
+          systemPromptEnabled={settings?.llmSystemPromptEnabled ?? false}
+          onUpdateDraft={onUpdateDraft}
+          onNavigate={onNavigate}
+        />
       )}
 
       {providerEnabled && (
@@ -1227,5 +1201,78 @@ function VLMOcrProgressText({
         <ActivityErrorPanel errors={activity.errors} />
       )}
     </div>
+  );
+}
+
+function PromptsLocaleCard({
+  draft,
+  systemPromptEnabled,
+  onUpdateDraft,
+  onNavigate,
+}: {
+  draft: SettingsDraft;
+  systemPromptEnabled: boolean;
+  onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
+  onNavigate?: (mode: Mode) => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const updateSettings = useUpdateSettingsMutation();
+
+  function handleSystemPromptToggle(checked: boolean) {
+    updateSettings.mutate(
+      { llmSystemPromptEnabled: checked },
+      { onError: (err) => toast.error(errorMessage(err)) },
+    );
+  }
+
+  return (
+    <Card
+      className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+      padding="none"
+    >
+      <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+        <MessageSquareText size={15} className="shrink-0 text-g-ink-3" />
+        <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+          {t("settings.promptsHeading")}
+        </span>
+      </div>
+      <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
+        <FieldRow
+          label={t("settings.systemPrompt")}
+          description={t("settings.systemPromptHint")}
+        >
+          <Switch
+            checked={systemPromptEnabled}
+            onCheckedChange={handleSystemPromptToggle}
+            aria-label={t("settings.systemPrompt")}
+          />
+        </FieldRow>
+        <FieldRow
+          label={t("settings.llmAutoLocale")}
+          description={t("settings.llmAutoLocaleHint")}
+        >
+          <Switch
+            checked={draft.llmAutoLocale}
+            onCheckedChange={(next) =>
+              onUpdateDraft((current) => ({
+                ...current,
+                llmAutoLocale: next,
+              }))
+            }
+            aria-label={t("settings.llmAutoLocale")}
+          />
+        </FieldRow>
+        <div className="py-3">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onNavigate?.("prompts")}
+          >
+            {t("settings.managePrompts")}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }

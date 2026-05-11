@@ -1494,6 +1494,8 @@
     "llmTimeout": "リクエストタイムアウト（秒）",
     "llmTimeoutHint": "VLM リクエストの最大待機秒数。複雑な画像や低速ハードウェアでは増やしてください。範囲：30〜600",
     "promptsHeading": "プロンプトと言語",
+    "systemPrompt": "システムプロンプト",
+    "systemPromptHint": "すべての AI 操作に自動的に付加されます。プロンプトマネージャーで編集できます",
     "llmAutoLocale": "自動言語応答",
     "llmAutoLocaleHint": "UI の言語設定に合わせて AI が対応する言語で応答します",
     "aiTagGroup": "AI タグ付け",
