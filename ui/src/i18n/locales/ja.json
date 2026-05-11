@@ -1511,7 +1511,7 @@
     "agentAdapterHint": "使用するコーディングエージェント CLI。Auto は最初に利用可能なものを自動検出",
     "agentAdapterAuto": "自動（推奨）",
     "agentModel": "Agent モデル",
-    "agentModelHint": "Agent CLI のモデル名（例: gpt-5.5、claude-sonnet-4-6、gemini-2.5-pro）。空欄の場合は CLI デフォルトを使用",
+    "agentModelHint": "Agent CLI のモデル名（例: gpt-5.5、claude-sonnet-4-6、gemini-3-pro）。空欄の場合は CLI デフォルトを使用",
     "agentAvailable": "利用可能",
     "agentNoneDetected": "未検出",
     "agentLocalLLMHint": "上記の LLM 接続設定を使用",
