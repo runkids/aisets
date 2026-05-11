@@ -1511,7 +1511,7 @@
     "agentAdapterHint": "使用哪个代码代理 CLI。Auto 会自动检测第一个可用的",
     "agentAdapterAuto": "自动（推荐）",
     "agentModel": "Agent 模型",
-    "agentModelHint": "代码代理使用的模型名称（例如 gpt-5.4、claude-sonnet-4-6）",
+    "agentModelHint": "Agent CLI 使用的模型名称（例如 gpt-5.5、claude-sonnet-4-6、gemini-2.5-pro）。留空则使用 CLI 默认",
     "agentAvailable": "可用",
     "agentNoneDetected": "未检测到",
     "agentLocalLLMHint": "使用上方设定的 LLM 连接",

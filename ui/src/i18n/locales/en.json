@@ -962,7 +962,7 @@
     "agentAdapterHint": "Which coding agent CLI to use. Auto detects the first available.",
     "agentAdapterAuto": "Auto (recommended)",
     "agentModel": "Agent model",
-    "agentModelHint": "Model name for the coding agent (e.g. gpt-5.4, claude-sonnet-4-6).",
+    "agentModelHint": "Model name for the agent CLI (e.g. gpt-5.5, claude-sonnet-4-6, gemini-2.5-pro). Leave empty for CLI default.",
     "agentAvailable": "Available",
     "agentNoneDetected": "None detected",
     "agentLocalLLMHint": "Uses the LLM connection configured above.",
