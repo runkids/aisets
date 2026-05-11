@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"aisets/internal/actions"
+	"aisets/internal/agent"
 	"aisets/internal/config"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
@@ -34,6 +35,8 @@ type Server struct {
 	scanner     *scanner.Scanner
 	ocrEngine   ocr.Engine
 	llmProvider llm.Provider
+	agentStatus agent.RuntimeStatus
+	agentChat   agent.ChatProvider
 	onReady     func()
 
 	mu            sync.Mutex
@@ -61,6 +64,8 @@ func New(opts Options) (*Server, error) {
 		batchPreviews: map[string]actions.BatchPreview{},
 	}
 	s.initLLMProvider()
+	s.initAgentStatus()
+	s.initAgentChat()
 	s.routes()
 	s.handler = s.wrapBasePath(s.mux)
 	return s, nil
@@ -171,6 +176,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/ai/ocr/run", s.handleVLMOCRRun)
 	s.mux.HandleFunc("POST /api/ai/optimize-advice", s.handleOptimizeAIAdvice)
 	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
+	s.mux.HandleFunc("GET /api/agent/status", s.handleAgentStatus)
 	s.mux.HandleFunc("GET /api/prompt-presets", s.handleListPromptPresets)
 	s.mux.HandleFunc("POST /api/prompt-presets", s.handleCreatePromptPreset)
 	s.mux.HandleFunc("PATCH /api/prompt-presets/{id}", s.handleUpdatePromptPreset)
@@ -200,6 +206,65 @@ func (s *Server) initLLMProvider() {
 	} else {
 		s.llmProvider = nil
 	}
+}
+
+func (s *Server) initAgentStatus() {
+	if s.store == nil {
+		return
+	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		return
+	}
+	adapter := settings.AgentAdapter
+	if !settings.AgentEnabled {
+		s.agentStatus = agent.RuntimeStatus{}
+		return
+	}
+	llmInfo := agent.LLMInfo{
+		Enabled:  settings.LLMEnabled,
+		Provider: settings.LLMProvider,
+		Model:    settings.LLMVisionModel,
+	}
+	s.agentStatus = agent.BuildRuntimeStatus(context.Background(), adapter, llmInfo)
+}
+
+func (s *Server) initAgentChat() {
+	if s.agentChat != nil {
+		_ = s.agentChat.Close()
+		s.agentChat = nil
+	}
+	if !s.agentStatus.Available || s.agentStatus.Active == "" {
+		return
+	}
+	var info agent.AdapterInfo
+	for _, a := range s.agentStatus.Adapters {
+		if a.ID == s.agentStatus.Active {
+			info = a
+			break
+		}
+	}
+	chat, err := agent.NewChatProvider(s.agentStatus.Active, info, s.llmProvider, prepareImageForVLM)
+	if err != nil {
+		return
+	}
+	s.agentChat = chat
+}
+
+func (s *Server) hasVLMBackend(settings config.AppSettings) bool {
+	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
+	return hasLLM || (settings.AgentEnabled && s.agentChat != nil)
+}
+
+func (s *Server) resolveVLMProvider(settings config.AppSettings) (providerName, modelName string) {
+	if settings.AgentEnabled && s.agentChat != nil {
+		model := settings.AgentModel
+		if model == "" {
+			model = s.agentStatus.Active
+		}
+		return "agent:" + s.agentStatus.Active, model
+	}
+	return settings.LLMProvider, settings.LLMVisionModel
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {

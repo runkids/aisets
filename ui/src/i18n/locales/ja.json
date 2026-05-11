@@ -294,7 +294,8 @@
     "yes": "はい",
     "expand": "展開",
     "collapse": "折りたたむ",
-    "saving": "保存中…"
+    "saving": "保存中…",
+    "ok": "OK"
   },
   "status": {
     "scanning": "スキャン中",
@@ -1503,6 +1504,18 @@
     "autoLocaleDisabled": "自動言語応答を無効にしました",
     "llmAutoLocale": "自動言語応答",
     "llmAutoLocaleHint": "UI の言語設定に合わせて AI が対応する言語で応答します",
+    "agentHeading": "Agent アダプタ",
+    "agentEnabled": "Agent を有効化",
+    "agentEnabledHint": "コーディングエージェント（Codex CLI、Claude Code）がスキャン結果からクリーンアッププランを生成することを許可",
+    "agentAdapter": "アダプタ",
+    "agentAdapterHint": "使用するコーディングエージェント CLI。Auto は最初に利用可能なものを自動検出",
+    "agentAdapterAuto": "自動（推奨）",
+    "agentModel": "Agent モデル",
+    "agentModelHint": "コーディングエージェントが使用するモデル名（例：gpt-5.4、claude-sonnet-4-6）",
+    "agentAvailable": "利用可能",
+    "agentNoneDetected": "未検出",
+    "agentLocalLLMHint": "上記の LLM 接続設定を使用",
+    "agentLocalLLMNotConfigured": "LLM 未設定 — 先に Connection Settings を設定してください",
     "aiTagGroup": "AI タグ付け",
     "aiTagDescription": "処理するワークスペースとプロジェクトを選択し、カテゴリ・タグ・説明を自動生成",
     "aiTagRun": "AI タグ付けを実行",

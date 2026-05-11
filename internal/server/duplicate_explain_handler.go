@@ -34,12 +34,8 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, apierr.From(err, "settings_failed"))
 		return
 	}
-	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
-		writeError(w, http.StatusBadRequest, apierr.New("ai_not_configured", "AI provider or vision model not configured"))
-		return
-	}
-	if s.llmProvider == nil {
-		writeError(w, http.StatusServiceUnavailable, apierr.New("provider_unavailable", "LLM provider is not available"))
+	if !s.hasVLMBackend(settings) {
+		writeError(w, http.StatusBadRequest, apierr.New("ai_not_configured", "AI provider or agent adapter not configured"))
 		return
 	}
 
@@ -85,28 +81,18 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		"distance":      distance,
 	})
 
-	leftURI, err := prepareImageForVLM(left.LocalPath, left.Ext, "tag")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, apierr.From(err, "image_prep_failed"))
-		return
-	}
-	rightURI, err := prepareImageForVLM(right.LocalPath, right.Ext, "tag")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, apierr.From(err, "image_prep_failed"))
-		return
-	}
-
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec == 0 {
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
+	_, modelName := s.resolveVLMProvider(settings)
+
 	start := time.Now()
-	resp, err := s.llmProvider.Chat(r.Context(), llm.ChatRequest{
-		Model:      settings.LLMVisionModel,
-		Messages:   buildChatMessages(systemPrompt, prompt, []string{leftURI, rightURI}),
-		TimeoutSec: timeoutSec,
-	})
+	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{
+		{Path: left.LocalPath, Ext: left.Ext},
+		{Path: right.LocalPath, Ext: right.Ext},
+	}, modelName, systemPrompt, prompt, timeoutSec)
 	durationMs := time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -114,7 +100,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	content := llm.CleanJSON(resp.Content)
+	content := llm.CleanJSON(rawContent)
 
 	var parsed struct {
 		Summary        string `json:"summary"`

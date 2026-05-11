@@ -294,7 +294,8 @@
     "yes": "Yes",
     "expand": "Expand",
     "collapse": "Collapse",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "ok": "OK"
   },
   "status": {
     "scanning": "Scanning",
@@ -954,6 +955,18 @@
     "autoLocaleDisabled": "Auto locale response disabled",
     "llmAutoLocale": "Auto locale response",
     "llmAutoLocaleHint": "AI responds in the language matching your UI locale setting.",
+    "agentHeading": "Agent Adapter",
+    "agentEnabled": "Enable agent",
+    "agentEnabledHint": "Allow coding agents (Codex CLI, Claude Code) to generate cleanup plans from scan findings.",
+    "agentAdapter": "Adapter",
+    "agentAdapterHint": "Which coding agent CLI to use. Auto detects the first available.",
+    "agentAdapterAuto": "Auto (recommended)",
+    "agentModel": "Agent model",
+    "agentModelHint": "Model name for the coding agent (e.g. gpt-5.4, claude-sonnet-4-6).",
+    "agentAvailable": "Available",
+    "agentNoneDetected": "None detected",
+    "agentLocalLLMHint": "Uses the LLM connection configured above.",
+    "agentLocalLLMNotConfigured": "LLM not configured — set up Connection Settings first",
     "aiTagGroup": "AI Tagging",
     "aiTagDescription": "Select a workspace and project to generate categories, tags, and descriptions",
     "aiTagRun": "Run AI Tagging",

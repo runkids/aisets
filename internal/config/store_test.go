@@ -1687,6 +1687,82 @@ func TestLLMSettingsEndpointNormalization(t *testing.T) {
 	}
 }
 
+func TestAgentSettingsRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	enabled := true
+	adapter := "codex"
+	model := "gpt-5.4"
+	updated, err := store.UpdateSettings(SettingsUpdate{
+		AgentEnabled: &enabled,
+		AgentAdapter: &adapter,
+		AgentModel:   &model,
+	})
+	if err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	if !updated.AgentEnabled {
+		t.Error("expected agentEnabled true")
+	}
+	if updated.AgentAdapter != "codex" {
+		t.Errorf("expected codex, got %s", updated.AgentAdapter)
+	}
+	if updated.AgentModel != "gpt-5.4" {
+		t.Errorf("expected gpt-5.4, got %s", updated.AgentModel)
+	}
+
+	read, err := store.Settings()
+	if err != nil {
+		t.Fatalf("Settings: %v", err)
+	}
+	if read.AgentAdapter != "codex" {
+		t.Errorf("persisted: expected codex, got %s", read.AgentAdapter)
+	}
+}
+
+func TestAgentSettingsInvalidAdapter(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	invalid := "invalid-adapter"
+	_, err = store.UpdateSettings(SettingsUpdate{AgentAdapter: &invalid})
+	if err == nil {
+		t.Fatal("expected error for invalid adapter")
+	}
+}
+
+func TestAgentSettingsDefaultIsAuto(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatalf("Settings: %v", err)
+	}
+	if settings.AgentAdapter != "auto" {
+		t.Errorf("expected default auto, got %s", settings.AgentAdapter)
+	}
+	if settings.AgentEnabled {
+		t.Error("expected agentEnabled false by default")
+	}
+}
+
 func scanAsset(root, projectID, projectName, repoPath string, bytes int64, hash string, usedCount int, savings int64) scanner.AssetItem {
 	usedBy := make([]string, 0, usedCount)
 	refs := make([]scanner.AssetReference, 0, usedCount)

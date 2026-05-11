@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
@@ -120,6 +121,55 @@ func extToMIME(ext string) string {
 	}
 }
 
+type vlmImage struct {
+	Path string
+	Ext  string
+}
+
+func (s *Server) chatVLM(ctx context.Context, images []vlmImage, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
+	if s.agentChat != nil {
+		paths := make([]string, len(images))
+		for i, img := range images {
+			paths[i] = img.Path
+		}
+		var res agent.ChatResult
+		_ = s.agentChat.ChatBatch(ctx, []agent.ChatRequest{{
+			Model:        modelName,
+			SystemPrompt: systemPrompt,
+			Prompt:       prompt,
+			ImagePaths:   paths,
+			TimeoutSec:   timeoutSec,
+		}}, func(_ int, r agent.ChatResult) { res = r })
+		if res.Err != nil {
+			return "", llm.ChatResponse{DurationMs: res.DurationMs}, res.Err
+		}
+		return res.Content, llm.ChatResponse{
+			Content:      res.Content,
+			InputTokens:  res.InputTokens,
+			OutputTokens: res.OutputTokens,
+			DurationMs:   res.DurationMs,
+		}, nil
+	}
+
+	var dataURIs []string
+	for _, img := range images {
+		dataURI, err := prepareImageForVLM(img.Path, img.Ext, "tag")
+		if err != nil {
+			return "", llm.ChatResponse{}, err
+		}
+		dataURIs = append(dataURIs, dataURI)
+	}
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model:      modelName,
+		Messages:   buildChatMessages(systemPrompt, prompt, dataURIs),
+		TimeoutSec: timeoutSec,
+	})
+	if err != nil {
+		return "", resp, err
+	}
+	return resp.Content, resp, nil
+}
+
 type aiTagWorkResult struct {
 	item     scanner.AssetItem
 	result   aitag.Result
@@ -146,12 +196,8 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_settings_failed")})
 		return
 	}
-	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or vision model not configured")})
-		return
-	}
-	if s.llmProvider == nil {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_provider_unavailable", "LLM provider is not available")})
+	if !s.hasVLMBackend(settings) {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or agent adapter not configured")})
 		return
 	}
 
@@ -169,8 +215,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerName := settings.LLMProvider
-	modelName := settings.LLMVisionModel
+	providerName, modelName := s.resolveVLMProvider(settings)
 
 	prompt := settings.LLMTagPrompt
 	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
@@ -394,20 +439,8 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Status:        aitag.StatusReady,
 	}
 
-	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "tag")
-	if err != nil {
-		result.Status = aitag.StatusFailed
-		result.ErrorCode = "aitag_read_failed"
-		result.ErrorMessage = err.Error()
-		return result, llm.ChatResponse{}
-	}
-
 	start := time.Now()
-	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
-		TimeoutSec: timeoutSec,
-	})
+	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -417,7 +450,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		return result, llm.ChatResponse{}
 	}
 
-	content := llm.CleanJSON(resp.Content)
+	content := llm.CleanJSON(rawContent)
 
 	var parsed struct {
 		Category           json.RawMessage `json:"category"`

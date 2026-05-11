@@ -163,6 +163,9 @@ export const defaultSettings: SettingsUpdate = {
   llmAutoLocale: false,
   llmConcurrency: 1,
   llmTimeout: 30,
+  agentEnabled: false,
+  agentAdapter: "auto",
+  agentModel: "",
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [

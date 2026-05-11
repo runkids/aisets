@@ -294,7 +294,8 @@
     "yes": "是",
     "expand": "展開",
     "collapse": "收合",
-    "saving": "儲存中…"
+    "saving": "儲存中…",
+    "ok": "確定"
   },
   "status": {
     "scanning": "正在掃描",
@@ -1709,6 +1710,18 @@
     "autoLocaleDisabled": "已停用自動語系回覆",
     "llmAutoLocale": "自動語系回覆",
     "llmAutoLocaleHint": "AI 根據介面語系自動以對應語言回覆",
+    "agentHeading": "Agent 配接器",
+    "agentEnabled": "啟用 Agent",
+    "agentEnabledHint": "允許程式碼代理（Codex CLI、Claude Code）根據掃描結果產生清理計畫",
+    "agentAdapter": "配接器",
+    "agentAdapterHint": "使用哪個程式碼代理 CLI。Auto 會自動偵測第一個可用的",
+    "agentAdapterAuto": "自動（建議）",
+    "agentModel": "Agent 模型",
+    "agentModelHint": "程式碼代理使用的模型名稱（例如 gpt-5.4、claude-sonnet-4-6）",
+    "agentAvailable": "可用",
+    "agentNoneDetected": "未偵測到",
+    "agentLocalLLMHint": "使用上方設定的 LLM 連線",
+    "agentLocalLLMNotConfigured": "LLM 尚未設定 — 請先設定 Connection Settings",
     "aiTagGroup": "AI 標記",
     "aiTagDescription": "選擇要處理的工作區與專案，自動產生分類、標籤和描述",
     "aiTagRun": "執行 AI 標記",

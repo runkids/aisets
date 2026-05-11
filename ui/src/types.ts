@@ -77,6 +77,9 @@ export type AppSettings = {
   llmAutoLocale: boolean;
   llmConcurrency: number;
   llmTimeout: number;
+  agentEnabled: boolean;
+  agentAdapter: string;
+  agentModel: string;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -149,6 +152,7 @@ export type SettingsInfo = AppSettings & {
   optimizationToolRuntime: OptimizationToolRuntime[];
   optimizationStrategyHash: string;
   llmRuntime: LLMRuntime;
+  agentRuntime: AgentRuntime;
 };
 
 export type OCRRuntime = {
@@ -202,6 +206,19 @@ export type LLMRuntime = {
   models: LLMModel[];
   visionModel: string;
   embedModel: string;
+};
+
+export type AgentAdapterInfo = {
+  id: string;
+  name: string;
+  version: string;
+  path: string;
+};
+
+export type AgentRuntime = {
+  adapters: AgentAdapterInfo[];
+  active: string;
+  available: boolean;
 };
 
 export type OptimizationStrategy = {
