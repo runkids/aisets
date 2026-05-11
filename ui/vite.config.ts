@@ -15,6 +15,25 @@ const vendorChunkGroups: Record<string, string[]> = {
   ],
   "vendor-icons": ["lucide-react"],
   "vendor-ui": ["class-variance-authority", "clsx", "tailwind-merge"],
+  "vendor-editor": [
+    "@tiptap/core",
+    "@tiptap/extension-placeholder",
+    "@tiptap/pm",
+    "@tiptap/react",
+    "@tiptap/starter-kit",
+    "prosemirror-changeset",
+    "prosemirror-commands",
+    "prosemirror-dropcursor",
+    "prosemirror-gapcursor",
+    "prosemirror-history",
+    "prosemirror-keymap",
+    "prosemirror-model",
+    "prosemirror-schema-list",
+    "prosemirror-state",
+    "prosemirror-tables",
+    "prosemirror-transform",
+    "prosemirror-view",
+  ],
 };
 
 const appChunkGroups: Record<string, string[]> = {
