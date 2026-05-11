@@ -1704,7 +1704,10 @@
     "clearAITagCacheConfirm": "すべての AI タグ結果を消去しますか？この操作は取り消せません。復元するには AI タグ付けを再実行する必要があります",
     "llmEnabled": "AI を有効化",
     "llmEnabledHint": "AI タグ付け・分類・検索のためにローカル LLM プロバイダを有効にします",
-    "llmTesting": "テスト中…"
+    "llmTesting": "テスト中…",
+    "vlmBackendLabel": "VLM バックエンド",
+    "vlmBackendLocal": "ローカル LLM",
+    "vlmBackendAgent": "Agent"
   },
   "catalog": {
     "notComputed": {

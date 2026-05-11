@@ -1722,7 +1722,10 @@
     "removeWorkspaceIcon": "이미지 제거",
     "workspaceIconTypeError": "PNG, JPEG, GIF 또는 WebP 이미지를 선택하세요",
     "workspaceIconSizeError": "워크스페이스 이미지는 512 KB 이하여야 합니다",
-    "workspaceIconReadError": "이 이미지를 읽을 수 없습니다"
+    "workspaceIconReadError": "이 이미지를 읽을 수 없습니다",
+    "vlmBackendLabel": "VLM 백엔드",
+    "vlmBackendLocal": "로컬 LLM",
+    "vlmBackendAgent": "Agent"
   },
   "catalog": {
     "notComputed": {

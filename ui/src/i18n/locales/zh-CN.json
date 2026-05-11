@@ -1704,7 +1704,10 @@
     "clearAITagCacheConfirm": "清除所有 AI 标签结果？此操作无法撤销，需重新运行 AI 标注才能恢复",
     "llmEnabled": "启用 AI",
     "llmEnabledHint": "启用本地 LLM 提供商以支持 AI 标注、分类和搜索",
-    "llmTesting": "测试中…"
+    "llmTesting": "测试中…",
+    "vlmBackendLabel": "VLM 后端",
+    "vlmBackendLocal": "本地 LLM",
+    "vlmBackendAgent": "Agent"
   },
   "catalog": {
     "notComputed": {

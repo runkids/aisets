@@ -1020,7 +1020,10 @@
     "aiLastRunCounts": "{{ready}} tagged, {{skipped}} skipped, {{cacheHit}} cached",
     "aiLastRunFailed": "{{failed}} failed",
     "aiLastRunScopeAll": "All",
-    "aiTokenTooltip": "Input {{input}} / Output {{output}} tokens"
+    "aiTokenTooltip": "Input {{input}} / Output {{output}} tokens",
+    "vlmBackendLabel": "VLM Backend",
+    "vlmBackendLocal": "Local LLM",
+    "vlmBackendAgent": "Agent"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

@@ -1775,7 +1775,10 @@
     "aiLastRunCounts": "{{ready}} 已標記、{{skipped}} 已略過、{{cacheHit}} 快取命中",
     "aiLastRunFailed": "{{failed}} 失敗",
     "aiLastRunScopeAll": "全部",
-    "aiTokenTooltip": "輸入 {{input}} / 輸出 {{output}} tokens"
+    "aiTokenTooltip": "輸入 {{input}} / 輸出 {{output}} tokens",
+    "vlmBackendLabel": "VLM 後端",
+    "vlmBackendLocal": "本地 LLM",
+    "vlmBackendAgent": "Agent"
   },
   "catalog": {
     "notComputed": {
