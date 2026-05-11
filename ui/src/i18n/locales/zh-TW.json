@@ -1746,6 +1746,7 @@
     "managePrompts": "管理提示詞",
     "strategyAICategory": "AI 分類",
     "strategyAICategoryHint": "僅匹配經 AI 標記分類的圖片——留空則匹配全部",
+    "aiCategoriesPlaceholder": "全部分類",
     "aiCategory.icon": "圖示",
     "aiCategory.photo": "照片",
     "aiCategory.screenshot": "截圖",
@@ -1779,7 +1780,16 @@
     "aiTokenTooltip": "輸入 {{input}} / 輸出 {{output}} tokens",
     "vlmBackendLabel": "VLM 後端",
     "vlmBackendLocal": "本地 LLM",
-    "vlmBackendAgent": "Agent"
+    "vlmBackendAgent": "Agent",
+    "vlmBackendInherit": "使用全域預設",
+    "vlmBackendAvailable": "可用",
+    "vlmBackendUnavailable": "未偵測到",
+    "vlmBackendGlobal": "全域預設",
+    "vlmBackendFeatureTag": "AI 標記",
+    "vlmBackendFeatureOcr": "AI OCR",
+    "vlmBackendFeatureOptimize": "優化建議",
+    "vlmBackendFeatureDuplicate": "近似重複",
+    "vlmBackendFeaturePrecheck": "預檢"
   },
   "catalog": {
     "notComputed": {

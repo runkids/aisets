@@ -156,6 +156,12 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     agentEnabled: settings?.agentEnabled ?? false,
     agentAdapter: settings?.agentAdapter ?? "auto",
     agentModel: settings?.agentModel ?? "",
+    vlmBackend: settings?.vlmBackend ?? "",
+    vlmBackendTag: settings?.vlmBackendTag ?? "",
+    vlmBackendOcr: settings?.vlmBackendOcr ?? "",
+    vlmBackendOptimize: settings?.vlmBackendOptimize ?? "",
+    vlmBackendDuplicate: settings?.vlmBackendDuplicate ?? "",
+    vlmBackendPrecheck: settings?.vlmBackendPrecheck ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -212,6 +218,12 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     agentEnabled: draft.agentEnabled,
     agentAdapter: draft.agentAdapter,
     agentModel: draft.agentModel,
+    vlmBackend: draft.vlmBackend,
+    vlmBackendTag: draft.vlmBackendTag,
+    vlmBackendOcr: draft.vlmBackendOcr,
+    vlmBackendOptimize: draft.vlmBackendOptimize,
+    vlmBackendDuplicate: draft.vlmBackendDuplicate,
+    vlmBackendPrecheck: draft.vlmBackendPrecheck,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -279,6 +291,12 @@ export function resetSectionDraft(
         agentEnabled: defaults.agentEnabled,
         agentAdapter: defaults.agentAdapter,
         agentModel: defaults.agentModel,
+        vlmBackend: defaults.vlmBackend,
+        vlmBackendTag: defaults.vlmBackendTag,
+        vlmBackendOcr: defaults.vlmBackendOcr,
+        vlmBackendOptimize: defaults.vlmBackendOptimize,
+        vlmBackendDuplicate: defaults.vlmBackendDuplicate,
+        vlmBackendPrecheck: defaults.vlmBackendPrecheck,
       };
     case "customFilters":
       return {

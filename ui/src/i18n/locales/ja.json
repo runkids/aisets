@@ -1540,6 +1540,7 @@
     "managePrompts": "プロンプトを管理",
     "strategyAICategory": "AI カテゴリ",
     "strategyAICategoryHint": "AI タグで分類された画像のみ一致——空欄ですべてに一致",
+    "aiCategoriesPlaceholder": "すべてのカテゴリ",
     "aiCategory.icon": "アイコン",
     "aiCategory.photo": "写真",
     "aiCategory.screenshot": "スクリーンショット",
@@ -1708,7 +1709,16 @@
     "llmTesting": "テスト中…",
     "vlmBackendLabel": "VLM バックエンド",
     "vlmBackendLocal": "ローカル LLM",
-    "vlmBackendAgent": "Agent"
+    "vlmBackendAgent": "Agent",
+    "vlmBackendInherit": "グローバルデフォルトを使用",
+    "vlmBackendAvailable": "利用可能",
+    "vlmBackendUnavailable": "未検出",
+    "vlmBackendGlobal": "グローバルデフォルト",
+    "vlmBackendFeatureTag": "AI タグ",
+    "vlmBackendFeatureOcr": "AI OCR",
+    "vlmBackendFeatureOptimize": "最適化アドバイス",
+    "vlmBackendFeatureDuplicate": "重複説明",
+    "vlmBackendFeaturePrecheck": "プリチェック"
   },
   "catalog": {
     "notComputed": {

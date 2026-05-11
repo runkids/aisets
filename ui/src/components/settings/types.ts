@@ -89,6 +89,12 @@ export type SettingsDraft = {
   agentEnabled: boolean;
   agentAdapter: string;
   agentModel: string;
+  vlmBackend: string;
+  vlmBackendTag: string;
+  vlmBackendOcr: string;
+  vlmBackendOptimize: string;
+  vlmBackendDuplicate: string;
+  vlmBackendPrecheck: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;

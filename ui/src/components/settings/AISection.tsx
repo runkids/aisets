@@ -34,6 +34,7 @@ import type { AITagRunCounts, VLMOcrRunCounts, Workspace } from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import type { ScopeProject } from "./AIScopePicker";
 import { AIScopePicker } from "./AIScopePicker";
+import { VLMBackendSelect } from "./VLMBackendSelect";
 
 const AI_TAG_LAST_RUN_KEY = "aisets:ai-tag:last-run";
 const VLM_OCR_LAST_RUN_KEY = "aisets:vlm-ocr:last-run";
@@ -301,9 +302,10 @@ export function AISection({
 
   const providerEnabled = draft.llmEnabled && draft.llmProvider !== "";
   const agentDetected = !!settings?.agentRuntime?.available;
-  const vlmAvailable = providerEnabled || (draft.agentEnabled && agentDetected);
-  const vlmBackend: "local-llm" | "agent" =
-    draft.agentEnabled && agentDetected ? "agent" : "local-llm";
+  const vlmAvailable =
+    providerEnabled ||
+    agentDetected ||
+    (settings?.agentRuntime?.adapters?.length ?? 0) > 0;
   const modelsQuery = useLLMModelsQuery(
     providerEnabled && draft.llmEndpoint !== "",
     providerEnabled
@@ -784,44 +786,71 @@ export function AISection({
       </Card>
 
       {vlmAvailable && (
-        <div className="flex items-center gap-3 rounded-g-md border border-g-line bg-g-surface px-6 py-2.5 shadow-g-sm md:px-8">
-          <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
-          <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-            {t("settings.vlmBackendLabel")}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              className={`rounded-g-sm px-2.5 py-1 font-g text-g-ui transition-colors ${vlmBackend === "local-llm" ? "bg-g-active-bg font-[590] text-g-active-text" : "text-g-ink-3 hover:text-g-ink-1"}`}
-              onClick={() => {
-                if (draft.agentEnabled) {
-                  onUpdateDraft((c) => ({ ...c, agentEnabled: false }));
-                  vlmBackendMutation.mutate({ agentEnabled: false });
-                }
-              }}
-            >
-              {t("settings.vlmBackendLocal")}
-            </button>
-            <button
-              type="button"
-              disabled={!agentDetected}
-              className={`rounded-g-sm px-2.5 py-1 font-g text-g-ui transition-colors ${vlmBackend === "agent" ? "bg-g-active-bg font-[590] text-g-active-text" : "text-g-ink-3 hover:text-g-ink-1"} disabled:opacity-40 disabled:cursor-not-allowed`}
-              onClick={() => {
-                if (!draft.agentEnabled) {
-                  onUpdateDraft((c) => ({ ...c, agentEnabled: true }));
-                  vlmBackendMutation.mutate({ agentEnabled: true });
-                }
-              }}
-            >
-              {t("settings.vlmBackendAgent")}
-              {agentDetected && settings?.agentRuntime?.active && (
-                <span className="ml-1 text-g-ink-3">
-                  ({settings.agentRuntime.active})
-                </span>
-              )}
-            </button>
+        <Card
+          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
+          padding="none"
+        >
+          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+            <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
+            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+              {t("settings.vlmBackendLabel")}
+            </span>
           </div>
-        </div>
+          <div className="flex flex-col gap-2.5 px-6 py-4 md:px-8">
+            {[
+              {
+                key: "vlmBackend" as const,
+                label: t("settings.vlmBackendGlobal"),
+                showInherit: false,
+              },
+              {
+                key: "vlmBackendTag" as const,
+                label: t("settings.vlmBackendFeatureTag"),
+                showInherit: true,
+              },
+              {
+                key: "vlmBackendOcr" as const,
+                label: t("settings.vlmBackendFeatureOcr"),
+                showInherit: true,
+              },
+              {
+                key: "vlmBackendOptimize" as const,
+                label: t("settings.vlmBackendFeatureOptimize"),
+                showInherit: true,
+              },
+              {
+                key: "vlmBackendDuplicate" as const,
+                label: t("settings.vlmBackendFeatureDuplicate"),
+                showInherit: true,
+              },
+              {
+                key: "vlmBackendPrecheck" as const,
+                label: t("settings.vlmBackendFeaturePrecheck"),
+                showInherit: true,
+              },
+            ].map((row) => (
+              <div
+                key={row.key}
+                className="flex items-center justify-between gap-4"
+              >
+                <span className="font-g text-g-ui tracking-g-ui text-g-ink-2">
+                  {row.label}
+                </span>
+                <VLMBackendSelect
+                  value={draft[row.key]}
+                  agentRuntime={settings?.agentRuntime}
+                  llmRuntime={settings?.llmRuntime}
+                  showInherit={row.showInherit}
+                  disabled={aiBusy}
+                  onChange={(v) => {
+                    onUpdateDraft((c) => ({ ...c, [row.key]: v }));
+                    vlmBackendMutation.mutate({ [row.key]: v });
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {providerEnabled && (

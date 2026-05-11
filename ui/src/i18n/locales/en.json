@@ -990,6 +990,7 @@
     "managePrompts": "Manage Prompts",
     "strategyAICategory": "AI Category",
     "strategyAICategoryHint": "Only match images classified by AI tagging — leave empty to match all",
+    "aiCategoriesPlaceholder": "All categories",
     "aiCategory.icon": "Icon",
     "aiCategory.photo": "Photo",
     "aiCategory.screenshot": "Screenshot",
@@ -1023,7 +1024,16 @@
     "aiTokenTooltip": "Input {{input}} / Output {{output}} tokens",
     "vlmBackendLabel": "VLM Backend",
     "vlmBackendLocal": "Local LLM",
-    "vlmBackendAgent": "Agent"
+    "vlmBackendAgent": "Agent",
+    "vlmBackendInherit": "Use global default",
+    "vlmBackendAvailable": "Available",
+    "vlmBackendUnavailable": "Not detected",
+    "vlmBackendGlobal": "Global default",
+    "vlmBackendFeatureTag": "AI Tag",
+    "vlmBackendFeatureOcr": "AI OCR",
+    "vlmBackendFeatureOptimize": "Optimize Advice",
+    "vlmBackendFeatureDuplicate": "Duplicate Explain",
+    "vlmBackendFeaturePrecheck": "Precheck"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

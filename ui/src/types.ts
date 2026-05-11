@@ -80,6 +80,12 @@ export type AppSettings = {
   agentEnabled: boolean;
   agentAdapter: string;
   agentModel: string;
+  vlmBackend: string;
+  vlmBackendTag: string;
+  vlmBackendOcr: string;
+  vlmBackendOptimize: string;
+  vlmBackendDuplicate: string;
+  vlmBackendPrecheck: string;
 };
 
 export type ScanProfile = "fast" | "full" | "custom";

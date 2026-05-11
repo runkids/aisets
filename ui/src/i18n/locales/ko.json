@@ -1551,6 +1551,7 @@
     "managePrompts": "프롬프트 관리",
     "strategyAICategory": "AI 카테고리",
     "strategyAICategoryHint": "AI 태그로 분류된 이미지만 일치 — 비워두면 전체 일치",
+    "aiCategoriesPlaceholder": "모든 카테고리",
     "aiCategory.icon": "아이콘",
     "aiCategory.photo": "사진",
     "aiCategory.screenshot": "스크린샷",
@@ -1726,7 +1727,16 @@
     "workspaceIconReadError": "이 이미지를 읽을 수 없습니다",
     "vlmBackendLabel": "VLM 백엔드",
     "vlmBackendLocal": "로컬 LLM",
-    "vlmBackendAgent": "Agent"
+    "vlmBackendAgent": "Agent",
+    "vlmBackendInherit": "글로벌 기본값 사용",
+    "vlmBackendAvailable": "사용 가능",
+    "vlmBackendUnavailable": "감지되지 않음",
+    "vlmBackendGlobal": "글로벌 기본값",
+    "vlmBackendFeatureTag": "AI 태그",
+    "vlmBackendFeatureOcr": "AI OCR",
+    "vlmBackendFeatureOptimize": "최적화 조언",
+    "vlmBackendFeatureDuplicate": "중복 설명",
+    "vlmBackendFeaturePrecheck": "사전 검사"
   },
   "catalog": {
     "notComputed": {

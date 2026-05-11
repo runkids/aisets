@@ -166,6 +166,12 @@ export const defaultSettings: SettingsUpdate = {
   agentEnabled: false,
   agentAdapter: "auto",
   agentModel: "",
+  vlmBackend: "",
+  vlmBackendTag: "",
+  vlmBackendOcr: "",
+  vlmBackendOptimize: "",
+  vlmBackendDuplicate: "",
+  vlmBackendPrecheck: "",
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [
