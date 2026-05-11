@@ -1796,7 +1796,9 @@
     "vlmBackendFeatureDuplicate": "近似重複",
     "vlmBackendFeaturePrecheck": "預檢",
     "aiTabLocal": "本地 LLM",
-    "aiTabAgent": "Agent CLI"
+    "aiTabAgent": "Agent CLI",
+    "aiTabBackend": "後端",
+    "aiTabPrompts": "提示詞"
   },
   "catalog": {
     "notComputed": {

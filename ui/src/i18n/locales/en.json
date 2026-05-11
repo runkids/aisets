@@ -1040,7 +1040,9 @@
     "vlmBackendFeatureDuplicate": "Duplicate Explain",
     "vlmBackendFeaturePrecheck": "Precheck",
     "aiTabLocal": "Local LLM",
-    "aiTabAgent": "Agent CLI"
+    "aiTabAgent": "Agent CLI",
+    "aiTabBackend": "Backend",
+    "aiTabPrompts": "Prompts"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

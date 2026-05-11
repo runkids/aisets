@@ -1725,7 +1725,9 @@
     "vlmBackendFeatureDuplicate": "重複説明",
     "vlmBackendFeaturePrecheck": "プリチェック",
     "aiTabLocal": "ローカル LLM",
-    "aiTabAgent": "Agent CLI"
+    "aiTabAgent": "Agent CLI",
+    "aiTabBackend": "バックエンド",
+    "aiTabPrompts": "プロンプト"
   },
   "catalog": {
     "notComputed": {

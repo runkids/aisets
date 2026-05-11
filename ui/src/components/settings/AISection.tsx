@@ -180,7 +180,9 @@ export function AISection({
   const selectedOcrPresetId = selectedOcrPresetIdOverride || ocrDefaultPresetId;
 
   const vlmBackendMutation = useUpdateSettingsMutation();
-  const [aiTab, setAiTab] = useState<"local" | "agent">("local");
+  const [aiTab, setAiTab] = useState<"local" | "agent" | "backend" | "prompts">(
+    "local",
+  );
   const [connectionExpanded, setConnectionExpanded] = useState(false);
   const [tagWorkspaceId, setTagWorkspaceId] =
     useState<string>(activeWorkspaceId);
@@ -372,32 +374,40 @@ export function AISection({
         className="overflow-hidden border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
         padding="none"
       >
-        <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+        <div className="flex items-center gap-3 border-b border-g-line px-6 py-2.5 md:px-8">
           <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
           <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
             {t("settings.section.ai")}
           </span>
-        </div>
-        <div className="px-6 py-2 md:px-8">
-          <Tabs
-            value={aiTab}
-            items={[
-              { value: "local" as const, label: t("settings.aiTabLocal") },
-              {
-                value: "agent" as const,
-                label: t("settings.aiTabAgent"),
-                badge: settings?.agentRuntime?.adapters?.length ? (
-                  <Badge tone="green">
-                    {settings.agentRuntime.adapters.length}
-                  </Badge>
-                ) : undefined,
-              },
-            ]}
-            onChange={setAiTab}
-            ariaLabel="AI backend"
-            variant="segment"
-            size="sm"
-          />
+          <div className="ml-auto">
+            <Tabs
+              value={aiTab}
+              items={[
+                { value: "local" as const, label: t("settings.aiTabLocal") },
+                {
+                  value: "agent" as const,
+                  label: t("settings.aiTabAgent"),
+                  badge: settings?.agentRuntime?.adapters?.length ? (
+                    <Badge tone="green">
+                      {settings.agentRuntime.adapters.length}
+                    </Badge>
+                  ) : undefined,
+                },
+                {
+                  value: "backend" as const,
+                  label: t("settings.aiTabBackend"),
+                },
+                {
+                  value: "prompts" as const,
+                  label: t("settings.aiTabPrompts"),
+                },
+              ]}
+              onChange={setAiTab}
+              ariaLabel="AI settings tab"
+              variant="segment"
+              size="sm"
+            />
+          </div>
         </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
           {aiTab === "local" && (
@@ -769,86 +779,79 @@ export function AISection({
               </FieldRow>
             </>
           )}
+
+          {aiTab === "backend" && (
+            <div className="flex flex-col gap-2.5 py-3">
+              {[
+                {
+                  key: "vlmBackend" as const,
+                  label: t("settings.vlmBackendGlobal"),
+                  showInherit: false,
+                },
+                {
+                  key: "vlmBackendTag" as const,
+                  label: t("settings.vlmBackendFeatureTag"),
+                  showInherit: true,
+                },
+                {
+                  key: "vlmBackendOcr" as const,
+                  label: t("settings.vlmBackendFeatureOcr"),
+                  showInherit: true,
+                },
+                {
+                  key: "vlmBackendOptimize" as const,
+                  label: t("settings.vlmBackendFeatureOptimize"),
+                  showInherit: true,
+                },
+                {
+                  key: "vlmBackendDuplicate" as const,
+                  label: t("settings.vlmBackendFeatureDuplicate"),
+                  showInherit: true,
+                },
+                {
+                  key: "vlmBackendPrecheck" as const,
+                  label: t("settings.vlmBackendFeaturePrecheck"),
+                  showInherit: true,
+                },
+              ].map((row) => (
+                <div
+                  key={row.key}
+                  className="flex items-center justify-between gap-4"
+                >
+                  <span className="font-g text-g-ui tracking-g-ui text-g-ink-2">
+                    {row.label}
+                  </span>
+                  <VLMBackendSelect
+                    value={draft[row.key]}
+                    agentRuntime={settings?.agentRuntime}
+                    llmRuntime={settings?.llmRuntime}
+                    showInherit={row.showInherit}
+                    disabled={aiBusy}
+                    onChange={(v) => {
+                      onUpdateDraft((c) => ({ ...c, [row.key]: v }));
+                      vlmBackendMutation.mutate({ [row.key]: v });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {aiTab === "prompts" && (
+            <div className="py-3">
+              <PromptsLocaleCard
+                draft={draft}
+                systemPromptEnabled={settings?.llmSystemPromptEnabled ?? false}
+                onUpdateDraft={onUpdateDraft}
+                onNavigate={onNavigate}
+                embedded
+              />
+            </div>
+          )}
+
           {settingActions}
         </div>
       </Card>
-
-      {vlmAvailable && (
-        <Card
-          className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
-          padding="none"
-        >
-          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
-            <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
-            <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-              {t("settings.vlmBackendLabel")}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2.5 px-6 py-4 md:px-8">
-            {[
-              {
-                key: "vlmBackend" as const,
-                label: t("settings.vlmBackendGlobal"),
-                showInherit: false,
-              },
-              {
-                key: "vlmBackendTag" as const,
-                label: t("settings.vlmBackendFeatureTag"),
-                showInherit: true,
-              },
-              {
-                key: "vlmBackendOcr" as const,
-                label: t("settings.vlmBackendFeatureOcr"),
-                showInherit: true,
-              },
-              {
-                key: "vlmBackendOptimize" as const,
-                label: t("settings.vlmBackendFeatureOptimize"),
-                showInherit: true,
-              },
-              {
-                key: "vlmBackendDuplicate" as const,
-                label: t("settings.vlmBackendFeatureDuplicate"),
-                showInherit: true,
-              },
-              {
-                key: "vlmBackendPrecheck" as const,
-                label: t("settings.vlmBackendFeaturePrecheck"),
-                showInherit: true,
-              },
-            ].map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between gap-4"
-              >
-                <span className="font-g text-g-ui tracking-g-ui text-g-ink-2">
-                  {row.label}
-                </span>
-                <VLMBackendSelect
-                  value={draft[row.key]}
-                  agentRuntime={settings?.agentRuntime}
-                  llmRuntime={settings?.llmRuntime}
-                  showInherit={row.showInherit}
-                  disabled={aiBusy}
-                  onChange={(v) => {
-                    onUpdateDraft((c) => ({ ...c, [row.key]: v }));
-                    vlmBackendMutation.mutate({ [row.key]: v });
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {providerEnabled && (
-        <PromptsLocaleCard
-          draft={draft}
-          systemPromptEnabled={settings?.llmSystemPromptEnabled ?? false}
-          onUpdateDraft={onUpdateDraft}
-          onNavigate={onNavigate}
-        />
-      )}
 
       {vlmAvailable && (
         <Card
@@ -1487,11 +1490,13 @@ function PromptsLocaleCard({
   systemPromptEnabled,
   onUpdateDraft,
   onNavigate,
+  embedded,
 }: {
   draft: SettingsDraft;
   systemPromptEnabled: boolean;
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
   onNavigate?: (mode: Mode) => void;
+  embedded?: boolean;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -1512,6 +1517,71 @@ function PromptsLocaleCard({
     );
   }
 
+  const content = (
+    <div
+      className={
+        embedded
+          ? "divide-y divide-g-line"
+          : "divide-y divide-g-line px-6 py-2 md:px-8 md:py-3"
+      }
+    >
+      <FieldRow
+        label={t("settings.systemPrompt")}
+        description={t("settings.systemPromptHint")}
+      >
+        <Switch
+          checked={systemPromptEnabled}
+          onCheckedChange={handleSystemPromptToggle}
+          aria-label={t("settings.systemPrompt")}
+        />
+      </FieldRow>
+      {systemPromptEnabled && (
+        <div className="py-3">
+          <SystemPromptInline />
+        </div>
+      )}
+      <FieldRow
+        label={t("settings.llmAutoLocale")}
+        description={t("settings.llmAutoLocaleHint")}
+      >
+        <Switch
+          checked={draft.llmAutoLocale}
+          onCheckedChange={(next) => {
+            onUpdateDraft((current) => ({
+              ...current,
+              llmAutoLocale: next,
+            }));
+            updateSettings.mutate(
+              { llmAutoLocale: next },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    next
+                      ? t("settings.autoLocaleEnabled")
+                      : t("settings.autoLocaleDisabled"),
+                  ),
+                onError: (err) => toast.error(errorMessage(err)),
+              },
+            );
+          }}
+          aria-label={t("settings.llmAutoLocale")}
+        />
+      </FieldRow>
+      <div className="py-3">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-g-sm px-1.5 py-2 text-left text-g-ui font-[510] text-g-ink-2 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
+          onClick={() => onNavigate?.("prompts")}
+        >
+          <span className="flex-1">{t("settings.managePrompts")}</span>
+          <ChevronRight size={14} className="shrink-0 text-g-ink-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  if (embedded) return content;
+
   return (
     <Card
       className="border border-g-line rounded-g-md bg-g-surface shadow-g-sm"
@@ -1523,60 +1593,7 @@ function PromptsLocaleCard({
           {t("settings.promptsHeading")}
         </span>
       </div>
-      <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-        <FieldRow
-          label={t("settings.systemPrompt")}
-          description={t("settings.systemPromptHint")}
-        >
-          <Switch
-            checked={systemPromptEnabled}
-            onCheckedChange={handleSystemPromptToggle}
-            aria-label={t("settings.systemPrompt")}
-          />
-        </FieldRow>
-        {systemPromptEnabled && (
-          <div className="py-3">
-            <SystemPromptInline />
-          </div>
-        )}
-        <FieldRow
-          label={t("settings.llmAutoLocale")}
-          description={t("settings.llmAutoLocaleHint")}
-        >
-          <Switch
-            checked={draft.llmAutoLocale}
-            onCheckedChange={(next) => {
-              onUpdateDraft((current) => ({
-                ...current,
-                llmAutoLocale: next,
-              }));
-              updateSettings.mutate(
-                { llmAutoLocale: next },
-                {
-                  onSuccess: () =>
-                    toast.success(
-                      next
-                        ? t("settings.autoLocaleEnabled")
-                        : t("settings.autoLocaleDisabled"),
-                    ),
-                  onError: (err) => toast.error(errorMessage(err)),
-                },
-              );
-            }}
-            aria-label={t("settings.llmAutoLocale")}
-          />
-        </FieldRow>
-        <div className="py-3">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-g-sm px-1.5 py-2 text-left text-g-ui font-[510] text-g-ink-2 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
-            onClick={() => onNavigate?.("prompts")}
-          >
-            <span className="flex-1">{t("settings.managePrompts")}</span>
-            <ChevronRight size={14} className="shrink-0 text-g-ink-4" />
-          </button>
-        </div>
-      </div>
+      {content}
     </Card>
   );
 }

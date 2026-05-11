@@ -1743,7 +1743,9 @@
     "vlmBackendFeatureDuplicate": "중복 설명",
     "vlmBackendFeaturePrecheck": "사전 검사",
     "aiTabLocal": "로컬 LLM",
-    "aiTabAgent": "Agent CLI"
+    "aiTabAgent": "Agent CLI",
+    "aiTabBackend": "백엔드",
+    "aiTabPrompts": "프롬프트"
   },
   "catalog": {
     "notComputed": {
