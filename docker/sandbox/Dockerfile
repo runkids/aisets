@@ -21,6 +21,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 
 ARG PNPM_VERSION
 RUN npm install -g pnpm@${PNPM_VERSION} svgo \
+  @anthropic-ai/claude-code @openai/codex \
   && go install github.com/air-verse/air@latest
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy,rustfmt

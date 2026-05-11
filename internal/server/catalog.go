@@ -674,7 +674,7 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 	}
 
 	ocrEnabled := settings.OCREnabled
-	vlmEnabled := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != ""
+	vlmEnabled := s.hasVLMBackend(settings)
 	if !ocrEnabled && !vlmEnabled {
 		return catalog, nil
 	}
@@ -705,8 +705,9 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 
 	var vlmResults map[string]ocr.Result
 	if vlmEnabled {
-		engineVersion := settings.LLMProvider + "/" + settings.LLMVisionModel
-		settingsHash := vlmOCRSettingsHash(settings.LLMVisionModel)
+		vlmProvider, vlmModel := s.resolveVLMProvider(settings)
+		engineVersion := vlmProvider + "/" + vlmModel
+		settingsHash := vlmOCRSettingsHash(vlmModel)
 		vlmResults, err = s.store.VLMOCRResults(catalog.Items, engineVersion, settingsHash)
 		if err != nil {
 			return scanner.Catalog{}, err
@@ -746,7 +747,8 @@ func (s *Server) enrichCatalogOCR(ctx context.Context, catalog scanner.Catalog) 
 }
 
 func (s *Server) enrichCatalogAITag(catalog scanner.Catalog, settings config.AppSettings) (scanner.Catalog, error) {
-	results, err := s.store.AITagResultsBestMatch(catalog.Items, settings.LLMProvider, settings.LLMVisionModel)
+	tagProvider, tagModel := s.resolveVLMProvider(settings)
+	results, err := s.store.AITagResultsBestMatch(catalog.Items, tagProvider, tagModel)
 	if err != nil {
 		return scanner.Catalog{}, err
 	}

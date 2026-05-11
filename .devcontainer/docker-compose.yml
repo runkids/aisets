@@ -23,6 +23,11 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/go/build-cache
       - dev-home:/home/developer
+      - ${HOME}/.claude:/home/developer/.claude
+      - ${HOME}/.codex:/home/developer/.codex
+      - ${HOME}/.gemini:/home/developer/.gemini
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
 
