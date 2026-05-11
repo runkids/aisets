@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -10,6 +11,7 @@ import {
   RefreshCw,
   ScanText,
   Settings2,
+  Shuffle,
   Square,
   Star,
   Tags,
@@ -183,7 +185,6 @@ export function AISection({
   const [aiTab, setAiTab] = useState<"local" | "agent" | "backend" | "prompts">(
     "local",
   );
-  const [connectionExpanded, setConnectionExpanded] = useState(false);
   const [tagWorkspaceId, setTagWorkspaceId] =
     useState<string>(activeWorkspaceId);
   const [tagProjectId, setTagProjectId] = useState<string>("");
@@ -383,24 +384,19 @@ export function AISection({
             <Tabs
               value={aiTab}
               items={[
-                { value: "local" as const, label: t("settings.aiTabLocal") },
+                { value: "local" as const, label: t("settings.aiTabLocal"), icon: <Settings2 /> },
                 {
                   value: "agent" as const,
                   label: t("settings.aiTabAgent"),
+                  icon: <Bot />,
                   badge: settings?.agentRuntime?.adapters?.length ? (
                     <Badge tone="green">
                       {settings.agentRuntime.adapters.length}
                     </Badge>
                   ) : undefined,
                 },
-                {
-                  value: "backend" as const,
-                  label: t("settings.aiTabBackend"),
-                },
-                {
-                  value: "prompts" as const,
-                  label: t("settings.aiTabPrompts"),
-                },
+                { value: "backend" as const, label: t("settings.aiTabBackend"), icon: <Shuffle /> },
+                { value: "prompts" as const, label: t("settings.aiTabPrompts"), icon: <MessageSquareText /> },
               ]}
               onChange={setAiTab}
               ariaLabel="AI settings tab"
@@ -439,44 +435,6 @@ export function AISection({
 
               {draft.llmEnabled && (
                 <>
-                  <div className="py-3">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2.5 text-left"
-                      onClick={() => setConnectionExpanded((prev) => !prev)}
-                      aria-expanded={connectionExpanded}
-                    >
-                      <Settings2 size={15} className="shrink-0 text-g-ink-3" />
-                      <span className="min-w-0 flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-                        {t("settings.llmConnectionHeading")}
-                      </span>
-                      <ChevronDown
-                        size={14}
-                        className={cn(
-                          "shrink-0 text-g-ink-4 transition-transform duration-200 ease-g",
-                          connectionExpanded && "rotate-180",
-                        )}
-                      />
-                    </button>
-                    {!connectionExpanded && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {providerLabel && (
-                          <Badge tone="default">{providerLabel}</Badge>
-                        )}
-                        {draft.llmVisionModel && (
-                          <Badge tone="default">{draft.llmVisionModel}</Badge>
-                        )}
-                        <Badge tone={isConnected ? "green" : "default"}>
-                          {isConnected
-                            ? t("settings.llmStatusConnected")
-                            : t("settings.llmStatusNotTested")}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-
-                  {connectionExpanded && (
-                    <>
                       <FieldRow
                         label={t("settings.llmProvider")}
                         description={
@@ -681,8 +639,6 @@ export function AISection({
                           className="min-w-[400px]"
                         />
                       </FieldRow>
-                    </>
-                  )}
                 </>
               )}
             </>

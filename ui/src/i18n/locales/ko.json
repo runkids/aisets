@@ -1744,7 +1744,7 @@
     "vlmBackendFeaturePrecheck": "사전 검사",
     "aiTabLocal": "로컬 LLM",
     "aiTabAgent": "Agent CLI",
-    "aiTabBackend": "백엔드",
+    "aiTabBackend": "할당",
     "aiTabPrompts": "프롬프트"
   },
   "catalog": {

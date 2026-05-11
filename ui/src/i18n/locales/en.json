@@ -1041,7 +1041,7 @@
     "vlmBackendFeaturePrecheck": "Precheck",
     "aiTabLocal": "Local LLM",
     "aiTabAgent": "Agent CLI",
-    "aiTabBackend": "Backend",
+    "aiTabBackend": "Routing",
     "aiTabPrompts": "Prompts"
   },
   "error": {

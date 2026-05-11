@@ -1726,7 +1726,7 @@
     "vlmBackendFeaturePrecheck": "プリチェック",
     "aiTabLocal": "ローカル LLM",
     "aiTabAgent": "Agent CLI",
-    "aiTabBackend": "バックエンド",
+    "aiTabBackend": "割当",
     "aiTabPrompts": "プロンプト"
   },
   "catalog": {

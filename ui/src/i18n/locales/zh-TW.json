@@ -1797,7 +1797,7 @@
     "vlmBackendFeaturePrecheck": "預檢",
     "aiTabLocal": "本地 LLM",
     "aiTabAgent": "Agent CLI",
-    "aiTabBackend": "後端",
+    "aiTabBackend": "指派",
     "aiTabPrompts": "提示詞"
   },
   "catalog": {
