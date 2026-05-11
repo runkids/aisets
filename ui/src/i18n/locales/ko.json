@@ -1736,7 +1736,9 @@
     "vlmBackendFeatureOcr": "AI OCR",
     "vlmBackendFeatureOptimize": "최적화 조언",
     "vlmBackendFeatureDuplicate": "중복 설명",
-    "vlmBackendFeaturePrecheck": "사전 검사"
+    "vlmBackendFeaturePrecheck": "사전 검사",
+    "aiTabLocal": "로컬 LLM",
+    "aiTabAgent": "Agent CLI"
   },
   "catalog": {
     "notComputed": {

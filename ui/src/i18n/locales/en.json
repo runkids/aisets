@@ -1033,7 +1033,9 @@
     "vlmBackendFeatureOcr": "AI OCR",
     "vlmBackendFeatureOptimize": "Optimize Advice",
     "vlmBackendFeatureDuplicate": "Duplicate Explain",
-    "vlmBackendFeaturePrecheck": "Precheck"
+    "vlmBackendFeaturePrecheck": "Precheck",
+    "aiTabLocal": "Local LLM",
+    "aiTabAgent": "Agent CLI"
   },
   "error": {
     "catalogLoad": "Failed to load catalog",

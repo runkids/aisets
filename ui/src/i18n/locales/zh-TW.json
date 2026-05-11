@@ -1789,7 +1789,9 @@
     "vlmBackendFeatureOcr": "AI OCR",
     "vlmBackendFeatureOptimize": "優化建議",
     "vlmBackendFeatureDuplicate": "近似重複",
-    "vlmBackendFeaturePrecheck": "預檢"
+    "vlmBackendFeaturePrecheck": "預檢",
+    "aiTabLocal": "本地 LLM",
+    "aiTabAgent": "Agent CLI"
   },
   "catalog": {
     "notComputed": {

@@ -180,6 +180,7 @@ export function AISection({
   const selectedOcrPresetId = selectedOcrPresetIdOverride || ocrDefaultPresetId;
 
   const vlmBackendMutation = useUpdateSettingsMutation();
+  const [aiTab, setAiTab] = useState<"local" | "agent">("local");
   const [connectionExpanded, setConnectionExpanded] = useState(false);
   const [agentExpanded, setAgentExpanded] = useState(false);
   const [tagWorkspaceId, setTagWorkspaceId] =
@@ -379,43 +380,77 @@ export function AISection({
           </span>
         </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-          <FieldRow
-            label={t("settings.llmEnabled")}
-            description={t("settings.llmEnabledHint")}
-          >
-            <Switch
-              checked={draft.llmEnabled}
-              disabled={aiBusy}
-              onCheckedChange={(next) =>
-                onUpdateDraft((current) => ({
-                  ...current,
-                  llmEnabled: next,
-                  llmProvider:
-                    next && !current.llmProvider
-                      ? "ollama"
-                      : current.llmProvider,
-                  llmEndpoint:
-                    next && !current.llmEndpoint
-                      ? defaultEndpoints["ollama"]
-                      : current.llmEndpoint,
-                }))
-              }
-              aria-label={t("settings.llmEnabled")}
-            />
-          </FieldRow>
+          <div className="flex items-center gap-4 border-b border-g-line pb-3">
+            <button
+              type="button"
+              className={cn(
+                "font-g text-g-ui font-[590] tracking-g-ui transition-colors",
+                aiTab === "local"
+                  ? "text-g-ink border-b-2 border-g-ink pb-1"
+                  : "text-g-ink-3 hover:text-g-ink-2",
+              )}
+              onClick={() => setAiTab("local")}
+            >
+              {t("settings.aiTabLocal")}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "font-g text-g-ui font-[590] tracking-g-ui transition-colors",
+                aiTab === "agent"
+                  ? "text-g-ink border-b-2 border-g-ink pb-1"
+                  : "text-g-ink-3 hover:text-g-ink-2",
+              )}
+              onClick={() => setAiTab("agent")}
+            >
+              {t("settings.aiTabAgent")}
+              {settings?.agentRuntime?.available && (
+                <Badge tone="green" className="ml-2">
+                  {(settings.agentRuntime.adapters?.length ?? 0)}
+                </Badge>
+              )}
+            </button>
+          </div>
 
-          {draft.llmEnabled && (
+          {aiTab === "local" && (
             <>
-              <div className="py-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 text-left"
-                  onClick={() => setConnectionExpanded((prev) => !prev)}
-                  aria-expanded={connectionExpanded}
-                >
-                  <Settings2 size={15} className="shrink-0 text-g-ink-3" />
-                  <span className="min-w-0 flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-                    {t("settings.llmConnectionHeading")}
+              <FieldRow
+                label={t("settings.llmEnabled")}
+                description={t("settings.llmEnabledHint")}
+              >
+                <Switch
+                  checked={draft.llmEnabled}
+                  disabled={aiBusy}
+                  onCheckedChange={(next) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      llmEnabled: next,
+                      llmProvider:
+                        next && !current.llmProvider
+                          ? "ollama"
+                          : current.llmProvider,
+                      llmEndpoint:
+                        next && !current.llmEndpoint
+                          ? defaultEndpoints["ollama"]
+                          : current.llmEndpoint,
+                    }))
+                  }
+                  aria-label={t("settings.llmEnabled")}
+                />
+              </FieldRow>
+
+              {draft.llmEnabled && (
+                <>
+                  <div className="py-3">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2.5 text-left"
+                      onClick={() => setConnectionExpanded((prev) => !prev)}
+                      aria-expanded={connectionExpanded}
+                    >
+                      <Settings2 size={15} className="shrink-0 text-g-ink-3" />
+                      <span className="min-w-0 flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                        {t("settings.llmConnectionHeading")}
                   </span>
                   <ChevronDown
                     size={14}
@@ -648,137 +683,98 @@ export function AISection({
                 </>
               )}
 
-              <div className="py-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 text-left"
-                  onClick={() => setAgentExpanded((prev) => !prev)}
-                  aria-expanded={agentExpanded}
-                >
-                  <Bot size={15} className="shrink-0 text-g-ink-3" />
-                  <span className="min-w-0 flex-1 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
-                    {t("settings.agentHeading")}
-                  </span>
-                  <ChevronDown
-                    size={14}
-                    className={cn(
-                      "shrink-0 text-g-ink-4 transition-transform duration-200 ease-g",
-                      agentExpanded && "rotate-180",
-                    )}
-                  />
-                </button>
-                {!agentExpanded && settings?.agentRuntime && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {settings.agentRuntime.adapters?.map((a) => (
-                      <Badge key={a.id} tone="default">
-                        {a.name}
-                        {a.version ? ` ${a.version}` : ""}
-                      </Badge>
-                    ))}
-                    <Badge
-                      tone={
-                        settings.agentRuntime.available ? "green" : "default"
-                      }
-                    >
-                      {settings.agentRuntime.available
-                        ? t("settings.agentAvailable")
-                        : t("settings.agentNoneDetected")}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-
-              {agentExpanded && (
-                <>
-                  <FieldRow
-                    label={t("settings.agentEnabled")}
-                    description={t("settings.agentEnabledHint")}
-                  >
-                    <Switch
-                      checked={draft.agentEnabled}
-                      disabled={aiBusy}
-                      onCheckedChange={(next) =>
-                        onUpdateDraft((current) => ({
-                          ...current,
-                          agentEnabled: next,
-                        }))
-                      }
-                      aria-label={t("settings.agentEnabled")}
-                    />
-                  </FieldRow>
-
-                  <FieldRow
-                    label={t("settings.agentAdapter")}
-                    description={t("settings.agentAdapterHint")}
-                  >
-                    <Select
-                      value={draft.agentAdapter || "auto"}
-                      options={[
-                        {
-                          value: "auto",
-                          label: t("settings.agentAdapterAuto"),
-                        },
-                        { value: "codex", label: "Codex CLI" },
-                        { value: "claude", label: "Claude Code" },
-                        { value: "cursor-agent", label: "Cursor Agent" },
-                        { value: "gemini", label: "Gemini CLI" },
-                        { value: "copilot", label: "Copilot CLI" },
-                        { value: "pi", label: "Pi" },
-                        { value: "local-llm", label: "Local LLM" },
-                      ]}
-                      disabled={aiBusy || !draft.agentEnabled}
-                      onChange={(value) =>
-                        onUpdateDraft((current) => ({
-                          ...current,
-                          agentAdapter: value,
-                        }))
-                      }
-                      aria-label={t("settings.agentAdapter")}
-                      className="min-w-[400px]"
-                    />
-                  </FieldRow>
-
-                  {draft.agentAdapter === "local-llm" ? (
-                    <FieldRow
-                      label={t("settings.agentModel")}
-                      description={t("settings.agentLocalLLMHint")}
-                    >
-                      <div className="flex flex-wrap gap-1.5">
-                        {draft.llmProvider && (
-                          <Badge tone="default">{draft.llmProvider}</Badge>
-                        )}
-                        {draft.llmVisionModel && (
-                          <Badge tone="default">{draft.llmVisionModel}</Badge>
-                        )}
-                        {!draft.llmProvider && (
-                          <span className="text-g-ui text-g-ink-4">
-                            {t("settings.agentLocalLLMNotConfigured")}
-                          </span>
-                        )}
-                      </div>
-                    </FieldRow>
-                  ) : (
-                    <FieldRow
-                      label={t("settings.agentModel")}
-                      description={t("settings.agentModelHint")}
-                    >
-                      <TextInput
-                        value={draft.agentModel}
-                        disabled={aiBusy || !draft.agentEnabled}
-                        onChange={(e) =>
-                          onUpdateDraft((current) => ({
-                            ...current,
-                            agentModel: e.target.value,
-                          }))
-                        }
-                        placeholder="gpt-5.4"
-                        aria-label={t("settings.agentModel")}
-                        className="min-w-[400px]"
-                      />
-                    </FieldRow>
-                  )}
                 </>
               )}
+            </>
+          )}
+
+          {aiTab === "agent" && (
+            <>
+              <FieldRow
+                label={t("settings.agentEnabled")}
+                description={t("settings.agentEnabledHint")}
+              >
+                <Switch
+                  checked={draft.agentEnabled}
+                  disabled={aiBusy}
+                  onCheckedChange={(next) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      agentEnabled: next,
+                    }))
+                  }
+                  aria-label={t("settings.agentEnabled")}
+                />
+              </FieldRow>
+
+              {settings?.agentRuntime && (
+                <div className="py-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {settings.agentRuntime.adapters?.length ? (
+                      settings.agentRuntime.adapters.map((a) => (
+                        <Badge key={a.id} tone="green">
+                          {a.name}
+                          {a.version ? ` ${a.version}` : ""}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge tone="default">
+                        {t("settings.agentNoneDetected")}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <FieldRow
+                label={t("settings.agentAdapter")}
+                description={t("settings.agentAdapterHint")}
+              >
+                <Select
+                  value={draft.agentAdapter || "auto"}
+                  options={[
+                    {
+                      value: "auto",
+                      label: t("settings.agentAdapterAuto"),
+                    },
+                    { value: "codex", label: "Codex CLI" },
+                    { value: "claude", label: "Claude Code" },
+                    { value: "cursor-agent", label: "Cursor Agent" },
+                    { value: "gemini", label: "Gemini CLI" },
+                    { value: "copilot", label: "Copilot CLI" },
+                    { value: "pi", label: "Pi" },
+                    { value: "local-llm", label: "Local LLM" },
+                  ]}
+                  disabled={aiBusy || !draft.agentEnabled}
+                  onChange={(value) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      agentAdapter: value,
+                    }))
+                  }
+                  aria-label={t("settings.agentAdapter")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
+
+              <FieldRow
+                label={t("settings.agentModel")}
+                description={t("settings.agentModelHint")}
+              >
+                <TextInput
+                  value={draft.agentModel}
+                  disabled={aiBusy || !draft.agentEnabled}
+                  onChange={(e) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      agentModel: e.target.value,
+                    }))
+                  }
+                  placeholder=""
+                  aria-label={t("settings.agentModel")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
             </>
           )}
           {settingActions}
