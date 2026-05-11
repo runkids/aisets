@@ -378,29 +378,28 @@ export function AISection({
             {t("settings.section.ai")}
           </span>
         </div>
+        <div className="px-6 py-2 md:px-8">
+          <Tabs
+            value={aiTab}
+            items={[
+              { value: "local" as const, label: t("settings.aiTabLocal") },
+              {
+                value: "agent" as const,
+                label: t("settings.aiTabAgent"),
+                badge: settings?.agentRuntime?.adapters?.length ? (
+                  <Badge tone="green">
+                    {settings.agentRuntime.adapters.length}
+                  </Badge>
+                ) : undefined,
+              },
+            ]}
+            onChange={setAiTab}
+            ariaLabel="AI backend"
+            variant="segment"
+            size="sm"
+          />
+        </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-          <div className="py-2">
-            <Tabs
-              value={aiTab}
-              items={[
-                { value: "local" as const, label: t("settings.aiTabLocal") },
-                {
-                  value: "agent" as const,
-                  label: t("settings.aiTabAgent"),
-                  badge: settings?.agentRuntime?.adapters?.length ? (
-                    <Badge tone="green">
-                      {settings.agentRuntime.adapters.length}
-                    </Badge>
-                  ) : undefined,
-                },
-              ]}
-              onChange={setAiTab}
-              ariaLabel="AI backend"
-              variant="segment"
-              size="sm"
-            />
-          </div>
-
           {aiTab === "local" && (
             <>
               <FieldRow
