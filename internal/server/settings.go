@@ -86,6 +86,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if body.AgentEnabled != nil || body.AgentAdapter != nil ||
 		body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMVisionModel != nil {
 		s.initAgentStatus()
+		s.initAgentChat()
 	}
 	settings, err := s.currentSettingsInfo()
 	if err != nil {

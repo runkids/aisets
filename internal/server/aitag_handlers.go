@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"aisets/internal/agent"
 	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
@@ -121,6 +122,42 @@ func extToMIME(ext string) string {
 	}
 }
 
+func (s *Server) chatVLM(ctx context.Context, localPath, ext, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
+	if s.agentChat != nil {
+		var res agent.ChatResult
+		_ = s.agentChat.ChatBatch(ctx, []agent.ChatRequest{{
+			Model:        modelName,
+			SystemPrompt: systemPrompt,
+			Prompt:       prompt,
+			ImagePaths:   []string{localPath},
+			TimeoutSec:   timeoutSec,
+		}}, func(_ int, r agent.ChatResult) { res = r })
+		if res.Err != nil {
+			return "", llm.ChatResponse{DurationMs: res.DurationMs}, res.Err
+		}
+		return res.Content, llm.ChatResponse{
+			Content:      res.Content,
+			InputTokens:  res.InputTokens,
+			OutputTokens: res.OutputTokens,
+			DurationMs:   res.DurationMs,
+		}, nil
+	}
+
+	dataURI, err := prepareImageForVLM(localPath, ext, "tag")
+	if err != nil {
+		return "", llm.ChatResponse{}, err
+	}
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model:      modelName,
+		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
+		TimeoutSec: timeoutSec,
+	})
+	if err != nil {
+		return "", resp, err
+	}
+	return resp.Content, resp, nil
+}
+
 type aiTagWorkResult struct {
 	item     scanner.AssetItem
 	result   aitag.Result
@@ -147,12 +184,10 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "aitag_settings_failed")})
 		return
 	}
-	if !settings.LLMEnabled || settings.LLMProvider == "" || settings.LLMVisionModel == "" {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or vision model not configured")})
-		return
-	}
-	if s.llmProvider == nil {
-		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_provider_unavailable", "LLM provider is not available")})
+	hasLLM := settings.LLMEnabled && settings.LLMProvider != "" && settings.LLMVisionModel != "" && s.llmProvider != nil
+	hasAgent := settings.AgentEnabled && s.agentChat != nil
+	if !hasLLM && !hasAgent {
+		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("aitag_not_configured", "AI provider or agent adapter not configured")})
 		return
 	}
 
@@ -170,8 +205,17 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerName := settings.LLMProvider
-	modelName := settings.LLMVisionModel
+	var providerName, modelName string
+	if hasAgent {
+		providerName = "agent:" + s.agentStatus.Active
+		modelName = settings.AgentModel
+		if modelName == "" {
+			modelName = s.agentStatus.Active
+		}
+	} else {
+		providerName = settings.LLMProvider
+		modelName = settings.LLMVisionModel
+	}
 
 	prompt := settings.LLMTagPrompt
 	if presetID := r.URL.Query().Get("presetId"); presetID != "" {
@@ -396,20 +440,8 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		Status:        aitag.StatusReady,
 	}
 
-	dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "tag")
-	if err != nil {
-		result.Status = aitag.StatusFailed
-		result.ErrorCode = "aitag_read_failed"
-		result.ErrorMessage = err.Error()
-		return result, llm.ChatResponse{}
-	}
-
 	start := time.Now()
-	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
-		TimeoutSec: timeoutSec,
-	})
+	rawContent, resp, err := s.chatVLM(ctx, item.LocalPath, item.Ext, modelName, systemPrompt, prompt, timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -419,8 +451,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 		return result, llm.ChatResponse{}
 	}
 
-	// Parse JSON from response, stripping markdown fences if present
-	content := strings.TrimSpace(resp.Content)
+	content := strings.TrimSpace(rawContent)
 	content = stripMarkdownFences(content)
 	content = fixVLMJSON(content)
 

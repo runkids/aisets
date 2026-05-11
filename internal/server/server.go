@@ -36,6 +36,7 @@ type Server struct {
 	ocrEngine   ocr.Engine
 	llmProvider llm.Provider
 	agentStatus agent.RuntimeStatus
+	agentChat   agent.ChatProvider
 	onReady     func()
 
 	mu            sync.Mutex
@@ -64,6 +65,7 @@ func New(opts Options) (*Server, error) {
 	}
 	s.initLLMProvider()
 	s.initAgentStatus()
+	s.initAgentChat()
 	s.routes()
 	s.handler = s.wrapBasePath(s.mux)
 	return s, nil
@@ -224,6 +226,28 @@ func (s *Server) initAgentStatus() {
 		Model:    settings.LLMVisionModel,
 	}
 	s.agentStatus = agent.BuildRuntimeStatus(context.Background(), adapter, llmInfo)
+}
+
+func (s *Server) initAgentChat() {
+	if s.agentChat != nil {
+		_ = s.agentChat.Close()
+		s.agentChat = nil
+	}
+	if !s.agentStatus.Available || s.agentStatus.Active == "" {
+		return
+	}
+	var info agent.AdapterInfo
+	for _, a := range s.agentStatus.Adapters {
+		if a.ID == s.agentStatus.Active {
+			info = a
+			break
+		}
+	}
+	chat, err := agent.NewChatProvider(s.agentStatus.Active, info, s.llmProvider, prepareImageForVLM)
+	if err != nil {
+		return
+	}
+	s.agentChat = chat
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {
