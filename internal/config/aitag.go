@@ -265,3 +265,144 @@ func (s *Store) AITagResultAny(contentHash, hashAlgorithm string) (*aitag.Result
 	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
 	return &result, nil
 }
+
+// AITagResultAnyWithEnglish returns the AI tag result with English i18n fields preferred.
+// If English i18n translations exist, category/tags/description are replaced with English versions.
+func (s *Store) AITagResultAnyWithEnglish(contentHash, hashAlgorithm string) (*aitag.Result, error) {
+	if contentHash == "" || hashAlgorithm == "" {
+		return nil, nil
+	}
+	row := s.rdb.QueryRow(`
+		SELECT category, tags_json, description,
+		       COALESCE(category_i18n_json, '{}'),
+		       COALESCE(tags_i18n_json, '{}'),
+		       COALESCE(description_i18n_json, '{}')
+		FROM ai_tags
+		WHERE content_hash = ? AND hash_algorithm = ? AND status = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, contentHash, hashAlgorithm, aitag.StatusReady)
+	var result aitag.Result
+	var tagsRaw, catI18n, tagsI18n, descI18n string
+	err := row.Scan(&result.Category, &tagsRaw, &result.Description,
+		&catI18n, &tagsI18n, &descI18n)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+
+	var catMap map[string]string
+	var tagsMap map[string][]string
+	var descMap map[string]string
+	_ = json.Unmarshal([]byte(catI18n), &catMap)
+	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
+	_ = json.Unmarshal([]byte(descI18n), &descMap)
+	if v := catMap["en"]; v != "" {
+		result.Category = v
+	}
+	if v := tagsMap["en"]; len(v) > 0 {
+		result.Tags = v
+	}
+	if v := descMap["en"]; v != "" {
+		result.Description = v
+	}
+	return &result, nil
+}
+
+// AITagI18nRow is a row from ai_tags missing English i18n.
+type AITagI18nRow struct {
+	ContentHash   string
+	HashAlgorithm string
+	Category      string
+	Tags          []string
+	Description   string
+}
+
+// AITagsMissingEnglish returns AI tag rows whose description_i18n_json does not contain an "en" key.
+// contentHashes limits the result to specific hashes (pass nil for all).
+func (s *Store) AITagsMissingEnglish(contentHashes []string) ([]AITagI18nRow, error) {
+	var query string
+	var args []any
+	if len(contentHashes) > 0 {
+		placeholders := make([]string, len(contentHashes))
+		for i, h := range contentHashes {
+			placeholders[i] = "?"
+			args = append(args, h)
+		}
+		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
+			FROM ai_tags
+			WHERE status = 'ready'
+			  AND content_hash IN (` + joinStrings(placeholders, ",") + `)
+			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE '%"en"%')`
+	} else {
+		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
+			FROM ai_tags
+			WHERE status = 'ready'
+			  AND (description_i18n_json IS NULL OR description_i18n_json = '{}' OR description_i18n_json NOT LIKE '%"en"%')`
+	}
+	rows, err := s.rdb.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var results []AITagI18nRow
+	for rows.Next() {
+		var r AITagI18nRow
+		var tagsRaw string
+		if err := rows.Scan(&r.ContentHash, &r.HashAlgorithm, &r.Category, &tagsRaw, &r.Description); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(tagsRaw), &r.Tags)
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+func joinStrings(ss []string, sep string) string {
+	if len(ss) == 0 {
+		return ""
+	}
+	out := ss[0]
+	for _, s := range ss[1:] {
+		out += sep + s
+	}
+	return out
+}
+
+// BackfillEnglishI18n writes English translations into the i18n columns of an ai_tags row.
+func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory string, enTags []string, enDescription string) error {
+	var catI18n, tagsI18n, descI18n string
+
+	// Read existing i18n JSON to merge.
+	_ = s.rdb.QueryRow(`SELECT COALESCE(category_i18n_json,'{}'), COALESCE(tags_i18n_json,'{}'), COALESCE(description_i18n_json,'{}')
+		FROM ai_tags WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'
+		ORDER BY updated_at DESC LIMIT 1`,
+		contentHash, hashAlgorithm).Scan(&catI18n, &tagsI18n, &descI18n)
+
+	catMap := map[string]string{}
+	tagsMap := map[string][]string{}
+	descMap := map[string]string{}
+	_ = json.Unmarshal([]byte(catI18n), &catMap)
+	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
+	_ = json.Unmarshal([]byte(descI18n), &descMap)
+
+	catMap["en"] = enCategory
+	if len(enTags) > 0 {
+		tagsMap["en"] = enTags
+	}
+	descMap["en"] = enDescription
+
+	catBytes, _ := json.Marshal(catMap)
+	tagsBytes, _ := json.Marshal(tagsMap)
+	descBytes, _ := json.Marshal(descMap)
+
+	_, err := s.db.Exec(`UPDATE ai_tags
+		SET category_i18n_json = ?, tags_i18n_json = ?, description_i18n_json = ?
+		WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'`,
+		string(catBytes), string(tagsBytes), string(descBytes),
+		contentHash, hashAlgorithm)
+	return err
+}

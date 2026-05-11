@@ -231,6 +231,10 @@ func DefaultAppSettings() AppSettings {
 		LLMTimeout:                 llm.DefaultChatTimeout,
 		AgentAdapter:               "auto",
 		AgentModel:                 "",
+		EmbedSearchThreshold:       0.5,
+		EmbedSearchLimit:           20,
+		EmbedSearchType:            "hybrid",
+		EmbedInputFields:           []string{"category", "tags", "description"},
 	}
 }
 
@@ -513,6 +517,32 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 			}
 			*pair.dst = v
 		}
+	}
+	if update.EmbedSearchThreshold != nil {
+		v := *update.EmbedSearchThreshold
+		if v < 0 || v > 1 {
+			return AppSettings{}, apierr.New("settings_embed_threshold_invalid", "embed search threshold must be between 0 and 1")
+		}
+		settings.EmbedSearchThreshold = v
+	}
+	if update.EmbedSearchLimit != nil {
+		v := *update.EmbedSearchLimit
+		if v < 1 || v > 100 {
+			return AppSettings{}, apierr.New("settings_embed_limit_invalid", "embed search limit must be between 1 and 100")
+		}
+		settings.EmbedSearchLimit = v
+	}
+	if update.EmbedSearchType != nil {
+		v := *update.EmbedSearchType
+		switch v {
+		case "text", "image", "hybrid":
+			settings.EmbedSearchType = v
+		default:
+			return AppSettings{}, apierr.New("settings_embed_type_invalid", "embed search type must be text, image, or hybrid")
+		}
+	}
+	if update.EmbedInputFields != nil {
+		settings.EmbedInputFields = update.EmbedInputFields
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID

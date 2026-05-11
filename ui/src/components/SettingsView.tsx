@@ -8,6 +8,7 @@ import {
   useCatalogQuery,
   useAddWorkspaceMutation,
   useClearAITagCacheMutation,
+  useClearEmbeddingsMutation,
   useClearOCRCacheMutation,
   useClearScanHistoryMutation,
   useImportSettingsMutation,
@@ -113,6 +114,7 @@ export function SettingsView({
   const clearScanHistoryMutation = useClearScanHistoryMutation();
   const clearOCRCacheMutation = useClearOCRCacheMutation();
   const clearAITagCacheMutation = useClearAITagCacheMutation();
+  const clearEmbeddingsMutation = useClearEmbeddingsMutation();
   const importMutation = useImportSettingsMutation();
   const installOCRMutation = useInstallOCRMutation();
   const removeProjectMutation = useRemoveProjectMutation();
@@ -457,6 +459,20 @@ export function SettingsView({
     });
   }
 
+  function onClearEmbeddings() {
+    clearEmbeddingsMutation.mutate(undefined, {
+      onSuccess: () => {
+        onDismissEmbed();
+        toast.success(t("toast.embeddingsCleared"));
+      },
+      onError: (error) => {
+        toast.error(errorMessage(error), {
+          title: t("toast.embeddingsClearFailed"),
+        });
+      },
+    });
+  }
+
   function settingActionsFor(
     section: Section | "catalogScanning" | "ocr",
     extraDisabled = false,
@@ -685,6 +701,7 @@ export function SettingsView({
               onClearScanHistory={onClearScanHistory}
               onClearOCRCache={onClearOCRCache}
               onClearAITagCache={onClearAITagCache}
+              onClearEmbeddings={onClearEmbeddings}
               onResetSettings={onResetAllSettings}
               onResetDatabase={onResetDatabase}
               onUpdateApp={onUpdateApp}
@@ -692,6 +709,7 @@ export function SettingsView({
               clearScanHistoryPending={clearScanHistoryMutation.isPending}
               clearOCRCachePending={clearOCRCacheMutation.isPending}
               clearAITagCachePending={clearAITagCacheMutation.isPending}
+              clearEmbeddingsPending={clearEmbeddingsMutation.isPending}
               resetPending={resetMutation.isPending}
               importPending={importMutation.isPending}
             />

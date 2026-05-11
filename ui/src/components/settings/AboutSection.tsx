@@ -30,6 +30,7 @@ type AboutSectionProps = {
   onClearScanHistory: () => void;
   onClearOCRCache: () => void;
   onClearAITagCache: () => void;
+  onClearEmbeddings: () => void;
   onResetSettings: () => Promise<void>;
   onResetDatabase: () => void;
   onUpdateApp: () => Promise<void>;
@@ -37,6 +38,7 @@ type AboutSectionProps = {
   clearScanHistoryPending: boolean;
   clearOCRCachePending: boolean;
   clearAITagCachePending: boolean;
+  clearEmbeddingsPending: boolean;
   resetPending: boolean;
   importPending: boolean;
 };
@@ -50,6 +52,7 @@ export function AboutSection({
   onClearScanHistory,
   onClearOCRCache,
   onClearAITagCache,
+  onClearEmbeddings,
   onResetSettings,
   onResetDatabase,
   onUpdateApp,
@@ -57,6 +60,7 @@ export function AboutSection({
   clearScanHistoryPending,
   clearOCRCachePending,
   clearAITagCachePending,
+  clearEmbeddingsPending,
   resetPending,
   importPending,
 }: AboutSectionProps) {
@@ -65,6 +69,7 @@ export function AboutSection({
   const [clearScanHistoryOpen, setClearScanHistoryOpen] = useState(false);
   const [clearOCRCacheOpen, setClearOCRCacheOpen] = useState(false);
   const [clearAITagCacheOpen, setClearAITagCacheOpen] = useState(false);
+  const [clearEmbeddingsOpen, setClearEmbeddingsOpen] = useState(false);
   const [resetDatabaseOpen, setResetDatabaseOpen] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -258,7 +263,7 @@ export function AboutSection({
                     <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
                       {t("settings.clearScanHistory")}
                     </span>
-                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                    <p className="mt-0.5 max-w-[64ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
                       {t("settings.clearScanHistoryHint")}
                     </p>
                   </div>
@@ -279,7 +284,7 @@ export function AboutSection({
                     <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
                       {t("settings.clearOCRCache")}
                     </span>
-                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                    <p className="mt-0.5 max-w-[64ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
                       {t("settings.clearOCRCacheHint")}
                     </p>
                   </div>
@@ -300,7 +305,7 @@ export function AboutSection({
                     <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
                       {t("settings.clearAITagCache")}
                     </span>
-                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                    <p className="mt-0.5 max-w-[64ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
                       {t("settings.clearAITagCacheHint")}
                     </p>
                   </div>
@@ -319,9 +324,30 @@ export function AboutSection({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
+                      {t("settings.clearEmbeddingsTitle")}
+                    </span>
+                    <p className="mt-0.5 max-w-[64ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                      {t("settings.clearEmbeddingsDescription")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setClearEmbeddingsOpen(true)}
+                    disabled={working}
+                    className="relative min-w-[12rem] shrink-0 self-start"
+                  >
+                    <Trash2 size={13} className="absolute left-2.5" />
+                    {t("settings.clearEmbeddings")}
+                  </Button>
+                </div>
+                <div className="border-t border-g-red-soft/50" />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <span className="font-g text-g-ui font-[510] tracking-g-ui text-g-ink">
                       {t("settings.resetDatabase")}
                     </span>
-                    <p className="mt-0.5 max-w-[44ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
+                    <p className="mt-0.5 max-w-[64ch] font-g text-g-caption tracking-g-ui text-g-ink-3">
                       {t("settings.resetDatabaseHint")}
                     </p>
                   </div>
@@ -417,6 +443,17 @@ export function AboutSection({
         loading={clearAITagCachePending}
         onConfirm={onClearAITagCache}
         onCancel={() => setClearAITagCacheOpen(false)}
+      />
+      <ConfirmDialog
+        open={clearEmbeddingsOpen}
+        variant="danger"
+        title={t("settings.clearEmbeddings")}
+        message={t("settings.clearEmbeddingsDescription")}
+        confirmText={t("settings.clearEmbeddings")}
+        cancelText={t("common.cancel")}
+        loading={clearEmbeddingsPending}
+        onConfirm={onClearEmbeddings}
+        onCancel={() => setClearEmbeddingsOpen(false)}
       />
       <ConfirmDialog
         open={resetDatabaseOpen}

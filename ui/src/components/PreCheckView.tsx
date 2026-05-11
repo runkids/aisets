@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { runPreCheckAI } from "../api";
+import { runPreCheckAI, basePath } from "../api";
 import { fileName, formatBytes } from "../ui";
 import { useToast } from "./ToastProvider";
 import {
@@ -179,7 +179,7 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
       try {
         const form = new FormData();
         list.forEach((f) => form.append("files", f, f.name));
-        const res = await fetch("/api/pre-check", {
+        const res = await fetch(`${basePath}/api/pre-check`, {
           method: "POST",
           body: form,
         });

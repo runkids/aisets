@@ -63,7 +63,7 @@ export function VariablesPanel({ variables, onChange, presetType }: Props) {
                 {builtinDef?.required && (
                   <Star
                     size={10}
-                    className="shrink-0 fill-current text-g-amber"
+                    className="shrink-0 fill-current text-g-yellow"
                   />
                 )}
               </span>

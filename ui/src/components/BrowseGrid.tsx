@@ -314,13 +314,14 @@ export function BrowseGrid({
             <div className="mt-1 flex flex-wrap items-center gap-1">
               <OCRStatusBadge item={item} />
               <AITagBadge item={item} />
-              <button
+              <div
                 ref={
                   tagPickerAsset?.id === item.id
                     ? tagPickerTriggerRef
                     : undefined
                 }
-                type="button"
+                role="button"
+                tabIndex={0}
                 className="inline-flex items-center justify-center size-5 rounded-g-pill border border-dashed border-g-line text-g-ink-4 hover:border-g-accent hover:text-g-accent transition-colors cursor-pointer opacity-0 group-hover/card:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -328,10 +329,19 @@ export function BrowseGrid({
                     prev?.id === item.id ? null : item,
                   );
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTagPickerAsset((prev) =>
+                      prev?.id === item.id ? null : item,
+                    );
+                  }
+                }}
                 aria-label={t("tags.addTag")}
               >
                 <Plus size={10} />
-              </button>
+              </div>
             </div>
           )}
         </div>

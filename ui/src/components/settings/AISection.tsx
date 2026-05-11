@@ -13,6 +13,7 @@ import {
   Settings2,
   Shuffle,
   Square,
+  Wand2,
   Waypoints,
   Star,
   Tags,
@@ -35,7 +36,12 @@ import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
 import type { EmbedActivityState } from "../../embedActivity";
 import { isEmbedActivityBusy } from "../../embedActivity";
-import type { AITagRunCounts, VLMOcrRunCounts, Workspace } from "../../types";
+import type {
+  AITagRunCounts,
+  EmbedRunCounts,
+  VLMOcrRunCounts,
+  Workspace,
+} from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import type { ScopeProject } from "./AIScopePicker";
 import { AIScopePicker } from "./AIScopePicker";
@@ -43,6 +49,7 @@ import { VLMBackendSelect } from "./VLMBackendSelect";
 
 const AI_TAG_LAST_RUN_KEY = "aisets:ai-tag:last-run";
 const VLM_OCR_LAST_RUN_KEY = "aisets:vlm-ocr:last-run";
+const EMBED_LAST_RUN_KEY = "aisets:embed:last-run";
 
 type LastRunRecord<T> = {
   counts: T;
@@ -51,6 +58,7 @@ type LastRunRecord<T> = {
   elapsedMs?: number;
   providerName?: string;
   modelName?: string;
+  errors?: { repoPath: string; message: string }[];
 };
 
 function readLastRun<T>(key: string): LastRunRecord<T> | null {
@@ -69,6 +77,7 @@ function saveLastRun<T>(
   elapsedMs?: number,
   providerName?: string,
   modelName?: string,
+  errors?: { repoPath: string; message: string }[],
 ): void {
   try {
     localStorage.setItem(
@@ -80,6 +89,7 @@ function saveLastRun<T>(
         elapsedMs,
         providerName,
         modelName,
+        errors: errors && errors.length > 0 ? errors : undefined,
       }),
     );
   } catch {
@@ -93,6 +103,22 @@ function formatElapsed(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+function middleTruncatePath(path: string, maxLen = 55): string {
+  if (path.length <= maxLen) return path;
+  const parts = path.split("/");
+  if (parts.length <= 2) {
+    const half = Math.floor((maxLen - 1) / 2);
+    return path.slice(0, half) + "…" + path.slice(-(maxLen - half - 1));
+  }
+  const fileName = parts[parts.length - 1];
+  for (let n = parts.length - 2; n >= 1; n--) {
+    const head = parts.slice(0, n).join("/");
+    const result = head + "/…/" + fileName;
+    if (result.length <= maxLen) return result;
+  }
+  return parts[0] + "/…/" + fileName;
 }
 
 function formatTokenCount(n: number): string {
@@ -148,7 +174,11 @@ type AISectionProps = {
   ) => void;
   onStopVLMOcr: () => void;
   embedActivity: EmbedActivityState;
-  onStartEmbed: (projectIds?: string[], scopeLabel?: string) => void;
+  onStartEmbed: (
+    projectIds?: string[],
+    scopeLabel?: string,
+    force?: boolean,
+  ) => void;
   onStopEmbed: () => void;
   onNavigate?: (mode: Mode) => void;
 };
@@ -204,9 +234,9 @@ export function AISection({
   const vlmBackendMutation = useUpdateSettingsMutation();
   const detectMutation = useDetectAgentCLIsMutation();
   const toast = useToast();
-  const [aiTab, setAiTab] = useState<"local" | "agent" | "backend" | "prompts">(
-    "local",
-  );
+  const [aiTab, setAiTab] = useState<
+    "local" | "agent" | "backend" | "prompts" | "search"
+  >("local");
   const [tagWorkspaceId, setTagWorkspaceId] =
     useState<string>(activeWorkspaceId);
   const [tagProjectId, setTagProjectId] = useState<string>("");
@@ -272,6 +302,8 @@ export function AISection({
           : undefined;
       const pn = aiTagActivity.providerName;
       const mn = aiTagActivity.modelName;
+      const errs =
+        aiTagActivity.errors.length > 0 ? aiTagActivity.errors : undefined;
       const record: LastRunRecord<AITagRunCounts> = {
         counts: aiTagActivity.counts,
         timestamp: Date.now(),
@@ -279,6 +311,7 @@ export function AISection({
         elapsedMs,
         providerName: pn,
         modelName: mn,
+        errors: errs,
       };
       saveLastRun(
         AI_TAG_LAST_RUN_KEY,
@@ -287,6 +320,7 @@ export function AISection({
         elapsedMs,
         pn,
         mn,
+        errs,
       );
       setLastAITagRun(record);
     }
@@ -315,6 +349,8 @@ export function AISection({
           : undefined;
       const pn = vlmOcrActivity.providerName;
       const mn = vlmOcrActivity.modelName;
+      const errs =
+        vlmOcrActivity.errors.length > 0 ? vlmOcrActivity.errors : undefined;
       const record: LastRunRecord<VLMOcrRunCounts> = {
         counts: vlmOcrActivity.counts,
         timestamp: Date.now(),
@@ -322,6 +358,7 @@ export function AISection({
         elapsedMs,
         providerName: pn,
         modelName: mn,
+        errors: errs,
       };
       saveLastRun(
         VLM_OCR_LAST_RUN_KEY,
@@ -330,6 +367,7 @@ export function AISection({
         elapsedMs,
         pn,
         mn,
+        errs,
       );
       setLastVLMOcrRun(record);
     }
@@ -338,6 +376,57 @@ export function AISection({
     vlmOcrActivity.counts,
     vlmOcrActivity.startedAt,
     vlmOcrActivity.scopeLabel,
+  ]);
+
+  const [lastEmbedRun, setLastEmbedRun] =
+    useState<LastRunRecord<EmbedRunCounts> | null>(() =>
+      readLastRun<EmbedRunCounts>(EMBED_LAST_RUN_KEY),
+    );
+  const prevEmbedPhase = useRef(embedActivity.phase);
+  useEffect(() => {
+    const prev = prevEmbedPhase.current;
+    prevEmbedPhase.current = embedActivity.phase;
+    if (
+      (prev === "running" || prev === "stopping") &&
+      (embedActivity.phase === "done" ||
+        embedActivity.phase === "stopped" ||
+        embedActivity.phase === "error") &&
+      embedActivity.counts
+    ) {
+      const sl = embedActivity.scopeLabel;
+      const elapsedMs =
+        embedActivity.startedAt != null
+          ? Date.now() - embedActivity.startedAt
+          : undefined;
+      const pn = embedActivity.providerName;
+      const mn = embedActivity.modelName;
+      const errs =
+        embedActivity.errors.length > 0 ? embedActivity.errors : undefined;
+      const record: LastRunRecord<EmbedRunCounts> = {
+        counts: embedActivity.counts,
+        timestamp: Date.now(),
+        scopeLabel: sl,
+        elapsedMs,
+        providerName: pn,
+        modelName: mn,
+        errors: errs,
+      };
+      saveLastRun(
+        EMBED_LAST_RUN_KEY,
+        embedActivity.counts,
+        sl,
+        elapsedMs,
+        pn,
+        mn,
+        errs,
+      );
+      setLastEmbedRun(record);
+    }
+  }, [
+    embedActivity.phase,
+    embedActivity.counts,
+    embedActivity.startedAt,
+    embedActivity.scopeLabel,
   ]);
 
   const aiBusy =
@@ -454,6 +543,11 @@ export function AISection({
                   value: "prompts" as const,
                   label: t("settings.aiTabPrompts"),
                   icon: <MessageSquareText />,
+                },
+                {
+                  value: "search" as const,
+                  label: t("settings.aiTabSearch"),
+                  icon: <Wand2 />,
                 },
               ]}
               onChange={setAiTab}
@@ -888,7 +982,141 @@ export function AISection({
             </div>
           )}
 
-          {(aiTab === "local" || aiTab === "agent") && settingActions}
+          {aiTab === "search" && (
+            <>
+              <FieldRow
+                label={t("settings.embedSearchType")}
+                description={t("settings.embedSearchTypeHint")}
+              >
+                <Select
+                  value={draft.embedSearchType || "hybrid"}
+                  options={[
+                    { value: "hybrid", label: t("settings.embedTypeHybrid") },
+                    { value: "text", label: t("settings.embedTypeText") },
+                    { value: "image", label: t("settings.embedTypeImage") },
+                  ]}
+                  onChange={(value) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      embedSearchType: value,
+                    }))
+                  }
+                  aria-label={t("settings.embedSearchType")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
+
+              <FieldRow
+                label={t("settings.embedSearchThreshold")}
+                description={t("settings.embedSearchThresholdHint")}
+              >
+                <TextInput
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={String(draft.embedSearchThreshold ?? 0.5)}
+                  onChange={(e) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      embedSearchThreshold: Math.max(
+                        0,
+                        Math.min(1, Number(e.target.value) || 0.5),
+                      ),
+                    }))
+                  }
+                  aria-label={t("settings.embedSearchThreshold")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
+
+              <FieldRow
+                label={t("settings.embedSearchLimit")}
+                description={t("settings.embedSearchLimitHint")}
+              >
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={String(draft.embedSearchLimit ?? 20)}
+                  onChange={(e) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      embedSearchLimit: Math.max(
+                        1,
+                        Math.min(100, Number(e.target.value) || 20),
+                      ),
+                    }))
+                  }
+                  aria-label={t("settings.embedSearchLimit")}
+                  className="min-w-[400px]"
+                />
+              </FieldRow>
+
+              <FieldRow
+                label={t("settings.embedInputFields")}
+                description={t("settings.embedInputFieldsHint")}
+              >
+                <div className="flex flex-wrap gap-2 min-w-[400px]">
+                  {(
+                    [
+                      {
+                        id: "category",
+                        label: t("settings.embedFieldCategory"),
+                      },
+                      { id: "tags", label: t("settings.embedFieldTags") },
+                      {
+                        id: "description",
+                        label: t("settings.embedFieldDescription"),
+                      },
+                      {
+                        id: "fileName",
+                        label: t("settings.embedFieldFileName"),
+                      },
+                      { id: "ocrText", label: t("settings.embedFieldOcrText") },
+                    ] as const
+                  ).map((field) => {
+                    const fields = draft.embedInputFields ?? [
+                      "category",
+                      "tags",
+                      "description",
+                    ];
+                    const active = fields.includes(field.id);
+                    return (
+                      <Button
+                        key={field.id}
+                        variant="chip"
+                        size="sm"
+                        data-active={active || undefined}
+                        onClick={() =>
+                          onUpdateDraft((current) => {
+                            const cur = current.embedInputFields ?? [
+                              "category",
+                              "tags",
+                              "description",
+                            ];
+                            const next = active
+                              ? cur.filter((f) => f !== field.id)
+                              : [...cur, field.id];
+                            return {
+                              ...current,
+                              embedInputFields: next.length > 0 ? next : cur,
+                            };
+                          })
+                        }
+                      >
+                        {active && <Check size={12} />}
+                        {field.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </FieldRow>
+            </>
+          )}
+
+          {(aiTab === "local" || aiTab === "agent" || aiTab === "search") &&
+            settingActions}
         </div>
       </Card>
 
@@ -952,7 +1180,7 @@ export function AISection({
                             icon: p.isDefault ? (
                               <Star
                                 size={14}
-                                className="fill-current text-g-amber"
+                                className="fill-current text-g-yellow"
                               />
                             ) : undefined,
                           }))}
@@ -992,6 +1220,7 @@ export function AISection({
                   elapsedMs={lastAITagRun.elapsedMs}
                   providerName={lastAITagRun.providerName}
                   modelName={lastAITagRun.modelName}
+                  errors={lastAITagRun.errors}
                 />
               ) : null}
             </div>
@@ -1051,7 +1280,7 @@ export function AISection({
                             icon: p.isDefault ? (
                               <Star
                                 size={14}
-                                className="fill-current text-g-amber"
+                                className="fill-current text-g-yellow"
                               />
                             ) : undefined,
                           }))}
@@ -1091,6 +1320,7 @@ export function AISection({
                   elapsedMs={lastVLMOcrRun.elapsedMs}
                   providerName={lastVLMOcrRun.providerName}
                   modelName={lastVLMOcrRun.modelName}
+                  errors={lastVLMOcrRun.errors}
                 />
               ) : null}
             </div>
@@ -1149,6 +1379,7 @@ export function AISection({
                           onStartEmbed(
                             resolveProjectIds(embedWorkspaceId, embedProjectId),
                             resolveScopeLabel(embedWorkspaceId, embedProjectId),
+                            true,
                           );
                         }}
                       >
@@ -1157,43 +1388,21 @@ export function AISection({
                     )}
                   </div>
                   {isEmbedActivityBusy(embedActivity) ||
-                  embedActivity.phase === "error" ||
-                  embedActivity.phase === "done" ? (
-                    <div className="flex flex-col gap-0.5 items-end">
-                      {embedActivity.counts && (
-                        <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
-                          {isEmbedActivityBusy(embedActivity) && (
-                            <LoaderCircle
-                              size={12}
-                              className="animate-spin shrink-0"
-                            />
-                          )}
-                          {t("activity.embedCounts", {
-                            processed: embedActivity.counts.processed,
-                            ready: embedActivity.counts.ready,
-                            failed: embedActivity.counts.failed,
-                            skipped: embedActivity.counts.skipped,
-                          })}
-                        </p>
-                      )}
-                      {embedActivity.currentFile &&
-                        isEmbedActivityBusy(embedActivity) && (
-                          <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-                            {embedActivity.currentFile}
-                          </p>
-                        )}
-                      {embedActivity.providerName && (
-                        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-                          {embedActivity.providerName}
-                          {embedActivity.modelName
-                            ? ` / ${embedActivity.modelName}`
-                            : ""}
-                        </span>
-                      )}
-                      {embedActivity.errors.length > 0 && (
-                        <ActivityErrorPanel errors={embedActivity.errors} />
-                      )}
-                    </div>
+                  embedActivity.phase === "error" ? (
+                    <EmbedProgressText
+                      activity={embedActivity}
+                      startedAt={embedActivity.startedAt}
+                    />
+                  ) : lastEmbedRun ? (
+                    <LastRunText
+                      counts={lastEmbedRun.counts}
+                      timestamp={lastEmbedRun.timestamp}
+                      scopeLabel={lastEmbedRun.scopeLabel}
+                      elapsedMs={lastEmbedRun.elapsedMs}
+                      providerName={lastEmbedRun.providerName}
+                      modelName={lastEmbedRun.modelName}
+                      errors={lastEmbedRun.errors}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -1269,24 +1478,27 @@ function LastRunText({
   elapsedMs,
   providerName,
   modelName,
+  errors,
 }: {
-  counts: AITagRunCounts | VLMOcrRunCounts;
+  counts: AITagRunCounts | VLMOcrRunCounts | EmbedRunCounts;
   timestamp: number;
   scopeLabel?: string;
   elapsedMs?: number;
   providerName?: string;
   modelName?: string;
+  errors?: { repoPath: string; message: string }[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language || undefined;
   const date = new Date(timestamp);
-  const timeStr = date.toLocaleTimeString([], {
+  const timeStr = date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
   const dateStr =
     date.toDateString() === new Date().toDateString()
       ? timeStr
-      : date.toLocaleDateString([], { month: "short", day: "numeric" }) +
+      : date.toLocaleDateString(locale, { month: "short", day: "numeric" }) +
         " " +
         timeStr;
 
@@ -1302,29 +1514,9 @@ function LastRunText({
       : providerName || modelName;
 
   return (
-    <div className="flex flex-col gap-0.5 items-end">
+    <div className="flex flex-col gap-1 items-end">
       <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
         <span>{t("settings.aiLastRun", { time: dateStr })}</span>
-        {"ready" in counts && (
-          <>
-            {sep}
-            <span>
-              {t("settings.aiLastRunCounts", {
-                ready: counts.ready,
-                skipped: counts.skipped,
-                cacheHit: counts.cacheHit,
-              })}
-            </span>
-          </>
-        )}
-        {counts.failed > 0 && (
-          <>
-            {sep}
-            <span className="text-g-red">
-              {t("settings.aiLastRunFailed", { failed: counts.failed })}
-            </span>
-          </>
-        )}
         {elapsedMs != null && (
           <>
             {sep}
@@ -1332,7 +1524,29 @@ function LastRunText({
           </>
         )}
       </p>
-      <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4 flex items-center gap-1.5">
+      {"ready" in counts && (
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          <Badge tone={counts.ready > 0 ? "green" : "default"}>
+            {t("settings.aiStatReady", { count: counts.ready })}
+          </Badge>
+          {counts.skipped > 0 && (
+            <Badge>
+              {t("settings.aiStatSkipped", { count: counts.skipped })}
+            </Badge>
+          )}
+          {counts.cacheHit > 0 && (
+            <Badge>
+              {t("settings.aiStatCached", { count: counts.cacheHit })}
+            </Badge>
+          )}
+          {counts.failed > 0 && (
+            <Badge tone="red">
+              {t("settings.aiStatFailed", { count: counts.failed })}
+            </Badge>
+          )}
+        </div>
+      )}
+      <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4 flex items-center gap-1.5 flex-wrap justify-end">
         {scopeLabel && <span>{scopeLabel}</span>}
         {providerModel && (
           <>
@@ -1340,14 +1554,18 @@ function LastRunText({
             <span>{providerModel}</span>
           </>
         )}
+        {"inputTokens" in counts &&
+          (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
+            <>
+              {(scopeLabel || providerModel) && sep}
+              <TokenBadge
+                inputTokens={counts.inputTokens ?? 0}
+                outputTokens={counts.outputTokens ?? 0}
+              />
+            </>
+          )}
       </span>
-      {"inputTokens" in counts &&
-        (counts.inputTokens ?? 0) + (counts.outputTokens ?? 0) > 0 && (
-          <TokenBadge
-            inputTokens={counts.inputTokens ?? 0}
-            outputTokens={counts.outputTokens ?? 0}
-          />
-        )}
+      {errors && errors.length > 0 && <ActivityErrorPanel errors={errors} />}
     </div>
   );
 }
@@ -1458,8 +1676,8 @@ function AITagProgressText({
         )}
       </p>
       {busy && activity.currentFile && (
-        <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-          {activity.currentFile}
+        <p className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {middleTruncatePath(activity.currentFile)}
         </p>
       )}
       {activity.providerName && (
@@ -1549,8 +1767,8 @@ function VLMOcrProgressText({
         )}
       </p>
       {busy && activity.currentFile && (
-        <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-          {activity.currentFile}
+        <p className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {middleTruncatePath(activity.currentFile)}
         </p>
       )}
       {activity.providerName && (
@@ -1564,6 +1782,90 @@ function VLMOcrProgressText({
           inputTokens={counts.inputTokens ?? 0}
           outputTokens={counts.outputTokens ?? 0}
         />
+      )}
+      {activity.errors.length > 0 && (
+        <ActivityErrorPanel errors={activity.errors} />
+      )}
+    </div>
+  );
+}
+
+function embedProgressLabel(
+  activity: EmbedActivityState,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  const counts = activity.counts;
+  switch (activity.phase) {
+    case "running":
+    case "stopping":
+      return counts
+        ? t("activity.embedCounts", {
+            processed: counts.processed,
+            ready: counts.ready,
+            failed: counts.failed,
+            skipped: counts.skipped,
+          })
+        : t("settings.embedRun");
+    case "done":
+      return counts
+        ? t("activity.embedCounts", {
+            processed: counts.processed,
+            ready: counts.ready,
+            failed: counts.failed,
+            skipped: counts.skipped,
+          })
+        : "";
+    case "stopped":
+      return t("settings.embedStopped");
+    case "error":
+      return activity.errorMessage ?? t("settings.embedFailed");
+    default:
+      return "";
+  }
+}
+
+function EmbedProgressText({
+  activity,
+  startedAt,
+}: {
+  activity: EmbedActivityState;
+  startedAt?: number;
+}) {
+  const { t } = useTranslation();
+  const busy = isEmbedActivityBusy(activity);
+  const label = embedProgressLabel(activity, t);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!busy || !startedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [busy, startedAt]);
+  const elapsedMs = busy && startedAt ? now - startedAt : undefined;
+
+  return (
+    <div className="flex flex-col gap-0.5 items-end">
+      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+        {busy && <LoaderCircle size={12} className="animate-spin shrink-0" />}
+        {label}
+        {elapsedMs != null && (
+          <>
+            <span className="text-g-ink-5 select-none" aria-hidden>
+              ·
+            </span>
+            <span className="text-g-ink-4">{formatElapsed(elapsedMs)}</span>
+          </>
+        )}
+      </p>
+      {busy && activity.currentFile && (
+        <p className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {middleTruncatePath(activity.currentFile)}
+        </p>
+      )}
+      {activity.providerName && (
+        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+          {activity.providerName}
+          {activity.modelName ? ` / ${activity.modelName}` : ""}
+        </span>
       )}
       {activity.errors.length > 0 && (
         <ActivityErrorPanel errors={activity.errors} />

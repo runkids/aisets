@@ -638,6 +638,7 @@ export async function runEmbedding(options?: {
   projectIds?: string[];
   assetIds?: string[];
   types?: ("text" | "image")[];
+  force?: boolean;
 }) {
   const qp = new URLSearchParams();
   if (options?.projectIds?.length)
@@ -646,6 +647,7 @@ export async function runEmbedding(options?: {
   const bodyObj: Record<string, unknown> = {};
   if (options?.assetIds?.length) bodyObj.assetIds = options.assetIds;
   if (options?.types?.length) bodyObj.types = options.types;
+  if (options?.force) bodyObj.force = true;
   const fetchBody = Object.keys(bodyObj).length
     ? JSON.stringify(bodyObj)
     : undefined;
@@ -679,7 +681,7 @@ export function clearEmbeddings() {
 
 export function semanticSearch(options: {
   q: string;
-  type?: "text" | "image";
+  type?: "text" | "image" | "hybrid";
   limit?: number;
   threshold?: number;
 }) {

@@ -1,5 +1,5 @@
 import type { ActionPreview, AssetItem } from "../types";
-import { APIError } from "../api";
+import { APIError, basePath } from "../api";
 
 export type Operation =
   | ""
@@ -122,12 +122,15 @@ export async function streamEstimate(
   signal?: AbortSignal,
   onEvent?: (event: EstimateStreamEvent) => void,
 ): Promise<void> {
-  const response = await fetch("/api/actions/optimization/estimate-stream", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
+  const response = await fetch(
+    `${basePath}/api/actions/optimization/estimate-stream`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    },
+  );
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(

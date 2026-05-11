@@ -213,7 +213,7 @@ function PresetList({
               active={selectedId === preset.id}
               icon={
                 preset.isDefault ? (
-                  <Star size={14} className="fill-current text-g-amber" />
+                  <Star size={14} className="fill-current text-g-yellow" />
                 ) : undefined
               }
               label={preset.name}

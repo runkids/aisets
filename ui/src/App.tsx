@@ -702,6 +702,7 @@ export function App() {
     assetIds?: string[],
     types?: ("text" | "image")[],
     scopeLabel?: string,
+    force?: boolean,
   ) {
     if (embedRunRef.current) return;
 
@@ -710,7 +711,7 @@ export function App() {
         abortRef: embedAbortRef,
         dispatch: dispatchEmbedActivity,
         run: ({ signal, onEvent }) =>
-          runEmbedding({ signal, onEvent, projectIds, assetIds, types }),
+          runEmbedding({ signal, onEvent, projectIds, assetIds, types, force }),
         scopeLabel,
       });
 
@@ -1028,12 +1029,13 @@ export function App() {
               onStopVLMOcr={onStopVLMOcrActivity}
               onDismissVLMOcr={onDismissVLMOcrActivity}
               embedActivity={embedActivity}
-              onStartEmbed={(projectIds, scopeLabel) =>
+              onStartEmbed={(projectIds, scopeLabel, force) =>
                 onStartEmbedActivity(
                   projectIds,
                   undefined,
                   undefined,
                   scopeLabel,
+                  force,
                 )
               }
               onStopEmbed={onStopEmbedActivity}
@@ -1184,6 +1186,10 @@ export function App() {
         scanId={catalogSummary?.scanId}
         customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
         ocrEnabled={ocrEnabled}
+        embedEnabled={
+          (settingsQuery.data?.settings.llmEnabled ?? false) &&
+          !!settingsQuery.data?.settings.llmEmbedModel
+        }
         onClose={() => setCmdkOpen(false)}
         onNavigate={changeMode}
         onOpenAsset={openAssetFromPalette}

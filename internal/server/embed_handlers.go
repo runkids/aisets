@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,6 +49,7 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	embedModel := settings.LLMEmbedModel
+	visionModel := settings.LLMVisionModel
 	if embedModel == "" {
 		sendNDJSON(w, map[string]any{"type": "error", "error": apierr.New("embed_model_missing", "Embed model not configured")})
 		return
@@ -56,11 +58,12 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		AssetIDs []string `json:"assetIds"`
 		Types    []string `json:"types"`
+		Force    bool     `json:"force"`
 	}
 	if r.ContentLength > 0 {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 	}
-	forceReprocess := len(body.AssetIDs) > 0
+	forceReprocess := body.Force || len(body.AssetIDs) > 0
 
 	requestedTypes := map[string]bool{"text": true}
 	if len(body.Types) > 0 {
@@ -142,6 +145,19 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 			}
 			candidates = append(candidates, embedJob{item: item, embedType: embedType})
 			counts.Queued++
+		}
+	}
+
+	// Pre-step: batch-translate AI tags missing English i18n.
+	if requestedTypes["text"] && visionModel != "" {
+		var hashes []string
+		for _, job := range candidates {
+			if job.embedType == "text" {
+				hashes = append(hashes, job.item.ContentHash)
+			}
+		}
+		if len(hashes) > 0 {
+			s.backfillEnglishI18nBatch(r.Context(), w, hashes, visionModel)
 		}
 	}
 
@@ -241,7 +257,7 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 
 	switch embedType {
 	case "text":
-		tagResult, err := s.store.AITagResultAny(item.ContentHash, item.HashAlgorithm)
+		tagResult, err := s.store.AITagResultAnyWithEnglish(item.ContentHash, item.HashAlgorithm)
 		if err != nil || tagResult == nil {
 			result.Status = "error"
 			result.ErrorCode = "embed_no_aitag"
@@ -255,6 +271,12 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 		if tagResult.Description != "" {
 			parts = append(parts, tagResult.Description)
 		}
+		name := filepath.Base(item.RepoPath)
+		if ext := filepath.Ext(name); ext != "" {
+			name = strings.TrimSuffix(name, ext)
+		}
+		name = strings.ReplaceAll(strings.ReplaceAll(name, "_", " "), "-", " ")
+		parts = append(parts, name)
 		req.Input = strings.Join(parts, " ")
 
 	case "image":
@@ -289,6 +311,81 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 	return embedWorkResult{item: item, embedType: embedType, result: result, vector: resp.Embedding}
 }
 
+const i18nBatchSize = 20
+
+func (s *Server) backfillEnglishI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, chatModel string) {
+	missing, err := s.store.AITagsMissingEnglish(contentHashes)
+	if err != nil || len(missing) == 0 {
+		return
+	}
+
+	sendNDJSON(w, map[string]any{"type": "translating", "total": len(missing)})
+
+	for i := 0; i < len(missing); i += i18nBatchSize {
+		if ctx.Err() != nil {
+			return
+		}
+		end := min(i+i18nBatchSize, len(missing))
+		batch := missing[i:end]
+
+		prompt := "Translate each numbered item to English. Return ONLY the translations, one per line, same numbering. Keep category on the first word, tags comma-separated, description as-is.\n\n"
+		for j, row := range batch {
+			text := row.Category
+			if len(row.Tags) > 0 {
+				text += " | " + strings.Join(row.Tags, ", ")
+			}
+			if row.Description != "" {
+				text += " | " + row.Description
+			}
+			prompt += strconv.Itoa(j+1) + ". " + text + "\n"
+		}
+
+		resp, cerr := s.llmProvider.Chat(ctx, llm.ChatRequest{
+			Model: chatModel,
+			Messages: []llm.ChatMessage{
+				{Role: "user", Content: prompt},
+			},
+			TimeoutSec: 30,
+		})
+		if cerr != nil {
+			continue
+		}
+
+		lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
+		for j, row := range batch {
+			if j >= len(lines) {
+				break
+			}
+			line := strings.TrimSpace(lines[j])
+			// Strip leading "N. " numbering
+			if idx := strings.Index(line, ". "); idx >= 0 && idx <= 3 {
+				line = strings.TrimSpace(line[idx+2:])
+			}
+
+			parts := strings.SplitN(line, "|", 3)
+			enCategory := strings.TrimSpace(parts[0])
+			var enTags []string
+			var enDesc string
+			if len(parts) >= 2 {
+				for _, t := range strings.Split(parts[1], ",") {
+					if t = strings.TrimSpace(t); t != "" {
+						enTags = append(enTags, t)
+					}
+				}
+			}
+			if len(parts) >= 3 {
+				enDesc = strings.TrimSpace(parts[2])
+			}
+			if enCategory == "" {
+				continue
+			}
+			_ = s.store.BackfillEnglishI18n(row.ContentHash, row.HashAlgorithm, enCategory, enTags, enDesc)
+		}
+
+		sendNDJSON(w, map[string]any{"type": "translating", "translated": min(end, len(missing)), "total": len(missing)})
+	}
+}
+
 func (s *Server) handleEmbedClear(w http.ResponseWriter, _ *http.Request) {
 	if err := s.store.RemoveEmbeddings(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_clear_failed"))
@@ -297,26 +394,35 @@ func (s *Server) handleEmbedClear(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+func containsNonLatin(s string) bool {
+	for _, r := range s {
+		if r > 0x024F {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) translateToEnglish(ctx context.Context, text, model string) string {
+	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
+		Model: model,
+		Messages: []llm.ChatMessage{
+			{Role: "system", Content: "Translate the user's text to English. Output ONLY the English translation, nothing else. Keep it concise."},
+			{Role: "user", Content: text},
+		},
+		TimeoutSec: 10,
+	})
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(resp.Content)
+}
+
 func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if q == "" {
 		writeJSON(w, http.StatusBadRequest, apierr.New("embed_search_empty", "query parameter q is required"))
 		return
-	}
-
-	embedType := r.URL.Query().Get("type")
-	if embedType == "" {
-		embedType = "text"
-	}
-	limitStr := r.URL.Query().Get("limit")
-	limit := 20
-	if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 100 {
-		limit = n
-	}
-	thresholdStr := r.URL.Query().Get("threshold")
-	threshold := float32(0.3)
-	if f, err := strconv.ParseFloat(thresholdStr, 32); err == nil {
-		threshold = float32(f)
 	}
 
 	settings, err := s.store.Settings()
@@ -329,38 +435,111 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start := time.Now()
-	queryResp, err := s.llmProvider.Embed(r.Context(), llm.EmbedRequest{
-		Model: settings.LLMEmbedModel,
-		Input: q,
-	})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_query_failed"))
-		return
+	embedType := r.URL.Query().Get("type")
+	if embedType == "" {
+		embedType = settings.EmbedSearchType
+		if embedType == "" {
+			embedType = "hybrid"
+		}
+	}
+	limit := settings.EmbedSearchLimit
+	if limit == 0 {
+		limit = 20
+	}
+	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 && n <= 100 {
+		limit = n
+	}
+	threshold := float32(settings.EmbedSearchThreshold)
+	if threshold == 0 {
+		threshold = 0.5
+	}
+	if f, err := strconv.ParseFloat(r.URL.Query().Get("threshold"), 32); err == nil {
+		threshold = float32(f)
 	}
 
-	allEmbeddings, err := s.store.AllReadyEmbeddings(embedType)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_load_failed"))
-		return
+	start := time.Now()
+
+	queryTexts := []string{q}
+	if containsNonLatin(q) {
+		if translated := s.translateToEnglish(r.Context(), q, settings.LLMVisionModel); translated != "" && translated != q {
+			queryTexts = append(queryTexts, translated)
+		}
+	}
+
+	var queryVectors [][]float32
+	for _, text := range queryTexts {
+		resp, err := s.llmProvider.Embed(r.Context(), llm.EmbedRequest{
+			Model: settings.LLMEmbedModel,
+			Input: text,
+		})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_query_failed"))
+			return
+		}
+		queryVectors = append(queryVectors, resp.Embedding)
+	}
+
+	// Load embeddings: hybrid queries both text and image, takes max per asset.
+	typesToQuery := []string{embedType}
+	if embedType == "hybrid" {
+		typesToQuery = []string{"text", "image"}
+	}
+
+	type assetScore struct {
+		projectID   string
+		repoPath    string
+		contentHash string
+		similarity  float32
+	}
+	bestPerAsset := map[string]*assetScore{}
+
+	var totalEmbeddings int
+	for _, et := range typesToQuery {
+		embs, err := s.store.AllReadyEmbeddings(et)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_load_failed"))
+			return
+		}
+		totalEmbeddings += len(embs)
+		for _, emb := range embs {
+			var best float32
+			for _, qv := range queryVectors {
+				if sim := embedding.CosineSimilarity(qv, emb.Vector); sim > best {
+					best = sim
+				}
+			}
+			if prev, ok := bestPerAsset[emb.AssetID]; ok {
+				if best > prev.similarity {
+					prev.similarity = best
+				}
+			} else {
+				bestPerAsset[emb.AssetID] = &assetScore{
+					projectID:   emb.ProjectID,
+					repoPath:    emb.RepoPath,
+					contentHash: emb.ContentHash,
+					similarity:  best,
+				}
+			}
+		}
 	}
 
 	type scoredResult struct {
-		AssetID    string  `json:"assetId"`
-		ProjectID  string  `json:"projectId"`
-		RepoPath   string  `json:"repoPath"`
-		Similarity float32 `json:"similarity"`
+		AssetID      string  `json:"assetId"`
+		ProjectID    string  `json:"projectId"`
+		RepoPath     string  `json:"repoPath"`
+		Similarity   float32 `json:"similarity"`
+		ThumbnailURL string  `json:"thumbnailUrl"`
 	}
 
 	var matches []scoredResult
-	for _, emb := range allEmbeddings {
-		sim := embedding.CosineSimilarity(queryResp.Embedding, emb.Vector)
-		if sim >= threshold {
+	for assetID, sc := range bestPerAsset {
+		if sc.similarity >= threshold {
 			matches = append(matches, scoredResult{
-				AssetID:    emb.AssetID,
-				ProjectID:  emb.ProjectID,
-				RepoPath:   emb.RepoPath,
-				Similarity: sim,
+				AssetID:      assetID,
+				ProjectID:    sc.projectID,
+				RepoPath:     sc.repoPath,
+				Similarity:   sc.similarity,
+				ThumbnailURL: "/api/thumbs/" + assetID + "?v=" + sc.contentHash,
 			})
 		}
 	}
@@ -372,7 +551,7 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"results":         matches,
 		"queryDurationMs": time.Since(start).Milliseconds(),
-		"totalEmbeddings": len(allEmbeddings),
+		"totalEmbeddings": totalEmbeddings,
 	})
 }
 
@@ -410,10 +589,11 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type scoredResult struct {
-		AssetID    string  `json:"assetId"`
-		ProjectID  string  `json:"projectId"`
-		RepoPath   string  `json:"repoPath"`
-		Similarity float32 `json:"similarity"`
+		AssetID      string  `json:"assetId"`
+		ProjectID    string  `json:"projectId"`
+		RepoPath     string  `json:"repoPath"`
+		Similarity   float32 `json:"similarity"`
+		ThumbnailURL string  `json:"thumbnailUrl"`
 	}
 
 	var matches []scoredResult
@@ -424,10 +604,11 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 		sim := embedding.CosineSimilarity(source.Vector, emb.Vector)
 		if sim > 0 {
 			matches = append(matches, scoredResult{
-				AssetID:    emb.AssetID,
-				ProjectID:  emb.ProjectID,
-				RepoPath:   emb.RepoPath,
-				Similarity: sim,
+				AssetID:      emb.AssetID,
+				ProjectID:    emb.ProjectID,
+				RepoPath:     emb.RepoPath,
+				Similarity:   sim,
+				ThumbnailURL: "/api/thumbs/" + emb.AssetID + "?v=" + emb.ContentHash,
 			})
 		}
 	}

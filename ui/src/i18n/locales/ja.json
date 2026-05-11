@@ -486,7 +486,9 @@
     "settingsCatalogScanningReset": "カタログスキャンをリセットしました。保存して適用してください",
     "settingsOcrReset": "OCR をリセットしました。保存して適用してください",
     "ocrCacheCleared": "OCR キャッシュをクリアしました",
-    "aiTagCacheCleared": "AI タグキャッシュをクリアしました"
+    "aiTagCacheCleared": "AI タグキャッシュをクリアしました",
+    "embeddingsCleared": "埋め込みキャッシュをクリアしました",
+    "embeddingsClearFailed": "埋め込みのクリアに失敗しました"
   },
   "prompt": {
     "renamePath": "新しいプロジェクト相対パス"
@@ -899,7 +901,16 @@
     "aiMatch": "AI タグ一致",
     "recentSearches": "最近の検索",
     "clearAll": "すべてクリア",
-    "removeHistory": "検索履歴から「{{query}}」を削除"
+    "removeHistory": "検索履歴から「{{query}}」を削除",
+    "toggleSemantic": "セマンティック検索に切替",
+    "semanticPlaceholder": "探しているものを自然言語で記述…",
+    "semanticSearching": "意味で検索中…",
+    "semanticResults": "セマンティック一致 ({{count}})",
+    "semanticNoResults": "セマンティック一致なし、別の表現をお試しください",
+    "semanticHint": "自然言語で説明を入力して、類似アセットを検索",
+    "toggleHint": "検索モードを切替",
+    "switchToSemantic": "セマンティック検索に切替",
+    "semanticMeta": "{{total}} 個の埋め込み · {{ms}}ms"
   },
   "precheck": {
     "title": "プリチェック",
@@ -1584,8 +1595,10 @@
     "aiAllWorkspaces": "すべてのワークスペース",
     "aiAllProjects": "すべてのプロジェクト",
     "aiLastRun": "前回実行 {{time}}",
-    "aiLastRunCounts": "{{ready}} タグ付き、{{skipped}} スキップ、{{cacheHit}} キャッシュ",
-    "aiLastRunFailed": "{{failed}} 失敗",
+    "aiStatReady": "{{count}} タグ付き",
+    "aiStatSkipped": "{{count}} スキップ",
+    "aiStatCached": "{{count}} キャッシュ",
+    "aiStatFailed": "{{count}} 失敗",
     "aiLastRunScopeAll": "すべて",
     "aiTokenTooltip": "入力 {{input}} / 出力 {{output}} tokens",
     "preferredEditor": "エディタ",
@@ -1739,11 +1752,33 @@
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "割当",
     "aiTabPrompts": "プロンプト",
+    "aiTabSearch": "検索",
+    "embedSearchType": "検索モード",
+    "embedSearchTypeHint": "Text は AI Tag テキスト、Image は CLIP ベクトル、Hybrid は両方を統合",
+    "embedTypeHybrid": "ハイブリッド (テキスト + 画像)",
+    "embedTypeText": "テキストのみ",
+    "embedTypeImage": "画像のみ",
+    "embedSearchThreshold": "類似度しきい値",
+    "embedSearchThresholdHint": "最小コサイン類似度 (0–1)、高いほど結果が少なく正確",
+    "embedSearchLimit": "最大結果数",
+    "embedSearchLimitHint": "検索ごとに返す最大結果数 (1–100)",
+    "embedInputFields": "埋め込み入力フィールド",
+    "embedInputFieldsHint": "テキスト埋め込み生成時に含める AI Tag フィールド、次回の埋め込み実行時に反映",
+    "embedFieldCategory": "カテゴリ",
+    "embedFieldTags": "タグ",
+    "embedFieldDescription": "説明",
+    "embedFieldFileName": "ファイル名",
+    "embedFieldOcrText": "OCR テキスト",
     "embedRunGroup": "セマンティック埋め込み",
     "embedRun": "埋め込み実行",
     "embedStop": "停止",
     "embedStopping": "停止中…",
-    "embedDescription": "アセットのセマンティック検索用のベクトル埋め込みを生成"
+    "embedDescription": "アセットのセマンティック検索用のベクトル埋め込みを生成",
+    "embedStopped": "埋め込み停止",
+    "embedFailed": "埋め込み失敗",
+    "clearEmbeddings": "埋め込みクリア",
+    "clearEmbeddingsTitle": "埋め込みキャッシュをクリア",
+    "clearEmbeddingsDescription": "すべての埋め込みベクトルを削除します。再生成するには埋め込みを再実行してください"
   },
   "catalog": {
     "notComputed": {

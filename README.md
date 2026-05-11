@@ -226,6 +226,55 @@ cd ui && pnpm install && pnpm run dev
 
 The Go server runs on `127.0.0.1:19520` by default. Vite proxies `/api` to it.
 
+### Sharing & Remote Access
+
+Share the dashboard over the network or internet. Pick the method that fits your setup:
+
+**Quick tunnel** — no config, public URL in seconds:
+
+```bash
+aisets ui --host 0.0.0.0 --no-open
+
+# ngrok
+ngrok http 19520
+
+# Cloudflare (no account needed for temporary tunnels)
+cloudflared tunnel --url http://localhost:19520
+```
+
+**Cloudflare with custom domain** — persistent tunnel:
+
+```bash
+cloudflared tunnel create aisets
+cloudflared tunnel route dns aisets assets.example.com
+cloudflared tunnel run --url http://localhost:19520 aisets
+```
+
+**Reverse proxy (sub-path)** — host alongside other services on the same domain:
+
+```bash
+aisets ui --base-path /aisets --host 0.0.0.0 --no-open
+# or: AISETS_UI_BASE_PATH=/aisets aisets ui --host 0.0.0.0 --no-open
+```
+
+```nginx
+# Nginx
+location /aisets/ {
+    proxy_pass http://127.0.0.1:19520;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+```
+# Caddy
+handle_path /aisets/* {
+    reverse_proxy 127.0.0.1:19520
+}
+```
+
+> **Note:** The dashboard reads files from the host filesystem. Anyone with the URL can browse scanned project assets.
+
 ### Devcontainer
 
 ```bash

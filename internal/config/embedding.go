@@ -110,7 +110,7 @@ func (s *Store) AllReadyEmbeddings(embedType string) ([]EmbeddingWithVector, err
 	}
 
 	rows, err := s.rdb.Query(`
-		SELECT e.id, e.asset_id, e.project_id, e.repo_path, v.vector
+		SELECT e.id, e.asset_id, e.project_id, e.repo_path, e.content_hash, v.vector
 		FROM embeddings e
 		JOIN embedding_vectors v ON v.embedding_id = e.id
 		WHERE e.embed_type = ? AND e.status = 'ready'
@@ -124,7 +124,7 @@ func (s *Store) AllReadyEmbeddings(embedType string) ([]EmbeddingWithVector, err
 	for rows.Next() {
 		var r EmbeddingWithVector
 		var blob []byte
-		if err := rows.Scan(&r.ID, &r.AssetID, &r.ProjectID, &r.RepoPath, &blob); err != nil {
+		if err := rows.Scan(&r.ID, &r.AssetID, &r.ProjectID, &r.RepoPath, &r.ContentHash, &blob); err != nil {
 			return nil, err
 		}
 		r.EmbedType = embedType

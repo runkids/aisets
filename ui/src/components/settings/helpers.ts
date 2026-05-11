@@ -181,6 +181,14 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     optimizationStrategies:
       settings?.optimizationStrategies ?? defaultOptimizationStrategies,
     customAssetFilters: settings?.customAssetFilters ?? [],
+    embedSearchThreshold: settings?.embedSearchThreshold ?? 0.5,
+    embedSearchLimit: settings?.embedSearchLimit ?? 20,
+    embedSearchType: settings?.embedSearchType ?? "hybrid",
+    embedInputFields: settings?.embedInputFields ?? [
+      "category",
+      "tags",
+      "description",
+    ],
   };
 }
 
@@ -239,6 +247,10 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     optimizationExternalTools: draft.optimizationExternalTools,
     optimizationStrategies: draft.optimizationStrategies,
     customAssetFilters: draft.customAssetFilters,
+    embedSearchThreshold: draft.embedSearchThreshold,
+    embedSearchLimit: draft.embedSearchLimit,
+    embedSearchType: draft.embedSearchType,
+    embedInputFields: draft.embedInputFields,
   };
 }
 

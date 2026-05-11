@@ -17,6 +17,7 @@ import {
   batchRenamePreview,
   checkLLMHealth,
   clearAITagCache,
+  clearEmbeddings,
   clearOCRCache,
   detectAgentCLIs,
   clearScanHistory,
@@ -613,6 +614,16 @@ export function useClearAITagCacheMutation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: clearAITagCache,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useClearEmbeddingsMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: clearEmbeddings,
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

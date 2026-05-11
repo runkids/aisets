@@ -48,7 +48,11 @@ export type SettingsViewProps = {
   onStopVLMOcr: () => void;
   onDismissVLMOcr: () => void;
   embedActivity: EmbedActivityState;
-  onStartEmbed: (projectIds?: string[], scopeLabel?: string) => void;
+  onStartEmbed: (
+    projectIds?: string[],
+    scopeLabel?: string,
+    force?: boolean,
+  ) => void;
   onStopEmbed: () => void;
   onDismissEmbed: () => void;
   onAddProject?: () => void;
@@ -110,6 +114,10 @@ export type SettingsDraft = {
   optimizationExternalTools: OptimizationExternalTool[];
   optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
+  embedSearchThreshold: number;
+  embedSearchLimit: number;
+  embedSearchType: string;
+  embedInputFields: string[];
 };
 
 export type BeforeInstallPromptEvent = Event & {

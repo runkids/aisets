@@ -172,6 +172,10 @@ export const defaultSettings: SettingsUpdate = {
   vlmBackendOptimize: "",
   vlmBackendDuplicate: "",
   vlmBackendPrecheck: "",
+  embedSearchThreshold: 0.5,
+  embedSearchLimit: 20,
+  embedSearchType: "hybrid",
+  embedInputFields: ["category", "tags", "description"],
   excludePatterns: [],
   excludePatternsByIntent: {
     code: [

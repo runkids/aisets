@@ -86,6 +86,10 @@ export type AppSettings = {
   vlmBackendOptimize: string;
   vlmBackendDuplicate: string;
   vlmBackendPrecheck: string;
+  embedSearchThreshold: number;
+  embedSearchLimit: number;
+  embedSearchType: string;
+  embedInputFields: string[];
 };
 
 export type ScanProfile = "fast" | "full" | "custom";
@@ -796,6 +800,7 @@ export type EmbedRunEvent =
       providerName?: string;
       modelName?: string;
     }
+  | { type: "translating"; translated?: number; total: number }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: EmbedRunCounts };
 
 export type SemanticSearchResult = {
@@ -803,6 +808,7 @@ export type SemanticSearchResult = {
   projectId: string;
   repoPath: string;
   similarity: number;
+  thumbnailUrl: string;
 };
 
 export type SemanticSearchResponse = {

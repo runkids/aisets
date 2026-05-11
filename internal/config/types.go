@@ -70,6 +70,10 @@ type AppSettings struct {
 	VLMBackendOptimize         string                               `json:"vlmBackendOptimize"`
 	VLMBackendDuplicate        string                               `json:"vlmBackendDuplicate"`
 	VLMBackendPrecheck         string                               `json:"vlmBackendPrecheck"`
+	EmbedSearchThreshold       float64                              `json:"embedSearchThreshold"`
+	EmbedSearchLimit           int                                  `json:"embedSearchLimit"`
+	EmbedSearchType            string                               `json:"embedSearchType"`
+	EmbedInputFields           []string                             `json:"embedInputFields"`
 }
 
 type SettingsUpdate struct {
@@ -119,6 +123,10 @@ type SettingsUpdate struct {
 	VLMBackendOptimize         *string                              `json:"vlmBackendOptimize"`
 	VLMBackendDuplicate        *string                              `json:"vlmBackendDuplicate"`
 	VLMBackendPrecheck         *string                              `json:"vlmBackendPrecheck"`
+	EmbedSearchThreshold       *float64                             `json:"embedSearchThreshold"`
+	EmbedSearchLimit           *int                                 `json:"embedSearchLimit"`
+	EmbedSearchType            *string                              `json:"embedSearchType"`
+	EmbedInputFields           []string                             `json:"embedInputFields"`
 }
 
 type CustomAssetFilter struct {

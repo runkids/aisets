@@ -486,7 +486,9 @@
     "settingsCatalogScanningReset": "目录扫描已重置，保存后生效",
     "settingsOcrReset": "OCR 已重置，保存后生效",
     "ocrCacheCleared": "OCR 缓存已清除",
-    "aiTagCacheCleared": "AI 标签缓存已清除"
+    "aiTagCacheCleared": "AI 标签缓存已清除",
+    "embeddingsCleared": "嵌入缓存已清除",
+    "embeddingsClearFailed": "清除嵌入失败"
   },
   "prompt": {
     "renamePath": "新的项目相對路径"
@@ -899,7 +901,16 @@
     "aiMatch": "命中 AI 标记",
     "recentSearches": "最近搜索",
     "clearAll": "清除全部",
-    "removeHistory": "从搜索记录移除「{{query}}」"
+    "removeHistory": "从搜索记录移除「{{query}}」",
+    "toggleSemantic": "切换语义搜索",
+    "semanticPlaceholder": "用自然语言描述你要找的素材…",
+    "semanticSearching": "语义搜索中…",
+    "semanticResults": "语义匹配 ({{count}})",
+    "semanticNoResults": "没有语义匹配结果，试试不同描述",
+    "semanticHint": "输入自然语言描述，找出意义相近的素材",
+    "toggleHint": "切换搜索模式",
+    "switchToSemantic": "切换到语义搜索",
+    "semanticMeta": "{{total}} 个嵌入 · {{ms}}ms"
   },
   "precheck": {
     "title": "预检",
@@ -1584,8 +1595,10 @@
     "aiAllWorkspaces": "所有工作区",
     "aiAllProjects": "所有项目",
     "aiLastRun": "上次执行 {{time}}",
-    "aiLastRunCounts": "{{ready}} 已标记、{{skipped}} 已跳过、{{cacheHit}} 缓存命中",
-    "aiLastRunFailed": "{{failed}} 失败",
+    "aiStatReady": "{{count}} 已标记",
+    "aiStatSkipped": "{{count}} 已跳过",
+    "aiStatCached": "{{count}} 缓存",
+    "aiStatFailed": "{{count}} 失败",
     "aiLastRunScopeAll": "全部",
     "aiTokenTooltip": "输入 {{input}} / 输出 {{output}} tokens",
     "preferredEditor": "编辑器",
@@ -1739,11 +1752,33 @@
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "指派",
     "aiTabPrompts": "提示词",
+    "aiTabSearch": "搜索",
+    "embedSearchType": "搜索模式",
+    "embedSearchTypeHint": "Text 使用 AI Tag 文字，Image 使用 CLIP 向量，Hybrid 合并两者取最高分",
+    "embedTypeHybrid": "混合 (文字 + 图片)",
+    "embedTypeText": "仅文字",
+    "embedTypeImage": "仅图片",
+    "embedSearchThreshold": "相似度阈值",
+    "embedSearchThresholdHint": "最低余弦相似度 (0–1)，越高结果越少但越精准",
+    "embedSearchLimit": "最大结果数",
+    "embedSearchLimitHint": "每次搜索最多返回的结果数量 (1–100)",
+    "embedInputFields": "嵌入输入字段",
+    "embedInputFieldsHint": "生成文字嵌入时要包含哪些 AI Tag 字段，下次执行嵌入时生效",
+    "embedFieldCategory": "分类",
+    "embedFieldTags": "标签",
+    "embedFieldDescription": "描述",
+    "embedFieldFileName": "文件名",
+    "embedFieldOcrText": "OCR 文字",
     "embedRunGroup": "语义嵌入",
     "embedRun": "执行嵌入",
     "embedStop": "停止",
     "embedStopping": "正在停止…",
-    "embedDescription": "生成向量嵌入，用于素材语义搜索"
+    "embedDescription": "生成向量嵌入，用于素材语义搜索",
+    "embedStopped": "嵌入已停止",
+    "embedFailed": "嵌入失败",
+    "clearEmbeddings": "清除嵌入",
+    "clearEmbeddingsTitle": "清除嵌入缓存",
+    "clearEmbeddingsDescription": "移除所有嵌入向量。重新执行嵌入即可重新生成"
   },
   "catalog": {
     "notComputed": {

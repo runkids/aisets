@@ -21,6 +21,7 @@ export type EmbedActivityState = {
   scopeLabel?: string;
   providerName?: string;
   modelName?: string;
+  translating?: { translated: number; total: number };
 };
 
 export type EmbedActivityAction =
@@ -60,6 +61,12 @@ export function embedActivityReducer(
       };
     case "event": {
       const e = action.event;
+      if (e.type === "translating") {
+        return {
+          ...state,
+          translating: { translated: e.translated ?? 0, total: e.total },
+        };
+      }
       if (!("counts" in e) || !e.counts) return state;
       const hasItemError =
         "errorMessage" in e && e.errorMessage && "repoPath" in e && e.repoPath;

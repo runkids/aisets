@@ -504,7 +504,9 @@
     "settingsCatalogScanningReset": "카탈로그 스캔이 재설정되었습니다. 저장하여 적용하세요",
     "settingsOcrReset": "OCR가 재설정되었습니다. 저장하여 적용하세요",
     "ocrCacheCleared": "OCR 캐시가 지워졌습니다",
-    "aiTagCacheCleared": "AI 태그 캐시가 지워졌습니다"
+    "aiTagCacheCleared": "AI 태그 캐시가 지워졌습니다",
+    "embeddingsCleared": "임베딩 캐시가 삭제되었습니다",
+    "embeddingsClearFailed": "임베딩 삭제에 실패했습니다"
   },
   "prompt": {
     "renamePath": "새 프로젝트 상대 경로"
@@ -917,7 +919,16 @@
     "aiMatch": "AI 태그 일치",
     "recentSearches": "최근 검색",
     "clearAll": "모두 지우기",
-    "removeHistory": "검색 기록에서 \"{{query}}\" 제거"
+    "removeHistory": "검색 기록에서 \"{{query}}\" 제거",
+    "toggleSemantic": "시맨틱 검색 전환",
+    "semanticPlaceholder": "찾고 있는 것을 자연어로 설명…",
+    "semanticSearching": "의미로 검색 중…",
+    "semanticResults": "시맨틱 일치 ({{count}})",
+    "semanticNoResults": "시맨틱 일치 결과가 없습니다. 다른 표현을 시도하세요",
+    "semanticHint": "자연어 설명을 입력하여 유사한 에셋 검색",
+    "toggleHint": "검색 모드 전환",
+    "switchToSemantic": "시맨틱 검색으로 전환",
+    "semanticMeta": "{{total}}개 임베딩 · {{ms}}ms"
   },
   "precheck": {
     "title": "사전 점검",
@@ -1595,8 +1606,10 @@
     "aiAllWorkspaces": "모든 워크스페이스",
     "aiAllProjects": "모든 프로젝트",
     "aiLastRun": "마지막 실행 {{time}}",
-    "aiLastRunCounts": "{{ready}}개 태그됨, {{skipped}}개 건너뜀, {{cacheHit}}개 캐시",
-    "aiLastRunFailed": "{{failed}}개 실패",
+    "aiStatReady": "{{count}}개 태그됨",
+    "aiStatSkipped": "{{count}}개 건너뜀",
+    "aiStatCached": "{{count}}개 캐시",
+    "aiStatFailed": "{{count}}개 실패",
     "aiLastRunScopeAll": "전체",
     "aiTokenTooltip": "입력 {{input}} / 출력 {{output}} tokens",
     "preferredEditor": "편집기",
@@ -1757,11 +1770,33 @@
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "할당",
     "aiTabPrompts": "프롬프트",
+    "aiTabSearch": "검색",
+    "embedSearchType": "검색 모드",
+    "embedSearchTypeHint": "Text는 AI Tag 텍스트, Image는 CLIP 벡터, Hybrid는 둘 다 결합",
+    "embedTypeHybrid": "하이브리드 (텍스트 + 이미지)",
+    "embedTypeText": "텍스트만",
+    "embedTypeImage": "이미지만",
+    "embedSearchThreshold": "유사도 임계값",
+    "embedSearchThresholdHint": "최소 코사인 유사도 (0–1), 높을수록 결과가 적지만 정확",
+    "embedSearchLimit": "최대 결과 수",
+    "embedSearchLimitHint": "검색당 반환할 최대 결과 수 (1–100)",
+    "embedInputFields": "임베딩 입력 필드",
+    "embedInputFieldsHint": "텍스트 임베딩 생성 시 포함할 AI Tag 필드, 다음 임베딩 실행 시 적용",
+    "embedFieldCategory": "카테고리",
+    "embedFieldTags": "태그",
+    "embedFieldDescription": "설명",
+    "embedFieldFileName": "파일명",
+    "embedFieldOcrText": "OCR 텍스트",
     "embedRunGroup": "시맨틱 임베딩",
     "embedRun": "임베딩 실행",
     "embedStop": "중지",
     "embedStopping": "중지 중…",
-    "embedDescription": "에셋의 시맨틱 검색을 위한 벡터 임베딩 생성"
+    "embedDescription": "에셋의 시맨틱 검색을 위한 벡터 임베딩 생성",
+    "embedStopped": "임베딩 중지됨",
+    "embedFailed": "임베딩 실패",
+    "clearEmbeddings": "임베딩 삭제",
+    "clearEmbeddingsTitle": "임베딩 캐시 삭제",
+    "clearEmbeddingsDescription": "모든 임베딩 벡터를 삭제합니다. 다시 생성하려면 임베딩을 다시 실행하세요"
   },
   "catalog": {
     "notComputed": {
