@@ -241,3 +241,27 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 	_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
 	return result, true, nil
 }
+
+func (s *Store) AITagResultAny(contentHash, hashAlgorithm string) (*aitag.Result, error) {
+	if contentHash == "" || hashAlgorithm == "" {
+		return nil, nil
+	}
+	row := s.rdb.QueryRow(`
+		SELECT category, tags_json, description
+		FROM ai_tags
+		WHERE content_hash = ? AND hash_algorithm = ? AND status = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, contentHash, hashAlgorithm, aitag.StatusReady)
+	var result aitag.Result
+	var tagsRaw string
+	err := row.Scan(&result.Category, &tagsRaw, &result.Description)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+	return &result, nil
+}

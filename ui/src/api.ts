@@ -16,6 +16,9 @@ import type {
   AITagRunEvent,
   OCRRunEvent,
   VLMOcrRunEvent,
+  EmbedRunEvent,
+  SemanticSearchResponse,
+  EmbedStats,
   Project,
   ProjectScanIntent,
   ProjectScanIntentDetection,
@@ -42,7 +45,7 @@ declare global {
   }
 }
 
-const basePath =
+export const basePath =
   typeof window === "undefined" ? "" : (window.__BASE_PATH__ ?? "");
 
 export class APIError extends Error {
@@ -609,6 +612,101 @@ export async function runVLMOcr(options?: {
   });
 }
 
+// --- Embedding ---
+
+function parseEmbedLine(
+  line: string,
+  onEvent?: (event: EmbedRunEvent) => void,
+): EmbedRunEvent | null {
+  if (!line.trim()) return null;
+  const event = JSON.parse(line) as EmbedRunEvent;
+  onEvent?.(event);
+  if (event.type === "error")
+    throwRunError(event.error, "embed_failed", "Embedding failed");
+  return event;
+}
+
+function isEmbedDone(
+  event: EmbedRunEvent,
+): event is Extract<EmbedRunEvent, { type: "done" }> {
+  return event.type === "done";
+}
+
+export async function runEmbedding(options?: {
+  onEvent?: (event: EmbedRunEvent) => void;
+  signal?: AbortSignal;
+  projectIds?: string[];
+  assetIds?: string[];
+  types?: ("text" | "image")[];
+}) {
+  const qp = new URLSearchParams();
+  if (options?.projectIds?.length)
+    qp.set("projectIds", options.projectIds.join(","));
+  const params = qp.toString() ? `?${qp}` : "";
+  const bodyObj: Record<string, unknown> = {};
+  if (options?.assetIds?.length) bodyObj.assetIds = options.assetIds;
+  if (options?.types?.length) bodyObj.types = options.types;
+  const fetchBody = Object.keys(bodyObj).length
+    ? JSON.stringify(bodyObj)
+    : undefined;
+  const response = await fetch(`${basePath}/api/ai/embed/run${params}`, {
+    method: "POST",
+    signal: options?.signal,
+    body: fetchBody,
+    headers: fetchBody ? { "content-type": "application/json" } : undefined,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    const body = JSON.parse(text || "{}") as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code)
+      throw new APIError(error.code, error.message, error.params);
+    throw new APIError("http_error", `HTTP ${response.status}`, {
+      status: response.status,
+    });
+  }
+  return streamNDJSON<EmbedRunEvent, Extract<EmbedRunEvent, { type: "done" }>>({
+    response,
+    parseLine: (line) => parseEmbedLine(line, options?.onEvent),
+    isDone: isEmbedDone,
+    fallbackDone: null,
+  });
+}
+
+export function clearEmbeddings() {
+  return request<{ ok: boolean }>("/api/ai/embed/clear", { method: "POST" });
+}
+
+export function semanticSearch(options: {
+  q: string;
+  type?: "text" | "image";
+  limit?: number;
+  threshold?: number;
+}) {
+  const qp = new URLSearchParams({ q: options.q });
+  if (options.type) qp.set("type", options.type);
+  if (options.limit) qp.set("limit", String(options.limit));
+  if (options.threshold != null) qp.set("threshold", String(options.threshold));
+  return request<SemanticSearchResponse>(`/api/ai/embed/search?${qp}`);
+}
+
+export function findSimilar(
+  assetId: string,
+  options?: { type?: "text" | "image"; limit?: number },
+) {
+  const qp = new URLSearchParams();
+  if (options?.type) qp.set("type", options.type);
+  if (options?.limit) qp.set("limit", String(options.limit));
+  const params = qp.toString() ? `?${qp}` : "";
+  return request<SemanticSearchResponse>(
+    `/api/ai/embed/similar/${assetId}${params}`,
+  );
+}
+
+export function embeddingStats() {
+  return request<EmbedStats>("/api/ai/embed/stats");
+}
+
 export function installOCR(languages: string[]) {
   return request<{ settings?: SettingsInfo }>("/api/ocr/install", {
     method: "POST",
@@ -888,7 +986,7 @@ export function batchCopy(assetIds: string[], targetDir: string) {
 }
 
 export async function batchExport(assetIds: string[]) {
-  const res = await fetch("/api/actions/batch/export", {
+  const res = await fetch(`${basePath}/api/actions/batch/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ assetIds }),

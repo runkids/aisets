@@ -124,6 +124,7 @@
     "batchExport": "Export",
     "batchAITag": "AI Tag",
     "batchAIOcr": "AI OCR",
+    "batchEmbed": "Embed",
     "applying": "Applying…",
     "generating": "Generating…",
     "copy": "Copy",
@@ -1048,7 +1049,12 @@
     "aiTabLocal": "Local LLM",
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "Routing",
-    "aiTabPrompts": "Prompts"
+    "aiTabPrompts": "Prompts",
+    "embedRunGroup": "Semantic Embedding",
+    "embedRun": "Generate Embeddings",
+    "embedStop": "Stop",
+    "embedStopping": "Stopping…",
+    "embedDescription": "Generate vector embeddings for semantic search across assets."
   },
   "error": {
     "catalogLoad": "Failed to load catalog",
@@ -1190,7 +1196,8 @@
     "copyErrors": "Copy errors",
     "errorsCopied": "Copied",
     "viewAISettings": "AI Settings",
-    "aiTagLockedTooltip": "Stop AI tagging first"
+    "aiTagLockedTooltip": "Stop AI tagging first",
+    "embedCounts": "Processed {{processed}}, ready {{ready}}, failed {{failed}}, skipped {{skipped}}"
   },
   "toast": {
     "projectAdded": "Project added: {{path}}",

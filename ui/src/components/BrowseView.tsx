@@ -21,6 +21,7 @@ import {
   PenLine,
   ScanText,
   Tags,
+  Waypoints,
   Trash2,
 } from "lucide-react";
 import { matchesCustomAssetFilter } from "../customAssetFilters";
@@ -127,6 +128,8 @@ type Props = {
   aiBusy?: boolean;
   onStartAITag?: (assetIds: string[]) => void;
   onStartVLMOcr?: (assetIds: string[]) => void;
+  embedEnabled?: boolean;
+  onStartEmbed?: (assetIds: string[]) => void;
 };
 
 function defaultBrowseStoredState(
@@ -610,6 +613,8 @@ export function BrowseView({
   aiBusy,
   onStartAITag,
   onStartVLMOcr,
+  embedEnabled,
+  onStartEmbed,
 }: Props) {
   const { t } = useTranslation();
   const [initialBrowseState] = useState(() =>
@@ -1144,6 +1149,17 @@ export function BrowseView({
                 >
                   <ScanText size={14} />
                   {t("action.batchAIOcr")}
+                </button>
+              )}
+              {embedEnabled && onStartEmbed && (
+                <button
+                  type="button"
+                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                  disabled={aiBusy || selected.size === 0}
+                  onClick={() => onStartEmbed(Array.from(selected))}
+                >
+                  <Waypoints size={14} />
+                  {t("action.batchEmbed")}
                 </button>
               )}
               <button

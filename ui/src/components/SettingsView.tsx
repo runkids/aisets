@@ -71,6 +71,10 @@ export function SettingsView({
   onStartVLMOcr,
   onStopVLMOcr,
   onDismissVLMOcr,
+  embedActivity,
+  onStartEmbed,
+  onStopEmbed,
+  onDismissEmbed,
   onAddProject,
   onNavigate,
 }: SettingsViewProps) {
@@ -412,6 +416,7 @@ export function SettingsView({
       onSuccess: () => {
         onDismissAITag();
         onDismissVLMOcr();
+        onDismissEmbed();
         toast.success(t("toast.databaseReset"));
       },
       onError: (error) => {
@@ -630,6 +635,11 @@ export function SettingsView({
                 )
               }
               onStopVLMOcr={onStopVLMOcr}
+              embedActivity={embedActivity}
+              onStartEmbed={(projectIds, scopeLabel) =>
+                onStartEmbed(projectIds, scopeLabel)
+              }
+              onStopEmbed={onStopEmbed}
               onNavigate={onNavigate}
             />
           )}

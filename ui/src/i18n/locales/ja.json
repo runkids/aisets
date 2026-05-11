@@ -130,6 +130,7 @@
     "batchExport": "エクスポート",
     "batchAITag": "AI タグ",
     "batchAIOcr": "AI OCR",
+    "batchEmbed": "埋め込み",
     "showAll": "残り {{count}} 件を表示"
   },
   "search": {
@@ -461,7 +462,8 @@
     "optimizeCounts": "処理済み {{processed}}/{{total}}、適用可能 {{applicable}}、ブロック {{blocked}}",
     "viewOptimize": "最適化を開く",
     "stopOptimize": "停止",
-    "optimizeLockedTooltip": "最適化を先に停止してください"
+    "optimizeLockedTooltip": "最適化を先に停止してください",
+    "embedCounts": "処理済み {{processed}}、完了 {{ready}}、失敗 {{failed}}、スキップ {{skipped}}"
   },
   "toast": {
     "projectAdded": "プロジェクトを追加しました：{{path}}",
@@ -1736,7 +1738,12 @@
     "aiTabLocal": "ローカル LLM",
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "割当",
-    "aiTabPrompts": "プロンプト"
+    "aiTabPrompts": "プロンプト",
+    "embedRunGroup": "セマンティック埋め込み",
+    "embedRun": "埋め込み実行",
+    "embedStop": "停止",
+    "embedStopping": "停止中…",
+    "embedDescription": "アセットのセマンティック検索用のベクトル埋め込みを生成"
   },
   "catalog": {
     "notComputed": {

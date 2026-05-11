@@ -130,6 +130,7 @@
     "batchExport": "导出",
     "batchAITag": "AI 标签",
     "batchAIOcr": "AI OCR",
+    "batchEmbed": "嵌入",
     "showAll": "显示全部 {{count}} 个"
   },
   "search": {
@@ -461,7 +462,8 @@
     "optimizeCounts": "已处理 {{processed}}/{{total}}，适用 {{applicable}}，已阻止 {{blocked}}",
     "viewOptimize": "打开优化",
     "stopOptimize": "停止",
-    "optimizeLockedTooltip": "请先停止优化"
+    "optimizeLockedTooltip": "请先停止优化",
+    "embedCounts": "已处理 {{processed}}，就绪 {{ready}}，失败 {{failed}}，跳过 {{skipped}}"
   },
   "toast": {
     "projectAdded": "已新增项目：{{path}}",
@@ -1736,7 +1738,12 @@
     "aiTabLocal": "本地 LLM",
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "指派",
-    "aiTabPrompts": "提示词"
+    "aiTabPrompts": "提示词",
+    "embedRunGroup": "语义嵌入",
+    "embedRun": "执行嵌入",
+    "embedStop": "停止",
+    "embedStopping": "正在停止…",
+    "embedDescription": "生成向量嵌入，用于素材语义搜索"
   },
   "catalog": {
     "notComputed": {

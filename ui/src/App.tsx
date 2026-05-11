@@ -58,7 +58,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { APIError, runOCR, runAITagging, runVLMOcr } from "./api";
+import { APIError, runOCR, runAITagging, runVLMOcr, runEmbedding } from "./api";
 import { errorMessage } from "./i18n/index";
 import {
   initialOCRActivityState,
@@ -84,6 +84,12 @@ import {
   runVLMOcrActivity,
   type VLMOcrActivityAbortRef,
 } from "./vlmOcrActivity";
+import {
+  initialEmbedActivityState,
+  isEmbedActivityBusy,
+  embedActivityReducer,
+  runEmbedActivity,
+} from "./embedActivity";
 import {
   ImageBackgroundProvider,
   normalizeImageBackgroundMode,
@@ -199,6 +205,12 @@ export function App() {
     null,
   ) as VLMOcrActivityAbortRef;
   const vlmOcrRunRef = useRef<Promise<void> | null>(null);
+  const [embedActivity, dispatchEmbedActivity] = useReducer(
+    embedActivityReducer,
+    initialEmbedActivityState,
+  );
+  const embedAbortRef = useRef<AbortController | null>(null);
+  const embedRunRef = useRef<Promise<void> | null>(null);
   const [optimizeActivity, dispatchOptimizeActivity] = useReducer(
     optimizeActivityReducer,
     initialOptimizeActivityState,
@@ -328,7 +340,9 @@ export function App() {
   }, [imageBackgroundMode]);
 
   const anyAIBusy =
-    isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
+    isAITagActivityBusy(aiTagActivity) ||
+    isVLMOcrActivityBusy(vlmOcrActivity) ||
+    isEmbedActivityBusy(embedActivity);
   useEffect(() => {
     if (!anyAIBusy) return undefined;
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -683,6 +697,41 @@ export function App() {
     dispatchVLMOcr({ type: "dismiss" });
   }
 
+  function onStartEmbedActivity(
+    projectIds?: string[],
+    assetIds?: string[],
+    types?: ("text" | "image")[],
+    scopeLabel?: string,
+  ) {
+    if (embedRunRef.current) return;
+
+    const run = (async () => {
+      await runEmbedActivity({
+        abortRef: embedAbortRef,
+        dispatch: dispatchEmbedActivity,
+        run: ({ signal, onEvent }) =>
+          runEmbedding({ signal, onEvent, projectIds, assetIds, types }),
+        scopeLabel,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+    })().finally(() => {
+      embedRunRef.current = null;
+    });
+
+    embedRunRef.current = run;
+  }
+
+  function onStopEmbedActivity() {
+    if (!embedAbortRef.current) return;
+    dispatchEmbedActivity({ type: "stopping" });
+    embedAbortRef.current.abort();
+  }
+
+  function onDismissEmbedActivity() {
+    dispatchEmbedActivity({ type: "dismiss" });
+  }
+
   function onOpenOCRSettings() {
     navigate({
       pathname: pathForMode("settings"),
@@ -933,6 +982,13 @@ export function App() {
                   assetIds,
                 )
               }
+              embedEnabled={
+                (settingsQuery.data?.settings.llmEnabled ?? false) &&
+                !!settingsQuery.data?.settings.llmEmbedModel
+              }
+              onStartEmbed={(assetIds) =>
+                onStartEmbedActivity(undefined, assetIds)
+              }
             />
           ) : mode === "settings" ? (
             <SettingsView
@@ -971,6 +1027,17 @@ export function App() {
               }
               onStopVLMOcr={onStopVLMOcrActivity}
               onDismissVLMOcr={onDismissVLMOcrActivity}
+              embedActivity={embedActivity}
+              onStartEmbed={(projectIds, scopeLabel) =>
+                onStartEmbedActivity(
+                  projectIds,
+                  undefined,
+                  undefined,
+                  scopeLabel,
+                )
+              }
+              onStopEmbed={onStopEmbedActivity}
+              onDismissEmbed={onDismissEmbedActivity}
               onAddProject={() => setDirectoryPickerOpen(true)}
               onNavigate={changeMode}
             />

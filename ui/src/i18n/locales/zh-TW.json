@@ -124,6 +124,7 @@
     "batchExport": "匯出",
     "batchAITag": "AI 標籤",
     "batchAIOcr": "AI OCR",
+    "batchEmbed": "嵌入",
     "applying": "套用中…",
     "generating": "產生中…",
     "copy": "複製",
@@ -497,7 +498,8 @@
     "copyErrors": "複製錯誤",
     "errorsCopied": "已複製",
     "viewAISettings": "AI 設定",
-    "aiTagLockedTooltip": "請先停止 AI 標記"
+    "aiTagLockedTooltip": "請先停止 AI 標記",
+    "embedCounts": "已處理 {{processed}}，就緒 {{ready}}，失敗 {{failed}}，略過 {{skipped}}"
   },
   "toast": {
     "projectAdded": "已新增專案：{{path}}",
@@ -1807,7 +1809,12 @@
     "aiTabLocal": "本地 LLM",
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "指派",
-    "aiTabPrompts": "提示詞"
+    "aiTabPrompts": "提示詞",
+    "embedRunGroup": "語意嵌入",
+    "embedRun": "執行嵌入",
+    "embedStop": "停止",
+    "embedStopping": "正在停止…",
+    "embedDescription": "產生向量嵌入，用於素材語意搜尋"
   },
   "catalog": {
     "notComputed": {

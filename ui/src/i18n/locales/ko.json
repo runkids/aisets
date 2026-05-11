@@ -130,6 +130,7 @@
     "batchExport": "내보내기",
     "batchAITag": "AI 태그",
     "batchAIOcr": "AI OCR",
+    "batchEmbed": "임베딩",
     "showAll": "나머지 {{count}}개 표시"
   },
   "search": {
@@ -479,7 +480,8 @@
     "optimizeCounts": "처리됨 {{processed}}/{{total}}, 적용 가능 {{applicable}}, 차단됨 {{blocked}}",
     "viewOptimize": "최적화 열기",
     "stopOptimize": "중지",
-    "optimizeLockedTooltip": "최적화를 먼저 중지하세요"
+    "optimizeLockedTooltip": "최적화를 먼저 중지하세요",
+    "embedCounts": "처리됨 {{processed}}, 완료 {{ready}}, 실패 {{failed}}, 건너뜀 {{skipped}}"
   },
   "toast": {
     "projectAdded": "프로젝트 추가됨: {{path}}",
@@ -1754,7 +1756,12 @@
     "aiTabLocal": "로컬 LLM",
     "aiTabAgent": "Agent CLI",
     "aiTabBackend": "할당",
-    "aiTabPrompts": "프롬프트"
+    "aiTabPrompts": "프롬프트",
+    "embedRunGroup": "시맨틱 임베딩",
+    "embedRun": "임베딩 실행",
+    "embedStop": "중지",
+    "embedStopping": "중지 중…",
+    "embedDescription": "에셋의 시맨틱 검색을 위한 벡터 임베딩 생성"
   },
   "catalog": {
     "notComputed": {

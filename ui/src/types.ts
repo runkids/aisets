@@ -764,6 +764,58 @@ export type VLMOcrRunEvent =
     }
   | { type: "error"; error?: APIErrorBody["error"]; counts?: VLMOcrRunCounts };
 
+export type EmbedRunCounts = {
+  queued: number;
+  processed: number;
+  ready: number;
+  failed: number;
+  skipped: number;
+  cacheHit: number;
+};
+
+export type EmbedRunEvent =
+  | {
+      type: "start";
+      counts: EmbedRunCounts;
+      providerName?: string;
+      modelName?: string;
+    }
+  | {
+      type: "progress";
+      assetId: string;
+      repoPath: string;
+      embedType: string;
+      status: string;
+      counts: EmbedRunCounts;
+      errorMessage?: string;
+    }
+  | {
+      type: "done";
+      counts: EmbedRunCounts;
+      firstError?: string;
+      providerName?: string;
+      modelName?: string;
+    }
+  | { type: "error"; error?: APIErrorBody["error"]; counts?: EmbedRunCounts };
+
+export type SemanticSearchResult = {
+  assetId: string;
+  projectId: string;
+  repoPath: string;
+  similarity: number;
+};
+
+export type SemanticSearchResponse = {
+  results: SemanticSearchResult[];
+  queryDurationMs: number;
+  totalEmbeddings: number;
+};
+
+export type EmbedStats = {
+  textCount: number;
+  imageCount: number;
+};
+
 export type ActionPreview = {
   id: string;
   type: string;

@@ -13,6 +13,7 @@ import {
   Settings2,
   Shuffle,
   Square,
+  Waypoints,
   Star,
   Tags,
 } from "lucide-react";
@@ -32,6 +33,8 @@ import type { AITagActivityState } from "../../aiTagActivity";
 import { isAITagActivityBusy } from "../../aiTagActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
 import { isVLMOcrActivityBusy } from "../../vlmOcrActivity";
+import type { EmbedActivityState } from "../../embedActivity";
+import { isEmbedActivityBusy } from "../../embedActivity";
 import type { AITagRunCounts, VLMOcrRunCounts, Workspace } from "../../types";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import type { ScopeProject } from "./AIScopePicker";
@@ -144,6 +147,9 @@ type AISectionProps = {
     scopeLabel?: string,
   ) => void;
   onStopVLMOcr: () => void;
+  embedActivity: EmbedActivityState;
+  onStartEmbed: (projectIds?: string[], scopeLabel?: string) => void;
+  onStopEmbed: () => void;
   onNavigate?: (mode: Mode) => void;
 };
 
@@ -170,6 +176,9 @@ export function AISection({
   onStopAITag,
   onStartVLMOcr,
   onStopVLMOcr,
+  embedActivity,
+  onStartEmbed,
+  onStopEmbed,
   onNavigate,
 }: AISectionProps) {
   const { t } = useTranslation();
@@ -204,6 +213,9 @@ export function AISection({
   const [ocrWorkspaceId, setOcrWorkspaceId] =
     useState<string>(activeWorkspaceId);
   const [ocrProjectId, setOcrProjectId] = useState<string>("");
+  const [embedWorkspaceId, setEmbedWorkspaceId] =
+    useState<string>(activeWorkspaceId);
+  const [embedProjectId, setEmbedProjectId] = useState<string>("");
 
   function resolveProjectIds(
     wsId: string,
@@ -329,7 +341,9 @@ export function AISection({
   ]);
 
   const aiBusy =
-    isAITagActivityBusy(aiTagActivity) || isVLMOcrActivityBusy(vlmOcrActivity);
+    isAITagActivityBusy(aiTagActivity) ||
+    isVLMOcrActivityBusy(vlmOcrActivity) ||
+    isEmbedActivityBusy(embedActivity);
 
   const host = deriveHost(settings?.llmEndpoint);
   const defaultEndpoints: Record<string, string> = {
@@ -1081,6 +1095,110 @@ export function AISection({
               ) : null}
             </div>
           </div>
+          {draft.llmEmbedModel && (
+            <>
+              <div className="flex items-center gap-2.5 border-t border-g-line px-6 pt-3 pb-1 md:px-8">
+                <Waypoints size={15} className="shrink-0 text-g-ink-3" />
+                <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+                  {t("settings.embedRunGroup")}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-6 px-6 pt-1 pb-3 md:px-8">
+                <p className="font-g text-g-ui tracking-g-ui text-g-ink-3 pt-1.5 max-w-[28ch]">
+                  {t("settings.embedDescription")}
+                </p>
+                <div className="flex flex-col gap-1.5 shrink-0 w-[520px]">
+                  {!isEmbedActivityBusy(embedActivity) && (
+                    <AIScopePicker
+                      workspaces={workspaces}
+                      projects={projects}
+                      selectedWorkspaceId={embedWorkspaceId}
+                      selectedProjectId={embedProjectId}
+                      disabled={aiBusy}
+                      onChangeWorkspace={setEmbedWorkspaceId}
+                      onChangeProject={setEmbedProjectId}
+                    />
+                  )}
+                  <div className="flex items-center justify-end gap-1.5">
+                    {isEmbedActivityBusy(embedActivity) ? (
+                      <Button
+                        variant="secondary"
+                        leadingIcon={
+                          embedActivity.phase === "stopping" ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-[icon-spin_900ms_linear_infinite]"
+                            />
+                          ) : (
+                            <Square size={14} />
+                          )
+                        }
+                        onClick={onStopEmbed}
+                        disabled={embedActivity.phase === "stopping"}
+                      >
+                        {embedActivity.phase === "stopping"
+                          ? t("settings.embedStopping")
+                          : t("settings.embedStop")}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        leadingIcon={<Play size={14} />}
+                        disabled={aiBusy || !draft.llmEmbedModel}
+                        onClick={() => {
+                          onStartEmbed(
+                            resolveProjectIds(embedWorkspaceId, embedProjectId),
+                            resolveScopeLabel(embedWorkspaceId, embedProjectId),
+                          );
+                        }}
+                      >
+                        {t("settings.embedRun")}
+                      </Button>
+                    )}
+                  </div>
+                  {isEmbedActivityBusy(embedActivity) ||
+                  embedActivity.phase === "error" ||
+                  embedActivity.phase === "done" ? (
+                    <div className="flex flex-col gap-0.5 items-end">
+                      {embedActivity.counts && (
+                        <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
+                          {isEmbedActivityBusy(embedActivity) && (
+                            <LoaderCircle
+                              size={12}
+                              className="animate-spin shrink-0"
+                            />
+                          )}
+                          {t("activity.embedCounts", {
+                            processed: embedActivity.counts.processed,
+                            ready: embedActivity.counts.ready,
+                            failed: embedActivity.counts.failed,
+                            skipped: embedActivity.counts.skipped,
+                          })}
+                        </p>
+                      )}
+                      {embedActivity.currentFile &&
+                        isEmbedActivityBusy(embedActivity) && (
+                          <p className="max-w-[400px] truncate font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+                            {embedActivity.currentFile}
+                          </p>
+                        )}
+                      {embedActivity.providerName && (
+                        <span className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
+                          {embedActivity.providerName}
+                          {embedActivity.modelName
+                            ? ` / ${embedActivity.modelName}`
+                            : ""}
+                        </span>
+                      )}
+                      {embedActivity.errors.length > 0 && (
+                        <ActivityErrorPanel errors={embedActivity.errors} />
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )}
         </Card>
       )}
     </div>
@@ -1185,7 +1303,7 @@ function LastRunText({
 
   return (
     <div className="flex flex-col gap-0.5 items-end">
-      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-4 flex items-center gap-1.5">
+      <p className="font-g-mono text-g-chip tracking-g-mono text-g-ink-3 flex items-center gap-1.5">
         <span>{t("settings.aiLastRun", { time: dateStr })}</span>
         {"ready" in counts && (
           <>

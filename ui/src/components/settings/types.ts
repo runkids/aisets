@@ -3,6 +3,7 @@ import type { Mode } from "../../ui";
 import type { AITagActivityState } from "../../aiTagActivity";
 import type { OCRActivityState } from "../../ocrActivity";
 import type { VLMOcrActivityState } from "../../vlmOcrActivity";
+import type { EmbedActivityState } from "../../embedActivity";
 import type {
   CustomAssetFilter,
   OptimizationExternalTool,
@@ -46,6 +47,10 @@ export type SettingsViewProps = {
   ) => void;
   onStopVLMOcr: () => void;
   onDismissVLMOcr: () => void;
+  embedActivity: EmbedActivityState;
+  onStartEmbed: (projectIds?: string[], scopeLabel?: string) => void;
+  onStopEmbed: () => void;
+  onDismissEmbed: () => void;
   onAddProject?: () => void;
   onNavigate?: (mode: Mode) => void;
 };
