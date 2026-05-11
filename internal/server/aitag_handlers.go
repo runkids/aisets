@@ -229,14 +229,24 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 			prompt = config.FormatPrompt(preset.Content)
 		}
 	}
-	if prompt == "" {
-		prompt = aitag.TagPrompt
+	lang := r.URL.Query().Get("lang")
+	isLocalized := settings.LLMAutoLocale && lang != "" && lang != "en"
+	if prompt == "" && isLocalized {
+		prompt = aitag.TagPromptLocalized(lang)
+	} else {
+		if prompt == "" {
+			prompt = aitag.TagPrompt
+		}
+		translationsBlock := aitag.TagTranslationsBlock
+		if isLocalized {
+			translationsBlock = aitag.TagTranslationsBlockForLocale(lang)
+		}
+		prompt = replaceDynamicVars(prompt, map[string]string{
+			"translations": translationsBlock,
+		})
+		prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
+			lang, "Write the description, tags, and all human-readable text in")
 	}
-	prompt = replaceDynamicVars(prompt, map[string]string{
-		"translations": aitag.TagTranslationsBlock,
-	})
-	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
-		r.URL.Query().Get("lang"), "Write the description, tags, and all human-readable text in")
 	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	var sourceItems []scanner.AssetItem

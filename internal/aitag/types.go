@@ -21,9 +21,102 @@ const TagPrompt = `Analyze this image and respond with a JSON object containing:
 
 Respond ONLY with valid JSON, no markdown or explanation.`
 
+var allI18nLocales = []string{"en", "zh-TW", "zh-CN", "ja", "ko"}
+
 const TagTranslationsBlock = `- "categoryI18n": object mapping locale codes to translated category name: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the category value naturally into each locale.
 - "tagsI18n": object mapping locale codes to translated tag arrays: {"zh-TW": [...], "zh-CN": [...], "ja": [...], "ko": [...]}. Each array must have the same length and order as "tags", translated naturally into that locale.
 - "descriptionI18n": object mapping locale codes to translated descriptions: {"zh-TW": "...", "zh-CN": "...", "ja": "...", "ko": "..."}. Translate the description naturally into each locale.`
+
+func TagTranslationsBlockForLocale(primaryLocale string) string {
+	name := localeDisplayNames[primaryLocale]
+	if name == "" {
+		name = primaryLocale
+	}
+	locales := excludeLocale(allI18nLocales, primaryLocale)
+	example := buildLocaleExample(locales)
+	arrayExample := buildLocaleArrayExample(locales)
+	return `NOTE: Write tags as natural-language words in ` + name + `, NOT English kebab-case.
+
+- "categoryI18n": ` + example + ` — translate the category into each locale
+- "tagsI18n": ` + arrayExample + ` — same count and order as "tags", translated into each locale
+- "descriptionI18n": ` + example + ` — translate the description into each locale
+
+categoryI18n, tagsI18n, and descriptionI18n are REQUIRED fields — do not omit them.`
+}
+
+var localeDisplayNames = map[string]string{
+	"en":    "English",
+	"zh-TW": "Traditional Chinese (繁體中文)",
+	"zh-CN": "Simplified Chinese (简体中文)",
+	"ja":    "Japanese (日本語)",
+	"ko":    "Korean (한국어)",
+}
+
+// TagPromptLocalized returns a complete tag prompt for non-English primary
+// locales. It interleaves i18n fields next to their base fields so smaller
+// models treat them as equally required, and removes the English-only
+// "kebab-case" instruction that conflicts with a non-English locale.
+func TagPromptLocalized(primaryLocale string) string {
+	name := localeDisplayNames[primaryLocale]
+	if name == "" {
+		name = primaryLocale
+	}
+
+	locales := excludeLocale(allI18nLocales, primaryLocale)
+	example := buildLocaleExample(locales)
+	arrayExample := buildLocaleArrayExample(locales)
+
+	return `Analyze this image and respond with a JSON object. Write ALL human-readable values in ` + name + `.
+
+- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork"
+- "categoryI18n": ` + example + ` — translate the category into each locale
+- "tags": array of 3-8 descriptive tags in ` + name + `
+- "tagsI18n": ` + arrayExample + ` — same count and order as "tags", translated into each locale
+- "description": one sentence describing the image in ` + name + `
+- "descriptionI18n": ` + example + ` — translate the description into each locale
+- "languages": ISO 639-3 codes for any visible text (e.g. ["eng"]), or [] if none
+- "containsFace": true if a human face is visible, false otherwise
+- "sceneType": one of "indoor", "outdoor", "studio", "digital", "abstract", "unknown"
+- "estimatedLocation": short place description if identifiable, or null
+- "locationConfidence": one of "high", "medium", "low", "none"
+
+Every field above is REQUIRED. Respond ONLY with valid JSON, no markdown.`
+}
+
+func excludeLocale(all []string, exclude string) []string {
+	var out []string
+	for _, l := range all {
+		if l != exclude {
+			out = append(out, l)
+		}
+	}
+	if len(out) == 0 {
+		return all[1:]
+	}
+	return out
+}
+
+func buildLocaleExample(locales []string) string {
+	s := "{"
+	for i, l := range locales {
+		if i > 0 {
+			s += ", "
+		}
+		s += `"` + l + `": "..."`
+	}
+	return s + "}"
+}
+
+func buildLocaleArrayExample(locales []string) string {
+	s := "{"
+	for i, l := range locales {
+		if i > 0 {
+			s += ", "
+		}
+		s += `"` + l + `": [...]`
+	}
+	return s + "}"
+}
 
 type Result struct {
 	ProjectID          string              `json:"projectId"`
