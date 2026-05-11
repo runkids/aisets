@@ -122,14 +122,23 @@ func extToMIME(ext string) string {
 	}
 }
 
-func (s *Server) chatVLM(ctx context.Context, localPath, ext, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
+type vlmImage struct {
+	Path string
+	Ext  string
+}
+
+func (s *Server) chatVLM(ctx context.Context, images []vlmImage, modelName, systemPrompt, prompt string, timeoutSec int) (string, llm.ChatResponse, error) {
 	if s.agentChat != nil {
+		paths := make([]string, len(images))
+		for i, img := range images {
+			paths[i] = img.Path
+		}
 		var res agent.ChatResult
 		_ = s.agentChat.ChatBatch(ctx, []agent.ChatRequest{{
 			Model:        modelName,
 			SystemPrompt: systemPrompt,
 			Prompt:       prompt,
-			ImagePaths:   []string{localPath},
+			ImagePaths:   paths,
 			TimeoutSec:   timeoutSec,
 		}}, func(_ int, r agent.ChatResult) { res = r })
 		if res.Err != nil {
@@ -143,13 +152,17 @@ func (s *Server) chatVLM(ctx context.Context, localPath, ext, modelName, systemP
 		}, nil
 	}
 
-	dataURI, err := prepareImageForVLM(localPath, ext, "tag")
-	if err != nil {
-		return "", llm.ChatResponse{}, err
+	var dataURIs []string
+	for _, img := range images {
+		dataURI, err := prepareImageForVLM(img.Path, img.Ext, "tag")
+		if err != nil {
+			return "", llm.ChatResponse{}, err
+		}
+		dataURIs = append(dataURIs, dataURI)
 	}
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
 		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
+		Messages:   buildChatMessages(systemPrompt, prompt, dataURIs),
 		TimeoutSec: timeoutSec,
 	})
 	if err != nil {
@@ -441,7 +454,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	}
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(ctx, item.LocalPath, item.Ext, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {

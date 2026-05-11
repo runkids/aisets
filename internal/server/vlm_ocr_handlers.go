@@ -353,7 +353,7 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, prov
 	}
 
 	start := time.Now()
-	rawContent, resp, err := s.chatVLM(ctx, item.LocalPath, item.Ext, modelName, systemPrompt, prompt, timeoutSec)
+	rawContent, resp, err := s.chatVLM(ctx, []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, modelName, systemPrompt, prompt, timeoutSec)
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {
