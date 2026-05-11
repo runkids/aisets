@@ -34,6 +34,7 @@ import type {
   UpdateAppResult,
   VersionCheck,
 } from "./types";
+import i18n from "./i18n";
 
 declare global {
   interface Window {
@@ -518,6 +519,7 @@ export async function runAITagging(options?: {
   if (options?.presetId) qp.set("presetId", options.presetId);
   if (options?.projectIds?.length)
     qp.set("projectIds", options.projectIds.join(","));
+  if (i18n.language) qp.set("lang", i18n.language);
   const params = qp.toString() ? `?${qp}` : "";
   const fetchBody = options?.assetIds?.length
     ? JSON.stringify({ assetIds: options.assetIds })
@@ -575,6 +577,7 @@ export async function runVLMOcr(options?: {
   if (options?.presetId) qp.set("presetId", options.presetId);
   if (options?.projectIds?.length)
     qp.set("projectIds", options.projectIds.join(","));
+  if (i18n.language) qp.set("lang", i18n.language);
   const params = qp.toString() ? `?${qp}` : "";
   const fetchBody = options?.assetIds?.length
     ? JSON.stringify({ assetIds: options.assetIds })

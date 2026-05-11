@@ -2,6 +2,7 @@ package precheck
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -21,21 +22,81 @@ func LocaleDisplayName(lang string) string {
 	return ""
 }
 
-const PrecheckAIPrompt = `Analyze this image for an asset library pre-import check. Respond with a JSON object containing:
-- "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork", "other"
-- "tags": array of 3-5 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "hero-section")
-- "description": one sentence describing the image content
-- "quality": object with:
-  - "score": integer 1-5 (1=unusable, 2=poor, 3=acceptable, 4=good, 5=excellent)
-  - "issues": array of applicable issue codes from ["blurry", "low_resolution", "noisy", "truncated", "watermarked"] (empty array if none)
-  - "assessment": one sentence quality summary
-- "suggestion": object with:
-  - "recommendedFilename": suggested kebab-case filename without extension
-  - "formatRecommendation": format conversion advice, or empty string if current format is fine
-  - "suitability": one of "good", "acceptable", "poor"
-  - "suitabilityReason": one sentence explaining the suitability rating
+const PrecheckAIPrompt = `You are reviewing an image file for an asset library pre-import check.
+
+{{precheckFindings}}
+
+Based on the image content AND the analysis above, respond as JSON:
+{
+  "category": one of "icon", "photo", "screenshot", "diagram", "illustration", "pattern", "logo", "banner", "texture", "sprite", "mockup", "artwork", "other",
+  "tags": array of 3-5 descriptive tags in lowercase kebab-case (e.g. "dark-mode", "hero-section"),
+  "description": one sentence describing the image content,
+  "quality": {
+    "score": integer 1-5 (1=unusable, 2=poor, 3=acceptable, 4=good, 5=excellent),
+    "issues": array of applicable codes from ["blurry", "low_resolution", "noisy", "truncated", "watermarked"] (empty if none),
+    "assessment": one sentence quality summary
+  },
+  "suggestion": {
+    "recommendedFilename": suggested kebab-case filename without extension,
+    "formatRecommendation": format conversion advice considering the analysis above, or empty string if current format is fine,
+    "suitability": one of "good", "acceptable", "poor",
+    "suitabilityReason": one sentence explaining the rating, referencing duplicate/naming/optimization findings if relevant
+  }
+}
+
+Important:
+- If duplicate or near-duplicate matches exist, factor them into suitability (duplicates → "poor")
+- If naming issues exist, suggest a clean filename that fixes them
+- If optimization issues exist, include format/compression advice in formatRecommendation
+- Your recommendation should complement, not contradict, the analysis findings
 
 Respond ONLY with valid JSON, no markdown or explanation.`
+
+func FormatPrecheckFindings(r Result) string {
+	var b strings.Builder
+	b.WriteString("File: " + r.Name + " (" + r.Ext + ", " + formatSize(r.Size) + ")")
+	if r.Image.Width > 0 {
+		b.WriteString(" " + strings.TrimSpace(strings.Join([]string{
+			r.Image.Format,
+			fmt.Sprintf("%dx%d", r.Image.Width, r.Image.Height),
+		}, " ")))
+	}
+	b.WriteString("\n")
+
+	if len(r.ExactMatches) > 0 {
+		b.WriteString(fmt.Sprintf("\nExact duplicates found: %d match(es) already in catalog.\n", len(r.ExactMatches)))
+	}
+	if len(r.NearMatches) > 0 {
+		b.WriteString(fmt.Sprintf("\nNear-duplicate matches: %d visually similar asset(s) found.\n", len(r.NearMatches)))
+	}
+	if len(r.NamingIssues) > 0 {
+		b.WriteString("\nNaming issues:\n")
+		for _, n := range r.NamingIssues {
+			b.WriteString("- " + n.Message + "\n")
+		}
+	}
+	if len(r.Optimization) > 0 {
+		b.WriteString("\nOptimization findings:\n")
+		for _, o := range r.Optimization {
+			b.WriteString("- [" + o.Severity + "] " + o.Reason + " → " + o.Suggestion + "\n")
+		}
+	}
+	if len(r.ExactMatches) == 0 && len(r.NearMatches) == 0 && len(r.NamingIssues) == 0 && len(r.Optimization) == 0 {
+		b.WriteString("\nNo issues detected by static analysis.\n")
+	}
+	return b.String()
+}
+
+func formatSize(bytes int64) string {
+	switch {
+	case bytes >= 1024*1024:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/(1024*1024))
+	case bytes >= 1024:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/1024)
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
 
 type AIQuality struct {
 	Score      int      `json:"score"`

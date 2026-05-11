@@ -512,6 +512,8 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	catalog, _ := s.ensureCatalog(r.Context())
+
 	modelName := settings.LLMVisionModel
 	timeoutSec := settings.LLMTimeout
 	if timeoutSec < llm.MinChatTimeout {
@@ -542,7 +544,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, map[string]any{"type": "start", "total": total})
 
 	for _, header := range files {
-		result := s.analyzeUploadAI(r.Context(), header, modelName, timeoutSec, systemPrompt, prompt)
+		result := s.analyzeUploadAI(r.Context(), header, modelName, timeoutSec, systemPrompt, prompt, catalog)
 		if result.Status == "ready" {
 			ready++
 		} else {
@@ -558,7 +560,7 @@ func (s *Server) handlePreCheckAI(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
-func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHeader, modelName string, timeoutSec int, systemPrompt, prompt string) precheck.AIResult {
+func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHeader, modelName string, timeoutSec int, systemPrompt, prompt string, catalog scanner.Catalog) precheck.AIResult {
 	name := header.Filename
 	src, err := header.Open()
 	if err != nil {
@@ -580,6 +582,10 @@ func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHead
 	}
 	tmp.Close()
 
+	precheckResult, _ := precheck.Analyze(ctx, name, tmpPath, catalog)
+	findings := precheck.FormatPrecheckFindings(precheckResult)
+	filePrompt := strings.ReplaceAll(prompt, "{{precheckFindings}}", findings)
+
 	dataURI, err := prepareImageForVLM(tmpPath, ext, "tag")
 	if err != nil {
 		return precheck.AIResult{Name: name, Status: "failed", ErrorCode: "precheck_ai_image_failed", ErrorMsg: "failed to prepare image: " + err.Error()}
@@ -588,7 +594,7 @@ func (s *Server) analyzeUploadAI(ctx context.Context, header *multipart.FileHead
 	start := time.Now()
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
 		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, prompt, []string{dataURI}),
+		Messages:   buildChatMessages(systemPrompt, filePrompt, []string{dataURI}),
 		TimeoutSec: timeoutSec,
 	})
 	if err != nil {

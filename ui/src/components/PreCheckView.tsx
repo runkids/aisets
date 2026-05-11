@@ -269,6 +269,14 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
                 );
                 if (idx >= 0) {
                   setExpanded((prev) => new Set([...prev, `${idx}-ai`]));
+                  requestAnimationFrame(() => {
+                    document
+                      .querySelector(`[data-precheck-card="${idx}"]`)
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "nearest",
+                      });
+                  });
                 }
               }
             } else if (event.type === "error") {
@@ -282,6 +290,8 @@ export function PreCheckView({ onOpenAsset, aiEnabled }: Props) {
       }
       if (readyCount > 0) {
         toast.success(t("precheck.aiDone", { count: readyCount }));
+      } else if (readyCount === 0 && files.length > 0) {
+        setAiError(t("precheck.aiError"));
       }
     } catch (err) {
       setAiError(err instanceof Error ? err.message : String(err));
@@ -698,7 +708,7 @@ function PreCheckCard({
   }
 
   return (
-    <Card padding="none">
+    <Card padding="none" data-precheck-card={index}>
       <div className="p-3">
         <div className="flex gap-3">
           <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-g-md bg-g-surface-3">
