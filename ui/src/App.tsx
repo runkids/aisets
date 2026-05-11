@@ -478,16 +478,18 @@ export function App() {
   const ocrActivityBusy = isOCRActivityBusy(ocrActivity);
   const optimizeActivityBusy = isOptimizeActivityBusy(optimizeActivity);
   const catalogActionsDisabled =
-    working || ocrActivityBusy || optimizeActivityBusy;
+    working || ocrActivityBusy || optimizeActivityBusy || anyAIBusy;
   const workspaceSwitchDisabled =
-    scanBusy || ocrActivityBusy || optimizeActivityBusy;
+    scanBusy || ocrActivityBusy || optimizeActivityBusy || anyAIBusy;
   const workspaceSwitchDisabledTooltip = scanBusy
     ? t("activity.scanLockedTooltip")
     : ocrActivityBusy
       ? t("activity.ocrLockedTooltip")
       : optimizeActivityBusy
         ? t("activity.optimizeLockedTooltip")
-        : undefined;
+        : anyAIBusy
+          ? t("activity.aiTagLockedTooltip")
+          : undefined;
   const workspaceName =
     settingsQuery.data?.settings.workspaceName ?? t("projects.workspaceName");
   const ocrEnabled = settingsQuery.data?.settings.ocrEnabled ?? false;

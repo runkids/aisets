@@ -315,7 +315,6 @@ export function AppTopbar({
             errorMessage={optimizeActivity.errorMessage}
             progressPercent={optimizeActivityProgressPercent(optimizeActivity)}
             startedAt={optimizeActivity.startedAt}
-            showIndeterminate
             primaryAction={{
               label: t("activity.viewOptimize"),
               onClick: onOpenOptimize,
