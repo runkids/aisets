@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -421,6 +422,7 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, provi
 	// Parse JSON from response, stripping markdown fences if present
 	content := strings.TrimSpace(resp.Content)
 	content = stripMarkdownFences(content)
+	content = fixVLMJSON(content)
 
 	var parsed struct {
 		Category           json.RawMessage `json:"category"`
@@ -545,6 +547,12 @@ func unmarshalStringArray(raw json.RawMessage) []string {
 		return out
 	}
 	return nil
+}
+
+func fixVLMJSON(s string) string {
+	s = regexp.MustCompile(`,\s*([}\]])`).ReplaceAllString(s, "$1")
+	s = regexp.MustCompile(`(["\d\]}\w])\s*\n\s*"`).ReplaceAllString(s, `$1,"`)
+	return s
 }
 
 func stripMarkdownFences(s string) string {
