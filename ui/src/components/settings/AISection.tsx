@@ -94,6 +94,7 @@ import {
   IconButton,
   Select,
   Switch,
+  Tabs,
   Textarea,
   TextInput,
   Tooltip,
@@ -378,36 +379,26 @@ export function AISection({
           </span>
         </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
-          <div className="flex items-center gap-4 border-b border-g-line pb-3">
-            <button
-              type="button"
-              className={cn(
-                "font-g text-g-ui font-[590] tracking-g-ui transition-colors",
-                aiTab === "local"
-                  ? "text-g-ink border-b-2 border-g-ink pb-1"
-                  : "text-g-ink-3 hover:text-g-ink-2",
-              )}
-              onClick={() => setAiTab("local")}
-            >
-              {t("settings.aiTabLocal")}
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "font-g text-g-ui font-[590] tracking-g-ui transition-colors",
-                aiTab === "agent"
-                  ? "text-g-ink border-b-2 border-g-ink pb-1"
-                  : "text-g-ink-3 hover:text-g-ink-2",
-              )}
-              onClick={() => setAiTab("agent")}
-            >
-              {t("settings.aiTabAgent")}
-              {settings?.agentRuntime?.available && (
-                <Badge tone="green" className="ml-2">
-                  {settings.agentRuntime.adapters?.length ?? 0}
-                </Badge>
-              )}
-            </button>
+          <div className="py-2">
+            <Tabs
+              value={aiTab}
+              items={[
+                { value: "local" as const, label: t("settings.aiTabLocal") },
+                {
+                  value: "agent" as const,
+                  label: t("settings.aiTabAgent"),
+                  badge: settings?.agentRuntime?.adapters?.length ? (
+                    <Badge tone="green">
+                      {settings.agentRuntime.adapters.length}
+                    </Badge>
+                  ) : undefined,
+                },
+              ]}
+              onChange={setAiTab}
+              ariaLabel="AI backend"
+              variant="segment"
+              size="sm"
+            />
           </div>
 
           {aiTab === "local" && (
