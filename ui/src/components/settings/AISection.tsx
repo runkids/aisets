@@ -1270,9 +1270,12 @@ function SystemPromptInline() {
         className="font-g-mono text-g-caption"
       />
       {isDirty && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button size="md" variant="ghost" onClick={() => setLocalValue(null)}>
+            {t("action.reset")}
+          </Button>
           <Button
-            size="sm"
+            size="md"
             variant="primary"
             onClick={handleSave}
             disabled={updateMutation.isPending || createMutation.isPending}
