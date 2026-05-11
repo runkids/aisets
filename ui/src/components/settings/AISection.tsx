@@ -916,8 +916,7 @@ export function AISection({
               ) : null}
             </div>
           </div>
-          <div className="border-t border-g-line" />
-          <div className="flex items-center gap-2.5 border-b border-g-line px-6 py-3 md:px-8">
+          <div className="flex items-center gap-2.5 border-y border-g-line px-6 py-3 md:px-8">
             <ScanText size={15} className="shrink-0 text-g-ink-3" />
             <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
               {t("settings.aiOcrGroup")}
