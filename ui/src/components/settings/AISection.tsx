@@ -810,7 +810,7 @@ export function AISection({
             </div>
           )}
 
-          {settingActions}
+          {(aiTab === "local" || aiTab === "agent") && settingActions}
         </div>
       </Card>
 
