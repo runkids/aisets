@@ -43,8 +43,9 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 	where = append(where, "at.status = 'ready'")
 
 	if q.Search != "" {
-		where = append(where, "t.value LIKE '%' || ? || '%'")
-		args = append(args, strings.ToLower(q.Search))
+		where = append(where, "(t.value LIKE '%' || ? || '%' OR LOWER(at.tags_i18n_json) LIKE '%' || ? || '%')")
+		low := strings.ToLower(q.Search)
+		args = append(args, low, low)
 	}
 	if q.Project != "" {
 		where = append(where, "at.project_id = ?")
@@ -368,13 +369,14 @@ func (s *Store) AITagSuggest(prefix string, limit int) ([]string, error) {
 		limit = 10
 	}
 
+	low := strings.ToLower(prefix)
 	rows, err := s.rdb.Query(`
 		SELECT DISTINCT t.value
 		FROM ai_tags at, json_each(at.tags_json) t
-		WHERE at.status = 'ready' AND t.value LIKE ? || '%'
+		WHERE at.status = 'ready' AND (t.value LIKE ? || '%' OR LOWER(at.tags_i18n_json) LIKE '%' || ? || '%')
 		ORDER BY t.value
 		LIMIT ?
-	`, strings.ToLower(prefix), limit)
+	`, low, low, limit)
 	if err != nil {
 		return nil, fmt.Errorf("aitag suggest query: %w", err)
 	}

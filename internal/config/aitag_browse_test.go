@@ -15,6 +15,7 @@ func seedTagData(t *testing.T, store *Store) {
 		{ProjectID: "proj1", RepoPath: "b.png", ContentHash: "h2", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", Tags: []string{"dark-mode", "hero-section"}, UpdatedAt: "2026-01-01T00:00:00Z"},
 		{ProjectID: "proj2", RepoPath: "c.svg", ContentHash: "h3", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "icon", Tags: []string{"navigation", "mobile"}, UpdatedAt: "2026-01-01T00:00:00Z"},
 		{ProjectID: "proj2", RepoPath: "d.png", ContentHash: "h4", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusFailed, Category: "", Tags: []string{"should-not-appear"}, UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ProjectID: "proj1", RepoPath: "e.jpg", ContentHash: "h5", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", Tags: []string{"boxing", "sports"}, TagsI18n: map[string][]string{"zh-TW": {"拳擊", "運動"}, "ja": {"ボクシング", "スポーツ"}}, UpdatedAt: "2026-01-01T00:00:00Z"},
 	}
 	for _, r := range rows {
 		if err := store.UpsertAITagResult(r); err != nil {
@@ -38,11 +39,11 @@ func TestAITagList_Basic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if page.Total != 5 {
-		t.Fatalf("expected 5 unique tags, got %d", page.Total)
+	if page.Total != 7 {
+		t.Fatalf("expected 7 unique tags, got %d", page.Total)
 	}
-	if page.TotalTaggedAssets != 3 {
-		t.Fatalf("expected 3 tagged assets, got %d", page.TotalTaggedAssets)
+	if page.TotalTaggedAssets != 4 {
+		t.Fatalf("expected 4 tagged assets, got %d", page.TotalTaggedAssets)
 	}
 	if page.TopCategory != "icon" {
 		t.Fatalf("expected top category 'icon', got %q", page.TopCategory)
@@ -118,14 +119,14 @@ func TestAITagList_AlphaSort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Tags) < 5 {
-		t.Fatalf("expected 5 tags, got %d", len(page.Tags))
+	if len(page.Tags) < 7 {
+		t.Fatalf("expected 7 tags, got %d", len(page.Tags))
 	}
-	if page.Tags[0].Tag != "dark-mode" {
-		t.Fatalf("expected first alpha tag 'dark-mode', got %q", page.Tags[0].Tag)
+	if page.Tags[0].Tag != "boxing" {
+		t.Fatalf("expected first alpha tag 'boxing', got %q", page.Tags[0].Tag)
 	}
-	if page.Tags[1].Tag != "hero-section" {
-		t.Fatalf("expected second alpha tag 'hero-section', got %q", page.Tags[1].Tag)
+	if page.Tags[1].Tag != "dark-mode" {
+		t.Fatalf("expected second alpha tag 'dark-mode', got %q", page.Tags[1].Tag)
 	}
 }
 
@@ -146,8 +147,8 @@ func TestAITagList_Pagination(t *testing.T) {
 	if len(page.Tags) != 2 {
 		t.Fatalf("expected 2 tags with limit=2, got %d", len(page.Tags))
 	}
-	if page.Total != 5 {
-		t.Fatalf("total should still be 5, got %d", page.Total)
+	if page.Total != 7 {
+		t.Fatalf("total should still be 7, got %d", page.Total)
 	}
 
 	page2, err := store.AITagList(AITagListQuery{Limit: 2, Offset: 2})
@@ -373,8 +374,8 @@ func TestAITagDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Total != 3 {
-		t.Fatalf("expected 3 remaining tags, got %d", page.Total)
+	if page.Total != 5 {
+		t.Fatalf("expected 5 remaining tags, got %d", page.Total)
 	}
 }
 
@@ -529,6 +530,72 @@ func TestAITagSuggest_NoResults(t *testing.T) {
 	}
 }
 
+func TestAITagList_I18nSearch(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	page, err := store.AITagList(AITagListQuery{Search: "拳擊"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total == 0 {
+		t.Fatal("expected i18n search '拳擊' to find tags, got 0")
+	}
+	found := false
+	for _, tag := range page.Tags {
+		if tag.Tag == "boxing" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected 'boxing' in results for i18n search '拳擊', got %v", page.Tags)
+	}
+
+	page, err = store.AITagList(AITagListQuery{Search: "ボクシング"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total == 0 {
+		t.Fatal("expected i18n search 'ボクシング' to find tags, got 0")
+	}
+}
+
+func TestAITagSuggest_I18n(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	suggestions, err := store.AITagSuggest("拳", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(suggestions) == 0 {
+		t.Fatal("expected suggestions for i18n prefix '拳', got 0")
+	}
+	found := false
+	for _, s := range suggestions {
+		if s == "boxing" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected 'boxing' in suggestions for i18n prefix '拳', got %v", suggestions)
+	}
+}
+
 func TestAITagList_CategoryFilter(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -551,7 +618,7 @@ func TestAITagList_CategoryFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Total != 2 {
-		t.Fatalf("expected 2 tags for category 'photo', got %d", page.Total)
+	if page.Total != 4 {
+		t.Fatalf("expected 4 tags for category 'photo', got %d", page.Total)
 	}
 }

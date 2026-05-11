@@ -3,7 +3,7 @@ import { Tags, X } from "lucide-react";
 import type { AssetItem } from "../types";
 import { useAssetTagsMutation } from "../tagsQueries";
 import { errorMessage } from "../i18n";
-import { Badge } from "./ui";
+import { Badge, Tooltip } from "./ui";
 import { TagPickerInput } from "./TagPickerInput";
 import { useToast } from "./ToastProvider";
 
@@ -64,23 +64,38 @@ export function AssetDrawerTags({ asset }: Props) {
         <div className="flex items-start gap-2">
           <Tags size={12} className="mt-1 shrink-0 text-g-ink-4" />
           <div className="flex flex-wrap gap-1">
-            {currentTags.map((rawTag, idx) => (
-              <Badge
-                key={`${rawTag}-${idx}`}
-                tone="line"
-                className="gap-1 pr-1 text-g-ink-2"
-              >
-                {displayTags[idx] ?? rawTag}
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center size-3.5 rounded-full hover:bg-g-surface-3 transition-colors cursor-pointer"
-                  onClick={() => handleRemove(rawTag)}
-                  aria-label={`${t("tags.removeTag")} ${rawTag}`}
+            {currentTags.map((rawTag, idx) => {
+              const display = displayTags[idx] ?? rawTag;
+              const showTooltip = display !== rawTag;
+              const badge = (
+                <Badge
+                  key={`${rawTag}-${idx}`}
+                  tone="line"
+                  className="gap-1 pr-1 text-g-ink-2"
                 >
-                  <X size={9} />
-                </button>
-              </Badge>
-            ))}
+                  {display}
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center size-3.5 rounded-full hover:bg-g-surface-3 transition-colors cursor-pointer"
+                    onClick={() => handleRemove(rawTag)}
+                    aria-label={`${t("tags.removeTag")} ${rawTag}`}
+                  >
+                    <X size={9} />
+                  </button>
+                </Badge>
+              );
+              return showTooltip ? (
+                <Tooltip
+                  key={`${rawTag}-${idx}`}
+                  label={rawTag}
+                  placement="top"
+                >
+                  {badge}
+                </Tooltip>
+              ) : (
+                badge
+              );
+            })}
           </div>
         </div>
       ) : (
