@@ -29,6 +29,7 @@ import { DirectoryPickerModal } from "./components/project/DirectoryPickerModal"
 import { DuplicatesView } from "./components/duplicates/DuplicatesView";
 import { LintView } from "./components/lint/LintView";
 import { NavSidebar } from "./components/shared/NavSidebar";
+import { ImageToolsView } from "./components/image-tools/ImageToolsView";
 import { OptimizeView } from "./components/optimize/OptimizeView";
 import { PreCheckView } from "./components/scan/PreCheckView";
 import { PromptsView } from "./components/prompts/PromptsView";
@@ -118,6 +119,12 @@ import {
   type Mode,
 } from "./ui";
 import { clearEstimateCaches } from "./components/optimize/optimizeCache";
+import {
+  animateImageToolBasket,
+  mergeImageToolBasket,
+  readImageToolBasket,
+  writeImageToolBasket,
+} from "./imageToolsBasket";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";
@@ -253,10 +260,27 @@ export function App() {
   const browseFocusAssetId = searchParams.get("focusAsset") ?? "";
   const browseInitialSearch = searchParams.get("q") ?? "";
   const browseInitialAICategory = searchParams.get("aiCategory") ?? "";
+  const [imageToolAssetIds, setImageToolAssetIds] =
+    useState(readImageToolBasket);
 
   function changeMode(nextMode: Mode, projectId?: string) {
     if (projectId != null) setSelectedProjectId(projectId);
     navigate(pathForMode(nextMode));
+  }
+
+  async function addToImageTools(
+    assetIds: string[],
+    target?: HTMLElement | null,
+  ) {
+    const next = mergeImageToolBasket(imageToolAssetIds, assetIds);
+    setImageToolAssetIds(next);
+    await animateImageToolBasket(assetIds, target);
+    toast.info(t("imageTools.addedToBasket", { count: assetIds.length }));
+  }
+
+  function setImageToolsBasket(assetIds: string[]) {
+    setImageToolAssetIds(assetIds);
+    writeImageToolBasket(assetIds);
   }
 
   const setDrawerId = useCallback(
@@ -461,7 +485,12 @@ export function App() {
     selectedProjectStats,
     0,
   );
-  const badges = navigationBadges(catalogSummary, scopedStats, optimizeCount);
+  const badges = navigationBadges(
+    catalogSummary,
+    scopedStats,
+    optimizeCount,
+    imageToolAssetIds.length,
+  );
 
   useEffect(() => {
     const settings = settingsQuery.data?.settings;
@@ -606,6 +635,7 @@ export function App() {
     switchWorkspaceMutation.mutate(workspaceId, {
       onSuccess: (result) => {
         setSelectedProjectId("");
+        setImageToolsBasket([]);
         toast.success(
           t("toast.workspaceSwitched", {
             name: result.settings.workspaceName,
@@ -1055,6 +1085,14 @@ export function App() {
                   assetIds,
                 )
               }
+              onAddToImageTools={addToImageTools}
+            />
+          ) : mode === "imageTools" ? (
+            <ImageToolsView
+              key={activeWorkspaceId}
+              scanId={catalogSummary?.scanId}
+              assetIds={imageToolAssetIds}
+              onAssetIdsChange={setImageToolsBasket}
             />
           ) : mode === "settings" ? (
             <SettingsView

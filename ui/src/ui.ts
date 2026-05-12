@@ -22,6 +22,7 @@ export type Mode =
   | "unused"
   | "optimize"
   | "lint"
+  | "imageTools"
   | "precheck"
   | "prompts"
   | "settings";
@@ -35,18 +36,21 @@ export const modes: Mode[] = [
   "unused",
   "optimize",
   "lint",
+  "imageTools",
   "precheck",
   "prompts",
   "settings",
 ];
 
 export function pathForMode(mode: Mode) {
+  if (mode === "imageTools") return "/image-tools";
   if (mode === "tags") return "/tags-categories";
   return `/${mode}`;
 }
 
 export function modeForPath(pathname: string): Mode {
   const segment = pathname.replace(/^\/+|\/+$/g, "").split("/")[0];
+  if (segment === "image-tools") return "imageTools";
   if (segment === "tags-categories") return "tags";
   return modes.includes(segment as Mode) ? (segment as Mode) : "projects";
 }

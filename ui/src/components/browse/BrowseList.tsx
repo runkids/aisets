@@ -130,6 +130,7 @@ export function BrowseList({
             ? `${listRowClassName} absolute left-0 top-0 w-full translate-y-[var(--row-y,0)]`
             : listRowClassName
         }
+        data-image-tool-asset-id={item.id}
         data-active={isSelected || isActive || undefined}
         style={style}
         onClick={() => (bulkMode ? onToggleSelect(item.id) : onSelect(item))}

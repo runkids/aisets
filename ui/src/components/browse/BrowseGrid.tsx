@@ -204,6 +204,7 @@ export function BrowseGrid({
         key={item.id}
         type="button"
         className="group/card relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:z-[2] data-[selected=true]:translate-y-[-2px] data-[selected=true]:border-g-accent data-[selected=true]:shadow-[0_0_0_2px_var(--g-accent),var(--g-shadow-md)] data-[selected=true]:after:absolute data-[selected=true]:after:inset-[6px] data-[selected=true]:after:rounded-[calc(var(--g-r-md)-2px)] data-[selected=true]:after:pointer-events-none data-[selected=true]:after:animate-[selectedPulse_1000ms_var(--g-ease-out)] cursor-pointer"
+        data-image-tool-asset-id={item.id}
         data-selected={isVisuallySelected || undefined}
         onClick={() => (bulkMode ? onToggleSelect(item.id) : onSelect(item))}
         aria-label={ariaLabel}

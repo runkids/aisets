@@ -896,3 +896,21 @@ func TestPlanAICategoryMatchFiltersStrategy(t *testing.T) {
 		t.Errorf("no-tag quality = %d, want 80", ops[2].Quality)
 	}
 }
+
+func TestManualPlanMissingImgtoolsBlocks(t *testing.T) {
+	items := []scanner.AssetItem{{
+		ID:       "a",
+		RepoPath: "src/photo.png",
+		Ext:      ".png",
+		Bytes:    120_000,
+		Image:    imageproc.Metadata{Format: "png", Width: 800, Height: 600},
+	}}
+
+	ops := manualPlanWithTools(items, Request{OutputFormat: "webp"}, func(string) bool { return false })
+	if len(ops) != 1 {
+		t.Fatalf("expected one op, got %d", len(ops))
+	}
+	if ops[0].ReasonCode != "optimizer_tool_missing" || ops[0].CanApply {
+		t.Fatalf("op = %#v", ops[0])
+	}
+}

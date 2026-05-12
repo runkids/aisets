@@ -40,11 +40,13 @@ type Request struct {
 	AssetIDs              []string                             `json:"assetIds"`
 	Strategy              Strategy                             `json:"strategy"`
 	OutputMode            OutputMode                           `json:"outputMode"`
+	OutputFormat          string                               `json:"outputFormat,omitempty"`
 	UpdateReferences      bool                                 `json:"updateReferences"`
 	Quality               int                                  `json:"quality"`
 	MaxDimensionPx        int                                  `json:"maxDimensionPx"`
 	AvifSpeed             int                                  `json:"avifSpeed"`
 	Workers               int                                  `json:"workers"`
+	AllowLarger           bool                                 `json:"allowLarger,omitempty"`
 	Strategies            []imageproc.OptimizationStrategy     `json:"optimizationStrategies,omitempty"`
 	ExternalTools         []imageproc.OptimizationExternalTool `json:"optimizationExternalTools,omitempty"`
 	StrategyHash          string                               `json:"optimizationStrategyHash,omitempty"`
@@ -606,7 +608,7 @@ func measureSingleOperation(project scanner.Project, op Operation, req Request, 
 		op.EstimatedBytes = estimatedBytes
 		op.SavingsBytes = max(0, op.CurrentBytes-estimatedBytes)
 	}
-	if op.SavingsBytes <= 0 {
+	if op.SavingsBytes <= 0 && !req.AllowLarger {
 		op.CanApply = false
 		op.ReasonCode = "no_effective_savings"
 		op.BlockedReason = "Candidate output is not smaller than the original."
@@ -673,7 +675,7 @@ func measureOperations(project scanner.Project, ops []Operation, req Request, ke
 			ops[index].EstimatedBytes = estimatedBytes
 			ops[index].SavingsBytes = max(0, ops[index].CurrentBytes-estimatedBytes)
 		}
-		if ops[index].SavingsBytes <= 0 {
+		if ops[index].SavingsBytes <= 0 && !req.AllowLarger {
 			ops[index].CanApply = false
 			ops[index].ReasonCode = "no_effective_savings"
 			ops[index].BlockedReason = "Candidate output is not smaller than the original."

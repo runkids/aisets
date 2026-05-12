@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Gauge,
   History,
+  Images,
   MessageSquareCode,
   Recycle,
   Settings,
@@ -21,6 +22,7 @@ type Badges = {
   duplicate: number;
   unused: number;
   optimize: number;
+  imageTools: number;
   lint: number;
 };
 
@@ -167,6 +169,13 @@ export function NavSidebar({
           icon: <ShieldCheck size={18} />,
         },
         {
+          id: "imageTools",
+          label: t("nav.imageTools"),
+          icon: <Images size={18} />,
+          badge: "imageTools",
+          tone: "blue",
+        },
+        {
           id: "prompts",
           label: t("nav.prompts"),
           icon: <MessageSquareCode size={18} />,
@@ -221,6 +230,9 @@ export function NavSidebar({
                   type="button"
                   className="group flex min-h-[36px] w-full items-center gap-2 rounded-g-md px-2 py-1.5 text-left text-[13px] font-medium tracking-[-0.012em] text-g-ink-3 transition-[background,color] duration-[120ms] ease-g [&_svg]:size-4 [&_svg]:shrink-0 hover:not-data-[active=true]:bg-[color-mix(in_srgb,var(--g-surface-2)_84%,transparent)] hover:not-data-[active=true]:text-g-ink-2 [[data-theme=dark]_&]:hover:not-data-[active=true]:bg-g-surface-3 [[data-theme=dark]_&]:hover:not-data-[active=true]:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus data-[active=true]:bg-g-active-bg data-[active=true]:text-g-active-text data-[active=true]:font-[var(--g-active-weight)] max-[960px]:justify-center"
                   data-active={mode === item.id}
+                  data-image-tools-basket-target={
+                    item.id === "imageTools" ? "true" : undefined
+                  }
                   aria-label={item.label}
                   onClick={() => onSelect(item.id)}
                 >
@@ -228,7 +240,7 @@ export function NavSidebar({
                   <span className="min-w-0 flex-1 max-[960px]:hidden">
                     {item.label}
                   </span>
-                  {item.badge == null ? null : (
+                  {item.badge == null || badges[item.badge] <= 0 ? null : (
                     <span
                       className="min-w-[28px] text-center text-[11px] font-g-mono bg-g-surface-2 text-g-ink-3 px-1.5 py-0.5 rounded-g-sm font-[510] tracking-[-0.015em] tabular-nums data-[tone=red]:bg-g-red-soft data-[tone=red]:text-g-red data-[tone=amber]:bg-g-amber-soft data-[tone=amber]:text-g-amber data-[tone=blue]:bg-g-blue-soft data-[tone=blue]:text-g-blue data-[tone=green]:bg-g-green-soft data-[tone=green]:text-g-green data-[tone=purple]:bg-g-purple-soft data-[tone=purple]:text-g-purple group-hover:not-group-data-[active=true]:bg-g-surface group-hover:not-group-data-[active=true]:text-g-ink-2 group-data-[active=true]:bg-g-surface group-data-[active=true]:text-g-ink-3 [[data-theme=dark]_&]:group-data-[active=true]:bg-[rgba(8,9,10,0.18)] [[data-theme=dark]_&]:group-data-[active=true]:text-g-accent-ink max-[960px]:hidden"
                       data-tone={item.tone ?? "default"}

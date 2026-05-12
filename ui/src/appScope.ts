@@ -10,6 +10,7 @@ export type NavigationBadges = {
   duplicate: number;
   unused: number;
   optimize: number;
+  imageTools: number;
   lint: number;
 };
 
@@ -86,6 +87,7 @@ export function navigationBadges(
   summary: CatalogSummary | null,
   scopedStats: CatalogStats,
   optimizeCount: number,
+  imageToolsCount = 0,
 ): NavigationBadges {
   return {
     projects: summary?.projects.length ?? 0,
@@ -96,6 +98,7 @@ export function navigationBadges(
         : 0,
     unused: scopedStats.unusedFiles,
     optimize: optimizeCount,
+    imageTools: imageToolsCount,
     lint: scopedStats.lintFindings,
   };
 }

@@ -39,11 +39,12 @@ type Server struct {
 	agentProviders map[string]agent.ChatProvider
 	onReady        func()
 
-	mu            sync.Mutex
-	catalog       scanner.Catalog
-	catalogStale  bool
-	previews      map[string]actions.Preview
-	batchPreviews map[string]actions.BatchPreview
+	mu                 sync.Mutex
+	catalog            scanner.Catalog
+	catalogStale       bool
+	previews           map[string]actions.Preview
+	batchPreviews      map[string]actions.BatchPreview
+	imageToolDownloads map[string]imageToolDownload
 
 	scanMu       sync.Mutex
 	scanRunning  bool
@@ -52,16 +53,17 @@ type Server struct {
 
 func New(opts Options) (*Server, error) {
 	s := &Server{
-		addr:          opts.Addr,
-		basePath:      normalizeBasePath(opts.BasePath),
-		store:         opts.Store,
-		uiDistDir:     opts.UIDistDir,
-		version:       opts.Version,
-		mux:           http.NewServeMux(),
-		scanner:       scanner.NewWithCacheDir(config.CacheDir()),
-		ocrEngine:     ocr.NewDefaultEngine(config.DataDir()),
-		previews:      map[string]actions.Preview{},
-		batchPreviews: map[string]actions.BatchPreview{},
+		addr:               opts.Addr,
+		basePath:           normalizeBasePath(opts.BasePath),
+		store:              opts.Store,
+		uiDistDir:          opts.UIDistDir,
+		version:            opts.Version,
+		mux:                http.NewServeMux(),
+		scanner:            scanner.NewWithCacheDir(config.CacheDir()),
+		ocrEngine:          ocr.NewDefaultEngine(config.DataDir()),
+		previews:           map[string]actions.Preview{},
+		batchPreviews:      map[string]actions.BatchPreview{},
+		imageToolDownloads: map[string]imageToolDownload{},
 	}
 	s.initLLMProvider()
 	s.initAgentStatus()
@@ -141,6 +143,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/thumbs/{id}", s.handleThumb)
 	s.mux.HandleFunc("POST /api/actions/optimization/preview", s.handleOptimizationPreview)
 	s.mux.HandleFunc("POST /api/actions/optimization/apply", s.handleApply)
+	s.mux.HandleFunc("POST /api/image-tools/assets/preview", s.handleImageToolAssetPreview)
+	s.mux.HandleFunc("POST /api/image-tools/assets/process", s.handleImageToolAssetProcess)
+	s.mux.HandleFunc("POST /api/image-tools/uploads/process", s.handleImageToolUploadProcess)
+	s.mux.HandleFunc("GET /api/image-tools/download/{token}", s.handleImageToolDownload)
 	s.mux.HandleFunc("POST /api/actions/rename/preview", s.handleRenamePreview)
 	s.mux.HandleFunc("POST /api/actions/rename/apply", s.handleApply)
 	s.mux.HandleFunc("POST /api/actions/merge-duplicates/preview", s.handleMergePreview)

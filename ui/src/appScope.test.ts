@@ -150,6 +150,7 @@ describe("navigationBadges", () => {
       duplicate: 1,
       unused: 2,
       optimize: 1,
+      imageTools: 0,
       lint: 3,
     });
   });

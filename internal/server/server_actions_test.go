@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -389,6 +390,93 @@ func TestBatchExport(t *testing.T) {
 	}
 }
 
+func TestImageToolsUploadDownloadAndProjectPreview(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	svgPath := filepath.Join(project, "img", "icon.svg")
+	mustWrite(t, svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="red"/></svg>`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uploadReq := newMultipartImageToolRequest(t, "upload.svg", svgPath, map[string]string{"outputFormat": "svg"})
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, uploadReq)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"token"`) {
+		t.Fatalf("upload process = %d %s", rec.Code, rec.Body.String())
+	}
+	var uploadBody struct {
+		Results []struct {
+			Token string `json:"token"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &uploadBody); err != nil {
+		t.Fatal(err)
+	}
+	if len(uploadBody.Results) != 1 || uploadBody.Results[0].Token == "" {
+		t.Fatalf("upload body = %#v", uploadBody)
+	}
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/download/"+uploadBody.Results[0].Token, nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "<svg") {
+		t.Fatalf("download = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/download/"+uploadBody.Results[0].Token, nil))
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"code":"download_token_invalid"`) {
+		t.Fatalf("reused download token = %d %s", rec.Code, rec.Body.String())
+	}
+
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 {
+		t.Fatalf("items = %#v", items)
+	}
+	payload, _ := json.Marshal(map[string]any{"assetIds": []string{items[0].ID}, "outputFormat": "svg"})
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/preview", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"targetPath":"img/icon-processed.svg"`) {
+		t.Fatalf("asset preview = %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/process", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"outputPath":"img/icon-processed.svg"`) || !strings.Contains(rec.Body.String(), `"token"`) {
+		t.Fatalf("asset process = %d %s", rec.Code, rec.Body.String())
+	}
+	var projectBody struct {
+		Results []struct {
+			Token      string `json:"token"`
+			OutputPath string `json:"outputPath"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &projectBody); err != nil {
+		t.Fatal(err)
+	}
+	if len(projectBody.Results) != 1 || projectBody.Results[0].Token == "" || projectBody.Results[0].OutputPath != "img/icon-processed.svg" {
+		t.Fatalf("project process body = %#v", projectBody)
+	}
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/download/"+projectBody.Results[0].Token, nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "<svg") {
+		t.Fatalf("project download = %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(project, "img", "icon-processed.svg")); err != nil {
+		t.Fatalf("safe variant should remain in project: %v", err)
+	}
+}
+
 func TestOptimizationEstimateCostPrioritizesLargeAnimationsLast(t *testing.T) {
 	smallStatic := scanner.AssetItem{
 		ID:    "png",
@@ -407,4 +495,32 @@ func TestOptimizationEstimateCostPrioritizesLargeAnimationsLast(t *testing.T) {
 	if largeCost <= smallCost {
 		t.Fatalf("large animated GIF cost %d should exceed static PNG cost %d", largeCost, smallCost)
 	}
+}
+
+func newMultipartImageToolRequest(t *testing.T, filename, path string, fields map[string]string) *http.Request {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	part, err := writer.CreateFormFile("files", filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(bytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/image-tools/uploads/process", &body)
+	req.Header.Set("content-type", writer.FormDataContentType())
+	return req
 }
