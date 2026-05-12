@@ -122,6 +122,7 @@
     "categoryFilter": "分类",
     "viewLocale": "翻译语言",
     "translateAll": "AI 翻译",
+    "translateTooltip": "按 AI 设置的翻译语系补齐缺漏的 AI 标签翻译；已完成的翻译会保留",
     "translating": "翻译中…",
     "translateDone": "翻译完成",
     "allCategories": "所有分类",

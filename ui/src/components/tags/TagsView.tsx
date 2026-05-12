@@ -40,6 +40,7 @@ import {
   StatCard,
   TextInput,
   TextInputClearButton,
+  Tooltip,
   type SegmentedControlItem,
 } from "../ui";
 import { TagsGrid } from "./TagsGrid";
@@ -504,22 +505,24 @@ export function TagsView({
                 className="w-24 flex-none"
               />
             )}
-            <Button
-              variant="secondary"
-              size="md"
-              leadingIcon={
-                translating ? (
-                  <LoaderCircle size={14} className="animate-spin" />
-                ) : (
-                  <Languages size={14} />
-                )
-              }
-              disabled={translating}
-              onClick={handleTranslate}
-              className="shrink-0"
-            >
-              {translating ? t("tags.translating") : t("tags.translateAll")}
-            </Button>
+            <Tooltip label={t("tags.translateTooltip")} placement="top">
+              <Button
+                variant="secondary"
+                size="md"
+                leadingIcon={
+                  translating ? (
+                    <LoaderCircle size={14} className="animate-spin" />
+                  ) : (
+                    <Languages size={14} />
+                  )
+                }
+                disabled={translating}
+                onClick={handleTranslate}
+                className="shrink-0"
+              >
+                {translating ? t("tags.translating") : t("tags.translateAll")}
+              </Button>
+            </Tooltip>
             {isFiltered && !isLoading && (
               <span className="text-g-caption text-g-ink-3 tabular-nums shrink-0">
                 {t("tags.filterCount", {

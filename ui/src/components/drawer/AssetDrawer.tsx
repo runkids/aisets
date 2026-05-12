@@ -399,10 +399,10 @@ export function AssetDrawer({
                 />
 
                 <div className="min-w-0">
-                  <div className="flex min-w-0 items-start gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <DialogPrimitive.Title asChild>
                       <h2
-                        className="line-clamp-2 min-w-0 flex-1 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
+                        className="line-clamp-2 min-w-0 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
                         title={assetFileName}
                       >
                         {assetFileName}
@@ -414,7 +414,7 @@ export function AssetDrawer({
                           size="sm"
                           onClick={() => onRename(asset)}
                           aria-label={t("action.rename")}
-                          className="mt-[-3px] shrink-0"
+                          className="shrink-0"
                         >
                           <Pencil size={14} />
                         </IconButton>
@@ -428,7 +428,7 @@ export function AssetDrawer({
                           ? t("favorites.remove")
                           : t("favorites.add")
                       }
-                      className="mt-[-3px] shrink-0"
+                      className="shrink-0"
                       onToggle={handleToggleFavorite}
                     />
                   </div>

@@ -122,6 +122,7 @@
     "categoryFilter": "Category",
     "viewLocale": "Translation",
     "translateAll": "AI Translate",
+    "translateTooltip": "Fill missing AI tag translations for the locales selected in AI settings. Existing translations are kept.",
     "translating": "Translating…",
     "translateDone": "Translation complete.",
     "allCategories": "All categories",

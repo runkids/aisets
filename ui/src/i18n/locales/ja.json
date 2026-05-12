@@ -122,6 +122,7 @@
     "categoryFilter": "カテゴリ",
     "viewLocale": "翻訳言語",
     "translateAll": "AI 翻訳",
+    "translateTooltip": "AI 設定で選択した言語の不足している AI タグ翻訳を補完します。既存の翻訳は保持されます",
     "translating": "翻訳中…",
     "translateDone": "翻訳完了",
     "allCategories": "すべてのカテゴリ",

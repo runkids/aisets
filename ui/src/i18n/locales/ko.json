@@ -122,6 +122,7 @@
     "categoryFilter": "카테고리",
     "viewLocale": "번역 언어",
     "translateAll": "AI 번역",
+    "translateTooltip": "AI 설정에서 선택한 언어의 누락된 AI 태그 번역을 채웁니다. 기존 번역은 유지됩니다",
     "translating": "번역 중…",
     "translateDone": "번역 완료",
     "allCategories": "모든 카테고리",
