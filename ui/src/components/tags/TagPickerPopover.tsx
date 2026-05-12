@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import type { AssetItem } from "../../types";
 import { useAssetTagsMutation } from "../../tagsQueries";
 import { errorMessage } from "../../i18n";
-import { Badge } from "../ui";
+import { Badge, Tooltip } from "../ui";
 import { TagPickerInput } from "./TagPickerInput";
 import { useToast } from "../shared/ToastProvider";
 
@@ -16,7 +16,7 @@ type Props = {
 };
 
 export function TagPickerPopover({ asset, triggerRef, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const popoverRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
@@ -26,6 +26,9 @@ export function TagPickerPopover({ asset, triggerRef, onClose }: Props) {
   });
 
   const currentTags = asset.aiTag?.tags ?? [];
+  const localeTags = asset.aiTag?.tagsI18n?.[i18n.language];
+  const displayTags =
+    localeTags && localeTags.length > 0 ? localeTags : currentTags;
   const mutation = useAssetTagsMutation();
 
   const updatePosition = useCallback(() => {
@@ -122,19 +125,34 @@ export function TagPickerPopover({ asset, triggerRef, onClose }: Props) {
     >
       {currentTags.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {currentTags.map((tag) => (
-            <Badge key={tag} tone="line" className="gap-1 pr-1 text-g-ink-2">
-              {tag}
-              <button
-                type="button"
-                className="inline-flex items-center justify-center size-3.5 rounded-full hover:bg-g-surface-3 transition-colors cursor-pointer"
-                onClick={() => handleRemove(tag)}
-                aria-label={`${t("tags.removeTag")} ${tag}`}
+          {currentTags.map((rawTag, idx) => {
+            const display = displayTags[idx] ?? rawTag;
+            const showTooltip = display !== rawTag;
+            const badge = (
+              <Badge
+                key={`${rawTag}-${idx}`}
+                tone="line"
+                className="gap-1 pr-1 text-g-ink-2"
               >
-                <X size={9} />
-              </button>
-            </Badge>
-          ))}
+                {display}
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center size-3.5 rounded-full hover:bg-g-surface-3 transition-colors cursor-pointer"
+                  onClick={() => handleRemove(rawTag)}
+                  aria-label={`${t("tags.removeTag")} ${rawTag}`}
+                >
+                  <X size={9} />
+                </button>
+              </Badge>
+            );
+            return showTooltip ? (
+              <Tooltip key={`${rawTag}-${idx}`} label={rawTag} placement="top">
+                {badge}
+              </Tooltip>
+            ) : (
+              badge
+            );
+          })}
         </div>
       )}
 

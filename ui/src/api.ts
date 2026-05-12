@@ -13,6 +13,7 @@ import type {
   ExportData,
   LLMModel,
   LLMRuntime,
+  AICategoryListResponse,
   AITagRunEvent,
   OCRRunEvent,
   VLMOcrRunEvent,
@@ -221,6 +222,7 @@ export function getCatalogItems(
 ) {
   return request<CatalogItemsPage>(
     `/api/catalog/items${queryString({
+      lang: i18n.language,
       scanId: params.scanId,
       assetId: params.assetId,
       projectId: params.projectId,
@@ -297,6 +299,7 @@ export function getCatalogFolders(
 ) {
   return request<CatalogFoldersPage>(
     `/api/catalog/folders${queryString({
+      lang: i18n.language,
       scanId: params.scanId,
       projectId: params.projectId,
       projectName: params.projectName,
@@ -316,7 +319,10 @@ export function getCatalogItemDetail(
   options?: { signal?: AbortSignal },
 ) {
   return request<CatalogItemDetail>(
-    `/api/catalog/items/${assetId}${queryString({ scanId })}`,
+    `/api/catalog/items/${assetId}${queryString({
+      lang: i18n.language,
+      scanId,
+    })}`,
     { signal: options?.signal },
   );
 }
@@ -1021,6 +1027,105 @@ export function batchApply(endpoint: string, token: string) {
   });
 }
 
+export type ImageToolSettings = {
+  outputFormat: string;
+  quality: number;
+  maxDimensionPx: number;
+  outputMode: "safeVariants" | "replace";
+};
+
+export type ImageToolResult = {
+  id: string;
+  name: string;
+  source: "project" | "upload";
+  repoPath?: string;
+  outputPath?: string;
+  projectName?: string;
+  inputFormat: string;
+  outputFormat: string;
+  currentBytes: number;
+  outputBytes: number;
+  savingsBytes: number;
+  operation: string;
+  token?: string;
+  downloadName?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
+export function previewImageToolAssets(params: {
+  assetIds: string[];
+  settings: ImageToolSettings;
+}) {
+  return request<{ preview: ActionPreview; token: string }>(
+    "/api/image-tools/assets/preview",
+    {
+      method: "POST",
+      body: JSON.stringify({ assetIds: params.assetIds, ...params.settings }),
+    },
+  );
+}
+
+export function processImageToolAssets(params: {
+  assetIds: string[];
+  settings: ImageToolSettings;
+}) {
+  return request<{ results: ImageToolResult[]; applied: unknown }>(
+    "/api/image-tools/assets/process",
+    {
+      method: "POST",
+      body: JSON.stringify({ assetIds: params.assetIds, ...params.settings }),
+    },
+  );
+}
+
+export async function processImageToolUploads(
+  files: File[],
+  settings: ImageToolSettings,
+) {
+  const form = new FormData();
+  files.forEach((file) => form.append("files", file, file.name));
+  form.set("outputFormat", settings.outputFormat);
+  form.set("quality", String(settings.quality));
+  form.set("maxDimensionPx", String(settings.maxDimensionPx || 0));
+  const res = await fetch(`${basePath}/api/image-tools/uploads/process`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new APIError(
+      body?.error?.code ?? "image_tools_failed",
+      body?.error?.message ?? `HTTP ${res.status}`,
+      body?.error?.params,
+    );
+  }
+  return (await res.json()) as {
+    results: ImageToolResult[];
+    zipToken?: string;
+  };
+}
+
+export async function downloadImageToolResult(
+  token: string,
+  filename?: string,
+) {
+  const res = await fetch(
+    `${basePath}/api/image-tools/download/${encodeURIComponent(token)}`,
+  );
+  if (!res.ok) throw new Error("Download failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    filename ||
+    res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ||
+    "aisets-image";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function batchCopy(assetIds: string[], targetDir: string) {
   return request<{
     succeeded: string[];
@@ -1119,6 +1224,24 @@ export function getTagList(params: {
   );
 }
 
+export function getCategoryList(params: {
+  q?: string;
+  sort?: string;
+  locale?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  return request<AICategoryListResponse>(
+    `/api/tags/category-list${queryString({
+      q: params.q,
+      sort: params.sort,
+      locale: params.locale,
+      limit: params.limit,
+      offset: params.offset,
+    })}`,
+  );
+}
+
 export function renameTag(from: string, to: string) {
   return request<{ ok: boolean; affected: number }>("/api/tags/rename", {
     method: "POST",
@@ -1138,6 +1261,36 @@ export function deleteTags(tags: string[]) {
     method: "POST",
     body: JSON.stringify({ tags }),
   });
+}
+
+export function renameCategory(from: string, to: string) {
+  return request<{ ok: boolean; affected: number }>(
+    "/api/tags/categories/rename",
+    {
+      method: "POST",
+      body: JSON.stringify({ from, to }),
+    },
+  );
+}
+
+export function mergeCategories(source: string[], target: string) {
+  return request<{ ok: boolean; affected: number }>(
+    "/api/tags/categories/merge",
+    {
+      method: "POST",
+      body: JSON.stringify({ source, target }),
+    },
+  );
+}
+
+export function clearCategories(categories: string[]) {
+  return request<{ ok: boolean; affected: number }>(
+    "/api/tags/categories/clear",
+    {
+      method: "POST",
+      body: JSON.stringify({ categories }),
+    },
+  );
 }
 
 export function setAssetTags(params: {
