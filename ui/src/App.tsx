@@ -109,7 +109,14 @@ import type {
   ProjectScanIntent,
   ScanEvent,
 } from "./types";
-import { fileName, modeForPath, pathForMode, type Mode } from "./ui";
+import {
+  clearBrowseSearchParams,
+  drawerSearchParams,
+  fileName,
+  modeForPath,
+  pathForMode,
+  type Mode,
+} from "./ui";
 import { clearEstimateCaches } from "./components/optimize/optimizeCache";
 
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
@@ -257,16 +264,22 @@ export function App() {
       setAutoScrollAssetId("");
       setSearchParams(
         (prev) => {
-          const next = new URLSearchParams(prev);
-          if (id) next.set("asset", id);
-          else next.delete("asset");
-          return next;
+          return drawerSearchParams(prev, id);
         },
         { replace: true },
       );
     },
     [setAutoScrollAssetId, setDrawerSeedAsset, setSearchParams],
   );
+
+  const clearBrowseSearchRoute = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        return clearBrowseSearchParams(prev);
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   const toast = useToast();
   const autoScanStartedRef = useRef(false);
@@ -1020,6 +1033,7 @@ export function App() {
               ocrFuzzySearch={ocrFuzzySearch}
               stats={scopedStats}
               onAutoScrollDone={clearAutoScrollAssetId}
+              onClearSearchRoute={clearBrowseSearchRoute}
               onOpenAsset={setDrawerId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
               aiBusy={anyAIBusy}

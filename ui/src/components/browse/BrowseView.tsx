@@ -122,6 +122,7 @@ type Props = {
   ocrEnabled: boolean;
   ocrFuzzySearch: boolean;
   onAutoScrollDone: () => void;
+  onClearSearchRoute: () => void;
   onOpenAsset: (id: string) => void;
   aiEnabled?: boolean;
   aiBusy?: boolean;
@@ -605,6 +606,7 @@ export function BrowseView({
   ocrEnabled,
   ocrFuzzySearch,
   onAutoScrollDone,
+  onClearSearchRoute,
   onOpenAsset,
   aiEnabled,
   aiBusy,
@@ -750,6 +752,7 @@ export function BrowseView({
     setSelectedFolder("");
     setExpandedFolders(new Set());
     setSearchQuery(next);
+    if (!next) onClearSearchRoute();
   }
 
   function handleStatusFilterChange(next: StatusFilter) {
