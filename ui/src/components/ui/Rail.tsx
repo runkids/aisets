@@ -16,6 +16,7 @@ import type {
 } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
+import { activeRailSectionsForScroll } from "./RailState";
 
 const RAIL_HEADING_HEIGHT = 28;
 
@@ -161,9 +162,12 @@ function Rail({
       (a, b) =>
         sectionTopInRail(rail, a.element) - sectionTopInRail(rail, b.element),
     );
-    const next = sortedSections.filter(
-      (section) =>
-        sectionTopInRail(rail, section.element) <= rail.scrollTop + 1,
+    const next = activeRailSectionsForScroll(
+      sortedSections,
+      rail.scrollTop,
+      rail.scrollHeight,
+      rail.clientHeight,
+      (section) => sectionTopInRail(rail, section.element),
     );
     setActiveSections((prev) => {
       const prevIds = prev.map((section) => section.id);
