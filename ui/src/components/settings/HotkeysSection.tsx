@@ -1,9 +1,4 @@
-import {
-  ArrowLeftRight,
-  CheckSquare,
-  Keyboard,
-  MousePointerClick,
-} from "lucide-react";
+import { ArrowLeftRight, CheckSquare, Keyboard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, Keycap } from "../ui";
 import { FieldRow } from "./FieldRow";
@@ -63,22 +58,13 @@ export function HotkeysSection() {
         </div>
         <div className="divide-y divide-g-line px-6 py-2 md:px-8 md:py-3">
           <FieldRow label={t("settings.hotkeyBulkClick1")}>
-            <span className="inline-flex items-center gap-1">
-              <MousePointerClick size={13} className="text-g-ink-3" />
-              <Keycap>{t("toolbar.bulkSelect")}</Keycap>
-            </span>
+            <Keycap>Ctrl Q</Keycap>
           </FieldRow>
           <FieldRow label={t("settings.hotkeyBulkClick2")}>
-            <span className="inline-flex items-center gap-1">
-              <MousePointerClick size={13} className="text-g-ink-3" />
-              <Keycap>{t("action.selectAll")}</Keycap>
-            </span>
+            <Keycap>Ctrl Q</Keycap>
           </FieldRow>
           <FieldRow label={t("settings.hotkeyBulkClick3")}>
-            <span className="inline-flex items-center gap-1">
-              <MousePointerClick size={13} className="text-g-ink-3" />
-              <Keycap>{t("common.cancel")}</Keycap>
-            </span>
+            <Keycap>Ctrl Q</Keycap>
           </FieldRow>
           <FieldRow label={t("settings.hotkeyBulkEsc")}>
             <Keycap>Esc</Keycap>
