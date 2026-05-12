@@ -853,8 +853,6 @@
     "sortSize": "サイズ",
     "sortRecent": "最近",
     "bulkSelect": "一括選択",
-    "expandDisplayControls": "表示コントロールを展開",
-    "collapseDisplayControls": "表示コントロールを折りたたむ",
     "clearSearch": "検索をクリア"
   },
   "browse": {

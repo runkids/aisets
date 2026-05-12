@@ -871,8 +871,6 @@
     "sortSize": "크기",
     "sortRecent": "최근",
     "bulkSelect": "일괄 선택",
-    "expandDisplayControls": "표시 컨트롤 펼치기",
-    "collapseDisplayControls": "표시 컨트롤 접기",
     "clearSearch": "검색 지우기"
   },
   "browse": {

@@ -1665,8 +1665,6 @@
     "sortSize": "Size",
     "sortRecent": "Recent",
     "bulkSelect": "Bulk select",
-    "expandDisplayControls": "Expand display controls",
-    "collapseDisplayControls": "Collapse display controls",
     "clearSearch": "Clear search"
   },
   "browse": {

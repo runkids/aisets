@@ -1,19 +1,15 @@
 import { Popover } from "radix-ui";
 import {
   ArrowDownAZ,
-  ChevronLeft,
-  ChevronRight,
   CircleHelp,
   Grid3X3,
   List,
   Moon,
   Search,
-  SlidersHorizontal,
   Sun,
   Trees,
   X,
 } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type { ImageBackgroundMode } from "../../imageBackground";
@@ -22,7 +18,6 @@ import {
   Select,
   TextInput,
   TextInputClearButton,
-  Tooltip,
   type SegmentedControlItem,
 } from "../ui";
 import {
@@ -99,7 +94,6 @@ export function BrowseToolbar({
   onBulkCancel,
 }: BrowseToolbarProps) {
   const { t } = useTranslation();
-  const [displayControlsOpen, setDisplayControlsOpen] = useState(true);
 
   const viewItems: Array<SegmentedControlItem<ViewMode>> = [
     {
@@ -255,150 +249,96 @@ export function BrowseToolbar({
           />
         </div>
 
-        <div
-          className={cn(
-            "ml-auto flex h-g-btn-md max-w-[480px] shrink-0 flex-row-reverse items-center gap-1.5 overflow-hidden transition-[max-width] duration-200 ease-g-out motion-reduce:transition-none",
-            !displayControlsOpen && "max-w-[70px]",
-          )}
-        >
-          <Tooltip
-            label={
-              displayControlsOpen
-                ? t("toolbar.collapseDisplayControls")
-                : t("toolbar.expandDisplayControls")
-            }
-          >
+        <BrowseIconToggleGroup
+          value={view}
+          items={viewItems}
+          onChange={onViewChange}
+          ariaLabel={t("tabs.viewAriaLabel")}
+        />
+
+        {view !== "list" && (
+          <BrowseSizeToggleGroup
+            value={gridSize}
+            items={sizeItems}
+            onChange={onGridSizeChange}
+            ariaLabel={t("toolbar.gridSize")}
+          />
+        )}
+
+        <BrowseIconToggleGroup
+          value={bgMode}
+          items={bgItems}
+          onChange={onBgModeChange}
+          ariaLabel={t("toolbar.backgroundMode")}
+        />
+
+        <Popover.Root>
+          <Popover.Trigger asChild>
             <button
               type="button"
-              aria-label={
-                displayControlsOpen
-                  ? t("toolbar.collapseDisplayControls")
-                  : t("toolbar.expandDisplayControls")
-              }
-              aria-expanded={displayControlsOpen}
-              onClick={() => setDisplayControlsOpen((open) => !open)}
-              className="inline-flex size-g-btn-md shrink-0 cursor-pointer items-center justify-center gap-px rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-3 shadow-g-inset transition-[background,border-color,color,box-shadow,transform] duration-[120ms] ease-g hover:border-g-line-strong hover:bg-g-surface hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&:active]:scale-[0.97] motion-reduce:[&:active]:scale-100"
+              className="ml-auto inline-flex h-g-btn-md shrink-0 cursor-pointer items-center justify-center self-center rounded-g-sm px-1.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+              aria-label={t("status.helpTitle")}
             >
-              <span className="relative inline-grid size-5 place-items-center">
-                <SlidersHorizontal size={15} aria-hidden="true" />
-                {displayControlsOpen ? (
-                  <ChevronRight
-                    size={10}
-                    className="absolute -right-1 top-1/2 -translate-y-1/2"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <ChevronLeft
-                    size={10}
-                    className="absolute -left-1 top-1/2 -translate-y-1/2"
-                    aria-hidden="true"
-                  />
-                )}
-              </span>
+              <CircleHelp size={15} aria-hidden="true" />
             </button>
-          </Tooltip>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="top"
+              align="end"
+              sideOffset={8}
+              collisionPadding={16}
+              className={cn(
+                "z-[200] w-[480px] rounded-g-lg border border-g-line-strong bg-g-canvas shadow-g-pop",
+                "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+              )}
+            >
+              <div className="flex items-center justify-between border-b border-g-line px-3.5 py-2.5">
+                <h3 className="font-g text-g-ui font-[590] text-g-ink">
+                  {t("status.helpTitle")}
+                </h3>
+                <Popover.Close asChild>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-g-sm p-0.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+                    aria-label="Close"
+                  >
+                    <X size={14} />
+                  </button>
+                </Popover.Close>
+              </div>
 
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-g-btn-md shrink-0 cursor-pointer items-center justify-center self-center rounded-g-sm px-1.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
-                aria-label={t("status.helpTitle")}
-              >
-                <CircleHelp size={15} aria-hidden="true" />
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                side="top"
-                align="end"
-                sideOffset={8}
-                collisionPadding={16}
-                className={cn(
-                  "z-[200] w-[480px] rounded-g-lg border border-g-line-strong bg-g-canvas shadow-g-pop",
-                  "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-                )}
-              >
-                <div className="flex items-center justify-between border-b border-g-line px-3.5 py-2.5">
-                  <h3 className="font-g text-g-ui font-[590] text-g-ink">
-                    {t("status.helpTitle")}
-                  </h3>
-                  <Popover.Close asChild>
-                    <button
-                      type="button"
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-g-sm p-0.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
-                      aria-label="Close"
+              <div className="max-h-[min(420px,60vh)] overflow-y-auto scroll-thin px-3.5 py-3">
+                <p className="mb-3 font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
+                  {t("status.helpIntro")}
+                </p>
+                <dl className="grid gap-2.5">
+                  {statusHelpItems.map((item) => (
+                    <div
+                      key={item.label}
+                      className="grid grid-cols-[8px_1fr] items-start gap-x-2.5 gap-y-0.5"
                     >
-                      <X size={14} />
-                    </button>
-                  </Popover.Close>
-                </div>
-
-                <div className="max-h-[min(420px,60vh)] overflow-y-auto scroll-thin px-3.5 py-3">
-                  <p className="mb-3 font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
-                    {t("status.helpIntro")}
-                  </p>
-                  <dl className="grid gap-2.5">
-                    {statusHelpItems.map((item) => (
-                      <div
-                        key={item.label}
-                        className="grid grid-cols-[8px_1fr] items-start gap-x-2.5 gap-y-0.5"
-                      >
-                        <span
-                          className={cn(
-                            "mt-[5px] h-2 w-2 shrink-0 rounded-full",
-                            item.dot,
-                          )}
-                          aria-hidden="true"
-                        />
-                        <dt className="font-g text-g-caption font-[590] text-g-ink">
-                          {item.label}
-                        </dt>
-                        <span aria-hidden="true" />
-                        <dd className="font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
-                          {item.description}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
-
-          <div
-            aria-hidden={!displayControlsOpen}
-            className={cn(
-              "flex min-w-0 shrink-0 items-center gap-1.5 transition-[opacity,transform] duration-200 ease-g-out motion-reduce:transition-none",
-              displayControlsOpen
-                ? "translate-x-0 opacity-100 delay-75"
-                : "pointer-events-none translate-x-3 opacity-0",
-            )}
-          >
-            <BrowseIconToggleGroup
-              value={view}
-              items={viewItems}
-              onChange={onViewChange}
-              ariaLabel={t("tabs.viewAriaLabel")}
-            />
-
-            {view !== "list" && (
-              <BrowseSizeToggleGroup
-                value={gridSize}
-                items={sizeItems}
-                onChange={onGridSizeChange}
-                ariaLabel={t("toolbar.gridSize")}
-              />
-            )}
-
-            <BrowseIconToggleGroup
-              value={bgMode}
-              items={bgItems}
-              onChange={onBgModeChange}
-              ariaLabel={t("toolbar.backgroundMode")}
-            />
-          </div>
-        </div>
+                      <span
+                        className={cn(
+                          "mt-[5px] h-2 w-2 shrink-0 rounded-full",
+                          item.dot,
+                        )}
+                        aria-hidden="true"
+                      />
+                      <dt className="font-g text-g-caption font-[590] text-g-ink">
+                        {item.label}
+                      </dt>
+                      <span aria-hidden="true" />
+                      <dd className="font-g text-g-caption font-normal leading-relaxed text-g-ink-3">
+                        {item.description}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
       </div>
     </div>
   );

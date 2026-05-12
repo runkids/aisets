@@ -853,8 +853,6 @@
     "sortSize": "大小",
     "sortRecent": "最近",
     "bulkSelect": "批量选择",
-    "expandDisplayControls": "展开显示控制",
-    "collapseDisplayControls": "收起显示控制",
     "clearSearch": "清除搜索"
   },
   "browse": {
