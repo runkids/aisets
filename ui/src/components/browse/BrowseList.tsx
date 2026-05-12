@@ -24,6 +24,7 @@ import {
 import { fileName, formatBytes, formatExt, hasDuplicates } from "../../ui";
 import { AITagBadge } from "../tags/AITagBadge";
 import { OCRStatusBadge } from "../shared/OCRStatusBadge";
+import { FavoriteButton } from "../shared/FavoriteButton";
 import { Badge, ImagePreview, Tooltip } from "../ui";
 
 type BrowseListProps = {
@@ -39,6 +40,7 @@ type BrowseListProps = {
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
+  onToggleFavorite: (item: AssetItem) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -46,6 +48,7 @@ type BrowseListProps = {
     string,
     { similarity: number; matchType?: string; label?: string }
   >;
+  favoritePending?: boolean;
 };
 
 const ROW_HEIGHT = 60;
@@ -53,7 +56,7 @@ const listGridClassName =
   "grid-cols-[48px_minmax(140px,360px)_92px_52px_112px_minmax(300px,1fr)] max-[768px]:grid-cols-[40px_1fr_68px]";
 const listResponsiveClassName =
   "max-[768px]:gap-3 max-[768px]:px-3 max-[768px]:[&>:nth-child(n+4)]:hidden";
-const listRowClassName = `grid cursor-pointer ${listGridClassName} items-center gap-4 min-h-[56px] border-b border-g-line px-4 py-2 text-left transition-[background,box-shadow] duration-[120ms] ease-[var(--g-ease)] hover:bg-g-surface-2 focus-visible:shadow-g-focus data-[active=true]:bg-g-accent-soft data-[active=true]:shadow-[inset_4px_0_0_var(--g-accent)] ${listResponsiveClassName}`;
+const listRowClassName = `group/list grid cursor-pointer ${listGridClassName} items-center gap-4 min-h-[56px] border-b border-g-line px-4 py-2 text-left transition-[background,box-shadow] duration-[120ms] ease-[var(--g-ease)] hover:bg-g-surface-2 focus-visible:shadow-g-focus data-[active=true]:bg-g-accent-soft data-[active=true]:shadow-[inset_4px_0_0_var(--g-accent)] ${listResponsiveClassName}`;
 const listHeaderClassName = `sticky top-0 z-[2] grid ${listGridClassName} items-center gap-4 min-h-[36px] border-b border-g-line bg-g-surface-2 px-4 py-2 text-left text-[10px] font-[510] uppercase tracking-[0.06em] text-g-ink-3 ${listResponsiveClassName}`;
 
 export function BrowseList({
@@ -69,10 +72,12 @@ export function BrowseList({
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
+  onToggleFavorite,
   onLoadMore,
   hasMore = false,
   loadingMore = false,
   semanticMetaById,
+  favoritePending = false,
 }: BrowseListProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -125,6 +130,7 @@ export function BrowseList({
           ? t("browse.flagOptimizable")
           : "",
       ocrStatusLabel(t, item),
+      item.favorite ? t("favorites.saved") : "",
     ].filter(Boolean);
     const ariaLabel = [item.repoPath, ...statusLabels].join(" · ");
 
@@ -132,9 +138,10 @@ export function BrowseList({
     const semanticMeta = semanticMetaById?.[item.id];
 
     return (
-      <button
+      <div
         key={item.id}
-        type="button"
+        role="button"
+        tabIndex={0}
         className={
           style
             ? `${listRowClassName} absolute left-0 top-0 w-full translate-y-[var(--row-y,0)]`
@@ -144,6 +151,15 @@ export function BrowseList({
         data-active={isSelected || isActive || undefined}
         style={style}
         onClick={() => (bulkMode ? onToggleSelect(item.id) : onSelect(item))}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (bulkMode) {
+            onToggleSelect(item.id);
+          } else {
+            onSelect(item);
+          }
+        }}
         aria-label={ariaLabel}
       >
         <ImagePreview
@@ -177,11 +193,29 @@ export function BrowseList({
           </div>
         </ImagePreview>
         <div className="min-w-0 flex flex-col justify-self-stretch">
-          <Tooltip label={item.repoPath} placement="top">
-            <div className="truncate font-g-mono text-[12px] text-g-ink">
-              {fileName(item.repoPath)}
-            </div>
-          </Tooltip>
+          <div className="flex min-w-0 items-center gap-2">
+            <Tooltip label={item.repoPath} placement="top">
+              <div className="min-w-0 flex-1 truncate font-g-mono text-[12px] text-g-ink">
+                {fileName(item.repoPath)}
+              </div>
+            </Tooltip>
+            {!bulkMode && (
+              <FavoriteButton
+                favorite={Boolean(item.favorite)}
+                pending={favoritePending}
+                label={
+                  item.favorite
+                    ? t("favorites.remove")
+                    : t("favorites.add")
+                }
+                className={cn(
+                  "size-[22px] shrink-0 rounded-g-sm opacity-0 group-hover/list:opacity-100 group-focus-within/list:opacity-100 [&_svg]:size-3.5",
+                  item.favorite && "opacity-100",
+                )}
+                onToggle={() => onToggleFavorite(item)}
+              />
+            )}
+          </div>
           <Tooltip label={item.repoPath} placement="top">
             <div className="truncate font-g-mono text-[10px] text-g-ink-4">
               {item.repoPath}
@@ -246,7 +280,7 @@ export function BrowseList({
             </span>
           ) : null}
         </span>
-      </button>
+      </div>
     );
   }
 

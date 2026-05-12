@@ -57,6 +57,8 @@ import {
   updatePromptPreset,
   deletePromptPreset,
   setPromptPresetDefault,
+  setCatalogItemFavorite,
+  setCatalogItemsFavorite,
 } from "./api";
 import type {
   CatalogDuplicatesParams,
@@ -150,6 +152,7 @@ function normalizeCatalogItemsParams(params: CatalogItemsParams) {
     aiCategory: params.aiCategory ?? "",
     aiOcrStatus: params.aiOcrStatus ?? "",
     hasGPS: params.hasGPS ?? "",
+    favorite: params.favorite ?? "",
     limit: params.limit ?? 100,
   };
 }
@@ -183,7 +186,44 @@ function normalizeCatalogFoldersParams(params: CatalogFoldersParams) {
     q: params.q ?? "",
     status: params.status ?? "",
     customFilter: params.customFilter ?? "",
+    favorite: params.favorite ?? "",
   };
+}
+
+export function useFavoriteAssetMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assetId,
+      favorite,
+      scanId,
+    }: {
+      assetId: string;
+      favorite: boolean;
+      scanId?: number;
+    }) => setCatalogItemFavorite(assetId, favorite, scanId),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useFavoriteAssetsMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assetIds,
+      favorite,
+      scanId,
+    }: {
+      assetIds: string[];
+      favorite: boolean;
+      scanId?: number;
+    }) => setCatalogItemsFavorite(assetIds, favorite, scanId),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
 }
 
 export function directoryListingQueryOptions(path: string, enabled: boolean) {

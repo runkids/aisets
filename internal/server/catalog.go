@@ -129,6 +129,7 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 		AICategory:           r.URL.Query().Get("aiCategory"),
 		Locale:               sanitizeLocale(r.URL.Query().Get("lang")),
 		AIOcrStatus:          r.URL.Query().Get("aiOcrStatus"),
+		Favorite:             r.URL.Query().Get("favorite") == "true",
 		Limit:                limit,
 		Cursor:               r.URL.Query().Get("cursor"),
 	}
@@ -171,6 +172,47 @@ func (s *Server) handleCatalogItems(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, page)
 }
 
+func (s *Server) handleCatalogItemFavorite(w http.ResponseWriter, r *http.Request) {
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	favorite := r.Method == http.MethodPost
+	item, err := s.store.SetAssetFavorite(scanID, r.PathValue("id"), favorite)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"item": item})
+}
+
+func (s *Server) handleCatalogFavorites(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ScanID   int64    `json:"scanId"`
+		AssetIDs []string `json:"assetIds"`
+		Favorite bool     `json:"favorite"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.AssetIDs) == 0 {
+		writeError(w, http.StatusBadRequest, apierr.New("asset_ids_required", "assetIds must not be empty"))
+		return
+	}
+	items, err := s.store.SetAssetFavorites(body.ScanID, body.AssetIDs, body.Favorite)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if missing := missingAssetIDs(body.AssetIDs, items); len(missing) > 0 {
+		writeError(w, http.StatusNotFound, apierr.WithParams("asset_not_found", "one or more assets were not found", map[string]any{"assetIds": missing}))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func (s *Server) handleCatalogFolders(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.ensureLatestScan(r.Context()); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -190,6 +232,7 @@ func (s *Server) handleCatalogFolders(w http.ResponseWriter, r *http.Request) {
 		Query:          r.URL.Query().Get("q"),
 		Status:         r.URL.Query().Get("status"),
 		CustomFilterID: r.URL.Query().Get("customFilter"),
+		Favorite:       r.URL.Query().Get("favorite") == "true",
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)

@@ -31,6 +31,7 @@ import { fileName, formatBytes, formatExt, hasDuplicates } from "../../ui";
 import { AITagBadge } from "../tags/AITagBadge";
 import { OCRStatusBadge } from "../shared/OCRStatusBadge";
 import { TagPickerPopover } from "../tags/TagPickerPopover";
+import { FavoriteButton } from "../shared/FavoriteButton";
 import { Badge, Checkbox, ImagePreview, Tooltip } from "../ui";
 
 type BrowseGridProps = {
@@ -47,6 +48,7 @@ type BrowseGridProps = {
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
+  onToggleFavorite: (item: AssetItem) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -54,6 +56,7 @@ type BrowseGridProps = {
     string,
     { similarity: number; matchType?: string; label?: string }
   >;
+  favoritePending?: boolean;
 };
 
 const SIZE_CONFIG: Record<
@@ -110,10 +113,12 @@ export function BrowseGrid({
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
+  onToggleFavorite,
   onLoadMore,
   hasMore = false,
   loadingMore = false,
   semanticMetaById,
+  favoritePending = false,
 }: BrowseGridProps) {
   const { t } = useTranslation();
   const cfg = SIZE_CONFIG[gridSize];
@@ -200,6 +205,7 @@ export function BrowseGrid({
           ? t("browse.flagOptimizable")
           : "",
       ocrStatusLabel(t, item),
+      item.favorite ? t("favorites.saved") : "",
     ].filter(Boolean);
     const referenceLabel = t("asset.refs", { count: item.usedBy.length });
     const ariaLabel = [item.repoPath, referenceLabel, ...statusLabels].join(
@@ -210,13 +216,23 @@ export function BrowseGrid({
     const semanticMeta = semanticMetaById?.[item.id];
 
     return (
-      <button
+      <div
         key={item.id}
-        type="button"
+        role="button"
+        tabIndex={0}
         className="group/card relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-[var(--g-ease)] hover:z-[1] hover:translate-y-[-2px] hover:border-g-line-strong hover:shadow-g-md focus-visible:z-[2] focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:z-[2] data-[selected=true]:translate-y-[-2px] data-[selected=true]:border-g-accent data-[selected=true]:shadow-[0_0_0_2px_var(--g-accent),var(--g-shadow-md)] data-[selected=true]:after:absolute data-[selected=true]:after:inset-[6px] data-[selected=true]:after:rounded-[calc(var(--g-r-md)-2px)] data-[selected=true]:after:pointer-events-none data-[selected=true]:after:animate-[selectedPulse_1000ms_var(--g-ease-out)] cursor-pointer"
         data-image-tool-asset-id={item.id}
         data-selected={isVisuallySelected || undefined}
         onClick={() => (bulkMode ? onToggleSelect(item.id) : onSelect(item))}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (bulkMode) {
+            onToggleSelect(item.id);
+          } else {
+            onSelect(item);
+          }
+        }}
         aria-label={ariaLabel}
       >
         <ImagePreview
@@ -301,11 +317,29 @@ export function BrowseGrid({
           </div>
         </ImagePreview>
         <div className="flex flex-col gap-1 px-3 py-2.5 transition-[background] duration-[160ms] ease-[var(--g-ease)] group-data-[selected=true]/card:bg-g-accent-soft">
-          <Tooltip label={item.repoPath} placement="top">
-            <div className="block w-full truncate text-left font-g-mono text-[12px] font-[510] text-g-ink">
-              {fileName(item.repoPath)}
-            </div>
-          </Tooltip>
+          <div className="flex min-w-0 items-center gap-2">
+            <Tooltip label={item.repoPath} placement="top">
+              <div className="block min-w-0 flex-1 truncate text-left font-g-mono text-[12px] font-[510] text-g-ink">
+                {fileName(item.repoPath)}
+              </div>
+            </Tooltip>
+            {!bulkMode && (
+              <FavoriteButton
+                favorite={Boolean(item.favorite)}
+                pending={favoritePending}
+                label={
+                  item.favorite
+                    ? t("favorites.remove")
+                    : t("favorites.add")
+                }
+                className={cn(
+                  "shrink-0 opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100",
+                  item.favorite && "opacity-100",
+                )}
+                onToggle={() => onToggleFavorite(item)}
+              />
+            )}
+          </div>
           <Tooltip label={item.repoPath} placement="top">
             <div className="block w-full truncate text-left font-g-mono text-[10px] text-g-ink-4">
               {item.repoPath}
@@ -364,7 +398,7 @@ export function BrowseGrid({
             </div>
           )}
         </div>
-      </button>
+      </div>
     );
   }
 

@@ -52,6 +52,13 @@
     "tags": "標籤與分類",
     "tagsDesc": "瀏覽和管理所有專案的 AI 生成標籤與分類"
   },
+  "favorites": {
+    "add": "加入收藏",
+    "remove": "移除收藏",
+    "saved": "已收藏",
+    "addSelected": "收藏所選項目",
+    "removeSelected": "取消收藏所選項目"
+  },
   "tags": {
     "modeLabel": "標籤管理模式",
     "modeTags": "標籤",
@@ -584,7 +591,11 @@
     "databaseReset": "資料庫已重設",
     "databaseResetFailed": "資料庫重設失敗",
     "embeddingsCleared": "嵌入快取已清除",
-    "embeddingsClearFailed": "清除嵌入失敗"
+    "embeddingsClearFailed": "清除嵌入失敗",
+    "favoriteAdded": "已加入收藏",
+    "favoriteRemoved": "已移除收藏",
+    "favoriteBulkAdded": "已將 {{count}} 個素材加入收藏",
+    "favoriteBulkRemoved": "已將 {{count}} 個素材移出收藏"
   },
   "prompt": {
     "renamePath": "新的專案相對路徑"
@@ -851,6 +862,8 @@
     "project": "專案",
     "extension": "副檔名",
     "customFilters": "自訂篩選器",
+    "saved": "已儲存",
+    "favorites": "收藏",
     "allProjects": "所有專案",
     "allExtensions": "所有副檔名",
     "allCustomFilters": "所有自訂篩選器",
@@ -881,7 +894,9 @@
     "aiSearchMode": "AI",
     "searchMode": "搜尋模式",
     "semanticSearch": "用意思搜尋素材...",
-    "runSemanticSearch": "執行 AI 搜尋"
+    "runSemanticSearch": "執行 AI 搜尋",
+    "expandDisplayControls": "展開顯示控制",
+    "collapseDisplayControls": "收合顯示控制"
   },
   "browse": {
     "selectItems": "選取素材以執行操作",

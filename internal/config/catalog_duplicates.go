@@ -301,6 +301,9 @@ func (s *Store) duplicateGroupMembersByGroup(scanID int64, groupIDs []string) (m
 	if err := s.hydrateAssetOptimization(scanID, allMembers); err != nil {
 		return nil, nil, err
 	}
+	if err := s.hydrateAssetFavorites(allMembers); err != nil {
+		return nil, nil, err
+	}
 	optimizedByID := make(map[string]scanner.AssetItem, len(allMembers))
 	for _, item := range allMembers {
 		optimizedByID[item.ID] = item
@@ -388,5 +391,18 @@ func (s *Store) loadNearDuplicateItems(scanID int64, pairs []scanner.NearDuplica
 		}
 		result[item.ID] = item
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	items := make([]scanner.AssetItem, 0, len(result))
+	for _, item := range result {
+		items = append(items, item)
+	}
+	if err := s.hydrateAssetFavorites(items); err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		result[item.ID] = item
+	}
+	return result, nil
 }

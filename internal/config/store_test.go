@@ -538,6 +538,14 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
+	if err := store.AddProjects([]string{root}); err != nil {
+		t.Fatal(err)
+	}
+	projects := store.Projects()
+	if len(projects) != 1 {
+		t.Fatalf("projects = %#v", projects)
+	}
+	projectID := projects[0].ID
 
 	filter := []CustomAssetFilter{{
 		ID:      "cars",
@@ -556,23 +564,23 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 
 	dupID := "dup-car"
-	car := scanAsset(root, "p", "workspace", "src/car.png", 10, "car", 1, 0)
+	car := scanAsset(root, projectID, "workspace", "src/car.png", 10, "car", 1, 0)
 	car.DuplicateGroupID = &dupID
 	car.ModifiedUnix = 10
-	carCopy := scanAsset(root, "p", "workspace", "src/car-copy.png", 11, "car", 0, 0)
+	carCopy := scanAsset(root, projectID, "workspace", "src/car-copy.png", 11, "car", 0, 0)
 	carCopy.DuplicateGroupID = &dupID
 	carCopy.ModifiedUnix = 30
-	icon := scanAsset(root, "p", "workspace", "src/icon.png", 20, "icon", 0, 0)
+	icon := scanAsset(root, projectID, "workspace", "src/icon.png", 20, "icon", 0, 0)
 	icon.ModifiedUnix = 20
-	logo := scanAsset(root, "p", "workspace", "src/icons/logo.png", 12, "logo", 0, 0)
+	logo := scanAsset(root, projectID, "workspace", "src/icons/logo.png", 12, "logo", 0, 0)
 	logo.ModifiedUnix = 5
 	logo.UsageClassification = scanner.UsageNotApplicable
 	logo.DeleteUnusedAllowed = false
-	carSVG := scanAsset(root, "p", "workspace", "src/car.svg", 30, "car-svg", 1, 0)
+	carSVG := scanAsset(root, projectID, "workspace", "src/car.svg", 30, "car-svg", 1, 0)
 	carSVG.ModifiedUnix = 40
-	if _, err := store.RecordScan(scanner.Catalog{
+	scanID, err := store.RecordScan(scanner.Catalog{
 		GeneratedAt: "2026-05-06T00:00:00Z",
-		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Projects:    []scanner.Project{{ID: projectID, Name: "workspace", Path: root}},
 		Items:       []scanner.AssetItem{car, icon, logo, carSVG, carCopy},
 		DuplicateGroups: []scanner.DuplicateGroup{{
 			ID:            dupID,
@@ -582,8 +590,16 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 			PreferredPath: "src/car.png",
 		}},
 		Stats: scanner.CatalogStats{TotalFiles: 5, DuplicateGroups: 1, DuplicateFiles: 2, UnusedFiles: 3},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
+	}
+	favorited, err := store.SetAssetFavorite(scanID, logo.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !favorited.Favorite || favorited.RepoPath != logo.RepoPath {
+		t.Fatalf("favorited item = %#v", favorited)
 	}
 
 	page, err := store.CatalogItems(CatalogItemQuery{Status: "referenced", Ext: ".png", Limit: 1})
@@ -598,6 +614,20 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 	if len(page.Facets.CustomFilters) != 1 || page.Facets.CustomFilters[0].Count != 1 {
 		t.Fatalf("custom filter facets = %#v", page.Facets.CustomFilters)
+	}
+	if page.Facets.FavoriteCount != 0 {
+		t.Fatalf("referenced png favorite facet = %#v", page.Facets)
+	}
+
+	page, err = store.CatalogItems(CatalogItemQuery{Favorite: true, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" || !page.Items[0].Favorite {
+		t.Fatalf("favorite page = %#v", page)
+	}
+	if page.Facets.FavoriteCount != 1 {
+		t.Fatalf("favorite facets = %#v", page.Facets)
 	}
 
 	page, err = store.CatalogItems(CatalogItemQuery{CustomFilterID: "cars", Sort: "path", Limit: 10})
@@ -645,6 +675,20 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	if folders.Total != 4 || len(folders.Folders) != 1 || folders.Folders[0].Path != "src/icons" || folders.Folders[0].Count != 1 {
 		t.Fatalf("child folders = %#v", folders)
 	}
+	folders, err = store.CatalogFolders(CatalogFolderQuery{Favorite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folders.Total != 1 || len(folders.Folders) != 1 || folders.Folders[0].Path != "src" || folders.Folders[0].Count != 1 {
+		t.Fatalf("favorite folders = %#v", folders)
+	}
+	summary, err := store.CatalogSummary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Stats.FavoriteFiles != 1 || len(summary.ProjectStats) != 1 || summary.ProjectStats[0].FavoriteFiles != 1 {
+		t.Fatalf("favorite summary = %#v", summary)
+	}
 	page, err = store.CatalogItems(CatalogItemQuery{Status: "notApplicable", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
@@ -679,6 +723,61 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
 		t.Fatalf("OCR fuzzy search page = %#v", page)
+	}
+}
+
+func TestAssetFavoritesFollowMoveAndDelete(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	logo := scanAsset(root, "p", "workspace", "src/logo.png", 10, "logo", 1, 0)
+	scanID, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-06T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{logo},
+		Stats:       scanner.CatalogStats{TotalFiles: 1, ReferencedFiles: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetAssetFavorite(scanID, logo.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MoveAssetFavorite("p", "src/logo.png", "src/brand/logo.png"); err != nil {
+		t.Fatal(err)
+	}
+
+	movedLogo := scanAsset(root, "p", "workspace", "src/brand/logo.png", 10, "logo", 1, 0)
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-07T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{movedLogo},
+		Stats:       scanner.CatalogStats{TotalFiles: 1, ReferencedFiles: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := store.CatalogItems(CatalogItemQuery{Favorite: true, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/brand/logo.png" || !page.Items[0].Favorite {
+		t.Fatalf("moved favorite page = %#v", page)
+	}
+
+	if err := store.DeleteAssetFavorite("p", "src/brand/logo.png"); err != nil {
+		t.Fatal(err)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Favorite: true, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 0 || len(page.Items) != 0 {
+		t.Fatalf("deleted favorite page = %#v", page)
 	}
 }
 

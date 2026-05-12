@@ -58,6 +58,7 @@ const defaultBrowseState = {
     project: "",
     ext: "",
     customFilter: "",
+    favorite: "",
     aiCategory: "",
     aiOcrStatus: "",
     hasGPS: "",
@@ -90,6 +91,7 @@ describe("normalizeBrowseStoredState", () => {
         project: "workspace",
         ext: ".png",
         customFilter: "icons",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -134,6 +136,7 @@ describe("normalizeBrowseStoredState", () => {
         project: "Current project",
         ext: "",
         customFilter: "palette-filter",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -148,6 +151,7 @@ describe("resetBrowseFiltersForStatusChange", () => {
       project: "",
       ext: "",
       customFilter: "",
+      favorite: "",
       aiCategory: "",
       aiOcrStatus: "",
       hasGPS: "",
@@ -159,11 +163,13 @@ describe("resetBrowseFiltersForStatusChange", () => {
       project: "workspace",
       ext: "",
       customFilter: "",
+      favorite: "",
       aiCategory: "",
       aiOcrStatus: "",
       hasGPS: "",
     });
   });
+
 });
 
 describe("applyBrowseFilters", () => {
@@ -211,6 +217,7 @@ describe("applyBrowseFilters", () => {
         project: "App",
         ext: ".png",
         customFilter: "icons",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -240,6 +247,7 @@ describe("applyBrowseFilters", () => {
         project: "App",
         ext: ".png",
         customFilter: "icons",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -298,6 +306,7 @@ describe("applyBrowseFilters", () => {
         project: "",
         ext: "",
         customFilter: "",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -325,6 +334,7 @@ describe("applyBrowseFilters", () => {
         project: "",
         ext: "",
         customFilter: "",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -349,6 +359,7 @@ describe("applyBrowseFilters", () => {
         project: "",
         ext: "",
         customFilter: "",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -359,6 +370,31 @@ describe("applyBrowseFilters", () => {
     });
 
     expect(result.filtered.map((item) => item.id)).toEqual(["duplicate"]);
+  });
+
+  it("filters favorites after the composed Browse result", () => {
+    const items = [
+      makeItem({ id: "saved", favorite: true }),
+      makeItem({ id: "regular", favorite: false }),
+    ];
+
+    const result = applyBrowseFilters({
+      items,
+      filters: {
+        project: "",
+        ext: "",
+        customFilter: "",
+        favorite: "true",
+        aiCategory: "",
+        aiOcrStatus: "",
+        hasGPS: "",
+      },
+      searchQuery: "",
+      statusFilter: "",
+      customFilters: [],
+    });
+
+    expect(result.filtered.map((item) => item.id)).toEqual(["saved"]);
   });
 
   it("does not use cached OCR text when OCR is disabled", () => {
@@ -381,6 +417,7 @@ describe("applyBrowseFilters", () => {
         project: "",
         ext: "",
         customFilter: "",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -423,6 +460,7 @@ describe("applyBrowseFilters", () => {
         project: "",
         ext: "",
         customFilter: "",
+        favorite: "",
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
@@ -442,6 +480,7 @@ describe("applyBrowseFilters", () => {
           project: "",
           ext: "",
           customFilter: "",
+          favorite: "",
           aiCategory: "",
           aiOcrStatus: "",
           hasGPS: "",

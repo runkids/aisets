@@ -52,6 +52,13 @@
     "tags": "タグとカテゴリ",
     "tagsDesc": "全プロジェクトの AI 生成タグとカテゴリを一覧・管理"
   },
+  "favorites": {
+    "add": "お気に入りに追加",
+    "remove": "お気に入りから削除",
+    "saved": "お気に入り",
+    "addSelected": "選択項目をお気に入りに追加",
+    "removeSelected": "選択項目のお気に入りを解除"
+  },
   "tags": {
     "modeLabel": "タグ管理モード",
     "modeTags": "タグ",
@@ -548,7 +555,11 @@
     "ocrCacheCleared": "OCR キャッシュをクリアしました",
     "aiTagCacheCleared": "AI タグキャッシュをクリアしました",
     "embeddingsCleared": "埋め込みキャッシュをクリアしました",
-    "embeddingsClearFailed": "埋め込みのクリアに失敗しました"
+    "embeddingsClearFailed": "埋め込みのクリアに失敗しました",
+    "favoriteAdded": "お気に入りに追加しました",
+    "favoriteRemoved": "お気に入りから削除しました",
+    "favoriteBulkAdded": "{{count}} 件のアセットをお気に入りに追加しました",
+    "favoriteBulkRemoved": "{{count}} 件のアセットのお気に入りを解除しました"
   },
   "prompt": {
     "renamePath": "新しいプロジェクト相対パス"
@@ -815,6 +826,8 @@
     "project": "プロジェクト",
     "extension": "拡張子",
     "customFilters": "カスタムフィルター",
+    "saved": "保存済み",
+    "favorites": "お気に入り",
     "allProjects": "すべてのプロジェクト",
     "allExtensions": "すべての拡張子",
     "allCustomFilters": "すべてのカスタムフィルター",
@@ -845,7 +858,9 @@
     "aiSearchMode": "AI",
     "searchMode": "検索モード",
     "semanticSearch": "意味でアセットを検索...",
-    "runSemanticSearch": "AI 検索を実行"
+    "runSemanticSearch": "AI 検索を実行",
+    "expandDisplayControls": "表示コントロールを展開",
+    "collapseDisplayControls": "表示コントロールを折りたたむ"
   },
   "browse": {
     "selectItems": "アセットを選択して操作する",

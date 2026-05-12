@@ -132,6 +132,12 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		return CatalogItemFacets{}, err
 	}
 	exifFacets, _ := s.CatalogEXIFFacetCounts(scanID, query.ProjectName, query.Ext)
+	favoriteQuery := query
+	favoriteQuery.Favorite = false
+	favoriteCount, err := s.catalogFavoriteCount(scanID, favoriteQuery)
+	if err != nil {
+		return CatalogItemFacets{}, err
+	}
 	customFilters := make([]CatalogCustomFilterFacet, 0, len(settings.CustomAssetFilters))
 	for _, filter := range settings.CustomAssetFilters {
 		if !filter.Enabled {
@@ -176,7 +182,26 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		AITagReadyCount:          aiTagReadyCount,
 		EXIFHasGPS:               exifFacets.HasGPS,
 		EXIFHasCamera:            exifFacets.HasCamera,
+		FavoriteCount:            favoriteCount,
 	}, nil
+}
+
+func (s *Store) catalogFavoriteCount(scanID int64, query CatalogItemQuery) (int, error) {
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	err = s.rdb.QueryRow(`
+		SELECT COUNT(*)
+		FROM asset_snapshots a
+		`+where+`
+			AND EXISTS (
+				SELECT 1 FROM asset_favorites f
+				WHERE f.project_id = a.project_id AND f.repo_path = a.repo_path
+			)
+	`, args...).Scan(&count)
+	return count, err
 }
 
 func (s *Store) catalogItemTotalForStatus(scanID int64, query CatalogItemQuery, status string) (int, error) {
@@ -913,6 +938,12 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		} else {
 			clauses = append(clauses, "NOT EXISTS (SELECT 1 FROM exif_data e WHERE e.scan_id = a.scan_id AND e.asset_id = a.asset_id AND e.has_gps = 1)")
 		}
+	}
+	if query.Favorite {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM asset_favorites f
+			WHERE f.project_id = a.project_id AND f.repo_path = a.repo_path
+		)`)
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args, nil
 }

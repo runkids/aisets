@@ -55,6 +55,7 @@ func (s *Store) CatalogSummary() (CatalogSummary, error) {
 			stats.PossiblyUnusedFiles += projectStat.PossiblyUnusedFiles
 			stats.UsageNotApplicableFiles += projectStat.UsageNotApplicableFiles
 			stats.ReferencedFiles += projectStat.ReferencedFiles
+			stats.FavoriteFiles += projectStat.FavoriteFiles
 		}
 	}
 	return CatalogSummary{
@@ -124,6 +125,9 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 			COALESCE(SUM(CASE WHEN a.usage_classification = 'notApplicable' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN a.usage_classification = 'referenced' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN EXISTS (
+				SELECT 1 FROM asset_favorites f WHERE f.project_id = a.project_id AND f.repo_path = a.repo_path
+			) THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN EXISTS (
 				SELECT 1 FROM duplicate_group_assets d WHERE d.scan_id = a.scan_id AND d.asset_id = a.asset_id
 			) THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN EXISTS (
@@ -139,7 +143,7 @@ func (s *Store) catalogProjectStats(scanID int64, projects []Project) ([]Catalog
 	defer rows.Close()
 	for rows.Next() {
 		var stat CatalogProjectStats
-		if err := rows.Scan(&stat.ProjectID, &stat.TotalFiles, &stat.TotalBytes, &stat.UnusedFiles, &stat.PossiblyUnusedFiles, &stat.UsageNotApplicableFiles, &stat.ReferencedFiles, &stat.DuplicateFiles, &stat.OptimizableFiles); err != nil {
+		if err := rows.Scan(&stat.ProjectID, &stat.TotalFiles, &stat.TotalBytes, &stat.UnusedFiles, &stat.PossiblyUnusedFiles, &stat.UsageNotApplicableFiles, &stat.ReferencedFiles, &stat.FavoriteFiles, &stat.DuplicateFiles, &stat.OptimizableFiles); err != nil {
 			return nil, err
 		}
 		stats[stat.ProjectID] = stat

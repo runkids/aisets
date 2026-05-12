@@ -133,6 +133,18 @@ func (s *Server) handleBatchApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	for _, move := range preview.Moves {
+		if err := s.store.MoveAssetFavorite(project.ID, move.From, move.To); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	for _, deleted := range preview.Deletes {
+		if err := s.store.DeleteAssetFavorite(project.ID, deleted); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
 	s.markCatalogStale()
 	go func() {
 		_, _, _ = s.scan(context.Background())

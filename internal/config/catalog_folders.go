@@ -20,6 +20,7 @@ func (s *Store) CatalogFolders(query CatalogFolderQuery) (CatalogFoldersPage, er
 		Query:          query.Query,
 		Status:         query.Status,
 		CustomFilterID: query.CustomFilterID,
+		Favorite:       query.Favorite,
 	}
 	where, args, err := s.catalogItemWhere(scanID, whereQuery)
 	if err != nil {

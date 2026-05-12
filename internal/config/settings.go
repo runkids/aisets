@@ -787,6 +787,7 @@ func (s *Store) ResetData() error {
 		"embeddings",
 		"ocr_results",
 		"ai_tags",
+		"asset_favorites",
 		"asset_notes",
 		"asset_labels",
 		"labels",

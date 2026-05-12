@@ -3,12 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 const railVariants = cva(
-  "flex shrink-0 flex-col gap-2 overflow-y-auto bg-transparent px-1.5 py-3",
+  "mt-3 mb-3 flex min-h-0 shrink-0 flex-col gap-2 overflow-y-auto bg-transparent px-1.5",
   {
     variants: {
       variant: {
         filter: "w-[200px] max-lg:hidden",
-        settings: "w-[220px] max-md:w-16 max-md:px-2 max-md:py-3",
+        settings: "w-[220px] max-md:w-16 max-md:px-2",
       },
     },
     defaultVariants: {
