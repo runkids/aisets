@@ -390,6 +390,7 @@ export type AssetItem = {
   deleteUnusedAllowed?: boolean;
   lintApplicability?: "applicable" | "advisory" | "notApplicable";
   optimizeApplicability?: "applicable" | "advisory" | "notApplicable";
+  favorite?: boolean;
   exif?: EXIFData;
 };
 
@@ -468,6 +469,7 @@ export type Catalog = {
     possiblyUnusedFiles?: number;
     usageNotApplicableFiles?: number;
     referencedFiles?: number;
+    favoriteFiles?: number;
     duplicateFiles: number;
     duplicateGroups: number;
     optimizableFiles: number;
@@ -485,6 +487,7 @@ export type Catalog = {
     possiblyUnusedFiles?: number;
     usageNotApplicableFiles?: number;
     referencedFiles?: number;
+    favoriteFiles?: number;
     nearDuplicates: number;
     lintFindings: number;
     cacheHits: number;
@@ -538,6 +541,7 @@ export type CatalogItemsPage = {
     aiTagReadyCount: number;
     exifHasGps: number;
     exifHasCamera: number;
+    favoriteCount: number;
   };
 };
 

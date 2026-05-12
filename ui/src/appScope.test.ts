@@ -26,6 +26,7 @@ function makeSummary(
       totalBytes: 0,
       unusedFiles: 0,
       duplicateFiles: 0,
+      favoriteFiles: 0,
       duplicateGroups: 0,
       optimizableFiles: optimizableFilesByProject[index] ?? 0,
       lintFindings: 0,
@@ -35,6 +36,7 @@ function makeSummary(
       duplicateGroups: 0,
       duplicateFiles: 0,
       unusedFiles: 0,
+      favoriteFiles: 0,
       nearDuplicates: 0,
       lintFindings: 0,
       cacheHits: 0,
@@ -73,6 +75,7 @@ describe("scopedStatsForProject", () => {
       possiblyUnusedFiles: 0,
       usageNotApplicableFiles: 0,
       referencedFiles: 0,
+      favoriteFiles: 0,
       nearDuplicates: 0,
       lintFindings: 3,
       cacheHits: 0,
@@ -154,4 +157,5 @@ describe("navigationBadges", () => {
       lint: 3,
     });
   });
+
 });

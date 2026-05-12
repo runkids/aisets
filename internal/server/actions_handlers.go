@@ -466,11 +466,33 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := s.syncFavoritesAfterApply(project.ID, preview); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	s.markCatalogStale()
 	go func() {
 		_, _, _ = s.scan(context.Background())
 	}()
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+func (s *Server) syncFavoritesAfterApply(projectID string, preview actions.Preview) error {
+	switch preview.Type {
+	case "rename":
+		source, _ := preview.Payload["sourcePath"].(string)
+		target, _ := preview.Payload["targetPath"].(string)
+		return s.store.MoveAssetFavorite(projectID, source, target)
+	case "merge":
+		source, _ := preview.Payload["sourcePath"].(string)
+		target, _ := preview.Payload["preferredPath"].(string)
+		return s.store.MoveAssetFavorite(projectID, source, target)
+	case "delete-unused":
+		source, _ := preview.Payload["sourcePath"].(string)
+		return s.store.DeleteAssetFavorite(projectID, source)
+	default:
+		return nil
+	}
 }
 
 func (s *Server) projectAndItem(ctx context.Context, assetID string) (scanner.Project, scanner.AssetItem, error) {

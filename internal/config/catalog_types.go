@@ -25,6 +25,7 @@ type CatalogProjectStats struct {
 	PossiblyUnusedFiles     int    `json:"possiblyUnusedFiles"`
 	UsageNotApplicableFiles int    `json:"usageNotApplicableFiles"`
 	ReferencedFiles         int    `json:"referencedFiles"`
+	FavoriteFiles           int    `json:"favoriteFiles"`
 	DuplicateFiles          int    `json:"duplicateFiles"`
 	DuplicateGroups         int    `json:"duplicateGroups"`
 	OptimizableFiles        int    `json:"optimizableFiles"`
@@ -49,6 +50,7 @@ type CatalogItemQuery struct {
 	Locale               string
 	AIOcrStatus          string
 	VLMEngineVersion     string
+	Favorite             bool
 	HasGPS               *bool
 	Limit                int
 	Cursor               string
@@ -95,6 +97,7 @@ type CatalogItemFacets struct {
 	AITagReadyCount          int                        `json:"aiTagReadyCount"`
 	EXIFHasGPS               int                        `json:"exifHasGps"`
 	EXIFHasCamera            int                        `json:"exifHasCamera"`
+	FavoriteCount            int                        `json:"favoriteCount"`
 }
 
 type CatalogFolderQuery struct {
@@ -106,6 +109,7 @@ type CatalogFolderQuery struct {
 	Query          string
 	Status         string
 	CustomFilterID string
+	Favorite       bool
 }
 
 type CatalogFolderNode struct {

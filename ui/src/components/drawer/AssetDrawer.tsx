@@ -17,7 +17,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useSettingsQuery } from "../../queries";
+import { useFavoriteAssetMutation, useSettingsQuery } from "../../queries";
+import { errorMessage } from "../../i18n";
 import {
   canDeleteUnused,
   notApplicableUsageLabel,
@@ -48,6 +49,7 @@ import {
 } from "../ui";
 import { DialogDrawerSurface, DialogOverlay } from "../ui/DialogShell";
 import { useToast } from "../shared/ToastProvider";
+import { FavoriteButton } from "../shared/FavoriteButton";
 
 const copyText = (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -159,6 +161,7 @@ export function AssetDrawer({
     return () => window.clearTimeout(timer);
   }, [closing, onClose]);
   const settingsQuery = useSettingsQuery();
+  const favoriteMut = useFavoriteAssetMutation();
   const ocrVisible = Boolean(
     settingsQuery.data?.settings.ocrEnabled &&
     asset.ocr &&
@@ -196,6 +199,28 @@ export function AssetDrawer({
   const isUnused = usage === "unused";
   const isPossiblyUnused = usage === "possiblyUnused";
   const isNotApplicable = usage === "notApplicable";
+
+  function handleToggleFavorite() {
+    favoriteMut.mutate(
+      {
+        assetId: asset.id,
+        favorite: !asset.favorite,
+        scanId,
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            asset.favorite
+              ? t("toast.favoriteRemoved")
+              : t("toast.favoriteAdded"),
+          );
+        },
+        onError: (error) => {
+          toast.error(errorMessage(error));
+        },
+      },
+    );
+  }
 
   const tabs = useMemo(() => {
     const items: TabItem<DrawerTab>[] = [
@@ -539,6 +564,16 @@ export function AssetDrawer({
                 >
                   {t("action.copyFileName")}
                 </Button>
+                <FavoriteButton
+                  favorite={Boolean(asset.favorite)}
+                  pending={favoriteMut.isPending}
+                  label={
+                    asset.favorite
+                      ? t("favorites.remove")
+                      : t("favorites.add")
+                  }
+                  onToggle={handleToggleFavorite}
+                />
                 {onRename && (
                   <Tooltip label={t("action.rename")}>
                     <IconButton

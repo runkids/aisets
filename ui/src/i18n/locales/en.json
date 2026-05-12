@@ -52,6 +52,13 @@
     "tags": "Tags & Categories",
     "tagsDesc": "Browse and manage AI-generated tags and categories across all projects."
   },
+  "favorites": {
+    "add": "Add to Favorites",
+    "remove": "Remove from Favorites",
+    "saved": "Favorite",
+    "addSelected": "Favorite Selected",
+    "removeSelected": "Unfavorite Selected"
+  },
   "tags": {
     "modeLabel": "Tag management mode",
     "modeTags": "Tags",
@@ -1360,7 +1367,11 @@
     "databaseReset": "Database reset",
     "databaseResetFailed": "Database reset failed",
     "embeddingsCleared": "Embedding cache cleared.",
-    "embeddingsClearFailed": "Failed to clear embeddings."
+    "embeddingsClearFailed": "Failed to clear embeddings.",
+    "favoriteAdded": "Added to favorites",
+    "favoriteRemoved": "Removed from favorites",
+    "favoriteBulkAdded": "Added {{count}} asset(s) to favorites",
+    "favoriteBulkRemoved": "Removed {{count}} asset(s) from favorites"
   },
   "prompt": {
     "renamePath": "New project-relative path"
@@ -1630,6 +1641,8 @@
     "allProjects": "All projects",
     "allExtensions": "All extensions",
     "allCustomFilters": "All custom filters",
+    "saved": "Saved",
+    "favorites": "Favorites",
     "requiresOCR": "Needs OCR",
     "requiresOCRHint": "This custom filter uses OCR, but OCR is currently off.",
     "requiresAI": "Needs AI",
@@ -1652,6 +1665,8 @@
     "sortSize": "Size",
     "sortRecent": "Recent",
     "bulkSelect": "Bulk select",
+    "expandDisplayControls": "Expand display controls",
+    "collapseDisplayControls": "Collapse display controls",
     "clearSearch": "Clear search"
   },
   "browse": {

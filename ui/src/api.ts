@@ -184,6 +184,7 @@ export type CatalogItemsParams = {
   aiCategory?: string;
   aiOcrStatus?: string;
   hasGPS?: string;
+  favorite?: string;
   limit?: number;
   cursor?: string | null;
 };
@@ -243,6 +244,7 @@ export function getCatalogItems(
       aiCategory: params.aiCategory,
       aiOcrStatus: params.aiOcrStatus,
       hasGPS: params.hasGPS,
+      favorite: params.favorite,
       limit: params.limit,
       cursor: params.cursor,
     })}`,
@@ -295,6 +297,7 @@ export type CatalogFoldersParams = {
   q?: string;
   status?: string;
   customFilter?: string;
+  favorite?: string;
 };
 
 export function getCatalogFolders(
@@ -312,8 +315,36 @@ export function getCatalogFolders(
       q: params.q,
       status: params.status,
       customFilter: params.customFilter,
+      favorite: params.favorite,
     })}`,
     { signal: options?.signal },
+  );
+}
+
+export function setCatalogItemFavorite(
+  assetId: string,
+  favorite: boolean,
+  scanId?: number,
+) {
+  return request<{ item: import("./types").AssetItem }>(
+    `/api/catalog/items/${encodeURIComponent(assetId)}/favorite${queryString({
+      scanId,
+    })}`,
+    { method: favorite ? "POST" : "DELETE" },
+  );
+}
+
+export function setCatalogItemsFavorite(
+  assetIds: string[],
+  favorite: boolean,
+  scanId?: number,
+) {
+  return request<{ items: import("./types").AssetItem[] }>(
+    "/api/catalog/favorites",
+    {
+      method: "POST",
+      body: JSON.stringify({ scanId, assetIds, favorite }),
+    },
   );
 }
 

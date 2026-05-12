@@ -14,6 +14,7 @@ type FilterState = {
   aiCategory: string;
   aiOcrStatus: string;
   hasGPS: string;
+  favorite?: string;
 };
 
 type FilterRailProps = {
@@ -31,6 +32,7 @@ type FilterRailProps = {
   aiTagReadyCount?: number;
   totalCount?: number;
   exifHasGpsCount?: number;
+  favoriteCount?: number;
   ocrEnabled?: boolean;
   aiEnabled?: boolean;
   onFiltersChange: (filters: FilterState) => void;
@@ -45,6 +47,11 @@ function countBy(items: AssetItem[], key: "projectName" | "ext") {
   return [...map.entries()]
     .map(([id, count]) => ({ id, count }))
     .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function shouldShowFavoriteRail(favoriteCount?: number) {
+  return (favoriteCount ?? 0) > 0;
 }
 
 export function FilterRail({
@@ -62,6 +69,7 @@ export function FilterRail({
   aiTagReadyCount,
   totalCount,
   exifHasGpsCount,
+  favoriteCount,
   ocrEnabled = true,
   aiEnabled = false,
   onFiltersChange,
@@ -80,7 +88,8 @@ export function FilterRail({
     onFiltersChange({
       ...filters,
       [key]:
-        filters[key] === value && !(key === "project" && projectScopeLocked)
+        filters[key] === value &&
+        !(key === "project" && projectScopeLocked)
           ? ""
           : value,
     });
@@ -88,6 +97,17 @@ export function FilterRail({
 
   return (
     <Rail className="ml-3 max-h-full px-0">
+      {shouldShowFavoriteRail(favoriteCount) ? (
+        <RailSection heading={t("filter.saved")}>
+          <RailItem
+            active={filters.favorite === "true"}
+            label={t("filter.favorites")}
+            count={favoriteCount ?? 0}
+            onClick={() => toggle("favorite", "true")}
+          />
+        </RailSection>
+      ) : null}
+
       <RailSection heading={t("filter.project")}>
         {!projectScopeLocked && (
           <RailItem

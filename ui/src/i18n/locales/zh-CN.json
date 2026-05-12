@@ -52,6 +52,13 @@
     "tags": "标签与分类",
     "tagsDesc": "浏览和管理所有项目的 AI 生成标签与分类"
   },
+  "favorites": {
+    "add": "加入收藏",
+    "remove": "移除收藏",
+    "saved": "已收藏",
+    "addSelected": "收藏所选项目",
+    "removeSelected": "取消收藏所选项目"
+  },
   "tags": {
     "modeLabel": "标签管理模式",
     "modeTags": "标签",
@@ -548,7 +555,11 @@
     "ocrCacheCleared": "OCR 缓存已清除",
     "aiTagCacheCleared": "AI 标签缓存已清除",
     "embeddingsCleared": "嵌入缓存已清除",
-    "embeddingsClearFailed": "清除嵌入失败"
+    "embeddingsClearFailed": "清除嵌入失败",
+    "favoriteAdded": "已加入收藏",
+    "favoriteRemoved": "已移除收藏",
+    "favoriteBulkAdded": "已将 {{count}} 个素材加入收藏",
+    "favoriteBulkRemoved": "已将 {{count}} 个素材移出收藏"
   },
   "prompt": {
     "renamePath": "新的项目相對路径"
@@ -815,6 +826,8 @@
     "project": "项目",
     "extension": "副文件名",
     "customFilters": "自定义筛选器",
+    "saved": "已保存",
+    "favorites": "收藏",
     "allProjects": "所有项目",
     "allExtensions": "所有扩展名",
     "allCustomFilters": "所有自定义筛选器",
@@ -840,6 +853,8 @@
     "sortSize": "大小",
     "sortRecent": "最近",
     "bulkSelect": "批量选择",
+    "expandDisplayControls": "展开显示控制",
+    "collapseDisplayControls": "收起显示控制",
     "clearSearch": "清除搜索"
   },
   "browse": {

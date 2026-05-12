@@ -148,6 +148,7 @@ type CatalogStats struct {
 	PossiblyUnusedFiles     int `json:"possiblyUnusedFiles"`
 	UsageNotApplicableFiles int `json:"usageNotApplicableFiles"`
 	ReferencedFiles         int `json:"referencedFiles"`
+	FavoriteFiles           int `json:"favoriteFiles"`
 	NearDuplicates          int `json:"nearDuplicates"`
 	LintFindings            int `json:"lintFindings"`
 	CacheHits               int `json:"cacheHits"`
@@ -184,6 +185,7 @@ type AssetItem struct {
 	DeleteUnusedAllowed    bool                     `json:"deleteUnusedAllowed"`
 	LintApplicability      LintApplicability        `json:"lintApplicability"`
 	OptimizeApplicability  OptimizeApplicability    `json:"optimizeApplicability"`
+	Favorite               bool                     `json:"favorite"`
 }
 
 type AssetReference struct {

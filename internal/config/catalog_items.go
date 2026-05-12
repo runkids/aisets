@@ -51,6 +51,9 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	if err := rows.Err(); err != nil {
 		return CatalogItemsPage{}, err
 	}
+	if err := s.hydrateAssetFavorites(items); err != nil {
+		return CatalogItemsPage{}, err
+	}
 	next := ""
 	if len(items) > limit {
 		items = items[:limit]
@@ -85,7 +88,14 @@ func (s *Store) CatalogItem(scanID int64, assetID string) (scanner.AssetItem, er
 	if errors.Is(err, sql.ErrNoRows) {
 		return scanner.AssetItem{}, apierr.WithParams("asset_not_found", "asset not found", map[string]any{"assetId": assetID})
 	}
-	return item, err
+	if err != nil {
+		return scanner.AssetItem{}, err
+	}
+	items := []scanner.AssetItem{item}
+	if err := s.hydrateAssetFavorites(items); err != nil {
+		return scanner.AssetItem{}, err
+	}
+	return items[0], nil
 }
 
 func catalogItemOrder(sort string) string {

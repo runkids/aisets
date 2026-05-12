@@ -31,8 +31,8 @@
     "duplicates": "중복 에셋",
     "unused": "미사용 에셋",
     "optimize": "최적화 가능 에셋",
-    "dashboardDesc": "워크스페이스 에셋 상태, 정리 기회 및 프로젝트 스캔 현황.",
-    "browseDesc": "프로젝트 간 에셋 참조를 검색, 조회 및 정리.",
+    "dashboardDesc": "워크스페이스 에셋 상태, 정리 기회 및 프로젝트 스캔 현황",
+    "browseDesc": "프로젝트 간 에셋 참조를 검색, 조회 및 정리",
     "historyDesc": "완료된 스캔을 비교하고 시간에 따른 에셋 변경을 확인합니다.",
     "duplicatesDesc": "BLAKE3 콘텐츠 해시가 동일한 에셋을 찾아 권장 경로를 유지하고 중복 복사본을 제거.",
     "unusedDesc": "코드에서 참조되지 않는 에셋을 확인하고, 안전하게 미리본 후 삭제.",
@@ -51,6 +51,13 @@
     "promptsDesc": "AI 프롬프트 템플릿과 변수를 생성하고 관리합니다",
     "tags": "태그 및 카테고리",
     "tagsDesc": "모든 프로젝트의 AI 생성 태그와 카테고리를 탐색하고 관리"
+  },
+  "favorites": {
+    "add": "즐겨찾기에 추가",
+    "remove": "즐겨찾기에서 제거",
+    "saved": "즐겨찾기",
+    "addSelected": "선택 항목 즐겨찾기",
+    "removeSelected": "선택 항목 즐겨찾기 해제"
   },
   "tags": {
     "modeLabel": "태그 관리 모드",
@@ -566,7 +573,11 @@
     "ocrCacheCleared": "OCR 캐시가 지워졌습니다",
     "aiTagCacheCleared": "AI 태그 캐시가 지워졌습니다",
     "embeddingsCleared": "임베딩 캐시가 삭제되었습니다",
-    "embeddingsClearFailed": "임베딩 삭제에 실패했습니다"
+    "embeddingsClearFailed": "임베딩 삭제에 실패했습니다",
+    "favoriteAdded": "즐겨찾기에 추가했습니다",
+    "favoriteRemoved": "즐겨찾기에서 제거했습니다",
+    "favoriteBulkAdded": "{{count}}개 에셋을 즐겨찾기에 추가했습니다",
+    "favoriteBulkRemoved": "{{count}}개 에셋을 즐겨찾기에서 제거했습니다"
   },
   "prompt": {
     "renamePath": "새 프로젝트 상대 경로"
@@ -833,6 +844,8 @@
     "project": "프로젝트",
     "extension": "확장자",
     "customFilters": "사용자 지정 필터",
+    "saved": "저장됨",
+    "favorites": "즐겨찾기",
     "allProjects": "모든 프로젝트",
     "allExtensions": "모든 확장자",
     "allCustomFilters": "모든 사용자 지정 필터",
@@ -858,6 +871,8 @@
     "sortSize": "크기",
     "sortRecent": "최근",
     "bulkSelect": "일괄 선택",
+    "expandDisplayControls": "표시 컨트롤 펼치기",
+    "collapseDisplayControls": "표시 컨트롤 접기",
     "clearSearch": "검색 지우기"
   },
   "browse": {

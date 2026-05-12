@@ -69,6 +69,9 @@ func (s *Store) AllOptimizableItems(scanID int64) ([]scanner.AssetItem, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if err := s.hydrateAssetFavorites(items); err != nil {
+		return nil, err
+	}
 	if err := s.hydrateAssetOptimization(scanID, items); err != nil {
 		return nil, err
 	}
@@ -109,6 +112,9 @@ func (s *Store) catalogItemsByIDs(scanID int64, ids []string) ([]scanner.AssetIt
 		if item, ok := byID[id]; ok {
 			out = append(out, item)
 		}
+	}
+	if err := s.hydrateAssetFavorites(out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

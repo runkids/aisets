@@ -22,6 +22,8 @@ import {
   LoaderCircle,
   PenLine,
   ScanText,
+  Star,
+  StarOff,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -35,6 +37,8 @@ import {
   useBatchApplyMutation,
   useCatalogFoldersQuery,
   useCatalogItemsInfiniteQuery,
+  useFavoriteAssetMutation,
+  useFavoriteAssetsMutation,
   useSettingsQuery,
 } from "../../queries";
 import {
@@ -81,6 +85,7 @@ type BrowseFilters = {
   aiCategory: string;
   aiOcrStatus: string;
   hasGPS: string;
+  favorite: string;
 };
 type BrowseStoredState = {
   filters: BrowseFilters;
@@ -182,6 +187,7 @@ function defaultBrowseStoredState(
       aiCategory: initialAICategory,
       aiOcrStatus: "",
       hasGPS: "",
+      favorite: "",
     },
     view: "grid",
     gridSize: "m",
@@ -218,6 +224,7 @@ export function normalizeBrowseStoredState(
     customFilter?: string;
     searchQuery?: string;
     aiCategory?: string;
+    favorite?: string;
   },
 ): BrowseStoredState {
   const state = isRecord(value) ? value : {};
@@ -238,11 +245,13 @@ export function normalizeBrowseStoredState(
       defaults.filters.aiOcrStatus,
     ),
     hasGPS: stringOrDefault(rawFilters.hasGPS, defaults.filters.hasGPS),
+    favorite: stringOrDefault(rawFilters.favorite, defaults.filters.favorite),
   };
 
   if (pinned?.project) filters.project = pinned.project;
   if (pinned?.customFilter) filters.customFilter = pinned.customFilter;
   if (pinned?.aiCategory) filters.aiCategory = pinned.aiCategory;
+  if (pinned?.favorite) filters.favorite = pinned.favorite;
   const searchQuery =
     pinned?.searchQuery != null ? pinned.searchQuery : defaults.searchQuery;
 
@@ -267,6 +276,7 @@ function readBrowseStoredState(
     customFilter?: string;
     searchQuery?: string;
     aiCategory?: string;
+    favorite?: string;
   },
 ) {
   if (typeof window === "undefined") return defaults;
@@ -299,6 +309,7 @@ function writeBrowseStoredState(state: BrowseStoredState) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function resetBrowseFiltersForStatusChange(
   projectScopeName = "",
+  favorite = "",
 ): BrowseFilters {
   return {
     project: projectScopeName,
@@ -307,6 +318,7 @@ export function resetBrowseFiltersForStatusChange(
     aiCategory: "",
     aiOcrStatus: "",
     hasGPS: "",
+    favorite,
   };
 }
 
@@ -449,6 +461,7 @@ export function applyBrowseFilters({
   const filteredWithoutCustom = facetBaseItems.filter((item) => {
     if (filters.project && item.projectName !== filters.project) return false;
     if (filters.ext && item.ext !== filters.ext) return false;
+    if (filters.favorite === "true" && !item.favorite) return false;
     return true;
   });
   const selectedCustomFilter =
@@ -464,6 +477,7 @@ export function applyBrowseFilters({
     if (!matchesStatus(item, statusFilter)) return false;
     if (filters.project && item.projectName !== filters.project) return false;
     if (filters.ext && item.ext !== filters.ext) return false;
+    if (filters.favorite === "true" && !item.favorite) return false;
     if (
       selectedCustomFilter &&
       !matchesCustomAssetFilter(item, selectedCustomFilter)
@@ -723,6 +737,8 @@ export function BrowseView({
   const movePreviewMut = useBatchMovePreviewMutation();
   const renamePreviewMut = useBatchRenamePreviewMutation();
   const batchApplyMut = useBatchApplyMutation();
+  const favoriteMut = useFavoriteAssetMutation();
+  const favoritesMut = useFavoriteAssetsMutation();
   const toast = useToast();
 
   const settingsQuery = useSettingsQuery();
@@ -738,11 +754,13 @@ export function BrowseView({
       q: debouncedSearchQuery.trim() || undefined,
       status: apiStatus(statusFilter) || undefined,
       customFilter: filters.customFilter || undefined,
+      favorite: filters.favorite || undefined,
     }),
     [
       debouncedSearchQuery,
       filters.customFilter,
       filters.ext,
+      filters.favorite,
       filters.project,
       projectFilterId,
       projectFilterName,
@@ -769,6 +787,7 @@ export function BrowseView({
       aiCategory: filters.aiCategory || undefined,
       aiOcrStatus: filters.aiOcrStatus || undefined,
       hasGPS: filters.hasGPS || undefined,
+      favorite: filters.favorite || undefined,
       folder: activeSelectedFolder || undefined,
       limit: 100,
     }),
@@ -779,6 +798,7 @@ export function BrowseView({
       filters.aiOcrStatus,
       filters.customFilter,
       filters.ext,
+      filters.favorite,
       filters.hasGPS,
       filters.project,
       focusAssetId,
@@ -809,6 +829,12 @@ export function BrowseView({
     setFilters(next);
   }
 
+  function handleRailFiltersChange(
+    next: Omit<BrowseFilters, "favorite"> & { favorite?: string },
+  ) {
+    handleFiltersChange({ ...next, favorite: next.favorite ?? "" });
+  }
+
   function handleSearchChange(next: string) {
     clearFocusedAssetQuery();
     setSelectedFolder("");
@@ -821,7 +847,12 @@ export function BrowseView({
     clearFocusedAssetQuery();
     setSelectedFolder("");
     setExpandedFolders(new Set());
-    setFilters(resetBrowseFiltersForStatusChange(projectFilterName));
+    setFilters(
+      resetBrowseFiltersForStatusChange(
+        projectFilterName,
+        "",
+      ),
+    );
     setStatusFilter(next);
   }
 
@@ -863,6 +894,7 @@ export function BrowseView({
         aiCategory: "",
         aiOcrStatus: "",
         hasGPS: "",
+        favorite: "",
       });
       setSearchQuery(initialSearchQuery);
       setStatusFilter("");
@@ -988,6 +1020,59 @@ export function BrowseView({
         .reduce((sum, i) => sum + i.bytes, 0),
     [items, selected],
   );
+  const selectedItems = useMemo(
+    () => items.filter((item) => selected.has(item.id)),
+    [items, selected],
+  );
+  const selectedFavoriteCount = useMemo(
+    () => selectedItems.filter((item) => item.favorite).length,
+    [selectedItems],
+  );
+  const selectedFavoriteTarget =
+    selectedItems.length > 0 && selectedFavoriteCount === selectedItems.length
+      ? false
+      : true;
+
+  function handleToggleFavorite(item: AssetItem) {
+    favoriteMut.mutate(
+      {
+        assetId: item.id,
+        favorite: !item.favorite,
+        scanId,
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            item.favorite
+              ? t("toast.favoriteRemoved")
+              : t("toast.favoriteAdded"),
+          );
+        },
+        onError: (e) => {
+          toast.error(errorMessage(e));
+        },
+      },
+    );
+  }
+
+  function handleBulkFavorite() {
+    const ids = Array.from(selected);
+    favoritesMut.mutate(
+      { assetIds: ids, favorite: selectedFavoriteTarget, scanId },
+      {
+        onSuccess: () => {
+          toast.success(
+            selectedFavoriteTarget
+              ? t("toast.favoriteBulkAdded", { count: ids.length })
+              : t("toast.favoriteBulkRemoved", { count: ids.length }),
+          );
+        },
+        onError: (e) => {
+          toast.error(errorMessage(e));
+        },
+      },
+    );
+  }
 
   function handleBatchDelete() {
     const ids = Array.from(selected);
@@ -1120,13 +1205,14 @@ export function BrowseView({
         extensionOptions={extensionFacet.options}
         extensionTotal={extensionFacet.total}
         exifHasGpsCount={facets?.exifHasGps}
+        favoriteCount={facets?.favoriteCount}
         ocrReadyCount={facets?.ocrReadyCount}
         vlmOcrReadyCount={facets?.vlmOcrReadyCount}
         aiTagReadyCount={facets?.aiTagReadyCount}
         totalCount={facets?.projectTotal}
         ocrEnabled={ocrEnabled}
         aiEnabled={Boolean(settingsQuery.data?.settings.llmEnabled)}
-        onFiltersChange={handleFiltersChange}
+        onFiltersChange={handleRailFiltersChange}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 px-3 pb-2 pt-0">
         <div className="max-w-none p-0 flex h-full flex-col">
@@ -1183,6 +1269,22 @@ export function BrowseView({
                   setSelected(new Set());
                   setBulkMode(false);
                 }}
+              />
+              <BulkActionButton
+                label={
+                  selectedFavoriteTarget
+                    ? t("favorites.addSelected")
+                    : t("favorites.removeSelected")
+                }
+                icon={
+                  selectedFavoriteTarget ? (
+                    <Star size={14} />
+                  ) : (
+                    <StarOff size={14} />
+                  )
+                }
+                disabled={selected.size === 0 || favoritesMut.isPending}
+                onClick={handleBulkFavorite}
               />
               <BulkActionButton
                 label={pathsCopied ? t("toast.copied") : t("action.copyPaths")}
@@ -1295,6 +1397,8 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
+                  onToggleFavorite={handleToggleFavorite}
+                  favoritePending={favoriteMut.isPending}
                 />
               </div>
             </div>
@@ -1314,6 +1418,8 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
+                  onToggleFavorite={handleToggleFavorite}
+                  favoritePending={favoriteMut.isPending}
                   hasMore={catalogItemsQuery.hasNextPage}
                   loadingMore={catalogItemsQuery.isFetchingNextPage}
                   onLoadMore={() => {
@@ -1335,6 +1441,8 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
+                  onToggleFavorite={handleToggleFavorite}
+                  favoritePending={favoriteMut.isPending}
                   hasMore={catalogItemsQuery.hasNextPage}
                   loadingMore={catalogItemsQuery.isFetchingNextPage}
                   onLoadMore={() => {

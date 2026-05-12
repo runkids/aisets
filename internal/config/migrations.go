@@ -183,6 +183,12 @@ func (s *Store) migrate() error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS asset_favorites (
+			project_id TEXT NOT NULL,
+			repo_path TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY (project_id, repo_path)
+		)`,
 		`CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			type TEXT NOT NULL,
@@ -248,6 +254,7 @@ func (s *Store) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_scans_completed_at ON scans(completed_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_scan_project_snapshots_scan ON scan_project_snapshots(scan_id, project_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_project_path ON asset_snapshots(project_id, repo_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_asset_favorites_project_path ON asset_favorites(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_asset_snapshots_hash ON asset_snapshots(hash_algorithm, content_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_references_project_path ON reference_snapshots(project_id, repo_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_ocr_results_project_path ON ocr_results(project_id, repo_path)`,

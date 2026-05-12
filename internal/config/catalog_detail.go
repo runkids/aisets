@@ -128,7 +128,13 @@ func (s *Store) assetDuplicates(scanID int64, item scanner.AssetItem) ([]scanner
 		}
 		out = append(out, dup)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := s.hydrateAssetFavorites(out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) assetNearDuplicates(scanID int64, assetID string) ([]scanner.NearDuplicate, error) {
