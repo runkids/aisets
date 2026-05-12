@@ -69,6 +69,38 @@ func (s *Store) CatalogItems(query CatalogItemQuery) (CatalogItemsPage, error) {
 	return CatalogItemsPage{Items: items, Total: total, NextCursor: next, Facets: facets}, nil
 }
 
+func (s *Store) CatalogItemIDs(query CatalogItemQuery) ([]string, error) {
+	scanID, err := s.resolveScanID(query.ScanID)
+	if err != nil {
+		return nil, err
+	}
+	where, args, err := s.catalogItemWhere(scanID, query)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.rdb.Query(`
+		SELECT DISTINCT a.asset_id
+		FROM asset_snapshots a
+		LEFT JOIN duplicate_group_assets d ON d.scan_id = a.scan_id AND d.asset_id = a.asset_id
+		LEFT JOIN duplicate_group_snapshots g ON g.scan_id = a.scan_id AND g.group_id = d.group_id
+		`+where+`
+		ORDER BY a.asset_id ASC
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (s *Store) CatalogItem(scanID int64, assetID string) (scanner.AssetItem, error) {
 	scanID, err := s.resolveScanID(scanID)
 	if err != nil {

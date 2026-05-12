@@ -31,7 +31,7 @@ import { fileName, formatBytes, formatExt, hasDuplicates } from "../../ui";
 import { AITagBadge } from "../tags/AITagBadge";
 import { OCRStatusBadge } from "../shared/OCRStatusBadge";
 import { TagPickerPopover } from "../tags/TagPickerPopover";
-import { Checkbox, ImagePreview, Tooltip } from "../ui";
+import { Badge, Checkbox, ImagePreview, Tooltip } from "../ui";
 
 type BrowseGridProps = {
   items: AssetItem[];
@@ -50,6 +50,10 @@ type BrowseGridProps = {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
+  semanticMetaById?: Record<
+    string,
+    { similarity: number; matchType?: string; label?: string }
+  >;
 };
 
 const SIZE_CONFIG: Record<
@@ -109,6 +113,7 @@ export function BrowseGrid({
   onLoadMore,
   hasMore = false,
   loadingMore = false,
+  semanticMetaById,
 }: BrowseGridProps) {
   const { t } = useTranslation();
   const cfg = SIZE_CONFIG[gridSize];
@@ -202,6 +207,7 @@ export function BrowseGrid({
     );
 
     const imgSrc = item.thumbnailUrl || item.url;
+    const semanticMeta = semanticMetaById?.[item.id];
 
     return (
       <button
@@ -321,6 +327,12 @@ export function BrowseGrid({
             <div className="mt-1 flex flex-wrap items-center gap-1">
               <OCRStatusBadge item={item} />
               <AITagBadge item={item} />
+              {semanticMeta && (
+                <Badge tone="purple">
+                  {Math.round(semanticMeta.similarity * 100)}%
+                  {semanticMeta.matchType ? ` · ${semanticMeta.matchType}` : ""}
+                </Badge>
+              )}
               <div
                 ref={
                   tagPickerAsset?.id === item.id

@@ -6,6 +6,7 @@ import {
   List,
   Moon,
   Search,
+  Sparkles,
   Sun,
   Trees,
   X,
@@ -24,10 +25,12 @@ import {
   BrowseIconToggleGroup,
   BrowseSizeToggleGroup,
   BrowseStatusBar,
+  BrowseTextToggleGroup,
 } from "./BrowseToolbarParts";
 
 export type ViewMode = "grid" | "list" | "tree";
 export type SortMode = "name" | "size" | "recent";
+export type SearchMode = "catalog" | "semantic";
 
 type StatusFilter =
   | ""
@@ -48,6 +51,7 @@ type BrowseToolbarProps = {
   view: ViewMode;
   gridSize: "s" | "m" | "l";
   bgMode: ImageBackgroundMode;
+  searchMode: SearchMode;
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
@@ -60,7 +64,9 @@ type BrowseToolbarProps = {
   onViewChange: (view: ViewMode) => void;
   onGridSizeChange: (size: "s" | "m" | "l") => void;
   onBgModeChange: (mode: ImageBackgroundMode) => void;
+  onSearchModeChange: (mode: SearchMode) => void;
   onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onStatusFilterChange: (status: StatusFilter) => void;
   onSortChange: (sort: SortMode) => void;
   onAICategoryChange: (category: string) => void;
@@ -73,6 +79,7 @@ export function BrowseToolbar({
   view,
   gridSize,
   bgMode,
+  searchMode,
   searchQuery,
   statusFilter,
   sortMode,
@@ -85,7 +92,9 @@ export function BrowseToolbar({
   onViewChange,
   onGridSizeChange,
   onBgModeChange,
+  onSearchModeChange,
   onSearchChange,
+  onSearchSubmit,
   onStatusFilterChange,
   onSortChange,
   onAICategoryChange,
@@ -125,6 +134,10 @@ export function BrowseToolbar({
       label: t("toolbar.darkBg"),
       icon: <Moon size={16} />,
     },
+  ];
+  const searchModeItems = [
+    { value: "catalog" as const, label: t("toolbar.catalogSearchMode") },
+    { value: "semantic" as const, label: t("toolbar.aiSearchMode") },
   ];
   const statusItems = [
     { value: "" as const, label: t("status.all") },
@@ -184,8 +197,18 @@ export function BrowseToolbar({
       <div className="flex flex-wrap items-center gap-3">
         <TextInput
           variant="search"
-          placeholder={t("toolbar.search")}
-          icon={<Search size={16} />}
+          placeholder={
+            searchMode === "semantic"
+              ? t("toolbar.semanticSearch")
+              : t("toolbar.search")
+          }
+          icon={
+            searchMode === "semantic" ? (
+              <Sparkles size={16} />
+            ) : (
+              <Search size={16} />
+            )
+          }
           suffix={
             <span className="inline-flex items-center gap-1">
               {searchQuery && (
@@ -194,13 +217,38 @@ export function BrowseToolbar({
                   onClick={() => onSearchChange("")}
                 />
               )}
-              <ArrowDownAZ size={14} aria-hidden="true" />
+              {searchMode === "semantic" ? (
+                <button
+                  type="button"
+                  className="inline-grid size-5 place-items-center rounded-g-sm text-g-purple transition-colors hover:bg-g-purple-soft focus-visible:shadow-g-focus"
+                  aria-label={t("toolbar.runSemanticSearch")}
+                  onClick={onSearchSubmit}
+                >
+                  <Sparkles size={14} />
+                </button>
+              ) : (
+                <ArrowDownAZ size={14} aria-hidden="true" />
+              )}
             </span>
           }
           value={searchQuery}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && searchMode === "semantic") {
+              e.preventDefault();
+              onSearchSubmit();
+            }
+          }}
           className="flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:flex-[1_1_100%] max-md:max-w-none"
           inputClassName="font-g text-g-ui tracking-g-ui"
+        />
+
+        <BrowseTextToggleGroup
+          value={searchMode}
+          items={searchModeItems}
+          onChange={onSearchModeChange}
+          ariaLabel={t("toolbar.searchMode")}
+          className="flex-none"
         />
 
         <Select

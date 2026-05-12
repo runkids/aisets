@@ -1663,11 +1663,22 @@
     "sortSize": "Size",
     "sortRecent": "Recent",
     "bulkSelect": "Bulk select",
-    "clearSearch": "Clear search"
+    "clearSearch": "Clear search",
+    "catalogSearchMode": "Text",
+    "aiSearchMode": "AI",
+    "searchMode": "Search mode",
+    "semanticSearch": "Search by meaning...",
+    "runSemanticSearch": "Run AI search"
   },
   "browse": {
     "selectItems": "Select assets to act on",
     "empty": "No assets match the current filters",
+    "semanticNoResults": "No AI matches found",
+    "semanticEmpty": "Enter an AI search",
+    "semanticEmptyDesc": "Use natural language to find assets by visual meaning, OCR text, and AI tags.",
+    "semanticWaiting": "Press Enter to run AI search.",
+    "semanticMeta": "AI search: {{count}} matches in {{duration}} ms",
+    "semanticPressEnter": "Semantic results use the current project, folder, status, and AI filters.",
     "emptyOCRTextHint": "{{count}} images finished OCR with no recognized text, so visible image text may not be searchable yet.",
     "unusedNotApplicableEmpty": "No cleanup-safe unused assets",
     "unusedNotApplicableDesc": "{{count}} assets are in asset packs or scans without checked references. Zero references are not deletion evidence, so they are not included in unused cleanup suggestions.",

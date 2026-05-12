@@ -42,6 +42,10 @@ type BrowseListProps = {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
+  semanticMetaById?: Record<
+    string,
+    { similarity: number; matchType?: string; label?: string }
+  >;
 };
 
 const ROW_HEIGHT = 60;
@@ -68,6 +72,7 @@ export function BrowseList({
   onLoadMore,
   hasMore = false,
   loadingMore = false,
+  semanticMetaById,
 }: BrowseListProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -124,6 +129,7 @@ export function BrowseList({
     const ariaLabel = [item.repoPath, ...statusLabels].join(" · ");
 
     const imgSrc = item.thumbnailUrl || item.url;
+    const semanticMeta = semanticMetaById?.[item.id];
 
     return (
       <button
@@ -198,6 +204,12 @@ export function BrowseList({
           <Badge tone="line">{formatExt(item.ext)}</Badge>
           <OCRStatusBadge item={item} />
           <AITagBadge item={item} />
+          {semanticMeta && (
+            <Badge tone="purple">
+              {Math.round(semanticMeta.similarity * 100)}%
+              {semanticMeta.matchType ? ` · ${semanticMeta.matchType}` : ""}
+            </Badge>
+          )}
           {duplicate && (
             <span className="inline-flex items-center gap-[3px] rounded-g-sm border border-[color-mix(in_srgb,var(--g-amber)_35%,transparent)] bg-g-amber-soft px-1.5 py-[3px] text-[10px] font-[510] leading-none tracking-[0.02em] text-g-amber">
               <Copy size={10} />

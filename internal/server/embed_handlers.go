@@ -18,6 +18,7 @@ import (
 	"aisets/internal/embedding"
 	"aisets/internal/llm"
 	"aisets/internal/scanner"
+	"aisets/internal/semantic"
 )
 
 type embedCounts struct {
@@ -551,54 +552,15 @@ func (s *Server) handleEmbedRepair(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func containsNonLatin(s string) bool {
-	for _, r := range s {
-		if r > 0x024F {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Server) translateToEnglish(ctx context.Context, text, model string) string {
-	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model: model,
-		Messages: []llm.ChatMessage{
-			{Role: "system", Content: "Translate the user's text to English. Output ONLY the English translation, nothing else. Keep it concise."},
-			{Role: "user", Content: text},
-		},
-		TimeoutSec: 10,
-	})
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(resp.Content)
-}
-
 func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
-	if q == "" {
-		writeJSON(w, http.StatusBadRequest, apierr.New("embed_search_empty", "query parameter q is required"))
-		return
-	}
-
 	settings, err := s.store.Settings()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_settings_failed"))
 		return
 	}
-	if !settings.LLMEnabled || s.llmProvider == nil || settings.LLMEmbedModel == "" {
-		writeJSON(w, http.StatusBadRequest, apierr.New("embed_not_configured", "LLM provider or embed model not configured"))
-		return
-	}
 
 	embedType := r.URL.Query().Get("type")
-	if embedType == "" {
-		embedType = settings.EmbedSearchType
-		if embedType == "" {
-			embedType = "hybrid"
-		}
-	}
 	limit := settings.EmbedSearchLimit
 	if limit == 0 {
 		limit = 20
@@ -613,113 +575,106 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	if f, err := strconv.ParseFloat(r.URL.Query().Get("threshold"), 32); err == nil {
 		threshold = float32(f)
 	}
-
-	start := time.Now()
-
-	queryTexts := []string{q}
-	if containsNonLatin(q) {
-		if translated := s.translateToEnglish(r.Context(), q, settings.LLMVisionModel); translated != "" && translated != q {
-			queryTexts = []string{translated}
-		}
+	filter, statusCode, err := s.semanticCatalogFilter(r, settings)
+	if err != nil {
+		writeError(w, statusCode, err)
+		return
 	}
-
-	var queryVectors [][]float32
-	var queryDimensions int
-	for _, text := range queryTexts {
-		resp, err := s.llmProvider.Embed(r.Context(), llm.EmbedRequest{
-			Model: settings.LLMEmbedModel,
-			Input: text,
-		})
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_query_failed"))
-			return
-		}
-		if queryDimensions == 0 {
-			queryDimensions = len(resp.Embedding)
-		}
-		queryVectors = append(queryVectors, resp.Embedding)
-	}
-	providerName := s.llmProvider.Name()
-
-	// Load embeddings: hybrid queries both text and image, takes max per asset.
-	typesToQuery := []string{embedType}
-	if embedType == "hybrid" {
-		typesToQuery = []string{"text", "image"}
-	}
-
-	type assetScore struct {
-		projectID   string
-		repoPath    string
-		contentHash string
-		similarity  float32
-	}
-	bestPerAsset := map[string]*assetScore{}
-
-	var totalEmbeddings int
-	for _, et := range typesToQuery {
-		embs, err := s.store.ReadyEmbeddings(config.EmbeddingQuery{
-			EmbedType:    et,
-			ProviderName: providerName,
-			ModelName:    settings.LLMEmbedModel,
-			Dimensions:   queryDimensions,
-		})
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_load_failed"))
-			return
-		}
-		totalEmbeddings += len(embs)
-		for _, emb := range embs {
-			var best float32
-			for _, qv := range queryVectors {
-				if sim := embedding.CosineSimilarity(qv, emb.Vector); sim > best {
-					best = sim
-				}
-			}
-			if prev, ok := bestPerAsset[emb.AssetID]; ok {
-				if best > prev.similarity {
-					prev.similarity = best
-				}
-			} else {
-				bestPerAsset[emb.AssetID] = &assetScore{
-					projectID:   emb.ProjectID,
-					repoPath:    emb.RepoPath,
-					contentHash: emb.ContentHash,
-					similarity:  best,
-				}
-			}
-		}
-	}
-
-	type scoredResult struct {
-		AssetID      string  `json:"assetId"`
-		ProjectID    string  `json:"projectId"`
-		RepoPath     string  `json:"repoPath"`
-		Similarity   float32 `json:"similarity"`
-		ThumbnailURL string  `json:"thumbnailUrl"`
-	}
-
-	var matches []scoredResult
-	for assetID, sc := range bestPerAsset {
-		if sc.similarity >= threshold {
-			matches = append(matches, scoredResult{
-				AssetID:      assetID,
-				ProjectID:    sc.projectID,
-				RepoPath:     sc.repoPath,
-				Similarity:   sc.similarity,
-				ThumbnailURL: "/api/thumbs/" + assetID + "?v=" + sc.contentHash,
-			})
-		}
-	}
-	sort.Slice(matches, func(i, j int) bool { return matches[i].Similarity > matches[j].Similarity })
-	if len(matches) > limit {
-		matches = matches[:limit]
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"results":         matches,
-		"queryDurationMs": time.Since(start).Milliseconds(),
-		"totalEmbeddings": totalEmbeddings,
+	response, err := semantic.Search(r.Context(), s.store, s.llmProvider, settings, semantic.Query{
+		Text:      q,
+		Type:      embedType,
+		Limit:     limit,
+		Threshold: threshold,
+		Filter:    filter,
 	})
+	if err != nil {
+		writeError(w, semanticSearchErrorStatus(err), err)
+		return
+	}
+	if r.URL.Query().Get("includeItems") == "true" && len(response.Results) > 0 {
+		if err := s.attachSemanticItems(r.Context(), &response, filter.ScanID, settings); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func semanticSearchErrorStatus(err error) int {
+	switch apierr.From(err, "embed_search_failed").Code {
+	case "embed_query_failed", "embed_load_failed":
+		return http.StatusInternalServerError
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+func (s *Server) semanticCatalogFilter(r *http.Request, settings config.AppSettings) (config.CatalogItemQuery, int, error) {
+	scanID, err := parseOptionalScanID(r.URL.Query().Get("scanId"))
+	if err != nil {
+		return config.CatalogItemQuery{}, http.StatusBadRequest, err
+	}
+	query := config.CatalogItemQuery{
+		ScanID:               scanID,
+		AssetID:              r.URL.Query().Get("assetId"),
+		ProjectID:            r.URL.Query().Get("projectId"),
+		ProjectName:          r.URL.Query().Get("projectName"),
+		Ext:                  r.URL.Query().Get("ext"),
+		Folder:               r.URL.Query().Get("folder"),
+		Query:                r.URL.Query().Get("catalogQ"),
+		Status:               r.URL.Query().Get("status"),
+		CustomFilterID:       r.URL.Query().Get("customFilter"),
+		OptimizationCategory: r.URL.Query().Get("optimizationCategory"),
+		OptimizationSeverity: r.URL.Query().Get("optimizationSeverity"),
+		Operation:            r.URL.Query().Get("operation"),
+		AICategory:           r.URL.Query().Get("aiCategory"),
+		Locale:               sanitizeLocale(r.URL.Query().Get("lang")),
+		AIOcrStatus:          r.URL.Query().Get("aiOcrStatus"),
+	}
+	if v := r.URL.Query().Get("hasGPS"); v != "" {
+		val := v == "true"
+		query.HasGPS = &val
+	}
+	_, vlmProvider, vlmModel := s.resolveVLMProviderForFeature(settings, agent.FeatureOCR)
+	if vlmProvider != "" && vlmModel != "" {
+		query.VLMEngineVersion = vlmProvider + "/" + vlmModel
+	}
+	return query, http.StatusOK, nil
+}
+
+func (s *Server) attachSemanticItems(ctx context.Context, response *semantic.Response, scanID int64, settings config.AppSettings) error {
+	ids := make([]string, 0, len(response.Results))
+	for _, result := range response.Results {
+		ids = append(ids, result.AssetID)
+	}
+	items, err := s.store.CatalogItemsWithOptimizationByIDs(scanID, ids)
+	if err != nil {
+		return err
+	}
+	catalog := scanner.Catalog{Items: items}
+	catalog, err = s.enrichCatalogOCR(ctx, catalog)
+	if err != nil {
+		return err
+	}
+	catalog, err = s.enrichCatalogAITag(catalog, settings)
+	if err != nil {
+		return err
+	}
+	catalog, err = s.enrichCatalogEXIF(catalog, scanID)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]scanner.AssetItem, len(catalog.Items))
+	for _, item := range catalog.Items {
+		byID[item.ID] = item
+	}
+	for i := range response.Results {
+		if item, ok := byID[response.Results[i].AssetID]; ok {
+			copy := item
+			response.Results[i].Item = &copy
+		}
+	}
+	return nil
 }
 
 func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {

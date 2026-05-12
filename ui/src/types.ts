@@ -818,12 +818,22 @@ export type SemanticSearchResult = {
   repoPath: string;
   similarity: number;
   thumbnailUrl: string;
+  matchType?: string;
+  matchReasons?: Array<{
+    kind: string;
+    label: string;
+    value?: string;
+    score?: number;
+  }>;
+  item?: AssetItem;
 };
 
 export type SemanticSearchResponse = {
   results: SemanticSearchResult[];
   queryDurationMs: number;
   totalEmbeddings: number;
+  query?: string;
+  translatedQuery?: string;
 };
 
 export type EmbedStats = {

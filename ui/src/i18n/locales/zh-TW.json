@@ -876,11 +876,22 @@
     "sortSize": "大小",
     "sortRecent": "最近",
     "bulkSelect": "批次選取",
-    "clearSearch": "清除搜尋"
+    "clearSearch": "清除搜尋",
+    "catalogSearchMode": "文字",
+    "aiSearchMode": "AI",
+    "searchMode": "搜尋模式",
+    "semanticSearch": "用意思搜尋素材...",
+    "runSemanticSearch": "執行 AI 搜尋"
   },
   "browse": {
     "selectItems": "選取素材以執行操作",
     "empty": "沒有素材符合目前篩選",
+    "semanticNoResults": "找不到符合的 AI 結果",
+    "semanticEmpty": "輸入 AI 搜尋",
+    "semanticEmptyDesc": "用自然語言依視覺語意、OCR 文字與 AI 標籤找素材",
+    "semanticWaiting": "按 Enter 執行 AI 搜尋",
+    "semanticMeta": "AI 搜尋：{{count}} 筆結果，耗時 {{duration}} ms",
+    "semanticPressEnter": "語意結果會套用目前專案、資料夾、狀態與 AI 篩選",
     "emptyOCRTextHint": "{{count}} 張圖片已完成 OCR 但沒有辨識出文字，因此輸入圖片上的字不一定會命中",
     "unusedNotApplicableEmpty": "沒有可安全清理的未使用素材",
     "unusedNotApplicableDesc": "目前有 {{count}} 個素材不適合用零引用判斷未使用；多半是素材包，或這次掃描停用引用分析，因此未列入未使用清理建議",
