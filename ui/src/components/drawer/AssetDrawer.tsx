@@ -30,7 +30,10 @@ import { AssetDrawerAI } from "./AssetDrawerAI";
 import { AssetDrawerOCR } from "./AssetDrawerOCR";
 import { AssetDrawerOptimize } from "./AssetDrawerOptimize";
 import { AssetDrawerTags } from "./AssetDrawerTags";
-import { useOptimizeVariants, type VariantInfo } from "../optimize/useOptimizeVariants";
+import {
+  useOptimizeVariants,
+  type VariantInfo,
+} from "../optimize/useOptimizeVariants";
 import { AssetDrawerOverview } from "./AssetDrawerOverview";
 import { AssetDrawerSimilar } from "./AssetDrawerSimilar";
 import { AssetDrawerUsage } from "./AssetDrawerUsage";
@@ -176,10 +179,10 @@ export function AssetDrawer({
   const assetFileName = fileName(asset.repoPath);
   const variants = useOptimizeVariants(asset, scanId);
   const displayAICategory = asset.aiTag?.category
-    ? asset.aiTag.categoryI18n?.[i18n.language] ??
+    ? (asset.aiTag.categoryI18n?.[i18n.language] ??
       t(`settings.aiCategory.${asset.aiTag.category}`, {
         defaultValue: asset.aiTag.category,
-      })
+      }))
     : "";
 
   const dimensions =
@@ -251,7 +254,7 @@ export function AssetDrawer({
       items.push({ value: "ai", label: t("drawer.tab.ai") });
     }
     return items;
-  }, [asset, ocrVisible, aiTagVisible, similarCount, t]);
+  }, [asset, llmEnabled, ocrVisible, aiTagVisible, similarCount, t]);
 
   const tabValues = useMemo(() => tabs.map((t) => t.value), [tabs]);
   const tab = tabValues.includes(rawTab) ? rawTab : "overview";
@@ -572,7 +575,10 @@ export function AssetDrawer({
               />
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 max-[600px]:p-4">
+            <div
+              key={asset.id}
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 max-[600px]:p-4"
+            >
               {detailLoading && (
                 <div className="mb-3 flex min-h-8 items-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 px-3 text-g-caption text-g-ink-3">
                   <LoaderCircle size={14} className="animate-spin" />
@@ -593,37 +599,49 @@ export function AssetDrawer({
                   )}
                 </div>
               )}
-              {tab === "overview" && <AssetDrawerOverview asset={asset} />}
-              {tab === "usage" && (
+              <div className={tab !== "overview" ? "hidden" : undefined}>
+                <AssetDrawerOverview asset={asset} />
+              </div>
+              <div className={tab !== "usage" ? "hidden" : undefined}>
                 <AssetDrawerUsage
                   asset={asset}
                   references={asset.references}
                   preferredEditor={preferredEditor}
                   rootPath={projectRoot(asset.localPath, asset.repoPath)}
                 />
+              </div>
+              {similarCount > 0 && (
+                <div className={tab !== "similar" ? "hidden" : undefined}>
+                  <AssetDrawerSimilar
+                    asset={asset}
+                    duplicateItems={duplicateItems}
+                    similarItems={similarItems}
+                    nearDuplicates={nearDuplicates}
+                    onOpenAsset={onOpenAsset}
+                    aiEnabled={settingsQuery.data?.settings.llmEnabled}
+                  />
+                </div>
               )}
-              {tab === "similar" && (
-                <AssetDrawerSimilar
-                  asset={asset}
-                  duplicateItems={duplicateItems}
-                  similarItems={similarItems}
-                  nearDuplicates={nearDuplicates}
-                  onOpenAsset={onOpenAsset}
-                  aiEnabled={settingsQuery.data?.settings.llmEnabled}
-                />
+              {asset.optimizationRecommendations.length > 0 && (
+                <div className={tab !== "optimize" ? "hidden" : undefined}>
+                  <AssetDrawerOptimize
+                    asset={asset}
+                    variants={variants}
+                    aiEnabled={settingsQuery.data?.settings.llmEnabled}
+                    onOpenAsset={onOpenAsset}
+                  />
+                </div>
               )}
-              {tab === "optimize" && (
-                <AssetDrawerOptimize
-                  asset={asset}
-                  variants={variants}
-                  aiEnabled={settingsQuery.data?.settings.llmEnabled}
-                  onOpenAsset={onOpenAsset}
-                />
+              {ocrVisible && asset.ocr && (
+                <div className={tab !== "ocr" ? "hidden" : undefined}>
+                  <AssetDrawerOCR ocr={asset.ocr} />
+                </div>
               )}
-              {tab === "ocr" && ocrVisible && asset.ocr && (
-                <AssetDrawerOCR ocr={asset.ocr} />
+              {(asset.aiTag?.status === "ready" || llmEnabled) && (
+                <div className={tab !== "tags" ? "hidden" : undefined}>
+                  <AssetDrawerTags asset={asset} />
+                </div>
               )}
-              {tab === "tags" && <AssetDrawerTags asset={asset} />}
               {aiTagVisible && (
                 <div className={tab !== "ai" ? "hidden" : undefined}>
                   <AssetDrawerAI
