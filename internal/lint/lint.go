@@ -7,14 +7,24 @@ import (
 )
 
 type Context struct {
-	File       string
-	Line       int
-	Content    string
-	Kind       string // string, css-url, pattern
-	Specifier  string
-	AssetBytes int64
-	AssetExt   string
-	AssetID    string
+	File               string
+	Line               int
+	Content            string
+	Kind               string // string, css-url, pattern
+	Specifier          string
+	AssetBytes         int64
+	AssetExt           string
+	AssetID            string
+	AssetPath          string
+	ProjectName        string
+	AssetWidth         int
+	AssetHeight        int
+	AssetAnimated      bool
+	AssetAlpha         bool
+	AssetDuplicate     bool
+	AssetNearDuplicate bool
+	AssetOptimizable   bool
+	AssetEXIFGPS       bool
 }
 
 type Finding struct {
@@ -29,6 +39,45 @@ type Finding struct {
 }
 
 type Rule func(ctx Context) *Finding
+
+type Settings struct {
+	BuiltinRules []BuiltinRuleSetting `json:"builtinRules"`
+	CustomRules  []CustomRuleSetting  `json:"customRules"`
+}
+
+type BuiltinRuleSetting struct {
+	ID          string `json:"id"`
+	Enabled     bool   `json:"enabled"`
+	Severity    string `json:"severity"`
+	ThresholdKB int    `json:"thresholdKB,omitempty"`
+}
+
+type CustomRuleSetting struct {
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Enabled    bool              `json:"enabled"`
+	Severity   string            `json:"severity"`
+	Message    string            `json:"message"`
+	Suggestion string            `json:"suggestion"`
+	Groups     []CustomRuleGroup `json:"groups"`
+}
+
+type CustomRuleGroup struct {
+	Clauses []CustomRuleClause `json:"clauses"`
+}
+
+type CustomRuleClause struct {
+	Field    string `json:"field"`
+	Operator string `json:"operator"`
+	Value    string `json:"value"`
+}
+
+type builtinDefinition struct {
+	id          string
+	severity    string
+	thresholdKB int
+	run         func(Context, BuiltinRuleSetting) *Finding
+}
 
 var imgTagRe = regexp.MustCompile(`(?i)<img\b`)
 var loadingAttrRe = regexp.MustCompile(`(?i)\bloading\s*=`)
@@ -51,6 +100,118 @@ var tailwindHeightRe = regexp.MustCompile(`(?:^|\s)(?:[a-z0-9-]+:)*h-\d`)
 
 var rasterExts = map[string]bool{
 	".avif": true, ".gif": true, ".jpeg": true, ".jpg": true, ".png": true, ".webp": true,
+}
+
+var builtinDefinitions = []builtinDefinition{
+	{id: "missing-lazy-loading", severity: "warning", thresholdKB: 20, run: missingLazyLoadingWithSetting},
+	{id: "missing-dimensions", severity: "warning", run: missingDimensionsWithSetting},
+	{id: "large-inline-import", severity: "critical", thresholdKB: 10, run: largeInlineImportWithSetting},
+	{id: "no-responsive-image", severity: "info", thresholdKB: 100, run: noResponsiveImageWithSetting},
+	{id: "svg-as-img", severity: "info", run: svgAsImgWithSetting},
+	{id: "img-as-background", severity: "info", thresholdKB: 20, run: imgAsBackgroundWithSetting},
+	{id: "bg-content-image", severity: "warning", thresholdKB: 80, run: bgContentImageWithSetting},
+	{id: "duplicate-asset", severity: "warning"},
+	{id: "exif-gps-privacy", severity: "advisory"},
+}
+
+func DefaultSettings() Settings {
+	settings := Settings{
+		BuiltinRules: make([]BuiltinRuleSetting, 0, len(builtinDefinitions)),
+		CustomRules:  []CustomRuleSetting{},
+	}
+	for _, def := range builtinDefinitions {
+		settings.BuiltinRules = append(settings.BuiltinRules, BuiltinRuleSetting{
+			ID:          def.id,
+			Enabled:     true,
+			Severity:    def.severity,
+			ThresholdKB: def.thresholdKB,
+		})
+	}
+	return settings
+}
+
+func NormalizeSettings(settings Settings) Settings {
+	defaults := DefaultSettings()
+	custom := normalizeCustomRules(settings.CustomRules)
+	if len(settings.BuiltinRules) == 0 {
+		defaults.CustomRules = custom
+		return defaults
+	}
+	byID := map[string]BuiltinRuleSetting{}
+	for _, rule := range settings.BuiltinRules {
+		rule.ID = strings.TrimSpace(rule.ID)
+		if rule.ID == "" {
+			continue
+		}
+		rule.Severity = normalizeSeverity(rule.Severity, "")
+		byID[rule.ID] = rule
+	}
+	for i, def := range builtinDefinitions {
+		if rule, ok := byID[def.id]; ok {
+			defaults.BuiltinRules[i].Enabled = rule.Enabled
+			defaults.BuiltinRules[i].Severity = normalizeSeverity(rule.Severity, def.severity)
+			if def.thresholdKB > 0 {
+				if rule.ThresholdKB > 0 {
+					defaults.BuiltinRules[i].ThresholdKB = rule.ThresholdKB
+				}
+			} else {
+				defaults.BuiltinRules[i].ThresholdKB = 0
+			}
+		}
+	}
+	defaults.CustomRules = custom
+	return defaults
+}
+
+func normalizeCustomRules(rules []CustomRuleSetting) []CustomRuleSetting {
+	if rules == nil {
+		return []CustomRuleSetting{}
+	}
+	out := make([]CustomRuleSetting, 0, len(rules))
+	for _, rule := range rules {
+		rule.ID = strings.TrimSpace(rule.ID)
+		rule.Name = strings.TrimSpace(rule.Name)
+		rule.Severity = normalizeSeverity(rule.Severity, "warning")
+		rule.Message = strings.TrimSpace(rule.Message)
+		rule.Suggestion = strings.TrimSpace(rule.Suggestion)
+		for groupIndex := range rule.Groups {
+			clauses := rule.Groups[groupIndex].Clauses
+			normalizedClauses := make([]CustomRuleClause, 0, len(clauses))
+			for _, clause := range clauses {
+				clause.Field = strings.TrimSpace(clause.Field)
+				clause.Operator = strings.TrimSpace(clause.Operator)
+				clause.Value = strings.TrimSpace(clause.Value)
+				if clause.Field == "" || clause.Operator == "" {
+					continue
+				}
+				normalizedClauses = append(normalizedClauses, clause)
+			}
+			rule.Groups[groupIndex].Clauses = normalizedClauses
+		}
+		out = append(out, rule)
+	}
+	return out
+}
+
+func normalizeSeverity(value, fallback string) string {
+	switch strings.TrimSpace(value) {
+	case "critical", "warning", "info", "advisory":
+		return strings.TrimSpace(value)
+	}
+	if fallback != "" {
+		return fallback
+	}
+	return "warning"
+}
+
+func BuiltinRule(settings Settings, id string) BuiltinRuleSetting {
+	settings = NormalizeSettings(settings)
+	for _, rule := range settings.BuiltinRules {
+		if rule.ID == id {
+			return rule
+		}
+	}
+	return BuiltinRuleSetting{ID: id, Enabled: true, Severity: "warning"}
 }
 
 func hasImgTag(content string) bool {
@@ -115,6 +276,10 @@ func extractFixedWidthPx(content string) int {
 }
 
 func MissingLazyLoading(ctx Context) *Finding {
+	return missingLazyLoadingWithSetting(ctx, BuiltinRule(DefaultSettings(), "missing-lazy-loading"))
+}
+
+func missingLazyLoadingWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if !hasImgTag(ctx.Content) {
 		return nil
 	}
@@ -124,12 +289,12 @@ func MissingLazyLoading(ctx Context) *Finding {
 	if ctx.AssetExt == ".svg" {
 		return nil
 	}
-	if ctx.AssetBytes <= 20*1024 {
+	if ctx.AssetBytes <= int64(setting.ThresholdKB)*1024 {
 		return nil
 	}
 	return &Finding{
 		RuleID:     "missing-lazy-loading",
-		Severity:   "warning",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -140,6 +305,10 @@ func MissingLazyLoading(ctx Context) *Finding {
 }
 
 func MissingDimensions(ctx Context) *Finding {
+	return missingDimensionsWithSetting(ctx, BuiltinRule(DefaultSettings(), "missing-dimensions"))
+}
+
+func missingDimensionsWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if !hasImgTag(ctx.Content) {
 		return nil
 	}
@@ -148,7 +317,7 @@ func MissingDimensions(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "missing-dimensions",
-		Severity:   "warning",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -159,7 +328,11 @@ func MissingDimensions(ctx Context) *Finding {
 }
 
 func LargeInlineImport(ctx Context) *Finding {
-	if ctx.AssetBytes <= 10*1024 {
+	return largeInlineImportWithSetting(ctx, BuiltinRule(DefaultSettings(), "large-inline-import"))
+}
+
+func largeInlineImportWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
+	if ctx.AssetBytes <= int64(setting.ThresholdKB)*1024 {
 		return nil
 	}
 	if !importRe.MatchString(ctx.Content) {
@@ -173,7 +346,7 @@ func LargeInlineImport(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "large-inline-import",
-		Severity:   "critical",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -184,10 +357,14 @@ func LargeInlineImport(ctx Context) *Finding {
 }
 
 func NoResponsiveImage(ctx Context) *Finding {
+	return noResponsiveImageWithSetting(ctx, BuiltinRule(DefaultSettings(), "no-responsive-image"))
+}
+
+func noResponsiveImageWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if !hasImgTag(ctx.Content) {
 		return nil
 	}
-	if ctx.AssetBytes <= 100*1024 {
+	if ctx.AssetBytes <= int64(setting.ThresholdKB)*1024 {
 		return nil
 	}
 	if !rasterExts[ctx.AssetExt] {
@@ -201,7 +378,7 @@ func NoResponsiveImage(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "no-responsive-image",
-		Severity:   "info",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -212,6 +389,10 @@ func NoResponsiveImage(ctx Context) *Finding {
 }
 
 func SvgAsImg(ctx Context) *Finding {
+	return svgAsImgWithSetting(ctx, BuiltinRule(DefaultSettings(), "svg-as-img"))
+}
+
+func svgAsImgWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if ctx.AssetExt != ".svg" {
 		return nil
 	}
@@ -220,7 +401,7 @@ func SvgAsImg(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "svg-as-img",
-		Severity:   "info",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -231,10 +412,14 @@ func SvgAsImg(ctx Context) *Finding {
 }
 
 func ImgAsBackground(ctx Context) *Finding {
+	return imgAsBackgroundWithSetting(ctx, BuiltinRule(DefaultSettings(), "img-as-background"))
+}
+
+func imgAsBackgroundWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if !hasImgTag(ctx.Content) {
 		return nil
 	}
-	if ctx.AssetBytes <= 20*1024 {
+	if ctx.AssetBytes <= int64(setting.ThresholdKB)*1024 {
 		return nil
 	}
 	if !emptyAltRe.MatchString(ctx.Content) {
@@ -242,7 +427,7 @@ func ImgAsBackground(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "img-as-background",
-		Severity:   "info",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -253,10 +438,14 @@ func ImgAsBackground(ctx Context) *Finding {
 }
 
 func BgContentImage(ctx Context) *Finding {
+	return bgContentImageWithSetting(ctx, BuiltinRule(DefaultSettings(), "bg-content-image"))
+}
+
+func bgContentImageWithSetting(ctx Context, setting BuiltinRuleSetting) *Finding {
 	if ctx.Kind != "css-url" {
 		return nil
 	}
-	if ctx.AssetBytes <= 80*1024 {
+	if ctx.AssetBytes <= int64(setting.ThresholdKB)*1024 {
 		return nil
 	}
 	if !rasterExts[ctx.AssetExt] {
@@ -264,7 +453,7 @@ func BgContentImage(ctx Context) *Finding {
 	}
 	return &Finding{
 		RuleID:     "bg-content-image",
-		Severity:   "warning",
+		Severity:   setting.Severity,
 		File:       ctx.File,
 		Line:       ctx.Line,
 		Snippet:    truncateSnippet(ctx.Content),
@@ -285,13 +474,246 @@ var AllRules = []Rule{
 }
 
 func Run(ctx Context) []Finding {
+	return RunWithSettings(ctx, DefaultSettings())
+}
+
+func RunWithSettings(ctx Context, settings Settings) []Finding {
+	settings = NormalizeSettings(settings)
+	builtins := map[string]BuiltinRuleSetting{}
+	for _, rule := range settings.BuiltinRules {
+		builtins[rule.ID] = rule
+	}
 	var findings []Finding
-	for _, rule := range AllRules {
-		if f := rule(ctx); f != nil {
+	for _, def := range builtinDefinitions {
+		if def.run == nil {
+			continue
+		}
+		setting, ok := builtins[def.id]
+		if !ok || !setting.Enabled {
+			continue
+		}
+		if f := def.run(ctx, setting); f != nil {
 			findings = append(findings, *f)
 		}
 	}
 	return findings
+}
+
+func RunCustom(ctx Context, settings Settings) []Finding {
+	settings = NormalizeSettings(settings)
+	var findings []Finding
+	for _, rule := range settings.CustomRules {
+		if !rule.Enabled || rule.ID == "" || len(rule.Groups) == 0 {
+			continue
+		}
+		if !customRuleMatches(ctx, rule) {
+			continue
+		}
+		message := rule.Message
+		if message == "" {
+			message = "Custom lint rule matched this image."
+		}
+		suggestion := rule.Suggestion
+		if suggestion == "" {
+			suggestion = "Review this image against your team asset rules."
+		}
+		file := ctx.File
+		if file == "" {
+			file = ctx.AssetPath
+		}
+		findings = append(findings, Finding{
+			RuleID:     "custom-" + rule.ID,
+			Severity:   rule.Severity,
+			File:       file,
+			Line:       ctx.Line,
+			Snippet:    truncateSnippet(ctx.Content),
+			Message:    message,
+			Suggestion: suggestion,
+			AssetID:    ctx.AssetID,
+		})
+	}
+	return findings
+}
+
+func CustomRuleUsesReference(rule CustomRuleSetting) bool {
+	for _, group := range rule.Groups {
+		for _, clause := range group.Clauses {
+			switch clause.Field {
+			case "referenceKind", "specifier", "snippet", "snippetRegex", "hasLoading", "hasFetchPriority", "hasWidth", "hasHeight", "hasSrcset", "altEmpty":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func customRuleMatches(ctx Context, rule CustomRuleSetting) bool {
+	for _, group := range rule.Groups {
+		if len(group.Clauses) == 0 {
+			continue
+		}
+		matched := true
+		for _, clause := range group.Clauses {
+			if !customClauseMatches(ctx, clause) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func customClauseMatches(ctx Context, clause CustomRuleClause) bool {
+	switch clause.Field {
+	case "path":
+		return matchText(ctx.AssetPath, clause.Operator, clause.Value)
+	case "folder":
+		folder := ""
+		if i := strings.LastIndex(ctx.AssetPath, "/"); i >= 0 {
+			folder = ctx.AssetPath[:i]
+		}
+		return matchText(folder, clause.Operator, clause.Value)
+	case "extension":
+		return matchText(ctx.AssetExt, clause.Operator, normalizeExt(clause.Value))
+	case "project":
+		return matchText(ctx.ProjectName, clause.Operator, clause.Value)
+	case "bytes":
+		return matchInt(ctx.AssetBytes, clause.Operator, clause.Value)
+	case "width":
+		return matchInt(int64(ctx.AssetWidth), clause.Operator, clause.Value)
+	case "height":
+		return matchInt(int64(ctx.AssetHeight), clause.Operator, clause.Value)
+	case "megapixels":
+		return matchFloat(float64(ctx.AssetWidth*ctx.AssetHeight)/1_000_000, clause.Operator, clause.Value)
+	case "animated":
+		return matchBool(ctx.AssetAnimated, clause.Operator, clause.Value)
+	case "alpha":
+		return matchBool(ctx.AssetAlpha, clause.Operator, clause.Value)
+	case "duplicate":
+		return matchBool(ctx.AssetDuplicate, clause.Operator, clause.Value)
+	case "nearDuplicate":
+		return matchBool(ctx.AssetNearDuplicate, clause.Operator, clause.Value)
+	case "optimizable":
+		return matchBool(ctx.AssetOptimizable, clause.Operator, clause.Value)
+	case "exifGps":
+		return matchBool(ctx.AssetEXIFGPS, clause.Operator, clause.Value)
+	case "referenceKind":
+		return matchText(ctx.Kind, clause.Operator, clause.Value)
+	case "specifier":
+		return matchText(ctx.Specifier, clause.Operator, clause.Value)
+	case "snippet":
+		return matchText(ctx.Content, clause.Operator, clause.Value)
+	case "snippetRegex":
+		return matchText(ctx.Content, "regex", clause.Value)
+	case "hasLoading":
+		return matchBool(loadingAttrRe.MatchString(ctx.Content), clause.Operator, clause.Value)
+	case "hasFetchPriority":
+		return matchBool(fetchPriorityRe.MatchString(ctx.Content), clause.Operator, clause.Value)
+	case "hasWidth":
+		return matchBool(hasWidthHint(ctx.Content), clause.Operator, clause.Value)
+	case "hasHeight":
+		return matchBool(hasHeightHint(ctx.Content), clause.Operator, clause.Value)
+	case "hasSrcset":
+		return matchBool(srcsetAttrRe.MatchString(ctx.Content), clause.Operator, clause.Value)
+	case "altEmpty":
+		return matchBool(emptyAltRe.MatchString(ctx.Content), clause.Operator, clause.Value)
+	}
+	return false
+}
+
+func matchText(actual, operator, expected string) bool {
+	actual = strings.TrimSpace(actual)
+	expected = strings.TrimSpace(expected)
+	switch operator {
+	case "contains":
+		return strings.Contains(strings.ToLower(actual), strings.ToLower(expected))
+	case "prefix":
+		return strings.HasPrefix(strings.ToLower(actual), strings.ToLower(expected))
+	case "suffix":
+		return strings.HasSuffix(strings.ToLower(actual), strings.ToLower(expected))
+	case "equals", "is":
+		return strings.EqualFold(actual, expected)
+	case "oneOf":
+		for _, option := range splitList(expected) {
+			if strings.EqualFold(actual, normalizeExt(option)) || strings.EqualFold(actual, option) {
+				return true
+			}
+		}
+		return false
+	case "regex":
+		re, err := regexp.Compile(expected)
+		if err != nil {
+			return false
+		}
+		return re.MatchString(actual)
+	}
+	return false
+}
+
+func matchInt(actual int64, operator, expected string) bool {
+	var value int64
+	if _, err := fmt.Sscanf(strings.TrimSpace(expected), "%d", &value); err != nil {
+		return false
+	}
+	switch operator {
+	case "gte":
+		return actual >= value
+	case "lte":
+		return actual <= value
+	case "equals", "is":
+		return actual == value
+	}
+	return false
+}
+
+func matchFloat(actual float64, operator, expected string) bool {
+	var value float64
+	if _, err := fmt.Sscanf(strings.TrimSpace(expected), "%f", &value); err != nil {
+		return false
+	}
+	switch operator {
+	case "gte":
+		return actual >= value
+	case "lte":
+		return actual <= value
+	case "equals", "is":
+		return actual == value
+	}
+	return false
+}
+
+func matchBool(actual bool, operator, expected string) bool {
+	if operator != "is" && operator != "equals" {
+		return false
+	}
+	expected = strings.ToLower(strings.TrimSpace(expected))
+	want := expected == "true" || expected == "yes" || expected == "1"
+	return actual == want
+}
+
+func splitList(value string) []string {
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n'
+	})
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func normalizeExt(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value != "" && !strings.HasPrefix(value, ".") {
+		return "." + value
+	}
+	return value
 }
 
 func truncateSnippet(s string) string {

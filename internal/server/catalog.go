@@ -605,6 +605,7 @@ func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOpti
 		ExcludePatterns:         settings.ExcludePatterns,
 		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
 		OptimizationThresholds:  settings.OptimizationThresholds,
+		LintSettings:            settings.LintRules,
 	})
 	if override.Profile != "" || override.Analyses != (scanner.AnalysisOptions{}) {
 		options.Profile = override.Profile
@@ -612,6 +613,7 @@ func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOpti
 		options = scanner.NormalizeScanOptions(options)
 		options.ExcludePatterns = settings.ExcludePatterns
 		options.ExcludePatternsByIntent = settings.ExcludePatternsByIntent
+		options.LintSettings = settings.LintRules
 	}
 	catalog, err := s.scanner.ScanWithOptions(ctx, projects, options, progress)
 	if err != nil {

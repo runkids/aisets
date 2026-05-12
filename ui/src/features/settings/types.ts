@@ -6,6 +6,7 @@ import type { VLMOcrActivityState } from "@/activity/vlmOcrActivity";
 import type { EmbedActivityState } from "@/activity/embedActivity";
 import type {
   CustomAssetFilter,
+  LintRuleSettings,
   OptimizationExternalTool,
   OptimizationStrategy,
   OptimizationThresholds,
@@ -68,6 +69,7 @@ export type Section =
   | "projects"
   | "appearance"
   | "scanning"
+  | "lintRules"
   | "ai"
   | "customFilters"
   | "optimization"
@@ -120,6 +122,7 @@ export type SettingsDraft = {
   optimizationExternalTools: OptimizationExternalTool[];
   optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
+  lintRules: LintRuleSettings;
   embedSearchThreshold: number;
   embedSearchLimit: number;
   embedSearchType: string;

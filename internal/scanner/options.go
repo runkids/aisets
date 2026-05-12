@@ -1,5 +1,7 @@
 package scanner
 
+import "aisets/internal/lint"
+
 func DefaultScanOptions() ScanOptions {
 	return ScanOptions{
 		Profile: ScanProfileFast,
@@ -8,6 +10,7 @@ func DefaultScanOptions() ScanOptions {
 			NearDuplicates: false,
 			Optimization:   false,
 		},
+		LintSettings: lint.DefaultSettings(),
 	}
 }
 
@@ -19,6 +22,7 @@ func FullScanOptions() ScanOptions {
 			NearDuplicates: true,
 			Optimization:   true,
 		},
+		LintSettings: lint.DefaultSettings(),
 	}
 }
 
@@ -32,6 +36,7 @@ func NormalizeScanOptions(options ScanOptions) ScanOptions {
 		options.Profile = ScanProfileFast
 		options.Analyses = DefaultScanOptions().Analyses
 	}
+	options.LintSettings = lint.NormalizeSettings(options.LintSettings)
 	return options
 }
 

@@ -49,7 +49,7 @@ export function DashboardView({ catalog, onJump }: Props) {
   );
 
   const lintBreakdown = useMemo(() => {
-    const counts = { critical: 0, warning: 0, info: 0 };
+    const counts = { critical: 0, warning: 0, info: 0, advisory: 0 };
     for (const f of catalog.lintFindings ?? []) {
       counts[f.severity] = (counts[f.severity] ?? 0) + 1;
     }

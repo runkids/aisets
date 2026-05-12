@@ -317,3 +317,89 @@ func TestRunReturnsMultipleFindings(t *testing.T) {
 		t.Error("expected missing-dimensions finding")
 	}
 }
+
+func TestRunWithSettingsAppliesBuiltinOverrides(t *testing.T) {
+	settings := DefaultSettings()
+	for i := range settings.BuiltinRules {
+		if settings.BuiltinRules[i].ID == "missing-lazy-loading" {
+			settings.BuiltinRules[i].Severity = "critical"
+			settings.BuiltinRules[i].ThresholdKB = 100
+		}
+		if settings.BuiltinRules[i].ID == "missing-dimensions" {
+			settings.BuiltinRules[i].Enabled = false
+		}
+	}
+	findings := RunWithSettings(Context{
+		Content:    `<img src="hero.png" />`,
+		AssetBytes: 50_000,
+		AssetExt:   ".png",
+	}, settings)
+	for _, finding := range findings {
+		if finding.RuleID == "missing-lazy-loading" {
+			t.Fatal("missing-lazy-loading should respect raised threshold")
+		}
+		if finding.RuleID == "missing-dimensions" {
+			t.Fatal("missing-dimensions should respect disabled setting")
+		}
+	}
+
+	for i := range settings.BuiltinRules {
+		if settings.BuiltinRules[i].ID == "missing-lazy-loading" {
+			settings.BuiltinRules[i].ThresholdKB = 20
+		}
+	}
+	findings = RunWithSettings(Context{
+		Content:    `<img src="hero.png" />`,
+		AssetBytes: 50_000,
+		AssetExt:   ".png",
+	}, settings)
+	if len(findings) != 1 || findings[0].RuleID != "missing-lazy-loading" || findings[0].Severity != "critical" {
+		t.Fatalf("findings = %#v", findings)
+	}
+}
+
+func TestRunCustomMatchesAssetAndReferenceRules(t *testing.T) {
+	settings := Settings{CustomRules: []CustomRuleSetting{{
+		ID:         "large-icon",
+		Name:       "Large icon",
+		Enabled:    true,
+		Severity:   "warning",
+		Message:    "Icon is too large.",
+		Suggestion: "Compress or resize the icon.",
+		Groups: []CustomRuleGroup{{Clauses: []CustomRuleClause{
+			{Field: "path", Operator: "contains", Value: "icons"},
+			{Field: "bytes", Operator: "gte", Value: "1024"},
+		}}},
+	}, {
+		ID:       "hero-priority",
+		Name:     "Hero priority",
+		Enabled:  true,
+		Severity: "info",
+		Groups: []CustomRuleGroup{{Clauses: []CustomRuleClause{
+			{Field: "snippet", Operator: "contains", Value: "hero"},
+			{Field: "hasFetchPriority", Operator: "is", Value: "false"},
+		}}},
+	}}}
+	assetFindings := RunCustom(Context{
+		AssetID:    "a1",
+		AssetPath:  "src/icons/logo.png",
+		AssetBytes: 2048,
+		AssetExt:   ".png",
+	}, settings)
+	if len(assetFindings) != 1 || assetFindings[0].RuleID != "custom-large-icon" {
+		t.Fatalf("asset findings = %#v", assetFindings)
+	}
+	refFindings := RunCustom(Context{
+		AssetID:   "a1",
+		File:      "src/App.tsx",
+		Line:      4,
+		Content:   `<img class="hero" src={hero} />`,
+		AssetPath: "assets/hero.png",
+	}, settings)
+	if len(refFindings) != 1 || refFindings[0].RuleID != "custom-hero-priority" {
+		t.Fatalf("reference findings = %#v", refFindings)
+	}
+	if !CustomRuleUsesReference(settings.CustomRules[1]) {
+		t.Fatal("expected reference rule")
+	}
+}

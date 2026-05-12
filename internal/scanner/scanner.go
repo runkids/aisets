@@ -186,7 +186,7 @@ func (s *Scanner) ScanWithOptions(ctx context.Context, projects []Project, optio
 	notifyProgress(progress, ScanProgress{Phase: ScanPhaseLint})
 	lintFindings := []lint.Finding{}
 	if referencesComputed {
-		lintFindings = runLint(referenceProjects(projects), referenceItems(items))
+		lintFindings = runLint(referenceProjects(projects), referenceItems(items), options.LintSettings)
 	} else {
 		reason := AnalysisSkipByUser
 		message := ""

@@ -8,13 +8,14 @@ import (
 	"aisets/internal/lint"
 )
 
-func runLint(projects []Project, items []AssetItem) []lint.Finding {
+func runLint(projects []Project, items []AssetItem, settings lint.Settings) []lint.Finding {
 	type refWithAsset struct {
 		ref   AssetReference
 		item  AssetItem
 		pPath string
 	}
 
+	settings = lint.NormalizeSettings(settings)
 	byFile := map[string][]refWithAsset{}
 	projectPath := map[string]string{}
 	for _, p := range projects {
@@ -39,20 +40,22 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 			if r.ref.Line > 0 && r.ref.Line <= len(lines) {
 				lineContent = lines[r.ref.Line-1]
 			}
-			ctx := lint.Context{
-				File:       r.ref.File,
-				Line:       r.ref.Line,
-				Content:    lineContent,
-				Kind:       r.ref.Kind,
-				Specifier:  r.ref.Specifier,
-				AssetBytes: r.item.Bytes,
-				AssetExt:   r.item.Ext,
-				AssetID:    r.item.ID,
-			}
-			findings = append(findings, lint.Run(ctx)...)
+			ctx := lintContextForItem(r.item)
+			ctx.File = r.ref.File
+			ctx.Line = r.ref.Line
+			ctx.Content = lineContent
+			ctx.Kind = r.ref.Kind
+			ctx.Specifier = r.ref.Specifier
+			findings = append(findings, lint.RunWithSettings(ctx, settings)...)
+			findings = append(findings, lint.RunCustom(ctx, referenceOnlyCustomContext(ctx, settings))...)
 		}
 	}
 	for _, item := range items {
+		findings = append(findings, lint.RunCustom(lintContextForItem(item), assetOnlyCustomSettings(settings))...)
+		duplicateRule := lint.BuiltinRule(settings, "duplicate-asset")
+		if !duplicateRule.Enabled {
+			continue
+		}
 		if item.DuplicateGroupID == nil || item.PreferredDuplicatePath == nil {
 			continue
 		}
@@ -61,7 +64,7 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 		}
 		findings = append(findings, lint.Finding{
 			RuleID:     "duplicate-asset",
-			Severity:   "warning",
+			Severity:   duplicateRule.Severity,
 			File:       item.RepoPath,
 			Line:       0,
 			Snippet:    "",
@@ -71,6 +74,10 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 		})
 	}
 	for _, item := range items {
+		gpsRule := lint.BuiltinRule(settings, "exif-gps-privacy")
+		if !gpsRule.Enabled {
+			continue
+		}
 		if item.EXIF == nil || item.EXIF.GPSLatitude == nil {
 			continue
 		}
@@ -79,7 +86,7 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 		}
 		findings = append(findings, lint.Finding{
 			RuleID:     "exif-gps-privacy",
-			Severity:   "advisory",
+			Severity:   gpsRule.Severity,
 			File:       item.RepoPath,
 			Line:       0,
 			Snippet:    "",
@@ -89,6 +96,46 @@ func runLint(projects []Project, items []AssetItem) []lint.Finding {
 		})
 	}
 	return findings
+}
+
+func lintContextForItem(item AssetItem) lint.Context {
+	return lint.Context{
+		File:               item.RepoPath,
+		Line:               0,
+		AssetBytes:         item.Bytes,
+		AssetExt:           item.Ext,
+		AssetID:            item.ID,
+		AssetPath:          item.RepoPath,
+		ProjectName:        item.ProjectName,
+		AssetWidth:         item.Image.Width,
+		AssetHeight:        item.Image.Height,
+		AssetAnimated:      item.Image.Animated,
+		AssetAlpha:         item.Image.Alpha,
+		AssetDuplicate:     item.DuplicateGroupID != nil,
+		AssetNearDuplicate: len(item.Similar) > 0,
+		AssetOptimizable:   len(item.Optimization) > 0,
+		AssetEXIFGPS:       item.EXIF != nil && item.EXIF.GPSLatitude != nil,
+	}
+}
+
+func referenceOnlyCustomContext(ctx lint.Context, settings lint.Settings) lint.Settings {
+	settings.CustomRules = filterCustomRules(settings.CustomRules, true)
+	return settings
+}
+
+func assetOnlyCustomSettings(settings lint.Settings) lint.Settings {
+	settings.CustomRules = filterCustomRules(settings.CustomRules, false)
+	return settings
+}
+
+func filterCustomRules(rules []lint.CustomRuleSetting, referenceRules bool) []lint.CustomRuleSetting {
+	out := make([]lint.CustomRuleSetting, 0, len(rules))
+	for _, rule := range rules {
+		if lint.CustomRuleUsesReference(rule) == referenceRules {
+			out = append(out, rule)
+		}
+	}
+	return out
 }
 
 func readFileLines(path string) []string {

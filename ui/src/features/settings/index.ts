@@ -7,6 +7,7 @@ export { WorkspaceSection } from "./WorkspaceSection";
 export { ProjectsSection } from "./ProjectsSection";
 export { ThemeSection } from "./ThemeSection";
 export { ScanningSection } from "./ScanningSection";
+export { LintRulesSection } from "./LintRulesSection";
 export { CustomFiltersSection } from "./CustomFiltersSection";
 export { OptimizationSection } from "./OptimizationSection";
 export { HotkeysSection } from "./HotkeysSection";

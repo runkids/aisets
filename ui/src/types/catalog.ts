@@ -159,7 +159,7 @@ export type NearDuplicate = {
 
 export type LintFinding = {
   ruleId: string;
-  severity: "critical" | "warning" | "info";
+  severity: "critical" | "warning" | "info" | "advisory";
   file: string;
   line: number;
   snippet: string;

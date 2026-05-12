@@ -99,6 +99,7 @@ type ScanOptions struct {
 	ExcludePatternsByIntent ExcludePatternsByIntent          `json:"excludePatternsByIntent,omitempty"`
 	Analyses                AnalysisOptions                  `json:"analyses"`
 	OptimizationThresholds  imageproc.OptimizationThresholds `json:"optimizationThresholds,omitempty"`
+	LintSettings            lint.Settings                    `json:"lintSettings,omitempty"`
 }
 
 type CatalogAnalysis struct {

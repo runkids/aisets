@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"aisets/internal/imageproc"
+	"aisets/internal/lint"
 )
 
 func TestLintEXIFGPSPrivacy(t *testing.T) {
@@ -15,7 +16,7 @@ func TestLintEXIFGPSPrivacy(t *testing.T) {
 		ScanIntent: ProjectScanIntentCode,
 		EXIF:       &imageproc.EXIFData{HasEXIF: true, GPSLatitude: &lat, GPSLongitude: &lon},
 	}}
-	findings := runLint(nil, items)
+	findings := runLint(nil, items, lint.DefaultSettings())
 	found := false
 	for _, f := range findings {
 		if f.RuleID == "exif-gps-privacy" {
@@ -37,7 +38,7 @@ func TestLintEXIFGPSSkipsAssetPack(t *testing.T) {
 		ScanIntent: ProjectScanIntentAssetPack,
 		EXIF:       &imageproc.EXIFData{HasEXIF: true, GPSLatitude: &lat, GPSLongitude: &lon},
 	}}
-	findings := runLint(nil, items)
+	findings := runLint(nil, items, lint.DefaultSettings())
 	for _, f := range findings {
 		if f.RuleID == "exif-gps-privacy" {
 			t.Error("asset packs should not trigger GPS privacy lint")
@@ -53,7 +54,7 @@ func TestLintEXIFNoGPS(t *testing.T) {
 		ScanIntent: ProjectScanIntentCode,
 		EXIF:       &imageproc.EXIFData{HasEXIF: true, CameraMake: "Canon"},
 	}}
-	findings := runLint(nil, items)
+	findings := runLint(nil, items, lint.DefaultSettings())
 	for _, f := range findings {
 		if f.RuleID == "exif-gps-privacy" {
 			t.Error("should not trigger without GPS")

@@ -51,6 +51,7 @@ import { WorkspaceSection } from "./WorkspaceSection";
 import { ProjectsSection } from "./ProjectsSection";
 import { ThemeSection } from "./ThemeSection";
 import { ScanningSection } from "./ScanningSection";
+import { LintRulesSection } from "./LintRulesSection";
 import { CustomFiltersSection } from "./CustomFiltersSection";
 import { OptimizationSection } from "./OptimizationSection";
 import { AboutSection } from "./AboutSection";
@@ -642,6 +643,16 @@ export function SettingsView({
               onStopOCR={onStopOCR}
               installOCRPending={installOCRMutation.isPending}
               removeOCRPending={removeOCRMutation.isPending}
+            />
+          )}
+
+          {activeSection === "lintRules" && (
+            <LintRulesSection
+              draft={draft}
+              working={working}
+              updateError={updateMutation.error}
+              settingActions={settingActionsFor("lintRules")}
+              onUpdateDraft={updateDraft}
             />
           )}
 

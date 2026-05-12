@@ -13,6 +13,7 @@ import (
 	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
+	"aisets/internal/lint"
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
@@ -227,6 +228,7 @@ func DefaultAppSettings() AppSettings {
 		OptimizationExternalTools:  imageproc.DefaultOptimizationExternalTools(),
 		OptimizationStrategies:     imageproc.DefaultOptimizationStrategies(),
 		CustomAssetFilters:         []CustomAssetFilter{},
+		LintRules:                  lint.DefaultSettings(),
 		PreferredEditor:            "vscode",
 		LLMProvider:                "",
 		LLMEndpoint:                defaultLLMEndpoint(),
@@ -349,6 +351,7 @@ func (s *Store) Settings() (AppSettings, error) {
 	if settings.CustomAssetFilters == nil {
 		settings.CustomAssetFilters = []CustomAssetFilter{}
 	}
+	settings.LintRules = lint.NormalizeSettings(settings.LintRules)
 	if settings.OptimizationThresholds == (imageproc.OptimizationThresholds{}) {
 		settings.OptimizationThresholds = imageproc.DefaultOptimizationThresholds()
 	}
@@ -478,6 +481,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 			return AppSettings{}, err
 		}
 		settings.CustomAssetFilters = filters
+	}
+	if update.LintRules != nil {
+		settings.LintRules = lint.NormalizeSettings(*update.LintRules)
 	}
 	if update.PreferredEditor != nil {
 		settings.PreferredEditor = *update.PreferredEditor
@@ -643,6 +649,7 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	settings.OptimizationExternalTools = normalizeOptimizationExternalTools(settings.OptimizationExternalTools)
 	settings.OptimizationStrategies = imageproc.NormalizeOptimizationStrategies(settings.OptimizationStrategies)
+	settings.LintRules = lint.NormalizeSettings(settings.LintRules)
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	if len(settings.OCRLanguages) == 0 {

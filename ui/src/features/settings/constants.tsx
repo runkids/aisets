@@ -4,6 +4,7 @@ import {
   FolderKanban,
   Info,
   Keyboard,
+  ListChecks,
   Paintbrush,
   Scan,
   Settings2,
@@ -13,6 +14,11 @@ import { AiChipIcon } from "@/components/ui/AiChipIcon";
 import type {
   CustomAssetFilterField,
   CustomAssetFilterOperator,
+  CustomLintRuleField,
+  CustomLintRuleOperator,
+  CustomLintRuleSetting,
+  LintRuleSeverity,
+  LintRuleSettings,
   ExcludePatternsByIntent,
   OptimizationExternalTool,
   OptimizationStrategy,
@@ -27,6 +33,7 @@ export const sectionMeta: { id: Section; icon: ReactNode }[] = [
   { id: "workspace", icon: <Settings2 size={15} /> },
   { id: "projects", icon: <FolderKanban size={15} /> },
   { id: "scanning", icon: <Scan size={15} /> },
+  { id: "lintRules", icon: <ListChecks size={15} /> },
   { id: "optimization", icon: <Sliders size={15} /> },
   { id: "customFilters", icon: <Filter size={15} /> },
   { id: "hotkeys", icon: <Keyboard size={15} /> },
@@ -136,6 +143,53 @@ export const LLM_MAX_CONCURRENCY = 8;
 export const LLM_MIN_TIMEOUT = 30;
 export const LLM_MAX_TIMEOUT = 600;
 
+export const lintSeverities: LintRuleSeverity[] = [
+  "critical",
+  "warning",
+  "info",
+  "advisory",
+];
+
+export const defaultLintRules: LintRuleSettings = {
+  builtinRules: [
+    {
+      id: "missing-lazy-loading",
+      enabled: true,
+      severity: "warning",
+      thresholdKB: 20,
+    },
+    { id: "missing-dimensions", enabled: true, severity: "warning" },
+    {
+      id: "large-inline-import",
+      enabled: true,
+      severity: "critical",
+      thresholdKB: 10,
+    },
+    {
+      id: "no-responsive-image",
+      enabled: true,
+      severity: "info",
+      thresholdKB: 100,
+    },
+    { id: "svg-as-img", enabled: true, severity: "info" },
+    {
+      id: "img-as-background",
+      enabled: true,
+      severity: "info",
+      thresholdKB: 20,
+    },
+    {
+      id: "bg-content-image",
+      enabled: true,
+      severity: "warning",
+      thresholdKB: 80,
+    },
+    { id: "duplicate-asset", enabled: true, severity: "warning" },
+    { id: "exif-gps-privacy", enabled: true, severity: "advisory" },
+  ],
+  customRules: [],
+};
+
 export const defaultSettings: SettingsUpdate = {
   workspaceName: "Aisets",
   defaultProjectRoot: "",
@@ -217,6 +271,7 @@ export const defaultSettings: SettingsUpdate = {
   optimizationExternalTools: defaultOptimizationExternalTools,
   optimizationStrategies: defaultOptimizationStrategies,
   customAssetFilters: [],
+  lintRules: defaultLintRules,
 };
 
 export const projectScanIntentValues: ProjectScanIntent[] = [
@@ -305,6 +360,143 @@ export const customFilterOperatorsByField: Record<
   aiContainsFace: ["is"],
   aiSceneType: ["equals", "contains"],
 };
+
+export const customLintRuleFields: CustomLintRuleField[] = [
+  "path",
+  "folder",
+  "extension",
+  "project",
+  "bytes",
+  "width",
+  "height",
+  "megapixels",
+  "animated",
+  "alpha",
+  "duplicate",
+  "nearDuplicate",
+  "optimizable",
+  "exifGps",
+  "referenceKind",
+  "specifier",
+  "snippet",
+  "snippetRegex",
+  "hasLoading",
+  "hasFetchPriority",
+  "hasWidth",
+  "hasHeight",
+  "hasSrcset",
+  "altEmpty",
+];
+
+export const customLintRuleOperatorsByField: Record<
+  CustomLintRuleField,
+  CustomLintRuleOperator[]
+> = {
+  path: ["contains", "prefix", "suffix", "equals", "regex"],
+  folder: ["contains", "prefix", "suffix", "equals", "regex"],
+  extension: ["equals", "oneOf"],
+  project: ["equals", "contains", "oneOf"],
+  bytes: ["gte", "lte"],
+  width: ["gte", "lte"],
+  height: ["gte", "lte"],
+  megapixels: ["gte", "lte"],
+  animated: ["is"],
+  alpha: ["is"],
+  duplicate: ["is"],
+  nearDuplicate: ["is"],
+  optimizable: ["is"],
+  exifGps: ["is"],
+  referenceKind: ["equals", "oneOf"],
+  specifier: ["contains", "prefix", "suffix", "equals", "regex"],
+  snippet: ["contains", "regex"],
+  snippetRegex: ["regex"],
+  hasLoading: ["is"],
+  hasFetchPriority: ["is"],
+  hasWidth: ["is"],
+  hasHeight: ["is"],
+  hasSrcset: ["is"],
+  altEmpty: ["is"],
+};
+
+export const lintRulePresets: Array<
+  Omit<CustomLintRuleSetting, "id" | "enabled">
+> = [
+  {
+    name: "Hero image missing priority",
+    severity: "warning",
+    message: "Hero image is missing an explicit fetch priority.",
+    suggestion:
+      'Add fetchpriority="high" or loading="eager" for intentional above-fold hero images.',
+    groups: [
+      {
+        clauses: [
+          { field: "snippet", operator: "contains", value: "hero" },
+          { field: "hasFetchPriority", operator: "is", value: "false" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Large image without srcset",
+    severity: "warning",
+    message: "Large image is missing responsive sources.",
+    suggestion:
+      "Provide srcset for content images that need to scale across viewport sizes.",
+    groups: [
+      {
+        clauses: [
+          { field: "bytes", operator: "gte", value: "102400" },
+          { field: "hasSrcset", operator: "is", value: "false" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Icon file too large",
+    severity: "warning",
+    message: "Icon asset is larger than expected.",
+    suggestion:
+      "Resize, compress, or move the asset out of the icon path if it is not an icon.",
+    groups: [
+      {
+        clauses: [
+          { field: "folder", operator: "contains", value: "icon" },
+          { field: "bytes", operator: "gte", value: "51200" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Oversized JPEG",
+    severity: "warning",
+    message: "JPEG asset exceeds the team size budget.",
+    suggestion: "Compress the JPEG or convert it to AVIF/WebP when supported.",
+    groups: [
+      {
+        clauses: [
+          { field: "extension", operator: "oneOf", value: ".jpg,.jpeg" },
+          { field: "bytes", operator: "gte", value: "307200" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Animated GIF too large",
+    severity: "warning",
+    message: "Animated GIF exceeds the team size budget.",
+    suggestion:
+      "Recompress the GIF or replace it with a video/WebP animation where appropriate.",
+    groups: [
+      {
+        clauses: [
+          { field: "extension", operator: "equals", value: ".gif" },
+          { field: "animated", operator: "is", value: "true" },
+          { field: "bytes", operator: "gte", value: "1048576" },
+        ],
+      },
+    ],
+  },
+];
 
 export const editorOptions = [
   { value: "vscode", label: "VS Code" },

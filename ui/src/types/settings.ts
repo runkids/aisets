@@ -26,6 +26,7 @@ export type AppSettings = {
   optimizationExternalTools: OptimizationExternalTool[];
   optimizationStrategies: OptimizationStrategy[];
   customAssetFilters: CustomAssetFilter[];
+  lintRules: LintRuleSettings;
   preferredEditor: string;
   llmEnabled: boolean;
   llmProvider: string;
@@ -162,6 +163,77 @@ export type OptimizationStrategyAction = {
   avifSpeed?: number;
   resizeMaxDimensionPx?: number;
   preserveAnimation?: boolean;
+};
+
+export type LintRuleSeverity = "critical" | "warning" | "info" | "advisory";
+
+export type BuiltinLintRuleSetting = {
+  id: string;
+  enabled: boolean;
+  severity: LintRuleSeverity;
+  thresholdKB?: number;
+};
+
+export type CustomLintRuleField =
+  | "path"
+  | "folder"
+  | "extension"
+  | "project"
+  | "bytes"
+  | "width"
+  | "height"
+  | "megapixels"
+  | "animated"
+  | "alpha"
+  | "duplicate"
+  | "nearDuplicate"
+  | "optimizable"
+  | "exifGps"
+  | "referenceKind"
+  | "specifier"
+  | "snippet"
+  | "snippetRegex"
+  | "hasLoading"
+  | "hasFetchPriority"
+  | "hasWidth"
+  | "hasHeight"
+  | "hasSrcset"
+  | "altEmpty";
+
+export type CustomLintRuleOperator =
+  | "contains"
+  | "regex"
+  | "prefix"
+  | "suffix"
+  | "equals"
+  | "oneOf"
+  | "gte"
+  | "lte"
+  | "is";
+
+export type CustomLintRuleClause = {
+  field: CustomLintRuleField;
+  operator: CustomLintRuleOperator;
+  value: string;
+};
+
+export type CustomLintRuleGroup = {
+  clauses: CustomLintRuleClause[];
+};
+
+export type CustomLintRuleSetting = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  severity: LintRuleSeverity;
+  message: string;
+  suggestion: string;
+  groups: CustomLintRuleGroup[];
+};
+
+export type LintRuleSettings = {
+  builtinRules: BuiltinLintRuleSetting[];
+  customRules: CustomLintRuleSetting[];
 };
 
 export type SettingsUpdate = Partial<AppSettings>;

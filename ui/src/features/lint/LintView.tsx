@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
-import { useCatalogLintInfiniteQuery } from "@/queries";
+import { useCatalogLintInfiniteQuery, useSettingsQuery } from "@/queries";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import type { LintFinding } from "@/types";
@@ -54,21 +54,25 @@ const SEVERITY_ICON: Record<string, React.ReactNode> = {
   critical: <XCircle size={14} />,
   warning: <AlertTriangle size={14} />,
   info: <Info size={14} />,
+  advisory: <Info size={14} />,
 };
 const SEVERITY_COLOR: Record<string, string> = {
   critical: "text-g-red",
   warning: "text-g-amber",
   info: "text-g-blue",
+  advisory: "text-g-ink-4",
 };
-const SEVERITY_TONE: Record<string, "red" | "amber" | "blue"> = {
+const SEVERITY_TONE: Record<string, "red" | "amber" | "blue" | "neutral"> = {
   critical: "red",
   warning: "amber",
   info: "blue",
+  advisory: "neutral",
 };
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
   warning: 1,
   info: 2,
+  advisory: 3,
 };
 
 type GroupTab = "file" | "rule";
@@ -116,6 +120,7 @@ export function LintView({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const settingsQuery = useSettingsQuery();
 
   const lintQuery = useCatalogLintInfiniteQuery(
     scanId,
@@ -166,7 +171,7 @@ export function LintView({
 
   const segments: StackedBarSegment[] = useMemo(
     () =>
-      (["critical", "warning", "info"] as const)
+      (["critical", "warning", "info", "advisory"] as const)
         .map((sev) => ({
           value: facetSevMap[sev] ?? 0,
           tone: SEVERITY_TONE[sev],
@@ -174,6 +179,23 @@ export function LintView({
         }))
         .filter((s) => s.value > 0),
     [facetSevMap, t],
+  );
+
+  const customRuleNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const rule of settingsQuery.data?.settings.lintRules.customRules ??
+      []) {
+      map.set(`custom-${rule.id}`, rule.name);
+    }
+    return map;
+  }, [settingsQuery.data?.settings.lintRules.customRules]);
+
+  const ruleLabel = useCallback(
+    (ruleId: string) =>
+      t(`lint.rule.${ruleId}.name`, {
+        defaultValue: customRuleNames.get(ruleId) ?? ruleId,
+      }),
+    [customRuleNames, t],
   );
 
   const toggleCollapse = useCallback((key: string) => {
@@ -368,7 +390,7 @@ export function LintView({
             <RailItem
               key={rf.id}
               active={railFilter.rule === rf.id}
-              label={t(`lint.rule.${rf.id}.name`, { defaultValue: rf.id })}
+              label={ruleLabel(rf.id)}
               count={rf.count}
               onClick={() =>
                 setRailFilter((f) => ({
@@ -388,7 +410,7 @@ export function LintView({
       >
         <div className="mx-auto max-w-[1600px] px-0 pb-6 pt-0 max-[768px]:px-0 max-[768px]:py-0">
           {/* ── Stats dashboard ── */}
-          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatCard
               label={t("lint.statTotal")}
               value={totalFromFacets || firstPage?.total || 0}
@@ -409,6 +431,11 @@ export function LintView({
             <StatCard
               label={t("severity.info")}
               value={facetSevMap["info"] ?? 0}
+              icon={<Info size={14} />}
+            />
+            <StatCard
+              label={t("severity.advisory")}
+              value={facetSevMap["advisory"] ?? 0}
               icon={<Info size={14} />}
             />
           </div>
@@ -480,6 +507,16 @@ export function LintView({
                     badge: (
                       <span className="font-[400] text-g-ink-4">
                         {facetSevMap["info"] ?? 0}
+                      </span>
+                    ),
+                  },
+                  {
+                    value: "advisory",
+                    label: t("severity.advisory"),
+                    icon: <Info size={13} className="text-g-ink-4" />,
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {facetSevMap["advisory"] ?? 0}
                       </span>
                     ),
                   },
@@ -656,9 +693,7 @@ export function LintView({
                           {SEVERITY_ICON[row.severity]}
                         </span>
                         <span className="text-g-caption">
-                          {t(`lint.rule.${row.ruleId}.name`, {
-                            defaultValue: row.ruleId,
-                          })}
+                          {ruleLabel(row.ruleId)}
                         </span>
                         <Badge
                           tone="line"
@@ -722,9 +757,7 @@ export function LintView({
                           {groupTab === "file" && (
                             <>
                               <Badge tone="line" className="text-[10px]">
-                                {t(`lint.rule.${finding.ruleId}.name`, {
-                                  defaultValue: finding.ruleId,
-                                })}
+                                {ruleLabel(finding.ruleId)}
                               </Badge>
                               <span className="font-g-mono text-g-chip text-g-ink-3">
                                 L:{finding.line}

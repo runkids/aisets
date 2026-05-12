@@ -6,17 +6,28 @@ import type {
   CustomAssetFilterField,
   CustomAssetFilterGroup,
   CustomAssetFilterOperator,
+  CustomLintRuleClause,
+  CustomLintRuleField,
+  CustomLintRuleGroup,
+  CustomLintRuleOperator,
+  CustomLintRuleSetting,
+  LintRuleSettings,
+  LintRuleSeverity,
   OCRRunCounts,
   SettingsInfo,
   SettingsUpdate,
 } from "@/types";
 import {
   customFilterOperatorsByField,
+  customLintRuleFields,
+  customLintRuleOperatorsByField,
   defaultOCRLanguages,
   defaultOptimizationExternalTools,
   defaultOptimizationStrategies,
   defaultSettings,
+  defaultLintRules,
   emptyExcludePatternsByIntent,
+  lintSeverities,
   projectScanIntentValues,
   sectionMeta,
 } from "./constants";
@@ -84,6 +95,212 @@ export function createCustomFilter(name: string): CustomAssetFilter {
     enabled: false,
     groups: [defaultGroup()],
   };
+}
+
+export function defaultLintRuleClauseValue(
+  field: CustomLintRuleField,
+  operator: CustomLintRuleOperator,
+) {
+  if (field === "path" && operator === "regex") return ".*";
+  if (field === "path") return "assets";
+  if (field === "folder") return "icons";
+  if (field === "extension" && operator === "oneOf") return ".png,.jpg,.webp";
+  if (field === "extension") return ".png";
+  if (field === "project") return "Project";
+  if (field === "bytes") return "102400";
+  if (field === "width" || field === "height") return "1024";
+  if (field === "megapixels") return "1";
+  if (field === "referenceKind") return "string";
+  if (field === "specifier") return "?raw";
+  if (field === "snippetRegex") return "hero|banner";
+  if (field === "snippet") return "hero";
+  return "true";
+}
+
+export function defaultLintRuleClause(
+  field: CustomLintRuleField = "path",
+): CustomLintRuleClause {
+  const operator = customLintRuleOperatorsByField[field][0];
+  return {
+    field,
+    operator,
+    value: defaultLintRuleClauseValue(field, operator),
+  };
+}
+
+export function defaultLintRuleGroup(): CustomLintRuleGroup {
+  return { clauses: [defaultLintRuleClause()] };
+}
+
+export function createCustomLintRule(name: string): CustomLintRuleSetting {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Date.now().toString(36);
+  return {
+    id: `custom-${random}`,
+    name,
+    enabled: false,
+    severity: "warning",
+    message: "Custom lint rule matched this image.",
+    suggestion: "Review this image against your team asset rules.",
+    groups: [defaultLintRuleGroup()],
+  };
+}
+
+export function createCustomLintRuleFromPreset(
+  preset: Omit<CustomLintRuleSetting, "id" | "enabled">,
+): CustomLintRuleSetting {
+  return {
+    ...createCustomLintRule(preset.name),
+    ...preset,
+    enabled: true,
+  };
+}
+
+export function lintRulesExportPayload(lintRules: LintRuleSettings) {
+  return {
+    kind: "aisets-lint-rules",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    lintRules,
+  };
+}
+
+export function parseLintRulesImportPayload(value: unknown): LintRuleSettings {
+  const candidate =
+    isRecord(value) && isRecord(value.lintRules) ? value.lintRules : value;
+  if (!isRecord(candidate)) {
+    throw new Error("Invalid lint rules payload");
+  }
+  const importedBuiltinRules = Array.isArray(candidate.builtinRules)
+    ? candidate.builtinRules
+        .map((rule) => parseBuiltinLintRule(rule))
+        .filter((rule): rule is NonNullable<typeof rule> => Boolean(rule))
+    : [];
+  const builtinRulesById = new Map(
+    importedBuiltinRules.map((rule) => [rule.id, rule]),
+  );
+  const builtinRules = defaultLintRules.builtinRules.map((rule) => ({
+    ...rule,
+    ...builtinRulesById.get(rule.id),
+    thresholdKB:
+      rule.thresholdKB === undefined
+        ? undefined
+        : (builtinRulesById.get(rule.id)?.thresholdKB ?? rule.thresholdKB),
+  }));
+  const customRules = Array.isArray(candidate.customRules)
+    ? candidate.customRules
+        .map((rule) => parseCustomLintRule(rule))
+        .filter((rule): rule is CustomLintRuleSetting => Boolean(rule))
+    : [];
+  return {
+    builtinRules,
+    customRules,
+  };
+}
+
+function parseBuiltinLintRule(value: unknown) {
+  if (!isRecord(value) || typeof value.id !== "string") return null;
+  const defaultRule = defaultLintRules.builtinRules.find(
+    (rule) => rule.id === value.id,
+  );
+  if (!defaultRule) return null;
+  const thresholdKB = numberValue(value.thresholdKB);
+  return {
+    id: value.id,
+    enabled: booleanValue(value.enabled, defaultRule.enabled),
+    severity: lintSeverityValue(value.severity, defaultRule.severity),
+    ...(defaultRule.thresholdKB === undefined || thresholdKB === undefined
+      ? {}
+      : { thresholdKB: Math.max(1, Math.round(thresholdKB)) }),
+  };
+}
+
+function parseCustomLintRule(value: unknown): CustomLintRuleSetting | null {
+  if (!isRecord(value)) return null;
+  const name = stringValue(value.name, "");
+  if (!name.trim()) return null;
+  const id = stringValue(value.id, "");
+  const groups = Array.isArray(value.groups)
+    ? value.groups
+        .map((group) => parseCustomLintRuleGroup(group))
+        .filter((group): group is CustomLintRuleGroup => Boolean(group))
+    : [];
+  const base = createCustomLintRule(name);
+  return {
+    ...base,
+    id: id.trim() || base.id,
+    name,
+    enabled: booleanValue(value.enabled, true),
+    severity: lintSeverityValue(value.severity, "warning"),
+    message: stringValue(value.message, "Custom lint rule matched this image."),
+    suggestion: stringValue(
+      value.suggestion,
+      "Review this image against your team asset rules.",
+    ),
+    groups: groups.length > 0 ? groups : [defaultLintRuleGroup()],
+  };
+}
+
+function parseCustomLintRuleGroup(value: unknown): CustomLintRuleGroup | null {
+  if (!isRecord(value) || !Array.isArray(value.clauses)) return null;
+  const clauses = value.clauses
+    .map((clause) => parseCustomLintRuleClause(clause))
+    .filter((clause): clause is CustomLintRuleClause => Boolean(clause));
+  return clauses.length > 0 ? { clauses } : null;
+}
+
+function parseCustomLintRuleClause(
+  value: unknown,
+): CustomLintRuleClause | null {
+  if (!isRecord(value) || typeof value.field !== "string") return null;
+  if (!customLintRuleFields.includes(value.field as CustomLintRuleField)) {
+    return null;
+  }
+  const field = value.field as CustomLintRuleField;
+  const allowedOperators = customLintRuleOperatorsByField[field];
+  const operator = allowedOperators.includes(
+    value.operator as CustomLintRuleOperator,
+  )
+    ? (value.operator as CustomLintRuleOperator)
+    : allowedOperators[0];
+  return {
+    field,
+    operator,
+    value: stringValue(
+      value.value,
+      defaultLintRuleClauseValue(field, operator),
+    ),
+  };
+}
+
+function lintSeverityValue(
+  value: unknown,
+  fallback: LintRuleSeverity,
+): LintRuleSeverity {
+  return lintSeverities.includes(value as LintRuleSeverity)
+    ? (value as LintRuleSeverity)
+    : fallback;
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export function operatorDescription(
@@ -197,6 +414,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     optimizationStrategies:
       settings?.optimizationStrategies ?? defaultOptimizationStrategies,
     customAssetFilters: settings?.customAssetFilters ?? [],
+    lintRules: settings?.lintRules ?? defaultLintRules,
     embedSearchThreshold: settings?.embedSearchThreshold ?? 0.5,
     embedSearchLimit: settings?.embedSearchLimit ?? 20,
     embedSearchType: settings?.embedSearchType ?? "hybrid",
@@ -265,6 +483,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     optimizationExternalTools: draft.optimizationExternalTools,
     optimizationStrategies: draft.optimizationStrategies,
     customAssetFilters: draft.customAssetFilters,
+    lintRules: draft.lintRules,
     embedSearchThreshold: draft.embedSearchThreshold,
     embedSearchLimit: draft.embedSearchLimit,
     embedSearchType: draft.embedSearchType,
@@ -333,6 +552,11 @@ export function resetSectionDraft(
       return {
         ...current,
         customAssetFilters: defaults.customAssetFilters,
+      };
+    case "lintRules":
+      return {
+        ...current,
+        lintRules: defaults.lintRules,
       };
     case "optimization":
       return {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"aisets/internal/imageproc"
+	"aisets/internal/lint"
 	"aisets/internal/scanner"
 )
 
@@ -46,6 +47,7 @@ type AppSettings struct {
 	OptimizationExternalTools  []imageproc.OptimizationExternalTool `json:"optimizationExternalTools"`
 	OptimizationStrategies     []imageproc.OptimizationStrategy     `json:"optimizationStrategies"`
 	CustomAssetFilters         []CustomAssetFilter                  `json:"customAssetFilters"`
+	LintRules                  lint.Settings                        `json:"lintRules"`
 	PreferredEditor            string                               `json:"preferredEditor"`
 	LLMEnabled                 bool                                 `json:"llmEnabled"`
 	LLMProvider                string                               `json:"llmProvider"`
@@ -102,6 +104,7 @@ type SettingsUpdate struct {
 	OptimizationExternalTools  []imageproc.OptimizationExternalTool `json:"optimizationExternalTools"`
 	OptimizationStrategies     []imageproc.OptimizationStrategy     `json:"optimizationStrategies"`
 	CustomAssetFilters         []CustomAssetFilter                  `json:"customAssetFilters"`
+	LintRules                  *lint.Settings                       `json:"lintRules"`
 	PreferredEditor            *string                              `json:"preferredEditor"`
 	LLMEnabled                 *bool                                `json:"llmEnabled"`
 	LLMProvider                *string                              `json:"llmProvider"`

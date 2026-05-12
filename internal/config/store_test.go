@@ -1565,6 +1565,22 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	tools[0].Enabled = true
 	strategies := imageproc.DefaultOptimizationStrategies()
 	strategies[0].Name = "Custom SVG"
+	lintRules := lint.DefaultSettings()
+	lintRules.BuiltinRules[0].Enabled = false
+	lintRules.BuiltinRules[2].Severity = "warning"
+	lintRules.BuiltinRules[2].ThresholdKB = 24
+	lintRules.CustomRules = []lint.CustomRuleSetting{{
+		ID:         "large-icons",
+		Name:       "Large icons",
+		Enabled:    true,
+		Severity:   "warning",
+		Message:    "Icon is too large.",
+		Suggestion: "Resize the icon.",
+		Groups: []lint.CustomRuleGroup{{Clauses: []lint.CustomRuleClause{
+			{Field: "folder", Operator: "contains", Value: "icons"},
+			{Field: "bytes", Operator: "gte", Value: "51200"},
+		}}},
+	}}
 	settings, err := store.UpdateSettings(SettingsUpdate{
 		WorkspaceName:              &workspace,
 		DefaultProjectRoot:         &rootPath,
@@ -1580,6 +1596,7 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 		OptimizationAutoApply:      &autoApply,
 		OptimizationExternalTools:  tools,
 		OptimizationStrategies:     strategies,
+		LintRules:                  &lintRules,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1592,6 +1609,9 @@ func TestSettingsValidationAndAllFields(t *testing.T) {
 	}
 	if !settings.OptimizationExternalTools[0].Enabled || settings.OptimizationStrategies[0].Name != "Custom SVG" {
 		t.Fatalf("optimization settings = %#v %#v", settings.OptimizationExternalTools, settings.OptimizationStrategies)
+	}
+	if settings.LintRules.BuiltinRules[0].Enabled || settings.LintRules.BuiltinRules[2].Severity != "warning" || settings.LintRules.BuiltinRules[2].ThresholdKB != 24 || len(settings.LintRules.CustomRules) != 1 {
+		t.Fatalf("lint settings = %#v", settings.LintRules)
 	}
 }
 

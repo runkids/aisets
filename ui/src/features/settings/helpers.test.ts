@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   draftFromSettings,
+  lintRulesExportPayload,
+  parseLintRulesImportPayload,
   resetSectionDraft,
   updateFromDraft,
 } from "./helpers";
+import { defaultLintRules } from "./constants";
+import type { LintRuleSettings } from "@/types";
 
 describe("settings draft helpers", () => {
   it("round-trips global and project-type exclude patterns", () => {
@@ -46,6 +50,7 @@ describe("settings draft helpers", () => {
       optimizationExternalTools: [],
       optimizationStrategies: [],
       customAssetFilters: [],
+      lintRules: defaultLintRules,
       preferredEditor: "vscode",
       llmEnabled: false,
       llmProvider: "",
@@ -178,6 +183,7 @@ describe("settings draft helpers", () => {
           ],
         },
       ],
+      lintRules: defaultLintRules,
       preferredEditor: "vscode",
       llmEnabled: true,
       llmProvider: "ollama",
@@ -280,5 +286,86 @@ describe("settings draft helpers", () => {
       optimization.optimizationExternalTools.every((tool) => !tool.enabled),
     ).toBe(true);
     expect(optimization.optimizationStrategies.length).toBeGreaterThan(0);
+  });
+
+  it("exports and imports lint rules as a scoped JSON payload", () => {
+    const lintRules: LintRuleSettings = {
+      builtinRules: defaultLintRules.builtinRules.map((rule) =>
+        rule.id === "missing-lazy-loading"
+          ? { ...rule, enabled: false, severity: "info", thresholdKB: 33 }
+          : rule,
+      ),
+      customRules: [
+        {
+          id: "team-hero",
+          name: "Team hero rule",
+          enabled: true,
+          severity: "warning" as const,
+          message: "Hero asset needs review.",
+          suggestion: "Check priority and responsive sources.",
+          groups: [
+            {
+              clauses: [
+                { field: "snippet", operator: "contains", value: "hero" },
+                {
+                  field: "hasFetchPriority",
+                  operator: "is",
+                  value: "false",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const payload = lintRulesExportPayload(lintRules);
+    const imported = parseLintRulesImportPayload(payload);
+
+    expect(payload.kind).toBe("aisets-lint-rules");
+    expect(imported).toEqual(lintRules);
+  });
+
+  it("accepts raw lint rule objects and drops invalid imported clauses", () => {
+    const imported = parseLintRulesImportPayload({
+      builtinRules: [
+        {
+          id: "missing-lazy-loading",
+          enabled: true,
+          severity: "unknown",
+          thresholdKB: "12",
+        },
+      ],
+      customRules: [
+        {
+          id: "icons",
+          name: "Icons",
+          enabled: true,
+          severity: "advisory",
+          message: "Icon matched.",
+          suggestion: "Compress it.",
+          groups: [
+            {
+              clauses: [
+                { field: "unknown", operator: "equals", value: "x" },
+                { field: "folder", operator: "contains", value: "icons" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(imported.builtinRules[0]).toEqual({
+      id: "missing-lazy-loading",
+      enabled: true,
+      severity: defaultLintRules.builtinRules[0].severity,
+      thresholdKB: 12,
+    });
+    expect(imported.customRules[0].groups).toEqual([
+      {
+        clauses: [{ field: "folder", operator: "contains", value: "icons" }],
+      },
+    ]);
   });
 });
