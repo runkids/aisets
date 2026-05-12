@@ -889,6 +889,8 @@
     "sortSize": "大小",
     "sortRecent": "最近",
     "bulkSelect": "批次選取",
+    "expandDisplayControls": "展開顯示控制",
+    "collapseDisplayControls": "收合顯示控制",
     "clearSearch": "清除搜尋"
   },
   "browse": {
