@@ -26,14 +26,14 @@ import {
   useVersionQuery,
   useDirectoryListingQuery,
 } from "../../queries";
-import type { ExportData, ProjectScanIntent } from "../../types";
-import { Rail, RailItem, RailSection } from "../ui";
-import { useToast } from "../shared/ToastProvider";
 import type {
-  SettingsViewProps,
-  Section,
-  SettingsDraft,
-} from "./types";
+  ExportData,
+  ProjectScanIntent,
+  UpdateAppResult,
+} from "../../types";
+import { Button, CopyButton, Modal, Rail, RailItem, RailSection } from "../ui";
+import { useToast } from "../shared/ToastProvider";
+import type { SettingsViewProps, Section, SettingsDraft } from "./types";
 import { sectionMeta, defaultSettings } from "./constants";
 import {
   draftFromSettings,
@@ -107,6 +107,7 @@ export function SettingsView({
   const [draftOverride, setDraftOverride] = useState<SettingsDraft | null>(
     null,
   );
+  const [updatedApp, setUpdatedApp] = useState<UpdateAppResult | null>(null);
   const ocrWorking = isOCRActivityBusy(ocrActivity);
 
   const settingsQuery = useSettingsQuery();
@@ -403,6 +404,7 @@ export function SettingsView({
         return;
       }
       if (result.update.updated) {
+        setUpdatedApp(result.update);
         toast.success(
           t("settings.updateSuccess", {
             version: result.update.latestVersion ?? "",
@@ -724,8 +726,84 @@ export function SettingsView({
           )}
         </div>
       </div>
+
+      {updatedApp && (
+        <UpdateRestartModal
+          update={updatedApp}
+          onClose={() => setUpdatedApp(null)}
+        />
+      )}
     </>
   );
+}
+
+function UpdateRestartModal({
+  update,
+  onClose,
+}: {
+  update: UpdateAppResult;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const version = update.latestVersion ?? update.currentVersion;
+  const port = currentUIPort();
+  const backgroundCommand = `aisets ui stop --port ${port}\naisets ui --port ${port} --clear-cache --no-open`;
+  const foregroundCommand = `Ctrl+C\naisets ui once --port ${port} --clear-cache --no-open`;
+
+  return (
+    <Modal
+      title={t("settings.updateRestartTitle")}
+      description={t("settings.updateRestartDesc")}
+      onClose={onClose}
+      size="md"
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          {t("common.close")}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-4 text-g-body text-g-ink-2">
+        <p>{t("settings.updateRestartBody", { version })}</p>
+        <RestartCommandBlock
+          title={t("settings.updateRestartBackgroundTitle")}
+          command={backgroundCommand}
+        />
+        <RestartCommandBlock
+          title={t("settings.updateRestartForegroundTitle")}
+          command={foregroundCommand}
+        />
+        <p className="text-g-caption text-g-ink-4">
+          {t("settings.updateRestartKeepFlags")}
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+function RestartCommandBlock({
+  title,
+  command,
+}: {
+  title: string;
+  command: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <section className="rounded-g-md border border-g-line bg-g-surface-2">
+      <div className="flex min-h-9 items-center justify-between gap-3 border-b border-g-line px-3">
+        <h3 className="text-g-caption font-[590] text-g-ink">{title}</h3>
+        <CopyButton value={command} label={t("common.copy")} />
+      </div>
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-2.5 font-g-mono text-g-caption leading-[1.55] tracking-g-mono text-g-ink">
+        {command}
+      </pre>
+    </section>
+  );
+}
+
+function currentUIPort() {
+  return window.location.port || "19520";
 }
 
 function sectionFromParam(value: string | null): Section | null {
