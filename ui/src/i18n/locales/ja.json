@@ -853,6 +853,8 @@
     "semanticNoResults": "一致する AI 結果はありません",
     "semanticEmpty": "AI 検索を入力",
     "semanticEmptyDesc": "自然言語で視覚的な意味、OCR テキスト、AI タグからアセットを探します",
+    "semanticSearching": "意味で検索中...",
+    "semanticRanking": "類似度で並べ替え",
     "semanticWaiting": "Enter キーで AI 検索を実行します",
     "semanticMeta": "AI 検索: {{count}} 件、{{duration}} ms",
     "semanticPressEnter": "セマンティック結果には現在のプロジェクト、フォルダー、状態、AI フィルターが適用されます",

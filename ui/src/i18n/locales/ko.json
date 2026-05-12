@@ -871,6 +871,8 @@
     "semanticNoResults": "일치하는 AI 결과가 없습니다",
     "semanticEmpty": "AI 검색 입력",
     "semanticEmptyDesc": "자연어로 시각적 의미, OCR 텍스트, AI 태그를 기준으로 에셋을 찾습니다",
+    "semanticSearching": "의미로 검색 중...",
+    "semanticRanking": "유사도 정렬",
     "semanticWaiting": "Enter 키를 눌러 AI 검색을 실행하세요",
     "semanticMeta": "AI 검색: {{count}}개 결과, {{duration}} ms",
     "semanticPressEnter": "시맨틱 결과에는 현재 프로젝트, 폴더, 상태, AI 필터가 적용됩니다",

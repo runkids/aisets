@@ -1676,6 +1676,8 @@
     "semanticNoResults": "No AI matches found",
     "semanticEmpty": "Enter an AI search",
     "semanticEmptyDesc": "Use natural language to find assets by visual meaning, OCR text, and AI tags.",
+    "semanticSearching": "Searching by meaning...",
+    "semanticRanking": "Semantic ranking",
     "semanticWaiting": "Press Enter to run AI search.",
     "semanticMeta": "AI search: {{count}} matches in {{duration}} ms",
     "semanticPressEnter": "Semantic results use the current project, folder, status, and AI filters.",

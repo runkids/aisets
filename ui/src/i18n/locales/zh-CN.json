@@ -853,6 +853,8 @@
     "semanticNoResults": "未找到匹配的 AI 结果",
     "semanticEmpty": "输入 AI 搜索",
     "semanticEmptyDesc": "用自然语言按视觉含义、OCR 文字和 AI 标签查找素材",
+    "semanticSearching": "语义搜索中...",
+    "semanticRanking": "相似度排序",
     "semanticWaiting": "按 Enter 运行 AI 搜索",
     "semanticMeta": "AI 搜索：{{count}} 个结果，用时 {{duration}} ms",
     "semanticPressEnter": "语义结果会套用当前项目、文件夹、状态与 AI 筛选",

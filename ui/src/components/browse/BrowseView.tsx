@@ -23,9 +23,9 @@ import {
   LoaderCircle,
   PenLine,
   ScanText,
-  Sparkles,
   Tags,
   Trash2,
+  WandSparkles,
 } from "lucide-react";
 import { matchesCustomAssetFilter } from "../../customAssetFilters";
 import { errorMessage } from "../../i18n";
@@ -41,6 +41,7 @@ import {
 } from "../../queries";
 import {
   batchExport,
+  embeddingStats,
   semanticSearch,
   type BatchPreviewResponse,
   type CatalogFoldersParams,
@@ -71,6 +72,10 @@ import {
 import { useImageBackgroundControls } from "../../imageBackground";
 import { FilterRail } from "../shared/FilterRail";
 import { useToast } from "../shared/ToastProvider";
+import {
+  SemanticSearchLoadingPanel,
+  type SemanticLoadingStyle,
+} from "../shared/CommandPalette";
 import { EmptyState, IconButton, Tooltip } from "../ui";
 
 type StatusFilter =
@@ -169,6 +174,7 @@ type Props = {
   ocrEnabled: boolean;
   ocrFuzzySearch: boolean;
   onAutoScrollDone: () => void;
+  onClearFocusAsset: () => void;
   onClearSearchRoute: () => void;
   onOpenAsset: (id: string) => void;
   aiEnabled?: boolean;
@@ -261,11 +267,7 @@ export function normalizeBrowseStoredState(
     filters,
     view: optionOrDefault(state.view, viewModes, defaults.view),
     gridSize: optionOrDefault(state.gridSize, gridSizes, defaults.gridSize),
-    searchMode: optionOrDefault(
-      state.searchMode,
-      ["catalog", "semantic"],
-      defaults.searchMode,
-    ),
+    searchMode: defaults.searchMode,
     searchQuery,
     statusFilter: optionOrDefault(
       state.statusFilter,
@@ -677,6 +679,7 @@ export function BrowseView({
   ocrEnabled,
   ocrFuzzySearch,
   onAutoScrollDone,
+  onClearFocusAsset,
   onClearSearchRoute,
   onOpenAsset,
   aiEnabled,
@@ -862,6 +865,32 @@ export function BrowseView({
     settingsQuery.data?.settings.embedSearchType === "hybrid"
       ? settingsQuery.data.settings.embedSearchType
       : "hybrid";
+  const embedStatsQuery = useQuery({
+    queryKey: ["embed-stats"],
+    queryFn: embeddingStats,
+    enabled: searchMode === "semantic",
+    staleTime: 10_000,
+  });
+  const semanticLoadingStyle = useMemo<SemanticLoadingStyle>(() => {
+    const styles = ["beam", "constellation", "swarm"] as const;
+    const seed = committedSemanticQuery
+      .split("")
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return styles[seed % styles.length];
+  }, [committedSemanticQuery]);
+  const semanticModelName =
+    embedStatsQuery.data?.modelName ||
+    settingsQuery.data?.settings.llmEmbedModel ||
+    t("commandPalette.embedModelUnknown");
+  const semanticDimensions = embedStatsQuery.data?.dimensions ?? 0;
+  const semanticDimensionsLabel =
+    semanticDimensions > 0
+      ? `${semanticDimensions}d`
+      : t("commandPalette.embeddingDimensionsUnknown");
+  const semanticDimensionToken =
+    semanticDimensions > 0
+      ? `${semanticDimensions}-D`
+      : t("commandPalette.embeddingSpace");
   const semanticQuery = useQuery({
     queryKey: [
       "browse-semantic-search",
@@ -907,8 +936,35 @@ export function BrowseView({
   const facets = catalogItemsQuery.data?.pages[0]?.facets;
 
   function clearFocusedAssetQuery() {
-    if (focusAssetId) setFocusAssetId("");
+    if (!focusAssetId) return;
+    setFocusAssetId("");
+    onClearFocusAsset();
   }
+
+  useEffect(() => {
+    if (!focusAssetId || activeAssetId) return undefined;
+
+    function handleFocusEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [role='dialog']"))
+      ) {
+        return;
+      }
+
+      setFocusAssetId("");
+      onClearFocusAsset();
+    }
+
+    document.addEventListener("keydown", handleFocusEscape, { capture: true });
+    return () =>
+      document.removeEventListener("keydown", handleFocusEscape, {
+        capture: true,
+      });
+  }, [activeAssetId, focusAssetId, onClearFocusAsset]);
 
   function handleFiltersChange(next: BrowseFilters) {
     clearFocusedAssetQuery();
@@ -967,7 +1023,7 @@ export function BrowseView({
       },
       view,
       gridSize,
-      searchMode,
+      searchMode: "catalog",
       searchQuery: focusAssetId ? "" : searchQuery,
       statusFilter,
       sortMode,
@@ -976,7 +1032,6 @@ export function BrowseView({
     filters,
     gridSize,
     projectFilterName,
-    searchMode,
     searchQuery,
     focusAssetId,
     sortMode,
@@ -1242,6 +1297,12 @@ export function BrowseView({
     searchMode === "semantic"
       ? semanticQuery.isLoading || (pending && items.length === 0)
       : catalogItemsQuery.isLoading || (pending && items.length === 0);
+  const showSemanticLoading =
+    searchMode === "semantic" &&
+    semanticQuery.isFetching &&
+    committedSemanticQuery.trim() !== "";
+  const highlightedAssetId = activeAssetId || focusAssetId;
+
   const emptyCopy =
     searchMode === "semantic"
       ? {
@@ -1307,24 +1368,6 @@ export function BrowseView({
             onBulkToggle={toggleBulkMode}
             onBulkCancel={cancelBulk}
           />
-
-          {searchMode === "semantic" && (
-            <div className="mb-2 flex min-h-8 flex-wrap items-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 px-2 py-1.5 font-g text-g-ui text-g-ink-3 shadow-g-inset">
-              <Sparkles size={13} className="text-g-purple" />
-              <span className="font-[590] text-g-ink">
-                {committedSemanticQuery || t("browse.semanticWaiting")}
-              </span>
-              <span className="text-g-ink-4">
-                {semanticQuery.data
-                  ? t("browse.semanticMeta", {
-                      count: semanticQuery.data.results.length,
-                      total: semanticQuery.data.totalEmbeddings,
-                      ms: semanticQuery.data.queryDurationMs,
-                    })
-                  : t("browse.semanticPressEnter")}
-              </span>
-            </div>
-          )}
 
           {bulkMode && (
             <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 overflow-x-auto rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
@@ -1406,7 +1449,31 @@ export function BrowseView({
             </div>
           )}
 
-          {showInitialLoading ? (
+          {showSemanticLoading ? (
+            <div className="mt-1 flex min-h-0 flex-1">
+              <SemanticSearchLoadingPanel
+                query={committedSemanticQuery}
+                modelName={semanticModelName}
+                dimensionsLabel={semanticDimensionsLabel}
+                style={semanticLoadingStyle}
+                dimensionToken={semanticDimensionToken}
+                fill
+                className="h-full w-full max-w-none rounded-g-md shadow-none"
+              />
+            </div>
+          ) : showInitialLoading && searchMode === "semantic" ? (
+            <div className="mt-1 flex min-h-0 flex-1">
+              <SemanticSearchLoadingPanel
+                query={committedSemanticQuery}
+                modelName={semanticModelName}
+                dimensionsLabel={semanticDimensionsLabel}
+                style={semanticLoadingStyle}
+                dimensionToken={semanticDimensionToken}
+                fill
+                className="h-full w-full max-w-none rounded-g-md shadow-none"
+              />
+            </div>
+          ) : showInitialLoading ? (
             <div className="mt-1 grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
               {Array.from({ length: 18 }).map((_, index) => (
                 <div
@@ -1423,6 +1490,16 @@ export function BrowseView({
             </div>
           ) : items.length === 0 ? (
             <EmptyState
+              className={
+                searchMode === "semantic"
+                  ? "min-h-[420px] justify-center"
+                  : undefined
+              }
+              icon={
+                searchMode === "semantic" ? (
+                  <WandSparkles aria-hidden="true" />
+                ) : undefined
+              }
               title={emptyCopy.title}
               description={
                 searchQuery.trim() && emptyOCRTextCount > 0
@@ -1454,7 +1531,7 @@ export function BrowseView({
                   bgMode={bgMode}
                   bulkMode={bulkMode}
                   selected={selected}
-                  activeAssetId={activeAssetId}
+                  activeAssetId={highlightedAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
                   imagePreviewDelayMs={imagePreviewDelayMs}
@@ -1473,7 +1550,7 @@ export function BrowseView({
                   bgMode={bgMode}
                   bulkMode={bulkMode}
                   selected={selected}
-                  activeAssetId={activeAssetId}
+                  activeAssetId={highlightedAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
                   imagePreviewDelayMs={imagePreviewDelayMs}
@@ -1503,7 +1580,7 @@ export function BrowseView({
                   bgMode={bgMode}
                   bulkMode={bulkMode}
                   selected={selected}
-                  activeAssetId={activeAssetId}
+                  activeAssetId={highlightedAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
                   imagePreviewDelayMs={imagePreviewDelayMs}

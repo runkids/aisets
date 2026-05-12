@@ -1,14 +1,13 @@
 import { Popover } from "radix-ui";
 import {
-  ArrowDownAZ,
   CircleHelp,
   Grid3X3,
   List,
   Moon,
   Search,
-  Sparkles,
   Sun,
   Trees,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -25,7 +24,6 @@ import {
   BrowseIconToggleGroup,
   BrowseSizeToggleGroup,
   BrowseStatusBar,
-  BrowseTextToggleGroup,
 } from "./BrowseToolbarParts";
 
 export type ViewMode = "grid" | "list" | "tree";
@@ -135,10 +133,6 @@ export function BrowseToolbar({
       icon: <Moon size={16} />,
     },
   ];
-  const searchModeItems = [
-    { value: "catalog" as const, label: t("toolbar.catalogSearchMode") },
-    { value: "semantic" as const, label: t("toolbar.aiSearchMode") },
-  ];
   const statusItems = [
     { value: "" as const, label: t("status.all") },
     { value: "unused" as const, label: t("status.unused") },
@@ -191,10 +185,11 @@ export function BrowseToolbar({
     { value: "size", label: t("toolbar.sortSize") },
     { value: "recent", label: t("toolbar.sortRecent") },
   ];
+  const nextSearchMode = searchMode === "semantic" ? "catalog" : "semantic";
 
   return (
     <div className="sticky top-0 z-[4] grid gap-2.5 mb-1 pb-1 bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 overflow-x-auto pb-0.5">
         <TextInput
           variant="search"
           placeholder={
@@ -204,51 +199,60 @@ export function BrowseToolbar({
           }
           icon={
             searchMode === "semantic" ? (
-              <Sparkles size={16} />
+              <WandSparkles size={16} />
             ) : (
               <Search size={16} />
             )
           }
           suffix={
-            <span className="inline-flex items-center gap-1">
+            <span className="-mr-1 inline-flex h-full items-center gap-1">
               {searchQuery && (
                 <TextInputClearButton
                   label={t("toolbar.clearSearch")}
                   onClick={() => onSearchChange("")}
+                  className="mr-0.5"
                 />
               )}
-              {searchMode === "semantic" ? (
-                <button
-                  type="button"
-                  className="inline-grid size-5 place-items-center rounded-g-sm text-g-purple transition-colors hover:bg-g-purple-soft focus-visible:shadow-g-focus"
-                  aria-label={t("toolbar.runSemanticSearch")}
-                  onClick={onSearchSubmit}
-                >
-                  <Sparkles size={14} />
-                </button>
-              ) : (
-                <ArrowDownAZ size={14} aria-hidden="true" />
-              )}
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+                  searchMode === "semantic" ? "text-g-purple" : "text-g-ink-3",
+                )}
+                aria-label={t("toolbar.searchMode")}
+                onClick={() => onSearchModeChange(nextSearchMode)}
+              >
+                {searchMode === "semantic" ? (
+                  <WandSparkles size={13} aria-hidden="true" />
+                ) : (
+                  <Search size={13} aria-hidden="true" />
+                )}
+                <span>
+                  {searchMode === "semantic"
+                    ? t("toolbar.aiSearchMode")
+                    : t("toolbar.catalogSearchMode")}
+                </span>
+                <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
+                  TAB
+                </kbd>
+              </button>
             </span>
           }
           value={searchQuery}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
           onKeyDown={(e) => {
+            if (e.key === "Tab" && !e.shiftKey) {
+              e.preventDefault();
+              onSearchModeChange(nextSearchMode);
+              return;
+            }
             if (e.key === "Enter" && searchMode === "semantic") {
               e.preventDefault();
               onSearchSubmit();
             }
           }}
-          className="flex-[1_1_360px] min-w-[min(320px,100%)] max-w-[640px] max-md:flex-[1_1_100%] max-md:max-w-none"
+          className="min-w-[260px] flex-1"
           inputClassName="font-g text-g-ui tracking-g-ui"
-        />
-
-        <BrowseTextToggleGroup
-          value={searchMode}
-          items={searchModeItems}
-          onChange={onSearchModeChange}
-          ariaLabel={t("toolbar.searchMode")}
-          className="flex-none"
         />
 
         <Select
@@ -256,7 +260,7 @@ export function BrowseToolbar({
           options={sortItems}
           onChange={(value) => onSortChange(value as SortMode)}
           aria-label={t("toolbar.sort")}
-          className="w-36 flex-none"
+          className="w-[150px] flex-none"
         />
 
         {aiCategoryOptions.length > 0 && (
@@ -265,7 +269,7 @@ export function BrowseToolbar({
             options={aiCategoryOptions}
             onChange={onAICategoryChange}
             aria-label={t("filterRail.aiCategory")}
-            className="w-36 flex-none"
+            className="w-[190px] flex-none"
           />
         )}
 
@@ -275,7 +279,7 @@ export function BrowseToolbar({
             options={customFilterOptions}
             onChange={onCustomFilterChange}
             aria-label={t("filter.customFilters")}
-            className="w-44 flex-none"
+            className="w-[220px] flex-none"
           />
         )}
 

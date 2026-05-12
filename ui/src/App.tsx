@@ -138,6 +138,12 @@ type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
 type ImagePreviewSize = { width: number; height: number };
+type BrowseRouteState = {
+  browseSearchMode?: "catalog" | "semantic";
+  browseSearchQuery?: string;
+  browseAssetId?: string;
+  browseFocusAssetId?: string;
+};
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -171,6 +177,25 @@ const DEFAULT_IMAGE_PREVIEW_SIZE: ImagePreviewSize = {
 const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
 const SCAN_ERROR_DISMISS_MS = 3500;
+
+function browseRouteState(value: unknown): BrowseRouteState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const state = value as Record<string, unknown>;
+  return {
+    browseSearchMode:
+      state.browseSearchMode === "semantic" ? "semantic" : undefined,
+    browseSearchQuery:
+      typeof state.browseSearchQuery === "string"
+        ? state.browseSearchQuery
+        : undefined,
+    browseAssetId:
+      typeof state.browseAssetId === "string" ? state.browseAssetId : undefined,
+    browseFocusAssetId:
+      typeof state.browseFocusAssetId === "string"
+        ? state.browseFocusAssetId
+        : undefined,
+  };
+}
 
 function storedThemePreference(): ThemePreference {
   const stored = window.localStorage.getItem("aisets-theme");
@@ -256,6 +281,7 @@ export function App() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = modeForPath(location.pathname);
+  const browseState = browseRouteState(location.state);
 
   useEffect(() => {
     if (location.pathname === "/") navigate("/projects", { replace: true });
@@ -328,12 +354,16 @@ export function App() {
     useState<ImageBackgroundMode>(storedImageBackgroundMode);
   const imagePreviewDelayMs = imagePreviewDelaySeconds * 1000;
 
-  const drawerId = searchParams.get("asset") ?? "";
+  const drawerId = searchParams.get("asset") ?? browseState.browseAssetId ?? "";
   const browseCustomFilterId = searchParams.get("customFilter") ?? "";
-  const browseFocusAssetId = searchParams.get("focusAsset") ?? "";
-  const browseInitialSearch = searchParams.get("q") ?? "";
-  const browseInitialSearchMode =
-    searchParams.get("searchMode") === "semantic" ? "semantic" : "catalog";
+  const [browseRouteFocusAssetId, setBrowseRouteFocusAssetId] = useState("");
+  const browseFocusAssetId =
+    searchParams.get("focusAsset") ??
+    browseState.browseFocusAssetId ??
+    browseRouteFocusAssetId;
+  const browseInitialSearch =
+    searchParams.get("q") ?? browseState.browseSearchQuery ?? "";
+  const browseInitialSearchMode = browseState.browseSearchMode ?? "catalog";
   const browseInitialAICategory = searchParams.get("aiCategory") ?? "";
   const [imageToolAssetIds, setImageToolAssetIds] =
     useState(readImageToolBasket);
@@ -360,7 +390,11 @@ export function App() {
 
   const setDrawerId = useCallback(
     (id: string) => {
-      if (!id) setDrawerSeedAsset(null);
+      if (id) {
+        setBrowseRouteFocusAssetId("");
+      } else {
+        setDrawerSeedAsset(null);
+      }
       setAutoScrollAssetId("");
       setSearchParams(
         (prev) => {
@@ -380,6 +414,24 @@ export function App() {
       { replace: true },
     );
   }, [setSearchParams]);
+
+  const clearBrowseFocusAsset = useCallback(() => {
+    setBrowseRouteFocusAssetId("");
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("focusAsset");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (browseState.browseFocusAssetId) {
+      setBrowseRouteFocusAssetId(browseState.browseFocusAssetId);
+    }
+  }, [browseState.browseFocusAssetId]);
 
   const toast = useToast();
   const autoScanStartedRef = useRef(false);
@@ -1064,22 +1116,19 @@ export function App() {
     });
   }
 
-  function openSemanticResultFromPalette(
-    result: { assetId: string; repoPath: string },
-    query: string,
-  ) {
-    const params = new URLSearchParams({
-      searchMode: "semantic",
-      q: query,
-      asset: result.assetId,
-      focusAsset: result.assetId,
-    });
+  function openSemanticResultFromPalette(result: {
+    assetId: string;
+    repoPath: string;
+  }) {
     setSelectedProjectId("");
     setDrawerSeedAsset(null);
     setAutoScrollAssetId(result.assetId);
-    navigate({
-      pathname: pathForMode("browse"),
-      search: `?${params.toString()}`,
+    setBrowseRouteFocusAssetId(result.assetId);
+    navigate(pathForMode("browse"), {
+      state: {
+        browseAssetId: result.assetId,
+        browseFocusAssetId: result.assetId,
+      } satisfies BrowseRouteState,
     });
   }
 
@@ -1184,6 +1233,7 @@ export function App() {
               ocrFuzzySearch={ocrFuzzySearch}
               stats={scopedStats}
               onAutoScrollDone={clearAutoScrollAssetId}
+              onClearFocusAsset={clearBrowseFocusAsset}
               onClearSearchRoute={clearBrowseSearchRoute}
               onOpenAsset={setDrawerId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}

@@ -96,7 +96,7 @@ describe("normalizeBrowseStoredState", () => {
       },
       view: "list",
       gridSize: "l",
-      searchMode: "semantic",
+      searchMode: "catalog",
       searchQuery: "",
       statusFilter: "duplicate",
       sortMode: "size",

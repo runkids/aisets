@@ -889,6 +889,8 @@
     "semanticNoResults": "找不到符合的 AI 結果",
     "semanticEmpty": "輸入 AI 搜尋",
     "semanticEmptyDesc": "用自然語言依視覺語意、OCR 文字與 AI 標籤找素材",
+    "semanticSearching": "語意搜尋中...",
+    "semanticRanking": "相似度排序",
     "semanticWaiting": "按 Enter 執行 AI 搜尋",
     "semanticMeta": "AI 搜尋：{{count}} 筆結果，耗時 {{duration}} ms",
     "semanticPressEnter": "語意結果會套用目前專案、資料夾、狀態與 AI 篩選",

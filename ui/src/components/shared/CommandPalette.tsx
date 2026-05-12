@@ -39,7 +39,10 @@ import type {
 } from "../../types";
 import { cn } from "@/lib/cn";
 import { semanticSearch, embeddingStats } from "../../api";
-import { embedStatsQueryKey, useCatalogItemsInfiniteQuery } from "../../queries";
+import {
+  embedStatsQueryKey,
+  useCatalogItemsInfiniteQuery,
+} from "../../queries";
 import { useCategoryListQuery, useTagsQuery } from "../../tagsQueries";
 import { useDebouncedValue } from "../../useDebouncedValue";
 import { useSearchHistory } from "../../useSearchHistory";
@@ -52,7 +55,8 @@ import {
 } from "../ui/DialogShell";
 
 type SearchMode = "catalog" | "semantic";
-type LoadingVisual = "beam" | "constellation" | "swarm";
+export type SemanticLoadingStyle = "beam" | "constellation" | "swarm";
+type LoadingVisual = SemanticLoadingStyle;
 type Phase = "idle" | "searching" | "results";
 
 type Props = {
@@ -417,27 +421,18 @@ function ModeSegment({
   const { t } = useTranslation();
   return (
     <div
-      className="relative inline-flex h-6 items-center rounded-g-pill border border-g-line-strong bg-g-surface-2 p-0.5"
+      className="inline-flex h-6 min-w-max items-center gap-0.5 rounded-g-pill border border-g-line-strong bg-g-surface-2 p-0.5"
       role="tablist"
       aria-label={t("commandPalette.toggleSemantic")}
     >
-      <span
-        className={cn(
-          "absolute bottom-0.5 top-0.5 w-[calc(50%-14px)] rounded-g-pill bg-g-surface transition-[transform,background,box-shadow] duration-[220ms] ease-g-spring [[data-theme=dark]_&]:bg-g-surface-3",
-          mode === "semantic"
-            ? "translate-x-[calc(100%+0px)] bg-[color-mix(in_srgb,var(--g-purple)_14%,var(--g-surface))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-purple)_35%,transparent)] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,var(--g-purple)_22%,var(--g-surface-2))] [[data-theme=dark]_&]:shadow-[0_0_16px_color-mix(in_srgb,var(--g-purple)_40%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--g-purple)_55%,transparent)]"
-            : "translate-x-0.5 shadow-g-sm",
-        )}
-        aria-hidden="true"
-      />
       <button
         type="button"
         role="tab"
         aria-selected={mode === "catalog"}
         onClick={() => onMode("catalog")}
         className={cn(
-          "relative z-[1] inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-colors duration-[160ms] ease-g hover:text-g-ink-2",
-          mode === "catalog" && "text-g-ink",
+          "inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-[background,color,box-shadow] duration-[160ms] ease-g hover:text-g-ink-2",
+          mode === "catalog" && "bg-g-surface text-g-ink shadow-g-sm",
         )}
       >
         <Search size={11} />
@@ -450,16 +445,16 @@ function ModeSegment({
         aria-disabled={!embedReady}
         onClick={() => embedReady && onMode("semantic")}
         className={cn(
-          "relative z-[1] inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-colors duration-[160ms] ease-g hover:text-g-ink-2 disabled:cursor-not-allowed disabled:opacity-50",
+          "inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-[background,color,box-shadow] duration-[160ms] ease-g hover:text-g-ink-2 disabled:cursor-not-allowed disabled:opacity-50",
           mode === "semantic" &&
-            "font-[590] text-g-purple [[data-theme=dark]_&]:text-[#c4b5fd]",
+            "bg-[color-mix(in_srgb,var(--g-purple)_14%,var(--g-surface))] font-[590] text-g-purple shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-purple)_35%,transparent)] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,var(--g-purple)_22%,var(--g-surface-2))] [[data-theme=dark]_&]:text-[#c4b5fd]",
         )}
         disabled={!embedReady}
       >
         <Sparkles size={11} />
         <span>{t("commandPalette.modeAI")}</span>
       </button>
-      <span className="relative z-[1] mx-1 font-g-mono text-[9px] font-[510] uppercase tracking-[0.04em] text-g-ink-4 opacity-65">
+      <span className="mx-1 font-g-mono text-[9px] font-[510] uppercase tracking-[0.04em] text-g-ink-4 opacity-65">
         Tab
       </span>
     </div>
@@ -1139,6 +1134,48 @@ function LoadingVisualView({
   if (style === "swarm")
     return <SwarmLoading dimensionToken={dimensionToken} />;
   return <SemanticBeam dimensionToken={dimensionToken} />;
+}
+
+export function SemanticSearchLoadingPanel({
+  query,
+  modelName,
+  dimensionsLabel,
+  style,
+  dimensionToken,
+  className,
+  fill = false,
+}: {
+  query: string;
+  modelName: string;
+  dimensionsLabel: string;
+  style: SemanticLoadingStyle;
+  dimensionToken: string;
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-g-lg border border-g-line bg-g-surface shadow-g-pop",
+        fill && "flex min-h-0 flex-col",
+        className,
+      )}
+    >
+      <SemanticContext
+        phase="searching"
+        query={query}
+        modelName={modelName}
+        dimensionsLabel={dimensionsLabel}
+      />
+      {fill ? (
+        <div className="min-h-0 flex-1 [&_.lsb-stage]:h-auto [&_.lsb-stage]:flex-1 [&_.lv-stage]:h-auto [&_.lv-stage]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-col">
+          <LoadingVisualView style={style} dimensionToken={dimensionToken} />
+        </div>
+      ) : (
+        <LoadingVisualView style={style} dimensionToken={dimensionToken} />
+      )}
+    </div>
+  );
 }
 
 function AiEmpty({
