@@ -102,6 +102,13 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 	if err != nil {
 		return CatalogItemFacets{}, err
 	}
+	var aiCategoryTranslations map[string]string
+	if query.Locale != "" {
+		aiCategoryTranslations, err = s.aiCategoryTranslations(query.Locale)
+		if err != nil {
+			return CatalogItemFacets{}, err
+		}
+	}
 	ocrReadyCount, err := s.catalogOCRReadyCount(scanID, query)
 	if err != nil {
 		return CatalogItemFacets{}, err
@@ -152,6 +159,7 @@ func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (Catalog
 		CustomFilters:            customFilters,
 		CustomFilterTotal:        customTotal,
 		AICategories:             aiCategories,
+		AICategoryTranslations:   aiCategoryTranslations,
 		AICategoryTotal:          aiCategoryTotal,
 		OCRReadyCount:            ocrReadyCount,
 		VLMOcrReadyCount:         vlmOcrReadyCount,

@@ -46,6 +46,7 @@ type CatalogItemQuery struct {
 	OptimizationSeverity string
 	Operation            string
 	AICategory           string
+	Locale               string
 	AIOcrStatus          string
 	VLMEngineVersion     string
 	HasGPS               *bool
@@ -87,6 +88,7 @@ type CatalogItemFacets struct {
 	CustomFilters            []CatalogCustomFilterFacet `json:"customFilters"`
 	CustomFilterTotal        int                        `json:"customFilterTotal"`
 	AICategories             []CatalogFacetOption       `json:"aiCategories"`
+	AICategoryTranslations   map[string]string          `json:"aiCategoryTranslations,omitempty"`
 	AICategoryTotal          int                        `json:"aiCategoryTotal"`
 	OCRReadyCount            int                        `json:"ocrReadyCount"`
 	VLMOcrReadyCount         int                        `json:"vlmOcrReadyCount"`

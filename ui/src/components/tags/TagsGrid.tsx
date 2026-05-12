@@ -30,6 +30,7 @@ type Props = {
   selected: Set<string>;
   translations?: Record<string, string>;
   categoryTranslations?: Record<string, string>;
+  displayLocale?: string;
   highlightMissing?: boolean;
   onTagClick: (tag: string) => void;
   onToggleSelect: (tag: string) => void;
@@ -46,6 +47,7 @@ export function TagsGrid({
   selected,
   translations,
   categoryTranslations,
+  displayLocale,
   highlightMissing = false,
   onTagClick,
   onToggleSelect,
@@ -53,9 +55,13 @@ export function TagsGrid({
 }: Props) {
   const { t } = useTranslation();
 
+  const displayLabel = (raw: string, translated?: string) => {
+    if (!translated || translated === raw) return raw;
+    return displayLocale === "en" ? translated : `${translated} (${raw})`;
+  };
+
   const tagLabel = (tag: string) => {
-    const tr = translations?.[tag];
-    return tr && tr !== tag ? `${tr} (${tag})` : tag;
+    return displayLabel(tag, translations?.[tag]);
   };
 
   const isMissing = (tag: string) => highlightMissing && !translations?.[tag];
@@ -158,8 +164,7 @@ export function TagsGrid({
               {/* Category badges — desktop only, max 6 visible */}
               <div className="hidden min-[1024px]:flex items-center gap-1 justify-end flex-shrink-0">
                 {item.categories.slice(0, 4).map((cat) => {
-                  const tr = categoryTranslations?.[cat];
-                  const label = tr && tr !== cat ? `${tr} (${cat})` : cat;
+                  const label = displayLabel(cat, categoryTranslations?.[cat]);
                   return (
                     <Badge key={cat} tone={CATEGORY_TONES[cat] ?? "default"}>
                       {label}
@@ -168,13 +173,12 @@ export function TagsGrid({
                 })}
                 {item.categories.length > 4 && (
                   <Tooltip
-                    label={item.categories
-                      .slice(4)
-                      .map((c) => {
-                        const tr = categoryTranslations?.[c];
-                        return tr && tr !== c ? `${tr} (${c})` : c;
-                      })
-                      .join(", ")}
+                    label={
+                      item.categories
+                        .slice(4)
+                        .map((c) => displayLabel(c, categoryTranslations?.[c]))
+                        .join(", ")
+                    }
                   >
                     <Badge tone="default">
                       +{item.categories.length - 4}

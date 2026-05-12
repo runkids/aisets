@@ -48,6 +48,12 @@ export function AssetDrawerTags({ asset }: Props) {
   const localeTags = aiTag?.tagsI18n?.[i18n.language];
   const displayTags =
     localeTags && localeTags.length > 0 ? localeTags : currentTags;
+  const displayCategory = aiTag?.category
+    ? aiTag.categoryI18n?.[i18n.language] ??
+      t(`settings.aiCategory.${aiTag.category}`, {
+        defaultValue: aiTag.category,
+      })
+    : "";
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,7 +62,7 @@ export function AssetDrawerTags({ asset }: Props) {
           <span className="shrink-0 font-g text-g-caption font-[510] text-g-ink-3">
             {t("drawer.aiCategory")}
           </span>
-          <Badge tone="purple">{aiTag.category}</Badge>
+          <Badge tone="purple">{displayCategory}</Badge>
         </div>
       )}
 

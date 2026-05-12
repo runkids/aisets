@@ -13,6 +13,10 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  useCategoryClearMutation,
+  useCategoryListQuery,
+  useCategoryMergeMutation,
+  useCategoryRenameMutation,
   useTagsQuery,
   useTagCategoriesQuery,
   useTagRenameMutation,
@@ -39,12 +43,20 @@ import {
   type SegmentedControlItem,
 } from "../ui";
 import { TagsGrid } from "./TagsGrid";
+import { CategoriesGrid } from "./CategoriesGrid";
 import { useToast } from "../shared/ToastProvider";
 import { BulkSelectButton } from "../shared/BulkSelectButton";
+
+type TaxonomyMode = "tags" | "categories";
 
 const SORT_ITEMS: SegmentedControlItem<"count" | "alpha">[] = [
   { value: "count", label: "#" },
   { value: "alpha", label: "A-Z" },
+];
+
+const MODE_ITEMS: SegmentedControlItem<TaxonomyMode>[] = [
+  { value: "tags", label: "Tags" },
+  { value: "categories", label: "Categories" },
 ];
 
 const LOCALE_OPTIONS = [
@@ -70,6 +82,7 @@ export function TagsView({
   const navigate = useNavigate();
   const toast = useToast();
 
+  const [mode, setMode] = useState<TaxonomyMode>("tags");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"count" | "alpha">("count");
   const [category, setCategory] = useState("");
@@ -95,18 +108,36 @@ export function TagsView({
     limit: 500,
     offset: 0,
   };
+  const categoryParams = {
+    q: debouncedSearch,
+    sort,
+    locale: viewLocale,
+    limit: 500,
+    offset: 0,
+  };
 
-  const { data, isLoading, refetch: refetchTags } = useTagsQuery(params);
+  const { data, isLoading } = useTagsQuery(params, mode === "tags");
+  const { data: categoryData, isLoading: categoryLoading } =
+    useCategoryListQuery(categoryParams, mode === "categories");
   const { data: catData } = useTagCategoriesQuery();
   const renameMutation = useTagRenameMutation();
   const mergeMutation = useTagMergeMutation();
   const deleteMutation = useTagDeleteMutation();
+  const categoryRenameMutation = useCategoryRenameMutation();
+  const categoryMergeMutation = useCategoryMergeMutation();
+  const categoryClearMutation = useCategoryClearMutation();
 
   const totalTags = data?.total ?? 0;
   const taggedAssets = data?.totalTaggedAssets ?? 0;
   const topCategory = data?.topCategory ?? "—";
+  const totalCategories = categoryData?.total ?? 0;
+  const categorizedAssets = categoryData?.totalCategorizedAssets ?? 0;
   const dataTags = data?.tags;
   const tags = useMemo(() => dataTags ?? [], [dataTags]);
+  const categories = useMemo(
+    () => categoryData?.categories ?? [],
+    [categoryData?.categories],
+  );
   const maxCount = useMemo(
     () =>
       dataTags && dataTags.length > 0
@@ -114,13 +145,32 @@ export function TagsView({
         : 1,
     [dataTags],
   );
+  const maxCategoryCount = useMemo(
+    () =>
+      categories.length > 0
+        ? Math.max(...categories.map((c) => c.assetCount))
+        : 1,
+    [categories],
+  );
 
   function handleTagClick(tag: string) {
     navigate(`/browse?q=${encodeURIComponent(tag)}`);
   }
 
+  function handleCategoryClick(cat: string) {
+    navigate(`/browse?aiCategory=${encodeURIComponent(cat)}`);
+  }
+
   function handleTranslate() {
     onStartTranslate();
+  }
+
+  function handleModeChange(next: TaxonomyMode) {
+    setMode(next);
+    setSelected(new Set());
+    setBulkMode(false);
+    setSearch("");
+    setCategory("");
   }
 
   const toggleSelect = useCallback((tag: string) => {
@@ -135,10 +185,14 @@ export function TagsView({
   const allSelected = useMemo(
     () =>
       bulkMode &&
-      tags.length > 0 &&
-      selected.size >= tags.length &&
-      tags.every((tag) => selected.has(tag.tag)),
-    [bulkMode, tags, selected],
+      (mode === "tags"
+        ? tags.length > 0 &&
+          selected.size >= tags.length &&
+          tags.every((tag) => selected.has(tag.tag))
+        : categories.length > 0 &&
+          selected.size >= categories.length &&
+          categories.every((cat) => selected.has(cat.category))),
+    [bulkMode, mode, tags, categories, selected],
   );
 
   const toggleBulkMode = useCallback(() => {
@@ -148,9 +202,13 @@ export function TagsView({
       setBulkMode(false);
       setSelected(new Set());
     } else {
-      setSelected(new Set(tags.map((tag) => tag.tag)));
+      setSelected(
+        mode === "tags"
+          ? new Set(tags.map((tag) => tag.tag))
+          : new Set(categories.map((cat) => cat.category)),
+      );
     }
-  }, [bulkMode, allSelected, tags]);
+  }, [bulkMode, allSelected, mode, tags, categories]);
 
   const cancelBulk = useCallback(() => {
     setBulkMode(false);
@@ -165,16 +223,22 @@ export function TagsView({
 
   function submitRename() {
     if (!renameTag || !renameValue.trim() || renameValue === renameTag) return;
-    renameMutation.mutate(
+    const mutation = mode === "tags" ? renameMutation : categoryRenameMutation;
+    mutation.mutate(
       { from: renameTag, to: renameValue.trim() },
       {
         onSuccess: (res) => {
           toast.success(
-            t("tags.renameSuccess", {
-              from: renameTag,
-              to: renameValue.trim(),
-              count: res.affected,
-            }),
+            t(
+              mode === "tags"
+                ? "tags.renameSuccess"
+                : "tags.renameCategorySuccess",
+              {
+                from: renameTag,
+                to: renameValue.trim(),
+                count: res.affected,
+              },
+            ),
           );
           setRenameTag(null);
           setSelected(new Set());
@@ -193,16 +257,22 @@ export function TagsView({
   function submitMerge() {
     const source = Array.from(selected).filter((s) => s !== mergeTarget);
     if (source.length === 0 || !mergeTarget.trim()) return;
-    mergeMutation.mutate(
+    const mutation = mode === "tags" ? mergeMutation : categoryMergeMutation;
+    mutation.mutate(
       { source, target: mergeTarget.trim() },
       {
         onSuccess: (res) => {
           toast.success(
-            t("tags.mergeSuccess", {
-              count: source.length,
-              target: mergeTarget.trim(),
-              affected: res.affected,
-            }),
+            t(
+              mode === "tags"
+                ? "tags.mergeSuccess"
+                : "tags.mergeCategorySuccess",
+              {
+                count: source.length,
+                target: mergeTarget.trim(),
+                affected: res.affected,
+              },
+            ),
           );
           setMergeOpen(false);
           setSelected(new Set());
@@ -214,15 +284,21 @@ export function TagsView({
 
   // Delete
   function submitDelete() {
-    const tagsToDelete = Array.from(selected);
-    if (tagsToDelete.length === 0) return;
-    deleteMutation.mutate(tagsToDelete, {
+    const values = Array.from(selected);
+    if (values.length === 0) return;
+    const mutation = mode === "tags" ? deleteMutation : categoryClearMutation;
+    mutation.mutate(values, {
       onSuccess: (res) => {
         toast.success(
-          t("tags.deleteSuccess", {
-            count: tagsToDelete.length,
-            affected: res.affected,
-          }),
+          t(
+            mode === "tags"
+              ? "tags.deleteSuccess"
+              : "tags.clearCategorySuccess",
+            {
+              count: values.length,
+              affected: res.affected,
+            },
+          ),
         );
         setDeleteOpen(false);
         setSelected(new Set());
@@ -231,17 +307,27 @@ export function TagsView({
     });
   }
 
-  const isFiltered = debouncedSearch.length > 0 || category.length > 0;
+  const isFiltered =
+    debouncedSearch.length > 0 || (mode === "tags" && category.length > 0);
+
+  const displayLabel = useCallback(
+    (raw: string, translated?: string) => {
+      if (!translated || translated === raw) return raw;
+      return viewLocale === "en" ? translated : `${translated} (${raw})`;
+    },
+    [viewLocale],
+  );
 
   const dbCatTr = data?.categoryTranslations;
   const categoryLabel = useCallback(
     (cat: string) => {
       const dbTr = dbCatTr?.[cat];
-      if (dbTr && dbTr !== cat) return `${dbTr} (${cat})`;
+      const dbLabel = displayLabel(cat, dbTr);
+      if (dbLabel) return dbLabel;
       const staticTr = t(`settings.aiCategory.${cat}`, { defaultValue: cat });
-      return staticTr !== cat ? `${staticTr} (${cat})` : cat;
+      return displayLabel(cat, staticTr);
     },
-    [t, dbCatTr],
+    [t, dbCatTr, displayLabel],
   );
 
   const catCategories = catData?.categories;
@@ -262,19 +348,33 @@ export function TagsView({
         {/* Stat cards */}
         <div className="grid grid-cols-3 gap-3 mb-4 pt-3 max-[768px]:grid-cols-1">
           <StatCard
-            label={t("tags.totalTags")}
-            value={totalTags}
-            icon={<Hash size={14} />}
+            label={
+              mode === "tags" ? t("tags.totalTags") : t("tags.totalCategories")
+            }
+            value={mode === "tags" ? totalTags : totalCategories}
+            icon={mode === "tags" ? <Hash size={14} /> : <Layers size={14} />}
           />
           <StatCard
-            label={t("tags.taggedAssets")}
-            value={taggedAssets}
+            label={
+              mode === "tags"
+                ? t("tags.taggedAssets")
+                : t("tags.categorizedAssets")
+            }
+            value={mode === "tags" ? taggedAssets : categorizedAssets}
             icon={<TagsIcon size={14} />}
             tone="accent"
           />
           <StatCard
-            label={t("tags.topCategory")}
-            value={topCategory !== "—" ? categoryLabel(topCategory) : "—"}
+            label={
+              mode === "tags" ? t("tags.topCategory") : t("tags.uniqueTags")
+            }
+            value={
+              mode === "tags"
+                ? topCategory !== "—"
+                  ? categoryLabel(topCategory)
+                  : "—"
+                : categories.reduce((sum, cat) => sum + cat.tagCount, 0)
+            }
             icon={<Layers size={14} />}
             tone="blue"
           />
@@ -283,10 +383,26 @@ export function TagsView({
         {/* Toolbar row 1: search + category + bulk toggle + sort */}
         <div className="sticky top-0 z-[4] -mx-4 mb-1 grid min-w-0 gap-1.5 bg-g-canvas px-4 pt-3 pb-1 max-[768px]:-mx-3 max-[768px]:px-3">
           <div className="flex items-center gap-2.5">
+            <SegmentedControl
+              value={mode}
+              items={MODE_ITEMS.map((item) => ({
+                ...item,
+                label:
+                  item.value === "tags"
+                    ? t("tags.modeTags")
+                    : t("tags.modeCategories"),
+              }))}
+              onChange={handleModeChange}
+              ariaLabel={t("tags.modeLabel")}
+            />
             <TextInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("tags.searchPlaceholder")}
+              placeholder={
+                mode === "tags"
+                  ? t("tags.searchPlaceholder")
+                  : t("tags.categorySearchPlaceholder")
+              }
               className="min-w-[200px] flex-1"
               suffix={
                 search ? (
@@ -297,14 +413,16 @@ export function TagsView({
                 ) : undefined
               }
             />
-            <Select
-              value={category}
-              options={categorySelectOptions}
-              onChange={setCategory}
-              aria-label={t("tags.categoryFilter")}
-              size="md"
-              className="w-44 flex-none"
-            />
+            {mode === "tags" && (
+              <Select
+                value={category}
+                options={categorySelectOptions}
+                onChange={setCategory}
+                aria-label={t("tags.categoryFilter")}
+                size="md"
+                className="w-44 flex-none"
+              />
+            )}
             <Select
               value={viewLocale}
               options={LOCALE_OPTIONS}
@@ -332,8 +450,8 @@ export function TagsView({
             {isFiltered && !isLoading && (
               <span className="text-g-caption text-g-ink-3 tabular-nums shrink-0">
                 {t("tags.filterCount", {
-                  shown: tags.length,
-                  total: totalTags,
+                  shown: mode === "tags" ? tags.length : categories.length,
+                  total: mode === "tags" ? totalTags : totalCategories,
                 })}
               </span>
             )}
@@ -371,7 +489,7 @@ export function TagsView({
                   onClick={() => openRename(Array.from(selected)[0])}
                 >
                   <Pencil size={14} />
-                  {t("tags.rename")}
+                  {t(mode === "tags" ? "tags.rename" : "tags.renameCategory")}
                 </button>
               )}
               {selected.size >= 2 && (
@@ -381,7 +499,7 @@ export function TagsView({
                   onClick={openMerge}
                 >
                   <Merge size={14} />
-                  {t("tags.merge")}
+                  {t(mode === "tags" ? "tags.merge" : "tags.mergeCategory")}
                 </button>
               )}
               <button
@@ -391,28 +509,44 @@ export function TagsView({
                 disabled={selected.size === 0}
               >
                 <Trash2 size={14} />
-                {t("tags.delete")}
+                {t(mode === "tags" ? "tags.delete" : "tags.clearCategory")}
               </button>
             </div>
           )}
         </div>
 
-        {/* Tag grid */}
-        <TagsGrid
-          tags={tags}
-          maxCount={maxCount}
-          isLoading={isLoading}
-          selected={selected}
-          translations={data?.translations}
-          categoryTranslations={data?.categoryTranslations}
-          highlightMissing={viewLocale !== i18n.language}
-          onTagClick={handleTagClick}
-          onToggleSelect={toggleSelect}
-          bulkMode={bulkMode}
-        />
+        {mode === "tags" ? (
+          <TagsGrid
+            tags={tags}
+            maxCount={maxCount}
+            isLoading={isLoading}
+            selected={selected}
+            translations={data?.translations}
+            categoryTranslations={data?.categoryTranslations}
+            displayLocale={viewLocale}
+            highlightMissing={viewLocale !== i18n.language}
+            onTagClick={handleTagClick}
+            onToggleSelect={toggleSelect}
+            bulkMode={bulkMode}
+          />
+        ) : (
+          <CategoriesGrid
+            categories={categories}
+            maxCount={maxCategoryCount}
+            isLoading={categoryLoading}
+            selected={selected}
+            translations={categoryData?.translations}
+            topTagTranslations={categoryData?.tagTranslations}
+            displayLocale={viewLocale}
+            highlightMissing={viewLocale !== i18n.language}
+            onCategoryClick={handleCategoryClick}
+            onToggleSelect={toggleSelect}
+            bulkMode={bulkMode}
+          />
+        )}
 
         {/* Browse all hint */}
-        {tags.length > 0 && !isFiltered && !bulkMode && (
+        {mode === "tags" && tags.length > 0 && !isFiltered && !bulkMode && (
           <div className="mt-4 flex justify-center">
             <button
               type="button"
@@ -429,8 +563,13 @@ export function TagsView({
       {/* Rename dialog */}
       {renameTag && (
         <Modal
-          title={t("tags.renameTitle")}
-          description={t("tags.renameDesc", { tag: renameTag })}
+          title={t(
+            mode === "tags" ? "tags.renameTitle" : "tags.renameCategoryTitle",
+          )}
+          description={t(
+            mode === "tags" ? "tags.renameDesc" : "tags.renameCategoryDesc",
+            { tag: renameTag, category: renameTag },
+          )}
           onClose={() => setRenameTag(null)}
           size="sm"
           footer={
@@ -442,14 +581,20 @@ export function TagsView({
                 variant="primary"
                 onClick={submitRename}
                 disabled={
-                  renameMutation.isPending ||
+                  (mode === "tags"
+                    ? renameMutation.isPending
+                    : categoryRenameMutation.isPending) ||
                   !renameValue.trim() ||
                   renameValue === renameTag
                 }
               >
-                {renameMutation.isPending
+                {(
+                  mode === "tags"
+                    ? renameMutation.isPending
+                    : categoryRenameMutation.isPending
+                )
                   ? t("common.saving")
-                  : t("tags.rename")}
+                  : t(mode === "tags" ? "tags.rename" : "tags.renameCategory")}
               </Button>
             </div>
           }
@@ -468,8 +613,13 @@ export function TagsView({
       {/* Merge dialog */}
       {mergeOpen && (
         <Modal
-          title={t("tags.mergeTitle")}
-          description={t("tags.mergeDesc", { count: selected.size })}
+          title={t(
+            mode === "tags" ? "tags.mergeTitle" : "tags.mergeCategoryTitle",
+          )}
+          description={t(
+            mode === "tags" ? "tags.mergeDesc" : "tags.mergeCategoryDesc",
+            { count: selected.size },
+          )}
           onClose={() => setMergeOpen(false)}
           size="sm"
           footer={
@@ -480,9 +630,19 @@ export function TagsView({
               <Button
                 variant="primary"
                 onClick={submitMerge}
-                disabled={mergeMutation.isPending || !mergeTarget.trim()}
+                disabled={
+                  (mode === "tags"
+                    ? mergeMutation.isPending
+                    : categoryMergeMutation.isPending) || !mergeTarget.trim()
+                }
               >
-                {mergeMutation.isPending ? t("common.saving") : t("tags.merge")}
+                {(
+                  mode === "tags"
+                    ? mergeMutation.isPending
+                    : categoryMergeMutation.isPending
+                )
+                  ? t("common.saving")
+                  : t(mode === "tags" ? "tags.merge" : "tags.mergeCategory")}
               </Button>
             </div>
           }
@@ -514,12 +674,21 @@ export function TagsView({
         open={deleteOpen}
         onConfirm={submitDelete}
         onCancel={() => setDeleteOpen(false)}
-        title={t("tags.deleteTitle")}
-        message={t("tags.deleteDesc", { count: selected.size })}
-        confirmText={t("tags.delete")}
+        title={t(
+          mode === "tags" ? "tags.deleteTitle" : "tags.clearCategoryTitle",
+        )}
+        message={t(
+          mode === "tags" ? "tags.deleteDesc" : "tags.clearCategoryDesc",
+          { count: selected.size },
+        )}
+        confirmText={t(mode === "tags" ? "tags.delete" : "tags.clearCategory")}
         cancelText={t("common.cancel")}
         variant="danger"
-        loading={deleteMutation.isPending}
+        loading={
+          mode === "tags"
+            ? deleteMutation.isPending
+            : categoryClearMutation.isPending
+        }
       />
     </div>
   );

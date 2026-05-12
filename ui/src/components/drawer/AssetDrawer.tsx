@@ -136,7 +136,7 @@ export function AssetDrawer({
   detailError,
   onRetryDetail,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const [rawTab, setRawTab] = useState<DrawerTab>("overview");
   const [closing, setClosing] = useState(false);
@@ -175,6 +175,12 @@ export function AssetDrawer({
     settingsQuery.data?.settings.preferredEditor ?? "vscode";
   const assetFileName = fileName(asset.repoPath);
   const variants = useOptimizeVariants(asset, scanId);
+  const displayAICategory = asset.aiTag?.category
+    ? asset.aiTag.categoryI18n?.[i18n.language] ??
+      t(`settings.aiCategory.${asset.aiTag.category}`, {
+        defaultValue: asset.aiTag.category,
+      })
+    : "";
 
   const dimensions =
     asset.image.width > 0 && asset.image.height > 0
@@ -463,7 +469,7 @@ export function AssetDrawer({
                       {asset.aiTag && asset.aiTag.status === "ready" && (
                         <HeroBadgeButton onClick={() => handleTabChange("ai")}>
                           <Badge tone="purple">
-                            {asset.aiTag.category || t("drawer.tab.ai")}
+                            {displayAICategory || t("drawer.tab.ai")}
                           </Badge>
                         </HeroBadgeButton>
                       )}

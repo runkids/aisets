@@ -39,7 +39,7 @@ import type {
 import { cn } from "@/lib/cn";
 import { semanticSearch, embeddingStats } from "../../api";
 import { useCatalogItemsInfiniteQuery } from "../../queries";
-import { useTagsQuery } from "../../tagsQueries";
+import { useCategoryListQuery, useTagsQuery } from "../../tagsQueries";
 import { useDebouncedValue } from "../../useDebouncedValue";
 import { useSearchHistory } from "../../useSearchHistory";
 import { fileName, type Mode } from "../../ui";
@@ -1495,6 +1495,10 @@ export function CommandPalette({
     { sort: "count", limit: 12, locale: i18n.language },
     open && embedReady,
   );
+  const categorySamplesQuery = useCategoryListQuery(
+    { sort: "count", limit: 8, locale: i18n.language },
+    open && embedReady,
+  );
   const sampleAssetsQuery = useCatalogItemsInfiniteQuery(
     scanId,
     { limit: 30 },
@@ -1507,17 +1511,12 @@ export function CommandPalette({
       tagSamplesQuery.data?.tags.map(
         (item) => tagSamplesQuery.data?.translations?.[item.tag] ?? item.tag,
       ) ?? [];
-    const categories = Array.from(
-      new Set(
-        (tagSamplesQuery.data?.tags ?? []).flatMap((item) =>
-          item.categories.map(
-            (category) =>
-              tagSamplesQuery.data?.categoryTranslations?.[category] ??
-              category,
-          ),
-        ),
-      ),
-    ).filter(Boolean);
+    const categories =
+      categorySamplesQuery.data?.categories.map(
+        (item) =>
+          categorySamplesQuery.data?.translations?.[item.category] ??
+          item.category,
+      ) ?? [];
     const descriptions =
       sampleAssetsQuery.data?.pages
         .flatMap((page) => page.items)
@@ -1547,6 +1546,7 @@ export function CommandPalette({
       .sort((a, b) => seededRank(a, sampleSeed) - seededRank(b, sampleSeed))
       .slice(0, 5);
   }, [
+    categorySamplesQuery.data,
     i18n.language,
     sampleAssetsQuery.data,
     sampleSeed,

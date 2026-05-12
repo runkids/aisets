@@ -363,6 +363,7 @@ export type AssetItem = {
   aiTag?: {
     status: "pending" | "ready" | "failed" | "skipped";
     category?: string;
+    categoryI18n?: Record<string, string>;
     tags?: string[];
     tagsI18n?: Record<string, string[]>;
     description?: string;
@@ -529,6 +530,7 @@ export type CatalogItemsPage = {
     }>;
     customFilterTotal: number;
     aiCategories: Array<{ id: string; count: number }>;
+    aiCategoryTranslations?: Record<string, string>;
     aiCategoryTotal: number;
     ocrReadyCount: number;
     vlmOcrReadyCount: number;
@@ -921,4 +923,20 @@ export type TagListResponse = {
   topCategory: string;
   translations?: Record<string, string>;
   categoryTranslations?: Record<string, string>;
+};
+
+export type AICategoryItem = {
+  category: string;
+  assetCount: number;
+  tagCount: number;
+  projectCount: number;
+  topTags: string[];
+};
+
+export type AICategoryListResponse = {
+  categories: AICategoryItem[];
+  total: number;
+  totalCategorizedAssets: number;
+  translations?: Record<string, string>;
+  tagTranslations?: Record<string, string>;
 };

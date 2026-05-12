@@ -252,6 +252,7 @@ export function App() {
   const browseCustomFilterId = searchParams.get("customFilter") ?? "";
   const browseFocusAssetId = searchParams.get("focusAsset") ?? "";
   const browseInitialSearch = searchParams.get("q") ?? "";
+  const browseInitialAICategory = searchParams.get("aiCategory") ?? "";
 
   function changeMode(nextMode: Mode, projectId?: string) {
     if (projectId != null) setSelectedProjectId(projectId);
@@ -1014,13 +1015,14 @@ export function App() {
             <BrowseView
               key={
                 selectedProject
-                  ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}`
-                  : `all-projects:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}`
+                  ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialAICategory}`
+                  : `all-projects:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialAICategory}`
               }
               activeAssetId={drawerId}
               autoScrollAssetId={autoScrollAssetId}
               initialCustomFilterId={browseCustomFilterId}
               initialSearchQuery={browseInitialSearch}
+              initialAICategory={browseInitialAICategory}
               initialFocusAssetId={browseFocusAssetId}
               customFilters={
                 settingsQuery.data?.settings.customAssetFilters ?? []

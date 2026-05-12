@@ -5,11 +5,15 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  clearCategories,
   deleteTags,
+  getCategoryList,
   getTagCategories,
   getTagList,
   getTagSuggestions,
+  mergeCategories,
   mergeTags,
+  renameCategory,
   renameTag,
   setAssetTags,
 } from "./api";
@@ -20,6 +24,14 @@ export type TagListParams = {
   sort?: string;
   project?: string;
   category?: string;
+  locale?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type AICategoryListParams = {
+  q?: string;
+  sort?: string;
   locale?: string;
   limit?: number;
   offset?: number;
@@ -37,10 +49,22 @@ function normalizeTagListParams(params: TagListParams) {
   };
 }
 
+function normalizeCategoryListParams(params: AICategoryListParams) {
+  return {
+    q: params.q || "",
+    sort: params.sort || "count",
+    locale: params.locale || "",
+    limit: params.limit || 100,
+    offset: params.offset || 0,
+  };
+}
+
 export const tagKeys = {
   all: ["tags"] as const,
   list: (params: TagListParams) =>
     ["tags", "list", normalizeTagListParams(params)] as const,
+  categoryList: (params: AICategoryListParams) =>
+    ["tags", "category-list", normalizeCategoryListParams(params)] as const,
   suggest: (q: string) => ["tags", "suggest", q] as const,
   categories: ["tags", "categories"] as const,
 };
@@ -65,6 +89,20 @@ export function useTagCategoriesQuery() {
   });
 }
 
+export function useCategoryListQuery(
+  params: AICategoryListParams,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: tagKeys.categoryList(params),
+    queryFn: () => getCategoryList(normalizeCategoryListParams(params)),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useTagSuggestQuery(q: string, enabled = true) {
   return useQuery({
     queryKey: tagKeys.suggest(q),
@@ -74,13 +112,18 @@ export function useTagSuggestQuery(q: string, enabled = true) {
   });
 }
 
+function invalidateTaxonomyQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: tagKeys.all });
+  qc.invalidateQueries({ queryKey: catalogQueryKey });
+}
+
 export function useTagRenameMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ from, to }: { from: string; to: string }) =>
       renameTag(from, to),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: tagKeys.all });
+      invalidateTaxonomyQueries(qc);
     },
   });
 }
@@ -91,7 +134,7 @@ export function useTagMergeMutation() {
     mutationFn: ({ source, target }: { source: string[]; target: string }) =>
       mergeTags(source, target),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: tagKeys.all });
+      invalidateTaxonomyQueries(qc);
     },
   });
 }
@@ -101,7 +144,39 @@ export function useTagDeleteMutation() {
   return useMutation({
     mutationFn: (tags: string[]) => deleteTags(tags),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: tagKeys.all });
+      invalidateTaxonomyQueries(qc);
+    },
+  });
+}
+
+export function useCategoryRenameMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ from, to }: { from: string; to: string }) =>
+      renameCategory(from, to),
+    onSuccess: () => {
+      invalidateTaxonomyQueries(qc);
+    },
+  });
+}
+
+export function useCategoryMergeMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ source, target }: { source: string[]; target: string }) =>
+      mergeCategories(source, target),
+    onSuccess: () => {
+      invalidateTaxonomyQueries(qc);
+    },
+  });
+}
+
+export function useCategoryClearMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categories: string[]) => clearCategories(categories),
+    onSuccess: () => {
+      invalidateTaxonomyQueries(qc);
     },
   });
 }

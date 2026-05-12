@@ -11,16 +11,205 @@ import (
 func seedTagData(t *testing.T, store *Store) {
 	t.Helper()
 	rows := []aitag.Result{
-		{ProjectID: "proj1", RepoPath: "a.png", ContentHash: "h1", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "icon", Tags: []string{"dark-mode", "navigation", "sidebar"}, UpdatedAt: "2026-01-01T00:00:00Z"},
-		{ProjectID: "proj1", RepoPath: "b.png", ContentHash: "h2", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", Tags: []string{"dark-mode", "hero-section"}, UpdatedAt: "2026-01-01T00:00:00Z"},
-		{ProjectID: "proj2", RepoPath: "c.svg", ContentHash: "h3", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "icon", Tags: []string{"navigation", "mobile"}, UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ProjectID: "proj1", RepoPath: "a.png", ContentHash: "h1", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "icon", CategoryI18n: map[string]string{"zh-TW": "圖示", "ja": "アイコン"}, Tags: []string{"dark-mode", "navigation", "sidebar"}, UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ProjectID: "proj1", RepoPath: "b.png", ContentHash: "h2", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", CategoryI18n: map[string]string{"zh-TW": "照片", "ja": "写真"}, Tags: []string{"dark-mode", "hero-section"}, UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ProjectID: "proj2", RepoPath: "c.svg", ContentHash: "h3", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "icon", CategoryI18n: map[string]string{"zh-TW": "圖示", "ja": "アイコン"}, Tags: []string{"navigation", "mobile"}, UpdatedAt: "2026-01-01T00:00:00Z"},
 		{ProjectID: "proj2", RepoPath: "d.png", ContentHash: "h4", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusFailed, Category: "", Tags: []string{"should-not-appear"}, UpdatedAt: "2026-01-01T00:00:00Z"},
-		{ProjectID: "proj1", RepoPath: "e.jpg", ContentHash: "h5", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", Tags: []string{"boxing", "sports"}, TagsI18n: map[string][]string{"zh-TW": {"拳擊", "運動"}, "ja": {"ボクシング", "スポーツ"}}, UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ProjectID: "proj1", RepoPath: "e.jpg", ContentHash: "h5", HashAlgorithm: "sha256", ProviderName: "ollama", ModelName: "llava", Status: aitag.StatusReady, Category: "photo", CategoryI18n: map[string]string{"zh-TW": "照片", "ja": "写真"}, Tags: []string{"boxing", "sports"}, TagsI18n: map[string][]string{"zh-TW": {"拳擊", "運動"}, "ja": {"ボクシング", "スポーツ"}}, UpdatedAt: "2026-01-01T00:00:00Z"},
 	}
 	for _, r := range rows {
 		if err := store.UpsertAITagResult(r); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestAITagCategoryList_Basic(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	page, err := store.AITagCategoryList(AICategoryListQuery{Locale: "zh-TW"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 2 {
+		t.Fatalf("expected 2 categories, got %d", page.Total)
+	}
+	if page.TotalCategorizedAssets != 4 {
+		t.Fatalf("expected 4 categorized assets, got %d", page.TotalCategorizedAssets)
+	}
+	if got := page.Translations["icon"]; got != "圖示" {
+		t.Fatalf("expected icon translation 圖示, got %q", got)
+	}
+	if got := page.TagTranslations["boxing"]; got != "拳擊" {
+		t.Fatalf("expected boxing translation 拳擊, got %q", got)
+	}
+
+	icon := page.Categories[0]
+	if icon.Category != "icon" {
+		t.Fatalf("expected first category icon, got %q", icon.Category)
+	}
+	if icon.AssetCount != 2 {
+		t.Fatalf("expected icon asset count 2, got %d", icon.AssetCount)
+	}
+	if icon.ProjectCount != 2 {
+		t.Fatalf("expected icon project count 2, got %d", icon.ProjectCount)
+	}
+	if icon.TagCount != 4 {
+		t.Fatalf("expected icon tag count 4, got %d", icon.TagCount)
+	}
+	if len(icon.TopTags) == 0 || icon.TopTags[0] != "navigation" {
+		t.Fatalf("expected navigation as top icon tag, got %v", icon.TopTags)
+	}
+}
+
+func TestAITagCategoryList_Search(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	page, err := store.AITagCategoryList(AICategoryListQuery{Search: "pho"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Categories[0].Category != "photo" {
+		t.Fatalf("expected photo search result, got total=%d categories=%v", page.Total, page.Categories)
+	}
+
+	page, err = store.AITagCategoryList(AICategoryListQuery{Search: "圖示"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Categories[0].Category != "icon" {
+		t.Fatalf("expected localized icon search result, got total=%d categories=%v", page.Total, page.Categories)
+	}
+}
+
+func TestAITagCategoryRename_PreservesTagData(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	affected, err := store.AITagCategoryRename("photo", "photography")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected != 2 {
+		t.Fatalf("expected 2 affected rows, got %d", affected)
+	}
+
+	page, err := store.AITagCategoryList(AICategoryListQuery{Search: "photography", Locale: "zh-TW"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Categories[0].AssetCount != 2 {
+		t.Fatalf("expected renamed category with 2 assets, got total=%d categories=%v", page.Total, page.Categories)
+	}
+	if page.Translations["photography"] != "照片" {
+		t.Fatalf("expected renamed category to preserve translation, got %q", page.Translations["photography"])
+	}
+
+	tags, err := store.AITagResultAny("h2", "sha256")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags == nil {
+		t.Fatal("expected AI tag row for h2")
+	}
+	if len(tags.Tags) != 2 || tags.Tags[0] != "dark-mode" || tags.Description != "" {
+		t.Fatalf("category rename should preserve tags and description, got %+v", tags)
+	}
+}
+
+func TestAITagCategoryMerge_UsesTargetTranslation(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	affected, err := store.AITagCategoryMerge([]string{"photo"}, "icon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected != 2 {
+		t.Fatalf("expected 2 affected rows, got %d", affected)
+	}
+
+	page, err := store.AITagCategoryList(AICategoryListQuery{Locale: "zh-TW"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Categories[0].Category != "icon" || page.Categories[0].AssetCount != 4 {
+		t.Fatalf("expected all rows merged into icon, got total=%d categories=%v", page.Total, page.Categories)
+	}
+	if page.Translations["icon"] != "圖示" {
+		t.Fatalf("expected target translation 圖示, got %q", page.Translations["icon"])
+	}
+}
+
+func TestAITagCategoryClear_PreservesRowsAndTags(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	affected, err := store.AITagCategoryClear([]string{"photo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected != 2 {
+		t.Fatalf("expected 2 affected rows, got %d", affected)
+	}
+
+	page, err := store.AITagCategoryList(AICategoryListQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Categories[0].Category != "icon" {
+		t.Fatalf("expected only icon category after clear, got total=%d categories=%v", page.Total, page.Categories)
+	}
+
+	tagPage, err := store.AITagList(AITagListQuery{Search: "boxing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tagPage.Total != 1 || tagPage.Tags[0].Count != 1 {
+		t.Fatalf("clear category should preserve tags, got total=%d tags=%v", tagPage.Total, tagPage.Tags)
+	}
+
+	var category, i18n string
+	if err := store.rdb.QueryRow(`
+		SELECT category, COALESCE(category_i18n_json, '{}') FROM ai_tags
+		WHERE project_id = 'proj1' AND repo_path = 'e.jpg'
+	`).Scan(&category, &i18n); err != nil {
+		t.Fatal(err)
+	}
+	if category != "" || i18n != "{}" {
+		t.Fatalf("expected category fields cleared, got category=%q i18n=%q", category, i18n)
 	}
 }
 

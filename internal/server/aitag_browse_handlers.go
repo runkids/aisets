@@ -141,6 +141,96 @@ func (s *Server) handleTagCategories(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"categories": cats})
 }
 
+func (s *Server) handleTagCategoryList(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	limit, err := parseOptionalInt(q.Get("limit"), "limit")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	offset, err := parseOptionalInt(q.Get("offset"), "offset")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	page, err := s.store.AITagCategoryList(config.AICategoryListQuery{
+		Search: q.Get("q"),
+		Sort:   q.Get("sort"),
+		Locale: sanitizeLocale(q.Get("locale")),
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) handleTagCategoryRename(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.From == "" || body.To == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("from and to are required"))
+		return
+	}
+	affected, err := s.store.AITagCategoryRename(body.From, body.To)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "affected": affected})
+}
+
+func (s *Server) handleTagCategoryMerge(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Source []string `json:"source"`
+		Target string   `json:"target"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.Source) == 0 || body.Target == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("source and target are required"))
+		return
+	}
+	affected, err := s.store.AITagCategoryMerge(body.Source, body.Target)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "affected": affected})
+}
+
+func (s *Server) handleTagCategoryClear(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Categories []string `json:"categories"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(body.Categories) == 0 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("categories are required"))
+		return
+	}
+	affected, err := s.store.AITagCategoryClear(body.Categories)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "affected": affected})
+}
+
 func (s *Server) handleTagSuggest(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	prefix := q.Get("q")

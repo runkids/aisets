@@ -117,6 +117,7 @@ type Props = {
     usageNotApplicableFiles?: number;
   };
   initialSearchQuery: string;
+  initialAICategory: string;
   initialFocusAssetId: string;
   imagePreviewEnabled: boolean;
   ocrEnabled: boolean;
@@ -134,13 +135,14 @@ function defaultBrowseStoredState(
   projectFilterName: string,
   initialCustomFilterId: string,
   initialSearchQuery = "",
+  initialAICategory = "",
 ): BrowseStoredState {
   return {
     filters: {
       project: projectFilterName,
       ext: "",
       customFilter: initialCustomFilterId,
-      aiCategory: "",
+      aiCategory: initialAICategory,
       aiOcrStatus: "",
       hasGPS: "",
     },
@@ -174,7 +176,12 @@ function optionOrDefault<T extends string>(
 export function normalizeBrowseStoredState(
   value: unknown,
   defaults: BrowseStoredState,
-  pinned?: { project?: string; customFilter?: string; searchQuery?: string },
+  pinned?: {
+    project?: string;
+    customFilter?: string;
+    searchQuery?: string;
+    aiCategory?: string;
+  },
 ): BrowseStoredState {
   const state = isRecord(value) ? value : {};
   const rawFilters = isRecord(state.filters) ? state.filters : {};
@@ -198,6 +205,7 @@ export function normalizeBrowseStoredState(
 
   if (pinned?.project) filters.project = pinned.project;
   if (pinned?.customFilter) filters.customFilter = pinned.customFilter;
+  if (pinned?.aiCategory) filters.aiCategory = pinned.aiCategory;
   const searchQuery =
     pinned?.searchQuery != null
       ? pinned.searchQuery
@@ -219,7 +227,12 @@ export function normalizeBrowseStoredState(
 
 function readBrowseStoredState(
   defaults: BrowseStoredState,
-  pinned?: { project?: string; customFilter?: string; searchQuery?: string },
+  pinned?: {
+    project?: string;
+    customFilter?: string;
+    searchQuery?: string;
+    aiCategory?: string;
+  },
 ) {
   if (typeof window === "undefined") return defaults;
   try {
@@ -601,6 +614,7 @@ export function BrowseView({
   projectFilterName,
   stats,
   initialSearchQuery,
+  initialAICategory,
   initialFocusAssetId,
   imagePreviewEnabled,
   ocrEnabled,
@@ -616,11 +630,17 @@ export function BrowseView({
   const { t } = useTranslation();
   const [initialBrowseState] = useState(() =>
     readBrowseStoredState(
-      defaultBrowseStoredState(projectFilterName, initialCustomFilterId),
+      defaultBrowseStoredState(
+        projectFilterName,
+        initialCustomFilterId,
+        initialSearchQuery,
+        initialAICategory,
+      ),
       {
         project: projectFilterName || undefined,
         customFilter: initialCustomFilterId || undefined,
         searchQuery: initialSearchQuery || undefined,
+        aiCategory: initialAICategory || undefined,
       },
     ),
   );
@@ -878,9 +898,12 @@ export function BrowseView({
         value: "",
         label: t("filterRail.allCategories"),
       },
-      ...cats.map((o) => ({ value: o.id, label: `${o.id} (${o.count})` })),
+      ...cats.map((o) => ({
+        value: o.id,
+        label: `${facets?.aiCategoryTranslations?.[o.id] ?? o.id} (${o.count})`,
+      })),
     ];
-  }, [aiCategoryFacet, t]);
+  }, [aiCategoryFacet, facets?.aiCategoryTranslations, t]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {

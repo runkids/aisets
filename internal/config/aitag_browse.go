@@ -35,6 +35,33 @@ type AITagListPage struct {
 	CategoryTranslations map[string]string `json:"categoryTranslations,omitempty"`
 }
 
+// AICategoryListQuery holds parameters for browsing unique AI categories.
+type AICategoryListQuery struct {
+	Search string
+	Sort   string // "count" (default) or "alpha"
+	Locale string
+	Limit  int
+	Offset int
+}
+
+// AICategoryListItem represents one unique AI category with aggregated metadata.
+type AICategoryListItem struct {
+	Category     string   `json:"category"`
+	AssetCount   int      `json:"assetCount"`
+	TagCount     int      `json:"tagCount"`
+	ProjectCount int      `json:"projectCount"`
+	TopTags      []string `json:"topTags"`
+}
+
+// AICategoryListPage is the paginated result of AITagCategoryList.
+type AICategoryListPage struct {
+	Categories             []AICategoryListItem `json:"categories"`
+	Total                  int                  `json:"total"`
+	TotalCategorizedAssets int                  `json:"totalCategorizedAssets"`
+	Translations           map[string]string    `json:"translations,omitempty"`
+	TagTranslations        map[string]string    `json:"tagTranslations,omitempty"`
+}
+
 // AITagList returns paginated unique tags aggregated from all ready ai_tags rows.
 func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 	if q.Limit <= 0 {
@@ -140,26 +167,229 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 	return page, nil
 }
 
-func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[string]string, error) {
+// AITagCategoryList returns paginated unique categories aggregated from ready ai_tags rows.
+func (s *Store) AITagCategoryList(q AICategoryListQuery) (AICategoryListPage, error) {
+	if q.Limit <= 0 {
+		q.Limit = 100
+	}
+
+	var where []string
+	var args []any
+	where = append(where, "status = 'ready'", "category != ''")
+
+	if q.Search != "" {
+		where = append(where, "(category LIKE '%' || ? || '%' OR LOWER(category_i18n_json) LIKE '%' || ? || '%')")
+		low := strings.ToLower(q.Search)
+		args = append(args, low, low)
+	}
+
+	whereClause := strings.Join(where, " AND ")
+	orderBy := "asset_count DESC, category ASC"
+	if q.Sort == "alpha" {
+		orderBy = "category ASC, asset_count DESC"
+	}
+
+	listSQL := fmt.Sprintf(`
+		SELECT category,
+			COUNT(DISTINCT project_id || char(0) || repo_path) AS asset_count,
+			COUNT(DISTINCT project_id) AS project_count
+		FROM ai_tags
+		WHERE %s
+		GROUP BY category
+		ORDER BY %s
+		LIMIT ? OFFSET ?
+	`, whereClause, orderBy)
+
+	listArgs := append(append([]any{}, args...), q.Limit, q.Offset)
+	rows, err := s.rdb.Query(listSQL, listArgs...)
+	if err != nil {
+		return AICategoryListPage{}, fmt.Errorf("ai category list query: %w", err)
+	}
+	defer rows.Close()
+
+	categories := []AICategoryListItem{}
+	for rows.Next() {
+		var item AICategoryListItem
+		if err := rows.Scan(&item.Category, &item.AssetCount, &item.ProjectCount); err != nil {
+			return AICategoryListPage{}, fmt.Errorf("ai category list scan: %w", err)
+		}
+		categories = append(categories, item)
+	}
+	if err := rows.Err(); err != nil {
+		return AICategoryListPage{}, fmt.Errorf("ai category list rows: %w", err)
+	}
+
+	countSQL := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT category)
+		FROM ai_tags
+		WHERE %s
+	`, whereClause)
+	var total int
+	if err := s.rdb.QueryRow(countSQL, args...).Scan(&total); err != nil {
+		return AICategoryListPage{}, fmt.Errorf("ai category count: %w", err)
+	}
+
+	var totalAssets int
+	if err := s.rdb.QueryRow(`
+		SELECT COUNT(DISTINCT project_id || char(0) || repo_path)
+		FROM ai_tags
+		WHERE status = 'ready' AND category != ''
+	`).Scan(&totalAssets); err != nil {
+		return AICategoryListPage{}, fmt.Errorf("ai category assets: %w", err)
+	}
+
+	if len(categories) > 0 {
+		topTags, tagCounts, err := s.aiCategoryTopTags(categories)
+		if err != nil {
+			return AICategoryListPage{}, err
+		}
+		for i := range categories {
+			categories[i].TopTags = topTags[categories[i].Category]
+			if categories[i].TopTags == nil {
+				categories[i].TopTags = []string{}
+			}
+			categories[i].TagCount = tagCounts[categories[i].Category]
+		}
+	}
+
+	page := AICategoryListPage{
+		Categories:             categories,
+		Total:                  total,
+		TotalCategorizedAssets: totalAssets,
+	}
+
+	if q.Locale != "" && len(categories) > 0 {
+		if tr, err := s.aiCategoryListTranslations(categories, q.Locale); err == nil && len(tr) > 0 {
+			page.Translations = tr
+		}
+		topTags := uniqueTopTags(categories)
+		if tr, err := s.aiTagTranslationsForValues(topTags, q.Locale); err == nil && len(tr) > 0 {
+			page.TagTranslations = tr
+		}
+	}
+
+	return page, nil
+}
+
+func uniqueTopTags(categories []AICategoryListItem) []string {
+	seen := make(map[string]struct{})
+	values := make([]string, 0, len(categories)*5)
+	for _, category := range categories {
+		for _, tag := range category.TopTags {
+			if _, ok := seen[tag]; ok {
+				continue
+			}
+			seen[tag] = struct{}{}
+			values = append(values, tag)
+		}
+	}
+	return values
+}
+
+func (s *Store) aiCategoryTopTags(categories []AICategoryListItem) (map[string][]string, map[string]int, error) {
+	values := make([]string, len(categories))
+	for i, c := range categories {
+		values[i] = c.Category
+	}
+	catClause, args := inClauseSQL("category", values)
+	rows, err := s.rdb.Query(fmt.Sprintf(`
+		SELECT category, t.value, COUNT(*) AS tag_count
+		FROM ai_tags, json_each(tags_json) t
+		WHERE status = 'ready' AND %s
+		GROUP BY category, t.value
+		ORDER BY category ASC, tag_count DESC, t.value ASC
+	`, catClause), args...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ai category top tags query: %w", err)
+	}
+	defer rows.Close()
+
+	topTags := map[string][]string{}
+	tagCounts := map[string]int{}
+	seenTags := map[string]map[string]struct{}{}
+	for rows.Next() {
+		var category, tag string
+		var tagCount int
+		if err := rows.Scan(&category, &tag, &tagCount); err != nil {
+			return nil, nil, fmt.Errorf("ai category top tags scan: %w", err)
+		}
+		if seenTags[category] == nil {
+			seenTags[category] = map[string]struct{}{}
+		}
+		if _, ok := seenTags[category][tag]; !ok {
+			seenTags[category][tag] = struct{}{}
+			tagCounts[category]++
+		}
+		if len(topTags[category]) < 5 {
+			topTags[category] = append(topTags[category], tag)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("ai category top tags rows: %w", err)
+	}
+	return topTags, tagCounts, nil
+}
+
+func (s *Store) aiCategoryListTranslations(categories []AICategoryListItem, locale string) (map[string]string, error) {
 	locale = validLocaleOrEmpty(locale)
 	if locale == "" {
 		return nil, nil
 	}
-	placeholders := make([]string, len(tags))
-	args := make([]any, len(tags))
-	for i, t := range tags {
-		placeholders[i] = "?"
-		args[i] = t.Tag
+	values := make([]string, len(categories))
+	for i, c := range categories {
+		values[i] = c.Category
 	}
+	catClause, args := inClauseSQL("category", values)
+	rows, err := s.rdb.Query(fmt.Sprintf(`
+		SELECT category, json_extract(category_i18n_json, '$."`+locale+`"')
+		FROM ai_tags
+		WHERE status = 'ready'
+		  AND %s
+		  AND json_type(category_i18n_json, '$."`+locale+`"') = 'text'
+		GROUP BY category
+	`, catClause), args...)
+	if err != nil {
+		return nil, fmt.Errorf("ai category list translations: %w", err)
+	}
+	defer rows.Close()
+
+	result := map[string]string{}
+	for rows.Next() {
+		var category string
+		var translation *string
+		if err := rows.Scan(&category, &translation); err != nil {
+			return nil, fmt.Errorf("ai category list translations scan: %w", err)
+		}
+		if translation != nil && *translation != "" {
+			result[category] = *translation
+		}
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[string]string, error) {
+	values := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		values = append(values, tag.Tag)
+	}
+	return s.aiTagTranslationsForValues(values, locale)
+}
+
+func (s *Store) aiTagTranslationsForValues(tags []string, locale string) (map[string]string, error) {
+	locale = validLocaleOrEmpty(locale)
+	if locale == "" || len(tags) == 0 {
+		return nil, nil
+	}
+	inExpr, args := inClauseSQL("t.value", tags)
 
 	rows, err := s.rdb.Query(fmt.Sprintf(`
 		SELECT t.value,
 		       json_extract(at.tags_i18n_json, '$."`+locale+`"[' || t.key || ']')
 		FROM ai_tags at, json_each(at.tags_json) t
 		WHERE at.status = 'ready'
-		  AND t.value IN (%s)
+		  AND %s
 		  AND json_type(at.tags_i18n_json, '$."`+locale+`"') = 'array'
-	`, strings.Join(placeholders, ",")), args...)
+	`, inExpr), args...)
 	if err != nil {
 		return nil, fmt.Errorf("aitag translations: %w", err)
 	}
@@ -214,6 +444,72 @@ func (s *Store) aiCategoryTranslations(locale string) (map[string]string, error)
 // AITagRename renames all occurrences of `from` to `to` in tags_json across all ready ai_tags rows.
 func (s *Store) AITagRename(from, to string) (int, error) {
 	return s.AITagMerge([]string{from}, to)
+}
+
+// AITagCategoryRename renames all ready ai_tags rows from one category to another.
+func (s *Store) AITagCategoryRename(from, to string) (int, error) {
+	if from == "" || to == "" {
+		return 0, fmt.Errorf("ai category rename: from and to must be non-empty")
+	}
+	res, err := s.db.Exec(`
+		UPDATE ai_tags
+		SET category = ?
+		WHERE status = 'ready' AND category = ?
+	`, to, from)
+	if err != nil {
+		return 0, fmt.Errorf("ai category rename: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+	return int(affected), nil
+}
+
+// AITagCategoryMerge merges all source categories into target without changing tags or descriptions.
+func (s *Store) AITagCategoryMerge(source []string, target string) (int, error) {
+	if len(source) == 0 || target == "" {
+		return 0, fmt.Errorf("ai category merge: source and target must be non-empty")
+	}
+
+	targetI18n := "{}"
+	var raw string
+	if err := s.rdb.QueryRow(`
+		SELECT COALESCE(category_i18n_json, '{}') FROM ai_tags
+		WHERE status = 'ready' AND category = ? AND category_i18n_json != '{}'
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, target).Scan(&raw); err == nil && raw != "" {
+		targetI18n = raw
+	}
+
+	inExpr, args := inClauseSQL("category", source)
+	updateArgs := append([]any{target, targetI18n}, args...)
+	res, err := s.db.Exec(fmt.Sprintf(`
+		UPDATE ai_tags
+		SET category = ?, category_i18n_json = ?
+		WHERE status = 'ready' AND %s
+	`, inExpr), updateArgs...)
+	if err != nil {
+		return 0, fmt.Errorf("ai category merge: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+	return int(affected), nil
+}
+
+// AITagCategoryClear clears categories from ready ai_tags rows while preserving tag data.
+func (s *Store) AITagCategoryClear(categories []string) (int, error) {
+	if len(categories) == 0 {
+		return 0, fmt.Errorf("ai category clear: categories must be non-empty")
+	}
+	inExpr, args := inClauseSQL("category", categories)
+	res, err := s.db.Exec(fmt.Sprintf(`
+		UPDATE ai_tags
+		SET category = '', category_i18n_json = '{}'
+		WHERE status = 'ready' AND %s
+	`, inExpr), args...)
+	if err != nil {
+		return 0, fmt.Errorf("ai category clear: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+	return int(affected), nil
 }
 
 // AITagMerge merges all source tags into target in tags_json and tags_i18n_json across all ready ai_tags rows.

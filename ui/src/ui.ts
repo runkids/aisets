@@ -41,11 +41,13 @@ export const modes: Mode[] = [
 ];
 
 export function pathForMode(mode: Mode) {
+  if (mode === "tags") return "/tags-categories";
   return `/${mode}`;
 }
 
 export function modeForPath(pathname: string): Mode {
   const segment = pathname.replace(/^\/+|\/+$/g, "").split("/")[0];
+  if (segment === "tags-categories") return "tags";
   return modes.includes(segment as Mode) ? (segment as Mode) : "projects";
 }
 

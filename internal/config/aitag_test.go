@@ -78,6 +78,7 @@ func TestAITagEnrichFieldsRoundTrip(t *testing.T) {
 		ModelName:          "llava",
 		Status:             aitag.StatusReady,
 		Category:           "photo",
+		CategoryI18n:       map[string]string{"zh-TW": "照片", "en": "Photo"},
 		Tags:               []string{"portrait", "outdoor"},
 		Description:        "A person standing in front of Tokyo Tower",
 		ContainsFace:       true,
@@ -121,6 +122,9 @@ func TestAITagEnrichFieldsRoundTrip(t *testing.T) {
 	if !gotBest.ContainsFace || gotBest.SceneType != "outdoor" || gotBest.EstimatedLocation != "Tokyo, Japan" {
 		t.Fatalf("BestMatch enrich fields mismatch: %+v", gotBest)
 	}
+	if gotBest.CategoryI18n["zh-TW"] != "照片" {
+		t.Fatalf("expected zh-TW category translation, got %+v", gotBest.CategoryI18n)
+	}
 
 	gotHash, found, err := store.AITagResultForContentHash("facehash", "sha256", "ollama", "llava")
 	if err != nil {
@@ -131,6 +135,9 @@ func TestAITagEnrichFieldsRoundTrip(t *testing.T) {
 	}
 	if !gotHash.ContainsFace || gotHash.EstimatedLocation != "Tokyo, Japan" {
 		t.Fatalf("ContentHash dedup enrich fields mismatch: %+v", gotHash)
+	}
+	if gotHash.CategoryI18n["zh-TW"] != "照片" {
+		t.Fatalf("expected zh-TW category translation on content hash lookup, got %+v", gotHash.CategoryI18n)
 	}
 }
 

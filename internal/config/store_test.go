@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/imageproc"
 	"aisets/internal/lint"
@@ -745,6 +746,51 @@ func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	}
 	if page.Items[0].Optimization[0].Operation != "convert-avif" {
 		t.Fatalf("catalog optimization operation = %#v", page.Items[0].Optimization[0])
+	}
+}
+
+func TestCatalogItems_AICategoryFacetTranslations(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	asset := scanAsset(root, "p", "workspace", "src/ball.png", 100, "ball", 0, 0)
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-12T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{asset},
+		Stats:       scanner.CatalogStats{TotalFiles: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertAITagResult(aitag.Result{
+		ProjectID:     asset.ProjectID,
+		RepoPath:      asset.RepoPath,
+		ContentHash:   asset.ContentHash,
+		HashAlgorithm: asset.HashAlgorithm,
+		ProviderName:  "ollama",
+		ModelName:     "llava",
+		Status:        aitag.StatusReady,
+		Category:      "sports",
+		CategoryI18n: map[string]string{
+			"en":    "Sports",
+			"zh-TW": "運動",
+		},
+		Tags: []string{"golf"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.CatalogItems(CatalogItemQuery{Locale: "en", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := page.Facets.AICategoryTranslations["sports"]; got != "Sports" {
+		t.Fatalf("expected English aiCategory translation, got %q", got)
 	}
 }
 

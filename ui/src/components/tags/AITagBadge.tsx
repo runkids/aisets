@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AiChipIcon } from "../ui/AiChipIcon";
 import type { AssetItem } from "../../types";
 import { Badge, Tooltip } from "../ui";
@@ -5,10 +6,16 @@ import { Badge, Tooltip } from "../ui";
 const MAX_VISIBLE_TAGS = 2;
 
 export function AITagBadge({ item }: { item: AssetItem }) {
+  const { i18n } = useTranslation();
   if (!item.aiTag || item.aiTag.status !== "ready") return null;
 
-  const category = item.aiTag.category;
-  const tags = item.aiTag.tags ?? [];
+  const category =
+    item.aiTag.categoryI18n?.[i18n.language] ?? item.aiTag.category;
+  const localizedTags = item.aiTag.tagsI18n?.[i18n.language];
+  const tags =
+    localizedTags && localizedTags.length > 0
+      ? localizedTags
+      : (item.aiTag.tags ?? []);
   const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
   const overflowCount = tags.length - MAX_VISIBLE_TAGS;
   const allTagsLabel = tags.join(", ");
