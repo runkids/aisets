@@ -21,22 +21,22 @@ import {
   scopedStatsForProject,
 } from "@/appScope";
 import { AppTopbar } from "@/components/shared/AppTopbar";
-import { AssetDrawer } from "@/components/drawer/AssetDrawer";
-import { BrowseView } from "@/components/browse/BrowseView";
+import { AssetDrawer } from "@/features/drawer";
+import { BrowseView } from "@/features/browse";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { ProjectsView } from "@/components/project/ProjectsView";
 import { DirectoryPickerModal } from "@/components/project/DirectoryPickerModal";
-import { DuplicatesView } from "@/components/duplicates/DuplicatesView";
-import { LintView } from "@/components/lint/LintView";
+import { DuplicatesView } from "@/features/duplicates";
+import { LintView } from "@/features/lint";
 import { NavSidebar } from "@/components/shared/NavSidebar";
-import { ImageToolsView } from "@/components/image-tools/ImageToolsView";
-import { OptimizeView } from "@/components/optimize/OptimizeView";
-import { PreCheckView } from "@/components/scan/PreCheckView";
+import { ImageToolsView } from "@/features/image-tools";
+import { OptimizeView } from "@/features/optimize";
+import { PreCheckView } from "@/features/scan";
 import { PromptsView } from "@/components/prompts/PromptsView";
 import { PreviewModal } from "@/components/shared/PreviewModal";
 import { ScrollToTop } from "@/components/shared/ScrollToTop";
-import { ScanHistoryView } from "@/components/scan/ScanHistoryView";
-import { TagsView } from "@/components/tags/TagsView";
+import { ScanHistoryView } from "@/features/scan";
+import { TagsView } from "@/features/tags";
 import {
   Button,
   EmptyState,
@@ -44,7 +44,7 @@ import {
   PromptDialog,
   ScanProgressContent,
 } from "@/components/ui";
-import { SettingsView } from "@/components/settings/SettingsView";
+import { SettingsView } from "@/features/settings";
 import { useToast } from "@/components/shared/ToastProvider";
 import {
   catalogQueryKey,
@@ -126,7 +126,7 @@ import {
   pathForMode,
   type Mode,
 } from "@/ui";
-import { clearEstimateCaches } from "@/components/optimize/optimizeCache";
+import { clearEstimateCaches } from "@/features/optimize";
 import {
   animateImageToolBasket,
   mergeImageToolBasket,
@@ -1416,7 +1416,6 @@ export function App() {
                 settingsQuery.data?.settings.llmTranslationLocales
               }
               onStartTranslate={onStartTranslateActivity}
-              onStopTranslate={onStopTranslateActivity}
             />
           ) : mode === "prompts" ? (
             <PromptsView />

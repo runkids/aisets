@@ -49,14 +49,14 @@ import { DirectoryPickerModal } from "@/components/project/DirectoryPickerModal"
 import type { AssetItem, CustomAssetFilter, RenameRules } from "@/types";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import { formatBytes } from "@/ui";
-import { BrowseGrid } from "@/components/browse/BrowseGrid";
-import { BrowseList } from "@/components/browse/BrowseList";
+import { BrowseGrid } from "./BrowseGrid";
+import { BrowseList } from "./BrowseList";
 import {
   BrowseToolbar,
   type SearchMode,
   type SortMode,
   type ViewMode,
-} from "@/components/browse/BrowseToolbar";
+} from "./BrowseToolbar";
 import { useImageBackgroundControls } from "@/imageBackground";
 import { FilterRail } from "@/components/shared/FilterRail";
 import { useToast } from "@/components/shared/ToastProvider";

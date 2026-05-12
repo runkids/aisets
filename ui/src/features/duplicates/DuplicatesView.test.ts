@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AssetItem, DuplicateGroup } from "../../types";
+import type { AssetItem, DuplicateGroup } from "@/types";
 import { buildDuplicateGroupViews } from "./duplicateGroupViews";
 
 function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {

@@ -23,8 +23,8 @@ All stack-specific rules and conventions live in `.skillshare/extras/rules/` and
 | Rule file | Scope |
 |-----------|-------|
 | `react-i18n.md` | i18n code-first, CJK punctuation, key hygiene, locale scope, fallbacks |
-| `react-ui-components.md` | UI primitives, layout patterns, settings, Rail, drawer, toast, icons |
-| `react-data-patterns.md` | Filtering, facets, virtual scroll, lazy load, React Query, portals |
+| `react-ui-components.md` | UI primitives, layout patterns, settings, Rail, drawer, toast, icons, feature refactors |
+| `react-data-patterns.md` | Filtering, facets, virtual scroll, lazy load, React Query, portals, effect dependencies |
 | `react-streaming.md` | NDJSON streaming, background activities, navigation badges |
 | `go-conventions.md` | General Go, testing, file splitting, struct vs DB, derived fields |
 | `go-sqlite.md` | Read/write pools, batch TX, query optimization, SQL patterns |

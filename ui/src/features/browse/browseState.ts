@@ -4,11 +4,7 @@ import { matchesOCRSearchText } from "@/ocrSearch";
 import { usageClassification } from "@/projectScanIntent";
 import type { AssetItem, CustomAssetFilter } from "@/types";
 import { fileName } from "@/ui";
-import type {
-  SearchMode,
-  SortMode,
-  ViewMode,
-} from "@/components/browse/BrowseToolbar";
+import type { SearchMode, SortMode, ViewMode } from "./BrowseToolbar";
 
 export type BrowseStats = {
   totalFiles: number;

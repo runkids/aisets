@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { facetOptions, projectFacetIds } from "./browseFacets";
-import type { AssetItem } from "../../types";
+import type { AssetItem } from "@/types";
 
 function makeItem(projectName: string): AssetItem {
   return {

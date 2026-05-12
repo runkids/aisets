@@ -1,0 +1,47 @@
+import { useTranslation } from "react-i18next";
+import { AiChipIcon } from "@/components/ui/AiChipIcon";
+import type { AssetItem } from "@/types";
+import { Badge, Tooltip } from "@/components/ui";
+
+const MAX_VISIBLE_TAGS = 2;
+
+export function AITagBadge({ item }: { item: AssetItem }) {
+  const { i18n } = useTranslation();
+  if (!item.aiTag || item.aiTag.status !== "ready") return null;
+
+  const category =
+    item.aiTag.categoryI18n?.[i18n.language] ?? item.aiTag.category;
+  const localizedTags = item.aiTag.tagsI18n?.[i18n.language];
+  const tags =
+    localizedTags && localizedTags.length > 0
+      ? localizedTags
+      : (item.aiTag.tags ?? []);
+  const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
+  const overflowCount = tags.length - MAX_VISIBLE_TAGS;
+  const allTagsLabel = tags.join(", ");
+
+  return (
+    <>
+      {category && (
+        <Badge tone="purple">
+          <AiChipIcon size={10} />
+          {category}
+        </Badge>
+      )}
+      {visibleTags.map((tag) => (
+        <Badge key={tag} tone="line" className="text-g-ink-3">
+          {tag}
+        </Badge>
+      ))}
+      {overflowCount > 0 && (
+        <Tooltip label={allTagsLabel} placement="top">
+          <span className="inline-flex">
+            <Badge tone="line" className="text-g-ink-4">
+              +{overflowCount}
+            </Badge>
+          </span>
+        </Tooltip>
+      )}
+    </>
+  );
+}

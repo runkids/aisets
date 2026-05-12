@@ -1,2 +1,2 @@
 /* eslint-disable react-refresh/only-export-components */
-export * from "@/features/browse";
+export * from "@/features/browse/BrowseView";

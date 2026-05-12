@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { customFilterOptions } from "../../customAssetFilters";
-import type { AssetItem, CustomAssetFilter } from "../../types";
+import { customFilterOptions } from "@/customAssetFilters";
+import type { AssetItem, CustomAssetFilter } from "@/types";
 import {
   applyBrowseFilters,
   normalizeBrowseStoredState,
   resetBrowseFiltersForStatusChange,
-} from "./BrowseView";
+} from "./browseState";
 
 function makeItem(overrides: Partial<AssetItem> = {}): AssetItem {
   return {
@@ -169,7 +169,6 @@ describe("resetBrowseFiltersForStatusChange", () => {
       hasGPS: "",
     });
   });
-
 });
 
 describe("applyBrowseFilters", () => {

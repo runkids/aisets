@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultTagViewLocale, tagViewLocaleOptions } from "./TagsView";
+import { defaultTagViewLocale, tagViewLocaleOptions } from "./tagViewLocale";
 
 describe("tagViewLocaleOptions", () => {
   it("only exposes configured translation locales", () => {

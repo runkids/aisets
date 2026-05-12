@@ -1,4 +1,4 @@
-import type { OptimizationOperation } from "../components/optimize/optimizeTypes";
+import type { OptimizationOperation } from "@/features/optimize";
 
 export type OptimizeActivityPhase =
   | "idle"
@@ -27,7 +27,12 @@ export type OptimizeActivityState = {
 };
 
 export type OptimizeActivityAction =
-  | { type: "start"; total: number; stage?: OptimizeActivityStage; startedAt?: number }
+  | {
+      type: "start";
+      total: number;
+      stage?: OptimizeActivityStage;
+      startedAt?: number;
+    }
   | { type: "stage"; stage: OptimizeActivityStage }
   | { type: "operation"; operation: OptimizationOperation }
   | { type: "stopping" }
