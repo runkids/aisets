@@ -101,13 +101,19 @@ export function VLMBackendSelect({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div
+      className={
+        isAgent
+          ? "grid w-full max-w-[466px] grid-cols-[minmax(0,1fr)_180px] items-center gap-1.5"
+          : "w-full max-w-[466px]"
+      }
+    >
       <DropdownMenuPrimitive.Root>
         <DropdownMenuPrimitive.Trigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className="inline-flex h-g-btn-md w-[280px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2 shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+            className="inline-flex h-g-btn-md w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-3 font-g text-g-ui font-[510] tracking-g-ui text-g-ink-2 shadow-g-inset transition-[background,border-color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
           >
             <span className="min-w-0 flex-1 truncate text-left">
               {displayLabel()}
@@ -254,7 +260,7 @@ export function VLMBackendSelect({
           placeholder={t("settings.vlmBackendAgentModelPlaceholder")}
           disabled={disabled}
           aria-label={t("settings.vlmBackendAgentModelPlaceholder")}
-          className="w-[180px]"
+          className="w-full"
         />
       )}
     </div>
