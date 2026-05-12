@@ -91,6 +91,37 @@ func TestResultWithEnglishFallback(t *testing.T) {
 	}
 }
 
+func TestIsLocaleTranslationUsableForLocaleRawCategory(t *testing.T) {
+	tests := []struct {
+		name     string
+		locale   string
+		raw      string
+		category string
+		want     bool
+	}{
+		{name: "english raw can stay english", locale: "en", raw: "crafts", category: "crafts", want: true},
+		{name: "chinese raw can stay chinese", locale: "zh-TW", raw: "動物", category: "動物", want: true},
+		{name: "english raw cannot stay untranslated for chinese", locale: "zh-TW", raw: "crafts", category: "crafts", want: false},
+		{name: "chinese raw cannot stay untranslated for english", locale: "en", raw: "動物", category: "動物", want: false},
+		{name: "translated category is accepted", locale: "zh-TW", raw: "crafts", category: "手工藝", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := Result{
+				Status:      StatusReady,
+				Category:    tt.raw,
+				Tags:        []string{"tag"},
+				Description: "A usable description",
+			}
+			got := IsLocaleTranslationUsableForLocale(raw, tt.locale, tt.category, []string{"標籤"}, "可用的描述")
+			if got != tt.want {
+				t.Fatalf("IsLocaleTranslationUsableForLocale() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCleanInvalidI18n(t *testing.T) {
 	result := Result{
 		Status:      StatusReady,

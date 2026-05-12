@@ -376,7 +376,8 @@ func (s *Store) AITagsMissingLocaleForProjects(locale string, contentHashes []st
 		where = append(where, projectClause)
 		args = append(args, projectArgs...)
 	}
-	query := `SELECT project_id, repo_path, content_hash, hash_algorithm, category, tags_json, description
+	query := `SELECT project_id, repo_path, content_hash, hash_algorithm, category, tags_json, description,
+			COALESCE(category_i18n_json, '{}'), COALESCE(tags_i18n_json, '{}'), COALESCE(description_i18n_json, '{}')
 		FROM ai_tags
 		WHERE ` + strings.Join(where, " AND ")
 	rows, err := s.rdb.Query(query, args...)
@@ -387,22 +388,42 @@ func (s *Store) AITagsMissingLocaleForProjects(locale string, contentHashes []st
 	var results []AITagI18nRow
 	for rows.Next() {
 		var r AITagI18nRow
-		var tagsRaw string
-		if err := rows.Scan(&r.ProjectID, &r.RepoPath, &r.ContentHash, &r.HashAlgorithm, &r.Category, &tagsRaw, &r.Description); err != nil {
+		var tagsRaw, catI18n, tagsI18n, descI18n string
+		if err := rows.Scan(&r.ProjectID, &r.RepoPath, &r.ContentHash, &r.HashAlgorithm, &r.Category, &tagsRaw, &r.Description, &catI18n, &tagsI18n, &descI18n); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(tagsRaw), &r.Tags)
-		if !aitag.IsResultUsable(aitag.Result{
+		raw := aitag.Result{
 			Status:      aitag.StatusReady,
 			Category:    r.Category,
 			Tags:        r.Tags,
 			Description: r.Description,
-		}) {
+		}
+		if !aitag.IsResultUsable(raw) {
+			continue
+		}
+		if !aitagI18nLocaleMissing(raw, locale, catI18n, tagsI18n, descI18n) {
 			continue
 		}
 		results = append(results, r)
 	}
 	return results, rows.Err()
+}
+
+func aitagI18nLocaleMissing(raw aitag.Result, locale, catI18n, tagsI18n, descI18n string) bool {
+	catMap := map[string]string{}
+	tagsMap := map[string][]string{}
+	descMap := map[string]string{}
+	_ = json.Unmarshal([]byte(catI18n), &catMap)
+	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
+	_ = json.Unmarshal([]byte(descI18n), &descMap)
+	category, hasCategory := catMap[locale]
+	tags, hasTags := tagsMap[locale]
+	description, hasDescription := descMap[locale]
+	if !hasCategory || !hasTags || !hasDescription {
+		return true
+	}
+	return !aitag.IsLocaleTranslationUsableForLocale(raw, locale, category, tags, description)
 }
 
 func joinStrings(ss []string, sep string) string {
@@ -425,8 +446,13 @@ func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category 
 }
 
 func (s *Store) BackfillLocaleI18nForAsset(projectID, repoPath, contentHash, hashAlgorithm, locale, category string, tags []string, description string) error {
+	_, err := s.BackfillLocaleI18nForAssetApplied(projectID, repoPath, contentHash, hashAlgorithm, locale, category, tags, description)
+	return err
+}
+
+func (s *Store) BackfillLocaleI18nForAssetApplied(projectID, repoPath, contentHash, hashAlgorithm, locale, category string, tags []string, description string) (bool, error) {
 	if !validI18nLocales[locale] {
-		return nil
+		return false, nil
 	}
 	var raw aitag.Result
 	var catI18n, tagsRaw, tagsI18n, descI18n string
@@ -441,15 +467,15 @@ func (s *Store) BackfillLocaleI18nForAsset(projectID, repoPath, contentHash, has
 		FROM ai_tags WHERE `+where+`
 		ORDER BY updated_at DESC LIMIT 1`, args...).Scan(&raw.Category, &tagsRaw, &raw.Description, &catI18n, &tagsI18n, &descI18n)
 	if err == sql.ErrNoRows {
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	raw.Status = aitag.StatusReady
 	_ = json.Unmarshal([]byte(tagsRaw), &raw.Tags)
-	if !aitag.IsResultUsable(raw) || !aitag.IsLocaleTranslationUsable(raw, category, tags, description) {
-		return nil
+	if !aitag.IsResultUsable(raw) || !aitag.IsLocaleTranslationUsableForLocale(raw, locale, category, tags, description) {
+		return false, nil
 	}
 
 	catMap := map[string]string{}
@@ -484,10 +510,17 @@ func (s *Store) BackfillLocaleI18nForAsset(projectID, repoPath, contentHash, has
 		updateWhere += ` AND project_id = ? AND repo_path = ?`
 		updateArgs = append(updateArgs, projectID, repoPath)
 	}
-	_, err = s.db.Exec(`UPDATE ai_tags
+	result, err := s.db.Exec(`UPDATE ai_tags
 		SET category_i18n_json = ?, tags_i18n_json = ?, description_i18n_json = ?
 		WHERE `+updateWhere, updateArgs...)
-	return err
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return true, nil
+	}
+	return affected > 0, nil
 }
 
 // AllReadyContentHashes returns content hashes of all ready AI tag rows.

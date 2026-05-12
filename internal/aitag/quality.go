@@ -3,6 +3,7 @@ package aitag
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var numberLikeText = regexp.MustCompile(`^\d+\.?$`)
@@ -56,6 +57,44 @@ func validLocaleTags(rawTags []string, tags []string) bool {
 // IsLocaleTranslationUsable validates a locale block against the raw tag row.
 func IsLocaleTranslationUsable(raw Result, category string, tags []string, description string) bool {
 	return usableText(category) && usableText(description) && validLocaleTags(raw.Tags, tags)
+}
+
+// IsLocaleTranslationUsableForLocale rejects raw-equivalent category text when
+// the raw category does not already match the target locale's script.
+func IsLocaleTranslationUsableForLocale(raw Result, locale string, category string, tags []string, description string) bool {
+	if !IsLocaleTranslationUsable(raw, category, tags, description) {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(category), strings.TrimSpace(raw.Category)) && !CategoryMatchesLocale(locale, raw.Category) {
+		return false
+	}
+	return true
+}
+
+func CategoryMatchesLocale(locale string, category string) bool {
+	switch locale {
+	case "zh-TW", "zh-CN":
+		return containsScript(category, unicode.Han)
+	case "ja":
+		return containsScript(category, unicode.Han, unicode.Hiragana, unicode.Katakana)
+	case "ko":
+		return containsScript(category, unicode.Hangul)
+	case "en":
+		return containsScript(category, unicode.Latin)
+	default:
+		return true
+	}
+}
+
+func containsScript(value string, tables ...*unicode.RangeTable) bool {
+	for _, r := range strings.TrimSpace(value) {
+		for _, table := range tables {
+			if unicode.In(r, table) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ResultWithEnglishFallback overlays valid English i18n fields while falling

@@ -368,7 +368,7 @@ func (s *Server) embeddingInputForItem(item scanner.AssetItem, fields []string) 
 	return input, inputHash, sourceHash, true, nil
 }
 
-const i18nBatchSize = 50
+const i18nBatchSize = 10
 
 var localeDisplayNames = map[string]string{
 	"en": "English", "zh-TW": "Traditional Chinese", "zh-CN": "Simplified Chinese",
@@ -376,6 +376,13 @@ var localeDisplayNames = map[string]string{
 }
 
 type i18nBackfillItem struct {
+	ID          int      `json:"id"`
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags"`
+	Description string   `json:"description"`
+}
+
+type i18nPromptRow struct {
 	ID          int      `json:"id"`
 	Category    string   `json:"category"`
 	Tags        []string `json:"tags"`
@@ -412,6 +419,65 @@ func parseI18nBackfillResponse(content string) ([]i18nBackfillItem, error) {
 	return direct, nil
 }
 
+func i18nBackfillPrompt(langName string, rows []config.AITagI18nRow) string {
+	promptRows := make([]i18nPromptRow, 0, len(rows))
+	for j, row := range rows {
+		promptRows = append(promptRows, i18nPromptRow{
+			ID:          j + 1,
+			Category:    row.Category,
+			Tags:        row.Tags,
+			Description: row.Description,
+		})
+	}
+	rowsJSON, _ := json.Marshal(promptRows)
+	return "Translate each item to " + langName + ". Return ONLY valid JSON in this exact shape: " +
+		`{"translations":[{"id":1,"category":"...","tags":["..."],"description":"..."}]}` + "\n" +
+		"Rules: preserve each id exactly, return exactly " + strconv.Itoa(len(rows)) + " translation objects, keep tags in the same count and order as the input tags, and do not use numbering or template placeholders.\n\n" +
+		"Input items JSON:\n" + string(rowsJSON)
+}
+
+func (s *Server) translateI18nRows(ctx context.Context, locale, langName string, rows []config.AITagI18nRow, backend, modelName string) (int, []config.AITagI18nRow, int, string) {
+	content, err := s.chatText(ctx, backend, modelName, i18nBackfillPrompt(langName, rows), 30)
+	if err != nil {
+		return 0, rows, 0, "failed to translate " + locale + " batch: " + err.Error()
+	}
+
+	items, err := parseI18nBackfillResponse(content)
+	if err != nil {
+		return 0, rows, 0, "invalid " + locale + " translation response: " + err.Error()
+	}
+
+	seen := map[int]bool{}
+	translated := 0
+	skipped := 0
+	retryRows := []config.AITagI18nRow{}
+	for _, item := range items {
+		if item.ID < 1 || item.ID > len(rows) || seen[item.ID] {
+			skipped++
+			continue
+		}
+		seen[item.ID] = true
+		row := rows[item.ID-1]
+		raw := aitag.Result{Status: aitag.StatusReady, Category: row.Category, Tags: row.Tags, Description: row.Description}
+		if !aitag.IsLocaleTranslationUsableForLocale(raw, locale, item.Category, item.Tags, item.Description) {
+			retryRows = append(retryRows, row)
+			continue
+		}
+		applied, err := s.store.BackfillLocaleI18nForAssetApplied(row.ProjectID, row.RepoPath, row.ContentHash, row.HashAlgorithm, locale, item.Category, item.Tags, item.Description)
+		if err != nil || !applied {
+			retryRows = append(retryRows, row)
+			continue
+		}
+		translated++
+	}
+	for i, row := range rows {
+		if !seen[i+1] {
+			retryRows = append(retryRows, row)
+		}
+	}
+	return translated, retryRows, skipped, ""
+}
+
 func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, projectIDs []string, backend, modelName string, targetLocales []string) i18nBackfillSummary {
 	summary := i18nBackfillSummary{Locales: targetLocales}
 	for _, locale := range targetLocales {
@@ -419,7 +485,7 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 		if err != nil {
 			warning := "failed to load missing " + locale + " translations"
 			summary.addWarning(warning)
-			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "warning": warning})
+			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "locales": targetLocales, "warning": warning})
 			continue
 		}
 		if len(missing) == 0 {
@@ -432,7 +498,7 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 			langName = locale
 		}
 
-		sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "total": len(missing)})
+		sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "locales": targetLocales, "total": len(missing)})
 
 		localeTranslated := 0
 		localeSkipped := 0
@@ -443,79 +509,38 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 			end := min(i+i18nBatchSize, len(missing))
 			batch := missing[i:end]
 
-			type promptRow struct {
-				ID          int      `json:"id"`
-				Category    string   `json:"category"`
-				Tags        []string `json:"tags"`
-				Description string   `json:"description"`
-			}
-			rows := make([]promptRow, 0, len(batch))
-			for j, row := range batch {
-				rows = append(rows, promptRow{
-					ID:          j + 1,
-					Category:    row.Category,
-					Tags:        row.Tags,
-					Description: row.Description,
-				})
-			}
-			rowsJSON, _ := json.Marshal(rows)
-			prompt := "Translate each item to " + langName + ". Return ONLY valid JSON in this exact shape: " +
-				`{"translations":[{"id":1,"category":"...","tags":["..."],"description":"..."}]}` + "\n" +
-				"Rules: preserve each id exactly, return one object per input item, keep tags in the same count and order as the input tags, and do not use numbering or template placeholders.\n\n" +
-				"Input items JSON:\n" + string(rowsJSON)
-
-			content, err := s.chatText(ctx, backend, modelName, prompt, 30)
-			if err != nil {
-				warning := "failed to translate " + locale + " batch"
-				summary.Skipped += len(batch)
-				localeSkipped += len(batch)
+			translated, retryRows, skipped, warning := s.translateI18nRows(ctx, locale, langName, batch, backend, modelName)
+			if warning != "" {
 				summary.addWarning(warning)
-				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped, "warning": warning})
-				continue
 			}
-
-			items, err := parseI18nBackfillResponse(content)
-			if err != nil {
-				warning := "invalid " + locale + " translation response"
-				summary.Skipped += len(batch)
-				localeSkipped += len(batch)
-				summary.addWarning(warning)
-				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped, "warning": warning})
-				continue
-			}
-			seen := map[int]bool{}
-			translated := 0
-			skipped := 0
-			for _, item := range items {
-				if item.ID < 1 || item.ID > len(batch) || seen[item.ID] {
-					skipped++
-					continue
+			if len(retryRows) > 0 {
+				for _, row := range retryRows {
+					if ctx.Err() != nil {
+						return summary
+					}
+					retryTranslated, retryFailedRows, retrySkipped, retryWarning := s.translateI18nRows(ctx, locale, langName, []config.AITagI18nRow{row}, backend, modelName)
+					translated += retryTranslated
+					skipped += retrySkipped
+					if retryWarning != "" {
+						summary.addWarning(retryWarning)
+					}
+					if len(retryFailedRows) > 0 {
+						skipped += len(retryFailedRows)
+					}
 				}
-				seen[item.ID] = true
-				row := batch[item.ID-1]
-				raw := aitag.Result{Status: aitag.StatusReady, Category: row.Category, Tags: row.Tags, Description: row.Description}
-				if !aitag.IsLocaleTranslationUsable(raw, item.Category, item.Tags, item.Description) {
-					skipped++
-					continue
-				}
-				if err := s.store.BackfillLocaleI18nForAsset(row.ProjectID, row.RepoPath, row.ContentHash, row.HashAlgorithm, locale, item.Category, item.Tags, item.Description); err != nil {
-					skipped++
-					continue
-				}
-				translated++
 			}
-			if missingRows := len(batch) - len(seen); missingRows > 0 {
-				skipped += missingRows
-			}
-
 			if skipped > 0 {
-				summary.addWarning("some " + locale + " translations were skipped")
+				summary.addWarning("some " + locale + " translations were skipped after retry")
 			}
 			summary.Translated += translated
 			summary.Skipped += skipped
 			localeTranslated += translated
 			localeSkipped += skipped
-			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped})
+			event := map[string]any{"type": "translating", "locale": locale, "locales": targetLocales, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped}
+			if warning != "" {
+				event["warning"] = warning
+			}
+			sendNDJSON(w, event)
 		}
 	}
 	return summary
