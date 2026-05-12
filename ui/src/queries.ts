@@ -625,8 +625,21 @@ export function useResetDatabaseMutation() {
   return useMutation({
     mutationFn: resetDatabase,
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
-      await client.invalidateQueries({ queryKey: settingsQueryKey });
+      const resetKeys = [
+        catalogQueryKey,
+        scansQueryKey,
+        settingsQueryKey,
+        embedStatsQueryKey,
+        ["prompt-presets"],
+        ["tags"],
+        ["browse-semantic-search"],
+      ];
+      for (const queryKey of resetKeys) {
+        client.removeQueries({ queryKey });
+      }
+      await Promise.all(
+        resetKeys.map((queryKey) => client.invalidateQueries({ queryKey })),
+      );
     },
   });
 }

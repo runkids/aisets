@@ -40,7 +40,6 @@ type AboutSectionProps = {
   clearAITagCachePending: boolean;
   clearEmbeddingsPending: boolean;
   resetPending: boolean;
-  importPending: boolean;
 };
 
 export function AboutSection({
@@ -62,7 +61,6 @@ export function AboutSection({
   clearAITagCachePending,
   clearEmbeddingsPending,
   resetPending,
-  importPending,
 }: AboutSectionProps) {
   const { t } = useTranslation();
   const [resetSettingsOpen, setResetSettingsOpen] = useState(false);
@@ -462,7 +460,7 @@ export function AboutSection({
         message={t("settings.resetConfirm")}
         confirmText={t("settings.resetDatabase")}
         cancelText={t("common.cancel")}
-        loading={importPending}
+        loading={resetPending}
         onConfirm={onResetDatabase}
         onCancel={() => setResetDatabaseOpen(false)}
       />

@@ -978,7 +978,7 @@
     "clearAITagCacheConfirm": "Clear all AI tag results? This cannot be undone. You will need to run AI tagging again to restore them.",
     "resetDatabase": "Reset Database",
     "resetDatabaseHint": "Deletes all projects, scans, labels, notes, tasks, and action history. This cannot be undone.",
-    "resetConfirm": "Reset the local Aisets database? This removes projects, scans, labels, notes, tasks, and action history.",
+    "resetConfirm": "Reset the local Aisets database? This removes projects, scans, labels, notes, tasks, and action history, restores built-in prompt presets, and clears browser-side caches.",
     "storage": "Storage",
     "storageDesc": "Current local storage paths used by the API server.",
     "databasePath": "Database",

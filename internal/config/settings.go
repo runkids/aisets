@@ -801,6 +801,7 @@ func (s *Store) ResetData() error {
 		"scans",
 		"projects",
 		"workspaces",
+		"prompt_presets",
 		"app_settings",
 	}
 	tx, err := s.db.Begin()
@@ -820,5 +821,8 @@ func (s *Store) ResetData() error {
 	if err = tx.Commit(); err != nil {
 		return err
 	}
-	return s.ensureDefaultWorkspace()
+	if err := s.ensureDefaultWorkspace(); err != nil {
+		return err
+	}
+	return s.RestoreDefaultPromptPresets()
 }

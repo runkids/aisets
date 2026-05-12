@@ -61,6 +61,97 @@ func FormatPrompt(content PromptPresetContent) string {
 	})
 }
 
+func (s *Store) RestoreDefaultPromptPresets() error {
+	now := nowUTC()
+	presets := defaultPromptPresets(now)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM prompt_presets`); err != nil {
+		return err
+	}
+	for _, preset := range presets {
+		contentJSON, err := json.Marshal(preset.Content)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			preset.ID, preset.Type, preset.Name, string(contentJSON), boolToInt(preset.IsDefault), preset.CreatedAt, preset.UpdatedAt,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func defaultPromptPresets(now string) []PromptPreset {
+	return []PromptPreset{
+		{
+			ID:        "tag-built-in-default",
+			Type:      "tag",
+			Name:      "Built-in Default",
+			Content:   PromptPresetContent{Template: defaultTagPrompt(), Variables: map[string]PromptVariable{}},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "ocr-built-in-default",
+			Type:      "ocr",
+			Name:      "Built-in Default",
+			Content:   PromptPresetContent{Template: defaultOCRPrompt(), Variables: map[string]PromptVariable{}},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:   "optimize-built-in-default",
+			Type: "optimize",
+			Name: "Built-in Default",
+			Content: PromptPresetContent{
+				Template: defaultOptimizePrompt(),
+				Variables: map[string]PromptVariable{
+					"contentTypes": {Type: PromptVarTags, Values: []string{
+						"photo", "icon", "screenshot", "diagram", "illustration", "gradient", "pattern", "text-heavy",
+					}},
+					"formats": {Type: PromptVarTags, Values: []string{
+						"avif", "webp", "png", "svg", "jpeg",
+					}},
+					"rules": {Type: PromptVarText, Values: []string{
+						"- Icons with transparency: lossless WebP or AVIF, preserve alpha\n- Photos/banners: lossy WebP/AVIF, quality 70-85\n- Screenshots with text: lossless or quality 95+ to preserve sharpness\n- Diagrams with text: lossless compression, consider SVG if simple shapes\n- Decorative gradients: aggressive lossy, quality 60-70\n- Patterns: lossless PNG or WebP for tile accuracy",
+					}},
+				},
+			},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "duplicate-built-in-default",
+			Type:      "duplicate",
+			Name:      "Built-in Default",
+			Content:   PromptPresetContent{Template: defaultDuplicatePrompt(), Variables: map[string]PromptVariable{}},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        "precheck-built-in-default",
+			Type:      "precheck",
+			Name:      "Built-in Default",
+			Content:   PromptPresetContent{Template: defaultPrecheckPrompt(), Variables: map[string]PromptVariable{}},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	}
+}
+
 func (s *Store) ListPromptPresets(presetType string) ([]PromptPreset, error) {
 	var rows *sql.Rows
 	var err error

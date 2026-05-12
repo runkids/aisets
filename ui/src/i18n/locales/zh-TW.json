@@ -1847,7 +1847,7 @@
     "clearAITagCacheConfirm": "確定要清除所有 AI 標記結果？此操作無法復原，需重新執行 AI 標記才能恢復",
     "resetDatabase": "重設資料庫",
     "resetDatabaseHint": "刪除所有專案、掃描、標籤、筆記、任務與操作紀錄，此操作無法復原",
-    "resetConfirm": "重設本機 Aisets 資料庫？這會移除專案、掃描、標籤、筆記、任務與操作紀錄",
+    "resetConfirm": "重設本機 Aisets 資料庫？這會移除專案、掃描、標籤、筆記、任務與操作紀錄，恢復內建提示詞預設，並清除瀏覽器端快取",
     "storage": "儲存空間",
     "storageDesc": "API server 目前使用的本機儲存路徑",
     "databasePath": "資料庫",

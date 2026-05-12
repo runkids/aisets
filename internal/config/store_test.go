@@ -1826,6 +1826,14 @@ func TestExportImportAndResetData(t *testing.T) {
 	if _, err := store.UpdateSettings(SettingsUpdate{WorkspaceName: &workspace, CustomAssetFilters: filters}); err != nil {
 		t.Fatal(err)
 	}
+	customName := "Custom Tag"
+	customContent := PromptPresetContent{Template: "custom tag prompt", Variables: map[string]PromptVariable{}}
+	if _, err := store.UpdatePromptPreset("tag-built-in-default", &customName, &customContent, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreatePromptPreset(PromptPreset{Type: "tag", Name: "Temporary", Content: customContent}); err != nil {
+		t.Fatal(err)
+	}
 
 	exported := store.ExportData()
 	if exported.Version != 1 || exported.ExportedAt == "" || len(exported.Projects) != 1 || exported.Projects[0].IconImage != projectIcon || exported.Settings == nil || exported.Settings.WorkspaceName != "Exported" || len(exported.Settings.CustomAssetFilters) != 1 {
@@ -1847,6 +1855,22 @@ func TestExportImportAndResetData(t *testing.T) {
 		t.Fatal(err)
 	} else if s.WorkspaceName != "Aisets" || s.ActiveWorkspaceID != "default" {
 		t.Fatalf("settings after reset = %#v", s)
+	}
+	for _, presetType := range []string{"tag", "ocr", "optimize", "duplicate", "precheck"} {
+		presets, err := store.ListPromptPresets(presetType)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(presets) != 1 || presets[0].Name != "Built-in Default" || !presets[0].IsDefault {
+			t.Fatalf("%s presets after reset = %#v", presetType, presets)
+		}
+	}
+	tagPresets, err := store.ListPromptPresets("tag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tagPresets[0].Content.Template != defaultTagPrompt() {
+		t.Fatalf("tag prompt after reset = %q", tagPresets[0].Content.Template)
 	}
 	if err := store.ImportData(exported); err != nil {
 		t.Fatal(err)

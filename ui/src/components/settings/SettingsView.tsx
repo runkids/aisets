@@ -42,6 +42,7 @@ import {
   resetSectionDraft,
 } from "./helpers";
 import { clearLastRun, EMBED_LAST_RUN_KEY } from "./aiSectionUtils";
+import { clearDatabaseResetBrowserCache } from "./resetBrowserCache";
 import { SettingsActions } from "./FieldRow";
 import { WorkspaceSection } from "./WorkspaceSection";
 import { ProjectsSection } from "./ProjectsSection";
@@ -428,10 +429,11 @@ export function SettingsView({
   function onResetDatabase() {
     if (scanWorking) return;
     resetMutation.mutate(undefined, {
-      onSuccess: () => {
+      onSuccess: async () => {
         onDismissAITag();
         onDismissVLMOcr();
         onDismissEmbed();
+        await clearDatabaseResetBrowserCache();
         toast.success(t("toast.databaseReset"));
       },
       onError: (error) => {
@@ -733,7 +735,6 @@ export function SettingsView({
               clearAITagCachePending={clearAITagCacheMutation.isPending}
               clearEmbeddingsPending={clearEmbeddingsMutation.isPending}
               resetPending={resetMutation.isPending}
-              importPending={importMutation.isPending}
             />
           )}
         </div>
