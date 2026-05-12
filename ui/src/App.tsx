@@ -331,6 +331,8 @@ export function App() {
   const browseCustomFilterId = searchParams.get("customFilter") ?? "";
   const browseFocusAssetId = searchParams.get("focusAsset") ?? "";
   const browseInitialSearch = searchParams.get("q") ?? "";
+  const browseInitialSearchMode =
+    searchParams.get("searchMode") === "semantic" ? "semantic" : "catalog";
   const browseInitialAICategory = searchParams.get("aiCategory") ?? "";
   const [imageToolAssetIds, setImageToolAssetIds] =
     useState(readImageToolBasket);
@@ -1052,6 +1054,25 @@ export function App() {
     });
   }
 
+  function openSemanticResultFromPalette(
+    result: { assetId: string; repoPath: string },
+    query: string,
+  ) {
+    const params = new URLSearchParams({
+      searchMode: "semantic",
+      q: query,
+      asset: result.assetId,
+      focusAsset: result.assetId,
+    });
+    setSelectedProjectId("");
+    setDrawerSeedAsset(null);
+    setAutoScrollAssetId(result.assetId);
+    navigate({
+      pathname: pathForMode("browse"),
+      search: `?${params.toString()}`,
+    });
+  }
+
   function openCustomFilterFromPalette(id: string) {
     const params = new URLSearchParams({ customFilter: id });
     setAutoScrollAssetId("");
@@ -1130,13 +1151,14 @@ export function App() {
             <BrowseView
               key={
                 selectedProject
-                  ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialAICategory}`
-                  : `all-projects:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialAICategory}`
+                  ? `${selectedProject.id}:${selectedProject.name}:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialSearchMode}:${browseInitialAICategory}`
+                  : `all-projects:${browseCustomFilterId}:${browseFocusAssetId}:${browseInitialSearch}:${browseInitialSearchMode}:${browseInitialAICategory}`
               }
               activeAssetId={drawerId}
               autoScrollAssetId={autoScrollAssetId}
               initialCustomFilterId={browseCustomFilterId}
               initialSearchQuery={browseInitialSearch}
+              initialSearchMode={browseInitialSearchMode}
               initialAICategory={browseInitialAICategory}
               initialFocusAssetId={browseFocusAssetId}
               customFilters={
@@ -1401,6 +1423,7 @@ export function App() {
         onClose={() => setCmdkOpen(false)}
         onNavigate={changeMode}
         onOpenAsset={openAssetFromPalette}
+        onOpenSemanticResult={openSemanticResultFromPalette}
         onOpenCustomFilter={openCustomFilterFromPalette}
       />
 

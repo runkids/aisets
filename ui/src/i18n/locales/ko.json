@@ -858,11 +858,22 @@
     "sortSize": "크기",
     "sortRecent": "최근",
     "bulkSelect": "일괄 선택",
-    "clearSearch": "검색 지우기"
+    "clearSearch": "검색 지우기",
+    "catalogSearchMode": "텍스트",
+    "aiSearchMode": "AI",
+    "searchMode": "검색 모드",
+    "semanticSearch": "의미로 에셋 검색...",
+    "runSemanticSearch": "AI 검색 실행"
   },
   "browse": {
     "selectItems": "에셋을 선택하여 작업하기",
     "empty": "현재 필터와 일치하는 에셋이 없습니다",
+    "semanticNoResults": "일치하는 AI 결과가 없습니다",
+    "semanticEmpty": "AI 검색 입력",
+    "semanticEmptyDesc": "자연어로 시각적 의미, OCR 텍스트, AI 태그를 기준으로 에셋을 찾습니다",
+    "semanticWaiting": "Enter 키를 눌러 AI 검색을 실행하세요",
+    "semanticMeta": "AI 검색: {{count}}개 결과, {{duration}} ms",
+    "semanticPressEnter": "시맨틱 결과에는 현재 프로젝트, 폴더, 상태, AI 필터가 적용됩니다",
     "flagDuplicate": "중복",
     "flagUnused": "미사용",
     "flagOptimizable": "최적화",

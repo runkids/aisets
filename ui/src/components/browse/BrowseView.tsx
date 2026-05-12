@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,6 +23,7 @@ import {
   LoaderCircle,
   PenLine,
   ScanText,
+  Sparkles,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -39,6 +41,7 @@ import {
 } from "../../queries";
 import {
   batchExport,
+  semanticSearch,
   type BatchPreviewResponse,
   type CatalogFoldersParams,
   type CatalogItemsParams,
@@ -59,7 +62,12 @@ import { useDebouncedValue } from "../../useDebouncedValue";
 import { fileName, formatBytes } from "../../ui";
 import { BrowseGrid } from "./BrowseGrid";
 import { BrowseList } from "./BrowseList";
-import { BrowseToolbar, type SortMode, type ViewMode } from "./BrowseToolbar";
+import {
+  BrowseToolbar,
+  type SearchMode,
+  type SortMode,
+  type ViewMode,
+} from "./BrowseToolbar";
 import { useImageBackgroundControls } from "../../imageBackground";
 import { FilterRail } from "../shared/FilterRail";
 import { useToast } from "../shared/ToastProvider";
@@ -86,6 +94,7 @@ type BrowseStoredState = {
   filters: BrowseFilters;
   view: ViewMode;
   gridSize: "s" | "m" | "l";
+  searchMode: SearchMode;
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
@@ -151,6 +160,7 @@ type Props = {
     usageNotApplicableFiles?: number;
   };
   initialSearchQuery: string;
+  initialSearchMode: SearchMode;
   initialAICategory: string;
   initialFocusAssetId: string;
   imagePreviewEnabled: boolean;
@@ -185,6 +195,7 @@ function defaultBrowseStoredState(
     },
     view: "grid",
     gridSize: "m",
+    searchMode: "catalog",
     searchQuery: initialSearchQuery,
     statusFilter: "",
     sortMode: "name",
@@ -250,6 +261,11 @@ export function normalizeBrowseStoredState(
     filters,
     view: optionOrDefault(state.view, viewModes, defaults.view),
     gridSize: optionOrDefault(state.gridSize, gridSizes, defaults.gridSize),
+    searchMode: optionOrDefault(
+      state.searchMode,
+      ["catalog", "semantic"],
+      defaults.searchMode,
+    ),
     searchQuery,
     statusFilter: optionOrDefault(
       state.statusFilter,
@@ -652,6 +668,7 @@ export function BrowseView({
   projectFilterName,
   stats,
   initialSearchQuery,
+  initialSearchMode,
   initialAICategory,
   initialFocusAssetId,
   imagePreviewEnabled,
@@ -695,6 +712,12 @@ export function BrowseView({
   const [searchQuery, setSearchQuery] = useState(
     initialBrowseState.searchQuery,
   );
+  const [searchMode, setSearchMode] = useState<SearchMode>(
+    initialSearchMode || initialBrowseState.searchMode,
+  );
+  const [committedSemanticQuery, setCommittedSemanticQuery] = useState(
+    initialSearchMode === "semantic" ? initialBrowseState.searchQuery : "",
+  );
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     initialBrowseState.statusFilter,
@@ -735,7 +758,10 @@ export function BrowseView({
         ? undefined
         : projectFilterName || filters.project || undefined,
       ext: filters.ext || undefined,
-      q: debouncedSearchQuery.trim() || undefined,
+      q:
+        searchMode === "semantic"
+          ? undefined
+          : debouncedSearchQuery.trim() || undefined,
       status: apiStatus(statusFilter) || undefined,
       customFilter: filters.customFilter || undefined,
     }),
@@ -746,6 +772,7 @@ export function BrowseView({
       filters.project,
       projectFilterId,
       projectFilterName,
+      searchMode,
       statusFilter,
     ],
   );
@@ -762,7 +789,10 @@ export function BrowseView({
         ? undefined
         : projectFilterName || filters.project || undefined,
       ext: filters.ext || undefined,
-      q: debouncedSearchQuery.trim() || undefined,
+      q:
+        searchMode === "semantic"
+          ? undefined
+          : debouncedSearchQuery.trim() || undefined,
       status: apiStatus(statusFilter) || undefined,
       sort: apiSort(sortMode) || undefined,
       customFilter: filters.customFilter || undefined,
@@ -784,6 +814,7 @@ export function BrowseView({
       focusAssetId,
       projectFilterId,
       projectFilterName,
+      searchMode,
       sortMode,
       statusFilter,
     ],
@@ -792,10 +823,87 @@ export function BrowseView({
     scanId,
     catalogItemsParams,
   );
-  const items = useMemo(
+  const catalogItems = useMemo(
     () => catalogItemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [catalogItemsQuery.data],
   );
+  const semanticFilterParams = useMemo<CatalogItemsParams>(
+    () => ({
+      scanId,
+      projectId: projectFilterId || undefined,
+      projectName: projectFilterId
+        ? undefined
+        : projectFilterName || filters.project || undefined,
+      ext: filters.ext || undefined,
+      status: apiStatus(statusFilter) || undefined,
+      customFilter: filters.customFilter || undefined,
+      aiCategory: filters.aiCategory || undefined,
+      aiOcrStatus: filters.aiOcrStatus || undefined,
+      hasGPS: filters.hasGPS || undefined,
+      folder: activeSelectedFolder || undefined,
+    }),
+    [
+      activeSelectedFolder,
+      filters.aiCategory,
+      filters.aiOcrStatus,
+      filters.customFilter,
+      filters.ext,
+      filters.hasGPS,
+      filters.project,
+      projectFilterId,
+      projectFilterName,
+      scanId,
+      statusFilter,
+    ],
+  );
+  const semanticSearchType: "text" | "image" | "hybrid" =
+    settingsQuery.data?.settings.embedSearchType === "text" ||
+    settingsQuery.data?.settings.embedSearchType === "image" ||
+    settingsQuery.data?.settings.embedSearchType === "hybrid"
+      ? settingsQuery.data.settings.embedSearchType
+      : "hybrid";
+  const semanticQuery = useQuery({
+    queryKey: [
+      "browse-semantic-search",
+      committedSemanticQuery,
+      semanticSearchType,
+      settingsQuery.data?.settings.embedSearchLimit ?? 20,
+      settingsQuery.data?.settings.embedSearchThreshold ?? 0.5,
+      semanticFilterParams,
+    ],
+    queryFn: () =>
+      semanticSearch({
+        q: committedSemanticQuery,
+        type: semanticSearchType,
+        limit: settingsQuery.data?.settings.embedSearchLimit || 20,
+        threshold: settingsQuery.data?.settings.embedSearchThreshold || 0.5,
+        includeItems: true,
+        filters: semanticFilterParams,
+      }),
+    enabled:
+      searchMode === "semantic" &&
+      scanId != null &&
+      committedSemanticQuery.trim() !== "",
+    staleTime: 30_000,
+  });
+  const semanticItems = useMemo<AssetItem[]>(
+    () =>
+      semanticQuery.data?.results
+        .map((result) => result.item)
+        .filter((item): item is AssetItem => Boolean(item)) ?? [],
+    [semanticQuery.data],
+  );
+  const semanticMetaById = useMemo(() => {
+    const out: Record<string, { similarity: number; matchType?: string }> = {};
+    for (const result of semanticQuery.data?.results ?? []) {
+      out[result.assetId] = {
+        similarity: result.similarity,
+        matchType: result.matchType,
+      };
+    }
+    return out;
+  }, [semanticQuery.data]);
+  const items = searchMode === "semantic" ? semanticItems : catalogItems;
   const facets = catalogItemsQuery.data?.pages[0]?.facets;
 
   function clearFocusedAssetQuery() {
@@ -814,7 +922,28 @@ export function BrowseView({
     setSelectedFolder("");
     setExpandedFolders(new Set());
     setSearchQuery(next);
-    if (!next) onClearSearchRoute();
+    if (!next) {
+      setCommittedSemanticQuery("");
+      onClearSearchRoute();
+    }
+  }
+
+  function handleSearchModeChange(next: SearchMode) {
+    clearFocusedAssetQuery();
+    setSelectedFolder("");
+    setExpandedFolders(new Set());
+    setSearchMode(next);
+    if (next === "semantic") {
+      setCommittedSemanticQuery(searchQuery.trim());
+    }
+  }
+
+  function handleSemanticSubmit() {
+    clearFocusedAssetQuery();
+    setSelectedFolder("");
+    setExpandedFolders(new Set());
+    setSearchMode("semantic");
+    setCommittedSemanticQuery(searchQuery.trim());
   }
 
   function handleStatusFilterChange(next: StatusFilter) {
@@ -838,6 +967,7 @@ export function BrowseView({
       },
       view,
       gridSize,
+      searchMode,
       searchQuery: focusAssetId ? "" : searchQuery,
       statusFilter,
       sortMode,
@@ -846,6 +976,7 @@ export function BrowseView({
     filters,
     gridSize,
     projectFilterName,
+    searchMode,
     searchQuery,
     focusAssetId,
     sortMode,
@@ -1104,10 +1235,25 @@ export function BrowseView({
   }
 
   const pending =
-    catalogItemsQuery.isFetching && !catalogItemsQuery.isFetchingNextPage;
+    searchMode === "semantic"
+      ? semanticQuery.isFetching
+      : catalogItemsQuery.isFetching && !catalogItemsQuery.isFetchingNextPage;
   const showInitialLoading =
-    catalogItemsQuery.isLoading || (pending && items.length === 0);
-  const emptyCopy = browseEmptyCopy(statusFilter, stats, t);
+    searchMode === "semantic"
+      ? semanticQuery.isLoading || (pending && items.length === 0)
+      : catalogItemsQuery.isLoading || (pending && items.length === 0);
+  const emptyCopy =
+    searchMode === "semantic"
+      ? {
+          title: committedSemanticQuery
+            ? t("browse.semanticNoResults")
+            : t("browse.semanticEmpty"),
+          description: semanticQuery.error
+            ? errorMessage(semanticQuery.error)
+            : t("browse.semanticEmptyDesc"),
+          tone: "neutral" as const,
+        }
+      : browseEmptyCopy(statusFilter, stats, t);
 
   return (
     <>
@@ -1134,6 +1280,7 @@ export function BrowseView({
             view={view}
             gridSize={gridSize}
             bgMode={bgMode}
+            searchMode={searchMode}
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             sortMode={sortMode}
@@ -1146,7 +1293,9 @@ export function BrowseView({
             onViewChange={setView}
             onGridSizeChange={setGridSize}
             onBgModeChange={setBgMode}
+            onSearchModeChange={handleSearchModeChange}
             onSearchChange={handleSearchChange}
+            onSearchSubmit={handleSemanticSubmit}
             onStatusFilterChange={handleStatusFilterChange}
             onSortChange={handleSortChange}
             onAICategoryChange={(v) =>
@@ -1158,6 +1307,24 @@ export function BrowseView({
             onBulkToggle={toggleBulkMode}
             onBulkCancel={cancelBulk}
           />
+
+          {searchMode === "semantic" && (
+            <div className="mb-2 flex min-h-8 flex-wrap items-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 px-2 py-1.5 font-g text-g-ui text-g-ink-3 shadow-g-inset">
+              <Sparkles size={13} className="text-g-purple" />
+              <span className="font-[590] text-g-ink">
+                {committedSemanticQuery || t("browse.semanticWaiting")}
+              </span>
+              <span className="text-g-ink-4">
+                {semanticQuery.data
+                  ? t("browse.semanticMeta", {
+                      count: semanticQuery.data.results.length,
+                      total: semanticQuery.data.totalEmbeddings,
+                      ms: semanticQuery.data.queryDurationMs,
+                    })
+                  : t("browse.semanticPressEnter")}
+              </span>
+            </div>
+          )}
 
           {bulkMode && (
             <div className="sticky top-0 z-[5] mb-2 flex w-full min-h-[44px] items-center gap-0.5 overflow-x-auto rounded-g-md border border-g-line bg-g-surface-2 p-1 shadow-g-inset animate-[slideUp2_200ms_var(--g-ease-out)]">
@@ -1314,8 +1481,17 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
-                  hasMore={catalogItemsQuery.hasNextPage}
-                  loadingMore={catalogItemsQuery.isFetchingNextPage}
+                  semanticMetaById={semanticMetaById}
+                  hasMore={
+                    searchMode === "semantic"
+                      ? false
+                      : catalogItemsQuery.hasNextPage
+                  }
+                  loadingMore={
+                    searchMode === "semantic"
+                      ? false
+                      : catalogItemsQuery.isFetchingNextPage
+                  }
                   onLoadMore={() => {
                     void catalogItemsQuery.fetchNextPage();
                   }}
@@ -1335,8 +1511,17 @@ export function BrowseView({
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
-                  hasMore={catalogItemsQuery.hasNextPage}
-                  loadingMore={catalogItemsQuery.isFetchingNextPage}
+                  semanticMetaById={semanticMetaById}
+                  hasMore={
+                    searchMode === "semantic"
+                      ? false
+                      : catalogItemsQuery.hasNextPage
+                  }
+                  loadingMore={
+                    searchMode === "semantic"
+                      ? false
+                      : catalogItemsQuery.isFetchingNextPage
+                  }
                   onLoadMore={() => {
                     void catalogItemsQuery.fetchNextPage();
                   }}

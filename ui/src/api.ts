@@ -740,11 +740,33 @@ export function semanticSearch(options: {
   type?: "text" | "image" | "hybrid";
   limit?: number;
   threshold?: number;
+  includeItems?: boolean;
+  filters?: Partial<CatalogItemsParams>;
 }) {
   const qp = new URLSearchParams({ q: options.q });
   if (options.type) qp.set("type", options.type);
   if (options.limit) qp.set("limit", String(options.limit));
   if (options.threshold != null) qp.set("threshold", String(options.threshold));
+  if (options.includeItems) qp.set("includeItems", "true");
+  const filters = options.filters;
+  if (filters) {
+    if (filters.scanId != null) qp.set("scanId", String(filters.scanId));
+    if (filters.projectId) qp.set("projectId", filters.projectId);
+    if (filters.projectName) qp.set("projectName", filters.projectName);
+    if (filters.ext) qp.set("ext", filters.ext);
+    if (filters.folder) qp.set("folder", filters.folder);
+    if (filters.q) qp.set("catalogQ", filters.q);
+    if (filters.status) qp.set("status", filters.status);
+    if (filters.customFilter) qp.set("customFilter", filters.customFilter);
+    if (filters.optimizationCategory)
+      qp.set("optimizationCategory", filters.optimizationCategory);
+    if (filters.optimizationSeverity)
+      qp.set("optimizationSeverity", filters.optimizationSeverity);
+    if (filters.operation) qp.set("operation", filters.operation);
+    if (filters.aiCategory) qp.set("aiCategory", filters.aiCategory);
+    if (filters.aiOcrStatus) qp.set("aiOcrStatus", filters.aiOcrStatus);
+    if (filters.hasGPS) qp.set("hasGPS", filters.hasGPS);
+  }
   return request<SemanticSearchResponse>(`/api/ai/embed/search?${qp}`);
 }
 

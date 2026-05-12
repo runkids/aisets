@@ -315,15 +315,5 @@ func (s *Server) resolveVLMProviderForFeature(settings config.AppSettings, featu
 }
 
 func newLLMProvider(provider, endpoint, apiKey string) llm.Provider {
-	endpoint = config.ResolveEndpointForRuntime(endpoint)
-	switch provider {
-	case "ollama":
-		return llm.NewOllamaProvider(endpoint)
-	case "openai-compat":
-		return llm.NewOpenAICompatProvider(endpoint, apiKey)
-	case "omlx":
-		return llm.NewOMLXProvider(endpoint, apiKey)
-	default:
-		return nil
-	}
+	return llm.NewProvider(provider, config.ResolveEndpointForRuntime(endpoint), apiKey)
 }

@@ -68,6 +68,7 @@ type Props = {
   onClose: () => void;
   onNavigate: (mode: Mode) => void;
   onOpenAsset: (asset: AssetItem) => void;
+  onOpenSemanticResult?: (result: SemanticSearchResult, query: string) => void;
   onOpenCustomFilter: (id: string) => void;
 };
 
@@ -1462,6 +1463,7 @@ export function CommandPalette({
   onClose,
   onNavigate,
   onOpenAsset,
+  onOpenSemanticResult,
   onOpenCustomFilter,
 }: Props) {
   const { t, i18n } = useTranslation();
@@ -1776,11 +1778,15 @@ export function CommandPalette({
       return;
     }
     if (item.kind === "semantic") {
-      onOpenAsset({
-        id: item.result.assetId,
-        projectId: item.result.projectId,
-        repoPath: item.result.repoPath,
-      } as AssetItem);
+      if (onOpenSemanticResult) {
+        onOpenSemanticResult(item.result, committedQuery || query.trim());
+      } else {
+        onOpenAsset({
+          id: item.result.assetId,
+          projectId: item.result.projectId,
+          repoPath: item.result.repoPath,
+        } as AssetItem);
+      }
       onClose();
     }
   }

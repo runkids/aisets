@@ -9,8 +9,10 @@ import (
 
 	"aisets/internal/apierr"
 	"aisets/internal/config"
+	"aisets/internal/llm"
 	"aisets/internal/projectintent"
 	"aisets/internal/scanner"
+	"aisets/internal/semantic"
 )
 
 func cmdProjects(args []string, jsonOut bool) error {
@@ -243,6 +245,8 @@ func cmdCatalog(args []string, jsonOut bool) error {
 		return cmdCatalogItems(args[1:], jsonOut)
 	case "item":
 		return cmdCatalogItem(args[1:], jsonOut)
+	case "search":
+		return cmdCatalogSearch(args[1:], jsonOut)
 	default:
 		return apierr.WithParams("catalog_unknown_subcommand", "catalog subcommand is unknown", map[string]any{"command": args[0]})
 	}
@@ -294,6 +298,84 @@ func cmdCatalogItems(args []string, jsonOut bool) error {
 	}
 	for _, item := range page.Items {
 		fmt.Printf("%s\t%s\t%s\n", item.ID, item.ProjectName, item.RepoPath)
+	}
+	return nil
+}
+
+func cmdCatalogSearch(args []string, jsonOut bool) error {
+	args, forcedJSON := stripJSONFlag(args)
+	jsonOut = jsonOut || forcedJSON
+	fs := newFlagSet("catalog search", jsonOut)
+	semanticMode := fs.Bool("semantic", false, "use semantic embedding search")
+	searchType := fs.String("type", "", "semantic search type: text, image, or hybrid")
+	limit := fs.Int("limit", 20, "result limit")
+	threshold := fs.Float64("threshold", 0, "semantic similarity threshold")
+	projectID := fs.String("project-id", "", "project id")
+	projectName := fs.String("project-name", "", "project name")
+	ext := fs.String("ext", "", "extension")
+	status := fs.String("status", "", "status filter")
+	customFilter := fs.String("custom-filter", "", "custom filter id")
+	aiCategory := fs.String("ai-category", "", "AI category filter")
+	aiOcrStatus := fs.String("ai-ocr-status", "", "AI/OCR status filter")
+	hasGPS := fs.String("has-gps", "", "GPS filter: true or false")
+	if err := parseFlagSet(fs, args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return apierr.WithParams("catalog_search_args", "catalog search expects exactly one query", map[string]any{"args": fs.Args()})
+	}
+	if !*semanticMode {
+		return cmdCatalogItems(append([]string{"--q", fs.Arg(0), "--limit", strconv.Itoa(*limit), "--project-id", *projectID, "--project-name", *projectName, "--ext", *ext, "--status", *status, "--custom-filter", *customFilter}, jsonFlag(jsonOut)...), jsonOut)
+	}
+
+	store, err := config.OpenStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := ensureScanExists(context.Background(), store); err != nil {
+		return err
+	}
+	settings, err := store.Settings()
+	if err != nil {
+		return err
+	}
+	provider := llm.NewProvider(settings.LLMProvider, config.ResolveEndpointForRuntime(settings.LLMEndpoint), settings.LLMApiKey)
+	filter := config.CatalogItemQuery{
+		ProjectID:      *projectID,
+		ProjectName:    *projectName,
+		Ext:            *ext,
+		Status:         *status,
+		CustomFilterID: *customFilter,
+		AICategory:     *aiCategory,
+		AIOcrStatus:    *aiOcrStatus,
+	}
+	if *hasGPS != "" {
+		val := *hasGPS == "true"
+		filter.HasGPS = &val
+	}
+	response, err := semantic.Search(context.Background(), store, provider, settings, semantic.Query{
+		Text:      fs.Arg(0),
+		Type:      *searchType,
+		Limit:     *limit,
+		Threshold: float32(*threshold),
+		Filter:    filter,
+	})
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, map[string]any{"ok": true, "search": response})
+	}
+	for _, result := range response.Results {
+		fmt.Printf("%.3f\t%s\t%s\n", result.Similarity, result.ProjectID, result.RepoPath)
+	}
+	return nil
+}
+
+func jsonFlag(jsonOut bool) []string {
+	if jsonOut {
+		return []string{"--json"}
 	}
 	return nil
 }

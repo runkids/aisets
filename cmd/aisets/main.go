@@ -93,6 +93,7 @@ func usageText() string {
   aisets scan [projectPaths...] [--json]
   aisets catalog items [--limit N] [--cursor C] [--project-id ID] [--q TEXT] [--status STATUS] [--sort SORT] [--json]
   aisets catalog item --id ID [--json]
+  aisets catalog search QUERY [--semantic] [--type hybrid] [--project-id ID] [--ext EXT] [--json]
   aisets scans list [--json]
   aisets scans diff --base ID --target ID [--json]
   aisets optimize estimate [assetIds...] [--json]
