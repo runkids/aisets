@@ -1,10 +1,12 @@
 import {
   CheckCircle,
   Copy,
+  Download,
   ExternalLink,
   FileCode,
   LoaderCircle,
   Pencil,
+  Share2,
   Trash2,
   X,
 } from "lucide-react";
@@ -68,6 +70,18 @@ const fallbackCopy = (text: string) => {
   textarea.select();
   document.execCommand("copy");
   document.body.removeChild(textarea);
+};
+
+const absoluteAssetUrl = (url: string) => new URL(url, window.location.href).href;
+
+const downloadAsset = (url: string, name: string) => {
+  const link = document.createElement("a");
+  link.href = absoluteAssetUrl(url);
+  link.download = name;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 const EDITOR_SCHEMES: Record<string, (path: string, line: number) => string> = {
@@ -222,6 +236,26 @@ export function AssetDrawer({
     );
   }
 
+  async function handleShareAsset() {
+    const url = absoluteAssetUrl(asset.url);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: assetFileName,
+          text: asset.repoPath,
+          url,
+        });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+    copyText(url);
+    toast.success(t("toast.shareLinkCopied"));
+  }
+
   const tabs = useMemo(() => {
     const items: TabItem<DrawerTab>[] = [
       { value: "overview", label: t("assetDrawer.tabOverview") },
@@ -364,14 +398,39 @@ export function AssetDrawer({
                 />
 
                 <div className="min-w-0">
-                  <DialogPrimitive.Title asChild>
-                    <h2
-                      className="line-clamp-2 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
-                      title={assetFileName}
-                    >
-                      {assetFileName}
-                    </h2>
-                  </DialogPrimitive.Title>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <DialogPrimitive.Title asChild>
+                      <h2
+                        className="line-clamp-2 min-w-0 flex-1 break-all font-g-display text-[17px] font-[590] leading-tight tracking-[-0.02em] text-g-ink"
+                        title={assetFileName}
+                      >
+                        {assetFileName}
+                      </h2>
+                    </DialogPrimitive.Title>
+                    {onRename && (
+                      <Tooltip label={t("action.rename")}>
+                        <IconButton
+                          size="sm"
+                          onClick={() => onRename(asset)}
+                          aria-label={t("action.rename")}
+                          className="mt-[-3px] shrink-0"
+                        >
+                          <Pencil size={14} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    <FavoriteButton
+                      favorite={Boolean(asset.favorite)}
+                      pending={favoriteMut.isPending}
+                      label={
+                        asset.favorite
+                          ? t("favorites.remove")
+                          : t("favorites.add")
+                      }
+                      className="mt-[-3px] shrink-0"
+                      onToggle={handleToggleFavorite}
+                    />
+                  </div>
                   <div
                     className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-g-ui text-g-ink-3"
                     title={asset.repoPath}
@@ -564,27 +623,22 @@ export function AssetDrawer({
                 >
                   {t("action.copyFileName")}
                 </Button>
-                <FavoriteButton
-                  favorite={Boolean(asset.favorite)}
-                  pending={favoriteMut.isPending}
-                  label={
-                    asset.favorite
-                      ? t("favorites.remove")
-                      : t("favorites.add")
-                  }
-                  onToggle={handleToggleFavorite}
-                />
-                {onRename && (
-                  <Tooltip label={t("action.rename")}>
-                    <IconButton
-                      size="sm"
-                      onClick={() => onRename(asset)}
-                      aria-label={t("action.rename")}
-                    >
-                      <Pencil size={14} />
-                    </IconButton>
-                  </Tooltip>
-                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<Share2 size={14} />}
+                  onClick={() => void handleShareAsset()}
+                >
+                  {t("action.share")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<Download size={14} />}
+                  onClick={() => downloadAsset(asset.url, assetFileName)}
+                >
+                  {t("action.downloadImage")}
+                </Button>
                 {onDelete && canDeleteUnused(asset) && (
                   <Tooltip label={t("action.delete")}>
                     <IconButton

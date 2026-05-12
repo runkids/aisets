@@ -34,11 +34,13 @@ export function FavoriteButton({
         <IconButton
           aria-label={label}
           aria-pressed={favorite}
-          disabled={pending}
+          aria-disabled={pending}
+          data-pending={pending ? "true" : undefined}
           className={cn(favorite && favoriteClassName, className)}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (pending) return;
             onToggle();
           }}
           onKeyDown={(event) => {
