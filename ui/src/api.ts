@@ -726,6 +726,10 @@ export async function runAITagTranslate(options?: {
     locale?: string;
     translated?: number;
     total?: number;
+    skipped?: number;
+    warning?: string;
+    warnings?: string[];
+    locales?: string[];
   }) => void;
 }) {
   const qp = new URLSearchParams();

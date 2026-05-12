@@ -11,6 +11,9 @@ export type TranslateActivityState = {
   locale?: string;
   translated: number;
   total: number;
+  skipped: number;
+  locales: string[];
+  warnings: string[];
   errorMessage?: string;
   startedAt?: number;
 };
@@ -20,6 +23,10 @@ export type TranslateEvent = {
   locale?: string;
   translated?: number;
   total?: number;
+  skipped?: number;
+  warning?: string;
+  warnings?: string[];
+  locales?: string[];
   error?: string;
 };
 
@@ -40,7 +47,18 @@ export const initialTranslateActivityState: TranslateActivityState = {
   phase: "idle",
   translated: 0,
   total: 0,
+  skipped: 0,
+  locales: [],
+  warnings: [],
 };
+
+function appendWarnings(current: string[], incoming: string[]) {
+  const next = [...current];
+  for (const warning of incoming) {
+    if (warning && !next.includes(warning)) next.push(warning);
+  }
+  return next.slice(0, 5);
+}
 
 export function translateActivityReducer(
   state: TranslateActivityState,
@@ -52,16 +70,26 @@ export function translateActivityReducer(
         phase: "running",
         translated: 0,
         total: 0,
+        skipped: 0,
+        locales: [],
+        warnings: [],
         startedAt: action.startedAt,
       };
     case "event": {
       const e = action.event;
+      const incomingWarnings = [
+        ...(e.warning ? [e.warning] : []),
+        ...(e.warnings ?? []),
+      ];
       if (e.type === "translating") {
         return {
           ...state,
           locale: e.locale ?? state.locale,
           translated: e.translated ?? state.translated,
           total: e.total ?? state.total,
+          skipped: e.skipped ?? state.skipped,
+          locales: e.locales ?? state.locales,
+          warnings: appendWarnings(state.warnings, incomingWarnings),
         };
       }
       if (e.type === "error") {
@@ -75,6 +103,10 @@ export function translateActivityReducer(
         return {
           ...state,
           phase: "done",
+          translated: e.translated ?? state.translated,
+          skipped: e.skipped ?? state.skipped,
+          locales: e.locales ?? state.locales,
+          warnings: appendWarnings(state.warnings, incomingWarnings),
         };
       }
       return state;

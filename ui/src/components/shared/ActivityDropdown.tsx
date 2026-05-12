@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -28,6 +29,7 @@ type ActivityDropdownProps = {
   busy: boolean;
   done: boolean;
   failed: boolean;
+  warning?: boolean;
   stopped: boolean;
   canDismiss: boolean;
   statusLabel: string;
@@ -48,6 +50,7 @@ export function ActivityDropdown({
   busy,
   done,
   failed,
+  warning = false,
   stopped,
   canDismiss,
   statusLabel,
@@ -86,17 +89,26 @@ export function ActivityDropdown({
       : finalElapsedMs
     : undefined;
   const hasErrors = errors && errors.length > 0;
+  const issueTextClass = warning && !failed ? "text-g-amber" : "text-g-red";
 
-  const dotTone = failed ? "bg-g-red" : done ? "bg-g-green" : "bg-g-accent";
+  const dotTone = failed
+    ? "bg-g-red"
+    : warning
+      ? "bg-g-amber"
+      : done
+        ? "bg-g-green"
+        : "bg-g-accent";
   const dropdownState = open
     ? "translate-y-0 opacity-100 pointer-events-auto"
     : "translate-y-1 opacity-0";
 
   const progressBarTone = failed
     ? "bg-g-red"
-    : done
-      ? "bg-g-green"
-      : "bg-g-accent";
+    : warning
+      ? "bg-g-amber"
+      : done
+        ? "bg-g-green"
+        : "bg-g-accent";
 
   return (
     <span className="group relative inline-flex">
@@ -122,7 +134,13 @@ export function ActivityDropdown({
       >
         <div className="w-[340px] rounded-g-lg border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-2 shadow-g-pop">
           <div className="flex items-center gap-2">
-            {done ? (
+            {warning ? (
+              <AlertTriangle
+                className="shrink-0 text-g-amber"
+                size={16}
+                aria-hidden="true"
+              />
+            ) : done ? (
               <CheckCircle2
                 className="shrink-0 text-g-green"
                 size={16}
@@ -166,7 +184,7 @@ export function ActivityDropdown({
                   <div className="flex items-center">
                     <button
                       type="button"
-                      className="flex flex-1 items-center gap-1 px-2 py-1.5 text-left text-g-red hover:bg-g-surface-2"
+                      className={`flex flex-1 items-center gap-1 px-2 py-1.5 text-left hover:bg-g-surface-2 ${issueTextClass}`}
                       onClick={() => setErrorsExpanded((v) => !v)}
                     >
                       <ChevronDown
@@ -219,7 +237,7 @@ export function ActivityDropdown({
                           <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
                             {err.repoPath}
                           </span>
-                          <span className="block truncate text-g-red">
+                          <span className={`block truncate ${issueTextClass}`}>
                             {err.message}
                           </span>
                         </li>
@@ -228,7 +246,9 @@ export function ActivityDropdown({
                   )}
                 </>
               ) : (
-                <p className="px-2 py-1.5 text-g-red">{errorMessage}</p>
+                <p className={`px-2 py-1.5 ${issueTextClass}`}>
+                  {errorMessage}
+                </p>
               )}
             </div>
           )}

@@ -382,6 +382,21 @@ type i18nBackfillItem struct {
 	Description string   `json:"description"`
 }
 
+type i18nBackfillSummary struct {
+	Translated int      `json:"translated"`
+	Total      int      `json:"total"`
+	Skipped    int      `json:"skipped"`
+	Locales    []string `json:"locales"`
+	Warnings   []string `json:"warnings,omitempty"`
+}
+
+func (s *i18nBackfillSummary) addWarning(message string) {
+	if message == "" || len(s.Warnings) >= 5 {
+		return
+	}
+	s.Warnings = append(s.Warnings, message)
+}
+
 func parseI18nBackfillResponse(content string) ([]i18nBackfillItem, error) {
 	cleaned := llm.CleanJSON(content)
 	var wrapped struct {
@@ -397,12 +412,20 @@ func parseI18nBackfillResponse(content string) ([]i18nBackfillItem, error) {
 	return direct, nil
 }
 
-func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, projectIDs []string, backend, modelName string, targetLocales []string) {
+func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, projectIDs []string, backend, modelName string, targetLocales []string) i18nBackfillSummary {
+	summary := i18nBackfillSummary{Locales: targetLocales}
 	for _, locale := range targetLocales {
 		missing, err := s.store.AITagsMissingLocaleForProjects(locale, contentHashes, projectIDs)
-		if err != nil || len(missing) == 0 {
+		if err != nil {
+			warning := "failed to load missing " + locale + " translations"
+			summary.addWarning(warning)
+			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "warning": warning})
 			continue
 		}
+		if len(missing) == 0 {
+			continue
+		}
+		summary.Total += len(missing)
 
 		langName := localeDisplayNames[locale]
 		if langName == "" {
@@ -411,9 +434,11 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 
 		sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "total": len(missing)})
 
+		localeTranslated := 0
+		localeSkipped := 0
 		for i := 0; i < len(missing); i += i18nBatchSize {
 			if ctx.Err() != nil {
-				return
+				return summary
 			}
 			end := min(i+i18nBatchSize, len(missing))
 			batch := missing[i:end]
@@ -441,12 +466,21 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 
 			content, err := s.chatText(ctx, backend, modelName, prompt, 30)
 			if err != nil {
+				warning := "failed to translate " + locale + " batch"
+				summary.Skipped += len(batch)
+				localeSkipped += len(batch)
+				summary.addWarning(warning)
+				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped, "warning": warning})
 				continue
 			}
 
 			items, err := parseI18nBackfillResponse(content)
 			if err != nil {
-				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": i, "total": len(missing), "skipped": len(batch)})
+				warning := "invalid " + locale + " translation response"
+				summary.Skipped += len(batch)
+				localeSkipped += len(batch)
+				summary.addWarning(warning)
+				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped, "warning": warning})
 				continue
 			}
 			seen := map[int]bool{}
@@ -474,9 +508,17 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 				skipped += missingRows
 			}
 
-			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": i + translated, "total": len(missing), "skipped": skipped})
+			if skipped > 0 {
+				summary.addWarning("some " + locale + " translations were skipped")
+			}
+			summary.Translated += translated
+			summary.Skipped += skipped
+			localeTranslated += translated
+			localeSkipped += skipped
+			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": localeTranslated, "total": len(missing), "skipped": localeSkipped})
 		}
 	}
+	return summary
 }
 
 func (s *Server) chatText(ctx context.Context, backend, modelName, prompt string, timeoutSec int) (string, error) {
@@ -540,8 +582,8 @@ func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.backfillI18nBatch(r.Context(), w, hashes, activeProjectIDs, backend, modelName, targetLocales)
-	sendNDJSON(w, map[string]any{"type": "done"})
+	summary := s.backfillI18nBatch(r.Context(), w, hashes, activeProjectIDs, backend, modelName, targetLocales)
+	sendNDJSON(w, map[string]any{"type": "done", "translated": summary.Translated, "total": summary.Total, "skipped": summary.Skipped, "locales": summary.Locales, "warnings": summary.Warnings})
 }
 
 func (s *Server) handleEmbedClear(w http.ResponseWriter, _ *http.Request) {

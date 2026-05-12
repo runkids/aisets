@@ -545,6 +545,8 @@
     "translateStopping": "중지 중",
     "translateStop": "중지",
     "translateDone": "번역 완료",
+    "translateDoneWithWarnings": "번역 완료, 일부 건너뜀",
+    "translateCountsWithSkipped": "{{translated}} / {{total}} (건너뜀 {{skipped}})",
     "translateStopped": "번역 중지됨",
     "translateError": "번역 실패"
   },

@@ -1410,6 +1410,7 @@ export function App() {
           ) : mode === "tags" ? (
             <TagsView
               translateActivity={translateActivity}
+              translationLocales={settingsQuery.data?.settings.llmTranslationLocales}
               onStartTranslate={onStartTranslateActivity}
               onStopTranslate={onStopTranslateActivity}
             />

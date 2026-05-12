@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -59,7 +59,7 @@ const MODE_ITEMS: SegmentedControlItem<TaxonomyMode>[] = [
   { value: "categories", label: "Categories" },
 ];
 
-const LOCALE_OPTIONS = [
+const TAG_LOCALE_OPTIONS = [
   { value: "en", label: "EN" },
   { value: "zh-TW", label: "繁中" },
   { value: "zh-CN", label: "简中" },
@@ -67,14 +67,60 @@ const LOCALE_OPTIONS = [
   { value: "ko", label: "한국어" },
 ];
 
+const TAG_LOCALE_LABELS = new Map(
+  TAG_LOCALE_OPTIONS.map((option) => [option.value, option.label]),
+);
+
+function normalizeDisplayLocale(locale: string | undefined) {
+  if (!locale) return "en";
+  if (locale === "en" || locale.startsWith("en-")) return "en";
+  return TAG_LOCALE_LABELS.has(locale) ? locale : "en";
+}
+
+export function tagViewLocaleOptions(translationLocales?: string[]) {
+  const seen = new Set<string>();
+  const locales =
+    translationLocales && translationLocales.length > 0
+      ? translationLocales
+      : ["en"];
+  return locales
+    .map(normalizeDisplayLocale)
+    .filter((locale) => {
+      if (seen.has(locale)) return false;
+      seen.add(locale);
+      return TAG_LOCALE_LABELS.has(locale);
+    })
+    .map((locale) => ({
+      value: locale,
+      label: TAG_LOCALE_LABELS.get(locale) ?? locale,
+    }));
+}
+
+export function defaultTagViewLocale(
+  appLocale: string | undefined,
+  translationLocales?: string[],
+) {
+  const normalizedAppLocale = normalizeDisplayLocale(appLocale);
+  const options = tagViewLocaleOptions(translationLocales);
+  if (
+    normalizedAppLocale !== "en" &&
+    options.some((option) => option.value === normalizedAppLocale)
+  ) {
+    return normalizedAppLocale;
+  }
+  return "en";
+}
+
 type TagsViewProps = {
   translateActivity: TranslateActivityState;
+  translationLocales?: string[];
   onStartTranslate: () => void;
   onStopTranslate: () => void;
 };
 
 export function TagsView({
   translateActivity,
+  translationLocales,
   onStartTranslate,
   onStopTranslate,
 }: TagsViewProps) {
@@ -86,7 +132,9 @@ export function TagsView({
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"count" | "alpha">("count");
   const [category, setCategory] = useState("");
-  const [viewLocale, setViewLocale] = useState(i18n.language || "en");
+  const [viewLocale, setViewLocale] = useState(() =>
+    defaultTagViewLocale(i18n.language, translationLocales),
+  );
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const translating = isTranslateActivityBusy(translateActivity);
@@ -99,6 +147,29 @@ export function TagsView({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 250);
+  const localeOptions = useMemo(
+    () => tagViewLocaleOptions(translationLocales),
+    [translationLocales],
+  );
+  const appLocale = normalizeDisplayLocale(i18n.language);
+  const showLocaleSelect = appLocale !== "en" && localeOptions.length > 1;
+  const preferredLocale = defaultTagViewLocale(
+    i18n.language,
+    translationLocales,
+  );
+
+  useEffect(() => {
+    setViewLocale((current) => {
+      if (!showLocaleSelect) return "en";
+      if (current === "en" && preferredLocale !== "en") {
+        return preferredLocale;
+      }
+      if (localeOptions.some((option) => option.value === current)) {
+        return current;
+      }
+      return preferredLocale;
+    });
+  }, [localeOptions, preferredLocale, showLocaleSelect]);
 
   const params: TagListParams = {
     q: debouncedSearch,
@@ -423,14 +494,16 @@ export function TagsView({
                 className="w-44 flex-none"
               />
             )}
-            <Select
-              value={viewLocale}
-              options={LOCALE_OPTIONS}
-              onChange={setViewLocale}
-              aria-label={t("tags.viewLocale")}
-              size="md"
-              className="w-24 flex-none"
-            />
+            {showLocaleSelect && (
+              <Select
+                value={viewLocale}
+                options={localeOptions}
+                onChange={setViewLocale}
+                aria-label={t("tags.viewLocale")}
+                size="md"
+                className="w-24 flex-none"
+              />
+            )}
             <Button
               variant="secondary"
               size="md"

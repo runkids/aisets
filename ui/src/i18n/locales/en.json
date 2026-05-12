@@ -1352,6 +1352,8 @@
     "translateStopping": "Stopping…",
     "translateStop": "Stop",
     "translateDone": "Translation complete",
+    "translateDoneWithWarnings": "Translation complete with warnings",
+    "translateCountsWithSkipped": "{{translated}} / {{total}} ({{skipped}} skipped)",
     "translateStopped": "Translation stopped",
     "translateError": "Translation failed"
   },

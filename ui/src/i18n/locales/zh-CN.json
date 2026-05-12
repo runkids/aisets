@@ -527,6 +527,8 @@
     "translateStopping": "停止中",
     "translateStop": "停止",
     "translateDone": "翻译完成",
+    "translateDoneWithWarnings": "翻译完成，但有跳过项目",
+    "translateCountsWithSkipped": "{{translated}} / {{total}}（跳过 {{skipped}}）",
     "translateStopped": "翻译已停止",
     "translateError": "翻译失败"
   },

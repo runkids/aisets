@@ -264,7 +264,9 @@ export function AppTopbar({
       ? t("activity.translateRunningLocale", { locale: translateActivity.locale })
       : t("activity.translateRunning")
     : translateActivity.phase === "done"
-      ? t("activity.translateDone")
+      ? translateActivity.skipped > 0 || translateActivity.warnings.length > 0
+        ? t("activity.translateDoneWithWarnings")
+        : t("activity.translateDone")
       : translateActivity.phase === "error"
         ? t("activity.translateError")
         : translateActivity.phase === "stopped"
@@ -272,8 +274,18 @@ export function AppTopbar({
           : t("activity.translateTitle");
   const translateCounts =
     translateActivity.total > 0
-      ? `${translateActivity.translated} / ${translateActivity.total}`
+      ? translateActivity.skipped > 0
+        ? t("activity.translateCountsWithSkipped", {
+            translated: translateActivity.translated,
+            total: translateActivity.total,
+            skipped: translateActivity.skipped,
+          })
+        : `${translateActivity.translated} / ${translateActivity.total}`
       : "";
+  const translateWarnings = translateActivity.warnings.map((warning) => ({
+    repoPath: translateActivity.locales.join(", ") || translateActivity.locale || "",
+    message: warning,
+  }));
   const catalogActionTooltip = ocrBusy
     ? t("activity.ocrLockedTooltip")
     : aiTagBusy
@@ -538,11 +550,17 @@ export function AppTopbar({
             busy={translateBusy}
             done={translateActivity.phase === "done"}
             failed={translateActivity.phase === "error"}
+            warning={
+              translateActivity.phase === "done" &&
+              (translateActivity.skipped > 0 ||
+                translateActivity.warnings.length > 0)
+            }
             stopped={translateActivity.phase === "stopped"}
             canDismiss={canDismissTranslateActivity(translateActivity)}
             statusLabel={translateStatusLabel}
             countsLabel={translateCounts}
             errorMessage={translateActivity.errorMessage}
+            errors={translateWarnings.length > 0 ? translateWarnings : undefined}
             progressPercent={translateActivityProgressPercent(translateActivity)}
             startedAt={translateActivity.startedAt}
             primaryAction={{
