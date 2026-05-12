@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { ImageBackgroundMode } from "../../imageBackground";
 import { languageOptionsForLocale } from "../../i18n";
-import { Card, Select, Switch, Tabs } from "../ui";
+import { Card, Select, Switch, Tabs, TextInput } from "../ui";
 import { useToast } from "../shared/ToastProvider";
 import { FieldRow } from "./index";
 import { editorOptions } from "./constants";
@@ -20,11 +20,15 @@ import type { ThemePreference } from "./types";
 type ThemeSectionProps = {
   theme: ThemePreference;
   imagePreviewEnabled: boolean;
+  imagePreviewDelaySeconds: number;
+  imagePreviewSize: { width: number; height: number };
   imageBackgroundMode: ImageBackgroundMode;
   preferredEditor?: string;
   translationLocales?: string[];
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
+  onImagePreviewDelaySecondsChange: (seconds: number) => void;
+  onImagePreviewSizeChange: (size: { width: number; height: number }) => void;
   onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
   onEditorChange: (editor: string) => void;
 };
@@ -32,11 +36,15 @@ type ThemeSectionProps = {
 export function ThemeSection({
   theme,
   imagePreviewEnabled,
+  imagePreviewDelaySeconds,
+  imagePreviewSize,
   imageBackgroundMode,
   preferredEditor,
   translationLocales,
   onThemeChange,
   onImagePreviewEnabledChange,
+  onImagePreviewDelaySecondsChange,
+  onImagePreviewSizeChange,
   onImageBackgroundModeChange,
   onEditorChange,
 }: ThemeSectionProps) {
@@ -125,6 +133,64 @@ export function ThemeSection({
               onCheckedChange={onImagePreviewEnabledChange}
               aria-label={t("settings.imagePreview")}
             />
+          </FieldRow>
+          <FieldRow
+            label={t("settings.imagePreviewDelay")}
+            description={t("settings.imagePreviewDelayHint")}
+            icon={<Image size={15} />}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step={0.1}
+              value={imagePreviewDelaySeconds}
+              onChange={(event) =>
+                onImagePreviewDelaySecondsChange(
+                  event.currentTarget.valueAsNumber,
+                )
+              }
+              suffix={t("settings.secondsSuffix")}
+              aria-label={t("settings.imagePreviewDelay")}
+              className="w-[160px] flex-none"
+            />
+          </FieldRow>
+          <FieldRow
+            label={t("settings.imagePreviewSize")}
+            description={t("settings.imagePreviewSizeHint")}
+            icon={<Image size={15} />}
+          >
+            <div className="flex min-w-0 gap-2">
+              <TextInput
+                type="number"
+                min={80}
+                step={1}
+                value={imagePreviewSize.width}
+                onChange={(event) =>
+                  onImagePreviewSizeChange({
+                    ...imagePreviewSize,
+                    width: event.currentTarget.valueAsNumber,
+                  })
+                }
+                suffix="px"
+                aria-label={t("settings.imagePreviewWidth")}
+                className="w-[132px] flex-none"
+              />
+              <TextInput
+                type="number"
+                min={80}
+                step={1}
+                value={imagePreviewSize.height}
+                onChange={(event) =>
+                  onImagePreviewSizeChange({
+                    ...imagePreviewSize,
+                    height: event.currentTarget.valueAsNumber,
+                  })
+                }
+                suffix="px"
+                aria-label={t("settings.imagePreviewHeight")}
+                className="w-[132px] flex-none"
+              />
+            </div>
           </FieldRow>
           <FieldRow
             label={t("settings.imageBackground")}

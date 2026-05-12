@@ -877,6 +877,7 @@ export type RenameRules = {
   replaceChars?: Record<string, string>;
   prefix?: string;
   suffix?: string;
+  customBaseNames?: Record<string, string>;
 };
 
 export type PromptPresetType =

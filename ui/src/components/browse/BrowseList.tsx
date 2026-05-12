@@ -34,6 +34,8 @@ type BrowseListProps = {
   activeAssetId: string;
   autoScrollAssetId: string;
   imagePreviewEnabled: boolean;
+  imagePreviewDelayMs: number;
+  imagePreviewSize: { width: number; height: number };
   onAutoScrollDone: () => void;
   onSelect: (item: AssetItem) => void;
   onToggleSelect: (id: string) => void;
@@ -58,6 +60,8 @@ export function BrowseList({
   activeAssetId,
   autoScrollAssetId,
   imagePreviewEnabled,
+  imagePreviewDelayMs,
+  imagePreviewSize,
   onAutoScrollDone,
   onSelect,
   onToggleSelect,
@@ -140,6 +144,8 @@ export function BrowseList({
           src={item.url}
           alt={fileName(item.repoPath)}
           enabled={imagePreviewEnabled}
+          delayMs={imagePreviewDelayMs}
+          size={imagePreviewSize}
         >
           <div
             className={cn(

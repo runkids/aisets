@@ -52,6 +52,8 @@ type OptimizeAIAdviceResponse struct {
 	RecommendedQuality *int   `json:"recommendedQuality"`
 	Lossless           bool   `json:"lossless"`
 	Rationale          string `json:"rationale"`
+	ProviderName       string `json:"providerName"`
+	ModelName          string `json:"modelName"`
 	DurationMs         int64  `json:"durationMs"`
 	InputTokens        int64  `json:"inputTokens"`
 	OutputTokens       int64  `json:"outputTokens"`
@@ -113,7 +115,7 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
-	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOptimize)
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOptimize)
 
 	start := time.Now()
 	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{{Path: item.LocalPath, Ext: item.Ext}}, backend, modelName, systemPrompt, prompt, "tag", timeoutSec)
@@ -144,6 +146,8 @@ func (s *Server) handleOptimizeAIAdvice(w http.ResponseWriter, r *http.Request) 
 		RecommendedQuality: parsed.RecommendedQuality,
 		Lossless:           parsed.Lossless,
 		Rationale:          parsed.Rationale,
+		ProviderName:       providerName,
+		ModelName:          modelName,
 		DurationMs:         durationMs,
 		InputTokens:        resp.InputTokens,
 		OutputTokens:       resp.OutputTokens,

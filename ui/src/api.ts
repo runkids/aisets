@@ -125,6 +125,8 @@ export type OptimizeAIAdvice = {
   recommendedQuality: number | null;
   lossless: boolean;
   rationale: string;
+  providerName: string;
+  modelName: string;
   durationMs: number;
   inputTokens: number;
   outputTokens: number;
@@ -144,6 +146,8 @@ export type DuplicateExplanation = {
   keepFilename?: string;
   recommendation: string;
   rationale: string;
+  providerName: string;
+  modelName: string;
   durationMs: number;
   inputTokens: number;
   outputTokens: number;

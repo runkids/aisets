@@ -18,6 +18,7 @@ type RenameRules struct {
 	ReplaceChars map[string]string `json:"replaceChars,omitempty"`
 	Prefix       string            `json:"prefix,omitempty"`
 	Suffix       string            `json:"suffix,omitempty"`
+	CustomBases  map[string]string `json:"customBaseNames,omitempty"`
 }
 
 // BatchResult holds the outcome of a batch delete or copy operation.
@@ -193,10 +194,13 @@ func BatchApply(project scanner.Project, preview BatchPreview) (ApplyResult, err
 }
 
 // applyRenameRules transforms a filename according to the rules.
-// Order: replaceChars → lowercase → prefix → suffix. Suffix is inserted before extension.
-func applyRenameRules(name string, rules RenameRules) string {
+// Order: custom base → replaceChars → lowercase → prefix → suffix. Suffix is inserted before extension.
+func applyRenameRules(name string, rules RenameRules, customBase string) string {
 	ext := filepath.Ext(name)
 	base := strings.TrimSuffix(name, ext)
+	if strings.TrimSpace(customBase) != "" {
+		base = strings.TrimSpace(customBase)
+	}
 
 	for old, repl := range rules.ReplaceChars {
 		base = strings.ReplaceAll(base, old, repl)
@@ -223,7 +227,7 @@ func BatchRenamePreview(project scanner.Project, items []scanner.AssetItem, rule
 	for _, item := range items {
 		dir := filepath.Dir(item.RepoPath)
 		oldName := filepath.Base(item.RepoPath)
-		newName := applyRenameRules(oldName, rules)
+		newName := applyRenameRules(oldName, rules, rules.CustomBases[item.ID])
 		if newName == oldName {
 			continue
 		}

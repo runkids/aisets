@@ -20,6 +20,8 @@ export type ThemePreference = "light" | "dark" | "system";
 export type SettingsViewProps = {
   theme: ThemePreference;
   imagePreviewEnabled: boolean;
+  imagePreviewDelaySeconds: number;
+  imagePreviewSize: { width: number; height: number };
   imageBackgroundMode: ImageBackgroundMode;
   ocrActivity: OCRActivityState;
   aiTagActivity: AITagActivityState;
@@ -27,6 +29,8 @@ export type SettingsViewProps = {
   scanWorking?: boolean;
   onThemeChange: (theme: ThemePreference) => void;
   onImagePreviewEnabledChange: (enabled: boolean) => void;
+  onImagePreviewDelaySecondsChange: (seconds: number) => void;
+  onImagePreviewSizeChange: (size: { width: number; height: number }) => void;
   onImageBackgroundModeChange: (mode: ImageBackgroundMode) => void;
   onStartOCR: (saveSettings: () => Promise<void>) => void;
   onStopOCR: () => void;

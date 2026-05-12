@@ -4,6 +4,10 @@ import (
 	"aisets/internal/llm"
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -167,6 +171,79 @@ func TestBuildCLIPrompt_NoSystem(t *testing.T) {
 	if !strings.Contains(got, "user prompt") {
 		t.Error("missing user prompt")
 	}
+}
+
+func TestCLIChatProvider_PreparesImagesForCLI(t *testing.T) {
+	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+	var capturedPath string
+	p := &CLIChatProvider{
+		binPath: os.Args[0],
+		name:    "helper",
+		buildArgs: func(req ChatRequest) []string {
+			if len(req.ImagePaths) != 1 {
+				t.Fatalf("expected one image path, got %d", len(req.ImagePaths))
+			}
+			capturedPath = req.ImagePaths[0]
+			return []string{"-test.run=TestCLIChatProviderHelperProcess", "--", capturedPath}
+		},
+		buildPrompt: defaultCLIPrompt,
+		prepareImage: func(localPath, ext, purpose string) (string, error) {
+			if localPath != "/img/source.svg" {
+				t.Fatalf("localPath = %q", localPath)
+			}
+			if ext != ".svg" {
+				t.Fatalf("ext = %q", ext)
+			}
+			if purpose != "vlm" {
+				t.Fatalf("purpose = %q", purpose)
+			}
+			return "data:image/png;base64,cG5nZGF0YQ==", nil
+		},
+	}
+
+	res := p.chatOne(context.Background(), ChatRequest{
+		Prompt:     "inspect",
+		ImagePaths: []string{"/img/source.svg"},
+		TimeoutSec: 5,
+	})
+	if res.Err != nil {
+		t.Fatal(res.Err)
+	}
+	if !strings.Contains(res.Content, "bytes=7") {
+		t.Fatalf("unexpected helper output: %s", res.Content)
+	}
+	if filepath.Ext(capturedPath) != ".png" {
+		t.Fatalf("prepared path ext = %q, want .png", filepath.Ext(capturedPath))
+	}
+	if _, err := os.Stat(capturedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected prepared image cleanup, stat err = %v", err)
+	}
+}
+
+func TestCLIChatProviderHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	args := os.Args
+	idx := -1
+	for i, arg := range args {
+		if arg == "--" {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx+1 >= len(args) {
+		os.Exit(2)
+	}
+	path := args[idx+1]
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("read_err=%v\n", err)
+		os.Exit(1)
+	}
+	stdin, _ := io.ReadAll(os.Stdin)
+	fmt.Printf("path=%s bytes=%d stdin_has_path=%t\n", path, len(data), strings.Contains(string(stdin), path))
+	os.Exit(0)
 }
 
 func TestTruncate(t *testing.T) {

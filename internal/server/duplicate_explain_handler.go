@@ -19,6 +19,8 @@ type DuplicateExplanationResponse struct {
 	KeepFilename   string `json:"keepFilename,omitempty"`
 	Recommendation string `json:"recommendation"`
 	Rationale      string `json:"rationale"`
+	ProviderName   string `json:"providerName"`
+	ModelName      string `json:"modelName"`
 	DurationMs     int64  `json:"durationMs"`
 	InputTokens    int64  `json:"inputTokens"`
 	OutputTokens   int64  `json:"outputTokens"`
@@ -96,7 +98,7 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		timeoutSec = llm.DefaultChatTimeout
 	}
 
-	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureDuplicate)
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureDuplicate)
 
 	start := time.Now()
 	rawContent, resp, err := s.chatVLM(r.Context(), []vlmImage{
@@ -130,6 +132,8 @@ func (s *Server) handleDuplicateExplain(w http.ResponseWriter, r *http.Request) 
 		KeepFilename:   parsed.KeepFilename,
 		Recommendation: parsed.Recommendation,
 		Rationale:      parsed.Rationale,
+		ProviderName:   providerName,
+		ModelName:      modelName,
 		DurationMs:     durationMs,
 		InputTokens:    resp.InputTokens,
 		OutputTokens:   resp.OutputTokens,

@@ -193,6 +193,8 @@ export function AssetDrawerOptimize({
               defaultOpen: true,
             },
           ]}
+          providerName={aiAdvice.providerName}
+          modelName={aiAdvice.modelName}
           durationMs={aiAdvice.durationMs}
           inputTokens={aiAdvice.inputTokens}
           outputTokens={aiAdvice.outputTokens}

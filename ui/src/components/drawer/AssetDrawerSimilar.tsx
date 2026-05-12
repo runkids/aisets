@@ -209,6 +209,8 @@ export function AssetDrawerSimilar({
                       content: explanation.rationale,
                     },
                   ]}
+                  providerName={explanation.providerName}
+                  modelName={explanation.modelName}
                   durationMs={explanation.durationMs}
                   inputTokens={explanation.inputTokens}
                   outputTokens={explanation.outputTokens}

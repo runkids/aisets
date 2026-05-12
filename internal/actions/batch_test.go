@@ -282,11 +282,22 @@ func TestApplyRenameRules(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := applyRenameRules(tc.input, tc.rules)
+			got := applyRenameRules(tc.input, tc.rules, "")
 			if got != tc.want {
 				t.Fatalf("applyRenameRules(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestApplyRenameRules_CustomBase(t *testing.T) {
+	got := applyRenameRules("Hero Banner.PNG", RenameRules{
+		Lowercase: true,
+		Prefix:    "icon-",
+		Suffix:    "-v2",
+	}, "Primary CTA")
+	if got != "icon-primary cta-v2.png" {
+		t.Fatalf("custom base rename = %q, want %q", got, "icon-primary cta-v2.png")
 	}
 }
 
@@ -336,5 +347,34 @@ func TestBatchRenamePreview(t *testing.T) {
 	}
 	if len(preview.Blockers) != 0 {
 		t.Fatalf("expected 0 blockers, got %v", preview.Blockers)
+	}
+}
+
+func TestBatchRenamePreview_CustomBases(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "img", "hero.png"), "hero")
+	mustWrite(t, filepath.Join(root, "img", "banner.png"), "banner")
+
+	project := scanner.Project{ID: root, Name: "fixture", Path: root}
+	items := []scanner.AssetItem{
+		{ID: "id-hero", ProjectID: root, RepoPath: "img/hero.png"},
+		{ID: "id-banner", ProjectID: root, RepoPath: "img/banner.png"},
+	}
+	rules := RenameRules{
+		Prefix:      "icon-",
+		Suffix:      "-v2",
+		CustomBases: map[string]string{"id-banner": "promo"},
+	}
+
+	preview := BatchRenamePreview(project, items, rules)
+
+	if len(preview.Moves) != 2 {
+		t.Fatalf("expected 2 moves, got %d", len(preview.Moves))
+	}
+	if preview.Moves[0].To != "img/icon-hero-v2.png" {
+		t.Fatalf("move[0].To = %q, want %q", preview.Moves[0].To, "img/icon-hero-v2.png")
+	}
+	if preview.Moves[1].To != "img/icon-promo-v2.png" {
+		t.Fatalf("move[1].To = %q, want %q", preview.Moves[1].To, "img/icon-promo-v2.png")
 	}
 }

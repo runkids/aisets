@@ -59,7 +59,14 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
 } from "./queries";
-import { APIError, runOCR, runAITagging, runVLMOcr, runEmbedding, runAITagTranslate } from "./api";
+import {
+  APIError,
+  runOCR,
+  runAITagging,
+  runVLMOcr,
+  runEmbedding,
+  runAITagTranslate,
+} from "./api";
 import { errorMessage } from "./i18n";
 import {
   initialOCRActivityState,
@@ -129,6 +136,7 @@ import {
 type PreviewState = { endpoint: string; token: string; value: ActionPreview };
 type ThemePreference = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
+type ImagePreviewSize = { width: number; height: number };
 
 const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -152,6 +160,13 @@ const emptyCatalogSummary: CatalogSummary = {
   },
 };
 const IMAGE_BACKGROUND_STORAGE_KEY = "aisets-image-background";
+const IMAGE_PREVIEW_DELAY_STORAGE_KEY = "aisets-image-preview-delay-seconds";
+const IMAGE_PREVIEW_SIZE_STORAGE_KEY = "aisets-image-preview-size";
+const DEFAULT_IMAGE_PREVIEW_DELAY_SECONDS = 1;
+const DEFAULT_IMAGE_PREVIEW_SIZE: ImagePreviewSize = {
+  width: 320,
+  height: 260,
+};
 const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
 const SCAN_ERROR_DISMISS_MS = 3500;
@@ -180,6 +195,56 @@ function storedImageBackgroundMode(): ImageBackgroundMode {
     return normalizeImageBackgroundMode(browseState?.bgMode, "checker");
   } catch {
     return "checker";
+  }
+}
+
+function normalizeImagePreviewDelaySeconds(value: unknown) {
+  if (value == null || value === "") return DEFAULT_IMAGE_PREVIEW_DELAY_SECONDS;
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_IMAGE_PREVIEW_DELAY_SECONDS;
+  }
+  return parsed;
+}
+
+function storedImagePreviewDelaySeconds() {
+  return normalizeImagePreviewDelaySeconds(
+    window.localStorage.getItem(IMAGE_PREVIEW_DELAY_STORAGE_KEY),
+  );
+}
+
+function normalizeImagePreviewDimension(value: unknown, fallback: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(80, Math.round(parsed));
+}
+
+function normalizeImagePreviewSize(value: unknown): ImagePreviewSize {
+  if (value && typeof value === "object") {
+    const maybe = value as Partial<ImagePreviewSize>;
+    return {
+      width: normalizeImagePreviewDimension(
+        maybe.width,
+        DEFAULT_IMAGE_PREVIEW_SIZE.width,
+      ),
+      height: normalizeImagePreviewDimension(
+        maybe.height,
+        DEFAULT_IMAGE_PREVIEW_SIZE.height,
+      ),
+    };
+  }
+  return DEFAULT_IMAGE_PREVIEW_SIZE;
+}
+
+function storedImagePreviewSize() {
+  try {
+    return normalizeImagePreviewSize(
+      JSON.parse(
+        window.localStorage.getItem(IMAGE_PREVIEW_SIZE_STORAGE_KEY) ?? "null",
+      ),
+    );
+  } catch {
+    return DEFAULT_IMAGE_PREVIEW_SIZE;
   }
 }
 
@@ -252,8 +317,15 @@ export function App() {
   const [imagePreviewEnabled, setImagePreviewEnabled] = useState(() => {
     return window.localStorage.getItem("aisets-image-preview") !== "off";
   });
+  const [imagePreviewDelaySeconds, setImagePreviewDelaySeconds] = useState(
+    storedImagePreviewDelaySeconds,
+  );
+  const [imagePreviewSize, setImagePreviewSize] = useState(
+    storedImagePreviewSize,
+  );
   const [imageBackgroundMode, setImageBackgroundMode] =
     useState<ImageBackgroundMode>(storedImageBackgroundMode);
+  const imagePreviewDelayMs = imagePreviewDelaySeconds * 1000;
 
   const drawerId = searchParams.get("asset") ?? "";
   const browseCustomFilterId = searchParams.get("customFilter") ?? "";
@@ -384,6 +456,20 @@ export function App() {
       imagePreviewEnabled ? "on" : "off",
     );
   }, [imagePreviewEnabled]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      IMAGE_PREVIEW_DELAY_STORAGE_KEY,
+      String(imagePreviewDelaySeconds),
+    );
+  }, [imagePreviewDelaySeconds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      IMAGE_PREVIEW_SIZE_STORAGE_KEY,
+      JSON.stringify(imagePreviewSize),
+    );
+  }, [imagePreviewSize]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -802,8 +888,7 @@ export function App() {
       await runTranslateActivity({
         abortRef: translateAbortRef,
         dispatch: dispatchTranslateActivity,
-        run: ({ signal, onEvent }) =>
-          runAITagTranslate({ signal, onEvent }),
+        run: ({ signal, onEvent }) => runAITagTranslate({ signal, onEvent }),
       });
 
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -1061,6 +1146,8 @@ export function App() {
               projectFilterId={effectiveSelectedProjectId || undefined}
               projectFilterName={selectedProject?.name ?? ""}
               imagePreviewEnabled={imagePreviewEnabled}
+              imagePreviewDelayMs={imagePreviewDelayMs}
+              imagePreviewSize={imagePreviewSize}
               ocrEnabled={ocrEnabled}
               ocrFuzzySearch={ocrFuzzySearch}
               stats={scopedStats}
@@ -1098,6 +1185,8 @@ export function App() {
             <SettingsView
               theme={theme}
               imagePreviewEnabled={imagePreviewEnabled}
+              imagePreviewDelaySeconds={imagePreviewDelaySeconds}
+              imagePreviewSize={imagePreviewSize}
               imageBackgroundMode={imageBackgroundMode}
               ocrActivity={ocrActivity}
               aiTagActivity={aiTagActivity}
@@ -1105,6 +1194,14 @@ export function App() {
               scanWorking={backendScanRunning || scanMutation.isPending}
               onThemeChange={setTheme}
               onImagePreviewEnabledChange={setImagePreviewEnabled}
+              onImagePreviewDelaySecondsChange={(value) =>
+                setImagePreviewDelaySeconds(
+                  normalizeImagePreviewDelaySeconds(value),
+                )
+              }
+              onImagePreviewSizeChange={(value) =>
+                setImagePreviewSize(normalizeImagePreviewSize(value))
+              }
               onImageBackgroundModeChange={setImageBackgroundMode}
               onStartOCR={onStartOCRActivity}
               onStopOCR={onStopOCRActivity}
@@ -1298,6 +1395,9 @@ export function App() {
           (settingsQuery.data?.settings.llmEnabled ?? false) &&
           !!settingsQuery.data?.settings.llmEmbedModel
         }
+        imagePreviewEnabled={imagePreviewEnabled}
+        imagePreviewDelayMs={imagePreviewDelayMs}
+        imagePreviewSize={imagePreviewSize}
         onClose={() => setCmdkOpen(false)}
         onNavigate={changeMode}
         onOpenAsset={openAssetFromPalette}

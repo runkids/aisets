@@ -94,7 +94,7 @@ describe("normalizeBrowseStoredState", () => {
       },
       view: "list",
       gridSize: "l",
-      searchQuery: "logo",
+      searchQuery: "",
       statusFilter: "duplicate",
       sortMode: "size",
     });

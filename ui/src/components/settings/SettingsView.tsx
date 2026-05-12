@@ -55,6 +55,8 @@ import { HotkeysSection } from "./HotkeysSection";
 export function SettingsView({
   theme,
   imagePreviewEnabled,
+  imagePreviewDelaySeconds,
+  imagePreviewSize,
   imageBackgroundMode,
   ocrActivity,
   aiTagActivity,
@@ -62,6 +64,8 @@ export function SettingsView({
   scanWorking = false,
   onThemeChange,
   onImagePreviewEnabledChange,
+  onImagePreviewDelaySecondsChange,
+  onImagePreviewSizeChange,
   onImageBackgroundModeChange,
   onStartOCR,
   onStopOCR,
@@ -575,11 +579,17 @@ export function SettingsView({
             <ThemeSection
               theme={theme}
               imagePreviewEnabled={imagePreviewEnabled}
+              imagePreviewDelaySeconds={imagePreviewDelaySeconds}
+              imagePreviewSize={imagePreviewSize}
               imageBackgroundMode={imageBackgroundMode}
               preferredEditor={settings?.preferredEditor}
               translationLocales={settings?.llmTranslationLocales}
               onThemeChange={onThemeChange}
               onImagePreviewEnabledChange={onImagePreviewEnabledChange}
+              onImagePreviewDelaySecondsChange={
+                onImagePreviewDelaySecondsChange
+              }
+              onImagePreviewSizeChange={onImagePreviewSizeChange}
               onImageBackgroundModeChange={onImageBackgroundModeChange}
               onEditorChange={(editor) =>
                 updateMutation.mutate({ preferredEditor: editor })

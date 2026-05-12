@@ -8,17 +8,17 @@ import (
 func NewChatProvider(adapterID string, info AdapterInfo, llmProvider llm.Provider, prepareImage PrepareImageFunc) (ChatProvider, error) {
 	switch adapterID {
 	case AdapterClaude:
-		return newClaudeChatProvider(info.Path), nil
+		return newClaudeChatProvider(info.Path, prepareImage), nil
 	case AdapterCodex:
-		return newCodexChatProvider(info.Path), nil
+		return newCodexChatProvider(info.Path, prepareImage), nil
 	case AdapterGemini:
-		return newGeminiChatProvider(info.Path), nil
+		return newGeminiChatProvider(info.Path, prepareImage), nil
 	case AdapterCopilot:
-		return newCopilotChatProvider(info.Path), nil
+		return newCopilotChatProvider(info.Path, prepareImage), nil
 	case AdapterCursorAgent:
-		return newCursorChatProvider(info.Path), nil
+		return newCursorChatProvider(info.Path, prepareImage), nil
 	case AdapterPi:
-		return newPiChatProvider(info.Path), nil
+		return newPiChatProvider(info.Path, prepareImage), nil
 	case AdapterLocalLLM:
 		if llmProvider == nil {
 			return nil, fmt.Errorf("local-llm adapter requires an LLM provider")

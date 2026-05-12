@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Images,
   MessageSquareCode,
   Tags,
   Trash2,
@@ -43,7 +44,7 @@ import { useCategoryListQuery, useTagsQuery } from "../../tagsQueries";
 import { useDebouncedValue } from "../../useDebouncedValue";
 import { useSearchHistory } from "../../useSearchHistory";
 import { fileName, type Mode } from "../../ui";
-import { AssetThumbnail } from "../ui";
+import { AssetThumbnail, ImagePreview } from "../ui";
 import {
   DialogOverlay,
   DialogSurface,
@@ -61,6 +62,9 @@ type Props = {
   ocrEnabled: boolean;
   embedEnabled: boolean;
   settings?: SettingsInfo;
+  imagePreviewEnabled: boolean;
+  imagePreviewDelayMs: number;
+  imagePreviewSize: { width: number; height: number };
   onClose: () => void;
   onNavigate: (mode: Mode) => void;
   onOpenAsset: (asset: AssetItem) => void;
@@ -94,6 +98,7 @@ const MODE_ITEMS: ModeItem[] = [
   { id: "optimize", labelKey: "nav.optimize", icon: <Gauge size={14} /> },
   { id: "lint", labelKey: "nav.lint", icon: <FileWarning size={14} /> },
   { id: "precheck", labelKey: "nav.precheck", icon: <ShieldCheck size={14} /> },
+  { id: "imageTools", labelKey: "nav.imageTools", icon: <Images size={14} /> },
   {
     id: "prompts",
     labelKey: "nav.prompts",
@@ -1326,11 +1331,15 @@ function ResultRow({
   active,
   index,
   src,
+  previewSrc,
   name,
   path,
   side,
   query,
   semantic,
+  imagePreviewEnabled,
+  imagePreviewDelayMs,
+  imagePreviewSize,
   onHover,
   onClick,
 }: {
@@ -1338,11 +1347,15 @@ function ResultRow({
   active: boolean;
   index: number;
   src?: string;
+  previewSrc?: string;
   name: string;
   path: string;
   side: ReactNode;
   query: string;
   semantic: boolean;
+  imagePreviewEnabled: boolean;
+  imagePreviewDelayMs: number;
+  imagePreviewSize: { width: number; height: number };
   onHover: () => void;
   onClick: () => void;
 }) {
@@ -1361,12 +1374,20 @@ function ResultRow({
       onMouseEnter={onHover}
       onClick={onClick}
     >
-      <AssetThumbnail
-        src={src}
-        size="sm"
-        className="size-[34px] rounded-g-md"
-        imageClassName="max-w-[90%] max-h-[90%]"
-      />
+      <ImagePreview
+        src={previewSrc ?? src ?? ""}
+        alt={name}
+        enabled={imagePreviewEnabled}
+        delayMs={imagePreviewDelayMs}
+        size={imagePreviewSize}
+      >
+        <AssetThumbnail
+          src={src}
+          size="sm"
+          className="size-[34px] rounded-g-md"
+          imageClassName="max-w-[90%] max-h-[90%]"
+        />
+      </ImagePreview>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-g-mono text-xs font-[510] tracking-g-mono text-current">
           {semantic ? name : highlight(name, query, false)}
@@ -1435,6 +1456,9 @@ export function CommandPalette({
   ocrEnabled,
   embedEnabled,
   settings,
+  imagePreviewEnabled,
+  imagePreviewDelayMs,
+  imagePreviewSize,
   onClose,
   onNavigate,
   onOpenAsset,
@@ -1962,6 +1986,7 @@ export function CommandPalette({
                               active={activeItemIndex === i}
                               index={i}
                               src={result.thumbnailUrl}
+                              previewSrc={result.thumbnailUrl}
                               name={fileName(result.repoPath)}
                               path={`${projectNameById.get(result.projectId) ?? result.projectId} · ${result.repoPath}`}
                               side={
@@ -1969,6 +1994,9 @@ export function CommandPalette({
                               }
                               query={query}
                               semantic
+                              imagePreviewEnabled={imagePreviewEnabled}
+                              imagePreviewDelayMs={imagePreviewDelayMs}
+                              imagePreviewSize={imagePreviewSize}
                               onHover={() => setActiveIndex(i)}
                               onClick={() => selectItem(i)}
                             />
@@ -2068,6 +2096,7 @@ export function CommandPalette({
                               active={activeItemIndex === index}
                               index={index}
                               src={asset.thumbnailUrl || asset.url}
+                              previewSrc={asset.url}
                               name={fileName(asset.repoPath)}
                               path={`${asset.projectName} · ${asset.repoPath}`}
                               side={
@@ -2077,6 +2106,9 @@ export function CommandPalette({
                               }
                               query={query}
                               semantic={false}
+                              imagePreviewEnabled={imagePreviewEnabled}
+                              imagePreviewDelayMs={imagePreviewDelayMs}
+                              imagePreviewSize={imagePreviewSize}
                               onHover={() => setActiveIndex(index)}
                               onClick={() => selectItem(index)}
                             />

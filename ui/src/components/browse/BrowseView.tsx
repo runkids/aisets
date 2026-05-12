@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -25,6 +26,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { matchesCustomAssetFilter } from "../../customAssetFilters";
+import { errorMessage } from "../../i18n";
 import {
   useBatchDeleteMutation,
   useBatchCopyMutation,
@@ -60,7 +62,8 @@ import { BrowseList } from "./BrowseList";
 import { BrowseToolbar, type SortMode, type ViewMode } from "./BrowseToolbar";
 import { useImageBackgroundControls } from "../../imageBackground";
 import { FilterRail } from "../shared/FilterRail";
-import { EmptyState } from "../ui";
+import { useToast } from "../shared/ToastProvider";
+import { EmptyState, IconButton, Tooltip } from "../ui";
 
 type StatusFilter =
   | ""
@@ -103,6 +106,36 @@ const statusFilters: StatusFilter[] = [
 ];
 const sortModes: SortMode[] = ["name", "size", "recent"];
 
+type BulkActionButtonProps = {
+  label: string;
+  icon: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+};
+
+function BulkActionButton({
+  label,
+  icon,
+  disabled,
+  onClick,
+}: BulkActionButtonProps) {
+  return (
+    <Tooltip label={label} placement="top">
+      <span className="inline-flex shrink-0">
+        <IconButton
+          size="md"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="rounded-[calc(var(--g-r-md)-2px)]"
+        >
+          {icon}
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
 type Props = {
   activeAssetId: string;
   autoScrollAssetId: string;
@@ -121,6 +154,8 @@ type Props = {
   initialAICategory: string;
   initialFocusAssetId: string;
   imagePreviewEnabled: boolean;
+  imagePreviewDelayMs: number;
+  imagePreviewSize: { width: number; height: number };
   ocrEnabled: boolean;
   ocrFuzzySearch: boolean;
   onAutoScrollDone: () => void;
@@ -209,9 +244,7 @@ export function normalizeBrowseStoredState(
   if (pinned?.customFilter) filters.customFilter = pinned.customFilter;
   if (pinned?.aiCategory) filters.aiCategory = pinned.aiCategory;
   const searchQuery =
-    pinned?.searchQuery != null
-      ? pinned.searchQuery
-      : stringOrDefault(state.searchQuery, defaults.searchQuery);
+    pinned?.searchQuery != null ? pinned.searchQuery : defaults.searchQuery;
 
   return {
     filters,
@@ -253,7 +286,10 @@ function writeBrowseStoredState(state: BrowseStoredState) {
   try {
     window.localStorage.setItem(
       BROWSE_STATE_STORAGE_KEY,
-      JSON.stringify(state),
+      JSON.stringify({
+        ...state,
+        searchQuery: "",
+      }),
     );
   } catch {
     // Ignore browser storage failures; filters still work for this session.
@@ -619,6 +655,8 @@ export function BrowseView({
   initialAICategory,
   initialFocusAssetId,
   imagePreviewEnabled,
+  imagePreviewDelayMs,
+  imagePreviewSize,
   ocrEnabled,
   ocrFuzzySearch,
   onAutoScrollDone,
@@ -685,6 +723,7 @@ export function BrowseView({
   const movePreviewMut = useBatchMovePreviewMutation();
   const renamePreviewMut = useBatchRenamePreviewMutation();
   const batchApplyMut = useBatchApplyMutation();
+  const toast = useToast();
 
   const settingsQuery = useSettingsQuery();
 
@@ -991,6 +1030,7 @@ export function BrowseView({
 
   function handleRenameConfirm(rules: RenameRules) {
     setShowRenameRules(false);
+    toast.info(t("toast.batchRenamePreviewLoading"));
     renamePreviewMut.mutate(
       { assetIds: Array.from(selected), rules },
       {
@@ -999,6 +1039,14 @@ export function BrowseView({
             endpoint: "/api/actions/batch/rename/apply",
             data,
           });
+          toast.success(
+            t("toast.batchRenamePreviewReady", {
+              count: data.preview.moves.length,
+            }),
+          );
+        },
+        onError: (e) => {
+          toast.error(errorMessage(e));
         },
       },
     );
@@ -1006,13 +1054,27 @@ export function BrowseView({
 
   function handleBatchApply() {
     if (!batchPreview) return;
+    const currentPreview = batchPreview;
+    const isRename = currentPreview.endpoint.includes("rename");
+    if (isRename) {
+      toast.info(t("toast.batchRenameApplyLoading"));
+    }
     batchApplyMut.mutate(
-      { endpoint: batchPreview.endpoint, token: batchPreview.data.token },
+      { endpoint: currentPreview.endpoint, token: currentPreview.data.token },
       {
         onSuccess: () => {
+          const moveCount = currentPreview.data.preview.moves.length;
           setBatchPreview(null);
           setSelected(new Set());
           setBulkMode(false);
+          if (isRename) {
+            toast.success(
+              t("toast.batchRenameApplySuccess", { count: moveCount }),
+            );
+          }
+        },
+        onError: (e) => {
+          toast.error(errorMessage(e));
         },
       },
     );
@@ -1108,9 +1170,9 @@ export function BrowseView({
                   : t("browse.selectItems")}
               </span>
               <span className="flex-1" />
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              <BulkActionButton
+                label={t("imageTools.addToTools")}
+                icon={<Images size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => {
                   if (!onAddToImageTools) {
@@ -1121,86 +1183,59 @@ export function BrowseView({
                   setSelected(new Set());
                   setBulkMode(false);
                 }}
-              >
-                <Images size={14} />
-                {t("imageTools.addToTools")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              />
+              <BulkActionButton
+                label={pathsCopied ? t("toast.copied") : t("action.copyPaths")}
+                icon={pathsCopied ? <Check size={14} /> : <Copy size={14} />}
                 disabled={selected.size === 0}
                 onClick={copyPaths}
-              >
-                {pathsCopied ? <Check size={14} /> : <Copy size={14} />}
-                {pathsCopied ? t("toast.copied") : t("action.copyPaths")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              />
+              <BulkActionButton
+                label={t("action.batchCopy")}
+                icon={<FolderOutput size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => setShowCopyDir(true)}
-              >
-                <FolderOutput size={14} />
-                {t("action.batchCopy")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              />
+              <BulkActionButton
+                label={t("action.batchMove")}
+                icon={<FolderInput size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => setShowMoveDir(true)}
-              >
-                <FolderInput size={14} />
-                {t("action.batchMove")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              />
+              <BulkActionButton
+                label={t("action.batchRename")}
+                icon={<PenLine size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => setShowRenameRules(true)}
-              >
-                <PenLine size={14} />
-                {t("action.batchRename")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              />
+              <BulkActionButton
+                label={t("action.batchExport")}
+                icon={<Download size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => batchExport(Array.from(selected))}
-              >
-                <Download size={14} />
-                {t("action.batchExport")}
-              </button>
+              />
               {aiEnabled && onStartAITag && (
-                <button
-                  type="button"
-                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                <BulkActionButton
+                  label={t("action.batchAITag")}
+                  icon={<Tags size={14} />}
                   disabled={aiBusy || selected.size === 0}
                   onClick={() => onStartAITag(Array.from(selected))}
-                >
-                  <Tags size={14} />
-                  {t("action.batchAITag")}
-                </button>
+                />
               )}
               {aiEnabled && onStartVLMOcr && (
-                <button
-                  type="button"
-                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+                <BulkActionButton
+                  label={t("action.batchAIOcr")}
+                  icon={<ScanText size={14} />}
                   disabled={aiBusy || selected.size === 0}
                   onClick={() => onStartVLMOcr(Array.from(selected))}
-                >
-                  <ScanText size={14} />
-                  {t("action.batchAIOcr")}
-                </button>
+                />
               )}
-              <button
-                type="button"
-                className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-[calc(var(--g-r-md)-2px)] px-2.5 font-[510] text-g-body text-g-ink-2 transition-[background,color,box-shadow] duration-[120ms] ease-g hover:bg-g-surface hover:text-g-ink hover:shadow-g-sm focus-visible:shadow-g-focus disabled:opacity-40 disabled:pointer-events-none"
+              <BulkActionButton
+                label={t("action.deleteSelected")}
+                icon={<Trash2 size={14} />}
                 disabled={selected.size === 0}
                 onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 size={14} />
-                {t("action.deleteSelected")}
-              </button>
+              />
             </div>
           )}
 
@@ -1255,6 +1290,8 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  imagePreviewDelayMs={imagePreviewDelayMs}
+                  imagePreviewSize={imagePreviewSize}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -1272,6 +1309,8 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  imagePreviewDelayMs={imagePreviewDelayMs}
+                  imagePreviewSize={imagePreviewSize}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -1291,6 +1330,8 @@ export function BrowseView({
                   activeAssetId={activeAssetId}
                   autoScrollAssetId={autoScrollAssetId}
                   imagePreviewEnabled={imagePreviewEnabled}
+                  imagePreviewDelayMs={imagePreviewDelayMs}
+                  imagePreviewSize={imagePreviewSize}
                   onAutoScrollDone={onAutoScrollDone}
                   onSelect={(item) => onOpenAsset(item.id)}
                   onToggleSelect={toggleSelect}
@@ -1337,9 +1378,10 @@ export function BrowseView({
 
       {showRenameRules && (
         <RenameRuleModal
-          filePaths={items
-            .filter((i) => selected.has(i.id))
-            .map((i) => i.repoPath)}
+          items={items.filter((i) => selected.has(i.id))}
+          imagePreviewEnabled={imagePreviewEnabled}
+          imagePreviewDelayMs={imagePreviewDelayMs}
+          imagePreviewSize={imagePreviewSize}
           onCancel={() => setShowRenameRules(false)}
           onConfirm={handleRenameConfirm}
         />

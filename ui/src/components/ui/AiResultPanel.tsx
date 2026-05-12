@@ -1,5 +1,12 @@
 import { type ReactNode, useCallback, useState } from "react";
-import { ChevronDown, RefreshCw, Sparkles, Timer, Zap } from "lucide-react";
+import {
+  Bot,
+  ChevronDown,
+  RefreshCw,
+  Sparkles,
+  Timer,
+  Zap,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { CopyButton } from "./CopyButton";
@@ -80,6 +87,8 @@ function Section({
 type AiResultPanelProps = {
   summary: ReactNode;
   sections?: { label: string; content: ReactNode; defaultOpen?: boolean }[];
+  providerName?: string;
+  modelName?: string;
   durationMs?: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -92,6 +101,8 @@ type AiResultPanelProps = {
 function AiResultPanel({
   summary,
   sections,
+  providerName,
+  modelName,
   durationMs,
   inputTokens,
   outputTokens,
@@ -101,6 +112,10 @@ function AiResultPanel({
   className,
 }: AiResultPanelProps) {
   const { t } = useTranslation();
+  const modelLabel =
+    providerName && modelName
+      ? `${providerName} / ${modelName}`
+      : providerName || modelName;
 
   const buildCopyText = useCallback(() => {
     if (copyText) return copyText;
@@ -166,8 +181,14 @@ function AiResultPanel({
       )}
 
       {/* Metadata footer */}
-      {(durationMs != null || inputTokens != null) && (
+      {(modelLabel || durationMs != null || inputTokens != null) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-g-purple/10 pt-2 font-g-mono text-[10px] text-g-ink-4">
+          {modelLabel && (
+            <span className="inline-flex items-center gap-1">
+              <Bot size={10} />
+              {modelLabel}
+            </span>
+          )}
           {durationMs != null && (
             <span className="inline-flex items-center gap-1">
               <Timer size={10} />
