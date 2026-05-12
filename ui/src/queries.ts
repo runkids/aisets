@@ -1,8 +1,8 @@
 import {
   type InfiniteData,
-  keepPreviousData,
   type QueryClient,
   type QueryKey,
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -71,11 +71,11 @@ import type {
 } from "./api";
 import type {
   AITagRunEvent,
+  ExportData,
   AssetItem,
   CatalogItemDetail,
   CatalogItemsPage,
   CatalogSummary,
-  ExportData,
   OCRRunEvent,
   VLMOcrRunEvent,
   ProjectScanIntent,
@@ -84,6 +84,7 @@ import type {
   ScanAnalyses,
   ScanEvent,
   ScanProfile,
+  SemanticSearchResponse,
   SettingsUpdate,
 } from "./types";
 
@@ -198,68 +199,70 @@ function normalizeCatalogFoldersParams(params: CatalogFoldersParams) {
 }
 
 type FavoriteOptimisticChange = {
-  assetIds: Set<string>;
+  ids: Set<string>;
   favorite: boolean;
 };
 
-type FavoriteOptimisticSnapshot = Array<readonly [QueryKey, unknown]>;
+type FavoriteOptimisticSnapshot = {
+  catalog: Array<[QueryKey, unknown]>;
+  semantic: Array<[QueryKey, unknown]>;
+};
 
-function favoriteDelta(items: AssetItem[], change: FavoriteOptimisticChange) {
-  const seen = new Set<string>();
-  return items.reduce((sum, item) => {
-    if (seen.has(item.id) || !change.assetIds.has(item.id)) return sum;
-    seen.add(item.id);
-    if (Boolean(item.favorite) === change.favorite) return sum;
-    return sum + (change.favorite ? 1 : -1);
-  }, 0);
+function favoriteDelta(item: AssetItem, change: FavoriteOptimisticChange) {
+  if (!change.ids.has(item.id)) return 0;
+  const current = Boolean(item.favorite);
+  if (current === change.favorite) return 0;
+  return change.favorite ? 1 : -1;
 }
 
-function updateAssetFavorite(
-  item: AssetItem,
+function updateAssetFavorite<T extends AssetItem>(
+  item: T,
   change: FavoriteOptimisticChange,
-) {
-  if (!change.assetIds.has(item.id)) return item;
+): T {
+  if (!change.ids.has(item.id)) return item;
+  if (Boolean(item.favorite) === change.favorite) return item;
   return { ...item, favorite: change.favorite };
 }
 
-function updateAssetListFavorite(
-  items: AssetItem[],
+function updateAssetListFavorite<T extends AssetItem>(
+  items: T[],
   change: FavoriteOptimisticChange,
 ) {
+  let delta = 0;
   let changed = false;
   const nextItems = items.map((item) => {
-    const nextItem = updateAssetFavorite(item, change);
-    if (nextItem !== item) changed = true;
-    return nextItem;
+    const itemDelta = favoriteDelta(item, change);
+    if (itemDelta === 0) return item;
+    delta += itemDelta;
+    changed = true;
+    return updateAssetFavorite(item, change);
   });
-  return changed ? nextItems : items;
+  return { changed, delta, items: changed ? nextItems : items };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function applyFavoriteUpdateToCatalogItemsPage(
   page: CatalogItemsPage,
   change: FavoriteOptimisticChange,
   favoriteFilter = false,
-  facetDelta = favoriteDelta(page.items, change),
-  totalDelta = favoriteFilter && !change.favorite ? facetDelta : 0,
-): CatalogItemsPage {
-  const nextItems = updateAssetListFavorite(page.items, change);
-  const filteredItems =
-    favoriteFilter && !change.favorite
-      ? nextItems.filter((item) => !change.assetIds.has(item.id))
-      : nextItems;
-  const removedCount = nextItems.length - filteredItems.length;
+) {
+  const updated = updateAssetListFavorite(page.items, change);
+  if (!updated.changed) return page;
 
-  if (nextItems === page.items && removedCount === 0 && facetDelta === 0) {
-    return page;
-  }
+  const items = favoriteFilter
+    ? updated.items.filter((item) => Boolean(item.favorite))
+    : updated.items;
+  const removedFromFavoriteFilter = page.items.length - items.length;
 
   return {
     ...page,
-    items: filteredItems,
-    total: Math.max(0, page.total + totalDelta),
+    items,
+    total: favoriteFilter
+      ? Math.max(0, page.total - removedFromFavoriteFilter)
+      : page.total,
     facets: {
       ...page.facets,
-      favoriteCount: Math.max(0, page.facets.favoriteCount + facetDelta),
+      favoriteCount: Math.max(0, page.facets.favoriteCount + updated.delta),
     },
   };
 }
@@ -270,23 +273,17 @@ function updateCatalogItemsData(
   favoriteFilter: boolean,
 ) {
   if (!data) return data;
-  const facetDelta = favoriteDelta(
-    data.pages.flatMap((page) => page.items),
-    change,
-  );
-  const totalDelta = favoriteFilter && !change.favorite ? facetDelta : 0;
-  return {
-    ...data,
-    pages: data.pages.map((page) =>
-      applyFavoriteUpdateToCatalogItemsPage(
-        page,
-        change,
-        favoriteFilter,
-        facetDelta,
-        totalDelta,
-      ),
-    ),
-  };
+  let changed = false;
+  const pages = data.pages.map((page) => {
+    const next = applyFavoriteUpdateToCatalogItemsPage(
+      page,
+      change,
+      favoriteFilter,
+    );
+    if (next !== page) changed = true;
+    return next;
+  });
+  return changed ? { ...data, pages } : data;
 }
 
 function updateCatalogItemDetailData(
@@ -294,124 +291,174 @@ function updateCatalogItemDetailData(
   change: FavoriteOptimisticChange,
 ) {
   if (!data) return data;
+  const item = updateAssetFavorite(data.item, change);
+  const duplicates = updateAssetListFavorite(data.duplicates, change);
+  const similarItems = updateAssetListFavorite(data.similarItems, change);
+  if (item === data.item && !duplicates.changed && !similarItems.changed) {
+    return data;
+  }
   return {
     ...data,
-    item: updateAssetFavorite(data.item, change),
-    duplicates: updateAssetListFavorite(data.duplicates, change),
-    similarItems: updateAssetListFavorite(data.similarItems, change),
+    item,
+    duplicates: duplicates.items,
+    similarItems: similarItems.items,
   };
 }
 
 function collectKnownFavoriteItems(
-  client: QueryClient,
-  change: FavoriteOptimisticChange,
+  snapshots: Array<[QueryKey, unknown]>,
+  out = new Map<string, AssetItem>(),
 ) {
-  const known = new Map<string, AssetItem>();
-  for (const query of client
-    .getQueryCache()
-    .findAll({ queryKey: catalogQueryKey })) {
-    const section = catalogKeySection(query.queryKey);
-    const data = query.state.data;
-    if (section === "items") {
-      const pages = (data as InfiniteData<CatalogItemsPage> | undefined)?.pages;
-      for (const page of pages ?? []) {
-        for (const item of page.items) {
-          if (change.assetIds.has(item.id)) known.set(item.id, item);
-        }
+  for (const [, data] of snapshots) {
+    if (!data || typeof data !== "object") continue;
+    const maybeInfinite = data as { pages?: CatalogItemsPage[] };
+    if (Array.isArray(maybeInfinite.pages)) {
+      for (const page of maybeInfinite.pages) {
+        for (const item of page.items ?? []) out.set(item.id, item);
       }
+      continue;
     }
-    if (section === "item") {
-      const detail = data as CatalogItemDetail | undefined;
-      if (detail?.item && change.assetIds.has(detail.item.id)) {
-        known.set(detail.item.id, detail.item);
-      }
+    const maybeDetail = data as CatalogItemDetail;
+    if (maybeDetail.item?.id) out.set(maybeDetail.item.id, maybeDetail.item);
+    for (const item of maybeDetail.duplicates ?? []) out.set(item.id, item);
+    for (const item of maybeDetail.similarItems ?? []) out.set(item.id, item);
+
+    const maybeSemantic = data as SemanticSearchResponse;
+    for (const result of maybeSemantic.results ?? []) {
+      if (result.item) out.set(result.item.id, result.item);
     }
   }
-  return Array.from(known.values());
+  return out;
 }
 
 function updateCatalogSummaryData(
   data: CatalogSummary | undefined,
-  knownItems: AssetItem[],
   change: FavoriteOptimisticChange,
+  knownItems: Map<string, AssetItem>,
 ) {
   if (!data) return data;
-  const totalDelta = favoriteDelta(knownItems, change);
-  if (totalDelta === 0) return data;
-
+  let totalDelta = 0;
   const projectDeltas = new Map<string, number>();
-  for (const item of knownItems) {
-    if (!change.assetIds.has(item.id)) continue;
-    const delta = Boolean(item.favorite) === change.favorite ? 0 : change.favorite ? 1 : -1;
+  for (const id of change.ids) {
+    const item = knownItems.get(id);
+    if (!item) continue;
+    const delta = favoriteDelta(item, change);
     if (delta === 0) continue;
-    projectDeltas.set(item.projectId, (projectDeltas.get(item.projectId) ?? 0) + delta);
+    totalDelta += delta;
+    projectDeltas.set(
+      item.projectId,
+      (projectDeltas.get(item.projectId) ?? 0) + delta,
+    );
   }
-
+  if (totalDelta === 0) return data;
   return {
     ...data,
     stats: {
       ...data.stats,
       favoriteFiles: Math.max(0, (data.stats.favoriteFiles ?? 0) + totalDelta),
     },
-    projectStats: data.projectStats.map((project) => {
-      const delta = projectDeltas.get(project.projectId) ?? 0;
-      if (delta === 0) return project;
+    projectStats: data.projectStats.map((stats) => {
+      const delta = projectDeltas.get(stats.projectId) ?? 0;
+      if (delta === 0) return stats;
       return {
-        ...project,
-        favoriteFiles: Math.max(0, (project.favoriteFiles ?? 0) + delta),
+        ...stats,
+        favoriteFiles: Math.max(0, (stats.favoriteFiles ?? 0) + delta),
       };
     }),
   };
 }
 
+function updateSemanticSearchData(
+  data: SemanticSearchResponse | undefined,
+  change: FavoriteOptimisticChange,
+) {
+  if (!data) return data;
+  let changed = false;
+  const results = data.results.map((result) => {
+    if (!result.item) return result;
+    const item = updateAssetFavorite(result.item, change);
+    if (item === result.item) return result;
+    changed = true;
+    return { ...result, item };
+  });
+  return changed ? { ...data, results } : data;
+}
+
 function catalogKeySection(queryKey: QueryKey) {
-  return queryKey[0] === catalogQueryKey[0] && typeof queryKey[1] === "string"
-    ? queryKey[1]
-    : "";
+  return Array.isArray(queryKey) ? queryKey[1] : undefined;
 }
 
 function catalogItemsFavoriteFilter(queryKey: QueryKey) {
-  const params = queryKey[3] as { favorite?: unknown } | undefined;
-  return params?.favorite === "true";
+  if (!Array.isArray(queryKey)) return false;
+  const params = queryKey[3];
+  return (
+    params != null &&
+    typeof params === "object" &&
+    "favorite" in params &&
+    (params as { favorite?: unknown }).favorite === "true"
+  );
 }
 
-function applyFavoriteOptimisticUpdate(
+async function applyFavoriteOptimisticUpdate(
   client: QueryClient,
   change: FavoriteOptimisticChange,
-) {
-  const queries = client.getQueryCache().findAll({ queryKey: catalogQueryKey });
-  const snapshot: FavoriteOptimisticSnapshot = queries.map((query) => [
-    query.queryKey,
-    query.state.data,
+): Promise<FavoriteOptimisticSnapshot> {
+  await Promise.all([
+    client.cancelQueries({ queryKey: catalogQueryKey }),
+    client.cancelQueries({ queryKey: ["browse-semantic-search"] }),
   ]);
-  const knownItems = collectKnownFavoriteItems(client, change);
-  const totalDelta = favoriteDelta(knownItems, change);
 
-  for (const query of queries) {
-    const section = catalogKeySection(query.queryKey);
-    if (section === "summary") {
-      client.setQueryData(query.queryKey, (data: CatalogSummary | undefined) =>
-        updateCatalogSummaryData(data, knownItems, change),
-      );
-    }
-    if (section === "items") {
-      client.setQueryData(
-        query.queryKey,
-        (data: InfiniteData<CatalogItemsPage> | undefined) =>
+  const snapshot: FavoriteOptimisticSnapshot = {
+    catalog: client.getQueriesData({ queryKey: catalogQueryKey }),
+    semantic: client.getQueriesData({ queryKey: ["browse-semantic-search"] }),
+  };
+  const knownItems = collectKnownFavoriteItems([
+    ...snapshot.catalog,
+    ...snapshot.semantic,
+  ]);
+
+  for (const [queryKey, data] of snapshot.catalog) {
+    switch (catalogKeySection(queryKey)) {
+      case "items":
+        client.setQueryData(
+          queryKey,
           updateCatalogItemsData(
-            data,
+            data as InfiniteData<CatalogItemsPage> | undefined,
             change,
-            catalogItemsFavoriteFilter(query.queryKey),
+            catalogItemsFavoriteFilter(queryKey),
           ),
-      );
+        );
+        break;
+      case "item":
+        client.setQueryData(
+          queryKey,
+          updateCatalogItemDetailData(
+            data as CatalogItemDetail | undefined,
+            change,
+          ),
+        );
+        break;
+      case "summary":
+        client.setQueryData(
+          queryKey,
+          updateCatalogSummaryData(
+            data as CatalogSummary | undefined,
+            change,
+            knownItems,
+          ),
+        );
+        break;
     }
-    if (section === "item") {
-      client.setQueryData(
-        query.queryKey,
-        (data: CatalogItemDetail | undefined) =>
-          updateCatalogItemDetailData(data, change),
-      );
-    }
+  }
+
+  for (const [queryKey, data] of snapshot.semantic) {
+    client.setQueryData(
+      queryKey,
+      updateSemanticSearchData(
+        data as SemanticSearchResponse | undefined,
+        change,
+      ),
+    );
   }
 
   return snapshot;
@@ -419,9 +466,13 @@ function applyFavoriteOptimisticUpdate(
 
 function restoreFavoriteOptimisticSnapshot(
   client: QueryClient,
-  snapshot?: FavoriteOptimisticSnapshot,
+  snapshot: FavoriteOptimisticSnapshot | undefined,
 ) {
-  for (const [queryKey, data] of snapshot ?? []) {
+  if (!snapshot) return;
+  for (const [queryKey, data] of snapshot.catalog) {
+    client.setQueryData(queryKey, data);
+  }
+  for (const [queryKey, data] of snapshot.semantic) {
     client.setQueryData(queryKey, data);
   }
 }
@@ -438,18 +489,19 @@ export function useFavoriteAssetMutation() {
       favorite: boolean;
       scanId?: number;
     }) => setCatalogItemFavorite(assetId, favorite, scanId),
-    onMutate: async ({ assetId, favorite }) => {
-      await client.cancelQueries({ queryKey: catalogQueryKey });
-      return applyFavoriteOptimisticUpdate(client, {
-        assetIds: new Set([assetId]),
+    onMutate: async ({ assetId, favorite }) =>
+      applyFavoriteOptimisticUpdate(client, {
+        ids: new Set([assetId]),
         favorite,
-      });
-    },
+      }),
     onError: (_error, _variables, snapshot) => {
       restoreFavoriteOptimisticSnapshot(client, snapshot);
     },
     onSettled: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: ["browse-semantic-search"] }),
+      ]);
     },
   });
 }
@@ -466,18 +518,19 @@ export function useFavoriteAssetsMutation() {
       favorite: boolean;
       scanId?: number;
     }) => setCatalogItemsFavorite(assetIds, favorite, scanId),
-    onMutate: async ({ assetIds, favorite }) => {
-      await client.cancelQueries({ queryKey: catalogQueryKey });
-      return applyFavoriteOptimisticUpdate(client, {
-        assetIds: new Set(assetIds),
+    onMutate: async ({ assetIds, favorite }) =>
+      applyFavoriteOptimisticUpdate(client, {
+        ids: new Set(assetIds),
         favorite,
-      });
-    },
+      }),
     onError: (_error, _variables, snapshot) => {
       restoreFavoriteOptimisticSnapshot(client, snapshot);
     },
     onSettled: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: ["browse-semantic-search"] }),
+      ]);
     },
   });
 }

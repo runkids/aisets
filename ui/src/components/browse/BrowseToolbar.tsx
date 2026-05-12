@@ -1,4 +1,4 @@
-import { Popover } from "radix-ui";
+import { HoverCard } from "radix-ui";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,7 +11,6 @@ import {
   Sun,
   Trees,
   WandSparkles,
-  X,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,6 +48,28 @@ type CustomFilterSelectOption = {
   value: string;
   label: string;
 };
+
+const DISPLAY_CONTROLS_OPEN_STORAGE_KEY = "aisets-browse-display-controls-open";
+
+function readDisplayControlsOpen() {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(DISPLAY_CONTROLS_OPEN_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeDisplayControlsOpen(open: boolean) {
+  try {
+    window.localStorage.setItem(
+      DISPLAY_CONTROLS_OPEN_STORAGE_KEY,
+      open ? "true" : "false",
+    );
+  } catch {
+    // Ignore browser storage failures; the control still works for this session.
+  }
+}
 
 type BrowseToolbarProps = {
   view: ViewMode;
@@ -108,7 +129,16 @@ export function BrowseToolbar({
   onBulkCancel,
 }: BrowseToolbarProps) {
   const { t } = useTranslation();
-  const [displayControlsOpen, setDisplayControlsOpen] = useState(true);
+  const [displayControlsOpen, setDisplayControlsOpen] = useState(
+    readDisplayControlsOpen,
+  );
+  const toggleDisplayControls = () => {
+    setDisplayControlsOpen((open) => {
+      const nextOpen = !open;
+      writeDisplayControlsOpen(nextOpen);
+      return nextOpen;
+    });
+  };
 
   const viewItems: Array<SegmentedControlItem<ViewMode>> = [
     {
@@ -332,7 +362,7 @@ export function BrowseToolbar({
                   : t("toolbar.expandDisplayControls")
               }
               aria-expanded={displayControlsOpen}
-              onClick={() => setDisplayControlsOpen((open) => !open)}
+              onClick={toggleDisplayControls}
               className="inline-flex size-g-btn-md shrink-0 cursor-pointer items-center justify-center gap-px rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-3 shadow-g-inset transition-[background,border-color,color,box-shadow,transform] duration-[120ms] ease-g hover:border-g-line-strong hover:bg-g-surface hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus [&:active]:scale-[0.97] motion-reduce:[&:active]:scale-100"
             >
               <span className="relative inline-grid size-5 place-items-center">
@@ -354,8 +384,8 @@ export function BrowseToolbar({
             </button>
           </Tooltip>
 
-          <Popover.Root>
-            <Popover.Trigger asChild>
+          <HoverCard.Root openDelay={120} closeDelay={120}>
+            <HoverCard.Trigger asChild>
               <button
                 type="button"
                 className="inline-flex h-g-btn-md shrink-0 cursor-pointer items-center justify-center self-center rounded-g-sm px-1.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
@@ -363,31 +393,22 @@ export function BrowseToolbar({
               >
                 <CircleHelp size={15} aria-hidden="true" />
               </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
+            </HoverCard.Trigger>
+            <HoverCard.Portal>
+              <HoverCard.Content
                 side="top"
                 align="end"
-                sideOffset={8}
+                sideOffset={4}
                 collisionPadding={16}
                 className={cn(
                   "z-[200] w-[480px] rounded-g-lg border border-g-line-strong bg-g-canvas shadow-g-pop",
                   "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
                 )}
               >
-                <div className="flex items-center justify-between border-b border-g-line px-3.5 py-2.5">
+                <div className="border-b border-g-line px-3.5 py-2.5">
                   <h3 className="font-g text-g-ui font-[590] text-g-ink">
                     {t("status.helpTitle")}
                   </h3>
-                  <Popover.Close asChild>
-                    <button
-                      type="button"
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-g-sm p-0.5 text-g-ink-4 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
-                      aria-label="Close"
-                    >
-                      <X size={14} />
-                    </button>
-                  </Popover.Close>
                 </div>
 
                 <div className="max-h-[min(420px,60vh)] overflow-y-auto scroll-thin px-3.5 py-3">
@@ -418,9 +439,9 @@ export function BrowseToolbar({
                     ))}
                   </dl>
                 </div>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+              </HoverCard.Content>
+            </HoverCard.Portal>
+          </HoverCard.Root>
 
           <div
             aria-hidden={!displayControlsOpen}

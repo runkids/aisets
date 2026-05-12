@@ -72,7 +72,8 @@ const fallbackCopy = (text: string) => {
   document.body.removeChild(textarea);
 };
 
-const absoluteAssetUrl = (url: string) => new URL(url, window.location.href).href;
+const absoluteAssetUrl = (url: string) =>
+  new URL(url, window.location.href).href;
 
 const downloadAsset = (url: string, name: string) => {
   const link = document.createElement("a");
