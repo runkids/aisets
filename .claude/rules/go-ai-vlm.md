@@ -1,0 +1,1 @@
+../../.skillshare/extras/rules/go-ai-vlm.md

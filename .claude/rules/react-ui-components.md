@@ -1,0 +1,1 @@
+../../.skillshare/extras/rules/react-ui-components.md

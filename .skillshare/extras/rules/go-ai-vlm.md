@@ -1,0 +1,27 @@
+# Go — AI Tags, VLM, OCR & Embeddings
+
+## Cross-Model vs Model-Scoped
+
+- **AI tag queries are cross-model; OCR queries scope to the current model.** `ai_tags` and `ocr_results` unique keys include `provider_name` + `model_name` / `engine_version`. Changing models creates new rows, not overwrites. **AI tags:** filter (`EXISTS ... category=?`), facet (`catalogAITagFacetCounts`), ready count, and enrichment (`AITagResultsBestMatch`) are all cross-model — they match any provider/model's ready tags. `AITagResultsBestMatch` prefers the current model via `ORDER BY CASE` but falls back to any model. **OCR:** facet counts (`catalogVLMOcrReadyCount`) and filters (`vlmOcrReady`) must still scope to the current `engine_version` / provider+model. `AITagResults` (model-specific) is only used for cache-hit checks during AI tagging — never for display enrichment.
+
+## Workspace Scoping
+
+- **AI data readiness must be workspace-scoped.** Store/API functions that decide whether AI features are available must join through the active workspace/project/scan scope before counting `ai_tags`, `ocr_results`, embeddings, or i18n data. Global table existence is not readiness: rows from another workspace must not enable semantic search, language search, badges, facets, or background actions for the current workspace.
+
+## Tags & i18n Sync
+
+- **All `tags_json` mutations must sync `tags_i18n_json`.** `tags_i18n_json` is a positional map (`{"zh-TW": ["tag0_zh", "tag1_zh"], "ja": [...]}`) whose entries correspond by index to `tags_json`. Any function that modifies `tags_json` (`AITagSetForAsset`, `AITagDelete`, `AITagMerge`/`AITagRename`) must also rebuild `tags_i18n_json` via `syncI18nTags()` and write both columns in the same UPDATE. Otherwise the search query (`tags_i18n_json LIKE ?`) still matches deleted tags, and merge/rename causes i18n translations to shift to wrong positions.
+- **i18n backfill "missing locale" check must cover all three i18n columns.** `AITagsMissingLocale` determines which rows need translation. Checking only `description_i18n_json` misses rows where `category_i18n_json` or `tags_i18n_json` lack the locale — the translation run reports "done" while categories remain untranslated. Use `json_extract` on all three columns and also compare `category_i18n_json` value against the English `category` — LLMs sometimes return the original English term as the "translation", which should be treated as untranslated.
+- **AI tag/i18n quality gates protect embeddings.** A ready AI tag row is reusable for cache or text embedding only when raw `category`, at least one tag, and `description` are all usable semantic text. English i18n is required for stable text embeddings, but other locales must follow settings/current UI language, not an all-locale default. Locale translations must be rejected when they are blank, number-like (`3.` / `7.`), template text, or tag arrays with the wrong length; otherwise dirty i18n becomes permanent embedding input.
+
+## Embeddings
+
+- **Semantic embeddings are scoped and input-hashed.** Text embedding cache hits must match asset content hash, provider, model, embed type, and the normalized embedding input hash. Search, stats, and similarity must only load embeddings for the current provider/model and the query/source vector dimensions. Old model vectors can stay in SQLite, but must never be mixed into current semantic search totals or cosine comparisons.
+
+## VLM Backend Resolution
+
+- **`chatVLM` must receive the calling feature's purpose for image preparation.** `prepareImageForVLM` uses the `purpose` parameter to choose resolution (`"ocr"` → 1536px, `"tag"` → 768px). Since `chatVLM` is shared by all 5 VLM features, each caller must pass its own purpose — hardcoding `"tag"` breaks OCR resolution.
+- **Per-feature VLM backend resolution follows a three-level fallback.** `resolveVLMProviderForFeature` checks per-feature override (`VLMBackendTag`, etc.) → global default (`VLMBackend`) → `"local-llm"`. The `featureBackend` switch must cover all feature constants (`agent.FeatureTag`, `agent.FeatureOCR`, etc.). An unhandled feature silently falls through to the global default with no error.
+- **`hasVLMBackend` must respect the live `AgentEnabled` setting.** The `agentProviders` map is populated at detection time and not cleared when the user toggles `agentEnabled` off. The guard must check `settings.AgentEnabled && len(s.agentProviders) > 0`, not just `len(s.agentProviders) > 0` — otherwise disabled agents still pass the gate.
+- **Agent backend string helpers live in the `agent` package.** Use `agent.AgentBackendID(backend)` and `agent.FormatAgentBackend(id)` instead of inline `strings.HasPrefix(v, "agent:")` / `strings.TrimPrefix`. The `"agent:"` prefix is a protocol detail — centralizing it prevents drift across config validation, server routing, and handler dispatch.
+- **`validVLMBackend` must accept all formats that `resolveVLMProviderForFeature` parses.** Backend values can be `""`, `"local-llm"`, `"local-llm/model"`, `"agent:id"`, or `"agent:id/model"`. Adding a new format to the resolver without updating the validator causes the settings API to reject valid values with "invalid VLM backend value".

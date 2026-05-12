@@ -1,0 +1,1 @@
+../../.skillshare/extras/rules/commit-verification.md

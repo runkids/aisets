@@ -1,0 +1,1 @@
+../../.skillshare/extras/rules/go-sqlite.md

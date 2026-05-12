@@ -3,5 +3,10 @@ targets:
   - claude
   - pi
   - universal
+extras:
+  - name: rules
+    targets:
+      - path: .claude/rules
+        mode: merge
 audit:
   block_threshold: CRITICAL

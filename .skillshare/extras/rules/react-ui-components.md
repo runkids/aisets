@@ -1,0 +1,44 @@
+# React / TypeScript — UI Components & Layout
+
+## Basics
+
+- Functional components, hooks, no class components.
+- Icons from Lucide React only — never emoji as structural icons.
+- Every `<button>` without visible text needs `aria-label`.
+- Every overlay needs ESC dismissal + focus trap + focus restoration.
+
+## Shared Primitives
+
+- **Use shared input primitives, not raw HTML.** Page components must use `TextInput`, `Textarea`, `Select`, and other UI primitives from `./ui` for all user inputs. Raw `<input>` and `<textarea>` elements with manual Tailwind classes produce inconsistent border, focus, and hover tokens across light/dark modes. The shared components handle all theme tokens automatically.
+- **StatCard consistency:** Every `<StatCard>` must include an `icon` prop (Lucide, `size={14}`). Use semantic `tone` for actionable metrics (e.g. `tone={count > 0 ? "red" : "neutral"}`). Do not omit icons on some cards — all cards in a stats grid must look uniform.
+- **Icons must match the feature domain.** When a page relates to an existing feature (AI Tag, AI OCR, Lint, Optimize), use the same Lucide icons that Settings and the nav sidebar use for that feature (`Tags` for AI Tag, `ScanText` for AI OCR). Check `settings/AISection.tsx` or `NavSidebar.tsx` for canonical icon mappings. Never use a generic placeholder icon.
+- **Replicate UI patterns by reading source, not guessing from screenshots.** When asked to match an existing component's style (active state, button variant, color token), find and read the source file that implements it. Use the same component (`Button variant="chip" data-active`) or copy the exact classes. Never approximate tokens from visual appearance — `bg-g-active-bg/10` looks nothing like `bg-g-ink` or `bg-g-purple-soft` in code but all look "dark" in a screenshot.
+
+## Page Layout
+
+- **New pages must follow an established layout pattern.** Data views follow the Browse/Duplicates blueprint (FilterRail + StatCards + toolbar + content grid). Tool/config pages follow the Settings blueprint (`Rail variant="settings"` sidebar + content area with `max-w-[1040px]` + sections in a single `Card`). Do not invent a new sidebar or layout structure — open an existing page, read its component, and match.
+- **Settings cards with multiple sections use Tabs in the card header, not collapsible accordions.** When a settings card contains logically separate sections (e.g. Local LLM / Agent CLI / Routing / Prompts), use the `Tabs` component (`variant="segment"`, `size="sm"`) positioned in the card header row with `ml-auto`. Each tab shows its own content panel. Nested collapsible sections inside tabs add unnecessary friction — the tab itself provides the context switch. Save/Reset buttons only render on tabs that have draft-based settings.
+- **Operation panels stay outside settings tabs as independent card sections.** AI Tag and OCR run panels are action-oriented (execute button + progress + last-run stats). They must remain visible together — not hidden inside tabs. Merge them into one card with section dividers (`border-t`) instead of separate cards, but never put them inside the settings tab system.
+
+## Sidebar & Navigation
+
+- **Sidebar navigation uses Rail components.** All sidebar navigation must use `Rail` + `RailSection` + `RailItem`. Data views use `variant="filter"`; settings/tool pages use `variant="settings"` with `icon` prop. Never build custom-styled `<button>` lists for sidebar navigation — the active state (`--g-active-bg`, `--g-active-text`, `--g-active-weight`) is baked into `RailItem`.
+- **Rail sticky section headers use an overlay stack.** When a scrollable `Rail` needs section headers to remain visible, render the active headings in one sticky overlay stack owned by `Rail`, not as independent `position: sticky` headings inside each section. The stack should show every scrolled-past header, use item-height rows with separators and one stack shadow, let the Rail container own top-radius clipping, and compute click-to-return targets relative to the Rail scroll container via `getBoundingClientRect()` while subtracting the stacked header height. Per-section sticky headings collapse to one visible header, lose separation/shadow, or scroll to the next card because `offsetTop` is measured against the wrong ancestor.
+- **New navigable pages must be registered in Command Palette.** When adding a route that users can navigate to directly (sidebar/topbar/tool page), update the Command Palette page registry in the same change. A page that exists in navigation but not in the palette is a discoverability regression.
+
+## Drawers & Overlays
+
+- **Drawer tab panels stay mounted until the drawer closes.** Drawer tabs that contain local UI state, forms, async output, or AI results must switch visibility with `hidden`/CSS instead of conditional-rendering only the active tab. Key the mounted content by `asset.id` or the drawer entity ID so state resets when switching to a different item, not when switching tabs; otherwise AI messages and in-progress local state disappear on tab changes.
+- **Topbar grid cell needs z-index above content area.** The App layout uses CSS Grid with topbar in `row-start-1` and content below. ActivityDropdown panels (`position: absolute`) inside the topbar are clipped by content-area sticky toolbars unless the topbar grid cell has `z-[100]` or higher. Without this, dropdowns appear behind sort bars and filter toolbars.
+
+## Toast & Mutations
+
+- **Toast for all API mutations.** Every React Query mutation (create, update, delete, set-default) must include `onSuccess` and `onError` callbacks with `useToast()`. Import `errorMessage` from `../i18n/index` for error formatting. Use toast as the terminal status surface; do not also render the same completion counts inline unless the state remains actionable after the toast disappears. Multi-metric toast bodies should use line breaks for scanability. Add English i18n keys plus only the needed display locale keys.
+- **`defaultSettings` must include every resettable field.** `settings/constants.tsx`'s `defaultSettings` is used by the "Reset to default" flow. If a settings field (e.g. `llmTagPrompt`) is missing from `defaultSettings`, the reset sends `undefined` → JSON omits the key → Go backend's `*string` pointer is `nil` → the old DB value is silently preserved. Every `AppSettings` string field that users can customize must appear in `defaultSettings` with its zero value (`""`), otherwise "Reset to default" is broken for that field.
+
+## Misc
+
+- **Web updates must prompt for restart, not reload.** When `/api/update` or `aisets update` replaces the Aisets binary, the running server is still the old process and may be incompatible with newly downloaded UI assets. On web-update success, show normal-user restart instructions (`aisets ui stop --port ...` then `aisets ui --port ... --clear-cache --no-open`) and tell the user to refresh after restart; do not auto-reload into a potentially incompatible frontend. Devcontainer commands are verification-only, not product-facing restart guidance.
+- **AI UI metadata must be settings-backed.** Embedding model labels, dimensions, vector search type, result limit, thresholds, and status copy shown in React surfaces must come from settings/runtime/stat APIs, not hard-coded demo strings. Otherwise the command palette and AI controls lie as soon as the provider, model, or semantic-search settings change.
+- **AI feature gates are workspace-scoped.** Frontend surfaces must only show AI capabilities (semantic search, language/i18n search, tag/OCR badges, translate/embed controls, command-palette AI entries) when the current workspace/project scope has the required ready data. Never enable an AI feature just because global SQLite tables contain rows from another workspace — the API response or stats must prove readiness for the active scope.
+- **Production builds must be warning-clean.** Treat `pnpm --dir ui build` warnings as regressions, including Sass `@import` deprecations, Rollup circular manual chunks, and oversized chunk warnings. Move package CSS imports to TS/CSS entrypoints instead of Sass `@import`, split large static locale payloads, and group mutually importing feature modules instead of forcing artificial chunks.

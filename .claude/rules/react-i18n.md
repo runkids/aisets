@@ -1,0 +1,1 @@
+../../.skillshare/extras/rules/react-i18n.md
