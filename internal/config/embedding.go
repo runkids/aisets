@@ -120,6 +120,7 @@ type EmbeddingQuery struct {
 	ProviderName string
 	ModelName    string
 	Dimensions   int
+	ProjectIDs   []string
 }
 
 func (s *Store) ReadyEmbeddings(q EmbeddingQuery) ([]EmbeddingWithVector, error) {
@@ -136,6 +137,14 @@ func (s *Store) ReadyEmbeddings(q EmbeddingQuery) ([]EmbeddingWithVector, error)
 	if q.Dimensions > 0 {
 		where += ` AND e.dimensions = ?`
 		args = append(args, q.Dimensions)
+	}
+	if q.ProjectIDs != nil {
+		if len(q.ProjectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("e.project_id", q.ProjectIDs)
+		where += ` AND ` + projectClause
+		args = append(args, projectArgs...)
 	}
 
 	var count int
@@ -182,6 +191,10 @@ func (s *Store) EmbeddingForAsset(assetID, embedType string) (*EmbeddingWithVect
 }
 
 func (s *Store) EmbeddingForAssetScoped(assetID, embedType, providerName, modelName string) (*EmbeddingWithVector, error) {
+	return s.EmbeddingForAssetScopedInProjects(assetID, embedType, providerName, modelName, nil)
+}
+
+func (s *Store) EmbeddingForAssetScopedInProjects(assetID, embedType, providerName, modelName string, projectIDs []string) (*EmbeddingWithVector, error) {
 	var r EmbeddingWithVector
 	var blob []byte
 	where := `e.asset_id = ? AND e.embed_type = ? AND e.status = 'ready'`
@@ -193,6 +206,14 @@ func (s *Store) EmbeddingForAssetScoped(assetID, embedType, providerName, modelN
 	if modelName != "" {
 		where += ` AND e.model_name = ?`
 		args = append(args, modelName)
+	}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("e.project_id", projectIDs)
+		where += ` AND ` + projectClause
+		args = append(args, projectArgs...)
 	}
 	err := s.rdb.QueryRow(`
 		SELECT e.id, e.asset_id, e.project_id, e.repo_path, e.content_hash, e.hash_algorithm,
@@ -227,6 +248,10 @@ func (s *Store) EmbeddingReadyCounts() (textCount, imageCount int, err error) {
 }
 
 func (s *Store) EmbeddingReadyCountsForModel(providerName, modelName string) (textCount, imageCount int, err error) {
+	return s.EmbeddingReadyCountsForModelInProjects(providerName, modelName, nil)
+}
+
+func (s *Store) EmbeddingReadyCountsForModelInProjects(providerName, modelName string, projectIDs []string) (textCount, imageCount int, err error) {
 	where := `status = 'ready'`
 	args := []any{}
 	if providerName != "" {
@@ -236,6 +261,14 @@ func (s *Store) EmbeddingReadyCountsForModel(providerName, modelName string) (te
 	if modelName != "" {
 		where += ` AND model_name = ?`
 		args = append(args, modelName)
+	}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return 0, 0, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where += ` AND ` + projectClause
+		args = append(args, projectArgs...)
 	}
 	rows, err := s.rdb.Query(`
 		SELECT embed_type, COUNT(*) FROM embeddings
@@ -267,6 +300,10 @@ func (s *Store) EmbeddingReadyDimensions() (int, error) {
 }
 
 func (s *Store) EmbeddingReadyDimensionsForModel(providerName, modelName string) (int, error) {
+	return s.EmbeddingReadyDimensionsForModelInProjects(providerName, modelName, nil)
+}
+
+func (s *Store) EmbeddingReadyDimensionsForModelInProjects(providerName, modelName string, projectIDs []string) (int, error) {
 	where := `status = 'ready'`
 	args := []any{}
 	if providerName != "" {
@@ -276,6 +313,14 @@ func (s *Store) EmbeddingReadyDimensionsForModel(providerName, modelName string)
 	if modelName != "" {
 		where += ` AND model_name = ?`
 		args = append(args, modelName)
+	}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return 0, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where += ` AND ` + projectClause
+		args = append(args, projectArgs...)
 	}
 	var dimensions int
 	err := s.rdb.QueryRow(`

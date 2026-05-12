@@ -534,6 +534,8 @@ function invalidateWorkspaceScope(client: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     client.invalidateQueries({ queryKey: catalogQueryKey }),
     client.invalidateQueries({ queryKey: settingsQueryKey }),
+    client.invalidateQueries({ queryKey: embedStatsQueryKey }),
+    client.invalidateQueries({ queryKey: ["tags"] }),
   ]);
 }
 

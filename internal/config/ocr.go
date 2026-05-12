@@ -247,17 +247,27 @@ func (s *Store) VLMOCRResultForContentHash(contentHash, hashAlgorithm, engineVer
 }
 
 func (s *Store) LatestReadyOCRTextForContentHash(contentHash, hashAlgorithm string) (string, error) {
+	return s.LatestReadyOCRTextForAsset("", "", contentHash, hashAlgorithm)
+}
+
+func (s *Store) LatestReadyOCRTextForAsset(projectID, repoPath, contentHash, hashAlgorithm string) (string, error) {
 	if contentHash == "" || hashAlgorithm == "" {
 		return "", nil
+	}
+	where := `content_hash = ? AND hash_algorithm = ? AND status = ?`
+	args := []any{contentHash, hashAlgorithm, ocr.StatusReady}
+	if projectID != "" || repoPath != "" {
+		where += ` AND project_id = ? AND repo_path = ?`
+		args = append(args, projectID, repoPath)
 	}
 	var normalized, raw string
 	err := s.rdb.QueryRow(`
 		SELECT COALESCE(normalized_text, ''), COALESCE(text, '')
 		FROM ocr_results
-		WHERE content_hash = ? AND hash_algorithm = ? AND status = ?
+		WHERE `+where+`
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, contentHash, hashAlgorithm, ocr.StatusReady).Scan(&normalized, &raw)
+	`, args...).Scan(&normalized, &raw)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

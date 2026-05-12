@@ -40,11 +40,12 @@ type Response struct {
 }
 
 type Query struct {
-	Text      string
-	Type      string
-	Limit     int
-	Threshold float32
-	Filter    config.CatalogItemQuery
+	Text       string
+	Type       string
+	Limit      int
+	Threshold  float32
+	Filter     config.CatalogItemQuery
+	ProjectIDs []string
 }
 
 type assetScore struct {
@@ -145,6 +146,7 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 			ProviderName: providerName,
 			ModelName:    settings.LLMEmbedModel,
 			Dimensions:   queryDimensions,
+			ProjectIDs:   query.ProjectIDs,
 		})
 		if err != nil {
 			return Response{}, apierr.From(err, "embed_load_failed")

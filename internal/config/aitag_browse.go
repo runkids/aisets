@@ -8,13 +8,14 @@ import (
 
 // AITagListQuery holds parameters for browsing unique AI tags.
 type AITagListQuery struct {
-	Search   string
-	Sort     string // "count" (default) or "alpha"
-	Project  string
-	Category string
-	Locale   string
-	Limit    int
-	Offset   int
+	Search     string
+	Sort       string // "count" (default) or "alpha"
+	Project    string
+	ProjectIDs []string
+	Category   string
+	Locale     string
+	Limit      int
+	Offset     int
 }
 
 // AITagListItem represents a unique tag with aggregated metadata.
@@ -37,11 +38,12 @@ type AITagListPage struct {
 
 // AICategoryListQuery holds parameters for browsing unique AI categories.
 type AICategoryListQuery struct {
-	Search string
-	Sort   string // "count" (default) or "alpha"
-	Locale string
-	Limit  int
-	Offset int
+	Search     string
+	Sort       string // "count" (default) or "alpha"
+	Locale     string
+	ProjectIDs []string
+	Limit      int
+	Offset     int
 }
 
 // AICategoryListItem represents one unique AI category with aggregated metadata.
@@ -76,6 +78,14 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 		where = append(where, "(t.value LIKE '%' || ? || '%' OR LOWER(at.tags_i18n_json) LIKE '%' || ? || '%')")
 		low := strings.ToLower(q.Search)
 		args = append(args, low, low)
+	}
+	if q.ProjectIDs != nil {
+		if len(q.ProjectIDs) == 0 {
+			return AITagListPage{Tags: []AITagListItem{}}, nil
+		}
+		projectClause, projectArgs := inClauseSQL("at.project_id", q.ProjectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
 	}
 	if q.Project != "" {
 		where = append(where, "at.project_id = ?")
@@ -143,7 +153,7 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 		return AITagListPage{}, fmt.Errorf("aitag count: %w", err)
 	}
 
-	taggedAssets, topCategory, err := s.aiTagStats(q.Project)
+	taggedAssets, topCategory, err := s.aiTagStats(q.Project, q.ProjectIDs)
 	if err != nil {
 		return AITagListPage{}, err
 	}
@@ -156,10 +166,10 @@ func (s *Store) AITagList(q AITagListQuery) (AITagListPage, error) {
 	}
 
 	if q.Locale != "" && len(tags) > 0 {
-		if tr, err := s.aiTagTranslations(tags, q.Locale); err == nil && len(tr) > 0 {
+		if tr, err := s.aiTagTranslations(tags, q.Locale, q.ProjectIDs); err == nil && len(tr) > 0 {
 			page.Translations = tr
 		}
-		if ctr, err := s.aiCategoryTranslations(q.Locale); err == nil && len(ctr) > 0 {
+		if ctr, err := s.aiCategoryTranslationsForProjects(q.Locale, q.ProjectIDs); err == nil && len(ctr) > 0 {
 			page.CategoryTranslations = ctr
 		}
 	}
@@ -181,6 +191,14 @@ func (s *Store) AITagCategoryList(q AICategoryListQuery) (AICategoryListPage, er
 		where = append(where, "(category LIKE '%' || ? || '%' OR LOWER(category_i18n_json) LIKE '%' || ? || '%')")
 		low := strings.ToLower(q.Search)
 		args = append(args, low, low)
+	}
+	if q.ProjectIDs != nil {
+		if len(q.ProjectIDs) == 0 {
+			return AICategoryListPage{Categories: []AICategoryListItem{}}, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", q.ProjectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
 	}
 
 	whereClause := strings.Join(where, " AND ")
@@ -229,17 +247,23 @@ func (s *Store) AITagCategoryList(q AICategoryListQuery) (AICategoryListPage, er
 		return AICategoryListPage{}, fmt.Errorf("ai category count: %w", err)
 	}
 
+	assetsWhere := []string{"status = 'ready'", "category != ''"}
+	assetsArgs := []any{}
+	if q.ProjectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", q.ProjectIDs)
+		assetsWhere = append(assetsWhere, projectClause)
+		assetsArgs = append(assetsArgs, projectArgs...)
+	}
 	var totalAssets int
 	if err := s.rdb.QueryRow(`
 		SELECT COUNT(DISTINCT project_id || char(0) || repo_path)
 		FROM ai_tags
-		WHERE status = 'ready' AND category != ''
-	`).Scan(&totalAssets); err != nil {
+		WHERE `+strings.Join(assetsWhere, " AND "), assetsArgs...).Scan(&totalAssets); err != nil {
 		return AICategoryListPage{}, fmt.Errorf("ai category assets: %w", err)
 	}
 
 	if len(categories) > 0 {
-		topTags, tagCounts, err := s.aiCategoryTopTags(categories)
+		topTags, tagCounts, err := s.aiCategoryTopTags(categories, q.ProjectIDs)
 		if err != nil {
 			return AICategoryListPage{}, err
 		}
@@ -259,11 +283,11 @@ func (s *Store) AITagCategoryList(q AICategoryListQuery) (AICategoryListPage, er
 	}
 
 	if q.Locale != "" && len(categories) > 0 {
-		if tr, err := s.aiCategoryListTranslations(categories, q.Locale); err == nil && len(tr) > 0 {
+		if tr, err := s.aiCategoryListTranslations(categories, q.Locale, q.ProjectIDs); err == nil && len(tr) > 0 {
 			page.Translations = tr
 		}
 		topTags := uniqueTopTags(categories)
-		if tr, err := s.aiTagTranslationsForValues(topTags, q.Locale); err == nil && len(tr) > 0 {
+		if tr, err := s.aiTagTranslationsForValues(topTags, q.Locale, q.ProjectIDs); err == nil && len(tr) > 0 {
 			page.TagTranslations = tr
 		}
 	}
@@ -286,19 +310,28 @@ func uniqueTopTags(categories []AICategoryListItem) []string {
 	return values
 }
 
-func (s *Store) aiCategoryTopTags(categories []AICategoryListItem) (map[string][]string, map[string]int, error) {
+func (s *Store) aiCategoryTopTags(categories []AICategoryListItem, projectIDs []string) (map[string][]string, map[string]int, error) {
 	values := make([]string, len(categories))
 	for i, c := range categories {
 		values[i] = c.Category
 	}
 	catClause, args := inClauseSQL("category", values)
+	where := []string{"status = 'ready'", catClause}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return map[string][]string{}, map[string]int{}, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	rows, err := s.rdb.Query(fmt.Sprintf(`
 		SELECT category, t.value, COUNT(*) AS tag_count
 		FROM ai_tags, json_each(tags_json) t
-		WHERE status = 'ready' AND %s
+		WHERE %s
 		GROUP BY category, t.value
 		ORDER BY category ASC, tag_count DESC, t.value ASC
-	`, catClause), args...)
+	`, strings.Join(where, " AND ")), args...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ai category top tags query: %w", err)
 	}
@@ -330,7 +363,7 @@ func (s *Store) aiCategoryTopTags(categories []AICategoryListItem) (map[string][
 	return topTags, tagCounts, nil
 }
 
-func (s *Store) aiCategoryListTranslations(categories []AICategoryListItem, locale string) (map[string]string, error) {
+func (s *Store) aiCategoryListTranslations(categories []AICategoryListItem, locale string, projectIDs []string) (map[string]string, error) {
 	locale = validLocaleOrEmpty(locale)
 	if locale == "" {
 		return nil, nil
@@ -340,14 +373,21 @@ func (s *Store) aiCategoryListTranslations(categories []AICategoryListItem, loca
 		values[i] = c.Category
 	}
 	catClause, args := inClauseSQL("category", values)
+	where := []string{"status = 'ready'", catClause, `json_type(category_i18n_json, '$."` + locale + `"') = 'text'`}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	rows, err := s.rdb.Query(fmt.Sprintf(`
 		SELECT category, json_extract(category_i18n_json, '$."`+locale+`"')
 		FROM ai_tags
-		WHERE status = 'ready'
-		  AND %s
-		  AND json_type(category_i18n_json, '$."`+locale+`"') = 'text'
+		WHERE %s
 		GROUP BY category
-	`, catClause), args...)
+	`, strings.Join(where, " AND ")), args...)
 	if err != nil {
 		return nil, fmt.Errorf("ai category list translations: %w", err)
 	}
@@ -367,29 +407,36 @@ func (s *Store) aiCategoryListTranslations(categories []AICategoryListItem, loca
 	return result, rows.Err()
 }
 
-func (s *Store) aiTagTranslations(tags []AITagListItem, locale string) (map[string]string, error) {
+func (s *Store) aiTagTranslations(tags []AITagListItem, locale string, projectIDs []string) (map[string]string, error) {
 	values := make([]string, 0, len(tags))
 	for _, tag := range tags {
 		values = append(values, tag.Tag)
 	}
-	return s.aiTagTranslationsForValues(values, locale)
+	return s.aiTagTranslationsForValues(values, locale, projectIDs)
 }
 
-func (s *Store) aiTagTranslationsForValues(tags []string, locale string) (map[string]string, error) {
+func (s *Store) aiTagTranslationsForValues(tags []string, locale string, projectIDs []string) (map[string]string, error) {
 	locale = validLocaleOrEmpty(locale)
 	if locale == "" || len(tags) == 0 {
 		return nil, nil
 	}
 	inExpr, args := inClauseSQL("t.value", tags)
+	where := []string{"at.status = 'ready'", inExpr, `json_type(at.tags_i18n_json, '$."` + locale + `"') = 'array'`}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("at.project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 
 	rows, err := s.rdb.Query(fmt.Sprintf(`
 		SELECT t.value,
 		       json_extract(at.tags_i18n_json, '$."`+locale+`"[' || t.key || ']')
 		FROM ai_tags at, json_each(at.tags_json) t
-		WHERE at.status = 'ready'
-		  AND %s
-		  AND json_type(at.tags_i18n_json, '$."`+locale+`"') = 'array'
-	`, inExpr), args...)
+		WHERE %s
+	`, strings.Join(where, " AND ")), args...)
 	if err != nil {
 		return nil, fmt.Errorf("aitag translations: %w", err)
 	}
@@ -410,18 +457,30 @@ func (s *Store) aiTagTranslationsForValues(tags []string, locale string) (map[st
 }
 
 func (s *Store) aiCategoryTranslations(locale string) (map[string]string, error) {
+	return s.aiCategoryTranslationsForProjects(locale, nil)
+}
+
+func (s *Store) aiCategoryTranslationsForProjects(locale string, projectIDs []string) (map[string]string, error) {
 	locale = validLocaleOrEmpty(locale)
 	if locale == "" {
 		return nil, nil
 	}
+	where := []string{"status = 'ready'", "category != ''", `json_type(category_i18n_json, '$."` + locale + `"') = 'text'`}
+	args := []any{}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	rows, err := s.rdb.Query(`
-		SELECT category, json_extract(category_i18n_json, '$."` + locale + `"')
+		SELECT category, json_extract(category_i18n_json, '$."`+locale+`"')
 		FROM ai_tags
-		WHERE status = 'ready'
-		  AND category != ''
-		  AND json_type(category_i18n_json, '$."` + locale + `"') = 'text'
+		WHERE `+strings.Join(where, " AND ")+`
 		GROUP BY category
-	`)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("ai category translations: %w", err)
 	}
@@ -446,16 +505,33 @@ func (s *Store) AITagRename(from, to string) (int, error) {
 	return s.AITagMerge([]string{from}, to)
 }
 
+func (s *Store) AITagRenameForProjects(from, to string, projectIDs []string) (int, error) {
+	return s.AITagMergeForProjects([]string{from}, to, projectIDs)
+}
+
 // AITagCategoryRename renames all ready ai_tags rows from one category to another.
 func (s *Store) AITagCategoryRename(from, to string) (int, error) {
+	return s.AITagCategoryRenameForProjects(from, to, nil)
+}
+
+func (s *Store) AITagCategoryRenameForProjects(from, to string, projectIDs []string) (int, error) {
 	if from == "" || to == "" {
 		return 0, fmt.Errorf("ai category rename: from and to must be non-empty")
+	}
+	where := []string{"status = 'ready'", "category = ?"}
+	args := []any{to, from}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return 0, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
 	}
 	res, err := s.db.Exec(`
 		UPDATE ai_tags
 		SET category = ?
-		WHERE status = 'ready' AND category = ?
-	`, to, from)
+		WHERE `+strings.Join(where, " AND "), args...)
 	if err != nil {
 		return 0, fmt.Errorf("ai category rename: %w", err)
 	}
@@ -465,28 +541,47 @@ func (s *Store) AITagCategoryRename(from, to string) (int, error) {
 
 // AITagCategoryMerge merges all source categories into target without changing tags or descriptions.
 func (s *Store) AITagCategoryMerge(source []string, target string) (int, error) {
+	return s.AITagCategoryMergeForProjects(source, target, nil)
+}
+
+func (s *Store) AITagCategoryMergeForProjects(source []string, target string, projectIDs []string) (int, error) {
 	if len(source) == 0 || target == "" {
 		return 0, fmt.Errorf("ai category merge: source and target must be non-empty")
+	}
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return 0, nil
 	}
 
 	targetI18n := "{}"
 	var raw string
+	targetWhere := []string{"status = 'ready'", "category = ?", "category_i18n_json != '{}'"}
+	targetArgs := []any{target}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		targetWhere = append(targetWhere, projectClause)
+		targetArgs = append(targetArgs, projectArgs...)
+	}
 	if err := s.rdb.QueryRow(`
 		SELECT COALESCE(category_i18n_json, '{}') FROM ai_tags
-		WHERE status = 'ready' AND category = ? AND category_i18n_json != '{}'
+		WHERE `+strings.Join(targetWhere, " AND ")+`
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, target).Scan(&raw); err == nil && raw != "" {
+	`, targetArgs...).Scan(&raw); err == nil && raw != "" {
 		targetI18n = raw
 	}
 
 	inExpr, args := inClauseSQL("category", source)
+	where := []string{"status = 'ready'", inExpr}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	updateArgs := append([]any{target, targetI18n}, args...)
-	res, err := s.db.Exec(fmt.Sprintf(`
+	res, err := s.db.Exec(`
 		UPDATE ai_tags
 		SET category = ?, category_i18n_json = ?
-		WHERE status = 'ready' AND %s
-	`, inExpr), updateArgs...)
+		WHERE `+strings.Join(where, " AND "), updateArgs...)
 	if err != nil {
 		return 0, fmt.Errorf("ai category merge: %w", err)
 	}
@@ -496,15 +591,27 @@ func (s *Store) AITagCategoryMerge(source []string, target string) (int, error) 
 
 // AITagCategoryClear clears categories from ready ai_tags rows while preserving tag data.
 func (s *Store) AITagCategoryClear(categories []string) (int, error) {
+	return s.AITagCategoryClearForProjects(categories, nil)
+}
+
+func (s *Store) AITagCategoryClearForProjects(categories []string, projectIDs []string) (int, error) {
 	if len(categories) == 0 {
 		return 0, fmt.Errorf("ai category clear: categories must be non-empty")
 	}
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return 0, nil
+	}
 	inExpr, args := inClauseSQL("category", categories)
-	res, err := s.db.Exec(fmt.Sprintf(`
+	where := []string{"status = 'ready'", inExpr}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
+	res, err := s.db.Exec(`
 		UPDATE ai_tags
 		SET category = '', category_i18n_json = '{}'
-		WHERE status = 'ready' AND %s
-	`, inExpr), args...)
+		WHERE `+strings.Join(where, " AND "), args...)
 	if err != nil {
 		return 0, fmt.Errorf("ai category clear: %w", err)
 	}
@@ -514,11 +621,24 @@ func (s *Store) AITagCategoryClear(categories []string) (int, error) {
 
 // AITagMerge merges all source tags into target in tags_json and tags_i18n_json across all ready ai_tags rows.
 func (s *Store) AITagMerge(source []string, target string) (int, error) {
+	return s.AITagMergeForProjects(source, target, nil)
+}
+
+func (s *Store) AITagMergeForProjects(source []string, target string, projectIDs []string) (int, error) {
 	if len(source) == 0 || target == "" {
 		return 0, fmt.Errorf("aitag merge: source and target must be non-empty")
 	}
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return 0, nil
+	}
 
 	inExpr, args := inClauseSQL("j.value", source)
+	where := []string{"status = 'ready'", fmt.Sprintf("EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)", inExpr)}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -526,11 +646,9 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	querySQL := fmt.Sprintf(`
+	querySQL := `
 		SELECT rowid, tags_json, COALESCE(tags_i18n_json, '{}') FROM ai_tags
-		WHERE status = 'ready'
-		  AND EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)
-	`, inExpr)
+		WHERE ` + strings.Join(where, " AND ")
 
 	rows, err := tx.Query(querySQL, args...)
 	if err != nil {
@@ -609,11 +727,24 @@ func (s *Store) AITagMerge(source []string, target string) (int, error) {
 
 // AITagDelete removes specified tags from all ready ai_tags rows' tags_json and tags_i18n_json.
 func (s *Store) AITagDelete(tags []string) (int, error) {
+	return s.AITagDeleteForProjects(tags, nil)
+}
+
+func (s *Store) AITagDeleteForProjects(tags []string, projectIDs []string) (int, error) {
 	if len(tags) == 0 {
 		return 0, fmt.Errorf("aitag delete: tags must be non-empty")
 	}
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return 0, nil
+	}
 
 	inExpr, args := inClauseSQL("j.value", tags)
+	where := []string{"status = 'ready'", fmt.Sprintf("EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)", inExpr)}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -621,11 +752,9 @@ func (s *Store) AITagDelete(tags []string) (int, error) {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	querySQL := fmt.Sprintf(`
+	querySQL := `
 		SELECT rowid, tags_json, COALESCE(tags_i18n_json, '{}') FROM ai_tags
-		WHERE status = 'ready'
-		  AND EXISTS (SELECT 1 FROM json_each(tags_json) j WHERE %s)
-	`, inExpr)
+		WHERE ` + strings.Join(where, " AND ")
 
 	rows, err := tx.Query(querySQL, args...)
 	if err != nil {
@@ -794,18 +923,33 @@ func syncI18nTags(oldTagsRaw, oldI18nRaw string, newTags []string) string {
 
 // AITagSuggest returns tag values matching the given prefix for autocomplete.
 func (s *Store) AITagSuggest(prefix string, limit int) ([]string, error) {
+	return s.AITagSuggestForProjects(prefix, limit, nil)
+}
+
+func (s *Store) AITagSuggestForProjects(prefix string, limit int, projectIDs []string) ([]string, error) {
 	if limit <= 0 {
 		limit = 10
 	}
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return []string{}, nil
+	}
 
 	low := strings.ToLower(prefix)
+	where := []string{"at.status = 'ready'", "(t.value LIKE ? || '%' OR LOWER(at.tags_i18n_json) LIKE '%' || ? || '%')"}
+	args := []any{low, low}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("at.project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
+	args = append(args, limit)
 	rows, err := s.rdb.Query(`
 		SELECT DISTINCT t.value
 		FROM ai_tags at, json_each(at.tags_json) t
-		WHERE at.status = 'ready' AND (t.value LIKE ? || '%' OR LOWER(at.tags_i18n_json) LIKE '%' || ? || '%')
+		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY t.value
 		LIMIT ?
-	`, low, low, limit)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("aitag suggest query: %w", err)
 	}
@@ -830,11 +974,25 @@ func (s *Store) AITagSuggest(prefix string, limit int) ([]string, error) {
 
 // AITagCategories returns all distinct categories from ready ai_tags rows.
 func (s *Store) AITagCategories() ([]string, error) {
+	return s.AITagCategoriesForProjects(nil)
+}
+
+func (s *Store) AITagCategoriesForProjects(projectIDs []string) ([]string, error) {
+	if projectIDs != nil && len(projectIDs) == 0 {
+		return []string{}, nil
+	}
+	where := []string{"status = 'ready'", "category != ''"}
+	args := []any{}
+	if projectIDs != nil {
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	rows, err := s.rdb.Query(`
 		SELECT DISTINCT category FROM ai_tags
-		WHERE status = 'ready' AND category != ''
+		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY category
-	`)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("aitag categories: %w", err)
 	}
@@ -857,10 +1015,18 @@ func (s *Store) AITagCategories() ([]string, error) {
 	return cats, nil
 }
 
-func (s *Store) aiTagStats(projectFilter string) (taggedAssets int, topCategory string, err error) {
+func (s *Store) aiTagStats(projectFilter string, projectIDs []string) (taggedAssets int, topCategory string, err error) {
 	var where []string
 	var args []any
 	where = append(where, "at.status = 'ready'")
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return 0, "", nil
+		}
+		projectClause, projectArgs := inClauseSQL("at.project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
 	if projectFilter != "" {
 		where = append(where, "at.project_id = ?")
 		args = append(args, projectFilter)

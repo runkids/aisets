@@ -69,6 +69,108 @@ func TestAITagCategoryList_Basic(t *testing.T) {
 	}
 }
 
+func TestAITagBrowseScopesProjectIDs(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	tags, err := store.AITagList(AITagListQuery{ProjectIDs: []string{"proj2"}, Locale: "zh-TW"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags.TotalTaggedAssets != 1 || tags.Total != 2 {
+		t.Fatalf("unexpected scoped tag totals: %#v", tags)
+	}
+	if _, ok := tags.Translations["boxing"]; ok {
+		t.Fatalf("translation from another project leaked: %#v", tags.Translations)
+	}
+	for _, item := range tags.Tags {
+		if item.Tag == "boxing" || item.Tag == "sports" || item.Tag == "dark-mode" {
+			t.Fatalf("tag from another project leaked: %#v", tags.Tags)
+		}
+	}
+
+	categories, err := store.AITagCategoryList(AICategoryListQuery{ProjectIDs: []string{"proj2"}, Locale: "zh-TW"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if categories.TotalCategorizedAssets != 1 || categories.Total != 1 || categories.Categories[0].ProjectCount != 1 {
+		t.Fatalf("unexpected scoped category totals: %#v", categories)
+	}
+	for _, tag := range categories.Categories[0].TopTags {
+		if tag == "sidebar" || tag == "boxing" {
+			t.Fatalf("top tag from another project leaked: %#v", categories.Categories[0].TopTags)
+		}
+	}
+
+	suggestions, err := store.AITagSuggestForProjects("box", 10, []string{"proj2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(suggestions) != 0 {
+		t.Fatalf("suggestions from another project leaked: %#v", suggestions)
+	}
+}
+
+func TestAITagMutationsScopeProjectIDs(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seedTagData(t, store)
+
+	if affected, err := store.AITagRenameForProjects("navigation", "nav", []string{"proj2"}); err != nil || affected != 1 {
+		t.Fatalf("scoped rename affected=%d err=%v", affected, err)
+	}
+	proj1, err := store.AITagList(AITagListQuery{ProjectIDs: []string{"proj1"}, Search: "navigation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj1.Total != 1 {
+		t.Fatalf("proj1 navigation should remain, got %#v", proj1.Tags)
+	}
+	proj1Nav, err := store.AITagList(AITagListQuery{ProjectIDs: []string{"proj1"}, Search: "nav"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj1Nav.Total != 1 {
+		t.Fatalf("proj1 raw navigation should still match nav prefix only once, got %#v", proj1Nav.Tags)
+	}
+	proj2, err := store.AITagList(AITagListQuery{ProjectIDs: []string{"proj2"}, Search: "nav"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj2.Total != 1 || proj2.Tags[0].Tag != "nav" {
+		t.Fatalf("proj2 nav missing after rename: %#v", proj2.Tags)
+	}
+
+	if affected, err := store.AITagCategoryRenameForProjects("icon", "symbol", []string{"proj2"}); err != nil || affected != 1 {
+		t.Fatalf("scoped category rename affected=%d err=%v", affected, err)
+	}
+	proj1Cats, err := store.AITagCategoryList(AICategoryListQuery{ProjectIDs: []string{"proj1"}, Search: "icon"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj1Cats.Total != 1 || proj1Cats.Categories[0].Category != "icon" {
+		t.Fatalf("proj1 icon category should remain: %#v", proj1Cats.Categories)
+	}
+	proj2Cats, err := store.AITagCategoryList(AICategoryListQuery{ProjectIDs: []string{"proj2"}, Search: "symbol"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proj2Cats.Total != 1 || proj2Cats.Categories[0].Category != "symbol" {
+		t.Fatalf("proj2 symbol category missing: %#v", proj2Cats.Categories)
+	}
+}
+
 func TestAITagCategoryList_Search(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -940,7 +1042,7 @@ func TestAITagTranslations_InvalidLocale(t *testing.T) {
 
 	tags := []AITagListItem{{Tag: "boxing", Count: 1}}
 
-	result, err := store.aiTagTranslations(tags, "'; DROP TABLE ai_tags --")
+	result, err := store.aiTagTranslations(tags, "'; DROP TABLE ai_tags --", nil)
 	if err != nil {
 		t.Fatalf("expected no error for invalid locale, got %v", err)
 	}
@@ -948,7 +1050,7 @@ func TestAITagTranslations_InvalidLocale(t *testing.T) {
 		t.Fatalf("expected nil for invalid locale, got %v", result)
 	}
 
-	result, err = store.aiTagTranslations(tags, "zh-TW")
+	result, err = store.aiTagTranslations(tags, "zh-TW", nil)
 	if err != nil {
 		t.Fatalf("valid locale should not error: %v", err)
 	}

@@ -3,6 +3,7 @@ package config
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"aisets/internal/aitag"
 	"aisets/internal/scanner"
@@ -278,8 +279,18 @@ func (s *Store) AITagResultAny(contentHash, hashAlgorithm string) (*aitag.Result
 // AITagResultAnyWithEnglish returns the AI tag result with English i18n fields preferred.
 // If English i18n translations exist, category/tags/description are replaced with English versions.
 func (s *Store) AITagResultAnyWithEnglish(contentHash, hashAlgorithm string) (*aitag.Result, error) {
+	return s.AITagResultAnyWithEnglishForAsset("", "", contentHash, hashAlgorithm)
+}
+
+func (s *Store) AITagResultAnyWithEnglishForAsset(projectID, repoPath, contentHash, hashAlgorithm string) (*aitag.Result, error) {
 	if contentHash == "" || hashAlgorithm == "" {
 		return nil, nil
+	}
+	where := `content_hash = ? AND hash_algorithm = ? AND status = ?`
+	args := []any{contentHash, hashAlgorithm, aitag.StatusReady}
+	if projectID != "" || repoPath != "" {
+		where += ` AND project_id = ? AND repo_path = ?`
+		args = append(args, projectID, repoPath)
 	}
 	row := s.rdb.QueryRow(`
 		SELECT category, tags_json, description,
@@ -287,10 +298,10 @@ func (s *Store) AITagResultAnyWithEnglish(contentHash, hashAlgorithm string) (*a
 		       COALESCE(tags_i18n_json, '{}'),
 		       COALESCE(description_i18n_json, '{}')
 		FROM ai_tags
-		WHERE content_hash = ? AND hash_algorithm = ? AND status = ?
+		WHERE `+where+`
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, contentHash, hashAlgorithm, aitag.StatusReady)
+	`, args...)
 	var result aitag.Result
 	var tagsRaw, catI18n, tagsI18n, descI18n string
 	err := row.Scan(&result.Category, &tagsRaw, &result.Description,
@@ -322,6 +333,8 @@ func (s *Store) AITagResultAnyWithEnglish(contentHash, hashAlgorithm string) (*a
 
 // AITagI18nRow is a row from ai_tags missing English i18n.
 type AITagI18nRow struct {
+	ProjectID     string
+	RepoPath      string
 	ContentHash   string
 	HashAlgorithm string
 	Category      string
@@ -336,6 +349,10 @@ func (s *Store) AITagsMissingEnglish(contentHashes []string) ([]AITagI18nRow, er
 var validI18nLocales = map[string]bool{"en": true, "zh-TW": true, "zh-CN": true, "ja": true, "ko": true}
 
 func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AITagI18nRow, error) {
+	return s.AITagsMissingLocaleForProjects(locale, contentHashes, nil)
+}
+
+func (s *Store) AITagsMissingLocaleForProjects(locale string, contentHashes []string, projectIDs []string) ([]AITagI18nRow, error) {
 	if !validI18nLocales[locale] {
 		return nil, nil
 	}
@@ -344,25 +361,24 @@ func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AI
 			   OR json_extract(category_i18n_json, ` + jsonPath + `) IS NULL
 			   OR json_extract(category_i18n_json, ` + jsonPath + `) = category
 			   OR json_extract(tags_i18n_json, ` + jsonPath + `) IS NULL)`
-	var query string
+	where := []string{"status = 'ready'", missingAny}
 	var args []any
 	if len(contentHashes) > 0 {
-		placeholders := make([]string, len(contentHashes))
-		for i, h := range contentHashes {
-			placeholders[i] = "?"
-			args = append(args, h)
-		}
-		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
-			FROM ai_tags
-			WHERE status = 'ready'
-			  AND content_hash IN (` + joinStrings(placeholders, ",") + `)
-			  AND ` + missingAny
-	} else {
-		query = `SELECT content_hash, hash_algorithm, category, tags_json, description
-			FROM ai_tags
-			WHERE status = 'ready'
-			  AND ` + missingAny
+		hashClause, hashArgs := inClauseSQL("content_hash", contentHashes)
+		where = append(where, hashClause)
+		args = append(args, hashArgs...)
 	}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where = append(where, projectClause)
+		args = append(args, projectArgs...)
+	}
+	query := `SELECT project_id, repo_path, content_hash, hash_algorithm, category, tags_json, description
+		FROM ai_tags
+		WHERE ` + strings.Join(where, " AND ")
 	rows, err := s.rdb.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -372,7 +388,7 @@ func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AI
 	for rows.Next() {
 		var r AITagI18nRow
 		var tagsRaw string
-		if err := rows.Scan(&r.ContentHash, &r.HashAlgorithm, &r.Category, &tagsRaw, &r.Description); err != nil {
+		if err := rows.Scan(&r.ProjectID, &r.RepoPath, &r.ContentHash, &r.HashAlgorithm, &r.Category, &tagsRaw, &r.Description); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(tagsRaw), &r.Tags)
@@ -405,16 +421,25 @@ func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory strin
 }
 
 func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category string, tags []string, description string) error {
+	return s.BackfillLocaleI18nForAsset("", "", contentHash, hashAlgorithm, locale, category, tags, description)
+}
+
+func (s *Store) BackfillLocaleI18nForAsset(projectID, repoPath, contentHash, hashAlgorithm, locale, category string, tags []string, description string) error {
 	if !validI18nLocales[locale] {
 		return nil
 	}
 	var raw aitag.Result
 	var catI18n, tagsRaw, tagsI18n, descI18n string
+	where := `content_hash = ? AND hash_algorithm = ? AND status = 'ready'`
+	args := []any{contentHash, hashAlgorithm}
+	if projectID != "" || repoPath != "" {
+		where += ` AND project_id = ? AND repo_path = ?`
+		args = append(args, projectID, repoPath)
+	}
 	err := s.rdb.QueryRow(`SELECT category, tags_json, description,
 			COALESCE(category_i18n_json,'{}'), COALESCE(tags_i18n_json,'{}'), COALESCE(description_i18n_json,'{}')
-		FROM ai_tags WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'
-		ORDER BY updated_at DESC LIMIT 1`,
-		contentHash, hashAlgorithm).Scan(&raw.Category, &tagsRaw, &raw.Description, &catI18n, &tagsI18n, &descI18n)
+		FROM ai_tags WHERE `+where+`
+		ORDER BY updated_at DESC LIMIT 1`, args...).Scan(&raw.Category, &tagsRaw, &raw.Description, &catI18n, &tagsI18n, &descI18n)
 	if err == sql.ErrNoRows {
 		return nil
 	}
@@ -453,17 +478,35 @@ func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category 
 	tagsBytes, _ := json.Marshal(tagsMap)
 	descBytes, _ := json.Marshal(descMap)
 
+	updateWhere := `content_hash = ? AND hash_algorithm = ? AND status = 'ready'`
+	updateArgs := []any{string(catBytes), string(tagsBytes), string(descBytes), contentHash, hashAlgorithm}
+	if projectID != "" || repoPath != "" {
+		updateWhere += ` AND project_id = ? AND repo_path = ?`
+		updateArgs = append(updateArgs, projectID, repoPath)
+	}
 	_, err = s.db.Exec(`UPDATE ai_tags
 		SET category_i18n_json = ?, tags_i18n_json = ?, description_i18n_json = ?
-		WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'`,
-		string(catBytes), string(tagsBytes), string(descBytes),
-		contentHash, hashAlgorithm)
+		WHERE `+updateWhere, updateArgs...)
 	return err
 }
 
 // AllReadyContentHashes returns content hashes of all ready AI tag rows.
 func (s *Store) AllReadyAITagHashes() ([]string, error) {
-	rows, err := s.rdb.Query(`SELECT DISTINCT content_hash FROM ai_tags WHERE status = 'ready'`)
+	return s.AllReadyAITagHashesForProjects(nil)
+}
+
+func (s *Store) AllReadyAITagHashesForProjects(projectIDs []string) ([]string, error) {
+	where := `status = 'ready'`
+	args := []any{}
+	if projectIDs != nil {
+		if len(projectIDs) == 0 {
+			return nil, nil
+		}
+		projectClause, projectArgs := inClauseSQL("project_id", projectIDs)
+		where += ` AND ` + projectClause
+		args = append(args, projectArgs...)
+	}
+	rows, err := s.rdb.Query(`SELECT DISTINCT content_hash FROM ai_tags WHERE `+where, args...)
 	if err != nil {
 		return nil, err
 	}

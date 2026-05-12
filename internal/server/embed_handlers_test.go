@@ -52,12 +52,34 @@ func TestEmbedSearchScopesProviderModelAndDimensions(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	projectRoot := resolvedTempDir(t)
+	if err := store.AddProjects([]string{projectRoot}); err != nil {
+		t.Fatal(err)
+	}
+	projectID := store.Projects()[0].ID
+	settingsBefore, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	activeWorkspaceID := settingsBefore.ActiveWorkspaceID
+	if _, err := store.AddWorkspace("Other", ""); err != nil {
+		t.Fatal(err)
+	}
+	otherRoot := resolvedTempDir(t)
+	if err := store.AddProjects([]string{otherRoot}); err != nil {
+		t.Fatal(err)
+	}
+	otherProjectID := store.Projects()[0].ID
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ActiveWorkspaceID: &activeWorkspaceID}); err != nil {
+		t.Fatal(err)
+	}
 	for _, result := range []config.EmbeddingResult{
-		{AssetID: "current-text", ProjectID: "p1", RepoPath: "current.png", ContentHash: "h1", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
-		{AssetID: "old-model", ProjectID: "p1", RepoPath: "old.png", ContentHash: "h2", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
-		{AssetID: "old-dim", ProjectID: "p1", RepoPath: "dim.png", ContentHash: "h3", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 3, Status: "ready"},
-		{AssetID: "current-image", ProjectID: "p1", RepoPath: "image.png", ContentHash: "h4", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
-		{AssetID: "old-image", ProjectID: "p1", RepoPath: "old-image.png", ContentHash: "h5", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
+		{AssetID: "current-text", ProjectID: projectID, RepoPath: "current.png", ContentHash: "h1", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
+		{AssetID: "old-model", ProjectID: projectID, RepoPath: "old.png", ContentHash: "h2", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
+		{AssetID: "old-dim", ProjectID: projectID, RepoPath: "dim.png", ContentHash: "h3", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 3, Status: "ready"},
+		{AssetID: "current-image", ProjectID: projectID, RepoPath: "image.png", ContentHash: "h4", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
+		{AssetID: "old-image", ProjectID: projectID, RepoPath: "old-image.png", ContentHash: "h5", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
+		{AssetID: "other-workspace", ProjectID: otherProjectID, RepoPath: "other.png", ContentHash: "h6", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
 	} {
 		vec := []float32{1, 0}
 		if result.Dimensions == 3 {
@@ -110,10 +132,32 @@ func TestEmbedStatsScopesCurrentModel(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	projectRoot := resolvedTempDir(t)
+	if err := store.AddProjects([]string{projectRoot}); err != nil {
+		t.Fatal(err)
+	}
+	projectID := store.Projects()[0].ID
+	settingsBefore, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	activeWorkspaceID := settingsBefore.ActiveWorkspaceID
+	if _, err := store.AddWorkspace("Other", ""); err != nil {
+		t.Fatal(err)
+	}
+	otherRoot := resolvedTempDir(t)
+	if err := store.AddProjects([]string{otherRoot}); err != nil {
+		t.Fatal(err)
+	}
+	otherProjectID := store.Projects()[0].ID
+	if _, err := store.UpdateSettings(config.SettingsUpdate{ActiveWorkspaceID: &activeWorkspaceID}); err != nil {
+		t.Fatal(err)
+	}
 	for _, result := range []config.EmbeddingResult{
-		{AssetID: "current-text", ProjectID: "p1", RepoPath: "current.png", ContentHash: "h1", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
-		{AssetID: "old-text", ProjectID: "p1", RepoPath: "old.png", ContentHash: "h2", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
-		{AssetID: "current-image", ProjectID: "p1", RepoPath: "image.png", ContentHash: "h3", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
+		{AssetID: "current-text", ProjectID: projectID, RepoPath: "current.png", ContentHash: "h1", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
+		{AssetID: "old-text", ProjectID: projectID, RepoPath: "old.png", ContentHash: "h2", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "old", Dimensions: 2, Status: "ready"},
+		{AssetID: "current-image", ProjectID: projectID, RepoPath: "image.png", ContentHash: "h3", HashAlgorithm: "xxh3", EmbedType: "image", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
+		{AssetID: "other-workspace", ProjectID: otherProjectID, RepoPath: "other.png", ContentHash: "h4", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "current", Dimensions: 2, Status: "ready"},
 	} {
 		if err := store.UpsertEmbedding(result, []float32{1, 0}); err != nil {
 			t.Fatal(err)

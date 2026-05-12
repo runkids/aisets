@@ -22,13 +22,14 @@ func (s *Server) handleTagList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := config.AITagListQuery{
-		Search:   q.Get("q"),
-		Sort:     q.Get("sort"),
-		Project:  q.Get("project"),
-		Category: q.Get("category"),
-		Locale:   sanitizeLocale(q.Get("locale")),
-		Limit:    limit,
-		Offset:   offset,
+		Search:     q.Get("q"),
+		Sort:       q.Get("sort"),
+		Project:    q.Get("project"),
+		ProjectIDs: s.store.ActiveProjectIDs(),
+		Category:   q.Get("category"),
+		Locale:     sanitizeLocale(q.Get("locale")),
+		Limit:      limit,
+		Offset:     offset,
 	}
 
 	page, err := s.store.AITagList(query)
@@ -53,7 +54,7 @@ func (s *Server) handleTagRename(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("from and to are required"))
 		return
 	}
-	affected, err := s.store.AITagRename(body.From, body.To)
+	affected, err := s.store.AITagRenameForProjects(body.From, body.To, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -74,7 +75,7 @@ func (s *Server) handleTagMerge(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("source and target are required"))
 		return
 	}
-	affected, err := s.store.AITagMerge(body.Source, body.Target)
+	affected, err := s.store.AITagMergeForProjects(body.Source, body.Target, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -94,7 +95,7 @@ func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("tags are required"))
 		return
 	}
-	affected, err := s.store.AITagDelete(body.Tags)
+	affected, err := s.store.AITagDeleteForProjects(body.Tags, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -133,7 +134,7 @@ func (s *Server) handleAssetSetTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTagCategories(w http.ResponseWriter, r *http.Request) {
-	cats, err := s.store.AITagCategories()
+	cats, err := s.store.AITagCategoriesForProjects(s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -156,11 +157,12 @@ func (s *Server) handleTagCategoryList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, err := s.store.AITagCategoryList(config.AICategoryListQuery{
-		Search: q.Get("q"),
-		Sort:   q.Get("sort"),
-		Locale: sanitizeLocale(q.Get("locale")),
-		Limit:  limit,
-		Offset: offset,
+		Search:     q.Get("q"),
+		Sort:       q.Get("sort"),
+		Locale:     sanitizeLocale(q.Get("locale")),
+		ProjectIDs: s.store.ActiveProjectIDs(),
+		Limit:      limit,
+		Offset:     offset,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -182,7 +184,7 @@ func (s *Server) handleTagCategoryRename(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, fmt.Errorf("from and to are required"))
 		return
 	}
-	affected, err := s.store.AITagCategoryRename(body.From, body.To)
+	affected, err := s.store.AITagCategoryRenameForProjects(body.From, body.To, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -203,7 +205,7 @@ func (s *Server) handleTagCategoryMerge(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, fmt.Errorf("source and target are required"))
 		return
 	}
-	affected, err := s.store.AITagCategoryMerge(body.Source, body.Target)
+	affected, err := s.store.AITagCategoryMergeForProjects(body.Source, body.Target, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -223,7 +225,7 @@ func (s *Server) handleTagCategoryClear(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, fmt.Errorf("categories are required"))
 		return
 	}
-	affected, err := s.store.AITagCategoryClear(body.Categories)
+	affected, err := s.store.AITagCategoryClearForProjects(body.Categories, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -244,7 +246,7 @@ func (s *Server) handleTagSuggest(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	suggestions, err := s.store.AITagSuggest(prefix, limit)
+	suggestions, err := s.store.AITagSuggestForProjects(prefix, limit, s.store.ActiveProjectIDs())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

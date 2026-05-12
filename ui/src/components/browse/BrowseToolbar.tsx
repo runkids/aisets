@@ -55,6 +55,7 @@ type BrowseToolbarProps = {
   gridSize: "s" | "m" | "l";
   bgMode: ImageBackgroundMode;
   searchMode: SearchMode;
+  semanticAvailable: boolean;
   searchQuery: string;
   statusFilter: StatusFilter;
   sortMode: SortMode;
@@ -83,6 +84,7 @@ export function BrowseToolbar({
   gridSize,
   bgMode,
   searchMode,
+  semanticAvailable,
   searchQuery,
   statusFilter,
   sortMode,
@@ -219,35 +221,37 @@ export function BrowseToolbar({
                   className="mr-0.5"
                 />
               )}
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
-                  searchMode === "semantic" ? "text-g-purple" : "text-g-ink-3",
-                )}
-                aria-label={t("toolbar.searchMode")}
-                onClick={() => onSearchModeChange(nextSearchMode)}
-              >
-                {searchMode === "semantic" ? (
-                  <WandSparkles size={13} aria-hidden="true" />
-                ) : (
-                  <Search size={13} aria-hidden="true" />
-                )}
-                <span>
-                  {searchMode === "semantic"
-                    ? t("toolbar.aiSearchMode")
-                    : t("toolbar.catalogSearchMode")}
-                </span>
-                <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
-                  TAB
-                </kbd>
-              </button>
+              {semanticAvailable && (
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+                    searchMode === "semantic" ? "text-g-purple" : "text-g-ink-3",
+                  )}
+                  aria-label={t("toolbar.searchMode")}
+                  onClick={() => onSearchModeChange(nextSearchMode)}
+                >
+                  {searchMode === "semantic" ? (
+                    <WandSparkles size={13} aria-hidden="true" />
+                  ) : (
+                    <Search size={13} aria-hidden="true" />
+                  )}
+                  <span>
+                    {searchMode === "semantic"
+                      ? t("toolbar.aiSearchMode")
+                      : t("toolbar.catalogSearchMode")}
+                  </span>
+                  <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
+                    TAB
+                  </kbd>
+                </button>
+              )}
             </span>
           }
           value={searchQuery}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === "Tab" && !e.shiftKey) {
+            if (e.key === "Tab" && !e.shiftKey && semanticAvailable) {
               e.preventDefault();
               onSearchModeChange(nextSearchMode);
               return;

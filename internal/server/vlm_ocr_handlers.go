@@ -132,6 +132,12 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("lang"), "Write the extracted text transcription as-is, but write any labels, descriptions, or commentary in")
 	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
+	activeProjectIDs := s.store.ActiveProjectIDs()
+	activeProjectSet := map[string]struct{}{}
+	for _, projectID := range activeProjectIDs {
+		activeProjectSet[projectID] = struct{}{}
+	}
+
 	var sourceItems []scanner.AssetItem
 	if forceReprocess {
 		sourceItems, err = s.store.CatalogItemsByIDs(0, body.AssetIDs)
@@ -139,11 +145,21 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 			sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(err, "vlm_ocr_catalog_failed")})
 			return
 		}
+		filtered := sourceItems[:0]
+		for _, item := range sourceItems {
+			if _, ok := activeProjectSet[item.ProjectID]; ok {
+				filtered = append(filtered, item)
+			}
+		}
+		sourceItems = filtered
 	} else {
 		projectFilter := parseProjectFilter(r.URL.Query().Get("projectIds"))
 		sourceItems = make([]scanner.AssetItem, 0, len(catalog.Items))
 		for _, rawItem := range catalog.Items {
 			item := rawItem
+			if _, ok := activeProjectSet[item.ProjectID]; !ok {
+				continue
+			}
 			if projectFilter != nil {
 				if _, ok := projectFilter[item.ProjectID]; !ok {
 					continue

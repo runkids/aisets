@@ -15,6 +15,15 @@ func (s *Store) Projects() []Project {
 	return s.ProjectsInWorkspace(s.activeWorkspaceID())
 }
 
+func (s *Store) ActiveProjectIDs() []string {
+	projects := s.Projects()
+	ids := make([]string, 0, len(projects))
+	for _, project := range projects {
+		ids = append(ids, project.ID)
+	}
+	return ids
+}
+
 func (s *Store) AllProjects() []Project {
 	rows, err := s.rdb.Query(`
 		SELECT id, workspace_id, name, path, icon_image, scan_intent, created_at

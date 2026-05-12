@@ -885,12 +885,19 @@ export function BrowseView({
     settingsQuery.data?.settings.embedSearchType === "hybrid"
       ? settingsQuery.data.settings.embedSearchType
       : "hybrid";
+  const embedConfigured = Boolean(
+    settingsQuery.data?.settings.llmEnabled &&
+      settingsQuery.data?.settings.llmEmbedModel,
+  );
   const embedStatsQuery = useQuery({
     queryKey: ["embed-stats"],
     queryFn: embeddingStats,
-    enabled: searchMode === "semantic",
+    enabled: embedConfigured,
     staleTime: 10_000,
   });
+  const semanticAvailable =
+    (embedStatsQuery.data?.textCount ?? 0) > 0 ||
+    (embedStatsQuery.data?.imageCount ?? 0) > 0;
   const semanticLoadingStyle = useMemo<SemanticLoadingStyle>(() => {
     const styles = ["beam", "constellation", "swarm"] as const;
     const seed = committedSemanticQuery
@@ -911,6 +918,7 @@ export function BrowseView({
     semanticDimensions > 0
       ? `${semanticDimensions}-D`
       : t("commandPalette.embeddingSpace");
+
   const semanticQuery = useQuery({
     queryKey: [
       "browse-semantic-search",
@@ -931,6 +939,7 @@ export function BrowseView({
       }),
     enabled:
       searchMode === "semantic" &&
+      semanticAvailable &&
       scanId != null &&
       committedSemanticQuery.trim() !== "",
     staleTime: 30_000,
@@ -1014,6 +1023,7 @@ export function BrowseView({
     clearFocusedAssetQuery();
     setSelectedFolder("");
     setExpandedFolders(new Set());
+    if (next === "semantic" && !semanticAvailable) return;
     setSearchMode(next);
     if (next === "semantic") {
       setCommittedSemanticQuery(searchQuery.trim());
@@ -1024,6 +1034,7 @@ export function BrowseView({
     clearFocusedAssetQuery();
     setSelectedFolder("");
     setExpandedFolders(new Set());
+    if (!semanticAvailable) return;
     setSearchMode("semantic");
     setCommittedSemanticQuery(searchQuery.trim());
   }
@@ -1428,6 +1439,7 @@ export function BrowseView({
             gridSize={gridSize}
             bgMode={bgMode}
             searchMode={searchMode}
+            semanticAvailable={semanticAvailable}
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             sortMode={sortMode}
