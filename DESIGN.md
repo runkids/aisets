@@ -162,6 +162,16 @@ Elevation is built primarily from **inset 1px borders + tight 4px drop shadows**
 
 > **Dotted main canvas:** keep the existing `radial-gradient(circle at 1px 1px, var(--g-line) 1px, transparent 0)` at `24px 24px`. In dark mode this becomes faint Charcoal dots on Pitch Black — preserves the "control panel grid" feel without adding light.
 
+### 2.1 Command Palette / Semantic Search
+
+The global command palette uses the same overlay shell as other dialogs, but its surface is tuned like a Spotlight-style control: 640px width, tight 12px radius, 1px hairline borders, and no heavy depth shadow in light mode. Semantic search is the only place where purple can become the active accent; catalog search stays neutral plus the global accent token.
+
+- Header: icon morphs between `Search` and `Wand2`; the input remains token-native and uses mode-specific caret color.
+- AI mode: render the mono context strip (`text-embedding-3-large · 384d · cosine`) and keep machine metadata in `font-g-mono`.
+- Loading: semantic search can use beam, constellation, swarm, or skeleton variants. They must rely on token colors and shared `_patterns.scss` keyframes, not component SCSS.
+- Results: asset rows keep 6px radius, compact thumbnail, mono path/name, tabular numeric score, and a functional active-row indicator.
+- Background: the vector-field canvas is allowed only while semantic mode is active and must stay under the modal, above the scrim, with pointer events disabled.
+
 ---
 
 ## 3. Shell Layout

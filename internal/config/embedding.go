@@ -191,3 +191,16 @@ func (s *Store) EmbeddingReadyCounts() (textCount, imageCount int, err error) {
 	}
 	return textCount, imageCount, rows.Err()
 }
+
+func (s *Store) EmbeddingReadyDimensions() (int, error) {
+	var dimensions int
+	err := s.rdb.QueryRow(`
+		SELECT COALESCE(MAX(dimensions), 0)
+		FROM embeddings
+		WHERE status = 'ready'
+	`).Scan(&dimensions)
+	if err != nil {
+		return 0, err
+	}
+	return dimensions, nil
+}

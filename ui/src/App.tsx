@@ -1239,6 +1239,7 @@ export function App() {
         scanId={catalogSummary?.scanId}
         customFilters={settingsQuery.data?.settings.customAssetFilters ?? []}
         ocrEnabled={ocrEnabled}
+        settings={settingsQuery.data?.settings}
         embedEnabled={
           (settingsQuery.data?.settings.llmEnabled ?? false) &&
           !!settingsQuery.data?.settings.llmEmbedModel

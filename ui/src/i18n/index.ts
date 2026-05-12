@@ -1,7 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import { APIError } from "../api";
 import en from "./locales/en.json";
 import zhTW from "./locales/zh-TW.json";
 import zhCN from "./locales/zh-CN.json";
@@ -13,6 +12,19 @@ export {
 } from "./languageOptions";
 
 const supportedLngs = ["en", "zh-TW", "zh-CN", "ja", "ko"];
+
+function isAPIErrorLike(error: unknown): error is {
+  code: string;
+  message?: string;
+  params?: Record<string, unknown>;
+} {
+  if (!(error instanceof Error)) return false;
+  const maybe = error as Error & {
+    code?: unknown;
+    params?: unknown;
+  };
+  return maybe.name === "APIError" && typeof maybe.code === "string";
+}
 
 i18n
   .use(LanguageDetector)
@@ -36,9 +48,9 @@ i18n
   });
 
 export function errorMessage(error: unknown) {
-  if (error instanceof APIError) {
+  if (isAPIErrorLike(error)) {
     const key = `error.${error.code}`;
-    const params = error.params as Record<string, unknown> | undefined;
+    const params = error.params;
     if (i18n.exists(key)) return i18n.t(key, params ?? {});
     return error.message ?? error.code;
   }

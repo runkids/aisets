@@ -185,6 +185,22 @@ textarea::-webkit-resizer {
     transform: translateX(100%);
   }
 }
+@keyframes lsb-pip-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes lsb-bar {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
 @keyframes ai-shimmer {
   0% {
     transform: translateX(-100%);
@@ -202,11 +218,413 @@ textarea::-webkit-resizer {
     opacity: 0.7;
   }
 }
+@keyframes ghostSwap {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ctx-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--g-purple) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--g-purple) 0%, transparent);
+  }
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes tokenPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+@keyframes beamTrace {
+  0% {
+    opacity: 0;
+    transform: translateX(-18px) scaleX(0.15);
+  }
+  45% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(36px) scaleX(0.4);
+  }
+}
+@keyframes constellationPulse {
+  0%,
+  100% {
+    transform: scale(0.76);
+  }
+  50% {
+    transform: scale(1.35);
+  }
+}
+@keyframes dashDraw {
+  from {
+    stroke-dashoffset: 140;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes swarmIn {
+  0% {
+    transform: translate(0, 0) scale(0.8);
+  }
+  70% {
+    transform: translate(-16px, -10px) scale(1.15);
+  }
+  100% {
+    transform: translate(0, 0) scale(0.8);
+  }
+}
+@keyframes contextScan {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(330%);
+  }
+}
 @keyframes progress-indeterminate {
   0% {
     transform: translateX(-110%);
   }
   100% {
     transform: translateX(380%);
+  }
+}
+
+.lsb-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 10px;
+  font-size: 12px;
+  color: var(--g-ink-2);
+  letter-spacing: -0.012em;
+}
+
+.lsb-pips {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.lsb-pip {
+  width: 14px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--g-purple) 16%, transparent);
+  transition:
+    width 240ms var(--g-ease),
+    background 240ms var(--g-ease);
+}
+
+.lsb-pip.done {
+  background: color-mix(in srgb, var(--g-purple) 65%, transparent);
+}
+
+.lsb-pip.current {
+  position: relative;
+  width: 22px;
+  background: var(--g-purple);
+}
+
+.lsb-pip.current::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: lsb-pip-shine 1.2s ease-in-out infinite;
+}
+
+.lsb-phase {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--g-ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.012em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lsb-timer {
+  flex-shrink: 0;
+  color: var(--g-ink-4);
+  font-family: var(--g-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+.lsb-timer-unit {
+  margin-left: 1px;
+  opacity: 0.6;
+}
+
+.lsb-stage {
+  position: relative;
+  height: 220px;
+  margin: 0 8px 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--g-purple) 18%, var(--g-line));
+  border-radius: var(--g-r-md);
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--g-purple) 14%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--g-purple) 4%, var(--g-surface-2)) 0%,
+      var(--g-surface-2) 100%
+    );
+  box-shadow: inset 0 0 60px color-mix(in srgb, var(--g-purple) 8%, transparent);
+}
+
+[data-theme="dark"] .lsb-stage {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--g-purple) 22%, transparent) 0%,
+      transparent 60%
+    ),
+    var(--g-canvas);
+  box-shadow:
+    inset 0 0 120px color-mix(in srgb, var(--g-purple) 14%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--g-purple) 24%, transparent);
+}
+
+.lsb-stat {
+  position: absolute;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--g-mono);
+  font-size: 9px;
+  font-weight: 510;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.lsb-stat-tl {
+  top: 8px;
+  left: 10px;
+}
+
+.lsb-stat-tr {
+  top: 8px;
+  right: 10px;
+}
+
+.lsb-stat-k {
+  color: var(--g-ink-4);
+}
+
+.lsb-stat-v {
+  color: var(--g-purple);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .lsb-stat-v {
+  color: #c4b5fd;
+}
+
+.lsb-bar {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  left: 10px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--g-purple) 14%, transparent);
+}
+
+.lsb-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 32%;
+  border-radius: 9999px;
+  animation: lsb-bar 1.8s var(--g-ease) infinite;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--g-purple) 30%,
+    var(--g-purple) 70%,
+    transparent
+  );
+}
+
+.lv-stage {
+  position: relative;
+  height: 168px;
+  margin: 4px 8px 12px;
+  overflow: hidden;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-r-md);
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--g-purple) 10%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--g-surface-2);
+}
+
+.lv-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--g-ink-5) 35%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--g-ink-5) 35%, transparent) 1px,
+      transparent 1px
+    );
+  background-position: center;
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  opacity: 0.18;
+}
+
+.lv-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lv-axis {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  left: 10px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--g-ink-4);
+  font-family: var(--g-mono);
+  font-size: 9px;
+  font-weight: 510;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+@keyframes imageToolCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes imageToolConveyor {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+
+@keyframes imageToolBeam {
+  from {
+    transform: translateX(-125%);
+  }
+  to {
+    transform: translateX(330%);
+  }
+}
+
+@keyframes imageToolScan {
+  from {
+    transform: translateX(0) skewX(-12deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(430%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes imageToolPackageIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+    filter: saturate(1.2);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: saturate(1);
   }
 }

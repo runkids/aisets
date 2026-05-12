@@ -826,6 +826,9 @@ export type SemanticSearchResponse = {
 export type EmbedStats = {
   textCount: number;
   imageCount: number;
+  providerName?: string;
+  modelName?: string;
+  dimensions?: number;
 };
 
 export type ActionPreview = {

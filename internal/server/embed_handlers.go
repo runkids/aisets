@@ -709,5 +709,23 @@ func (s *Server) handleEmbedStats(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"textCount": textCount, "imageCount": imageCount})
+	dimensions, err := s.store.EmbeddingReadyDimensions()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
+		return
+	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_settings_failed"))
+		return
+	}
+	providerName := settings.LLMProvider
+	if s.llmProvider != nil {
+		providerName = s.llmProvider.Name()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"textCount": textCount, "imageCount": imageCount,
+		"providerName": providerName, "modelName": settings.LLMEmbedModel,
+		"dimensions": dimensions,
+	})
 }

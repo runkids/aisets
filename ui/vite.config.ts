@@ -36,6 +36,14 @@ const vendorChunkGroups: Record<string, string[]> = {
   ],
 };
 
+const localeChunkNames: Record<string, string> = {
+  "en.json": "locale-en",
+  "zh-TW.json": "locale-zh-tw",
+  "zh-CN.json": "locale-zh-cn",
+  "ja.json": "locale-ja",
+  "ko.json": "locale-ko",
+};
+
 const appChunkGroups: Record<string, string[]> = {
   "app-shell": [
     "/src/components/shared/AppTopbar.tsx",
@@ -53,26 +61,26 @@ const appChunkGroups: Record<string, string[]> = {
     "/src/ocrStatus.ts",
     "/src/projectScanIntent.ts",
     "/src/queries.ts",
+    "/src/tagsQueries.ts",
     "/src/types.ts",
     "/src/ui.ts",
     "/src/useDebouncedValue.ts",
   ],
-  "app-i18n": ["/src/i18n/"],
-  "app-ui": [
-    "/src/components/ui/",
-    "/src/components/shared/",
+  "app-i18n": ["/src/i18n/index.ts", "/src/i18n/languageOptions.ts"],
+  "app-ui": ["/src/components/ui/"],
+  "feature-workspace": [
+    "/src/components/browse/",
+    "/src/components/drawer/",
+    "/src/components/duplicates/",
+    "/src/components/lint/",
+    "/src/components/optimize/",
+    "/src/components/project/",
+    "/src/components/prompts/",
+    "/src/components/settings/",
+    "/src/components/tags/",
   ],
-  "feature-browse": ["/src/components/browse/"],
-  "feature-drawer": ["/src/components/drawer/"],
-  "feature-duplicates": ["/src/components/duplicates/"],
-  "feature-lint": ["/src/components/lint/"],
-  "feature-optimize": ["/src/components/optimize/"],
-  "feature-tags": ["/src/components/tags/"],
-  "feature-scan": ["/src/components/scan/"],
-  "feature-projects": ["/src/components/project/"],
   "feature-history": ["/src/scanHistory.ts"],
-  "feature-settings": ["/src/components/settings/"],
-  "feature-prompts": ["/src/components/prompts/"],
+  "feature-scan": ["/src/components/scan/"],
   "feature-dashboard": ["/src/components/dashboard/"],
 };
 
@@ -80,13 +88,21 @@ function normalizeModuleId(id: string): string {
   return id.replaceAll("\\", "/");
 }
 
-function chunkFromModuleId(
-  id: string,
-  chunkGroups: Record<string, string[]>,
-): string | undefined {
+function localeChunkFromModuleId(id: string): string | undefined {
+  const normalizedId = normalizeModuleId(id);
+  const marker = "/src/i18n/locales/";
+  const markerIndex = normalizedId.indexOf(marker);
+
+  if (markerIndex === -1) return undefined;
+
+  const fileName = normalizedId.slice(markerIndex + marker.length);
+  return localeChunkNames[fileName];
+}
+
+function appChunkFromModuleId(id: string): string | undefined {
   const normalizedId = normalizeModuleId(id);
 
-  for (const [chunkName, matchers] of Object.entries(chunkGroups)) {
+  for (const [chunkName, matchers] of Object.entries(appChunkGroups)) {
     const matches = matchers.some((matcher) => {
       if (matcher.endsWith("/")) return normalizedId.includes(matcher);
       return normalizedId.endsWith(matcher);
@@ -122,6 +138,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          const localeChunk = localeChunkFromModuleId(id);
+          if (localeChunk) return localeChunk;
+
           const packageName = packageNameFromModuleId(id);
 
           if (packageName) {
@@ -130,11 +149,9 @@ export default defineConfig({
             )) {
               if (packages.includes(packageName)) return chunkName;
             }
-
-            return "vendor";
           }
 
-          return chunkFromModuleId(id, appChunkGroups);
+          return appChunkFromModuleId(id);
         },
       },
     },
