@@ -19,6 +19,7 @@ const ocrFilterFields = new Set<CustomAssetFilterField>([
   "ocrScript",
   "ocrConfidence",
   "ocrStatus",
+  "ocrSource",
 ]);
 
 const aiFilterFields = new Set<CustomAssetFilterField>([
@@ -184,6 +185,14 @@ function matchesClause(
     }
     case "ocrStatus":
       return clause.operator === "is" && item.ocr?.status === value;
+    case "ocrSource":
+      if (clause.operator !== "is") return false;
+      if (value === "any") return Boolean(item.ocr?.engineName);
+      if (value === "vlm") return item.ocr?.engineName === "vlm";
+      if (value === "local") {
+        return Boolean(item.ocr?.engineName) && item.ocr?.engineName !== "vlm";
+      }
+      return false;
     case "aiCategory":
       if (!item.aiTag || item.aiTag.status !== "ready") return false;
       return matchesText(item.aiTag.category ?? "", clause.operator, value);

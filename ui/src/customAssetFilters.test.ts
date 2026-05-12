@@ -131,6 +131,7 @@ describe("matchesCustomAssetFilter", () => {
     const item = makeItem({
       ocr: {
         status: "ready",
+        engineName: "vlm",
         text: "SALE 活動",
         normalizedText: "sale 活動",
         languages: ["eng", "chi_tra"],
@@ -147,11 +148,30 @@ describe("matchesCustomAssetFilter", () => {
       { field: "ocrScript", operator: "equals", value: "han" },
       { field: "ocrConfidence", operator: "gte", value: "0.8" },
       { field: "ocrStatus", operator: "is", value: "ready" },
+      { field: "ocrSource", operator: "is", value: "vlm" },
+      { field: "ocrSource", operator: "is", value: "any" },
     ] as const) {
       expect(
         matchesCustomAssetFilter(item, filter([{ clauses: [clause] }])),
       ).toBe(true);
     }
+
+    expect(
+      matchesCustomAssetFilter(
+        makeItem({
+          ocr: {
+            status: "ready",
+            engineName: "tesseract",
+            text: "SALE",
+          },
+        }),
+        filter([
+          {
+            clauses: [{ field: "ocrSource", operator: "is", value: "local" }],
+          },
+        ]),
+      ),
+    ).toBe(true);
 
     expect(
       matchesCustomAssetFilter(

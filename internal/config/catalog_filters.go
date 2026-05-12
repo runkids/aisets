@@ -33,8 +33,9 @@ func customCatalogFilterSQLForFilters(id string, filters []CustomAssetFilter) (s
 	args := []any{}
 	for _, group := range selected.Groups {
 		parts := []string{}
+		ocrSource := customFilterGroupOCRSource(group)
 		for _, clause := range group.Clauses {
-			sqlClause, sqlArgs, err := catalogCustomClauseSQL(clause)
+			sqlClause, sqlArgs, err := catalogCustomClauseSQL(clause, ocrSource)
 			if err != nil {
 				return "", nil, err
 			}
@@ -49,6 +50,15 @@ func customCatalogFilterSQLForFilters(id string, filters []CustomAssetFilter) (s
 		return "", nil, nil
 	}
 	return "(" + strings.Join(groupClauses, " OR ") + ")", args, nil
+}
+
+func customFilterGroupOCRSource(group CustomAssetFilterGroup) string {
+	for _, clause := range group.Clauses {
+		if clause.Field == "ocrSource" && clause.Operator == "is" {
+			return strings.TrimSpace(clause.Value)
+		}
+	}
+	return ""
 }
 
 func (s *Store) catalogItemFacets(scanID int64, query CatalogItemQuery) (CatalogItemFacets, error) {
@@ -410,7 +420,7 @@ func customFilterUsesOCR(filter CustomAssetFilter) bool {
 	for _, group := range filter.Groups {
 		for _, clause := range group.Clauses {
 			switch clause.Field {
-			case "ocrText", "ocrLanguage", "ocrScript", "ocrConfidence", "ocrStatus":
+			case "ocrText", "ocrLanguage", "ocrScript", "ocrConfidence", "ocrStatus", "ocrSource":
 				return true
 			}
 		}
@@ -430,7 +440,7 @@ func customFilterUsesAI(filter CustomAssetFilter) bool {
 	return false
 }
 
-func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, error) {
+func catalogCustomClauseSQL(clause CustomAssetFilterClause, ocrSource string) (string, []any, error) {
 	value := strings.TrimSpace(clause.Value)
 	switch clause.Field {
 	case "path":
@@ -466,28 +476,31 @@ func catalogCustomClauseSQL(clause CustomAssetFilterClause) (string, []any, erro
 	case "optimizable":
 		return booleanExistsSQL("EXISTS (SELECT 1 FROM optimization_snapshots o2 WHERE o2.scan_id = a.scan_id AND o2.asset_id = a.asset_id)", value), nil, nil
 	case "ocrText":
-		return ocrExistsSQL(textClauseSQL("COALESCE(ocr.normalized_text, ocr.text, '')", clause.Operator, value))
+		sql, args, err := textClauseSQL("COALESCE(ocr.normalized_text, ocr.text, '')", clause.Operator, value)
+		return ocrExistsSQLWithSource(sql, args, err, ocrSource)
 	case "ocrLanguage":
 		if clause.Operator == "oneOf" {
-			sql, args := ocrJSONListExistsSQL("ocr.languages_json", lowerList(value))
+			sql, args := ocrJSONListExistsSQL("ocr.languages_json", lowerList(value), ocrSource)
 			return sql, args, nil
 		}
-		sql, args := ocrJSONListExistsSQL("ocr.languages_json", []string{strings.ToLower(value)})
+		sql, args := ocrJSONListExistsSQL("ocr.languages_json", []string{strings.ToLower(value)}, ocrSource)
 		return sql, args, nil
 	case "ocrScript":
 		if clause.Operator == "oneOf" {
-			sql, args := ocrJSONListExistsSQL("ocr.scripts_json", lowerList(value))
+			sql, args := ocrJSONListExistsSQL("ocr.scripts_json", lowerList(value), ocrSource)
 			return sql, args, nil
 		}
-		sql, args := ocrJSONListExistsSQL("ocr.scripts_json", []string{strings.ToLower(value)})
+		sql, args := ocrJSONListExistsSQL("ocr.scripts_json", []string{strings.ToLower(value)}, ocrSource)
 		return sql, args, nil
 	case "ocrConfidence":
 		if clause.Operator == "gte" {
-			return ocrExistsSQL("ocr.confidence >= ?", []any{value}, nil)
+			return ocrExistsSQLWithSource("ocr.confidence >= ?", []any{value}, nil, ocrSource)
 		}
-		return ocrExistsSQL("ocr.confidence <= ?", []any{value}, nil)
+		return ocrExistsSQLWithSource("ocr.confidence <= ?", []any{value}, nil, ocrSource)
 	case "ocrStatus":
-		return ocrExistsSQL("ocr.status = ?", []any{value}, nil)
+		return ocrExistsSQLWithSource("ocr.status = ?", []any{value}, nil, ocrSource)
+	case "ocrSource":
+		return ocrExistsSQLWithSource("1 = 1", nil, nil, value)
 	case "aiCategory":
 		return aiTagExistsSQL(textClauseSQL("ait.category", clause.Operator, value))
 	case "aiTag":
@@ -557,9 +570,13 @@ func booleanExistsSQL(existsExpr, value string) string {
 	return "NOT " + existsExpr
 }
 
-func ocrExistsSQL(clause string, args []any, err error) (string, []any, error) {
+func ocrExistsSQLWithSource(clause string, args []any, err error, source string) (string, []any, error) {
 	if err != nil {
 		return "", nil, err
+	}
+	sourceClause := ocrSourceSQL(source)
+	if sourceClause != "" {
+		sourceClause = "\n\t\t\tAND " + sourceClause
 	}
 	return `EXISTS (
 		SELECT 1 FROM ocr_results ocr
@@ -567,11 +584,12 @@ func ocrExistsSQL(clause string, args []any, err error) (string, []any, error) {
 			AND ocr.repo_path = a.repo_path
 			AND ocr.content_hash = a.content_hash
 			AND ocr.hash_algorithm = a.hash_algorithm
+			` + sourceClause + `
 			AND ` + clause + `
 	)`, args, nil
 }
 
-func ocrJSONListExistsSQL(expr string, values []string) (string, []any) {
+func ocrJSONListExistsSQL(expr string, values []string, source string) (string, []any) {
 	if len(values) == 0 {
 		return "0 = 1", nil
 	}
@@ -581,14 +599,30 @@ func ocrJSONListExistsSQL(expr string, values []string) (string, []any) {
 		parts = append(parts, "LOWER("+expr+") LIKE ?")
 		args = append(args, "%\""+value+"\"%")
 	}
+	sourceClause := ocrSourceSQL(source)
+	if sourceClause != "" {
+		sourceClause = "\n\t\t\tAND " + sourceClause
+	}
 	return `EXISTS (
 		SELECT 1 FROM ocr_results ocr
 		WHERE ocr.project_id = a.project_id
 			AND ocr.repo_path = a.repo_path
 			AND ocr.content_hash = a.content_hash
 			AND ocr.hash_algorithm = a.hash_algorithm
+			` + sourceClause + `
 			AND (` + strings.Join(parts, " OR ") + `)
 	)`, args
+}
+
+func ocrSourceSQL(source string) string {
+	switch strings.TrimSpace(source) {
+	case "vlm":
+		return "ocr.engine_name = 'vlm'"
+	case "local":
+		return "COALESCE(ocr.engine_name, '') <> 'vlm'"
+	default:
+		return ""
+	}
 }
 
 func aiTagExistsSQL(clause string, args []any, err error) (string, []any, error) {

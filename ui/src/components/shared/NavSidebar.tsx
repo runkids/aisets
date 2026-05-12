@@ -186,7 +186,7 @@ export function NavSidebar({
   ];
 
   return (
-    <aside className="relative z-30 flex flex-col overflow-visible bg-transparent pl-3 pr-0 pb-3">
+    <aside className="relative z-30 flex min-h-0 flex-col overflow-hidden bg-transparent pl-3 pr-0 pb-3">
       <div className="order-1 shrink-0 pt-3 pb-1 max-[960px]:hidden">
         <ProjectSwitcher
           workspaceName={workspaceName}
@@ -203,7 +203,7 @@ export function NavSidebar({
       </div>
 
       <nav
-        className="order-2 flex flex-1 flex-col gap-1.5 overflow-y-auto py-1"
+        className="order-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto py-1"
         aria-label={t("nav.navigationAria")}
       >
         {groups.map((group) => (
@@ -243,7 +243,7 @@ export function NavSidebar({
         ))}
       </nav>
 
-      <div className="order-3 flex flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm max-[960px]:items-center max-[960px]:px-2">
+      <div className="order-3 flex shrink-0 flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm max-[960px]:items-center max-[960px]:px-2">
         <div className="flex flex-col gap-0.5 text-g-chip text-g-ink-4 max-[960px]:hidden">
           <span>{t("nav.lastScan")}</span>
           <div className="flex items-center gap-1.5">

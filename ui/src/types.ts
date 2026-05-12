@@ -119,6 +119,7 @@ export type CustomAssetFilterField =
   | "ocrScript"
   | "ocrConfidence"
   | "ocrStatus"
+  | "ocrSource"
   | "aiCategory"
   | "aiTag"
   | "aiDescription"

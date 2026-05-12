@@ -36,6 +36,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   DropdownMenu,
   EmptyState,
   IconButton,
@@ -54,6 +55,16 @@ type CustomFiltersSectionProps = {
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
 };
 
+type CustomFilterDeleteTarget =
+  | { type: "filter"; filterId: string }
+  | { type: "group"; filterId: string; groupIndex: number }
+  | {
+      type: "clause";
+      filterId: string;
+      groupIndex: number;
+      clauseIndex: number;
+    };
+
 export function CustomFiltersSection({
   draft,
   working,
@@ -63,6 +74,8 @@ export function CustomFiltersSection({
 }: CustomFiltersSectionProps) {
   const { t } = useTranslation();
   const [customFiltersHelpOpen, setCustomFiltersHelpOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] =
+    useState<CustomFilterDeleteTarget | null>(null);
 
   function updateCustomFilters(
     updater: (filters: CustomAssetFilter[]) => CustomAssetFilter[],
@@ -159,6 +172,22 @@ export function CustomFiltersSection({
           : group,
       ),
     }));
+  }
+
+  function onConfirmDeleteCustomFilterTarget() {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "filter") {
+      onDeleteCustomFilter(deleteTarget.filterId);
+    } else if (deleteTarget.type === "group") {
+      onDeleteCustomFilterGroup(deleteTarget.filterId, deleteTarget.groupIndex);
+    } else {
+      onDeleteCustomFilterClause(
+        deleteTarget.filterId,
+        deleteTarget.groupIndex,
+        deleteTarget.clauseIndex,
+      );
+    }
+    setDeleteTarget(null);
   }
 
   function onCustomFilterFieldChange(
@@ -308,7 +337,11 @@ export function CustomFiltersSection({
                             icon: <Trash2 size={15} />,
                             variant: "danger" as const,
                             disabled: working,
-                            onClick: () => onDeleteCustomFilter(filter.id),
+                            onClick: () =>
+                              setDeleteTarget({
+                                type: "filter",
+                                filterId: filter.id,
+                              }),
                           },
                         ]}
                       />
@@ -337,10 +370,11 @@ export function CustomFiltersSection({
                                   "settings.deleteCustomFilterGroup",
                                 )}
                                 onClick={() =>
-                                  onDeleteCustomFilterGroup(
-                                    filter.id,
+                                  setDeleteTarget({
+                                    type: "group",
+                                    filterId: filter.id,
                                     groupIndex,
-                                  )
+                                  })
                                 }
                               >
                                 <Trash2 size={12} />
@@ -500,11 +534,12 @@ export function CustomFiltersSection({
                                       }
                                       aria-label={t("action.delete")}
                                       onClick={() =>
-                                        onDeleteCustomFilterClause(
-                                          filter.id,
+                                        setDeleteTarget({
+                                          type: "clause",
+                                          filterId: filter.id,
                                           groupIndex,
                                           clauseIndex,
-                                        )
+                                        })
                                       }
                                     >
                                       <Trash2 size={13} />
@@ -559,6 +594,29 @@ export function CustomFiltersSection({
           {settingActions}
         </div>
       </Card>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        variant="danger"
+        title={
+          deleteTarget?.type === "filter"
+            ? t("settings.deleteCustomFilterTitle")
+            : deleteTarget?.type === "group"
+              ? t("settings.deleteCustomFilterGroupTitle")
+              : t("settings.deleteCustomFilterClauseTitle")
+        }
+        message={
+          deleteTarget?.type === "filter"
+            ? t("settings.deleteCustomFilterDesc")
+            : deleteTarget?.type === "group"
+              ? t("settings.deleteCustomFilterGroupDesc")
+              : t("settings.deleteCustomFilterClauseDesc")
+        }
+        confirmText={t("action.delete")}
+        cancelText={t("common.cancel")}
+        loading={working}
+        onConfirm={onConfirmDeleteCustomFilterTarget}
+        onCancel={() => setDeleteTarget(null)}
+      />
       {customFiltersHelpOpen && (
         <Modal
           title={t("settings.customFiltersHelpTitle")}

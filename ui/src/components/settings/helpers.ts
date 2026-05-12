@@ -46,6 +46,7 @@ export function defaultClauseValue(
   if (field === "ocrScript") return "han";
   if (field === "ocrConfidence") return "0.6";
   if (field === "ocrStatus") return "ready";
+  if (field === "ocrSource") return "vlm";
   if (field === "aiCategory") return "icon";
   if (field === "aiTag" && operator === "oneOf") return "dark-mode,mobile,hero";
   if (field === "aiTag") return "dark-mode";
@@ -104,6 +105,7 @@ export function clauseValueOptions(field: CustomAssetFilterField) {
   )
     return ["true", "false"];
   if (field === "ocrStatus") return ["pending", "ready", "failed", "skipped"];
+  if (field === "ocrSource") return ["any", "local", "vlm"];
   if (field === "aiStatus")
     return ["pending", "ready", "failed", "skipped", "none"];
   return null;

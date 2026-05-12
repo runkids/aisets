@@ -204,6 +204,7 @@ The global command palette uses the same overlay shell as other dialogs, but its
 - The sidebar sits under the global topbar and is part of the dotted canvas, not a line-separated slab: `background: transparent`, no right border, 12px left/bottom padding, and no right padding so sidebar cards align flush to the content boundary.
 - Product brand is not rendered inside the sidebar. It lives in the global topbar (§3.2) so the brand and page chrome read as one header.
 - Sidebar content is cardized: project switcher, each nav group, and footer use `--g-surface` fill, `--g-line` border, 6px radius, and `--g-shadow-sm`. Nav groups use 4px inner padding and stack rows with a 4px gap so active fills never visually merge. There are no full-height divider lines.
+- Sidebar height is constrained by the shell row. The project switcher and footer stay pinned as shrink-0 cards, while the nav group stack owns vertical overflow with `min-height: 0` and `overflow-y: auto`.
 - **Nav section label**: 10px uppercase Storm Cloud, +0.06em tracking, 8px bottom padding
 - **`.sb-link`**: 6px 8px padding, **6px radius** (matches `RailItem` active shape), Inter 13px / 400, Storm Cloud default
   - Non-active hover: light uses a medium `--g-surface-2` wash so it remains readable without becoming selected, and flips the count badge to `--g-surface` so the chip stays distinct; dark steps to `--g-surface-3` + `--g-ink` so it remains visible on the dark sidebar
@@ -230,7 +231,7 @@ The global command palette uses the same overlay shell as other dialogs, but its
   - Focus: border `--g-accent`, box-shadow `--g-shadow-focus`, bg `--g-surface`
   - Press: subtle `scale(0.99)` only; disabled by reduced motion
 - Command palette search includes pages, assets, paths, and enabled Custom Filters. Selecting a Custom Filter navigates to Browse and applies that saved filter immediately.
-- **Keyboard hint** `Keycap`: shared `ui/src/components/ui/Keycap.tsx` component using token-backed Tailwind classes. Default size is mono 12px / Storm Cloud, `--g-surface-2` bg, 1px strong line border, 4px radius, 2px 8px padding. Used by topbar search, command palette, Settings hotkey rows, and compact tooltip shortcut pills. Topbar command-palette trigger shows `⌘ P`, matching the implemented shortcut.
+- **Keyboard hint** `Keycap`: shared `ui/src/components/ui/Keycap.tsx` component using token-backed Tailwind classes. Default size is mono 12px / Storm Cloud, `--g-surface-2` bg, 1px strong line border, 4px radius, 2px 8px padding. Used by topbar search, command palette, Settings hotkey rows, and compact tooltip shortcut pills. Topbar command-palette trigger shows `⌘ P`, and the shared bulk-select button surfaces `Ctrl Q` plus `Esc` while bulk mode is active.
 
 ### 3.3 Rail
 

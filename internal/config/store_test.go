@@ -682,6 +682,122 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 }
 
+func TestCatalogCustomFilterOCRSourceConstrainsOCRClauses(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	filters := []CustomAssetFilter{{
+		ID:      "ai-sale",
+		Name:    "AI sale",
+		Enabled: true,
+		Groups: []CustomAssetFilterGroup{{
+			Clauses: []CustomAssetFilterClause{{
+				Field:    "ocrSource",
+				Operator: "is",
+				Value:    "vlm",
+			}, {
+				Field:    "ocrText",
+				Operator: "contains",
+				Value:    "sale",
+			}},
+		}},
+	}, {
+		ID:      "local-sale",
+		Name:    "Local sale",
+		Enabled: true,
+		Groups: []CustomAssetFilterGroup{{
+			Clauses: []CustomAssetFilterClause{{
+				Field:    "ocrSource",
+				Operator: "is",
+				Value:    "local",
+			}, {
+				Field:    "ocrText",
+				Operator: "contains",
+				Value:    "sale",
+			}},
+		}},
+	}}
+	if _, err := store.UpdateSettings(SettingsUpdate{CustomAssetFilters: filters}); err != nil {
+		t.Fatal(err)
+	}
+
+	localOnlyText := scanAsset(root, "p", "workspace", "src/local-text.png", 10, "local-text", 0, 0)
+	aiText := scanAsset(root, "p", "workspace", "src/ai-text.png", 11, "ai-text", 0, 0)
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-12T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "workspace", Path: root}},
+		Items:       []scanner.AssetItem{localOnlyText, aiText},
+		Stats:       scanner.CatalogStats{TotalFiles: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsHash := ocr.SettingsHash(OCRSettingsFromApp(DefaultAppSettings()))
+	for _, result := range []ocr.Result{
+		{
+			ProjectID:     localOnlyText.ProjectID,
+			RepoPath:      localOnlyText.RepoPath,
+			ContentHash:   localOnlyText.ContentHash,
+			HashAlgorithm: localOnlyText.HashAlgorithm,
+			EngineName:    "test-ocr",
+			EngineVersion: "local",
+			SettingsHash:  settingsHash,
+			Status:        ocr.StatusReady,
+			Text:          "SALE",
+		},
+		{
+			ProjectID:     localOnlyText.ProjectID,
+			RepoPath:      localOnlyText.RepoPath,
+			ContentHash:   localOnlyText.ContentHash,
+			HashAlgorithm: localOnlyText.HashAlgorithm,
+			EngineName:    "vlm",
+			EngineVersion: "provider/model",
+			SettingsHash:  settingsHash,
+			Status:        ocr.StatusReady,
+			Text:          "Logo",
+		},
+		{
+			ProjectID:     aiText.ProjectID,
+			RepoPath:      aiText.RepoPath,
+			ContentHash:   aiText.ContentHash,
+			HashAlgorithm: aiText.HashAlgorithm,
+			EngineName:    "vlm",
+			EngineVersion: "provider/model",
+			SettingsHash:  settingsHash,
+			Status:        ocr.StatusReady,
+			Text:          "SALE",
+		},
+	} {
+		if err := store.UpsertOCRResult(result); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page, err := store.CatalogItems(CatalogItemQuery{CustomFilterID: "ai-sale", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/ai-text.png" {
+		t.Fatalf("AI OCR source custom filter page = %#v", page)
+	}
+	if len(page.Facets.CustomFilters) != 2 || page.Facets.CustomFilters[0].Count != 1 || page.Facets.CustomFilters[1].Count != 1 {
+		t.Fatalf("OCR source custom filter facets = %#v", page.Facets.CustomFilters)
+	}
+
+	page, err = store.CatalogItems(CatalogItemQuery{CustomFilterID: "local-sale", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/local-text.png" {
+		t.Fatalf("local OCR source custom filter page = %#v", page)
+	}
+}
+
 func TestCatalogBatchQueriesHydrateReferencesAndOptimization(t *testing.T) {
 	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
@@ -1488,6 +1604,11 @@ func TestCustomAssetFiltersPersistAndValidate(t *testing.T) {
 			name:    "invalid OCR confidence",
 			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "ocrConfidence", Operator: "gte", Value: "2"}}}}}},
 			code:    "custom_filter_confidence_invalid",
+		},
+		{
+			name:    "invalid OCR source",
+			filters: []CustomAssetFilter{{ID: "bad", Name: "Bad", Enabled: true, Groups: []CustomAssetFilterGroup{{Clauses: []CustomAssetFilterClause{{Field: "ocrSource", Operator: "is", Value: "remote"}}}}}},
+			code:    "custom_filter_ocr_source_invalid",
 		},
 	}
 	for _, tt := range cases {

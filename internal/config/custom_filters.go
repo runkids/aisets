@@ -145,6 +145,13 @@ func normalizeCustomAssetFilterClause(clause CustomAssetFilterClause) (CustomAss
 		if !isOneOf(clause.Value, "pending", "ready", "failed", "skipped") {
 			return CustomAssetFilterClause{}, apierr.New("custom_filter_ocr_status_invalid", "custom filter OCR status is invalid")
 		}
+	case "ocrSource":
+		if clause.Operator != "is" {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
+		}
+		if !isOneOf(clause.Value, "any", "local", "vlm") {
+			return CustomAssetFilterClause{}, apierr.New("custom_filter_ocr_source_invalid", "custom filter OCR source is invalid")
+		}
 	case "aiCategory":
 		if !isOneOf(clause.Operator, "equals", "contains", "regex") {
 			return CustomAssetFilterClause{}, apierr.New("custom_filter_operator_invalid", "custom filter operator is invalid")
