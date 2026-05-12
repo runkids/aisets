@@ -46,12 +46,15 @@ const localeChunkNames: Record<string, string> = {
 
 const appChunkGroups: Record<string, string[]> = {
   "app-shell": [
+    "/src/app/",
     "/src/components/shared/AppTopbar.tsx",
     "/src/components/shared/CommandPalette.tsx",
+    "/src/features/command-palette/",
     "/src/components/shared/NavSidebar.tsx",
     "/src/components/shared/ScrollToTop.tsx",
   ],
   "app-data": [
+    "/src/api/",
     "/src/api.ts",
     "/src/activity/",
     "/src/appScope.ts",
@@ -60,9 +63,12 @@ const appChunkGroups: Record<string, string[]> = {
     "/src/ocrSearch.ts",
     "/src/ocrStatus.ts",
     "/src/projectScanIntent.ts",
+    "/src/queries/",
     "/src/queries.ts",
     "/src/tagsQueries.ts",
+    "/src/types/",
     "/src/types.ts",
+    "/src/ui/",
     "/src/ui.ts",
     "/src/useDebouncedValue.ts",
   ],
@@ -70,6 +76,7 @@ const appChunkGroups: Record<string, string[]> = {
   "app-ui": ["/src/components/ui/"],
   "feature-workspace": [
     "/src/components/browse/",
+    "/src/features/browse/",
     "/src/components/drawer/",
     "/src/components/duplicates/",
     "/src/components/lint/",
@@ -80,6 +87,7 @@ const appChunkGroups: Record<string, string[]> = {
     "/src/components/tags/",
   ],
   "feature-history": ["/src/scanHistory.ts"],
+  "feature-semantic-search": ["/src/features/semantic-search/"],
   "feature-scan": ["/src/components/scan/"],
   "feature-dashboard": ["/src/components/dashboard/"],
 };
