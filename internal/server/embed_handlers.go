@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"aisets/internal/agent"
+	"aisets/internal/aitag"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/embedding"
@@ -34,6 +34,14 @@ type embedWorkResult struct {
 	embedType string
 	result    config.EmbeddingResult
 	vector    []float32
+}
+
+type embedJob struct {
+	item       scanner.AssetItem
+	embedType  string
+	input      string
+	inputHash  string
+	sourceHash string
 }
 
 func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
@@ -107,11 +115,7 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type embedJob struct {
-		item      scanner.AssetItem
-		embedType string
-	}
-
+	var preparedItems []scanner.AssetItem
 	var candidates []embedJob
 	counts := embedCounts{}
 
@@ -132,12 +136,40 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 			item.ContentHash = sum
 			item.HashAlgorithm = algorithm
 		}
+		preparedItems = append(preparedItems, item)
+	}
 
+	if requestedTypes["text"] && visionModel != "" && len(preparedItems) > 0 {
+		var hashes []string
+		for _, item := range preparedItems {
+			hashes = append(hashes, item.ContentHash)
+		}
+		targetLocales := targetTranslationLocales(settings, r.URL.Query().Get("lang"))
+		translateBackend, _, translateModel := s.resolveVLMProviderForFeature(settings, agent.FeatureTranslate)
+		s.backfillI18nBatch(r.Context(), w, hashes, translateBackend, translateModel, targetLocales)
+	}
+
+	for _, item := range preparedItems {
 		for embedType := range requestedTypes {
+			job := embedJob{item: item, embedType: embedType}
+			if embedType == "text" {
+				input, inputHash, sourceHash, ok, ierr := s.embeddingInputForItem(item, settings.EmbedInputFields)
+				if ierr != nil {
+					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(ierr, "embed_input_failed")})
+					return
+				}
+				if !ok {
+					counts.Skipped++
+					continue
+				}
+				job.input = input
+				job.inputHash = inputHash
+				job.sourceHash = sourceHash
+			}
 			if !forceReprocess {
 				exists, cerr := s.store.HasReadyEmbedding(
 					item.ProjectID, item.RepoPath, item.ContentHash, item.HashAlgorithm,
-					embedType, providerName, embedModel,
+					embedType, providerName, embedModel, job.inputHash,
 				)
 				if cerr != nil {
 					sendNDJSON(w, map[string]any{"type": "error", "error": apierr.From(cerr, "embed_cache_failed")})
@@ -148,25 +180,8 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			}
-			candidates = append(candidates, embedJob{item: item, embedType: embedType})
+			candidates = append(candidates, job)
 			counts.Queued++
-		}
-	}
-
-	if requestedTypes["text"] && visionModel != "" {
-		var hashes []string
-		for _, job := range candidates {
-			if job.embedType == "text" {
-				hashes = append(hashes, job.item.ContentHash)
-			}
-		}
-		if len(hashes) > 0 {
-			targetLocales := settings.LLMTranslationLocales
-			if len(targetLocales) == 0 {
-				targetLocales = []string{"en"}
-			}
-			translateBackend, _, translateModel := s.resolveVLMProviderForFeature(settings, agent.FeatureTranslate)
-			s.backfillI18nBatch(r.Context(), w, hashes, translateBackend, translateModel, targetLocales)
 		}
 	}
 
@@ -188,7 +203,7 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				wr := s.processEmbed(ctx, job.item, job.embedType, providerName, embedModel)
+				wr := s.processEmbed(ctx, job, providerName, embedModel)
 				select {
 				case results <- wr:
 				case <-ctx.Done():
@@ -248,14 +263,17 @@ func (s *Server) handleEmbedRun(w http.ResponseWriter, r *http.Request) {
 	sendNDJSON(w, doneEvent)
 }
 
-func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embedType, providerName, modelName string) embedWorkResult {
+func (s *Server) processEmbed(ctx context.Context, job embedJob, providerName, modelName string) embedWorkResult {
+	item := job.item
 	result := config.EmbeddingResult{
 		AssetID:       item.ID,
 		ProjectID:     item.ProjectID,
 		RepoPath:      item.RepoPath,
 		ContentHash:   item.ContentHash,
 		HashAlgorithm: item.HashAlgorithm,
-		EmbedType:     embedType,
+		InputHash:     job.inputHash,
+		SourceHash:    job.sourceHash,
+		EmbedType:     job.embedType,
 		ProviderName:  providerName,
 		ModelName:     modelName,
 		Status:        "ready",
@@ -264,37 +282,24 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 	var req llm.EmbedRequest
 	req.Model = modelName
 
-	switch embedType {
+	switch job.embedType {
 	case "text":
-		tagResult, err := s.store.AITagResultAnyWithEnglish(item.ContentHash, item.HashAlgorithm)
-		if err != nil || tagResult == nil {
+		if strings.TrimSpace(job.input) == "" {
 			result.Status = "error"
 			result.ErrorCode = "embed_no_aitag"
-			result.ErrorMessage = "no ready AI Tag result for this asset"
-			return embedWorkResult{item: item, embedType: embedType, result: result}
+			result.ErrorMessage = "no usable AI Tag text for this asset"
+			return embedWorkResult{item: item, embedType: job.embedType, result: result}
 		}
-		parts := []string{tagResult.Category}
-		if len(tagResult.Tags) > 0 {
-			parts = append(parts, tagResult.Tags...)
-		}
-		if tagResult.Description != "" {
-			parts = append(parts, tagResult.Description)
-		}
-		name := filepath.Base(item.RepoPath)
-		if ext := filepath.Ext(name); ext != "" {
-			name = strings.TrimSuffix(name, ext)
-		}
-		name = strings.ReplaceAll(strings.ReplaceAll(name, "_", " "), "-", " ")
-		parts = append(parts, name)
-		req.Input = strings.Join(parts, " ")
+		req.Input = job.input
 
 	case "image":
+		result.SourceHash = item.ContentHash
 		dataURI, err := prepareImageForVLM(item.LocalPath, item.Ext, "embed")
 		if err != nil {
 			result.Status = "error"
 			result.ErrorCode = "embed_image_prep_failed"
 			result.ErrorMessage = err.Error()
-			return embedWorkResult{item: item, embedType: embedType, result: result}
+			return embedWorkResult{item: item, embedType: job.embedType, result: result}
 		}
 		req.Images = []string{dataURI}
 	}
@@ -313,11 +318,35 @@ func (s *Server) processEmbed(ctx context.Context, item scanner.AssetItem, embed
 			result.ErrorCode = "embed_llm_failed"
 			result.ErrorMessage = err.Error()
 		}
-		return embedWorkResult{item: item, embedType: embedType, result: result}
+		return embedWorkResult{item: item, embedType: job.embedType, result: result}
 	}
 
 	result.Dimensions = resp.Dimensions
-	return embedWorkResult{item: item, embedType: embedType, result: result, vector: resp.Embedding}
+	return embedWorkResult{item: item, embedType: job.embedType, result: result, vector: resp.Embedding}
+}
+
+func (s *Server) embeddingInputForItem(item scanner.AssetItem, fields []string) (string, string, string, bool, error) {
+	tagResult, err := s.store.AITagResultAnyWithEnglish(item.ContentHash, item.HashAlgorithm)
+	if err != nil {
+		return "", "", "", false, err
+	}
+	if tagResult == nil {
+		return "", "", "", false, nil
+	}
+	var ocrText string
+	if embedInputFieldsContain(fields, "ocrText") {
+		ocrText, err = s.store.LatestReadyOCRTextForContentHash(item.ContentHash, item.HashAlgorithm)
+		if err != nil {
+			return "", "", "", false, err
+		}
+	}
+	input := buildEmbeddingInput(item, *tagResult, ocrText, fields)
+	if strings.TrimSpace(input) == "" {
+		return "", "", "", false, nil
+	}
+	inputHash := hashEmbeddingInput(input)
+	sourceHash := hashEmbeddingInput(strings.Join(normalizeEmbedInputFields(fields), "\x00") + "\x00" + input)
+	return input, inputHash, sourceHash, true, nil
 }
 
 const i18nBatchSize = 50
@@ -325,6 +354,28 @@ const i18nBatchSize = 50
 var localeDisplayNames = map[string]string{
 	"en": "English", "zh-TW": "Traditional Chinese", "zh-CN": "Simplified Chinese",
 	"ja": "Japanese", "ko": "Korean",
+}
+
+type i18nBackfillItem struct {
+	ID          int      `json:"id"`
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags"`
+	Description string   `json:"description"`
+}
+
+func parseI18nBackfillResponse(content string) ([]i18nBackfillItem, error) {
+	cleaned := llm.CleanJSON(content)
+	var wrapped struct {
+		Translations []i18nBackfillItem `json:"translations"`
+	}
+	if err := json.Unmarshal([]byte(cleaned), &wrapped); err == nil && len(wrapped.Translations) > 0 {
+		return wrapped.Translations, nil
+	}
+	var direct []i18nBackfillItem
+	if err := json.Unmarshal([]byte(cleaned), &direct); err != nil {
+		return nil, err
+	}
+	return direct, nil
 }
 
 func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, contentHashes []string, backend, modelName string, targetLocales []string) {
@@ -348,53 +399,63 @@ func (s *Server) backfillI18nBatch(ctx context.Context, w http.ResponseWriter, c
 			end := min(i+i18nBatchSize, len(missing))
 			batch := missing[i:end]
 
-			prompt := "Translate each numbered item to " + langName + ". Return ONLY the translations, one per line, same numbering. Format: category | tag1, tag2, ... | description\n\n"
-			for j, row := range batch {
-				text := row.Category
-				if len(row.Tags) > 0 {
-					text += " | " + strings.Join(row.Tags, ", ")
-				}
-				if row.Description != "" {
-					text += " | " + row.Description
-				}
-				prompt += strconv.Itoa(j+1) + ". " + text + "\n"
+			type promptRow struct {
+				ID          int      `json:"id"`
+				Category    string   `json:"category"`
+				Tags        []string `json:"tags"`
+				Description string   `json:"description"`
 			}
+			rows := make([]promptRow, 0, len(batch))
+			for j, row := range batch {
+				rows = append(rows, promptRow{
+					ID:          j + 1,
+					Category:    row.Category,
+					Tags:        row.Tags,
+					Description: row.Description,
+				})
+			}
+			rowsJSON, _ := json.Marshal(rows)
+			prompt := "Translate each item to " + langName + ". Return ONLY valid JSON in this exact shape: " +
+				`{"translations":[{"id":1,"category":"...","tags":["..."],"description":"..."}]}` + "\n" +
+				"Rules: preserve each id exactly, return one object per input item, keep tags in the same count and order as the input tags, and do not use numbering or template placeholders.\n\n" +
+				"Input items JSON:\n" + string(rowsJSON)
 
 			content, err := s.chatText(ctx, backend, modelName, prompt, 30)
 			if err != nil {
 				continue
 			}
 
-			lines := strings.Split(strings.TrimSpace(content), "\n")
-			for j, row := range batch {
-				if j >= len(lines) {
-					break
-				}
-				line := strings.TrimSpace(lines[j])
-				if idx := strings.Index(line, ". "); idx >= 0 && idx <= 3 {
-					line = strings.TrimSpace(line[idx+2:])
-				}
-				parts := strings.SplitN(line, "|", 3)
-				cat := strings.TrimSpace(parts[0])
-				var tags []string
-				var desc string
-				if len(parts) >= 2 {
-					for _, t := range strings.Split(parts[1], ",") {
-						if t = strings.TrimSpace(t); t != "" {
-							tags = append(tags, t)
-						}
-					}
-				}
-				if len(parts) >= 3 {
-					desc = strings.TrimSpace(parts[2])
-				}
-				if cat == "" {
+			items, err := parseI18nBackfillResponse(content)
+			if err != nil {
+				sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": i, "total": len(missing), "skipped": len(batch)})
+				continue
+			}
+			seen := map[int]bool{}
+			translated := 0
+			skipped := 0
+			for _, item := range items {
+				if item.ID < 1 || item.ID > len(batch) || seen[item.ID] {
+					skipped++
 					continue
 				}
-				_ = s.store.BackfillLocaleI18n(row.ContentHash, row.HashAlgorithm, locale, cat, tags, desc)
+				seen[item.ID] = true
+				row := batch[item.ID-1]
+				raw := aitag.Result{Status: aitag.StatusReady, Category: row.Category, Tags: row.Tags, Description: row.Description}
+				if !aitag.IsLocaleTranslationUsable(raw, item.Category, item.Tags, item.Description) {
+					skipped++
+					continue
+				}
+				if err := s.store.BackfillLocaleI18n(row.ContentHash, row.HashAlgorithm, locale, item.Category, item.Tags, item.Description); err != nil {
+					skipped++
+					continue
+				}
+				translated++
+			}
+			if missingRows := len(batch) - len(seen); missingRows > 0 {
+				skipped += missingRows
 			}
 
-			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": min(end, len(missing)), "total": len(missing)})
+			sendNDJSON(w, map[string]any{"type": "translating", "locale": locale, "translated": i + translated, "total": len(missing), "skipped": skipped})
 		}
 	}
 }
@@ -447,10 +508,7 @@ func (s *Server) handleAITagTranslate(w http.ResponseWriter, r *http.Request) {
 
 	backend, _, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureTranslate)
 
-	targetLocales := settings.LLMTranslationLocales
-	if len(targetLocales) == 0 {
-		targetLocales = []string{"en"}
-	}
+	targetLocales := targetTranslationLocales(settings, r.URL.Query().Get("lang"))
 
 	hashes, err := s.store.AllReadyAITagHashes()
 	if err != nil {
@@ -472,6 +530,25 @@ func (s *Server) handleEmbedClear(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleEmbedRepair(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Apply bool `json:"apply"`
+	}
+	if r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	report, err := s.store.RepairEmbeddingInputs(body.Apply)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_repair_failed"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"dryRun": !body.Apply,
+		"apply":  body.Apply,
+		"counts": report,
+	})
 }
 
 func containsNonLatin(s string) bool {
@@ -547,6 +624,7 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var queryVectors [][]float32
+	var queryDimensions int
 	for _, text := range queryTexts {
 		resp, err := s.llmProvider.Embed(r.Context(), llm.EmbedRequest{
 			Model: settings.LLMEmbedModel,
@@ -556,8 +634,12 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_query_failed"))
 			return
 		}
+		if queryDimensions == 0 {
+			queryDimensions = len(resp.Embedding)
+		}
 		queryVectors = append(queryVectors, resp.Embedding)
 	}
+	providerName := s.llmProvider.Name()
 
 	// Load embeddings: hybrid queries both text and image, takes max per asset.
 	typesToQuery := []string{embedType}
@@ -575,7 +657,12 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 
 	var totalEmbeddings int
 	for _, et := range typesToQuery {
-		embs, err := s.store.AllReadyEmbeddings(et)
+		embs, err := s.store.ReadyEmbeddings(config.EmbeddingQuery{
+			EmbedType:    et,
+			ProviderName: providerName,
+			ModelName:    settings.LLMEmbedModel,
+			Dimensions:   queryDimensions,
+		})
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_load_failed"))
 			return
@@ -652,7 +739,17 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	source, err := s.store.EmbeddingForAsset(assetID, embedType)
+	settings, err := s.store.Settings()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_settings_failed"))
+		return
+	}
+	if !settings.LLMEnabled || s.llmProvider == nil || settings.LLMEmbedModel == "" {
+		writeJSON(w, http.StatusBadRequest, apierr.New("embed_not_configured", "LLM provider or embed model not configured"))
+		return
+	}
+	providerName := s.llmProvider.Name()
+	source, err := s.store.EmbeddingForAssetScoped(assetID, embedType, providerName, settings.LLMEmbedModel)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_lookup_failed"))
 		return
@@ -662,7 +759,12 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allEmbeddings, err := s.store.AllReadyEmbeddings(embedType)
+	allEmbeddings, err := s.store.ReadyEmbeddings(config.EmbeddingQuery{
+		EmbedType:    embedType,
+		ProviderName: providerName,
+		ModelName:    settings.LLMEmbedModel,
+		Dimensions:   source.Dimensions,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_load_failed"))
 		return
@@ -704,16 +806,6 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEmbedStats(w http.ResponseWriter, _ *http.Request) {
-	textCount, imageCount, err := s.store.EmbeddingReadyCounts()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
-		return
-	}
-	dimensions, err := s.store.EmbeddingReadyDimensions()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
-		return
-	}
 	settings, err := s.store.Settings()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_settings_failed"))
@@ -722,6 +814,24 @@ func (s *Server) handleEmbedStats(w http.ResponseWriter, _ *http.Request) {
 	providerName := settings.LLMProvider
 	if s.llmProvider != nil {
 		providerName = s.llmProvider.Name()
+	}
+	if providerName == "" || settings.LLMEmbedModel == "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"textCount": 0, "imageCount": 0,
+			"providerName": providerName, "modelName": settings.LLMEmbedModel,
+			"dimensions": 0,
+		})
+		return
+	}
+	textCount, imageCount, err := s.store.EmbeddingReadyCountsForModel(providerName, settings.LLMEmbedModel)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
+		return
+	}
+	dimensions, err := s.store.EmbeddingReadyDimensionsForModel(providerName, settings.LLMEmbedModel)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apierr.From(err, "embed_stats_failed"))
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"textCount": textCount, "imageCount": imageCount,

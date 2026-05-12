@@ -65,7 +65,12 @@ export function Toast({
 
       <span className="block min-w-0 flex-1 leading-[1.4]">
         {title && <span className="block font-[590] text-g-ink">{title}</span>}
-        <span className={cn("block text-g-ink-2", title && "mt-0.5")}>
+        <span
+          className={cn(
+            "block whitespace-pre-line text-g-ink-2",
+            title && "mt-0.5",
+          )}
+        >
           {children}
         </span>
       </span>

@@ -48,6 +48,7 @@ import { SettingsView } from "./components/settings/SettingsView";
 import { useToast } from "./components/shared/ToastProvider";
 import {
   catalogQueryKey,
+  embedStatsQueryKey,
   useAddProjectMutation,
   useApplyPreviewMutation,
   useSwitchWorkspaceMutation,
@@ -743,7 +744,10 @@ export function App() {
         runBatch: ({ signal, onEvent }) => runOCR({ signal, onEvent }),
       });
 
-      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: catalogQueryKey }),
+        queryClient.invalidateQueries({ queryKey: embedStatsQueryKey }),
+      ]);
 
       if (result.status === "done") {
         toast.success(t("settings.ocrRunSuccess"));
@@ -790,7 +794,10 @@ export function App() {
         scopeLabel,
       });
 
-      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: catalogQueryKey }),
+        queryClient.invalidateQueries({ queryKey: embedStatsQueryKey }),
+      ]);
     })().finally(() => {
       aiTagActivityRunRef.current = null;
     });
@@ -863,7 +870,10 @@ export function App() {
         scopeLabel,
       });
 
-      await queryClient.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: catalogQueryKey }),
+        queryClient.invalidateQueries({ queryKey: embedStatsQueryKey }),
+      ]);
     })().finally(() => {
       embedRunRef.current = null;
     });

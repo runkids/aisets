@@ -232,10 +232,7 @@ func (s *Server) handleAITagRun(w http.ResponseWriter, r *http.Request) {
 	}
 	lang := r.URL.Query().Get("lang")
 	isLocalized := settings.LLMAutoLocale && lang != "" && lang != "en"
-	targetLocales := settings.LLMTranslationLocales
-	if len(targetLocales) == 0 {
-		targetLocales = aitag.AllI18nLocales
-	}
+	targetLocales := targetTranslationLocales(settings, lang)
 	if prompt == "" && isLocalized {
 		prompt = aitag.TagPromptLocalizedForLocales(lang, targetLocales)
 	} else {
@@ -531,6 +528,13 @@ func (s *Server) processAITag(ctx context.Context, item scanner.AssetItem, backe
 	if result.Languages == nil {
 		result.Languages = []string{}
 	}
+	if !aitag.IsResultUsable(result) {
+		result.Status = aitag.StatusFailed
+		result.ErrorCode = "aitag_invalid_result"
+		result.ErrorMessage = "AI tag result is missing category, tags, or description"
+		return result, resp
+	}
+	result, _ = aitag.CleanInvalidI18n(result)
 	return result, resp
 }
 
@@ -572,6 +576,44 @@ func copyAITagResultForItem(result aitag.Result, item scanner.AssetItem) aitag.R
 	result.HashAlgorithm = item.HashAlgorithm
 	result.UpdatedAt = ""
 	return result
+}
+
+func targetTranslationLocales(settings config.AppSettings, lang string) []string {
+	if len(settings.LLMTranslationLocales) > 0 {
+		return normalizeTranslationLocales(settings.LLMTranslationLocales)
+	}
+	lang = strings.TrimSpace(lang)
+	if lang == "" || lang == "en" || !isAITagI18nLocale(lang) {
+		return []string{"en"}
+	}
+	return []string{"en", lang}
+}
+
+func normalizeTranslationLocales(locales []string) []string {
+	out := make([]string, 0, len(locales)+1)
+	seen := map[string]bool{}
+	add := func(locale string) {
+		locale = strings.TrimSpace(locale)
+		if locale == "" || seen[locale] || !isAITagI18nLocale(locale) {
+			return
+		}
+		out = append(out, locale)
+		seen[locale] = true
+	}
+	add("en")
+	for _, locale := range locales {
+		add(locale)
+	}
+	return out
+}
+
+func isAITagI18nLocale(locale string) bool {
+	for _, supported := range aitag.AllI18nLocales {
+		if locale == supported {
+			return true
+		}
+	}
+	return false
 }
 
 // unmarshalStringOrFirst tolerates LLMs returning either "value" or ["value", ...].

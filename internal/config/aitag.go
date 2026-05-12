@@ -122,6 +122,9 @@ func (s *Store) AITagResults(items []scanner.AssetItem, providerName, modelName 
 		_ = json.Unmarshal([]byte(tagsI18nRaw), &result.TagsI18n)
 		_ = json.Unmarshal([]byte(descI18nRaw), &result.DescriptionI18n)
 		_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
+		if result.Status == aitag.StatusReady && !aitag.IsResultUsable(result) {
+			continue
+		}
 		out[aiTagKey(result.ProjectID, result.RepoPath)] = result
 	}
 	return out, rows.Err()
@@ -242,6 +245,9 @@ func (s *Store) AITagResultForContentHash(contentHash, hashAlgorithm, providerNa
 	_ = json.Unmarshal([]byte(tagsI18nRaw), &result.TagsI18n)
 	_ = json.Unmarshal([]byte(descI18nRaw), &result.DescriptionI18n)
 	_ = json.Unmarshal([]byte(langsRaw), &result.Languages)
+	if !aitag.IsResultUsable(result) {
+		return aitag.Result{}, false, nil
+	}
 	return result, true, nil
 }
 
@@ -295,22 +301,21 @@ func (s *Store) AITagResultAnyWithEnglish(contentHash, hashAlgorithm string) (*a
 	if err != nil {
 		return nil, err
 	}
+	result.Status = aitag.StatusReady
 	_ = json.Unmarshal([]byte(tagsRaw), &result.Tags)
+	if !aitag.IsResultUsable(result) {
+		return nil, nil
+	}
 
-	var catMap map[string]string
-	var tagsMap map[string][]string
-	var descMap map[string]string
-	_ = json.Unmarshal([]byte(catI18n), &catMap)
-	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
-	_ = json.Unmarshal([]byte(descI18n), &descMap)
-	if v := catMap["en"]; v != "" {
-		result.Category = v
-	}
-	if v := tagsMap["en"]; len(v) > 0 {
-		result.Tags = v
-	}
-	if v := descMap["en"]; v != "" {
-		result.Description = v
+	result.CategoryI18n = map[string]string{}
+	result.TagsI18n = map[string][]string{}
+	result.DescriptionI18n = map[string]string{}
+	_ = json.Unmarshal([]byte(catI18n), &result.CategoryI18n)
+	_ = json.Unmarshal([]byte(tagsI18n), &result.TagsI18n)
+	_ = json.Unmarshal([]byte(descI18n), &result.DescriptionI18n)
+	result = aitag.ResultWithEnglishFallback(result)
+	if !aitag.IsResultUsable(result) {
+		return nil, nil
 	}
 	return &result, nil
 }
@@ -371,6 +376,14 @@ func (s *Store) AITagsMissingLocale(locale string, contentHashes []string) ([]AI
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(tagsRaw), &r.Tags)
+		if !aitag.IsResultUsable(aitag.Result{
+			Status:      aitag.StatusReady,
+			Category:    r.Category,
+			Tags:        r.Tags,
+			Description: r.Description,
+		}) {
+			continue
+		}
 		results = append(results, r)
 	}
 	return results, rows.Err()
@@ -392,11 +405,27 @@ func (s *Store) BackfillEnglishI18n(contentHash, hashAlgorithm, enCategory strin
 }
 
 func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category string, tags []string, description string) error {
-	var catI18n, tagsI18n, descI18n string
-	_ = s.rdb.QueryRow(`SELECT COALESCE(category_i18n_json,'{}'), COALESCE(tags_i18n_json,'{}'), COALESCE(description_i18n_json,'{}')
+	if !validI18nLocales[locale] {
+		return nil
+	}
+	var raw aitag.Result
+	var catI18n, tagsRaw, tagsI18n, descI18n string
+	err := s.rdb.QueryRow(`SELECT category, tags_json, description,
+			COALESCE(category_i18n_json,'{}'), COALESCE(tags_i18n_json,'{}'), COALESCE(description_i18n_json,'{}')
 		FROM ai_tags WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'
 		ORDER BY updated_at DESC LIMIT 1`,
-		contentHash, hashAlgorithm).Scan(&catI18n, &tagsI18n, &descI18n)
+		contentHash, hashAlgorithm).Scan(&raw.Category, &tagsRaw, &raw.Description, &catI18n, &tagsI18n, &descI18n)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	raw.Status = aitag.StatusReady
+	_ = json.Unmarshal([]byte(tagsRaw), &raw.Tags)
+	if !aitag.IsResultUsable(raw) || !aitag.IsLocaleTranslationUsable(raw, category, tags, description) {
+		return nil
+	}
 
 	catMap := map[string]string{}
 	tagsMap := map[string][]string{}
@@ -404,6 +433,15 @@ func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category 
 	_ = json.Unmarshal([]byte(catI18n), &catMap)
 	_ = json.Unmarshal([]byte(tagsI18n), &tagsMap)
 	_ = json.Unmarshal([]byte(descI18n), &descMap)
+	if catMap == nil {
+		catMap = map[string]string{}
+	}
+	if tagsMap == nil {
+		tagsMap = map[string][]string{}
+	}
+	if descMap == nil {
+		descMap = map[string]string{}
+	}
 
 	catMap[locale] = category
 	if len(tags) > 0 {
@@ -415,7 +453,7 @@ func (s *Store) BackfillLocaleI18n(contentHash, hashAlgorithm, locale, category 
 	tagsBytes, _ := json.Marshal(tagsMap)
 	descBytes, _ := json.Marshal(descMap)
 
-	_, err := s.db.Exec(`UPDATE ai_tags
+	_, err = s.db.Exec(`UPDATE ai_tags
 		SET category_i18n_json = ?, tags_i18n_json = ?, description_i18n_json = ?
 		WHERE content_hash = ? AND hash_algorithm = ? AND status = 'ready'`,
 		string(catBytes), string(tagsBytes), string(descBytes),

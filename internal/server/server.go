@@ -189,6 +189,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/ai/duplicate-explain", s.handleDuplicateExplain)
 	s.mux.HandleFunc("POST /api/ai/embed/run", s.handleEmbedRun)
 	s.mux.HandleFunc("POST /api/ai/embed/clear", s.handleEmbedClear)
+	s.mux.HandleFunc("POST /api/ai/embed/repair", s.handleEmbedRepair)
 	s.mux.HandleFunc("GET /api/ai/embed/search", s.handleEmbedSearch)
 	s.mux.HandleFunc("GET /api/ai/embed/similar/{id}", s.handleEmbedSimilar)
 	s.mux.HandleFunc("GET /api/ai/embed/stats", s.handleEmbedStats)

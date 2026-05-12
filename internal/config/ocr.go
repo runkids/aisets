@@ -246,6 +246,30 @@ func (s *Store) VLMOCRResultForContentHash(contentHash, hashAlgorithm, engineVer
 	return result, true, nil
 }
 
+func (s *Store) LatestReadyOCRTextForContentHash(contentHash, hashAlgorithm string) (string, error) {
+	if contentHash == "" || hashAlgorithm == "" {
+		return "", nil
+	}
+	var normalized, raw string
+	err := s.rdb.QueryRow(`
+		SELECT COALESCE(normalized_text, ''), COALESCE(text, '')
+		FROM ocr_results
+		WHERE content_hash = ? AND hash_algorithm = ? AND status = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, contentHash, hashAlgorithm, ocr.StatusReady).Scan(&normalized, &raw)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(normalized) != "" {
+		return normalized, nil
+	}
+	return raw, nil
+}
+
 func (s *Store) RemoveOCRResults() error {
 	_, err := s.db.Exec(`DELETE FROM ocr_results`)
 	return err

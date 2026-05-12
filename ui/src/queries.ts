@@ -40,6 +40,7 @@ import {
   removeOCR,
   removeProject,
   removeWorkspace,
+  repairEmbeddings,
   renamePreview,
   renameProject,
   renameWorkspace,
@@ -81,6 +82,8 @@ export const catalogQueryKey = ["catalog"] as const;
 export const scansQueryKey = ["scans"] as const;
 export const settingsQueryKey = ["settings"] as const;
 export const versionQueryKey = ["version"] as const;
+export const embedStatsQueryKey = ["embed-stats"] as const;
+export const embedRepairCheckQueryKey = ["embed-repair-check"] as const;
 
 export const catalogKeys = {
   all: catalogQueryKey,
@@ -625,7 +628,35 @@ export function useClearEmbeddingsMutation() {
   return useMutation({
     mutationFn: clearEmbeddings,
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: embedStatsQueryKey }),
+      ]);
+    },
+  });
+}
+
+export function useEmbedRepairCheckQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: embedRepairCheckQueryKey,
+    queryFn: () => repairEmbeddings(false),
+    enabled,
+    retry: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRepairEmbeddingsMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (apply: boolean) => repairEmbeddings(apply),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: catalogQueryKey }),
+        client.invalidateQueries({ queryKey: embedStatsQueryKey }),
+        client.invalidateQueries({ queryKey: embedRepairCheckQueryKey }),
+      ]);
     },
   });
 }

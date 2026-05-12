@@ -39,7 +39,7 @@ import type {
 } from "../../types";
 import { cn } from "@/lib/cn";
 import { semanticSearch, embeddingStats } from "../../api";
-import { useCatalogItemsInfiniteQuery } from "../../queries";
+import { embedStatsQueryKey, useCatalogItemsInfiniteQuery } from "../../queries";
 import { useCategoryListQuery, useTagsQuery } from "../../tagsQueries";
 import { useDebouncedValue } from "../../useDebouncedValue";
 import { useSearchHistory } from "../../useSearchHistory";
@@ -136,7 +136,7 @@ function useSemanticSearchQuery(
 
 function useEmbedReady(open: boolean, embedEnabled: boolean) {
   const statsQuery = useQuery({
-    queryKey: ["embed-stats"],
+    queryKey: embedStatsQueryKey,
     queryFn: embeddingStats,
     enabled: open && embedEnabled,
     staleTime: 10_000,
@@ -1477,7 +1477,7 @@ export function CommandPalette({
   const searchPending = query.trim() !== debouncedQuery.trim();
   const searchHistory = useSearchHistory();
   const embed = useEmbedReady(open, embedEnabled);
-  const embedReady = embedEnabled;
+  const embedReady = embed.ready;
   const semanticActive = searchMode === "semantic" && embedReady;
   const semanticSearchType =
     settings?.embedSearchType === "text" ||

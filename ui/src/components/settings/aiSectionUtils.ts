@@ -59,6 +59,14 @@ export function saveLastRun<T>(
   }
 }
 
+export function clearLastRun(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore storage errors (quota, private mode)
+  }
+}
+
 // ── Formatters ─────────────────────────────────────────────────────
 
 export function formatElapsed(ms: number): string {

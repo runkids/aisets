@@ -1479,6 +1479,8 @@ func (s *Store) migrateEmbeddingsTable() error {
 			embed_type     TEXT    NOT NULL CHECK(embed_type IN ('text', 'image')),
 			provider_name  TEXT    NOT NULL,
 			model_name     TEXT    NOT NULL,
+			input_hash     TEXT    NOT NULL DEFAULT '',
+			source_hash    TEXT    NOT NULL DEFAULT '',
 			dimensions     INTEGER NOT NULL,
 			status         TEXT    NOT NULL DEFAULT 'ready',
 			error_code     TEXT    NOT NULL DEFAULT '',
@@ -1500,6 +1502,25 @@ func (s *Store) migrateEmbeddingsTable() error {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return fmt.Errorf("migrateEmbeddingsTable: %w", err)
 		}
+	}
+	columns, err := s.tableColumns("embeddings")
+	if err != nil {
+		return fmt.Errorf("migrateEmbeddingsTable columns: %w", err)
+	}
+	for column, stmt := range map[string]string{
+		"input_hash":  `ALTER TABLE embeddings ADD COLUMN input_hash TEXT NOT NULL DEFAULT ''`,
+		"source_hash": `ALTER TABLE embeddings ADD COLUMN source_hash TEXT NOT NULL DEFAULT ''`,
+	} {
+		if columns[column] {
+			continue
+		}
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("migrateEmbeddingsTable add %s: %w", column, err)
+		}
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_model_ready
+		ON embeddings (embed_type, provider_name, model_name, dimensions) WHERE status = 'ready'`); err != nil {
+		return fmt.Errorf("migrateEmbeddingsTable indexes: %w", err)
 	}
 	return nil
 }

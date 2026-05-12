@@ -3,6 +3,8 @@ package config
 import (
 	"path/filepath"
 	"testing"
+
+	"aisets/internal/aitag"
 )
 
 func openEmbedTestStore(t *testing.T) *Store {
@@ -60,6 +62,7 @@ func TestEmbeddingCacheCheck(t *testing.T) {
 	r := EmbeddingResult{
 		AssetID: "a1", ProjectID: "p1", RepoPath: "x.png",
 		ContentHash: "h1", HashAlgorithm: "xxh3",
+		InputHash: "input-a",
 		EmbedType: "text", ProviderName: "ollama", ModelName: "m1",
 		Dimensions: 2, Status: "ready",
 	}
@@ -67,7 +70,7 @@ func TestEmbeddingCacheCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exists, err := store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1")
+	exists, err := store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,12 +78,66 @@ func TestEmbeddingCacheCheck(t *testing.T) {
 		t.Fatal("expected cache hit")
 	}
 
-	exists, err = store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "other-model")
+	exists, err = store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1", "input-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Fatal("expected cache hit for matching input hash")
+	}
+
+	exists, err = store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1", "input-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Fatal("expected cache miss for changed input hash")
+	}
+
+	exists, err = store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "other-model", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if exists {
 		t.Fatal("expected cache miss for different model")
+	}
+}
+
+func TestEmbeddingScopedQuery(t *testing.T) {
+	store := openEmbedTestStore(t)
+
+	rows := []EmbeddingResult{
+		{AssetID: "a1", ProjectID: "p1", RepoPath: "a.png", ContentHash: "h1", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "m1", Dimensions: 2, Status: "ready"},
+		{AssetID: "a2", ProjectID: "p1", RepoPath: "b.png", ContentHash: "h2", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "m2", Dimensions: 2, Status: "ready"},
+		{AssetID: "a3", ProjectID: "p1", RepoPath: "c.png", ContentHash: "h3", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "m1", Dimensions: 3, Status: "ready"},
+	}
+	for _, row := range rows {
+		vec := make([]float32, row.Dimensions)
+		vec[0] = 1
+		if err := store.UpsertEmbedding(row, vec); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	scoped, err := store.ReadyEmbeddings(EmbeddingQuery{
+		EmbedType:    "text",
+		ProviderName: "ollama",
+		ModelName:    "m1",
+		Dimensions:   2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scoped) != 1 || scoped[0].AssetID != "a1" {
+		t.Fatalf("unexpected scoped embeddings: %+v", scoped)
+	}
+
+	textCount, imageCount, err := store.EmbeddingReadyCountsForModel("ollama", "m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if textCount != 2 || imageCount != 0 {
+		t.Fatalf("unexpected scoped counts: text=%d image=%d", textCount, imageCount)
 	}
 }
 
@@ -152,7 +209,7 @@ func TestEmbeddingErrorNoVector(t *testing.T) {
 		t.Fatal("error rows should not appear in ready embeddings")
 	}
 
-	exists, err := store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1")
+	exists, err := store.HasReadyEmbedding("p1", "x.png", "h1", "xxh3", "text", "ollama", "m1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,5 +280,81 @@ func TestEmbeddingForAsset(t *testing.T) {
 	}
 	if miss != nil {
 		t.Fatal("expected nil for nonexistent asset")
+	}
+}
+
+func TestRepairEmbeddingInputs(t *testing.T) {
+	store := openEmbedTestStore(t)
+
+	valid := aitag.Result{
+		ProjectID: "p1", RepoPath: "valid.png",
+		ContentHash: "hv", HashAlgorithm: "xxh3",
+		ProviderName: "ollama", ModelName: "vision",
+		Status: aitag.StatusReady, Category: "icon",
+		Tags:         []string{"button", "primary"},
+		Description:  "A primary button icon",
+		CategoryI18n: map[string]string{"en": "7.", "zh-TW": "圖示"},
+		TagsI18n: map[string][]string{
+			"en":    {"Button"},
+			"zh-TW": {"按鈕", "主要"},
+		},
+		DescriptionI18n: map[string]string{"en": "...", "zh-TW": "主要按鈕圖示"},
+	}
+	invalid := aitag.Result{
+		ProjectID: "p1", RepoPath: "invalid.png",
+		ContentHash: "hi", HashAlgorithm: "xxh3",
+		ProviderName: "ollama", ModelName: "vision",
+		Status: aitag.StatusReady,
+	}
+	for _, result := range []aitag.Result{valid, invalid} {
+		if err := store.UpsertAITagResult(result); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, result := range []EmbeddingResult{
+		{AssetID: "av", ProjectID: "p1", RepoPath: "valid.png", ContentHash: "hv", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "embed", Dimensions: 2, Status: "ready"},
+		{AssetID: "ai", ProjectID: "p1", RepoPath: "invalid.png", ContentHash: "hi", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "embed", Dimensions: 2, Status: "ready"},
+		{AssetID: "keep", ProjectID: "p1", RepoPath: "keep.png", ContentHash: "hk", HashAlgorithm: "xxh3", EmbedType: "text", ProviderName: "ollama", ModelName: "embed", Dimensions: 2, Status: "ready"},
+	} {
+		if err := store.UpsertEmbedding(result, []float32{1, 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	report, err := store.RepairEmbeddingInputs(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.InvalidAITags != 1 || report.ClearedI18nEntries != 1 || report.DeletedStaleTextEmbeddings != 2 {
+		t.Fatalf("unexpected dry-run report: %+v", report)
+	}
+	if got, _ := store.AllReadyEmbeddings("text"); len(got) != 3 {
+		t.Fatalf("dry-run should not delete embeddings, got %d", len(got))
+	}
+
+	report, err = store.RepairEmbeddingInputs(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.InvalidAITags != 1 || report.ClearedI18nEntries != 1 || report.DeletedStaleTextEmbeddings != 2 {
+		t.Fatalf("unexpected apply report: %+v", report)
+	}
+	if got, _ := store.AllReadyEmbeddings("text"); len(got) != 1 || got[0].AssetID != "keep" {
+		t.Fatalf("unexpected remaining embeddings: %+v", got)
+	}
+
+	gotValid, err := store.AITagResultAnyWithEnglish("hv", "xxh3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotValid == nil || gotValid.Category != "icon" {
+		t.Fatalf("expected invalid English i18n removed with raw fallback, got %+v", gotValid)
+	}
+	gotInvalid, err := store.AITagResultAnyWithEnglish("hi", "xxh3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotInvalid != nil {
+		t.Fatalf("expected invalid raw AI tag to be unusable, got %+v", gotInvalid)
 	}
 }

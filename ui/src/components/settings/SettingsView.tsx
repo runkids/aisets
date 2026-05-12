@@ -41,6 +41,7 @@ import {
   ocrProgressLabel,
   resetSectionDraft,
 } from "./helpers";
+import { clearLastRun, EMBED_LAST_RUN_KEY } from "./aiSectionUtils";
 import { SettingsActions } from "./FieldRow";
 import { WorkspaceSection } from "./WorkspaceSection";
 import { ProjectsSection } from "./ProjectsSection";
@@ -475,6 +476,7 @@ export function SettingsView({
     clearEmbeddingsMutation.mutate(undefined, {
       onSuccess: () => {
         onDismissEmbed();
+        clearLastRun(EMBED_LAST_RUN_KEY);
         toast.success(t("toast.embeddingsCleared"));
       },
       onError: (error) => {

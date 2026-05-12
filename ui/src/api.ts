@@ -18,6 +18,7 @@ import type {
   OCRRunEvent,
   VLMOcrRunEvent,
   EmbedRunEvent,
+  EmbedRepairResponse,
   SemanticSearchResponse,
   EmbedStats,
   Project,
@@ -654,6 +655,7 @@ export async function runEmbedding(options?: {
   const qp = new URLSearchParams();
   if (options?.projectIds?.length)
     qp.set("projectIds", options.projectIds.join(","));
+  if (i18n.language) qp.set("lang", i18n.language);
   const params = qp.toString() ? `?${qp}` : "";
   const bodyObj: Record<string, unknown> = {};
   if (options?.assetIds?.length) bodyObj.assetIds = options.assetIds;
@@ -695,7 +697,10 @@ export async function runAITagTranslate(options?: {
     total?: number;
   }) => void;
 }) {
-  const response = await fetch(`${basePath}/api/ai/tag/translate`, {
+  const qp = new URLSearchParams();
+  if (i18n.language) qp.set("lang", i18n.language);
+  const params = qp.toString() ? `?${qp}` : "";
+  const response = await fetch(`${basePath}/api/ai/tag/translate${params}`, {
     method: "POST",
     signal: options?.signal,
   });
@@ -733,6 +738,13 @@ export async function runAITagTranslate(options?: {
 
 export function clearEmbeddings() {
   return request<{ ok: boolean }>("/api/ai/embed/clear", { method: "POST" });
+}
+
+export function repairEmbeddings(apply: boolean) {
+  return request<EmbedRepairResponse>("/api/ai/embed/repair", {
+    method: "POST",
+    body: JSON.stringify({ apply }),
+  });
 }
 
 export function semanticSearch(options: {

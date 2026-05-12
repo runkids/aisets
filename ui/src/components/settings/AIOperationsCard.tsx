@@ -2,6 +2,7 @@ import {
   LoaderCircle,
   Play,
   ScanText,
+  ShieldCheck,
   Square,
   Star,
   Tags,
@@ -9,7 +10,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePromptPresetsQuery } from "../../queries";
+import {
+  useEmbedRepairCheckQuery,
+  usePromptPresetsQuery,
+  useRepairEmbeddingsMutation,
+} from "../../queries";
+import { errorMessage } from "../../i18n";
 import type { AITagActivityState } from "../../activity/aiTagActivity";
 import { isAITagActivityBusy } from "../../activity/aiTagActivity";
 import type { VLMOcrActivityState } from "../../activity/vlmOcrActivity";
@@ -18,6 +24,7 @@ import type { EmbedActivityState } from "../../activity/embedActivity";
 import { isEmbedActivityBusy } from "../../activity/embedActivity";
 import type {
   AITagRunCounts,
+  EmbedRepairCounts,
   EmbedRunCounts,
   SettingsInfo,
   VLMOcrRunCounts,
@@ -37,10 +44,12 @@ import {
   AI_TAG_LAST_RUN_KEY,
   VLM_OCR_LAST_RUN_KEY,
   EMBED_LAST_RUN_KEY,
+  clearLastRun,
   readLastRun,
   saveLastRun,
 } from "./aiSectionUtils";
 import type { SettingsDraft } from "./types";
+import { useToast } from "../shared/ToastProvider";
 
 type AIOperationsCardProps = {
   draft: SettingsDraft;
@@ -92,6 +101,8 @@ export function AIOperationsCard({
   onStopEmbed,
 }: AIOperationsCardProps) {
   const { t } = useTranslation();
+  const toast = useToast();
+  const repairEmbeddingsMutation = useRepairEmbeddingsMutation();
 
   const tagPresetsQuery = usePromptPresetsQuery("tag");
   const ocrPresetsQuery = usePromptPresetsQuery("ocr");
@@ -311,6 +322,83 @@ export function AIOperationsCard({
     providerEnabled ||
     agentDetected ||
     (settings?.agentRuntime?.adapters?.length ?? 0) > 0;
+  const repairCheckQuery = useEmbedRepairCheckQuery(vlmAvailable);
+  const repairCheckCounts = repairCheckQuery.data?.counts;
+  const repairableIssueCount = repairCheckCounts
+    ? repairCheckCounts.invalidAiTags +
+      repairCheckCounts.clearedI18nEntries +
+      repairCheckCounts.deletedStaleTextEmbeddings
+    : 0;
+  const hasRepairableIssues = repairableIssueCount > 0;
+  const repairCheckBusy =
+    repairCheckQuery.isFetching || repairEmbeddingsMutation.isPending;
+
+  function embedRepairSummary(counts: EmbedRepairCounts) {
+    return t("settings.embedRepairResult", {
+      invalid: counts.invalidAiTags,
+      i18n: counts.clearedI18nEntries,
+      embeddings: counts.deletedStaleTextEmbeddings,
+      skipped: counts.skippedRows,
+    });
+  }
+
+  function embedRepairStatusText() {
+    if (repairCheckQuery.isFetching) return t("settings.embedRepairChecking");
+    if (repairCheckQuery.isError) return t("settings.embedRepairCheckFailed");
+    if (!repairCheckCounts) return null;
+    if (hasRepairableIssues) return t("settings.embedRepairNeedsRepair");
+    return t("settings.embedRepairClean");
+  }
+
+  async function onCheckEmbeddingRepair() {
+    try {
+      const result = await repairCheckQuery.refetch({ throwOnError: true });
+      const counts = result.data?.counts;
+      if (!counts) return;
+      const repairable =
+        counts.invalidAiTags +
+        counts.clearedI18nEntries +
+        counts.deletedStaleTextEmbeddings;
+      if (repairable > 0 || counts.skippedRows > 0) {
+        toast.show("warning", embedRepairSummary(counts), {
+          title: t("settings.embedRepairCheckIssues"),
+          durationMs: 6000,
+        });
+        return;
+      }
+      toast.success(t("settings.embedRepairClean"), {
+        title: t("settings.embedRepairCheckSuccess"),
+      });
+    } catch (err) {
+      toast.error(errorMessage(err), {
+        title: t("settings.embedRepairFailed"),
+      });
+    }
+  }
+
+  function onRepairEmbeddings(apply: boolean) {
+    repairEmbeddingsMutation.mutate(apply, {
+      onSuccess: (result) => {
+        if (apply) {
+          clearLastRun(EMBED_LAST_RUN_KEY);
+          setLastEmbedRun(null);
+        }
+        toast.success(embedRepairSummary(result.counts), {
+          title: t(
+            apply
+              ? "settings.embedRepairApplySuccess"
+              : "settings.embedRepairCheckSuccess",
+          ),
+          durationMs: 6000,
+        });
+      },
+      onError: (err) => {
+        toast.error(errorMessage(err), {
+          title: t("settings.embedRepairFailed"),
+        });
+      },
+    });
+  }
 
   if (!vlmAvailable) return null;
 
@@ -570,22 +658,67 @@ export function AIOperationsCard({
                       : t("settings.embedStop")}
                   </Button>
                 ) : (
-                  <Button
-                    variant="primary"
-                    leadingIcon={<Play size={14} />}
-                    disabled={aiBusy || !draft.llmEmbedModel}
-                    onClick={() => {
-                      onStartEmbed(
-                        resolveProjectIds(embedWorkspaceId, embedProjectId),
-                        resolveScopeLabel(embedWorkspaceId, embedProjectId),
-                        true,
-                      );
-                    }}
-                  >
-                    {t("settings.embedRun")}
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      leadingIcon={
+                        repairCheckQuery.isFetching ? (
+                          <LoaderCircle
+                            size={14}
+                            className="animate-[icon-spin_900ms_linear_infinite]"
+                          />
+                        ) : (
+                          <ShieldCheck size={14} />
+                        )
+                      }
+                      disabled={aiBusy || repairCheckBusy}
+                      onClick={onCheckEmbeddingRepair}
+                    >
+                      {repairCheckQuery.isFetching
+                        ? t("settings.embedRepairChecking")
+                        : t("settings.embedRepairCheck")}
+                    </Button>
+                    {hasRepairableIssues && (
+                      <Button
+                        variant="secondary"
+                        leadingIcon={
+                          repairEmbeddingsMutation.isPending ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-[icon-spin_900ms_linear_infinite]"
+                            />
+                          ) : (
+                            <ShieldCheck size={14} />
+                          )
+                        }
+                        disabled={aiBusy || repairCheckBusy}
+                        onClick={() => onRepairEmbeddings(true)}
+                      >
+                        {t("settings.embedRepairApply")}
+                      </Button>
+                    )}
+                    <Button
+                      variant="primary"
+                      leadingIcon={<Play size={14} />}
+                      disabled={aiBusy || !draft.llmEmbedModel}
+                      onClick={() => {
+                        onStartEmbed(
+                          resolveProjectIds(embedWorkspaceId, embedProjectId),
+                          resolveScopeLabel(embedWorkspaceId, embedProjectId),
+                          true,
+                        );
+                      }}
+                    >
+                      {t("settings.embedRun")}
+                    </Button>
+                  </>
                 )}
               </div>
+              {!isEmbedActivityBusy(embedActivity) && embedRepairStatusText() ? (
+                <p className="font-g text-g-caption tracking-g-ui text-g-ink-3 text-right">
+                  {embedRepairStatusText()}
+                </p>
+              ) : null}
               {isEmbedActivityBusy(embedActivity) ||
               embedActivity.phase === "error" ? (
                 <EmbedProgressText

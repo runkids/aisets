@@ -834,6 +834,19 @@ export type EmbedStats = {
   dimensions?: number;
 };
 
+export type EmbedRepairCounts = {
+  invalidAiTags: number;
+  clearedI18nEntries: number;
+  deletedStaleTextEmbeddings: number;
+  skippedRows: number;
+};
+
+export type EmbedRepairResponse = {
+  dryRun: boolean;
+  apply: boolean;
+  counts: EmbedRepairCounts;
+};
+
 export type ActionPreview = {
   id: string;
   type: string;
