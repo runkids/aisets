@@ -274,16 +274,35 @@ export function AppTopbar({
           : t("activity.translateTitle");
   const translateCounts =
     translateActivity.total > 0
-      ? translateActivity.skipped > 0
-        ? t("activity.translateCountsWithSkipped", {
+      ? translateBusy
+        ? t("activity.translateLocaleCounts", {
+            locale: translateActivity.locale ?? "",
             translated: translateActivity.translated,
             total: translateActivity.total,
-            skipped: translateActivity.skipped,
           })
-        : `${translateActivity.translated} / ${translateActivity.total}`
+        : translateActivity.skipped > 0
+          ? t("activity.translateCountsWithSkipped", {
+              translated: translateActivity.translated,
+              total: translateActivity.total,
+              skipped: translateActivity.skipped,
+            })
+          : t("activity.translateCounts", {
+              translated: translateActivity.translated,
+              total: translateActivity.total,
+            })
       : "";
+  const translateLocaleList =
+    translateActivity.locales.length > 0
+      ? translateActivity.locales.join("、")
+      : translateActivity.locale;
+  const translateDetail =
+    translateBusy && translateLocaleList
+      ? t("activity.translateLocalesLabel", {
+          locales: translateLocaleList,
+        })
+      : undefined;
   const translateWarnings = translateActivity.warnings.map((warning) => ({
-    repoPath: translateActivity.locales.join(", ") || translateActivity.locale || "",
+    repoPath: "",
     message: warning,
   }));
   const catalogActionTooltip = ocrBusy
@@ -559,8 +578,16 @@ export function AppTopbar({
             canDismiss={canDismissTranslateActivity(translateActivity)}
             statusLabel={translateStatusLabel}
             countsLabel={translateCounts}
+            detailLabel={translateDetail}
             errorMessage={translateActivity.errorMessage}
             errors={translateWarnings.length > 0 ? translateWarnings : undefined}
+            errorsLabel={
+              translateWarnings.length > 0
+                ? t("activity.warningCount", {
+                    count: translateWarnings.length,
+                  })
+                : undefined
+            }
             progressPercent={translateActivityProgressPercent(translateActivity)}
             startedAt={translateActivity.startedAt}
             primaryAction={{

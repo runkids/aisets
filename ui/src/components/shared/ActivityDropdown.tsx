@@ -34,8 +34,10 @@ type ActivityDropdownProps = {
   canDismiss: boolean;
   statusLabel: string;
   countsLabel: string;
+  detailLabel?: string;
   errorMessage?: string;
   errors?: ActivityError[];
+  errorsLabel?: string;
   progressPercent: number;
   showIndeterminate?: boolean;
   startedAt?: number;
@@ -55,8 +57,10 @@ export function ActivityDropdown({
   canDismiss,
   statusLabel,
   countsLabel,
+  detailLabel,
   errorMessage,
   errors,
+  errorsLabel,
   progressPercent,
   showIndeterminate = false,
   startedAt,
@@ -172,6 +176,11 @@ export function ActivityDropdown({
           <p className="mt-1.5 font-g-mono text-[11px] tracking-g-mono text-g-ink-3 tabular-nums">
             {countsLabel}
           </p>
+          {detailLabel && (
+            <p className="mt-0.5 text-g-caption leading-[1.35] text-g-ink-4">
+              {detailLabel}
+            </p>
+          )}
           {elapsedMs != null && (
             <p className="font-g-mono text-[11px] tracking-g-mono text-g-ink-4 tabular-nums text-right">
               {formatElapsed(elapsedMs)}
@@ -192,10 +201,11 @@ export function ActivityDropdown({
                         className={`shrink-0 transition-transform duration-100 ${errorsExpanded ? "" : "-rotate-90"}`}
                       />
                       <span className="flex-1 truncate">
-                        {t("activity.failedCount", {
-                          count: errors.length,
-                          defaultValue: "{{count}} failed",
-                        })}
+                        {errorsLabel ??
+                          t("activity.failedCount", {
+                            count: errors.length,
+                            defaultValue: "{{count}} failed",
+                          })}
                       </span>
                     </button>
                     <button
@@ -212,7 +222,11 @@ export function ActivityDropdown({
                       className="shrink-0 px-2 py-1.5 text-g-ink-4 hover:text-g-ink transition-colors duration-100"
                       onClick={() => {
                         const text = errors
-                          .map((e) => `${e.repoPath}\n${e.message}`)
+                          .map((e) =>
+                            e.repoPath
+                              ? `${e.repoPath}\n${e.message}`
+                              : e.message,
+                          )
                           .join("\n\n");
                         navigator.clipboard.writeText(text).then(() => {
                           setCopied(true);
@@ -234,9 +248,11 @@ export function ActivityDropdown({
                           key={i}
                           className="border-b border-g-line px-2 py-1 last:border-b-0"
                         >
-                          <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
-                            {err.repoPath}
-                          </span>
+                          {err.repoPath && (
+                            <span className="block truncate font-g-mono text-g-chip text-g-ink-2">
+                              {err.repoPath}
+                            </span>
+                          )}
                           <span className={`block truncate ${issueTextClass}`}>
                             {err.message}
                           </span>

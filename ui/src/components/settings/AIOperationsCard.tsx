@@ -347,7 +347,7 @@ export function AIOperationsCard({
     if (repairCheckQuery.isError) return t("settings.embedRepairCheckFailed");
     if (!repairCheckCounts) return null;
     if (hasRepairableIssues) return t("settings.embedRepairNeedsRepair");
-    return t("settings.embedRepairClean");
+    return null;
   }
 
   async function onCheckEmbeddingRepair() {

@@ -18,6 +18,7 @@ describe("translateActivityReducer", () => {
         event: {
           type: "translating",
           locale: "en",
+          locales: ["en", "zh-TW"],
           translated: 0,
           total: 2,
           skipped: 1,
@@ -29,6 +30,7 @@ describe("translateActivityReducer", () => {
         event: {
           type: "done",
           translated: 1,
+          total: 12,
           skipped: 1,
           locales: ["en", "zh-TW"],
           warnings: ["some en translations were skipped"],
@@ -40,7 +42,7 @@ describe("translateActivityReducer", () => {
       phase: "done",
       locale: "en",
       translated: 1,
-      total: 2,
+      total: 12,
       skipped: 1,
       locales: ["en", "zh-TW"],
       warnings: [

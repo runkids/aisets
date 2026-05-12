@@ -104,6 +104,7 @@ export function translateActivityReducer(
           ...state,
           phase: "done",
           translated: e.translated ?? state.translated,
+          total: e.total ?? state.total,
           skipped: e.skipped ?? state.skipped,
           locales: e.locales ?? state.locales,
           warnings: appendWarnings(state.warnings, incomingWarnings),
