@@ -35,7 +35,6 @@ import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import {
   AssetThumbnail,
-  Badge,
   Button,
   Card,
   CardBody,
