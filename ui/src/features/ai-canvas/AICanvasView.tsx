@@ -108,32 +108,150 @@ function nowISO() {
   return new Date().toISOString();
 }
 
-function renderMarkdown(text: string) {
-  const parts: ReactNode[] = [];
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    if (i > 0) parts.push(<br key={`br-${i}`} />);
-    const line = lines[i];
-    const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-    for (let j = 0; j < tokens.length; j++) {
-      const t = tokens[j];
-      if (t.startsWith("**") && t.endsWith("**")) {
-        parts.push(<strong key={`${i}-${j}`}>{t.slice(2, -2)}</strong>);
-      } else if (t.startsWith("`") && t.endsWith("`")) {
-        parts.push(
-          <code
-            key={`${i}-${j}`}
-            className="rounded bg-black/10 px-1 py-0.5 text-[0.9em] dark:bg-white/10"
-          >
-            {t.slice(1, -1)}
-          </code>,
-        );
-      } else {
-        parts.push(t);
-      }
+function renderInline(line: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  for (let j = 0; j < tokens.length; j++) {
+    const t = tokens[j];
+    if (t.startsWith("**") && t.endsWith("**")) {
+      nodes.push(<strong key={`${keyPrefix}-${j}`}>{t.slice(2, -2)}</strong>);
+    } else if (t.startsWith("`") && t.endsWith("`")) {
+      nodes.push(
+        <code
+          key={`${keyPrefix}-${j}`}
+          className="rounded bg-black/10 px-1 py-0.5 text-[0.9em] dark:bg-white/10"
+        >
+          {t.slice(1, -1)}
+        </code>,
+      );
+    } else if (t) {
+      nodes.push(t);
     }
   }
-  return parts;
+  return nodes;
+}
+
+function renderMarkdown(text: string) {
+  const lines = text.split("\n");
+  const elements: ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.startsWith("|") && line.includes("|", 1)) {
+      const tableRows: string[][] = [];
+      while (i < lines.length && lines[i].startsWith("|")) {
+        const row = lines[i]
+          .split("|")
+          .slice(1, -1)
+          .map((c) => c.trim());
+        if (!row.every((c) => /^[-:]+$/.test(c))) {
+          tableRows.push(row);
+        }
+        i++;
+      }
+      if (tableRows.length > 0) {
+        const [header, ...body] = tableRows;
+        elements.push(
+          <table
+            key={`tbl-${i}`}
+            className="my-1 w-full border-collapse text-[0.85em]"
+          >
+            <thead>
+              <tr>
+                {header.map((h, ci) => (
+                  <th
+                    key={ci}
+                    className="border border-white/10 px-2 py-1 text-left font-[590]"
+                  >
+                    {renderInline(h, `th-${i}-${ci}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((cell, ci) => (
+                    <td
+                      key={ci}
+                      className="border border-white/10 px-2 py-1"
+                    >
+                      {renderInline(cell, `td-${i}-${ri}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>,
+        );
+      }
+      continue;
+    }
+
+    if (/^#{1,3}\s/.test(line)) {
+      const level = line.match(/^(#{1,3})\s/)![1].length;
+      const text = line.replace(/^#{1,3}\s+/, "");
+      const cls =
+        level === 1
+          ? "text-[1.1em] font-[590]"
+          : level === 2
+            ? "text-[1em] font-[590]"
+            : "text-[0.95em] font-[590]";
+      elements.push(
+        <div key={`h-${i}`} className={`mt-1 ${cls}`}>
+          {renderInline(text, `h-${i}`)}
+        </div>,
+      );
+      i++;
+      continue;
+    }
+
+    if (/^[-*]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*]\s+/, ""));
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${i}`} className="my-0.5 list-disc pl-4">
+          {items.map((item, li) => (
+            <li key={li}>{renderInline(item, `li-${i}-${li}`)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\.\s+/, ""));
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${i}`} className="my-0.5 list-decimal pl-4">
+          {items.map((item, li) => (
+            <li key={li}>{renderInline(item, `li-${i}-${li}`)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    if (line.trim() === "") {
+      elements.push(<div key={`sp-${i}`} className="h-2" />);
+      i++;
+      continue;
+    }
+
+    elements.push(
+      <div key={`p-${i}`}>{renderInline(line, `p-${i}`)}</div>,
+    );
+    i++;
+  }
+  return elements;
 }
 
 function nextCardPosition(
@@ -1389,24 +1507,6 @@ export function AICanvasView({
         onEvent: handleEvent,
         signal: abort.signal,
       });
-
-      if (assistantText) {
-        const pos = nextCardPosition(cards.length + newCards.length);
-        const card: CanvasCard = {
-          id: createCanvasCardId("ai"),
-          kind: "assistant",
-          x: pos.x + CARD_WIDTH + 36,
-          y: pos.y,
-          createdAt: nowISO(),
-          prompt: promptText,
-          message: assistantText,
-          bullets: [],
-          assetIds: selectedAssets.map((c) => c.asset.id),
-          commentIds: [],
-        };
-        setCards((current) => [...current, card]);
-        setSelectedCardId(card.id);
-      }
 
       if (assistantText) {
         setChatHistory((prev) => [
