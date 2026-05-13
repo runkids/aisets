@@ -53,6 +53,9 @@ import { deriveHost, sortedTranslationLocales } from "./aiSectionUtils";
 type AISettingsCardProps = {
   draft: SettingsDraft;
   settings?: SettingsInfo;
+  imagePreviewEnabled: boolean;
+  imagePreviewDelaySeconds: number;
+  imagePreviewSize: { width: number; height: number };
   working: boolean;
   aiBusy: boolean;
   settingActions: ReactNode;
@@ -63,6 +66,9 @@ type AISettingsCardProps = {
 export function AISettingsCard({
   draft,
   settings,
+  imagePreviewEnabled,
+  imagePreviewDelaySeconds,
+  imagePreviewSize,
   working,
   aiBusy,
   settingActions,
@@ -856,6 +862,9 @@ export function AISettingsCard({
               <EmbeddingCalibrationPanel
                 draft={draft}
                 settings={settings}
+                imagePreviewEnabled={imagePreviewEnabled}
+                imagePreviewDelayMs={imagePreviewDelaySeconds * 1000}
+                imagePreviewSize={imagePreviewSize}
                 onUpdateDraft={onUpdateDraft}
               />
             </FieldRow>

@@ -8,6 +8,9 @@ import { AIOperationsCard } from "./AIOperationsCard";
 export function AISection({
   draft,
   settings,
+  imagePreviewEnabled,
+  imagePreviewDelaySeconds,
+  imagePreviewSize,
   working,
   aiTagActivity,
   vlmOcrActivity,
@@ -35,6 +38,9 @@ export function AISection({
       <AISettingsCard
         draft={draft}
         settings={settings}
+        imagePreviewEnabled={imagePreviewEnabled}
+        imagePreviewDelaySeconds={imagePreviewDelaySeconds}
+        imagePreviewSize={imagePreviewSize}
         working={working}
         aiBusy={aiBusy}
         settingActions={settingActions}

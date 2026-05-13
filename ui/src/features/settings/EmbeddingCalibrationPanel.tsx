@@ -3,11 +3,12 @@ import {
   Check,
   CircleHelp,
   Loader2,
+  Pencil,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,6 +17,7 @@ import {
   saveEmbeddingCalibrationLabel,
   semanticSearch,
 } from "@/api";
+import { useToast } from "@/components/shared/ToastProvider";
 import type {
   EmbeddingCalibrationAnalysis,
   EmbeddingCalibrationLabel,
@@ -26,6 +28,7 @@ import {
   AssetThumbnail,
   Badge,
   Button,
+  ImagePreview,
   Modal,
   Select,
   TextInput,
@@ -37,11 +40,14 @@ import type { SettingsDraft } from "./types";
 type Props = {
   draft: SettingsDraft;
   settings?: SettingsInfo;
+  imagePreviewEnabled: boolean;
+  imagePreviewDelayMs: number;
+  imagePreviewSize: { width: number; height: number };
   onUpdateDraft: (updater: (current: SettingsDraft) => SettingsDraft) => void;
 };
 
 type SearchType = "text" | "image" | "hybrid";
-type LabelsResponse = { labels: EmbeddingCalibrationLabel[] };
+type LabelsResponse = { labels: EmbeddingCalibrationLabel[] | null };
 type PreviewVariables = { query: string; searchType: SearchType };
 const LABEL_SAVE_TIMEOUT_MS = 15_000;
 
@@ -68,6 +74,43 @@ function score(value: number) {
   return value.toFixed(3);
 }
 
+function labelsFrom(response: LabelsResponse | null | undefined) {
+  return Array.isArray(response?.labels) ? response.labels : [];
+}
+
+function StepDot({
+  num,
+  done,
+  label,
+}: {
+  num: number;
+  done: boolean;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        className={
+          done
+            ? "grid size-5 place-items-center rounded-full bg-g-accent text-[10px] text-g-accent-ink"
+            : "grid size-5 place-items-center rounded-full border border-g-line-strong font-g-mono text-[10px] font-[590] text-g-ink-3"
+        }
+      >
+        {done ? <Check size={11} /> : num}
+      </span>
+      <span
+        className={
+          done
+            ? "font-g text-g-caption font-[590] text-g-ink"
+            : "font-g text-g-caption text-g-ink-3"
+        }
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function HelpTip({ label }: { label: string }) {
   return (
     <Tooltip
@@ -89,19 +132,26 @@ function HelpTip({ label }: { label: string }) {
 export function EmbeddingCalibrationPanel({
   draft,
   settings,
+  imagePreviewEnabled,
+  imagePreviewDelayMs,
+  imagePreviewSize,
   onUpdateDraft,
 }: Props) {
   const { t } = useTranslation();
+  const toast = useToast();
   const queryClient = useQueryClient();
+  const applyTimerRef = useRef<number | null>(null);
   const [query, setQuery] = useState("");
   const [searchType, setSearchType] = useState<SearchType>("hybrid");
+  const [applyPending, setApplyPending] = useState(false);
   const [analysis, setAnalysis] = useState<EmbeddingCalibrationAnalysis | null>(
     null,
   );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [previewContext, setPreviewContext] =
-    useState<PreviewVariables | null>(null);
+  const [previewContext, setPreviewContext] = useState<PreviewVariables | null>(
+    null,
+  );
   const q = query.trim();
   const activeLabelQuery = previewContext?.query ?? q;
   const activeLabelSearchType = previewContext?.searchType ?? searchType;
@@ -118,11 +168,11 @@ export function EmbeddingCalibrationPanel({
   });
   const labelsByAsset = useMemo(() => {
     const map = new Map<string, "match" | "reject">();
-    for (const label of labelsQuery.data?.labels ?? []) {
+    for (const label of labelsFrom(labelsQuery.data)) {
       map.set(label.assetId, label.label);
     }
     return map;
-  }, [labelsQuery.data?.labels]);
+  }, [labelsQuery.data]);
 
   const previewMutation = useMutation({
     mutationFn: (variables: PreviewVariables) =>
@@ -166,10 +216,12 @@ export function EmbeddingCalibrationPanel({
       const key = labelsQueryKey(variables.query, variables.searchType);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<LabelsResponse>(key);
+      const previousLabels = labelsFrom(previous);
       const optimistic: EmbeddingCalibrationLabel = {
-        id: previous?.labels.find(
-          (label) => label.assetId === variables.result.assetId,
-        )?.id ?? 0,
+        id:
+          previousLabels.find(
+            (label) => label.assetId === variables.result.assetId,
+          )?.id ?? 0,
         query: variables.query,
         searchType: variables.searchType,
         assetId: variables.result.assetId,
@@ -183,7 +235,7 @@ export function EmbeddingCalibrationPanel({
       queryClient.setQueryData<LabelsResponse>(key, (current) => ({
         labels: [
           optimistic,
-          ...(current?.labels ?? []).filter(
+          ...labelsFrom(current).filter(
             (label) => label.assetId !== variables.result.assetId,
           ),
         ],
@@ -202,7 +254,7 @@ export function EmbeddingCalibrationPanel({
       queryClient.setQueryData<LabelsResponse>(key, (current) => ({
         labels: [
           data.label,
-          ...(current?.labels ?? []).filter(
+          ...labelsFrom(current).filter(
             (label) => label.assetId !== data.label.assetId,
           ),
         ],
@@ -219,27 +271,31 @@ export function EmbeddingCalibrationPanel({
     onSuccess: setAnalysis,
   });
 
+  useEffect(
+    () => () => {
+      if (applyTimerRef.current) window.clearTimeout(applyTimerRef.current);
+    },
+    [],
+  );
+
   const canSearch = q !== "" && Boolean(settings?.llmEnabled);
   const results = previewMutation.data?.results ?? [];
   const busy =
     previewMutation.isPending ||
     saveLabelMutation.isPending ||
     analyzeMutation.isPending;
-  const mutationError = saveLabelMutation.error;
+  const mutationError =
+    saveLabelMutation.error ?? (!previewOpen ? previewMutation.error : null);
   const currentAnalysis = analyzeMutation.data ?? analysis;
 
   function handlePreview() {
     const variables = { query: q, searchType };
     setPreviewContext(variables);
-    setPreviewOpen(true);
+    setPreviewOpen(false);
     previewMutation.reset();
-    previewMutation.mutate(variables);
-  }
-
-  function retryPreview() {
-    const variables = previewContext ?? { query: q, searchType };
-    previewMutation.reset();
-    previewMutation.mutate(variables);
+    previewMutation.mutate(variables, {
+      onSuccess: () => setPreviewOpen(true),
+    });
   }
 
   function handleAnalyze() {
@@ -250,6 +306,11 @@ export function EmbeddingCalibrationPanel({
 
   function applyRecommendation() {
     if (!currentAnalysis) return;
+    if (applyTimerRef.current) window.clearTimeout(applyTimerRef.current);
+    setApplyPending(true);
+    toast.info(t("settings.embedCalibrationApplyWorking"), {
+      durationMs: 1200,
+    });
     onUpdateDraft((current) => ({
       ...current,
       embedSearchThreshold: Number(
@@ -263,12 +324,51 @@ export function EmbeddingCalibrationPanel({
         (currentAnalysis.imageRecommendation.margin ?? 0.05).toFixed(2),
       ),
     }));
+    setAnalysisOpen(false);
+    applyTimerRef.current = window.setTimeout(() => {
+      setApplyPending(false);
+      toast.success(t("settings.embedCalibrationApplyDone"), {
+        durationMs: 2200,
+      });
+      applyTimerRef.current = null;
+    }, 450);
   }
 
+  const matchCount = [...labelsByAsset.values()].filter(
+    (v) => v === "match",
+  ).length;
+  const rejectCount = [...labelsByAsset.values()].filter(
+    (v) => v === "reject",
+  ).length;
+  const hasLabels = matchCount + rejectCount > 0;
+  const stepDone1 = results.length > 0;
+  const stepDone2 = hasLabels;
+
   return (
-    <div className="min-w-[400px] space-y-3 rounded-g-md border border-g-line bg-g-surface-2 p-3">
-      {/* ── Search row ───────────────────────────────── */}
-      <div className="grid gap-2 min-[760px]:grid-cols-[1fr_140px_auto]">
+    <div className="min-w-[400px] overflow-hidden rounded-g-lg border border-g-line shadow-g-sm">
+      {/* ── Step indicator ───────────────────────────── */}
+      <div className="flex items-center gap-0 border-b border-g-line bg-g-surface px-3 py-2">
+        <StepDot
+          num={1}
+          done={stepDone1}
+          label={t("settings.embedCalibrationStep1")}
+        />
+        <div className="mx-1 h-px flex-1 bg-g-line" />
+        <StepDot
+          num={2}
+          done={stepDone2}
+          label={t("settings.embedCalibrationStep2")}
+        />
+        <div className="mx-1 h-px flex-1 bg-g-line" />
+        <StepDot
+          num={3}
+          done={!!currentAnalysis}
+          label={t("settings.embedCalibrationStep3")}
+        />
+      </div>
+
+      {/* ── Step 1: Search ───────────────────────────── */}
+      <div className="grid gap-2 border-b border-g-line bg-g-surface-2 p-2.5 min-[760px]:grid-cols-[1fr_140px_auto]">
         <TextInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -287,7 +387,7 @@ export function EmbeddingCalibrationPanel({
         />
         <Button
           type="button"
-          variant="secondary"
+          variant="primary"
           leadingIcon={
             previewMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -305,12 +405,43 @@ export function EmbeddingCalibrationPanel({
       </div>
 
       {mutationError && (
-        <div className="text-g-caption text-g-red">
+        <div className="border-b border-g-red/20 bg-g-red-soft px-3 py-2 text-g-caption text-g-red">
           {errorMessage(mutationError)}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-g-line pt-3">
+      {/* ── Step 2: Label summary ────────────────────── */}
+      {stepDone1 && (
+        <div className="flex items-center gap-2 border-b border-g-line bg-g-surface-2 px-3 py-2">
+          {hasLabels ? (
+            <span className="font-g-mono text-g-chip tabular-nums text-g-ink-3">
+              {t("settings.embedCalibrationLabelSummary", {
+                match: matchCount,
+                reject: rejectCount,
+              })}
+            </span>
+          ) : (
+            <span className="font-g text-g-caption text-g-ink-4">
+              {t("settings.embedCalibrationNoLabels")}
+            </span>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            leadingIcon={<Pencil size={13} />}
+            onClick={() => {
+              if (!previewMutation.isPending) setPreviewOpen(true);
+            }}
+            disabled={previewMutation.isPending || results.length === 0}
+          >
+            {t("settings.embedCalibrationEditLabels")}
+          </Button>
+        </div>
+      )}
+
+      {/* ── Step 3: Analyze ──────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2.5 bg-g-surface-2 px-3 py-2.5">
         <Button
           type="button"
           variant="secondary"
@@ -328,32 +459,50 @@ export function EmbeddingCalibrationPanel({
             ? t("settings.embedCalibrationAnalyzing")
             : t("settings.embedCalibrationAnalyze")}
         </Button>
+
         {currentAnalysis && (
-          <div className="flex flex-wrap items-center gap-2 font-g-mono text-g-chip text-g-ink-3">
-            <span>
-              {t("settings.embedCalibrationTextMetric", {
-                threshold: score(currentAnalysis.textRecommendation.threshold),
-                f1: pct(currentAnalysis.textRecommendation.f1),
-              })}
-            </span>
-            <span>
-              {t("settings.embedCalibrationImageMetric", {
-                threshold: score(currentAnalysis.imageRecommendation.threshold),
-                margin: score(currentAnalysis.imageRecommendation.margin ?? 0),
-                f1: pct(currentAnalysis.imageRecommendation.f1),
-              })}
-            </span>
+          <>
+            <div className="flex items-center gap-1.5 rounded-g-pill border border-g-blue/25 bg-g-blue-soft px-2.5 py-1 font-g-mono text-g-chip tabular-nums text-g-blue">
+              <span className="font-[590]">
+                {t("settings.embedCalibrationTextMetric", {
+                  threshold: score(
+                    currentAnalysis.textRecommendation.threshold,
+                  ),
+                  f1: pct(currentAnalysis.textRecommendation.f1),
+                })}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-g-pill border border-g-purple/25 bg-g-purple-soft px-2.5 py-1 font-g-mono text-g-chip tabular-nums text-g-purple">
+              <span className="font-[590]">
+                {t("settings.embedCalibrationImageMetric", {
+                  threshold: score(
+                    currentAnalysis.imageRecommendation.threshold,
+                  ),
+                  margin: score(
+                    currentAnalysis.imageRecommendation.margin ?? 0,
+                  ),
+                  f1: pct(currentAnalysis.imageRecommendation.f1),
+                })}
+              </span>
+            </div>
             <Button
               type="button"
               variant="primary"
-              trailingIcon={<ArrowRight size={14} />}
-              disabled={busy}
+              trailingIcon={
+                applyPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ArrowRight size={14} />
+                )
+              }
+              disabled={busy || applyPending}
               onClick={applyRecommendation}
-              className="self-center"
             >
-              {t("settings.embedCalibrationApply")}
+              {applyPending
+                ? t("settings.embedCalibrationApplying")
+                : t("settings.embedCalibrationApply")}
             </Button>
-          </div>
+          </>
         )}
       </div>
 
@@ -386,43 +535,11 @@ export function EmbeddingCalibrationPanel({
           }
         >
           <div className="p-3">
-            {previewMutation.isPending && (
-              <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-g-md border border-g-line bg-g-surface-2 font-g text-g-ui text-g-ink-3">
-                <Loader2 size={18} className="animate-spin" />
-                <span>{t("settings.embedCalibrationLoading")}</span>
+            {results.length === 0 && (
+              <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-3">
+                {t("settings.embedCalibrationNoResults")}
               </div>
             )}
-
-            {previewMutation.error && (
-              <div className="rounded-g-md border border-g-red/30 bg-g-red/5 p-3">
-                <div className="font-g text-g-ui font-[590] text-g-red">
-                  {t("settings.embedCalibrationPreviewFailed")}
-                </div>
-                <p className="mb-3 mt-1 text-g-ui leading-[1.5] text-g-red">
-                  {t("settings.embedCalibrationPreviewFailedHint")}
-                </p>
-                <div className="mb-3 font-g-mono text-g-chip text-g-red/80">
-                  {errorMessage(previewMutation.error)}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={retryPreview}
-                  disabled={busy}
-                >
-                  {t("common.retry")}
-                </Button>
-              </div>
-            )}
-
-            {!previewMutation.isPending &&
-              !previewMutation.error &&
-              results.length === 0 && (
-                <div className="rounded-g-md border border-g-line bg-g-surface-2 p-3 text-g-ui text-g-ink-3">
-                  {t("settings.embedCalibrationNoResults")}
-                </div>
-              )}
 
             {results.length > 0 && (
               <div className="grid gap-1.5">
@@ -439,11 +556,19 @@ export function EmbeddingCalibrationPanel({
                       key={result.assetId}
                       className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2 py-1.5"
                     >
-                      <AssetThumbnail
-                        src={result.thumbnailUrl}
+                      <ImagePreview
+                        src={result.item?.url || result.thumbnailUrl}
                         alt={result.repoPath}
-                        size="sm"
-                      />
+                        enabled={imagePreviewEnabled}
+                        delayMs={imagePreviewDelayMs}
+                        size={imagePreviewSize}
+                      >
+                        <AssetThumbnail
+                          src={result.thumbnailUrl}
+                          alt={result.repoPath}
+                          size="sm"
+                        />
+                      </ImagePreview>
                       <div className="min-w-0">
                         <div className="truncate font-g text-g-ui font-[510] text-g-ink">
                           {result.repoPath}
@@ -464,9 +589,7 @@ export function EmbeddingCalibrationPanel({
                         <Button
                           type="button"
                           size="sm"
-                          variant={
-                            label === "match" ? "primary" : "secondary"
-                          }
+                          variant={label === "match" ? "primary" : "secondary"}
                           leadingIcon={
                             pendingLabel === "match" ? (
                               <Loader2 size={13} className="animate-spin" />
@@ -490,9 +613,7 @@ export function EmbeddingCalibrationPanel({
                         <Button
                           type="button"
                           size="sm"
-                          variant={
-                            label === "reject" ? "danger" : "secondary"
-                          }
+                          variant={label === "reject" ? "danger" : "secondary"}
                           leadingIcon={
                             pendingLabel === "reject" ? (
                               <Loader2 size={13} className="animate-spin" />
@@ -543,10 +664,17 @@ export function EmbeddingCalibrationPanel({
                 type="button"
                 size="sm"
                 variant="primary"
-                disabled={!currentAnalysis || busy}
+                leadingIcon={
+                  applyPending ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : undefined
+                }
+                disabled={!currentAnalysis || busy || applyPending}
                 onClick={applyRecommendation}
               >
-                {t("settings.embedCalibrationApply")}
+                {applyPending
+                  ? t("settings.embedCalibrationApplying")
+                  : t("settings.embedCalibrationApply")}
               </Button>
             </div>
           }

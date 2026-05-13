@@ -13,7 +13,7 @@ import type {
   CatalogSummary,
   SemanticSearchResponse,
 } from "@/types";
-import { catalogQueryKey } from "./queryKeys";
+import { catalogKeySection, catalogQueryKey } from "./queryKeys";
 
 type FavoriteOptimisticChange = {
   ids: Set<string>;
@@ -121,7 +121,7 @@ function updateCatalogItemDetailData(
   };
 }
 
-function collectKnownFavoriteItems(
+export function collectKnownItems(
   snapshots: Array<[QueryKey, unknown]>,
   out = new Map<string, AssetItem>(),
 ) {
@@ -200,10 +200,6 @@ function updateSemanticSearchData(
   return changed ? { ...data, results } : data;
 }
 
-function catalogKeySection(queryKey: QueryKey) {
-  return Array.isArray(queryKey) ? queryKey[1] : undefined;
-}
-
 function catalogItemsFavoriteFilter(queryKey: QueryKey) {
   if (!Array.isArray(queryKey)) return false;
   const params = queryKey[3];
@@ -228,7 +224,7 @@ async function applyFavoriteOptimisticUpdate(
     catalog: client.getQueriesData({ queryKey: catalogQueryKey }),
     semantic: client.getQueriesData({ queryKey: ["browse-semantic-search"] }),
   };
-  const knownItems = collectKnownFavoriteItems([
+  const knownItems = collectKnownItems([
     ...snapshot.catalog,
     ...snapshot.semantic,
   ]);

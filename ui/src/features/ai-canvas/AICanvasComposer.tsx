@@ -255,24 +255,24 @@ export function AICanvasComposer({
                     <article
                       key={i}
                       className={cn(
-                        "max-w-[calc(100%-16px)] rounded-g-lg border px-4 py-3 text-g-body leading-[1.55] text-white/84",
+                        "max-w-[min(760px,calc(100%-16px))] rounded-g-lg border px-3 py-2 text-g-body leading-[1.45] text-white/84",
                         isUser
                           ? "self-end border-white/[0.1] bg-white/[0.12]"
                           : "self-start border-white/[0.06] bg-white/[0.06]",
                       )}
                     >
                       {entry.mentions && entry.mentions.length > 0 && (
-                        <div className="mb-2 flex flex-wrap gap-2">
+                        <div className="mb-1.5 flex flex-wrap gap-1.5">
                           {entry.mentions.map((mention) => (
                             <span
                               key={mention.id}
-                              className="inline-flex max-w-[200px] items-center gap-2 rounded-[12px] border border-white/[0.08] bg-black/[0.16] py-1 pl-1 pr-2"
+                              className="inline-flex max-w-[190px] items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-black/[0.16] py-0.5 pl-0.5 pr-1.5"
                             >
                               <AssetThumbnail
                                 src={mention.src}
                                 size="sm"
-                                className="size-7 rounded-[9px] border-white/[0.1] bg-white/[0.06]"
-                                imageClassName="max-h-5 max-w-5"
+                                className="size-6 rounded-[8px] border-white/[0.1] bg-white/[0.06]"
+                                imageClassName="max-h-4 max-w-4"
                                 draggable={false}
                               />
                               <span className="min-w-0 flex-1">

@@ -290,6 +290,33 @@ export function downloadBlob(blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
+export async function saveToProject(
+  blob: Blob,
+  projectId: string,
+  fileName?: string,
+): Promise<{ path: string }> {
+  const form = new FormData();
+  form.append("projectId", projectId);
+  form.append("fileName", fileName || `canvas-${Date.now()}.png`);
+  form.append("file", blob, "capture.png");
+  const res = await fetch("/api/canvas/capture/save", {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    let msg = `save failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      msg = body?.error?.message || body?.error?.code || msg;
+    } catch {
+      const text = await res.text().catch(() => "");
+      if (text) msg = text;
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export function useCanvasCapture(opts: CaptureOpts) {
   const { rootRef, cardElementsRef, cards, selectedCardIds, viewport } = opts;
   const [isCapturing, setIsCapturing] = useState(false);

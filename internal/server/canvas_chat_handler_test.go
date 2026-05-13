@@ -166,12 +166,37 @@ func TestCanvasSystemPrompt_ImageOptimizationAdviceOnAllowsOptimizationProposals
 }
 
 func TestBuildCanvasUserPrompt_ImageOptimizationAdviceOff(t *testing.T) {
-	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "看看這張圖"}}, canvasSnapshot{}, canvasChatOptions{ImageOptimizationAdvice: false})
+	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "看看這張圖"}}, canvasSnapshot{}, canvasChatOptions{ImageOptimizationAdvice: false}, "zh-TW")
 	if !strings.Contains(prompt, "Image optimization advice is OFF") {
 		t.Fatalf("prompt should include OFF state:\n%s", prompt)
 	}
 	if !strings.Contains(prompt, "Do not proactively propose compression, resizing, or format conversion") {
 		t.Fatalf("prompt should restrict proactive optimization:\n%s", prompt)
+	}
+}
+
+func TestBuildCanvasUserPrompt_UsesLatestUserLanguage(t *testing.T) {
+	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "再幫我找一張類似家庭照的 family_danran.png"}}, canvasSnapshot{}, canvasChatOptions{}, "en")
+	if !strings.Contains(prompt, "Respond in Traditional Chinese") {
+		t.Fatalf("prompt should override to latest user language:\n%s", prompt)
+	}
+}
+
+func TestCanvasSearchQueryCandidates(t *testing.T) {
+	got := canvasSearchQueryCandidates("再幫我找一張類似家庭照的 family_danran.png")
+	want := []string{"再幫我找一張類似家庭照的 family_danran.png", "family_danran"}
+	if len(got) < len(want) {
+		t.Fatalf("candidates = %#v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("candidate %d = %q, want %q; all=%#v", i, got[i], want[i], got)
+		}
+	}
+
+	got = canvasSearchQueryCandidates("類似家庭照 family_danran")
+	if len(got) < 2 || got[1] != "family_danran" {
+		t.Fatalf("stem-only candidates = %#v", got)
 	}
 }
 
@@ -223,7 +248,7 @@ func TestCanvasImageTempFile_DecodesDataURI(t *testing.T) {
 }
 
 func TestBuildCanvasUserPrompt_NotesAttachedCanvasImage(t *testing.T) {
-	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{}, canvasChatOptions{CanvasImageAttached: true})
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{}, canvasChatOptions{CanvasImageAttached: true}, "en")
 	if !strings.Contains(prompt, "hidden AI-only screenshot") {
 		t.Fatalf("prompt should mention attached screenshot:\n%s", prompt)
 	}
@@ -236,7 +261,7 @@ func TestBuildCanvasUserPrompt_IncludesSelectedAssetTargets(t *testing.T) {
 			{ID: "asset-card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1", RepoPath: "assets/a.png"}},
 			{ID: "asset-card-2", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a2", RepoPath: "assets/b.png"}},
 		},
-	}, canvasChatOptions{})
+	}, canvasChatOptions{}, "en")
 	for _, want := range []string{"Selected asset targets (2)", "assetId=a1", "assetId=a2"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, prompt)

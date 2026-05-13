@@ -102,6 +102,11 @@ var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(
 
 var toolCallCleanRe = regexp.MustCompile(`(?s)<\|?/?tool_call\|?>`)
 var unquotedJSONKeyRe = regexp.MustCompile(`([\{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:`)
+var hanTextRe = regexp.MustCompile(`\p{Han}`)
+var kanaTextRe = regexp.MustCompile(`[ぁ-ゟ゠-ヿ]`)
+var hangulTextRe = regexp.MustCompile(`[가-힣]`)
+var filenameTokenRe = regexp.MustCompile(`(?i)([A-Za-z0-9][A-Za-z0-9_-]*)\.(png|jpe?g|webp|gif|svg|avif|heic)`)
+var assetStemTokenRe = regexp.MustCompile(`[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)+`)
 
 type canvasActionSpan struct {
 	start, end int
@@ -334,7 +339,23 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	return textBody, actions
 }
 
-func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, options canvasChatOptions) string {
+func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
+	if hangulTextRe.MatchString(latestUserMessage) {
+		return "Korean (한국어)"
+	}
+	if kanaTextRe.MatchString(latestUserMessage) {
+		return "Japanese (日本語)"
+	}
+	if hanTextRe.MatchString(latestUserMessage) {
+		if strings.HasPrefix(locale, "zh-CN") {
+			return "Simplified Chinese (简体中文)"
+		}
+		return "Traditional Chinese (繁體中文)"
+	}
+	return ""
+}
+
+func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, options canvasChatOptions, locale string) string {
 	var b strings.Builder
 
 	b.WriteString("## Canvas State\n")
@@ -438,6 +459,10 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	b.WriteString("- For a spread-out layout, leave at least 160px horizontal and 120px vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
 	b.WriteString("- For 8+ cards, spread them across a broad board (roughly 1600-2400px wide, multiple rows/columns). Avoid piling every card near the center or around one hero image.\n")
 
+	if lang := canvasLatestUserLanguage(latestCanvasUserMessage(messages), locale); lang != "" {
+		fmt.Fprintf(&b, "\n## Response Language Override\n- The latest user message is written in %s. Respond in %s for natural-language text and tool labels/descriptions/impacts unless the user explicitly requests another language.\n", lang, lang)
+	}
+
 	b.WriteString("\n## Assistant Options\n")
 	if options.ImageOptimizationAdvice {
 		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n")
@@ -465,6 +490,37 @@ func latestCanvasUserMessage(messages []canvasChatMessage) string {
 		if messages[i].Role == "user" {
 			return messages[i].Content
 		}
+	}
+	return ""
+}
+
+func canvasSearchQueryCandidates(s string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if v == "" || seen[v] {
+			return
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	add(s)
+	for _, match := range filenameTokenRe.FindAllStringSubmatch(s, -1) {
+		if len(match) >= 2 {
+			add(match[1])
+		}
+	}
+	for _, token := range assetStemTokenRe.FindAllString(s, -1) {
+		add(token)
+	}
+	return out
+}
+
+func canvasExactFilenameStem(s string) string {
+	candidates := canvasSearchQueryCandidates(s)
+	if len(candidates) > 1 {
+		return candidates[1]
 	}
 	return ""
 }
@@ -711,7 +767,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	req.Options.CanvasImageAttached = req.CanvasImage != ""
 	req.Options.AutoLocale = settings.LLMAutoLocale
 	systemPrompt := canvasSystemPrompt(locale, req.Options)
-	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options)
+	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options, locale)
 
 	var images []vlmImage
 	if req.CanvasImage != "" {
@@ -789,14 +845,17 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		textBody, actions := parseCanvasActions(content)
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas)
+		hasCaptureAction := false
 		for _, act := range actions {
 			if canvasToolIsCapture(act.Tool) {
-				captureSeen = true
+				hasCaptureAction = true
+				break
 			}
 		}
-		missingCapture := captureRequested && !captureSeen && loop < maxToolLoops-1
+		missingCapture := captureRequested && !captureSeen && !hasCaptureAction && loop < maxToolLoops-1
 
 		var toolResults []string
+		captureExecutedThisLoop := false
 		for _, act := range actions {
 			if act.Tool == "focus_card" {
 				sendNDJSON(w, map[string]any{
@@ -808,14 +867,23 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if canvasToolSafe(act.Tool) {
+				if canvasToolIsCapture(act.Tool) {
+					if captureSeen {
+						continue
+					}
+					captureSeen = true
+					captureExecutedThisLoop = true
+				}
 				result := s.executeCanvasSafeAction(r, act, settings)
 				sendNDJSON(w, map[string]any{
 					"type":   "action_result",
 					"tool":   act.Tool,
 					"result": result,
 				})
-				resultJSON, _ := json.Marshal(result)
-				toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
+				if !canvasToolIsCapture(act.Tool) {
+					resultJSON, _ := json.Marshal(result)
+					toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
+				}
 			} else {
 				if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
 					continue
@@ -844,6 +912,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if captureExecutedThisLoop && !truncatedAction {
+			break
+		}
 		if len(toolResults) == 0 && !missingCapture && !truncatedAction {
 			break
 		}
@@ -956,14 +1027,22 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		if scanID == 0 {
 			return map[string]any{"items": []any{}, "error": "no scan available"}
 		}
-		query := config.CatalogItemQuery{
-			ScanID: scanID,
-			Query:  q,
-			Limit:  limit,
-		}
-		page, err := s.store.CatalogItems(query)
-		if err != nil {
-			return map[string]any{"items": []any{}, "error": err.Error()}
+		var page config.CatalogItemsPage
+		var err error
+		for _, candidate := range canvasSearchQueryCandidates(q) {
+			query := config.CatalogItemQuery{
+				ScanID: scanID,
+				Query:  candidate,
+				Limit:  limit,
+			}
+			page, err = s.store.CatalogItems(query)
+			if err != nil {
+				return map[string]any{"items": []any{}, "error": err.Error()}
+			}
+			if page.Total > 0 {
+				q = candidate
+				break
+			}
 		}
 		type richAsset struct {
 			ID          string   `json:"id"`

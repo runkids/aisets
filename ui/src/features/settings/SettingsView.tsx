@@ -660,6 +660,9 @@ export function SettingsView({
             <AISection
               draft={draft}
               settings={settings}
+              imagePreviewEnabled={imagePreviewEnabled}
+              imagePreviewDelaySeconds={imagePreviewDelaySeconds}
+              imagePreviewSize={imagePreviewSize}
               working={working}
               aiTagActivity={aiTagActivity}
               vlmOcrActivity={vlmOcrActivity}

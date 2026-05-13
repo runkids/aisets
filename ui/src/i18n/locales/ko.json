@@ -484,6 +484,8 @@
     "renamePreview": "이름 변경 미리보기 실패",
     "deletePreview": "삭제 미리보기 실패",
     "applyPreview": "변경 적용 실패",
+    "api_unavailable": "Aisets가 백엔드 API에 연결할 수 없습니다. 로컬 서버가 실행 중인지 확인한 뒤 다시 시도하세요.",
+    "invalid_json_response": "백엔드가 올바르지 않은 응답을 반환했습니다. 다시 시도하세요.",
     "bad_request": "요청 형식이 올바르지 않습니다.",
     "internal_error": "예기치 않은 시스템 오류가 발생했습니다.",
     "directory_default_path_failed": "기본 디렉토리를 가져올 수 없습니다.",

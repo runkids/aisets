@@ -742,14 +742,32 @@ export function BrowseView({
 
   function handleBatchDelete() {
     const ids = Array.from(selected);
+    if (ids.includes(activeAssetId)) onOpenAsset("");
     batchDeleteMut.mutate(ids, {
-      onSuccess: () => {
+      onSuccess: (result) => {
         setSelected(new Set());
         setBulkMode(false);
         setShowDeleteConfirm(false);
+        if (result.failed.length > 0) {
+          toast.show(
+            "warning",
+            t("action.batchDeletePartial", {
+              succeeded: result.succeeded.length,
+              total: ids.length,
+              failed: result.failed.length,
+            }),
+          );
+        } else {
+          toast.success(
+            t("action.batchDeleteSuccess", {
+              count: result.succeeded.length,
+            }),
+          );
+        }
       },
-      onError: () => {
+      onError: (e) => {
         setShowDeleteConfirm(false);
+        toast.error(errorMessage(e));
       },
     });
   }

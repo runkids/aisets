@@ -21,6 +21,27 @@ export class APIError extends Error {
   }
 }
 
+async function readJSON<T>(response: Response, path: string): Promise<T> {
+  const text =
+    typeof response.text === "function"
+      ? await response.text()
+      : JSON.stringify(await response.json());
+
+  try {
+    return JSON.parse(text || "{}") as T;
+  } catch {
+    const snippet = text.trim().slice(0, 120);
+    const looksLikeHTML = /^<!doctype|^<html/i.test(snippet);
+    throw new APIError(
+      looksLikeHTML ? "api_unavailable" : "invalid_json_response",
+      looksLikeHTML
+        ? "The API returned the app shell instead of JSON."
+        : "The API returned invalid JSON.",
+      { path, status: response.status },
+    );
+  }
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${basePath}${path}`, {
     ...init,
@@ -30,9 +51,9 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!response.ok) {
-    const body = (await response
-      .json()
-      .catch(() => ({}))) as Partial<APIErrorBody>;
+    const body = await readJSON<Partial<APIErrorBody>>(response, path).catch(
+      () => ({}) as Partial<APIErrorBody>,
+    );
     const error = body.error;
     if (error?.code) {
       throw new APIError(error.code, error.message, error.params);
@@ -41,7 +62,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
       status: response.status,
     });
   }
-  return response.json() as Promise<T>;
+  return readJSON<T>(response, path);
 }
 
 export function queryString(

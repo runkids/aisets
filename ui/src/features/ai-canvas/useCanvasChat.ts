@@ -248,6 +248,7 @@ export function useCanvasChat(opts: {
     const newCards: CanvasCard[] = [];
     const animationTimers: number[] = [];
     let animationEndMs = 0;
+    let captureQueued = false;
 
     function queueTimer(fn: () => void, delay: number) {
       const timer = window.setTimeout(fn, delay);
@@ -346,6 +347,8 @@ export function useCanvasChat(opts: {
     }
 
     function runCaptureTool(tool: string, transparent: boolean) {
+      if (captureQueued) return;
+      captureQueued = true;
       const delay = Math.max(0, animationEndMs + 120);
       queueTimer(() => {
         if (tool === "capture_viewport") void captureViewport(transparent);
@@ -666,11 +669,6 @@ export function useCanvasChat(opts: {
             : undefined;
           const addedCards: AssetCanvasCard[] = [];
           for (const asset of matchedAssets) {
-            const exists = canvasCards.some(
-              (c): c is AssetCanvasCard =>
-                c.kind === "asset" && c.asset.id === asset.id,
-            );
-            if (exists) continue;
             const pos = nextCardPosition(
               canvasCards.length + newCards.length + addedCards.length,
               viewport,

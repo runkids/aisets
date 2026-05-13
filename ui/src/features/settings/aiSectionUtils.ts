@@ -133,6 +133,9 @@ export function sortedTranslationLocales(currentLang: string) {
 export type AISectionProps = {
   draft: SettingsDraft;
   settings?: SettingsInfo;
+  imagePreviewEnabled: boolean;
+  imagePreviewDelaySeconds: number;
+  imagePreviewSize: { width: number; height: number };
   working: boolean;
   aiTagActivity: AITagActivityState;
   vlmOcrActivity: VLMOcrActivityState;

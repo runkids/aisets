@@ -5,6 +5,7 @@ import {
   getCatalogLint,
   getScanDiff,
   getScans,
+  request,
   runOCR,
   scanCatalog,
   updateSettings,
@@ -254,6 +255,30 @@ describe("scan history endpoints", () => {
         },
       }),
     );
+  });
+});
+
+describe("request", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("throws a readable APIError when an API route returns the app shell", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "<!doctype html><html><body>Aisets</body></html>",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(request("/api/ai/embed/search?q=cat")).rejects.toMatchObject({
+      code: "api_unavailable",
+      name: "APIError",
+      params: {
+        path: "/api/ai/embed/search?q=cat",
+        status: 200,
+      },
+    });
   });
 });
 

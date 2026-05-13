@@ -1,3 +1,4 @@
+import type { QueryKey } from "@tanstack/react-query";
 import type {
   CatalogDuplicatesParams,
   CatalogFoldersParams,
@@ -54,6 +55,10 @@ export const scanKeys = {
   diff: (baseId: number | undefined, targetId: number | undefined) =>
     [...scansQueryKey, "diff", baseId ?? 0, targetId ?? 0] as const,
 };
+
+export function catalogKeySection(queryKey: QueryKey) {
+  return Array.isArray(queryKey) ? queryKey[1] : undefined;
+}
 
 function normalizeCatalogItemsParams(params: CatalogItemsParams) {
   return {

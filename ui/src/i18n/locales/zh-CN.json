@@ -466,6 +466,8 @@
     "renamePreview": "Rename preview 失败",
     "deletePreview": "Delete preview 失败",
     "applyPreview": "应用变更失败",
+    "api_unavailable": "Aisets 连接不到后端 API。请确认本机服务器仍在运行，然后再试一次",
+    "invalid_json_response": "后端返回格式不正确，请再试一次",
     "bad_request": "请求格式不正确",
     "internal_error": "系统发生未预期错误",
     "directory_default_path_failed": "无法获取默认目录",

@@ -23,7 +23,9 @@ import {
 } from "@/queries";
 import type { BatchPreviewResponse } from "@/api";
 import type { AssetItem } from "@/types";
+import { errorMessage } from "@/i18n";
 import { fileName, formatBytes, formatExt } from "@/ui";
+import { useToast } from "@/components/shared/ToastProvider";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import {
   AssetThumbnail,
@@ -70,6 +72,7 @@ export function DuplicatesView({
   onMerge,
 }: Props) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("exact");
   const [sort, setSort] = useState<SortKey>("members");
 
@@ -378,11 +381,32 @@ export function DuplicatesView({
   const batchDeleteMut = useBatchDeleteMutation();
 
   function handleBatchDelete() {
-    batchDeleteMut.mutate(Array.from(selected), {
-      onSuccess: () => {
+    const ids = Array.from(selected);
+    batchDeleteMut.mutate(ids, {
+      onSuccess: (result) => {
         setSelected(new Set());
         setBulkMode(false);
         setShowDeleteConfirm(false);
+        if (result.failed.length > 0) {
+          toast.show(
+            "warning",
+            t("action.batchDeletePartial", {
+              succeeded: result.succeeded.length,
+              total: ids.length,
+              failed: result.failed.length,
+            }),
+          );
+        } else {
+          toast.success(
+            t("action.batchDeleteSuccess", {
+              count: result.succeeded.length,
+            }),
+          );
+        }
+      },
+      onError: (e) => {
+        setShowDeleteConfirm(false);
+        toast.error(errorMessage(e));
       },
     });
   }

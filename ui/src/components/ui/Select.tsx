@@ -12,6 +12,7 @@ type Option = {
 };
 
 type SelectSize = "sm" | "md";
+type SelectVariant = "default" | "dark";
 
 type Props = {
   value: string;
@@ -19,17 +20,16 @@ type Props = {
   onChange: (value: string) => void;
   "aria-label"?: string;
   size?: SelectSize;
+  variant?: SelectVariant;
   className?: string;
   disabled?: boolean;
 };
 
 const triggerVariants = cva(
   [
-    "inline-flex w-full items-center gap-2 rounded-g-md bg-g-surface px-3 font-g font-[510] tracking-g-ui text-g-ink",
-    "border border-g-line shadow-g-inset",
+    "inline-flex w-full items-center gap-2 rounded-g-md px-3 font-g font-[510] tracking-g-ui",
     "transition-[background,border-color,box-shadow] duration-[120ms] ease-g",
-    "hover:border-g-input-hover hover:bg-g-input-hover-bg focus-visible:outline-none focus-visible:shadow-g-focus",
-    "data-[placeholder]:text-g-ink-3",
+    "focus-visible:outline-none focus-visible:shadow-g-focus",
     "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38]",
   ],
   {
@@ -38,8 +38,20 @@ const triggerVariants = cva(
         sm: "h-g-btn-sm text-g-caption",
         md: "h-g-btn-md text-g-ui",
       },
+      variant: {
+        default: [
+          "bg-g-surface text-g-ink border border-g-line shadow-g-inset",
+          "hover:border-g-input-hover hover:bg-g-input-hover-bg",
+          "data-[placeholder]:text-g-ink-3",
+        ],
+        dark: [
+          "bg-white/[0.08] text-white/80 border border-white/[0.08]",
+          "hover:bg-white/[0.12] hover:text-white",
+          "data-[placeholder]:text-white/38",
+        ],
+      },
     },
-    defaultVariants: { size: "md" },
+    defaultVariants: { size: "md", variant: "default" },
   },
 );
 
@@ -51,6 +63,7 @@ export function Select({
   onChange,
   "aria-label": ariaLabel,
   size = "md",
+  variant = "default",
   className,
   disabled,
 }: Props) {
@@ -59,6 +72,7 @@ export function Select({
     o.value === "" ? { ...o, value: EMPTY_SENTINEL } : o,
   );
   const selected = normalizedOptions.find((o) => o.value === internalValue);
+  const dark = variant === "dark";
 
   function handleChange(v: string) {
     onChange(v === EMPTY_SENTINEL ? "" : v);
@@ -71,7 +85,7 @@ export function Select({
       disabled={disabled}
     >
       <SelectPrimitive.Trigger
-        className={cn(triggerVariants({ size }), className)}
+        className={cn(triggerVariants({ size, variant }), className)}
         aria-label={ariaLabel}
       >
         {selected?.icon && (
@@ -90,7 +104,10 @@ export function Select({
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
           className={cn(
-            "z-[140] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[min(480px,calc(100vw-24px))] overflow-hidden rounded-g-md border border-g-line-strong bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
+            "z-[140] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[min(480px,calc(100vw-24px))] overflow-hidden p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]",
+            dark
+              ? "rounded-[18px] border border-white/[0.08] bg-[rgba(42,42,42,0.98)] backdrop-blur-xl"
+              : "rounded-g-md border border-g-line-strong bg-g-surface",
           )}
           position="popper"
           sideOffset={6}
@@ -102,10 +119,19 @@ export function Select({
                 key={option.value}
                 value={option.value}
                 className={cn(
-                  "flex w-full cursor-pointer items-center gap-2 rounded-g-md px-2.5 py-2 text-left font-g text-g-ui text-g-ink-2 outline-none",
+                  "flex w-full cursor-pointer items-center gap-2 px-2.5 py-2 text-left font-g text-g-ui outline-none",
                   "transition-[background,color] duration-[120ms] ease-g",
-                  "data-[highlighted]:bg-g-surface-2 data-[highlighted]:text-g-ink",
-                  "data-[state=checked]:bg-g-active-bg data-[state=checked]:font-[590] data-[state=checked]:text-g-active-text",
+                  dark
+                    ? [
+                        "rounded-[14px] text-white",
+                        "data-[highlighted]:bg-white/[0.1]",
+                        "data-[state=checked]:bg-white/[0.13] data-[state=checked]:font-[590]",
+                      ]
+                    : [
+                        "rounded-g-md text-g-ink-2",
+                        "data-[highlighted]:bg-g-surface-2 data-[highlighted]:text-g-ink",
+                        "data-[state=checked]:bg-g-active-bg data-[state=checked]:font-[590] data-[state=checked]:text-g-active-text",
+                      ],
                 )}
               >
                 {option.icon && (
@@ -117,7 +143,12 @@ export function Select({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{option.label}</span>
                     {option.description && (
-                      <span className="block text-g-caption font-normal leading-snug text-g-ink-3">
+                      <span
+                        className={cn(
+                          "block text-g-caption font-normal leading-snug",
+                          dark ? "text-white/38" : "text-g-ink-3",
+                        )}
+                      >
                         {option.description}
                       </span>
                     )}

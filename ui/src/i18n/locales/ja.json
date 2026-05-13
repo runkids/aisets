@@ -466,6 +466,8 @@
     "renamePreview": "リネームプレビュー失敗",
     "deletePreview": "削除プレビュー失敗",
     "applyPreview": "変更の適用に失敗",
+    "api_unavailable": "Aisets がバックエンド API に接続できません。ローカルサーバーが起動しているか確認してから再試行してください。",
+    "invalid_json_response": "バックエンドから無効なレスポンスが返されました。もう一度お試しください。",
     "bad_request": "リクエスト形式が不正です",
     "internal_error": "予期しないシステムエラーが発生しました",
     "directory_default_path_failed": "デフォルトディレクトリを取得できませんでした",

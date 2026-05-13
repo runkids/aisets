@@ -2,9 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"aisets/internal/imageproc"
 )
@@ -110,4 +114,80 @@ func (s *Server) handleCanvasCapture(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
 	http.ServeFile(w, r, tmpFile)
+}
+
+func (s *Server) handleCanvasCaptureSave(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("parse form: %w", err))
+		return
+	}
+	projectID := r.FormValue("projectId")
+	if projectID == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("projectId is required"))
+		return
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("file is required: %w", err))
+		return
+	}
+	defer file.Close()
+
+	project, err := s.store.Project(projectID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("project not found: %w", err))
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("fileName"))
+	if name == "" {
+		name = fmt.Sprintf("canvas-%d.png", os.Getpid())
+	}
+	if filepath.Ext(name) == "" {
+		name += ".png"
+	}
+	name = filepath.Base(name)
+
+	if _, statErr := os.Stat(project.Path); statErr != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("project directory not accessible: %s: %w", project.Path, statErr))
+		return
+	}
+
+	targetAbs := filepath.Join(project.Path, name)
+	for i := 1; i < 100; i++ {
+		if _, err := os.Stat(targetAbs); os.IsNotExist(err) {
+			break
+		}
+		ext := filepath.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		targetAbs = filepath.Join(project.Path, fmt.Sprintf("%s-%d%s", base, i, ext))
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(targetAbs), ".aisets-capture-*")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	tmpPath := tmp.Name()
+	if _, copyErr := io.Copy(tmp, file); copyErr != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		writeError(w, http.StatusInternalServerError, copyErr)
+		return
+	}
+	tmp.Close()
+
+	if err := os.Rename(tmpPath, targetAbs); err != nil {
+		os.Remove(tmpPath)
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	s.markCatalogStale()
+
+	relPath, _ := filepath.Rel(project.Path, targetAbs)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"path":    relPath,
+		"absPath": targetAbs,
+	})
 }

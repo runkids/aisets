@@ -693,14 +693,6 @@ export function AICanvasView({
   }
 
   function addAsset(asset: AssetItem) {
-    const existing = cards.find(
-      (card): card is AssetCanvasCard =>
-        card.kind === "asset" && card.asset.id === asset.id,
-    );
-    if (existing) {
-      setSelectedCardIds([existing.id]);
-      return;
-    }
     const id = createCanvasCardId("asset");
     const rect = rootRef.current?.getBoundingClientRect();
     const containerSize = rect
@@ -1103,6 +1095,12 @@ export function AICanvasView({
           t={t}
           preview={capturePreview}
           dismissPreview={dismissCapturePreview}
+          onSaved={(project, file) => {
+            toast.success(t("aiCanvas.savedToProject", { project, file }));
+          }}
+          onSaveError={(msg) => {
+            toast.error(msg, { title: t("aiCanvas.saveError") });
+          }}
         />
       )}
 
