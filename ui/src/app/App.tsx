@@ -29,6 +29,7 @@ import { DirectoryPickerModal } from "@/components/project/DirectoryPickerModal"
 import { DuplicatesView } from "@/features/duplicates";
 import { LintView } from "@/features/lint";
 import { NavSidebar } from "@/components/shared/NavSidebar";
+import { AICanvasView } from "@/features/ai-canvas";
 import { ImageToolsView } from "@/features/image-tools";
 import { OptimizeView } from "@/features/optimize";
 import { PreCheckView } from "@/features/scan";
@@ -1264,6 +1265,13 @@ export function App() {
               scanId={catalogSummary?.scanId}
               assetIds={imageToolAssetIds}
               onAssetIdsChange={setImageToolsBasket}
+            />
+          ) : mode === "aiCanvas" ? (
+            <AICanvasView
+              key={activeWorkspaceId}
+              scanId={catalogSummary?.scanId}
+              aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
+              onOpenAsset={setDrawerId}
             />
           ) : mode === "settings" ? (
             <SettingsView

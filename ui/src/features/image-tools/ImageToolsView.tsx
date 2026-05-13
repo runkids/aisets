@@ -156,6 +156,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
       }),
     enabled: searchMode === "semantic" && committedSemanticQuery.length > 0,
     staleTime: 30_000,
+    placeholderData: (previousData) => previousData,
   });
   const semanticItems: AssetItem[] = useMemo(
     () =>
@@ -242,8 +243,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     setError("");
   }, [assetIds, onAssetIdsChange, staleBasketIds]);
 
-  const semanticHasResults =
-    isSemanticActive && semanticItems.length > 0;
+  const semanticHasResults = isSemanticActive && semanticItems.length > 0;
   const pickerItems = useMemo(() => {
     const source = semanticHasResults ? semanticItems : rawPickerItems;
     return source
@@ -550,12 +550,12 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           </button>
                         )}
                         {showSemanticLoading && (
-                          <span className="ml-1 mr-0.5 inline-flex items-center gap-[3px]">
-                            {[0, 1, 2, 3, 4].map((i) => (
+                          <span className="ml-1.5 mr-0.5 inline-flex items-end gap-[4px] pb-[2px]">
+                            {[0, 1, 2].map((i) => (
                               <span
                                 key={i}
-                                className="inline-block size-[5px] rounded-full bg-g-purple animate-[countPulse_1s_ease-in-out_infinite]"
-                                style={{ animationDelay: `${i * 120}ms` }}
+                                className="inline-block size-[6px] rounded-full bg-g-purple shadow-[0_0_6px_var(--g-purple)] animate-[semanticWave_1.2s_ease-in-out_infinite]"
+                                style={{ animationDelay: `${i * 160}ms` }}
                               />
                             ))}
                           </span>
