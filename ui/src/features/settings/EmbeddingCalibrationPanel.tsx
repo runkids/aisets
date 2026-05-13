@@ -1,7 +1,7 @@
-import { Check, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   analyzeEmbeddingCalibration,
   embeddingCalibrationLabels,
@@ -10,6 +10,7 @@ import {
 } from "@/api";
 import type {
   EmbeddingCalibrationAnalysis,
+  EmbeddingCalibrationLabel,
   SemanticSearchResult,
   SettingsInfo,
 } from "@/types";
@@ -30,6 +31,11 @@ type Props = {
 };
 
 type SearchType = "text" | "image" | "hybrid";
+type LabelsResponse = { labels: EmbeddingCalibrationLabel[] };
+
+function labelsQueryKey(query: string, searchType: SearchType) {
+  return ["embed-calibration-labels", query, searchType] as const;
+}
 
 function pct(value: number | undefined) {
   if (value == null || Number.isNaN(value)) return "0%";
@@ -46,15 +52,17 @@ export function EmbeddingCalibrationPanel({
   onUpdateDraft,
 }: Props) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [searchType, setSearchType] = useState<SearchType>("hybrid");
   const [analysis, setAnalysis] = useState<EmbeddingCalibrationAnalysis | null>(
     null,
   );
   const q = query.trim();
+  const labelKey = labelsQueryKey(q, searchType);
 
   const labelsQuery = useQuery({
-    queryKey: ["embed-calibration-labels", q, searchType],
+    queryKey: labelKey,
     queryFn: () => embeddingCalibrationLabels({ q, type: searchType }),
     enabled: q !== "",
   });
@@ -83,12 +91,16 @@ export function EmbeddingCalibrationPanel({
     mutationFn: ({
       result,
       label,
+      query,
+      searchType,
     }: {
       result: SemanticSearchResult;
       label: "match" | "reject";
+      query: string;
+      searchType: SearchType;
     }) =>
       saveEmbeddingCalibrationLabel({
-        query: q,
+        query,
         searchType,
         assetId: result.assetId,
         projectId: result.projectId,
@@ -96,8 +108,56 @@ export function EmbeddingCalibrationPanel({
         contentHash: result.item?.contentHash ?? "",
         label,
       }),
-    onSuccess: () => {
-      void labelsQuery.refetch();
+    onMutate: async (variables) => {
+      const key = labelsQueryKey(variables.query, variables.searchType);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<LabelsResponse>(key);
+      const optimistic: EmbeddingCalibrationLabel = {
+        id: previous?.labels.find(
+          (label) => label.assetId === variables.result.assetId,
+        )?.id ?? 0,
+        query: variables.query,
+        searchType: variables.searchType,
+        assetId: variables.result.assetId,
+        projectId: variables.result.projectId,
+        repoPath: variables.result.repoPath,
+        contentHash: variables.result.item?.contentHash ?? "",
+        label: variables.label,
+        createdAt: "",
+        updatedAt: "",
+      };
+      queryClient.setQueryData<LabelsResponse>(key, (current) => ({
+        labels: [
+          optimistic,
+          ...(current?.labels ?? []).filter(
+            (label) => label.assetId !== variables.result.assetId,
+          ),
+        ],
+      }));
+      return { previous, queryKey: key };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<LabelsResponse>(
+        context.queryKey,
+        context.previous ?? { labels: [] },
+      );
+    },
+    onSuccess: (data, variables) => {
+      const key = labelsQueryKey(variables.query, variables.searchType);
+      queryClient.setQueryData<LabelsResponse>(key, (current) => ({
+        labels: [
+          data.label,
+          ...(current?.labels ?? []).filter(
+            (label) => label.assetId !== data.label.assetId,
+          ),
+        ],
+      }));
+    },
+    onSettled: (_data, _err, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: labelsQueryKey(variables.query, variables.searchType),
+      });
     },
   });
   const analyzeMutation = useMutation({
@@ -111,6 +171,8 @@ export function EmbeddingCalibrationPanel({
     previewMutation.isPending ||
     saveLabelMutation.isPending ||
     analyzeMutation.isPending;
+  const mutationError =
+    previewMutation.error ?? saveLabelMutation.error ?? analyzeMutation.error;
 
   function applyRecommendation() {
     if (!analysis) return;
@@ -151,17 +213,32 @@ export function EmbeddingCalibrationPanel({
         <Button
           type="button"
           variant="secondary"
-          leadingIcon={<Search size={14} />}
+          leadingIcon={
+            previewMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Search size={14} />
+            )
+          }
           disabled={!canSearch || busy}
           onClick={() => previewMutation.mutate()}
         >
-          {t("settings.embedCalibrationPreview")}
+          {previewMutation.isPending
+            ? t("settings.embedCalibrationPreviewing")
+            : t("settings.embedCalibrationPreview")}
         </Button>
       </div>
 
-      {previewMutation.error && (
+      {mutationError && (
         <div className="text-g-caption text-g-red">
-          {errorMessage(previewMutation.error)}
+          {errorMessage(mutationError)}
+        </div>
+      )}
+
+      {previewMutation.isPending && (
+        <div className="flex items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2 py-2 font-g text-g-ui text-g-ink-3">
+          <Loader2 size={14} className="animate-spin" />
+          <span>{t("settings.embedCalibrationLoading")}</span>
         </div>
       )}
 
@@ -169,6 +246,11 @@ export function EmbeddingCalibrationPanel({
         <div className="grid gap-1.5">
           {results.map((result) => {
             const label = labelsByAsset.get(result.assetId);
+            const pendingLabel =
+              saveLabelMutation.isPending &&
+              saveLabelMutation.variables?.result.assetId === result.assetId
+                ? saveLabelMutation.variables.label
+                : null;
             return (
               <div
                 key={result.assetId}
@@ -200,10 +282,21 @@ export function EmbeddingCalibrationPanel({
                     type="button"
                     size="sm"
                     variant={label === "match" ? "primary" : "secondary"}
-                    leadingIcon={<Check size={13} />}
+                    leadingIcon={
+                      pendingLabel === "match" ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Check size={13} />
+                      )
+                    }
                     disabled={busy}
                     onClick={() =>
-                      saveLabelMutation.mutate({ result, label: "match" })
+                      saveLabelMutation.mutate({
+                        result,
+                        label: "match",
+                        query: q,
+                        searchType,
+                      })
                     }
                   >
                     {t("settings.embedCalibrationMatch")}
@@ -212,10 +305,21 @@ export function EmbeddingCalibrationPanel({
                     type="button"
                     size="sm"
                     variant={label === "reject" ? "danger" : "secondary"}
-                    leadingIcon={<X size={13} />}
+                    leadingIcon={
+                      pendingLabel === "reject" ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <X size={13} />
+                      )
+                    }
                     disabled={busy}
                     onClick={() =>
-                      saveLabelMutation.mutate({ result, label: "reject" })
+                      saveLabelMutation.mutate({
+                        result,
+                        label: "reject",
+                        query: q,
+                        searchType,
+                      })
                     }
                   >
                     {t("settings.embedCalibrationReject")}
@@ -231,11 +335,19 @@ export function EmbeddingCalibrationPanel({
         <Button
           type="button"
           variant="secondary"
-          leadingIcon={<SlidersHorizontal size={14} />}
+          leadingIcon={
+            analyzeMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <SlidersHorizontal size={14} />
+            )
+          }
           disabled={busy}
           onClick={() => analyzeMutation.mutate()}
         >
-          {t("settings.embedCalibrationAnalyze")}
+          {analyzeMutation.isPending
+            ? t("settings.embedCalibrationAnalyzing")
+            : t("settings.embedCalibrationAnalyze")}
         </Button>
         {analysis && (
           <div className="flex flex-wrap items-center gap-2 font-g-mono text-g-chip text-g-ink-3">
