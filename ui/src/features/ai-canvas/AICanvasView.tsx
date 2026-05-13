@@ -107,6 +107,31 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function renderMarkdown(text: string) {
+  const parts: ReactNode[] = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) parts.push(<br key={`br-${i}`} />);
+    const line = lines[i];
+    const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+    for (let j = 0; j < tokens.length; j++) {
+      const t = tokens[j];
+      if (t.startsWith("**") && t.endsWith("**")) {
+        parts.push(<strong key={`${i}-${j}`}>{t.slice(2, -2)}</strong>);
+      } else if (t.startsWith("`") && t.endsWith("`")) {
+        parts.push(
+          <code key={`${i}-${j}`} className="rounded bg-black/10 px-1 py-0.5 text-[0.9em] dark:bg-white/10">
+            {t.slice(1, -1)}
+          </code>,
+        );
+      } else {
+        parts.push(t);
+      }
+    }
+  }
+  return parts;
+}
+
 function nextCardPosition(
   count: number,
   viewport?: { x: number; y: number; scale: number },
@@ -467,7 +492,7 @@ function AssistantCardBody({
             : t("aiCanvas.noSelection")}
         </span>
       </div>
-      <p className="text-g-body leading-[1.45] text-g-ink">{card.message}</p>
+      <p className="text-g-body leading-[1.45] text-g-ink">{renderMarkdown(card.message)}</p>
       <ul className="flex flex-col gap-1.5">
         {card.bullets.map((bullet) => (
           <li
@@ -674,20 +699,22 @@ function AICursor({
       className="pointer-events-none absolute z-[60] transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
     >
-      <div className="flex items-center gap-1.5">
-        <div
+      <div className="flex flex-col items-start">
+        <MousePointer2
+          size={22}
+          strokeWidth={2.5}
           className={cn(
-            "size-3.5 rounded-full border-2 border-g-purple shadow-g-sm transition-all duration-500",
+            "drop-shadow-md transition-all duration-500",
             active
-              ? "bg-g-purple scale-100"
-              : "bg-g-purple/40 scale-90",
+              ? "fill-g-purple text-black"
+              : "fill-g-purple/40 text-black/40",
             status === "thinking" && "animate-pulse",
           )}
         />
         <div
           className={cn(
-            "flex items-center gap-1 rounded-g-sm bg-g-purple px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
-            active ? "opacity-100" : "opacity-50",
+            "-mt-1 ml-3 flex items-center gap-1 rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
+            active ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
           )}
         >
           <span>AI</span>
@@ -724,7 +751,13 @@ export function AICanvasView({
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
-  const [composerCollapsed, setComposerCollapsed] = useState(false);
+  const [composerCollapsed, setComposerCollapsed] = useState(() => {
+    try {
+      return sessionStorage.getItem("aisets.canvas.collapsed") === "true";
+    } catch {
+      return true;
+    }
+  });
   const [composerPreviewOpen, setComposerPreviewOpen] = useState(false);
   const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
@@ -735,7 +768,16 @@ export function AICanvasView({
     y: number;
     label?: string;
     status: "thinking" | "acting" | "idle";
-  }>({ x: 120, y: 60, status: "idle" });
+  }>(() => {
+    const rect = typeof window !== "undefined"
+      ? { width: window.innerWidth, height: window.innerHeight }
+      : { width: 1440, height: 900 };
+    return {
+      x: rect.width / 2 - CARD_WIDTH / 2,
+      y: rect.height / 2 - 100,
+      status: "idle" as const,
+    };
+  });
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
@@ -799,6 +841,17 @@ export function AICanvasView({
       chatHistory: chatHistory.slice(-10),
     });
   }, [cards, selectedCardId, viewport, chatHistory]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        "aisets.canvas.collapsed",
+        composerCollapsed ? "true" : "false",
+      );
+    } catch {
+      // sessionStorage unavailable
+    }
+  }, [composerCollapsed]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -1761,6 +1814,9 @@ export function AICanvasView({
             </button>
             {!composerCollapsed && (
               <div
+                ref={(el) => {
+                  if (el) el.scrollTop = el.scrollHeight;
+                }}
                 data-ai-canvas-scroll="true"
                 className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-3"
               >
@@ -1773,7 +1829,7 @@ export function AICanvasView({
                     <div
                       key={i}
                       className={cn(
-                        "rounded-g-md px-3 py-2 text-g-caption leading-[1.5]",
+                        "max-w-[80%] rounded-g-md px-3 py-2 text-g-caption leading-[1.5]",
                         entry.role === "user"
                           ? "self-end bg-white/[0.08] text-white/80"
                           : "self-start bg-g-purple/20 text-white/70",
@@ -1782,9 +1838,15 @@ export function AICanvasView({
                       <div className="mb-1 text-[10px] font-[590] uppercase tracking-wider text-white/40">
                         {entry.role === "user" ? "You" : "AI"}
                       </div>
-                      <div className="whitespace-pre-wrap">{entry.content}</div>
+                      <div className="whitespace-pre-wrap">{renderMarkdown(entry.content)}</div>
                     </div>
                   ))
+                )}
+                {isWorking && (
+                  <div className="flex items-center gap-2 self-start rounded-g-md bg-g-purple/20 px-3 py-2 text-g-caption text-white/50">
+                    <LoaderCircle size={12} className="animate-spin" />
+                    AI thinking…
+                  </div>
                 )}
               </div>
             )}
