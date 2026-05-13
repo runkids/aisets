@@ -6,7 +6,12 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import { intersects, selectionBounds, type CanvasSelection } from "./canvasUtils";
+import {
+  intersects,
+  selectionBounds,
+  zoomViewportAtPoint,
+  type CanvasSelection,
+} from "./canvasUtils";
 import { clampCanvasScale, type CanvasCard } from "./aiCanvasState";
 
 export function useCanvasDrag(opts: {
@@ -61,7 +66,16 @@ export function useCanvasDrag(opts: {
     startY: number;
     currentX: number;
     currentY: number;
+    previewsConnectors: boolean;
+    lastPreviewAt: number;
   } | null>(null);
+  const wheelFrameRef = useRef<number | null>(null);
+  const wheelPendingRef = useRef<{
+    panX: number;
+    panY: number;
+    zoomFactor: number;
+    point: { x: number; y: number } | null;
+  }>({ panX: 0, panY: 0, zoomFactor: 1, point: null });
 
   // --- gesture prevention effect ---
   useEffect(() => {
@@ -124,11 +138,17 @@ export function useCanvasDrag(opts: {
     if (!drag?.element) return;
     drag.element.style.transform =
       "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
-    setDragPreview({
-      cardId: drag.cardId,
-      x: drag.currentX,
-      y: drag.currentY,
-    });
+    if (drag.previewsConnectors) {
+      const now = performance.now();
+      if (now - drag.lastPreviewAt >= 32) {
+        drag.lastPreviewAt = now;
+        setDragPreview({
+          cardId: drag.cardId,
+          x: drag.currentX,
+          y: drag.currentY,
+        });
+      }
+    }
   }, [setDragPreview]);
 
   const scheduleDragFrame = useCallback(() => {
@@ -136,10 +156,41 @@ export function useCanvasDrag(opts: {
     dragFrameRef.current = window.requestAnimationFrame(renderDragFrame);
   }, [renderDragFrame]);
 
+  const flushWheelFrame = useCallback(() => {
+    wheelFrameRef.current = null;
+    const pending = wheelPendingRef.current;
+    wheelPendingRef.current = { panX: 0, panY: 0, zoomFactor: 1, point: null };
+
+    setViewport((current) => {
+      let next = current;
+      if (pending.point && pending.zoomFactor !== 1) {
+        const nextScale = clampCanvasScale(current.scale * pending.zoomFactor);
+        next = zoomViewportAtPoint(current, pending.point, nextScale);
+      }
+      if (pending.panX !== 0 || pending.panY !== 0) {
+        next = {
+          ...next,
+          x: next.x - pending.panX,
+          y: next.y - pending.panY,
+        };
+      }
+      return next;
+    });
+  }, [setViewport]);
+
+  const scheduleWheelFrame = useCallback(() => {
+    if (wheelFrameRef.current !== null) return;
+    wheelFrameRef.current = window.requestAnimationFrame(flushWheelFrame);
+  }, [flushWheelFrame]);
+
   useEffect(() => {
     return () => {
-      if (dragFrameRef.current === null) return;
-      window.cancelAnimationFrame(dragFrameRef.current);
+      if (dragFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragFrameRef.current);
+      }
+      if (wheelFrameRef.current !== null) {
+        window.cancelAnimationFrame(wheelFrameRef.current);
+      }
     };
   }, []);
 
@@ -156,7 +207,15 @@ export function useCanvasDrag(opts: {
       element.style.willChange = "transform";
       element.style.zIndex = "35";
     }
-    setDragPreview({ cardId: card.id, x: card.x, y: card.y });
+    const previewsConnectors =
+      card.kind === "comment" ||
+      cards.some(
+        (candidate) =>
+          candidate.kind === "comment" && candidate.anchorId === card.id,
+      );
+    if (previewsConnectors) {
+      setDragPreview({ cardId: card.id, x: card.x, y: card.y });
+    }
     dragRef.current = {
       cardId: card.id,
       element,
@@ -166,6 +225,8 @@ export function useCanvasDrag(opts: {
       startY: card.y,
       currentX: card.x,
       currentY: card.y,
+      previewsConnectors,
+      lastPreviewAt: 0,
     };
   }
 
@@ -203,7 +264,7 @@ export function useCanvasDrag(opts: {
           : card,
       ),
     );
-    setDragPreview(null);
+    if (drag.previewsConnectors) setDragPreview(null);
     dragRef.current = null;
   }
 
@@ -212,18 +273,28 @@ export function useCanvasDrag(opts: {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
-      const direction = event.deltaY > 0 ? -0.08 : 0.08;
-      setViewport((current) => ({
-        ...current,
-        scale: clampCanvasScale(current.scale + direction),
-      }));
+      const bounds = rootRef.current?.getBoundingClientRect();
+      const point = bounds
+        ? { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
+        : { x: 0, y: 0 };
+      const normalizedDelta =
+        event.deltaMode === 1
+          ? event.deltaY * 16
+          : event.deltaMode === 2
+            ? event.deltaY * 800
+            : event.deltaY;
+      const factor = Math.max(
+        0.94,
+        Math.min(1.06, Math.pow(2, -normalizedDelta / 600)),
+      );
+      wheelPendingRef.current.zoomFactor *= factor;
+      wheelPendingRef.current.point = point;
+      scheduleWheelFrame();
       return;
     }
-    setViewport((current) => ({
-      ...current,
-      x: current.x - event.deltaX,
-      y: current.y - event.deltaY,
-    }));
+    wheelPendingRef.current.panX += event.deltaX;
+    wheelPendingRef.current.panY += event.deltaY;
+    scheduleWheelFrame();
   }
 
   // --- canvas selection / pointer handlers ---

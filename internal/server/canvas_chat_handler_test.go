@@ -126,6 +126,24 @@ func TestParseCanvasActions_GemmaFormat(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_PlainCallFormat(t *testing.T) {
+	input := "call: {\"tool\": \"create_comment\", \"params\": {\"anchorCardId\": \"asset-1\", \"text\": \"圈出紅色印章\", \"region\": {\"x\": 0.3, \"y\": 0.5, \"width\": 0.4, \"height\": 0.2}}, \"description\": \"註解印章\", \"impact\": \"標記圖片區域\"}\n已經註解。"
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action from plain call format, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "create_comment" {
+		t.Fatalf("expected create_comment, got %s", actions[0].Tool)
+	}
+	if strings.Contains(text, "create_comment") || strings.Contains(text, "call:") {
+		t.Fatalf("text should not contain raw tool call: %q", text)
+	}
+	region, ok := actions[0].Params["region"].(map[string]any)
+	if !ok || region["x"] != 0.3 {
+		t.Fatalf("expected parsed region, got %#v", actions[0].Params["region"])
+	}
+}
+
 func TestSplitParagraphs(t *testing.T) {
 	ps := splitParagraphs("Hello\n\nWorld\n\nDone")
 	if len(ps) != 3 {

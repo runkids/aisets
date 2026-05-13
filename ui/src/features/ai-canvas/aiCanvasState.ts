@@ -131,9 +131,12 @@ export function createCanvasCardId(prefix: string) {
     .slice(2, 8)}`;
 }
 
+const MIN_CANVAS_SCALE = 0.01;
+const MAX_CANVAS_SCALE = 256;
+
 export function clampCanvasScale(value: number) {
   if (!Number.isFinite(value)) return 1;
-  return Math.min(1.8, Math.max(0.45, value));
+  return Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

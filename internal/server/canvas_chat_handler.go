@@ -83,26 +83,106 @@ var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(
 
 var toolCallCleanRe = regexp.MustCompile(`(?s)<\|?/?tool_call\|?>`)
 
+type canvasActionSpan struct {
+	start, end int
+	json       string
+}
+
+func balancedJSONObjectEnd(s string, start int) int {
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(s); i++ {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+			} else if ch == '\\' {
+				escaped = true
+			} else if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = true
+			continue
+		}
+		switch ch {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return -1
+}
+
+func findPlainCanvasCallSpans(content string) []canvasActionSpan {
+	var spans []canvasActionSpan
+	searchStart := 0
+	for {
+		idx := strings.Index(content[searchStart:], "call:")
+		if idx < 0 {
+			break
+		}
+		start := searchStart + idx
+		jsonStart := start + len("call:")
+		for jsonStart < len(content) && strings.ContainsRune(" \n\r\t", rune(content[jsonStart])) {
+			jsonStart++
+		}
+		hasParen := jsonStart < len(content) && content[jsonStart] == '('
+		if hasParen {
+			jsonStart++
+			for jsonStart < len(content) && strings.ContainsRune(" \n\r\t", rune(content[jsonStart])) {
+				jsonStart++
+			}
+		}
+		if jsonStart >= len(content) || content[jsonStart] != '{' {
+			searchStart = start + len("call:")
+			continue
+		}
+		jsonEnd := balancedJSONObjectEnd(content, jsonStart)
+		if jsonEnd < 0 {
+			searchStart = start + len("call:")
+			continue
+		}
+		end := jsonEnd
+		if hasParen {
+			for end < len(content) && strings.ContainsRune(" \n\r\t", rune(content[end])) {
+				end++
+			}
+			if end < len(content) && content[end] == ')' {
+				end++
+			}
+		}
+		spans = append(spans, canvasActionSpan{start: start, end: end, json: content[jsonStart:jsonEnd]})
+		searchStart = end
+	}
+	return spans
+}
+
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
+	plainCallSpans := findPlainCanvasCallSpans(content)
 
-	if len(matches) == 0 && len(toolMatches) == 0 {
+	if len(matches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 {
 		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
 		return strings.TrimSpace(cleaned), nil
 	}
 
-	type span struct {
-		start, end int
-		json       string
-	}
-	var spans []span
+	var spans []canvasActionSpan
 	for _, loc := range matches {
-		spans = append(spans, span{loc[0], loc[1], content[loc[2]:loc[3]]})
+		spans = append(spans, canvasActionSpan{loc[0], loc[1], content[loc[2]:loc[3]]})
 	}
 	for _, loc := range toolMatches {
-		spans = append(spans, span{loc[0], loc[1], content[loc[2]:loc[3]]})
+		spans = append(spans, canvasActionSpan{loc[0], loc[1], content[loc[2]:loc[3]]})
 	}
+	spans = append(spans, plainCallSpans...)
 	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
 
 	var textParts []string

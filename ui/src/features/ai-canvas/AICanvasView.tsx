@@ -20,16 +20,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getCatalogItems, previewImageUrl } from "@/api";
-import { request } from "@/api/client";
 import {
   previewImageToolAssets,
   renderImageToolPreview,
@@ -42,11 +35,6 @@ import {
   IconButton,
   TextInput,
 } from "@/components/ui";
-import {
-  canvasChat,
-  serializeCanvasSnapshot,
-  type CanvasChatEvent,
-} from "@/api/canvasChat";
 import { cn } from "@/lib/cn";
 import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
@@ -60,6 +48,7 @@ import {
   renderMarkdown,
   selectedAssetIds,
   selectionBounds,
+  zoomViewportAtPoint,
 } from "./canvasUtils";
 import {
   buildAssistantBullets,
@@ -78,7 +67,6 @@ import {
   type ChatHistoryEntry,
   type OperationCanvasCard,
   type ProposalCanvasCard,
-  type ProposalStatus,
   type VariantCanvasCard,
 } from "./aiCanvasState";
 import {
@@ -176,7 +164,6 @@ export function AICanvasView({
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const {
     canvasSelection,
-    cardElementsRef,
     registerCardElement,
     handleDragStart,
     handleDragMove,
@@ -262,11 +249,26 @@ export function AICanvasView({
     selectedAssets.length > 0
       ? selectedAssets.map((card) => fileName(card.asset.repoPath)).join(", ")
       : t("aiCanvas.noSelection");
-  const { handleApproveProposal, handleRejectProposal } =
-    useProposalExecution({ cards, t, setCards });
+  const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
+    cards,
+    t,
+    setCards,
+  });
   const { handleAsk, handleStop } = useCanvasChat({
-    scanId, cards, selectedCardId, viewport, chatHistory, prompt, t, rootRef,
-    setCards, setChatHistory, setAiCursor, setError, setWorking, setPrompt,
+    scanId,
+    cards,
+    selectedCardId,
+    viewport,
+    chatHistory,
+    prompt,
+    t,
+    rootRef,
+    setCards,
+    setChatHistory,
+    setAiCursor,
+    setError,
+    setWorking,
+    setPrompt,
   });
   const isWorking = working !== "idle";
   const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
@@ -519,13 +521,23 @@ export function AICanvasView({
     }
   }
 
-
   function clearCanvas() {
     setCards([]);
     setSelectedCardId(undefined);
     setChatHistory([]);
     setError("");
     setClearConfirmOpen(false);
+  }
+
+  function zoomCanvasBy(factor: number) {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    const point = bounds
+      ? { x: bounds.width / 2, y: bounds.height / 2 }
+      : { x: 0, y: 0 };
+    setViewport((current) => {
+      const nextScale = clampCanvasScale(current.scale * factor);
+      return zoomViewportAtPoint(current, point, nextScale);
+    });
   }
 
   function appendPromptToken(token: string) {
@@ -556,7 +568,7 @@ export function AICanvasView({
       className="relative flex min-h-0 flex-1 overscroll-none overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.055)_1px,transparent_0)]"
     >
       <div
-        className="absolute inset-0 cursor-default overscroll-none overflow-hidden"
+        className="absolute inset-0 z-0 cursor-default overscroll-none overflow-hidden"
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerEnd}
@@ -682,7 +694,7 @@ export function AICanvasView({
       {searchOpen ? (
         <aside
           data-ai-canvas-overlay="true"
-          className="pointer-events-auto absolute left-3 top-3 z-20 flex w-[min(620px,calc(100%-24px))] flex-col gap-1 rounded-g-md border border-g-line bg-g-surface/95 p-1 shadow-g-md backdrop-blur"
+          className="pointer-events-auto absolute left-3 top-3 z-50 flex w-[min(620px,calc(100%-24px))] flex-col gap-1 rounded-g-md border border-g-line bg-g-surface/95 p-1 shadow-g-md backdrop-blur"
         >
           <form
             className="flex items-center gap-1"
@@ -775,7 +787,7 @@ export function AICanvasView({
           data-ai-canvas-overlay="true"
           size="md"
           aria-label={t("aiCanvas.openSearch")}
-          className="pointer-events-auto absolute left-3 top-3 z-20 border border-g-line bg-g-surface shadow-g-md"
+          className="pointer-events-auto absolute left-3 top-3 z-50 border border-g-line bg-g-surface shadow-g-md"
           onClick={() => setSearchOpen(true)}
         >
           <Search />
@@ -784,7 +796,7 @@ export function AICanvasView({
 
       <div
         data-ai-canvas-overlay="true"
-        className="pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-1 rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-md"
+        className="pointer-events-auto absolute right-3 top-3 z-50 flex items-center gap-1 rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-md"
       >
         {onExitCanvas && (
           <Button
@@ -799,12 +811,7 @@ export function AICanvasView({
         <IconButton
           size="sm"
           aria-label={t("aiCanvas.zoomOut")}
-          onClick={() =>
-            setViewport((current) => ({
-              ...current,
-              scale: clampCanvasScale(current.scale - 0.12),
-            }))
-          }
+          onClick={() => zoomCanvasBy(1 / 1.25)}
         >
           <ZoomOut />
         </IconButton>
@@ -812,12 +819,7 @@ export function AICanvasView({
         <IconButton
           size="sm"
           aria-label={t("aiCanvas.zoomIn")}
-          onClick={() =>
-            setViewport((current) => ({
-              ...current,
-              scale: clampCanvasScale(current.scale + 0.12),
-            }))
-          }
+          onClick={() => zoomCanvasBy(1.25)}
         >
           <ZoomIn />
         </IconButton>
@@ -851,17 +853,17 @@ export function AICanvasView({
 
       <div
         data-ai-canvas-overlay="true"
-        className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
-        style={{ height: composerCollapsed ? 130 : composerHeight }}
+        className="pointer-events-auto absolute inset-x-0 bottom-0 z-[60] mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+        style={{ height: composerCollapsed ? 92 : composerHeight }}
       >
         <div className="relative h-full">
           <div
             className={cn(
-              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
-              composerCollapsed && "!h-12",
+              "absolute inset-x-7 bottom-[52px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
+              composerCollapsed && "!h-[44px]",
             )}
             style={
-              composerCollapsed ? undefined : { height: composerHeight - 90 }
+              composerCollapsed ? undefined : { height: composerHeight - 72 }
             }
           >
             {!composerCollapsed && (
@@ -924,7 +926,7 @@ export function AICanvasView({
               <div
                 ref={chatScrollRef}
                 data-ai-canvas-scroll="true"
-                className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-3"
+                className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-16"
               >
                 {chatHistory.length === 0 ? (
                   <div className="py-4 text-center text-g-caption text-white/30">
@@ -960,7 +962,7 @@ export function AICanvasView({
             )}
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 rounded-[32px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-3 py-3 shadow-g-pop backdrop-blur-xl">
+          <div className="absolute inset-x-0 bottom-0 rounded-[28px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-2.5 py-2 shadow-g-pop backdrop-blur-xl">
             {composerToolsOpen && (
               <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/[0.06] pb-3 text-g-caption text-white/58">
                 {composerPreviewOpen && (
@@ -1094,7 +1096,7 @@ export function AICanvasView({
                 )}
               </div>
             )}
-            <div className="flex h-12 items-center gap-2">
+            <div className="flex min-h-9 items-center gap-1.5">
               <IconButton
                 size="md"
                 aria-label={t("aiCanvas.addAttachment")}
@@ -1114,7 +1116,7 @@ export function AICanvasView({
               <textarea
                 value={prompt}
                 placeholder={t("aiCanvas.composerPlaceholder")}
-                className="min-h-6 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-6 text-white outline-none placeholder:text-white/35"
+                className="max-h-20 min-h-5 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-5 text-white outline-none placeholder:text-white/35"
                 rows={1}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
@@ -1178,7 +1180,7 @@ export function AICanvasView({
       {debugOpen && (
         <div
           data-ai-canvas-overlay="true"
-          className="pointer-events-auto absolute right-3 bottom-[160px] z-40 max-h-[60vh] w-[420px] overflow-auto rounded-g-md border border-white/10 bg-[rgba(20,20,20,0.95)] p-3 font-mono text-[11px] leading-[1.5] text-green-400 shadow-g-pop backdrop-blur-xl"
+          className="pointer-events-auto absolute right-3 bottom-[160px] z-[70] max-h-[60vh] w-[420px] overflow-auto rounded-g-md border border-white/10 bg-[rgba(20,20,20,0.95)] p-3 font-mono text-[11px] leading-[1.5] text-green-400 shadow-g-pop backdrop-blur-xl"
           data-ai-canvas-scroll="true"
           onPointerDown={(e) => e.stopPropagation()}
         >

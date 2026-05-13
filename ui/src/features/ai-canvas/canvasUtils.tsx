@@ -28,10 +28,7 @@ export function nowISO() {
   return new Date().toISOString();
 }
 
-export function renderInline(
-  line: string,
-  keyPrefix: string,
-): ReactNode[] {
+export function renderInline(line: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   for (let j = 0; j < tokens.length; j++) {
@@ -205,6 +202,20 @@ export function imageMeta(asset: AssetItem) {
 
 export function tagLabel(asset: AssetItem) {
   return asset.aiTag?.tags?.slice(0, 4).join(", ") || "";
+}
+
+export function zoomViewportAtPoint(
+  viewport: { x: number; y: number; scale: number },
+  point: { x: number; y: number },
+  nextScale: number,
+) {
+  const worldX = (point.x - viewport.x) / viewport.scale;
+  const worldY = (point.y - viewport.y) / viewport.scale;
+  return {
+    x: point.x - worldX * nextScale,
+    y: point.y - worldY * nextScale,
+    scale: nextScale,
+  };
 }
 
 export function selectionBounds(selection: CanvasSelection) {

@@ -15,7 +15,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { Badge, Button, IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import type { AssetItem } from "@/types";
 import { fileName, formatBytes, formatExt } from "@/ui";
 import {
   cardDisplayName,
