@@ -1999,7 +1999,13 @@
     "noSavingsShort": "±0",
     "sizeIncrease": "+{{pct}}%",
     "processing": "Processing…",
-    "queued": "Queued"
+    "queued": "Queued",
+    "convertN": "Convert {{count}}",
+    "nSelected": "{{count}} selected",
+    "savedTo": "Saved to project",
+    "tempDownload": "Temporary — download to save",
+    "selectOrDrop": "Select images from the catalog or drop files here",
+    "readyHint": "Ready — press Convert"
   },
   "precheck": {
     "title": "Pre-Check",

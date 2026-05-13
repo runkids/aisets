@@ -1128,7 +1128,13 @@
     "noSavingsShort": "±0",
     "sizeIncrease": "+{{pct}}%",
     "processing": "處理中…",
-    "queued": "佇列中"
+    "queued": "佇列中",
+    "convertN": "轉換 {{count}} 張",
+    "nSelected": "已選 {{count}} 張",
+    "savedTo": "已儲存至專案",
+    "tempDownload": "暫存檔案，請下載保存",
+    "selectOrDrop": "從目錄選擇圖片或拖放檔案到這裡",
+    "readyHint": "準備好了，按轉換"
   },
   "precheck": {
     "title": "預檢",
