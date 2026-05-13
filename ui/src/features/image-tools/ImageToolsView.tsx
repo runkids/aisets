@@ -428,7 +428,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               key={virtualRow.key}
                               ref={wallVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="absolute left-0 top-0 grid w-full gap-4"
+                              className="absolute left-0 top-0 grid w-full gap-4 pb-4"
                               style={{
                                 gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
                                 transform: `translateY(${virtualRow.start}px)`,
