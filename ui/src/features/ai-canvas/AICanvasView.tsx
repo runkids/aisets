@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ArrowUp,
   AtSign,
+  Check,
   CheckCircle2,
   Eye,
   ImagePlus,
@@ -15,7 +16,9 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Square,
   Trash2,
+  XCircle,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -43,6 +46,11 @@ import {
   IconButton,
   TextInput,
 } from "@/components/ui";
+import {
+  canvasChat,
+  serializeCanvasSnapshot,
+  type CanvasChatEvent,
+} from "@/api/canvasChat";
 import { cn } from "@/lib/cn";
 import type { AssetItem } from "@/types";
 import { fileName, formatBytes, formatExt } from "@/ui";
@@ -54,7 +62,6 @@ import {
   commentsForAssets,
   createCanvasCardId,
   emptyAICanvasSession,
-  inferPromptIntent,
   readAICanvasSession,
   selectedAssetCards,
   writeAICanvasSession,
@@ -62,7 +69,10 @@ import {
   type AssetCanvasCard,
   type CanvasCard,
   type CommentCanvasCard,
+  type ChatHistoryEntry,
   type OperationCanvasCard,
+  type ProposalCanvasCard,
+  type ProposalStatus,
   type VariantCanvasCard,
 } from "./aiCanvasState";
 
@@ -496,6 +506,121 @@ function OperationCardBody({ card }: { card: OperationCanvasCard }) {
   );
 }
 
+function ProposalCardBody({
+  card,
+  onApprove,
+  onReject,
+}: {
+  card: ProposalCanvasCard;
+  onApprove: (card: ProposalCanvasCard) => void;
+  onReject: (card: ProposalCanvasCard) => void;
+}) {
+  const { t } = useTranslation();
+  const isPending = card.status === "pending";
+  const isExecuting = card.status === "executing";
+  const isCompleted = card.status === "completed";
+  const isFailed = card.status === "failed";
+  const isRejected = card.status === "rejected";
+
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <div className="flex flex-wrap gap-1.5">
+        <Badge tone={isPending ? "amber" : isCompleted ? "green" : isRejected ? "line" : isFailed ? "red" : "blue"}>
+          {card.tool.replaceAll("_", " ")}
+        </Badge>
+        <Badge tone={isCompleted ? "green" : isRejected ? "line" : isPending ? "amber" : "line"}>
+          {isExecuting
+            ? t("aiCanvas.executing")
+            : isCompleted
+              ? t("aiCanvas.completed")
+              : isRejected
+                ? t("aiCanvas.rejected")
+                : isFailed
+                  ? t("aiCanvas.failed")
+                  : t("aiCanvas.pending")}
+        </Badge>
+      </div>
+      <p className={cn("text-g-body leading-[1.45] text-g-ink", isRejected && "line-through opacity-50")}>
+        {card.description}
+      </p>
+      {card.impact && (
+        <p className="text-g-caption text-g-ink-3">{card.impact}</p>
+      )}
+      {card.error && (
+        <p className="text-g-caption text-g-red">{card.error}</p>
+      )}
+      {isPending && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant="primary"
+            leadingIcon={<Check />}
+            onClick={() => onApprove(card)}
+          >
+            {t("aiCanvas.approve")}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            leadingIcon={<XCircle />}
+            onClick={() => onReject(card)}
+          >
+            {t("aiCanvas.reject")}
+          </Button>
+        </div>
+      )}
+      {isExecuting && (
+        <div className="flex items-center gap-2 text-g-caption text-g-ink-3">
+          <LoaderCircle size={14} className="animate-spin" />
+          {t("aiCanvas.executing")}
+        </div>
+      )}
+      {isFailed && (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => onApprove(card)}
+        >
+          {t("aiCanvas.retry")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function AICursor({
+  position,
+  label,
+  visible,
+  status,
+}: {
+  position: { x: number; y: number };
+  label?: string;
+  visible: boolean;
+  status?: "thinking" | "acting" | "idle";
+}) {
+  if (!visible) return null;
+  return (
+    <div
+      className="pointer-events-none absolute z-[60] transition-transform duration-300 ease-out"
+      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+    >
+      <div className="flex items-center gap-1.5">
+        <div
+          className={cn(
+            "size-4 rounded-full border-2 border-g-purple bg-g-purple shadow-g-sm",
+            status === "thinking" && "animate-pulse",
+          )}
+        />
+        <div className="flex items-center gap-1 rounded-g-sm bg-g-purple px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm">
+          <span>AI</span>
+          {label && <span className="max-w-[120px] truncate opacity-80">· {label}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AICanvasView({
   scanId,
   aiEnabled,
@@ -523,8 +648,19 @@ export function AICanvasView({
   const [composerCollapsed, setComposerCollapsed] = useState(false);
   const [composerPreviewOpen, setComposerPreviewOpen] = useState(false);
   const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
+    initialSession.chatHistory ?? [],
+  );
+  const [aiCursor, setAiCursor] = useState<{
+    x: number;
+    y: number;
+    label?: string;
+    visible: boolean;
+    status?: "thinking" | "acting" | "idle";
+  }>({ x: 0, y: 0, visible: false });
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
   const canvasSelectionRef = useRef<CanvasSelection | null>(null);
@@ -572,8 +708,9 @@ export function AICanvasView({
       cards,
       selectedCardId,
       viewport,
+      chatHistory: chatHistory.slice(-10),
     });
-  }, [cards, selectedCardId, viewport]);
+  }, [cards, selectedCardId, viewport, chatHistory]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -889,45 +1026,6 @@ export function AICanvasView({
     setSelectedCardId(id);
   }
 
-  function createEditTask(assetCard: AssetCanvasCard, promptText: string) {
-    const createdAt = nowISO();
-    const comment: CommentCanvasCard = {
-      id: createCanvasCardId("comment"),
-      kind: "comment",
-      x: assetCard.x + CARD_WIDTH + 36,
-      y: assetCard.y + 40,
-      createdAt,
-      anchorId: assetCard.id,
-      text: promptText,
-      region: {
-        x: 0.32,
-        y: 0.28,
-        width: 0.34,
-        height: 0.24,
-      },
-    };
-    const assistant: CanvasCard = {
-      id: createCanvasCardId("ai"),
-      kind: "assistant",
-      x: assetCard.x + CARD_WIDTH + 36,
-      y: assetCard.y + 260,
-      createdAt,
-      prompt: promptText,
-      message: t("aiCanvas.editTaskCreated"),
-      bullets: [
-        ...buildAssistantBullets(promptText, [...cards, comment], assetCard.id),
-        t("aiCanvas.editTaskLimit"),
-        t("aiCanvas.editTaskNext"),
-      ],
-      assetIds: [assetCard.asset.id],
-      commentIds: [comment.id],
-    };
-
-    setCards((current) => [...current, comment, assistant]);
-    setSelectedCardId(assistant.id);
-    setError("");
-  }
-
   async function createImagePreview(
     assetCard: AssetCanvasCard,
     promptText: string,
@@ -1007,56 +1105,173 @@ export function AICanvasView({
   async function handleAsk() {
     const promptText = prompt.trim();
     if (!promptText) return;
-    const assetCards = selectedAssets;
-    const intent = inferPromptIntent(promptText);
     setPrompt("");
-
-    if (intent === "comment") {
-      const target = assetCards[0];
-      if (!target) {
-        setError(t("aiCanvas.selectionRequired"));
-        addAssistantCard(promptText, t("aiCanvas.selectionRequired"));
-        return;
-      }
-      addComment(target, promptText);
-      return;
-    }
-
-    if (intent === "operationPreview") {
-      if (assetCards.length === 0) {
-        setError(t("aiCanvas.selectionRequired"));
-        addAssistantCard(promptText, t("aiCanvas.selectionRequired"));
-        return;
-      }
-      await createOperationPreview(assetCards, promptText);
-      return;
-    }
-
-    if (intent === "imageEdit") {
-      const target = assetCards[0];
-      if (!target) {
-        setError(t("aiCanvas.selectionRequired"));
-        addAssistantCard(promptText, t("aiCanvas.selectionRequired"));
-        return;
-      }
-      createEditTask(target, promptText);
-      return;
-    }
-
-    if (intent === "imagePreview") {
-      const target = assetCards[0];
-      if (!target) {
-        setError(t("aiCanvas.selectionRequired"));
-        addAssistantCard(promptText, t("aiCanvas.selectionRequired"));
-        return;
-      }
-      await createImagePreview(target, promptText);
-      return;
-    }
-
+    setError("");
     setWorking("ai");
-    addAssistantCard(promptText);
-    setWorking("idle");
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    const messages: ChatHistoryEntry[] = [
+      ...chatHistory,
+      { role: "user", content: promptText },
+    ];
+    const snapshot = serializeCanvasSnapshot(cards, selectedCardId, viewport);
+
+    let assistantText = "";
+    const newCards: CanvasCard[] = [];
+
+    function handleEvent(event: CanvasChatEvent) {
+      if (event.type === "focus" && event.cardId) {
+        const target = cards.find((c) => c.id === event.cardId);
+        if (target) {
+          setAiCursor({
+            x: target.x + CARD_WIDTH / 2,
+            y: target.y - 24,
+            label: event.label,
+            visible: true,
+            status: "acting",
+          });
+        }
+      }
+      if (event.type === "focus" && !event.cardId) {
+        setAiCursor((prev) => ({ ...prev, visible: false }));
+      }
+      if (event.type === "thinking") {
+        setAiCursor((prev) => ({ ...prev, status: "thinking", visible: true }));
+      }
+      if (event.type === "text") {
+        assistantText += (assistantText ? "\n\n" : "") + event.content;
+      }
+      if (event.type === "proposal") {
+        const pos = nextCardPosition(cards.length + newCards.length);
+        const card: ProposalCanvasCard = {
+          id: createCanvasCardId("proposal"),
+          kind: "proposal",
+          x: pos.x + CARD_WIDTH + 36,
+          y: pos.y + newCards.length * 60,
+          createdAt: nowISO(),
+          proposalId: event.id,
+          tool: event.tool,
+          params: event.params,
+          description: event.description,
+          impact: event.impact,
+          status: "pending",
+          sourceAssetId: event.targetAssetId,
+        };
+        newCards.push(card);
+        setCards((current) => [...current, card]);
+      }
+      if (event.type === "action_result" && event.tool === "focus_card") {
+        const result = event.result as { cardId?: string; label?: string };
+        if (result?.cardId) {
+          const target = cards.find((c) => c.id === result.cardId);
+          if (target) {
+            setAiCursor({
+              x: target.x + CARD_WIDTH / 2,
+              y: target.y - 24,
+              label: result.label,
+              visible: true,
+              status: "acting",
+            });
+          }
+        }
+      }
+    }
+
+    try {
+      await canvasChat({
+        messages,
+        canvas: snapshot,
+        locale: "zh-TW",
+        onEvent: handleEvent,
+        signal: abort.signal,
+      });
+
+      if (assistantText) {
+        const pos = nextCardPosition(cards.length + newCards.length);
+        const card: CanvasCard = {
+          id: createCanvasCardId("ai"),
+          kind: "assistant",
+          x: pos.x + CARD_WIDTH + 36,
+          y: pos.y,
+          createdAt: nowISO(),
+          prompt: promptText,
+          message: assistantText,
+          bullets: [],
+          assetIds: selectedAssets.map((c) => c.asset.id),
+          commentIds: [],
+        };
+        setCards((current) => [...current, card]);
+        setSelectedCardId(card.id);
+      }
+
+      setChatHistory((prev) => [
+        ...prev.slice(-9),
+        { role: "user", content: promptText },
+        ...(assistantText
+          ? [{ role: "assistant", content: assistantText }]
+          : []),
+      ]);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setError(
+          err instanceof Error ? err.message : t("aiCanvas.operationError"),
+        );
+      }
+    } finally {
+      setWorking("idle");
+      setAiCursor((prev) => ({ ...prev, visible: false, status: "idle" }));
+      abortRef.current = null;
+    }
+  }
+
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
+  function updateProposalStatus(
+    proposalId: string,
+    status: ProposalStatus,
+    extra?: Partial<ProposalCanvasCard>,
+  ) {
+    setCards((current) =>
+      current.map((card) =>
+        card.kind === "proposal" && card.proposalId === proposalId
+          ? { ...card, status, ...extra }
+          : card,
+      ),
+    );
+  }
+
+  function handleApproveProposal(card: ProposalCanvasCard) {
+    const assetStillOnCanvas = !card.sourceAssetId || cards.some(
+      (c) => c.kind === "asset" && c.asset.id === card.sourceAssetId,
+    );
+    if (!assetStillOnCanvas) {
+      updateProposalStatus(card.proposalId, "failed", {
+        error: t("aiCanvas.assetRemovedError"),
+      });
+      return;
+    }
+    updateProposalStatus(card.proposalId, "executing");
+    void executeProposal(card);
+  }
+
+  async function executeProposal(card: ProposalCanvasCard) {
+    try {
+      // TODO: wire each tool to its existing API (renderImageToolPreview, /api/assets/tags, etc.)
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      updateProposalStatus(card.proposalId, "completed");
+    } catch (err) {
+      updateProposalStatus(card.proposalId, "failed", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+
+  function handleRejectProposal(card: ProposalCanvasCard) {
+    updateProposalStatus(card.proposalId, "rejected");
   }
 
   function clearCanvas() {
@@ -1092,6 +1307,7 @@ export function AICanvasView({
     if (card.kind === "comment") return card.text || t("aiCanvas.emptyComment");
     if (card.kind === "variant") return t("aiCanvas.previewGenerated");
     if (card.kind === "operation") return card.prompt;
+    if (card.kind === "proposal") return `${card.tool}: ${card.description}`;
     return cardDisplayName(card);
   }
 
@@ -1150,11 +1366,23 @@ export function AICanvasView({
                 <AssistantCardBody card={card} />
               ) : card.kind === "variant" ? (
                 <VariantCardBody card={card} />
-              ) : (
+              ) : card.kind === "proposal" ? (
+                <ProposalCardBody
+                  card={card}
+                  onApprove={handleApproveProposal}
+                  onReject={handleRejectProposal}
+                />
+              ) : card.kind === "operation" ? (
                 <OperationCardBody card={card} />
-              )}
+              ) : null}
             </CardShell>
           ))}
+          <AICursor
+            position={{ x: aiCursor.x, y: aiCursor.y }}
+            label={aiCursor.label}
+            visible={aiCursor.visible}
+            status={aiCursor.status}
+          />
         </div>
       </div>
 
@@ -1503,19 +1731,26 @@ export function AICanvasView({
               >
                 <SlidersHorizontal />
               </IconButton>
-              <IconButton
-                size="md"
-                aria-label={t("aiCanvas.ask")}
-                disabled={prompt.trim() === "" || isWorking}
-                className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
-                onClick={() => void handleAsk()}
-              >
-                {isWorking ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
+              {isWorking ? (
+                <IconButton
+                  size="md"
+                  aria-label={t("aiCanvas.stopChat")}
+                  className="rounded-full border-g-red bg-g-red text-white hover:bg-g-red/90"
+                  onClick={handleStop}
+                >
+                  <Square size={14} />
+                </IconButton>
+              ) : (
+                <IconButton
+                  size="md"
+                  aria-label={t("aiCanvas.ask")}
+                  disabled={prompt.trim() === ""}
+                  className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
+                  onClick={() => void handleAsk()}
+                >
                   <ArrowUp />
-                )}
-              </IconButton>
+                </IconButton>
+              )}
             </div>
           </div>
         </div>

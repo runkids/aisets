@@ -121,7 +121,17 @@
     "previewTools": "Preview tools",
     "advancedChat": "Advanced chat",
     "autoReview": "Auto review",
-    "modelHigh": "5.5 high"
+    "modelHigh": "5.5 high",
+    "approve": "Approve",
+    "reject": "Reject",
+    "retry": "Retry",
+    "executing": "Executing…",
+    "completed": "Completed",
+    "rejected": "Rejected",
+    "failed": "Failed",
+    "pending": "Pending",
+    "stopChat": "Stop AI",
+    "assetRemovedError": "This asset is no longer on the canvas."
   },
   "favorites": {
     "add": "Add to Favorites",

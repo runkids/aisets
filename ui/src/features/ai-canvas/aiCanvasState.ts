@@ -64,18 +64,42 @@ export type OperationCanvasCard = CanvasCardBase & {
   assetIds: string[];
 };
 
+export type ProposalStatus =
+  | "pending"
+  | "executing"
+  | "completed"
+  | "rejected"
+  | "failed";
+
+export type ProposalCanvasCard = CanvasCardBase & {
+  kind: "proposal";
+  proposalId: string;
+  tool: string;
+  params: Record<string, unknown>;
+  description: string;
+  impact: string;
+  status: ProposalStatus;
+  result?: unknown;
+  error?: string;
+  sourceAssetId?: string;
+};
+
 export type CanvasCard =
   | AssetCanvasCard
   | CommentCanvasCard
   | AssistantCanvasCard
   | VariantCanvasCard
-  | OperationCanvasCard;
+  | OperationCanvasCard
+  | ProposalCanvasCard;
+
+export type ChatHistoryEntry = { role: string; content: string };
 
 export type AICanvasSession = {
   version: 1;
   cards: CanvasCard[];
   selectedCardId?: string;
   viewport: CanvasViewport;
+  chatHistory?: ChatHistoryEntry[];
 };
 
 export type AICanvasPromptIntent =
@@ -246,6 +270,35 @@ function normalizeCard(value: unknown): CanvasCard | null {
     };
   }
 
+  if (kind === "proposal" && typeof value.tool === "string") {
+    return {
+      id,
+      kind,
+      x,
+      y,
+      createdAt,
+      proposalId:
+        typeof value.proposalId === "string" ? value.proposalId : id,
+      tool: value.tool,
+      params: isRecord(value.params)
+        ? (value.params as Record<string, unknown>)
+        : {},
+      description:
+        typeof value.description === "string" ? value.description : "",
+      impact: typeof value.impact === "string" ? value.impact : "",
+      status:
+        typeof value.status === "string"
+          ? (value.status as ProposalStatus)
+          : "pending",
+      result: value.result,
+      error: typeof value.error === "string" ? value.error : undefined,
+      sourceAssetId:
+        typeof value.sourceAssetId === "string"
+          ? value.sourceAssetId
+          : undefined,
+    };
+  }
+
   return null;
 }
 
@@ -263,6 +316,17 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
       ? value.selectedCardId
       : undefined;
 
+  const chatHistory = Array.isArray(value.chatHistory)
+    ? (value.chatHistory as unknown[])
+        .filter(
+          (e): e is ChatHistoryEntry =>
+            isRecord(e) &&
+            typeof e.role === "string" &&
+            typeof e.content === "string",
+        )
+        .slice(-10)
+    : [];
+
   return {
     version: 1,
     cards,
@@ -272,6 +336,7 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
       y: Number(viewport.y) || 0,
       scale: clampCanvasScale(Number(viewport.scale) || 1),
     },
+    chatHistory,
   };
 }
 
@@ -334,6 +399,7 @@ export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "comment") return card.text || "Comment";
   if (card.kind === "assistant") return card.prompt || "AI";
   if (card.kind === "variant") return card.sourceName;
+  if (card.kind === "proposal") return card.description || card.tool;
   return card.prompt || "Preview";
 }
 

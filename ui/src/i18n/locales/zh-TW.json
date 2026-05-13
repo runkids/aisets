@@ -121,7 +121,17 @@
     "previewTools": "預覽工具",
     "advancedChat": "進階聊天",
     "autoReview": "自動審核",
-    "modelHigh": "5.5 高"
+    "modelHigh": "5.5 高",
+    "approve": "核准",
+    "reject": "拒絕",
+    "retry": "重試",
+    "executing": "執行中…",
+    "completed": "已完成",
+    "rejected": "已拒絕",
+    "failed": "失敗",
+    "pending": "待確認",
+    "stopChat": "停止 AI",
+    "assetRemovedError": "此 asset 已不在畫布上"
   },
   "favorites": {
     "add": "加入收藏",
