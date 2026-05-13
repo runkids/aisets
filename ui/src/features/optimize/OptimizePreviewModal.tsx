@@ -45,7 +45,7 @@ export function OptimizePreviewModal({
   return (
     <Modal
       title={t("optimize.previewTitle")}
-      description={`${operations.length} ${t("asset.assets", { count: operations.length })} · ${t("optimize.previewSaves", { savings: formatBytes(totalSavings), pct: totalPct, defaultValue: "saves {{savings}} ({{pct}}%)" })}`}
+      description={`${t("asset.assets", { count: operations.length })} · ${t("optimize.previewSaves", { savings: formatBytes(totalSavings), pct: totalPct, defaultValue: "saves {{savings}} ({{pct}}%)" })}`}
       onClose={onClose}
       size="lg"
       className="max-w-[1200px] h-[min(86vh,760px)]"

@@ -158,7 +158,19 @@
     "clearConfirmAction": "Clear all",
     "pendingProposals": "{{count}} pending proposals — select one or approve all",
     "approveAll": "Approve all",
-    "rejectAll": "Reject all"
+    "rejectAll": "Reject all",
+    "screenshot": "Screenshot",
+    "captureViewport": "Capture viewport",
+    "captureCanvas": "Capture entire canvas",
+    "captureSelected": "Capture selected",
+    "transparentBg": "Transparent",
+    "copy": "Copy",
+    "download": "Download",
+    "captureSuccess": "Screenshot copied to clipboard",
+    "captureDownloaded": "Screenshot downloaded",
+    "captureError": "Screenshot failed",
+    "captureNoSelection": "No cards selected",
+    "multiSelected": "{{count}} cards selected"
   },
   "favorites": {
     "add": "Add to Favorites",

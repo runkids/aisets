@@ -118,7 +118,7 @@ export function CardShell({
   width?: number;
   children: ReactNode;
   position?: { x: number; y: number };
-  onSelect: (id: string) => void;
+  onSelect: (id: string, shiftKey?: boolean) => void;
   onDragStart: (
     event: ReactPointerEvent<HTMLDivElement>,
     card: CanvasCard,
@@ -180,7 +180,7 @@ export function CardShell({
       }}
       data-ai-canvas-card="true"
       data-selected={selected || undefined}
-      onPointerDown={() => onSelect(card.id)}
+      onPointerDown={(e) => onSelect(card.id, e.shiftKey)}
     >
       {compact ? (
         <div
@@ -392,6 +392,7 @@ export function AssetCardBody({
     <div className="flex flex-col">
       <div
         ref={imageContainerRef}
+        data-ai-canvas-asset-frame="true"
         className={cn(
           "relative aspect-[4/3]",
           compact ? "bg-transparent" : "bg-g-surface-2",

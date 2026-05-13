@@ -263,3 +263,48 @@ export function cardTone(card: CanvasCard) {
   if (card.kind === "variant") return "border-g-blue/50";
   return "border-g-green/50";
 }
+
+export function cardsBoundingBox(
+  cards: CanvasCard[],
+  ids: string[],
+  cardWidths: Record<string, number>,
+  cardElements: Map<string, HTMLElement>,
+): { x: number; y: number; w: number; h: number } | null {
+  if (ids.length === 0) return null;
+  const idSet = new Set(ids);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let found = 0;
+  for (const card of cards) {
+    if (!idSet.has(card.id)) continue;
+    const el = cardElements.get(card.id);
+    const w = cardWidths[card.id] ?? el?.offsetWidth ?? CARD_WIDTH;
+    const h = el?.offsetHeight ?? 240;
+    minX = Math.min(minX, card.x);
+    minY = Math.min(minY, card.y);
+    maxX = Math.max(maxX, card.x + w);
+    maxY = Math.max(maxY, card.y + h);
+    found++;
+  }
+  if (found === 0) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+export function viewportToFitBounds(
+  bounds: { x: number; y: number; w: number; h: number },
+  containerSize: { width: number; height: number },
+  padding = 40,
+) {
+  const availW = containerSize.width - padding * 2;
+  const availH = containerSize.height - padding * 2;
+  const scale = Math.min(1, availW / bounds.w, availH / bounds.h);
+  const cx = bounds.x + bounds.w / 2;
+  const cy = bounds.y + bounds.h / 2;
+  return {
+    x: containerSize.width / 2 - cx * scale,
+    y: containerSize.height / 2 - cy * scale,
+    scale,
+  };
+}

@@ -1,3 +1,4 @@
+mod composite;
 mod convert;
 mod exif;
 mod hash;
@@ -116,6 +117,12 @@ enum Command {
         /// Output PNG file path
         output: String,
     },
+    /// Composite multiple images onto a canvas (JSON spec via stdin)
+    Composite {
+        /// Output PNG file path (default: stdout)
+        #[arg(long)]
+        output: Option<String>,
+    },
     /// Extract EXIF metadata (GPS, camera, date, orientation, DPI)
     Exif {
         /// Input file path
@@ -167,6 +174,7 @@ fn main() {
             input,
             output,
         } => vlm_normalize::run(&input, &output, &purpose, max_size, &background),
+        Command::Composite { output } => composite::run(output.as_deref()),
         Command::Exif { input } => exif::run(&input),
         Command::Version => {
             println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));

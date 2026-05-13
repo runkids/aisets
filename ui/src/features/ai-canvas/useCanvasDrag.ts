@@ -19,11 +19,12 @@ export function useCanvasDrag(opts: {
   rootRef: React.RefObject<HTMLDivElement | null>;
   viewport: { x: number; y: number; scale: number };
   cards: CanvasCard[];
+  selectedCardIds: string[];
   setCards: React.Dispatch<React.SetStateAction<CanvasCard[]>>;
   setViewport: React.Dispatch<
     React.SetStateAction<{ x: number; y: number; scale: number }>
   >;
-  setSelectedCardId: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setSelectedCardIds: React.Dispatch<React.SetStateAction<string[]>>;
   setDragPreview: React.Dispatch<
     React.SetStateAction<{ cardId: string; x: number; y: number } | null>
   >;
@@ -46,9 +47,10 @@ export function useCanvasDrag(opts: {
     rootRef,
     viewport,
     cards,
+    selectedCardIds,
     setCards,
     setViewport,
-    setSelectedCardId,
+    setSelectedCardIds,
     setDragPreview,
   } = opts;
 
@@ -69,6 +71,12 @@ export function useCanvasDrag(opts: {
     currentY: number;
     previewsConnectors: boolean;
     lastPreviewAt: number;
+    peers: Array<{
+      id: string;
+      el: HTMLElement;
+      startX: number;
+      startY: number;
+    }>;
   } | null>(null);
   const wheelFrameRef = useRef<number | null>(null);
   const wheelPendingRef = useRef<{
@@ -137,8 +145,16 @@ export function useCanvasDrag(opts: {
     dragFrameRef.current = null;
     const drag = dragRef.current;
     if (!drag?.element) return;
+    const dx = drag.currentX - drag.startX;
+    const dy = drag.currentY - drag.startY;
     drag.element.style.transform =
       "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+    const peers = drag.peers;
+    for (let i = 0; i < peers.length; i++) {
+      const p = peers[i];
+      p.el.style.transform =
+        "translate(" + (p.startX + dx) + "px, " + (p.startY + dy) + "px)";
+    }
     if (drag.previewsConnectors) {
       const now = performance.now();
       if (now - drag.lastPreviewAt >= 32) {
@@ -217,6 +233,29 @@ export function useCanvasDrag(opts: {
     if (previewsConnectors) {
       setDragPreview({ cardId: card.id, x: card.x, y: card.y });
     }
+    const peers: Array<{
+      id: string;
+      el: HTMLElement;
+      startX: number;
+      startY: number;
+    }> = [];
+    if (selectedCardIds.includes(card.id)) {
+      for (const peerId of selectedCardIds) {
+        if (peerId === card.id) continue;
+        const peerEl = cardElementsRef.current.get(peerId);
+        const peerCard = cards.find((c) => c.id === peerId);
+        if (peerEl && peerCard) {
+          peerEl.style.willChange = "transform";
+          peerEl.style.zIndex = "35";
+          peers.push({
+            id: peerId,
+            el: peerEl,
+            startX: peerCard.x,
+            startY: peerCard.y,
+          });
+        }
+      }
+    }
     dragRef.current = {
       cardId: card.id,
       element,
@@ -228,6 +267,7 @@ export function useCanvasDrag(opts: {
       currentY: card.y,
       previewsConnectors,
       lastPreviewAt: 0,
+      peers,
     };
   }
 
@@ -252,18 +292,33 @@ export function useCanvasDrag(opts: {
       window.cancelAnimationFrame(dragFrameRef.current);
       dragFrameRef.current = null;
     }
+    const dx = drag.currentX - drag.startX;
+    const dy = drag.currentY - drag.startY;
     if (drag.element) {
       drag.element.style.transform =
         "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
       drag.element.style.willChange = "";
       drag.element.style.zIndex = "";
     }
+    const endPeers = drag.peers;
+    for (let i = 0; i < endPeers.length; i++) {
+      const p = endPeers[i];
+      p.el.style.transform =
+        "translate(" + (p.startX + dx) + "px, " + (p.startY + dy) + "px)";
+      p.el.style.willChange = "";
+      p.el.style.zIndex = "";
+    }
+    const peerUpdates = new Map(
+      endPeers.map((p) => [p.id, { x: p.startX + dx, y: p.startY + dy }]),
+    );
     setCards((current) =>
-      current.map((card) =>
-        card.id === drag.cardId
-          ? { ...card, x: drag.currentX, y: drag.currentY }
-          : card,
-      ),
+      current.map((card) => {
+        if (card.id === drag.cardId)
+          return { ...card, x: drag.currentX, y: drag.currentY };
+        const peerPos = peerUpdates.get(card.id);
+        if (peerPos) return { ...card, x: peerPos.x, y: peerPos.y };
+        return card;
+      }),
     );
     if (drag.previewsConnectors) setDragPreview(null);
     dragRef.current = null;
@@ -271,9 +326,7 @@ export function useCanvasDrag(opts: {
 
   // --- wheel handler ---
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
       const bounds = rootRef.current?.getBoundingClientRect();
       const point = bounds
         ? { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
@@ -338,21 +391,23 @@ export function useCanvasDrag(opts: {
     if (!selection) return;
     const bounds = selectionBounds(selection);
     const rootBounds = rootRef.current?.getBoundingClientRect();
-    const selected =
+    const matchedIds: string[] =
       rootBounds && bounds.width > 4 && bounds.height > 4
-        ? cards.find((card) => {
-            const element = cardElementsRef.current.get(card.id);
-            if (!element) return false;
-            const rect = element.getBoundingClientRect();
-            return intersects(bounds, {
-              left: rect.left - rootBounds.left,
-              top: rect.top - rootBounds.top,
-              width: rect.width,
-              height: rect.height,
-            });
-          })
-        : undefined;
-    setSelectedCardId(selected?.id);
+        ? cards
+            .filter((card) => {
+              const element = cardElementsRef.current.get(card.id);
+              if (!element) return false;
+              const rect = element.getBoundingClientRect();
+              return intersects(bounds, {
+                left: rect.left - rootBounds.left,
+                top: rect.top - rootBounds.top,
+                width: rect.width,
+                height: rect.height,
+              });
+            })
+            .map((card) => card.id)
+        : [];
+    setSelectedCardIds(matchedIds);
     canvasSelectionRef.current = null;
     setCanvasSelection(null);
   }

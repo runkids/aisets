@@ -2,9 +2,12 @@ import {
   ArrowLeft,
   ArrowUp,
   AtSign,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardCopy,
+  Download,
   Eye,
   EyeOff,
   Layers3,
@@ -61,6 +64,11 @@ import {
   selectionBounds,
   zoomViewportAtPoint,
 } from "./canvasUtils";
+import {
+  copyBlobToClipboard,
+  downloadBlob,
+  useCanvasCapture,
+} from "./useCanvasCapture";
 import {
   buildAssistantBullets,
   cardIdsForDeletion,
@@ -161,9 +169,10 @@ export function AICanvasView({
     return readAICanvasSession(window.sessionStorage);
   }, []);
   const [cards, setCards] = useState<CanvasCard[]>(initialSession.cards);
-  const [selectedCardId, setSelectedCardId] = useState<string | undefined>(
-    initialSession.selectedCardId,
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>(
+    initialSession.selectedCardIds ?? [],
   );
+  const primarySelectedId = selectedCardIds[0] as string | undefined;
   const [viewport, setViewport] = useState(initialSession.viewport);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AssetItem[]>([]);
@@ -235,6 +244,15 @@ export function AICanvasView({
   const [cardWidths, setCardWidths] = useState<Record<string, number>>(
     initialSession.cardWidths ?? {},
   );
+  const [captureTransparent, setCaptureTransparent] = useState(() => {
+    try {
+      return (
+        localStorage.getItem("aisets.canvas.captureTransparent") === "true"
+      );
+    } catch {
+      return false;
+    }
+  });
   const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -292,15 +310,79 @@ export function AICanvasView({
     rootRef,
     viewport,
     cards,
+    selectedCardIds,
     setCards,
     setViewport,
-    setSelectedCardId,
+    setSelectedCardIds,
     setDragPreview,
   });
 
+  const {
+    captureViewport,
+    captureCanvas,
+    captureSelected,
+    isCapturing,
+    preview: capturePreview,
+    dismissPreview: dismissCapturePreview,
+  } = useCanvasCapture({
+    rootRef,
+    cardElementsRef,
+    scanId,
+    cards,
+    selectedCardIds,
+    viewport,
+  });
+
+  const [cardElementSizes, setCardElementSizes] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
+  const registerMeasuredCardElement = useCallback(
+    (cardId: string, node: HTMLElement | null) => {
+      registerCardElement(cardId, node);
+      if (!node) return;
+      setCardElementSizes((current) => {
+        const nextSize = { width: node.offsetWidth, height: node.offsetHeight };
+        const previous = current[cardId];
+        if (
+          previous?.width === nextSize.width &&
+          previous.height === nextSize.height
+        ) {
+          return current;
+        }
+        return { ...current, [cardId]: nextSize };
+      });
+    },
+    [registerCardElement],
+  );
+
+  const groupBounds = useMemo(() => {
+    if (selectedCardIds.length <= 1) return null;
+    const selected = new Set(selectedCardIds);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let found = 0;
+    for (const card of cards) {
+      if (!selected.has(card.id)) continue;
+      const size = cardElementSizes[card.id];
+      const width = cardWidths[card.id] ?? size?.width ?? CARD_WIDTH;
+      const height =
+        size?.height ??
+        (card.kind === "asset" && compactCards ? width * 0.75 : 240);
+      minX = Math.min(minX, card.x);
+      minY = Math.min(minY, card.y);
+      maxX = Math.max(maxX, card.x + width);
+      maxY = Math.max(maxY, card.y + height);
+      found++;
+    }
+    if (found === 0) return null;
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }, [cardElementSizes, cardWidths, cards, compactCards, selectedCardIds]);
+
   const selectedAssets = useMemo(
-    () => selectedAssetCards(cards, selectedCardId),
-    [cards, selectedCardId],
+    () => selectedAssetCards(cards, selectedCardIds),
+    [cards, selectedCardIds],
   );
   const mentionableImageCards = useMemo(
     () =>
@@ -387,7 +469,9 @@ export function AICanvasView({
       const bend = Math.max(56, Math.abs(targetX - fromX) * 0.35);
       const c1x = fromX + (fromX < targetX ? bend : -bend);
       const c2x = targetX + (fromX < targetX ? -bend : bend);
-      const active = selectedCardId === card.id || selectedCardId === anchor.id;
+      const active =
+        selectedCardIds.includes(card.id) ||
+        selectedCardIds.includes(anchor.id);
 
       return [
         {
@@ -401,7 +485,7 @@ export function AICanvasView({
         },
       ];
     });
-  }, [cardWidths, cards, compactCards, dragPreview, selectedCardId]);
+  }, [cardWidths, cards, compactCards, dragPreview, selectedCardIds]);
   const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
     cards,
     t,
@@ -410,7 +494,7 @@ export function AICanvasView({
   const { handleAsk, handleStop } = useCanvasChat({
     scanId,
     cards,
-    selectedCardId,
+    selectedCardId: primarySelectedId,
     viewport,
     chatHistory,
     prompt,
@@ -457,10 +541,10 @@ export function AICanvasView({
     return groups;
   }, [aiBackendOptions]);
   const selectedProposal = useMemo(() => {
-    if (!selectedCardId) return undefined;
-    const card = cards.find((c) => c.id === selectedCardId);
+    if (!primarySelectedId) return undefined;
+    const card = cards.find((c) => c.id === primarySelectedId);
     return card?.kind === "proposal" ? card : undefined;
-  }, [cards, selectedCardId]);
+  }, [cards, primarySelectedId]);
   const pendingProposals = useMemo(
     () =>
       cards.filter(
@@ -475,13 +559,13 @@ export function AICanvasView({
     writeAICanvasSession(window.sessionStorage, {
       version: 1,
       cards,
-      selectedCardId,
+      selectedCardIds: selectedCardIds.length > 0 ? selectedCardIds : undefined,
       viewport,
       chatHistory: chatHistory.slice(-10),
       cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
       viewMode: viewMode !== "normal" ? viewMode : undefined,
     });
-  }, [cards, selectedCardId, viewport, chatHistory, cardWidths, viewMode]);
+  }, [cards, selectedCardIds, viewport, chatHistory, cardWidths, viewMode]);
 
   useEffect(() => {
     try {
@@ -512,6 +596,17 @@ export function AICanvasView({
       // localStorage unavailable
     }
   }, [imageOptimizationAdvice]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "aisets.canvas.captureTransparent",
+        captureTransparent ? "true" : "false",
+      );
+    } catch {
+      // localStorage unavailable
+    }
+  }, [captureTransparent]);
 
   useEffect(() => {
     searchOpenRef.current = searchOpen;
@@ -579,8 +674,8 @@ export function AICanvasView({
       const removedIds = cardIdsForDeletion(cards, target.id);
 
       setCards((current) => current.filter((card) => !removedIds.has(card.id)));
-      setSelectedCardId((current) =>
-        current && removedIds.has(current) ? undefined : current,
+      setSelectedCardIds((current) =>
+        current.filter((id) => !removedIds.has(id)),
       );
     },
     [cards],
@@ -629,7 +724,7 @@ export function AICanvasView({
         card.kind === "asset" && card.asset.id === asset.id,
     );
     if (existing) {
-      setSelectedCardId(existing.id);
+      setSelectedCardIds([existing.id]);
       return;
     }
     const id = createCanvasCardId("asset");
@@ -647,11 +742,11 @@ export function AICanvasView({
       asset,
     };
     setCards((current) => [...current, card]);
-    setSelectedCardId(id);
+    setSelectedCardIds([id]);
   }
 
   function addAssistantCard(promptText: string, message?: string) {
-    const assetCards = selectedAssetCards(cards, selectedCardId);
+    const assetCards = selectedAssetCards(cards, selectedCardIds);
     const commentCards = commentsForAssets(
       cards,
       assetCards.map((card) => card.id),
@@ -671,12 +766,12 @@ export function AICanvasView({
       message:
         message ??
         (aiEnabled ? t("aiCanvas.aiResponse") : t("aiCanvas.aiContextOnly")),
-      bullets: buildAssistantBullets(promptText, cards, selectedCardId),
+      bullets: buildAssistantBullets(promptText, cards, selectedCardIds),
       assetIds: selectedAssetIds(assetCards),
       commentIds: commentIds(commentCards),
     };
     setCards((current) => [...current, card]);
-    setSelectedCardId(card.id);
+    setSelectedCardIds([card.id]);
   }
 
   function commentRequestsAi(text: string) {
@@ -706,7 +801,7 @@ export function AICanvasView({
     };
     const nextCards = [...cards, card];
     setCards((current) => [...current, card]);
-    setSelectedCardId(id);
+    setSelectedCardIds([id]);
 
     if (commentRequestsAi(commentText)) {
       void handleAsk({
@@ -746,7 +841,7 @@ export function AICanvasView({
         outputFormat: preview.outputFormat,
       };
       setCards((current) => [...current, card]);
-      setSelectedCardId(card.id);
+      setSelectedCardIds([card.id]);
       if (promptText) {
         addAssistantCard(promptText, t("aiCanvas.previewGenerated"));
       }
@@ -783,7 +878,7 @@ export function AICanvasView({
         assetIds: selectedAssetIds(assetCards),
       };
       setCards((current) => [...current, card]);
-      setSelectedCardId(card.id);
+      setSelectedCardIds([card.id]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("aiCanvas.operationError"),
@@ -795,7 +890,7 @@ export function AICanvasView({
 
   function clearCanvas() {
     setCards([]);
-    setSelectedCardId(undefined);
+    setSelectedCardIds([]);
     setChatHistory([]);
     setError("");
     setClearConfirmOpen(false);
@@ -873,7 +968,7 @@ export function AICanvasView({
     setMentionedCardIds((current) =>
       current.includes(cardId) ? current : [...current, cardId],
     );
-    setSelectedCardId(cardId);
+    setSelectedCardIds([cardId]);
     appendPromptToken(`@${target.name}`);
   }
 
@@ -898,6 +993,7 @@ export function AICanvasView({
     >
       <div
         className="absolute inset-0 z-0 cursor-default overscroll-none overflow-hidden"
+        data-ai-canvas-scroll-area="true"
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerEnd}
@@ -905,6 +1001,7 @@ export function AICanvasView({
         onWheel={handleWheel}
       >
         <div
+          data-ai-canvas-inner="true"
           className="absolute left-0 top-0 origin-top-left"
           style={{
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
@@ -962,11 +1059,17 @@ export function AICanvasView({
               <CardShell
                 key={card.id}
                 card={card}
-                selected={selectedCardId === card.id}
+                selected={selectedCardIds.includes(card.id)}
                 compact={compactCards && card.kind === "asset"}
                 width={cardWidths[card.id]}
-                onSelect={(id) => {
-                  setSelectedCardId(id);
+                onSelect={(id, shiftKey) => {
+                  setSelectedCardIds((prev) =>
+                    shiftKey
+                      ? prev.includes(id)
+                        ? prev.filter((x) => x !== id)
+                        : [...prev, id]
+                      : [id],
+                  );
                   setCards((prev) => {
                     const idx = prev.findIndex((c) => c.id === id);
                     if (idx < 0 || idx === prev.length - 1) return prev;
@@ -981,10 +1084,34 @@ export function AICanvasView({
                 onDelete={deleteCard}
                 onResize={
                   card.kind === "asset"
-                    ? (id, w) => setCardWidths((prev) => ({ ...prev, [id]: w }))
+                    ? (id, w) => {
+                        if (
+                          selectedCardIds.length > 1 &&
+                          selectedCardIds.includes(id)
+                        ) {
+                          const oldW = cardWidths[id] ?? CARD_WIDTH;
+                          const ratio = w / oldW;
+                          setCardWidths((prev) => {
+                            const next = { ...prev, [id]: w };
+                            for (const peerId of selectedCardIds) {
+                              if (peerId === id) continue;
+                              next[peerId] = Math.max(
+                                200,
+                                Math.min(
+                                  800,
+                                  (prev[peerId] ?? CARD_WIDTH) * ratio,
+                                ),
+                              );
+                            }
+                            return next;
+                          });
+                        } else {
+                          setCardWidths((prev) => ({ ...prev, [id]: w }));
+                        }
+                      }
                     : undefined
                 }
-                onRegister={registerCardElement}
+                onRegister={registerMeasuredCardElement}
                 position={
                   dragPreview?.cardId === card.id
                     ? { x: dragPreview.x, y: dragPreview.y }
@@ -999,7 +1126,7 @@ export function AICanvasView({
                     hideOverlays={hideCards}
                     commentEnabled={commentMode}
                     onOpenAsset={onOpenAsset}
-                    onSelectComment={setSelectedCardId}
+                    onSelectComment={(id) => setSelectedCardIds([id])}
                     onCreateComment={addComment}
                     onRenderPreview={(assetCard) =>
                       void createImagePreview(assetCard, "")
@@ -1026,6 +1153,17 @@ export function AICanvasView({
               </CardShell>
             );
           })}
+          {groupBounds && !hideCards && (
+            <div
+              className="pointer-events-none absolute z-[38] border-2 border-dashed border-[#0d99ff] rounded-g-sm"
+              style={{
+                left: groupBounds.x - 8,
+                top: groupBounds.y - 8,
+                width: groupBounds.w + 16,
+                height: groupBounds.h + 16,
+              }}
+            />
+          )}
           {!hideCards && (
             <AICursor
               position={{ x: aiCursor.x, y: aiCursor.y }}
@@ -1373,6 +1511,68 @@ export function AICanvasView({
         >
           <MessageCircle />
         </IconButton>
+        <DropdownMenuPrimitive.Root>
+          <DropdownMenuPrimitive.Trigger asChild>
+            <IconButton
+              size="sm"
+              aria-label={t("aiCanvas.screenshot")}
+              disabled={isCapturing}
+            >
+              {isCapturing ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <Camera />
+              )}
+            </IconButton>
+          </DropdownMenuPrimitive.Trigger>
+          <DropdownMenuPrimitive.Portal>
+            <DropdownMenuPrimitive.Content
+              align="end"
+              sideOffset={8}
+              className="z-[80] min-w-[200px] rounded-g-lg border border-g-line bg-g-surface p-1 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
+            >
+              <DropdownMenuPrimitive.Item
+                onSelect={() => {
+                  void captureViewport(captureTransparent);
+                }}
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
+              >
+                {t("aiCanvas.captureViewport")}
+              </DropdownMenuPrimitive.Item>
+              <DropdownMenuPrimitive.Item
+                onSelect={() => {
+                  void captureCanvas(captureTransparent);
+                }}
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
+              >
+                {t("aiCanvas.captureCanvas")}
+              </DropdownMenuPrimitive.Item>
+              <DropdownMenuPrimitive.Item
+                disabled={selectedCardIds.length === 0}
+                onSelect={() => {
+                  void captureSelected(captureTransparent);
+                }}
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-g-surface-2"
+              >
+                {t("aiCanvas.captureSelected")}
+              </DropdownMenuPrimitive.Item>
+              <DropdownMenuPrimitive.Separator className="mx-2 my-1 h-px bg-g-line" />
+              <div
+                className="flex min-h-8 items-center justify-between gap-3 rounded-g-sm px-3 py-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="font-g text-g-ui text-g-ink-2">
+                  {t("aiCanvas.transparentBg")}
+                </span>
+                <Switch
+                  checked={captureTransparent}
+                  onCheckedChange={setCaptureTransparent}
+                  aria-label={t("aiCanvas.transparentBg")}
+                />
+              </div>
+            </DropdownMenuPrimitive.Content>
+          </DropdownMenuPrimitive.Portal>
+        </DropdownMenuPrimitive.Root>
         <IconButton
           size="sm"
           aria-label={t("aiCanvas.viewMode")}
@@ -1386,7 +1586,7 @@ export function AICanvasView({
                   ? "hidden"
                   : "normal",
             );
-            setSelectedCardId(undefined);
+            setSelectedCardIds([]);
           }}
         >
           {viewMode === "hidden" ? (
@@ -1926,6 +2126,60 @@ export function AICanvasView({
         </div>
       </div>
 
+      {capturePreview && (
+        <div
+          data-ai-canvas-overlay="true"
+          className="pointer-events-auto absolute right-4 bottom-28 z-[80] animate-[capturePreviewIn_320ms_var(--g-ease-out)_both] motion-reduce:animate-none"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="group relative max-w-[360px] min-w-[160px] overflow-hidden rounded-[16px] bg-[rgba(31,31,31,0.92)] shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+            <div className="relative bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-[length:12px_12px] p-2.5">
+              <img
+                src={capturePreview.url}
+                alt={t("aiCanvas.screenshot")}
+                className="block max-h-[280px] rounded-[10px]"
+                draggable={false}
+              />
+            </div>
+            <div className="flex items-center justify-center gap-1 px-3 py-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                leadingIcon={<ClipboardCopy />}
+                className="flex-1 border-transparent text-white/72 hover:bg-white/[0.1] hover:text-white"
+                onClick={() => {
+                  void copyBlobToClipboard(capturePreview.blob).then(
+                    dismissCapturePreview,
+                  );
+                }}
+              >
+                {t("aiCanvas.copy")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                leadingIcon={<Download />}
+                className="flex-1 border-transparent text-white/72 hover:bg-white/[0.1] hover:text-white"
+                onClick={() => {
+                  downloadBlob(capturePreview.blob);
+                  dismissCapturePreview();
+                }}
+              >
+                {t("aiCanvas.download")}
+              </Button>
+              <IconButton
+                size="sm"
+                aria-label={t("common.cancel")}
+                className="border-transparent text-white/40 hover:bg-white/[0.1] hover:text-white"
+                onClick={dismissCapturePreview}
+              >
+                <X />
+              </IconButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {debugOpen && (
         <div
           data-ai-canvas-overlay="true"
@@ -1943,7 +2197,7 @@ export function AICanvasView({
                   {
                     version: 1,
                     viewport,
-                    selectedCardId,
+                    selectedCardIds,
                     cardWidths,
                     cards: cards.map((c) => {
                       const base: Record<string, unknown> = {
@@ -1989,7 +2243,7 @@ export function AICanvasView({
             {JSON.stringify(
               {
                 viewport,
-                selectedCardId,
+                selectedCardIds,
                 working,
                 cardsCount: cards.length,
                 cardWidths,

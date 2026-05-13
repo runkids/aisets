@@ -67,13 +67,24 @@ describe("normalizeAICanvasSession", () => {
   it("keeps valid cards and drops stale selected ids", () => {
     const session = normalizeAICanvasSession({
       cards: [makeAssetCard("hero"), { kind: "asset", id: "" }],
-      selectedCardId: "missing",
+      selectedCardIds: ["missing"],
       viewport: { x: 5, y: 10, scale: 8 },
     });
 
     expect(session.cards).toHaveLength(1);
-    expect(session.selectedCardId).toBeUndefined();
-    expect(session.viewport.scale).toBe(1.8);
+    expect(session.selectedCardIds).toBeUndefined();
+    expect(session.viewport.scale).toBe(8);
+  });
+
+  it("migrates legacy selectedCardId to selectedCardIds", () => {
+    const asset = makeAssetCard("hero");
+    const session = normalizeAICanvasSession({
+      cards: [asset],
+      selectedCardId: asset.id,
+      viewport: { x: 0, y: 0, scale: 1 },
+    });
+
+    expect(session.selectedCardIds).toEqual([asset.id]);
   });
 });
 
@@ -91,7 +102,7 @@ describe("selectedAssetCards", () => {
       region: { x: 0.2, y: 0.3, width: 0.4, height: 0.2 },
     };
 
-    expect(selectedAssetCards([asset, comment], comment.id)).toEqual([asset]);
+    expect(selectedAssetCards([asset, comment], [comment.id])).toEqual([asset]);
     expect(commentsForAssets([asset, comment], [asset.id])).toEqual([comment]);
   });
 });
@@ -151,7 +162,7 @@ describe("buildAssistantBullets", () => {
     const bullets = buildAssistantBullets(
       "describe",
       [asset, comment],
-      asset.id,
+      [asset.id],
     );
 
     expect(bullets).toContain("hero.png · 640x480 · 2.0 KB");

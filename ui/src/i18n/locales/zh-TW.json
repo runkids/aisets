@@ -158,7 +158,19 @@
     "clearConfirmAction": "全部清除",
     "pendingProposals": "{{count}} 個待確認提案 — 選取一個或全部核准",
     "approveAll": "全部核准",
-    "rejectAll": "全部拒絕"
+    "rejectAll": "全部拒絕",
+    "screenshot": "截圖",
+    "captureViewport": "擷取可見區域",
+    "captureCanvas": "擷取整個畫布",
+    "captureSelected": "擷取選取範圍",
+    "transparentBg": "去背",
+    "copy": "複製",
+    "download": "下載",
+    "captureSuccess": "截圖已複製到剪貼簿",
+    "captureDownloaded": "截圖已下載",
+    "captureError": "截圖失敗",
+    "captureNoSelection": "未選取任何卡片",
+    "multiSelected": "已選取 {{count}} 張卡片"
   },
   "favorites": {
     "add": "加入收藏",

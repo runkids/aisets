@@ -108,7 +108,7 @@ export type ChatHistoryEntry = {
 export type AICanvasSession = {
   version: 1;
   cards: CanvasCard[];
-  selectedCardId?: string;
+  selectedCardIds?: string[];
   viewport: CanvasViewport;
   chatHistory?: ChatHistoryEntry[];
   cardWidths?: Record<string, number>;
@@ -325,11 +325,16 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
         .filter((card): card is CanvasCard => !!card)
     : [];
   const viewport = isRecord(value.viewport) ? value.viewport : {};
-  const selectedCardId =
-    typeof value.selectedCardId === "string" &&
-    cards.some((card) => card.id === value.selectedCardId)
-      ? value.selectedCardId
-      : undefined;
+  let rawIds: string[] = [];
+  if (Array.isArray(value.selectedCardIds)) {
+    rawIds = (value.selectedCardIds as unknown[]).filter(
+      (id): id is string => typeof id === "string",
+    );
+  } else if (typeof value.selectedCardId === "string" && value.selectedCardId) {
+    rawIds = [value.selectedCardId];
+  }
+  const cardIdSet = new Set(cards.map((card) => card.id));
+  const selectedCardIds = rawIds.filter((id) => cardIdSet.has(id));
 
   const chatHistory = Array.isArray(value.chatHistory)
     ? (value.chatHistory as unknown[])
@@ -352,7 +357,7 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
   return {
     version: 1,
     cards,
-    selectedCardId,
+    selectedCardIds: selectedCardIds.length > 0 ? selectedCardIds : undefined,
     viewport: {
       x: Number(viewport.x) || 0,
       y: Number(viewport.y) || 0,
@@ -387,17 +392,31 @@ export function writeAICanvasSession(
 
 export function selectedAssetCards(
   cards: CanvasCard[],
-  selectedCardId: string | undefined,
+  selectedCardIds: string[],
 ) {
-  if (!selectedCardId) return [];
-  const selected = cards.find((card) => card.id === selectedCardId);
-  if (!selected) return [];
-  if (selected.kind === "asset") return [selected];
-  if (selected.kind !== "comment") return [];
-  return cards.filter(
-    (card): card is AssetCanvasCard =>
-      card.kind === "asset" && card.id === selected.anchorId,
-  );
+  if (selectedCardIds.length === 0) return [];
+  const idSet = new Set(selectedCardIds);
+  const result: AssetCanvasCard[] = [];
+  const anchorIds = new Set<string>();
+
+  for (const card of cards) {
+    if (!idSet.has(card.id)) continue;
+    if (card.kind === "asset") result.push(card);
+    else if (card.kind === "comment") anchorIds.add(card.anchorId);
+  }
+
+  if (anchorIds.size > 0) {
+    for (const card of cards) {
+      if (
+        card.kind === "asset" &&
+        anchorIds.has(card.id) &&
+        !idSet.has(card.id)
+      ) {
+        result.push(card);
+      }
+    }
+  }
+  return result;
 }
 
 export function commentsForAssets(cards: CanvasCard[], assetCardIds: string[]) {
@@ -466,9 +485,9 @@ export function inferPromptIntent(prompt: string): AICanvasPromptIntent {
 export function buildAssistantBullets(
   prompt: string,
   cards: CanvasCard[],
-  selectedCardId: string | undefined,
+  selectedCardIds: string[],
 ) {
-  const selectedAssets = selectedAssetCards(cards, selectedCardId);
+  const selectedAssets = selectedAssetCards(cards, selectedCardIds);
   const comments = commentsForAssets(
     cards,
     selectedAssets.map((card) => card.id),
