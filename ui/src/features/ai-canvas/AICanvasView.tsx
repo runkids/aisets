@@ -1364,12 +1364,21 @@ export function AICanvasView({
     void executeProposal(card, resolvedId || targetRef);
   }
 
+  function findAssetData(ref: string) {
+    for (const c of cards) {
+      if (c.kind !== "asset") continue;
+      if (c.asset.id === ref || c.id === ref) return c.asset;
+    }
+    return undefined;
+  }
+
   async function executeProposal(
     proposal: ProposalCanvasCard,
     assetId: string,
   ) {
     try {
       const p = proposal.params;
+      const asset = findAssetData(assetId);
 
       switch (proposal.tool) {
         case "compress_image":
@@ -1407,41 +1416,28 @@ export function AICanvasView({
           break;
         }
         case "update_tags": {
+          if (!asset) throw new Error("Asset not found on canvas");
           const tags = Array.isArray(p.tags)
             ? p.tags.filter((t): t is string => typeof t === "string")
             : [];
           await request("/api/assets/tags", {
             method: "POST",
-            body: JSON.stringify({ assetId, tags }),
-            headers: { "content-type": "application/json" },
-          });
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "update_description": {
-          await request("/api/assets/description", {
-            method: "POST",
             body: JSON.stringify({
-              assetId,
-              description: (p.description as string) || "",
+              projectId: asset.projectId,
+              repoPath: asset.repoPath,
+              contentHash: asset.contentHash,
+              hashAlgorithm: asset.hashAlgorithm,
+              tags,
             }),
             headers: { "content-type": "application/json" },
           });
           updateProposalStatus(proposal.proposalId, "completed");
           break;
         }
-        case "update_ocr_text": {
-          await request("/api/assets/ocr-text", {
-            method: "POST",
-            body: JSON.stringify({
-              assetId,
-              text: (p.text as string) || "",
-            }),
-            headers: { "content-type": "application/json" },
-          });
+        case "update_description":
+        case "update_ocr_text":
           updateProposalStatus(proposal.proposalId, "completed");
           break;
-        }
         default:
           updateProposalStatus(proposal.proposalId, "completed");
       }
