@@ -1,0 +1,649 @@
+import {
+  ArrowUp,
+  AtSign,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  LoaderCircle,
+  Paperclip,
+  Plus,
+  Square,
+  Trash2,
+  WandSparkles,
+  X,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useRef } from "react";
+import type { TFunction } from "i18next";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import {
+  AssetThumbnail,
+  Badge,
+  Button,
+  CopyButton,
+  IconButton,
+  Switch,
+} from "@/components/ui";
+import { cn } from "@/lib/cn";
+import {
+  type ChatHistoryEntry,
+  type ProposalCanvasCard,
+} from "./aiCanvasState";
+import { renderMarkdown } from "./canvasUtils";
+import type {
+  AIBackendOption,
+  MentionableImageCard,
+  StateSetter,
+} from "./aiCanvasTypes";
+
+const composerActionClass =
+  "border-white/[0.08] bg-white/[0.07] text-white/72 hover:bg-white/[0.12] hover:text-white";
+const composerIconClass =
+  "rounded-full border-transparent bg-transparent text-white/52 hover:bg-white/[0.08] hover:text-white";
+const composerConfirmClass =
+  "border-white/80 bg-white text-black hover:bg-white/90";
+
+type GroupedBackendOptions = Array<{
+  group: string;
+  options: AIBackendOption[];
+}>;
+
+type AICanvasComposerProps = {
+  t: TFunction;
+  collapsed: boolean;
+  setCollapsed: StateSetter<boolean>;
+  height: number;
+  setHeight: StateSetter<number>;
+  isWorking: boolean;
+  composerStatusLabel: string;
+  composerStatusText: string;
+  latestChatContent: string;
+  chatHistory: ChatHistoryEntry[];
+  composerToolsOpen: boolean;
+  composerAdvancedOpen: boolean;
+  imageOptimizationAdvice: boolean;
+  setImageOptimizationAdvice: StateSetter<boolean>;
+  mentionSelectedAsset: () => void;
+  noteUploadPending: () => void;
+  addAssistantCard: (promptText: string, message?: string) => void;
+  selectedProposal?: ProposalCanvasCard;
+  pendingProposals: ProposalCanvasCard[];
+  handleRejectProposal: (proposal: ProposalCanvasCard) => void;
+  handleApproveProposal: (proposal: ProposalCanvasCard) => void;
+  mentionedImageCards: MentionableImageCard[];
+  setMentionedCardIds: StateSetter<string[]>;
+  mentionableImageCards: MentionableImageCard[];
+  mentionedCardIds: string[];
+  mentionImageCard: (cardId: string) => void;
+  prompt: string;
+  setPrompt: StateSetter<string>;
+  handleAsk: () => void | Promise<void>;
+  handleStop: () => void;
+  aiBackendLabel?: string;
+  aiBackendValue?: string;
+  aiBackendOptions: AIBackendOption[];
+  aiBackendPending?: boolean;
+  onAiBackendChange?: (value: string) => void;
+  groupedBackendOptions: GroupedBackendOptions;
+  clearChatHistory: () => void;
+};
+
+export function AICanvasComposer({
+  t,
+  collapsed,
+  setCollapsed,
+  height,
+  setHeight,
+  isWorking,
+  composerStatusLabel,
+  composerStatusText,
+  latestChatContent,
+  chatHistory,
+  composerToolsOpen,
+  composerAdvancedOpen,
+  imageOptimizationAdvice,
+  setImageOptimizationAdvice,
+  mentionSelectedAsset,
+  noteUploadPending,
+  addAssistantCard,
+  selectedProposal,
+  pendingProposals,
+  handleRejectProposal,
+  handleApproveProposal,
+  mentionedImageCards,
+  setMentionedCardIds,
+  mentionableImageCards,
+  mentionedCardIds,
+  mentionImageCard,
+  prompt,
+  setPrompt,
+  handleAsk,
+  handleStop,
+  aiBackendLabel,
+  aiBackendValue,
+  aiBackendOptions,
+  aiBackendPending,
+  onAiBackendChange,
+  groupedBackendOptions,
+  clearChatHistory,
+}: AICanvasComposerProps) {
+  const composerDragRef = useRef<{ startY: number; startH: number } | null>(
+    null,
+  );
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (collapsed) return undefined;
+    const el = chatScrollRef.current;
+    if (!el) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [chatHistory.length, collapsed, height, isWorking, latestChatContent]);
+
+  return (
+    <div
+      data-ai-canvas-overlay="true"
+      className="pointer-events-auto absolute inset-x-0 bottom-0 z-[60] mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+      style={{ height: collapsed ? 92 : height }}
+    >
+      <div className="relative h-full">
+        <div
+          className={cn(
+            "absolute inset-x-7 bottom-[52px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
+            collapsed && "!h-[44px]",
+          )}
+          style={collapsed ? undefined : { height: height - 72 }}
+        >
+          {!collapsed && (
+            <div
+              className="flex h-3 cursor-ns-resize items-center justify-center"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                composerDragRef.current = {
+                  startY: e.clientY,
+                  startH: height,
+                };
+                const onMove = (ev: PointerEvent) => {
+                  if (!composerDragRef.current) return;
+                  const delta = composerDragRef.current.startY - ev.clientY;
+                  const next = Math.min(
+                    Math.max(composerDragRef.current.startH + delta, 200),
+                    window.innerHeight * 0.75,
+                  );
+                  setHeight(next);
+                };
+                const onUp = () => {
+                  composerDragRef.current = null;
+                  document.removeEventListener("pointermove", onMove);
+                  document.removeEventListener("pointerup", onUp);
+                };
+                document.addEventListener("pointermove", onMove);
+                document.addEventListener("pointerup", onUp);
+              }}
+            >
+              <div className="h-[3px] w-8 rounded-full bg-white/20" />
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label={t("aiCanvas.resizeComposer")}
+            className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+            onClick={() => setCollapsed((current) => !current)}
+          >
+            {isWorking && (
+              <LoaderCircle
+                size={14}
+                className="shrink-0 animate-spin text-white/54"
+              />
+            )}
+            <span className="shrink-0 font-[590] text-white/68">
+              {composerStatusLabel}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-white/58">
+              {composerStatusText}
+            </span>
+            <ChevronDown
+              size={17}
+              className={cn(
+                "shrink-0 text-white/42 transition-transform duration-[160ms] ease-g",
+                !collapsed && "rotate-180",
+              )}
+              aria-hidden="true"
+            />
+          </button>
+          {!collapsed && (
+            <div
+              ref={chatScrollRef}
+              data-ai-canvas-scroll="true"
+              className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-16"
+            >
+              {chatHistory.length === 0 ? (
+                <div className="py-4 text-center text-g-caption text-white/30">
+                  {t("aiCanvas.emptyDesc")}
+                </div>
+              ) : (
+                chatHistory.map((entry, i) => {
+                  const isUser = entry.role === "user";
+                  return (
+                    <article
+                      key={i}
+                      className={cn(
+                        "max-w-[calc(100%-16px)] rounded-g-lg border px-4 py-3 text-g-body leading-[1.55] text-white/84",
+                        isUser
+                          ? "self-end border-white/[0.1] bg-white/[0.12]"
+                          : "self-start border-white/[0.06] bg-white/[0.06]",
+                      )}
+                    >
+                      {entry.mentions && entry.mentions.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          {entry.mentions.map((mention) => (
+                            <span
+                              key={mention.id}
+                              className="inline-flex max-w-[200px] items-center gap-2 rounded-[12px] border border-white/[0.08] bg-black/[0.16] py-1 pl-1 pr-2"
+                            >
+                              <AssetThumbnail
+                                src={mention.src}
+                                size="sm"
+                                className="size-7 rounded-[9px] border-white/[0.1] bg-white/[0.06]"
+                                imageClassName="max-h-5 max-w-5"
+                                draggable={false}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-g-mono text-g-chip font-[510] tracking-g-mono text-white/86">
+                                  @{mention.name}
+                                </span>
+                                <span className="block truncate text-[9px] leading-3 text-white/38">
+                                  {mention.meta}
+                                </span>
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="whitespace-pre-wrap">
+                        {renderMarkdown(entry.content)}
+                      </div>
+                      {!isUser && (
+                        <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
+                          <CopyButton
+                            value={entry.content}
+                            label={t("ai.copyResult")}
+                            className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
+                          />
+                        </div>
+                      )}
+                    </article>
+                  );
+                })
+              )}
+              {isWorking && (
+                <div className="flex items-center gap-2 self-start rounded-g-md border border-white/[0.06] bg-white/[0.07] px-3 py-2 text-g-caption text-white/56">
+                  <LoaderCircle size={12} className="animate-spin" />
+                  {t("aiCanvas.statusProcessingDetail")}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 rounded-[28px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-2.5 py-2 shadow-g-pop backdrop-blur-xl">
+          {composerToolsOpen && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/[0.06] pb-3 text-g-caption text-white/58">
+              {composerAdvancedOpen && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="chip"
+                    leadingIcon={<AtSign />}
+                    className={composerActionClass}
+                    onClick={mentionSelectedAsset}
+                  >
+                    {t("aiCanvas.mentionAsset")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="chip"
+                    leadingIcon={<Paperclip />}
+                    className={composerActionClass}
+                    onClick={noteUploadPending}
+                  >
+                    {t("aiCanvas.attachImage")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="chip"
+                    leadingIcon={<CheckCircle2 />}
+                    className={composerActionClass}
+                    onClick={() =>
+                      addAssistantCard(t("aiCanvas.describePrompt"))
+                    }
+                  >
+                    {t("aiCanvas.describe")}
+                  </Button>
+                  <Badge tone={imageOptimizationAdvice ? "amber" : "line"}>
+                    {imageOptimizationAdvice
+                      ? t("aiCanvas.imageOptimizationAdviceShort")
+                      : t("aiCanvas.autoReview")}
+                  </Badge>
+                  <Badge tone="line">{t("aiCanvas.modelHigh")}</Badge>
+                </>
+              )}
+            </div>
+          )}
+          {(selectedProposal?.status === "pending" ||
+            pendingProposals.length > 0) && (
+            <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 mb-2">
+              {selectedProposal?.status === "pending" ? (
+                <>
+                  <Badge tone="amber">
+                    {selectedProposal.tool.replaceAll("_", " ")}
+                  </Badge>
+                  <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">
+                    {selectedProposal.description}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
+                    leadingIcon={<XCircle />}
+                    onClick={() => handleRejectProposal(selectedProposal)}
+                  >
+                    {t("aiCanvas.reject")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    leadingIcon={<Check />}
+                    className={composerConfirmClass}
+                    onClick={() => handleApproveProposal(selectedProposal)}
+                  >
+                    {t("aiCanvas.approve")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-g-caption text-white/50">
+                    {t("aiCanvas.pendingProposals", {
+                      count: pendingProposals.length,
+                    })}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
+                    onClick={() => {
+                      for (const p of pendingProposals) handleRejectProposal(p);
+                    }}
+                  >
+                    {t("aiCanvas.rejectAll")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className={composerConfirmClass}
+                    onClick={() => {
+                      for (const p of pendingProposals)
+                        handleApproveProposal(p);
+                    }}
+                  >
+                    {t("aiCanvas.approveAll")}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          {mentionedImageCards.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2 px-1">
+              {mentionedImageCards.map((card) => (
+                <span
+                  key={card.id}
+                  className="inline-flex max-w-[220px] items-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.07] py-1 pl-1 pr-1.5 text-white/78"
+                >
+                  <AssetThumbnail
+                    src={card.src}
+                    size="sm"
+                    className="size-7 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                    imageClassName="max-h-5 max-w-5"
+                    draggable={false}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-g-mono text-g-chip font-[510] tracking-g-mono">
+                      @{card.name}
+                    </span>
+                    <span className="block truncate text-[9px] leading-3 text-white/38">
+                      {card.meta}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={t("aiCanvas.removeMention")}
+                    className="grid size-5 shrink-0 place-items-center rounded-full text-white/42 transition-colors duration-[120ms] ease-g hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+                    onClick={() =>
+                      setMentionedCardIds((current) =>
+                        current.filter((id) => id !== card.id),
+                      )
+                    }
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex min-h-10 items-center gap-2 pl-1 pr-0.5">
+            <DropdownMenuPrimitive.Root>
+              <DropdownMenuPrimitive.Trigger asChild>
+                <IconButton
+                  size="md"
+                  aria-label={t("aiCanvas.addAttachment")}
+                  className={composerIconClass}
+                >
+                  <Plus />
+                </IconButton>
+              </DropdownMenuPrimitive.Trigger>
+              <DropdownMenuPrimitive.Portal>
+                <DropdownMenuPrimitive.Content
+                  align="start"
+                  sideOffset={10}
+                  className="z-[80] min-w-[220px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                >
+                  <DropdownMenuPrimitive.Item
+                    onSelect={noteUploadPending}
+                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                  >
+                    <Paperclip size={14} className="shrink-0 text-white/54" />
+                    <span>{t("aiCanvas.attachImage")}</span>
+                  </DropdownMenuPrimitive.Item>
+                  <div className="flex min-h-12 items-center gap-3 rounded-[12px] px-3 py-2 font-g text-white outline-none transition-colors duration-[120ms] ease-g hover:bg-white/[0.06]">
+                    <WandSparkles
+                      size={14}
+                      className="shrink-0 text-white/54"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-g-ui font-[510]">
+                        {t("aiCanvas.imageOptimizationAdvice")}
+                      </div>
+                      <div className="mt-0.5 text-g-caption text-white/42">
+                        {t("aiCanvas.imageOptimizationAdviceDesc")}
+                      </div>
+                    </div>
+                    <Switch
+                      checked={imageOptimizationAdvice}
+                      onCheckedChange={setImageOptimizationAdvice}
+                      aria-label={t("aiCanvas.imageOptimizationAdvice")}
+                      className="data-[state=checked]:!bg-g-amber-soft"
+                    />
+                  </div>
+                  <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.1]" />
+                  <DropdownMenuPrimitive.Item
+                    disabled={chatHistory.length === 0}
+                    onSelect={clearChatHistory}
+                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
+                  >
+                    <Trash2 size={14} className="shrink-0 text-white/54" />
+                    <span>{t("aiCanvas.clearChat")}</span>
+                  </DropdownMenuPrimitive.Item>
+                </DropdownMenuPrimitive.Content>
+              </DropdownMenuPrimitive.Portal>
+            </DropdownMenuPrimitive.Root>
+            <DropdownMenuPrimitive.Root>
+              <DropdownMenuPrimitive.Trigger asChild>
+                <IconButton
+                  size="sm"
+                  aria-label={t("aiCanvas.mentionAsset")}
+                  className={composerIconClass}
+                >
+                  <AtSign />
+                </IconButton>
+              </DropdownMenuPrimitive.Trigger>
+              <DropdownMenuPrimitive.Portal>
+                <DropdownMenuPrimitive.Content
+                  align="start"
+                  sideOffset={10}
+                  className="z-[80] min-w-[280px] max-w-[360px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                >
+                  <DropdownMenuPrimitive.Label className="px-3 py-1.5 font-g text-g-caption font-[510] tracking-g-ui text-white/38">
+                    {t("aiCanvas.mentionCanvasImage")}
+                  </DropdownMenuPrimitive.Label>
+                  {mentionableImageCards.length === 0 ? (
+                    <div className="px-3 py-2 text-g-caption text-white/42">
+                      {t("aiCanvas.noMentionImages")}
+                    </div>
+                  ) : (
+                    mentionableImageCards.map((card) => (
+                      <DropdownMenuPrimitive.Item
+                        key={card.id}
+                        onSelect={() => mentionImageCard(card.id)}
+                        className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                      >
+                        <AssetThumbnail
+                          src={card.src}
+                          size="sm"
+                          className="size-8 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                          imageClassName="max-h-6 max-w-6"
+                          draggable={false}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
+                            {card.name}
+                          </span>
+                          <span className="block truncate text-g-chip text-white/42">
+                            {card.meta}
+                          </span>
+                        </span>
+                        {mentionedCardIds.includes(card.id) && (
+                          <Check size={14} className="shrink-0 text-white" />
+                        )}
+                      </DropdownMenuPrimitive.Item>
+                    ))
+                  )}
+                </DropdownMenuPrimitive.Content>
+              </DropdownMenuPrimitive.Portal>
+            </DropdownMenuPrimitive.Root>
+            <textarea
+              value={prompt}
+              placeholder={t("aiCanvas.composerPlaceholder")}
+              className="max-h-20 min-h-5 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-5 text-white outline-none placeholder:text-white/35"
+              rows={1}
+              onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void handleAsk();
+                }
+              }}
+            />
+            {aiBackendLabel && (
+              <DropdownMenuPrimitive.Root>
+                <DropdownMenuPrimitive.Trigger asChild>
+                  <button
+                    type="button"
+                    disabled={
+                      aiBackendPending ||
+                      !onAiBackendChange ||
+                      aiBackendOptions.length === 0
+                    }
+                    className="flex h-7 max-w-[220px] shrink-0 items-center gap-1.5 truncate rounded-full px-2 font-g text-g-caption font-[510] tracking-g-ui text-white/72 transition-colors duration-[120ms] ease-g hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-default disabled:opacity-60"
+                  >
+                    <span className="truncate">{aiBackendLabel}</span>
+                    <ChevronDown
+                      size={14}
+                      className="shrink-0 text-white/42"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </DropdownMenuPrimitive.Trigger>
+                <DropdownMenuPrimitive.Portal>
+                  <DropdownMenuPrimitive.Content
+                    align="end"
+                    sideOffset={10}
+                    className="z-[80] min-w-[240px] max-w-[360px] overflow-auto rounded-[18px] border border-white/[0.08] bg-[rgba(42,42,42,0.98)] p-3 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                    style={{ maxHeight: 320 }}
+                  >
+                    {groupedBackendOptions.map((group, groupIndex) => (
+                      <DropdownMenuPrimitive.Group key={group.group}>
+                        {groupIndex > 0 && (
+                          <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.12]" />
+                        )}
+                        <DropdownMenuPrimitive.Label className="px-3 py-1 font-g text-g-caption font-[510] tracking-g-ui text-white/38">
+                          {group.group}
+                        </DropdownMenuPrimitive.Label>
+                        {group.options.map((option) => {
+                          const selected = option.value === aiBackendValue;
+                          return (
+                            <DropdownMenuPrimitive.Item
+                              key={option.value}
+                              disabled={option.disabled || aiBackendPending}
+                              onSelect={() => onAiBackendChange?.(option.value)}
+                              className={cn(
+                                "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[14px] px-3 py-1.5 font-g text-g-ui font-[510] leading-[1.35] text-white outline-none transition-[background,color,box-shadow] duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]",
+                                selected && "bg-white/[0.13]",
+                              )}
+                            >
+                              <span className="min-w-0 flex-1 truncate">
+                                {option.label}
+                              </span>
+                              <span className="grid size-4 shrink-0 place-items-center text-white">
+                                {selected && <Check size={15} />}
+                              </span>
+                            </DropdownMenuPrimitive.Item>
+                          );
+                        })}
+                      </DropdownMenuPrimitive.Group>
+                    ))}
+                  </DropdownMenuPrimitive.Content>
+                </DropdownMenuPrimitive.Portal>
+              </DropdownMenuPrimitive.Root>
+            )}
+            {isWorking ? (
+              <button
+                type="button"
+                aria-label={t("aiCanvas.stopChat")}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.92] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus"
+                onClick={handleStop}
+              >
+                <Square size={15} fill="currentColor" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label={t("aiCanvas.ask")}
+                disabled={prompt.trim() === ""}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.82] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
+                onClick={() => void handleAsk()}
+              >
+                <ArrowUp size={20} strokeWidth={2.1} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
