@@ -21,13 +21,19 @@ import (
 
 const (
 	vlmOCREngineName    = "vlm"
-	vlmOCRPromptVersion = "aisets-vlm-ocr-v1"
+	vlmOCRPromptVersion = "aisets-vlm-ocr-v2"
 	vlmOCRMode          = "vlm"
 )
 
-const vlmOCRPrompt = `Analyze this image and respond with a JSON object:
-- "text": all visible text exactly as it appears, preserving original layout, line breaks, indentation and formatting. If the image contains code, preserve indentation exactly. Empty string if no text is visible.
+const vlmOCRPrompt = `Transcribe visible text from this image and respond with a JSON object:
+- "text": all visible text exactly as it appears, preserving original layout, line breaks, indentation and formatting. If the image contains code, preserve indentation exactly.
 - "languages": array of ISO 639-3 language codes detected in the text (e.g. ["eng"], ["zho", "eng"]). Empty array if no text.
+
+Rules:
+- Include only text that is visibly present in the image.
+- Do NOT describe, summarize, infer, translate, label, or explain the image.
+- Do NOT include object, person, scene, marketing, or accessibility descriptions.
+- If no text is visible, set "text" to "" and "languages" to [].
 
 Respond ONLY with valid JSON, no markdown or explanation.`
 
@@ -62,6 +68,19 @@ func vlmOCRSettingsHash(modelName string) string {
 	raw, _ := json.Marshal(payload)
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
+}
+
+func buildVLMOCRPrompt(prompt string, autoLocale bool, lang string) string {
+	if strings.TrimSpace(prompt) == "" {
+		prompt = vlmOCRPrompt
+	}
+	guard := "IMPORTANT: This is OCR, not image captioning. Return only visible text exactly as it appears. Do not translate it. Do not add labels, descriptions, captions, summaries, inferences, or commentary. If no text is visible, return {\"text\":\"\",\"languages\":[]}."
+	if autoLocale {
+		if name := llm.LocaleDisplayName(lang); name != "" {
+			guard += " Ignore the UI language (" + name + ") for transcribed text."
+		}
+	}
+	return prompt + "\n\n" + guard
 }
 
 func eligibleForVLMOCR(item scanner.AssetItem) bool {
@@ -125,11 +144,7 @@ func (s *Server) handleVLMOCRRun(w http.ResponseWriter, r *http.Request) {
 			prompt = config.FormatPrompt(preset.Content)
 		}
 	}
-	if prompt == "" {
-		prompt = vlmOCRPrompt
-	}
-	prompt = llm.AppendLocaleInstruction(prompt, settings.LLMAutoLocale,
-		r.URL.Query().Get("lang"), "Write the extracted text transcription as-is, but write any labels, descriptions, or commentary in")
+	prompt = buildVLMOCRPrompt(prompt, settings.LLMAutoLocale, r.URL.Query().Get("lang"))
 	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
 
 	activeProjectIDs := s.store.ActiveProjectIDs()
