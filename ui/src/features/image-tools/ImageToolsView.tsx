@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
@@ -864,9 +865,12 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                 />
                 <div className="flex h-g-btn-md items-center gap-1.5 rounded-g-md border border-g-line bg-g-surface px-2">
                   <Tooltip label={t("imageTools.qualityHint")}>
-                    <span className="flex cursor-help items-center gap-0.5 font-g text-g-chip text-g-ink-3">
+                    <Link
+                      to="/settings?section=optimization"
+                      className="flex items-center gap-0.5 font-g text-g-chip text-g-ink-3 transition-colors hover:text-g-ink"
+                    >
                       Q <Info size={11} />
-                    </span>
+                    </Link>
                   </Tooltip>
                   <Range
                     min={1}
@@ -884,9 +888,12 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   </span>
                 </div>
                 <Tooltip label={t("imageTools.resizeTooltip")}>
-                  <span className="cursor-help text-g-ink-4">
+                  <Link
+                    to="/settings?section=optimization"
+                    className="text-g-ink-4 transition-colors hover:text-g-ink"
+                  >
                     <Info size={13} />
-                  </span>
+                  </Link>
                 </Tooltip>
                 <TextInput
                   value={settings.maxDimensionPx || ""}
