@@ -92,7 +92,18 @@ export type CanvasCard =
   | OperationCanvasCard
   | ProposalCanvasCard;
 
-export type ChatHistoryEntry = { role: string; content: string };
+export type ChatMentionPreview = {
+  id: string;
+  name: string;
+  meta: string;
+  src?: string;
+};
+
+export type ChatHistoryEntry = {
+  role: string;
+  content: string;
+  mentions?: ChatMentionPreview[];
+};
 
 export type AICanvasSession = {
   version: 1;

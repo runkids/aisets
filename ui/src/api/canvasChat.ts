@@ -42,12 +42,22 @@ type CanvasSnapshotPayload = {
   cards: Array<Record<string, unknown>>;
 };
 
+type CanvasChatOptions = {
+  imageOptimizationAdvice?: boolean;
+};
+
 export function serializeCanvasSnapshot(
   cards: CanvasCard[],
   selectedCardId: string | undefined,
   viewport: CanvasViewport,
+  extraSelectedCardIds: string[] = [],
 ): CanvasSnapshotPayload {
-  const selectedCardIds = selectedCardId ? [selectedCardId] : [];
+  const selectedCardIds = [
+    ...new Set([
+      ...(selectedCardId ? [selectedCardId] : []),
+      ...extraSelectedCardIds,
+    ]),
+  ];
   const selectedSet = new Set(selectedCardIds);
 
   return {
@@ -83,6 +93,14 @@ export function serializeCanvasSnapshot(
         base.text = card.text;
         base.region = card.region;
       }
+      if (card.kind === "variant") {
+        base.sourceAssetId = card.sourceAssetId;
+        base.sourceName = card.sourceName;
+        base.inputBytes = card.inputBytes;
+        base.outputBytes = card.outputBytes;
+        base.inputFormat = card.inputFormat;
+        base.outputFormat = card.outputFormat;
+      }
       if (card.kind === "proposal") {
         base.tool = card.tool;
         base.status = card.status;
@@ -97,6 +115,7 @@ export async function canvasChat(options: {
   messages: ChatHistoryEntry[];
   canvas: CanvasSnapshotPayload;
   locale: string;
+  options?: CanvasChatOptions;
   onEvent?: (event: CanvasChatEvent) => void;
   signal?: AbortSignal;
 }): Promise<CanvasChatDone | null> {
@@ -104,6 +123,7 @@ export async function canvasChat(options: {
     messages: options.messages,
     canvas: options.canvas,
     locale: options.locale,
+    options: options.options,
   });
 
   const response = await fetch(`${basePath}/api/ai/canvas/chat`, {

@@ -42,6 +42,7 @@ import {
   ConfirmDialog,
   CopyButton,
   IconButton,
+  Switch,
   TextInput,
   TextInputClearButton,
 } from "@/components/ui";
@@ -89,7 +90,6 @@ import {
   ProposalCardBody,
   VariantCardBody,
 } from "./canvasCards";
-import { useRotatingGhost } from "@/hooks/useRotatingGhost";
 import { useCanvasChat } from "./useCanvasChat";
 import { useCanvasDrag } from "./useCanvasDrag";
 import { useProposalExecution } from "./useProposalExecution";
@@ -111,6 +111,8 @@ const SEMANTIC_PHASES = [
 
 const ASSET_CARD_IMAGE_TOP = 38;
 const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
+const IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY =
+  "aisets.canvas.imageOptimizationAdvice";
 const DEFAULT_COMPOSER_HEIGHT = 320;
 const composerActionClass =
   "border-white/[0.08] bg-white/[0.07] text-white/72 hover:bg-white/[0.12] hover:text-white";
@@ -176,18 +178,6 @@ export function AICanvasView({
   const [searchSelectedIds, setSearchSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const ghostSamples = useMemo(
-    () => [
-      t("commandPalette.sampleQuery1"),
-      t("commandPalette.sampleQuery2"),
-      t("commandPalette.sampleQuery3"),
-    ],
-    [t],
-  );
-  const ghostIdx = useRotatingGhost(
-    searchMode === "semantic" && !query.trim() && !searchBusy,
-    ghostSamples.length,
-  );
   const [phaseIdx, setPhaseIdx] = useState(0);
   useEffect(() => {
     if (!searchBusy || searchMode !== "semantic") return;
@@ -198,6 +188,7 @@ export function AICanvasView({
   }, [searchBusy, searchMode]);
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [mentionedCardIds, setMentionedCardIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
   const [composerCollapsed, setComposerCollapsed] = useState(() => {
@@ -208,6 +199,15 @@ export function AICanvasView({
     }
   });
   const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
+  const [imageOptimizationAdvice, setImageOptimizationAdvice] = useState(() => {
+    try {
+      return (
+        localStorage.getItem(IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY) === "true"
+      );
+    } catch {
+      return false;
+    }
+  });
   const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
     initialSession.chatHistory ?? [],
   );
@@ -257,6 +257,7 @@ export function AICanvasView({
     y: number;
   } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!aiEnabled) return;
@@ -298,6 +299,42 @@ export function AICanvasView({
   const selectedAssets = useMemo(
     () => selectedAssetCards(cards, selectedCardId),
     [cards, selectedCardId],
+  );
+  const mentionableImageCards = useMemo(
+    () =>
+      cards.flatMap((card) => {
+        if (card.kind === "asset") {
+          return [
+            {
+              id: card.id,
+              name: fileName(card.asset.repoPath),
+              meta: imageMeta(card.asset),
+              src: card.asset.thumbnailUrl || card.asset.url,
+            },
+          ];
+        }
+        if (card.kind === "variant") {
+          return [
+            {
+              id: card.id,
+              name: card.sourceName,
+              meta: `${card.inputFormat.toUpperCase()} → ${card.outputFormat.toUpperCase()}`,
+              src: card.previewUrl,
+            },
+          ];
+        }
+        return [];
+      }),
+    [cards],
+  );
+  const mentionedImageCards = useMemo(
+    () =>
+      mentionedCardIds
+        .map((id) => mentionableImageCards.find((card) => card.id === id))
+        .filter((card): card is (typeof mentionableImageCards)[number] =>
+          Boolean(card),
+        ),
+    [mentionableImageCards, mentionedCardIds],
   );
   const commentsByAnchor = useMemo(() => {
     const map = new Map<string, CommentCanvasCard[]>();
@@ -375,6 +412,8 @@ export function AICanvasView({
     viewport,
     chatHistory,
     prompt,
+    mentionedCardIds,
+    imageOptimizationAdvice,
     t,
     rootRef,
     setCards,
@@ -383,6 +422,7 @@ export function AICanvasView({
     setError,
     setWorking,
     setPrompt,
+    setMentionedCardIds,
   });
   const isWorking = working !== "idle";
   const composerToolsOpen = composerAdvancedOpen;
@@ -459,6 +499,39 @@ export function AICanvasView({
       // localStorage unavailable
     }
   }, [composerHeight]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY,
+        imageOptimizationAdvice ? "true" : "false",
+      );
+    } catch {
+      // localStorage unavailable
+    }
+  }, [imageOptimizationAdvice]);
+
+  useEffect(() => {
+    function onCanvasSearchShortcut(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "p") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSearchOpen(true);
+      window.requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
+    }
+
+    document.addEventListener("keydown", onCanvasSearchShortcut, {
+      capture: true,
+    });
+    return () => {
+      document.removeEventListener("keydown", onCanvasSearchShortcut, {
+        capture: true,
+      });
+    };
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -780,14 +853,23 @@ export function AICanvasView({
     });
   }
 
+  function mentionImageCard(cardId: string) {
+    const target = mentionableImageCards.find((card) => card.id === cardId);
+    if (!target) return;
+    setMentionedCardIds((current) =>
+      current.includes(cardId) ? current : [...current, cardId],
+    );
+    setSelectedCardId(cardId);
+    appendPromptToken(`@${target.name}`);
+  }
+
   function mentionSelectedAsset() {
     const target = selectedAssets[0];
-    appendPromptToken(
-      "@" +
-        (target
-          ? fileName(target.asset.repoPath)
-          : t("aiCanvas.selectedMention")),
-    );
+    if (target) {
+      mentionImageCard(target.id);
+      return;
+    }
+    appendPromptToken("@" + t("aiCanvas.selectedMention"));
   }
 
   function noteUploadPending() {
@@ -961,6 +1043,7 @@ export function AICanvasView({
             }}
           >
             <TextInput
+              ref={searchInputRef}
               value={query}
               variant="command"
               size="sm"
@@ -970,13 +1053,6 @@ export function AICanvasView({
                     size={14}
                     className="animate-spin text-g-ink-3"
                   />
-                ) : searchMode === "semantic" && !query.trim() ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <WandSparkles size={14} className="shrink-0 text-g-ink-3" />
-                    <span className="rounded-g-pill border border-g-line bg-g-surface-2 px-1 py-px font-g-mono text-[8px] uppercase tracking-[0.04em] text-g-ink-3 opacity-75">
-                      {t("commandPalette.tryPrefix")}
-                    </span>
-                  </span>
                 ) : (
                   <span className="relative inline-grid size-[14px] place-items-center">
                     <Search
@@ -991,7 +1067,7 @@ export function AICanvasView({
                     <WandSparkles
                       size={14}
                       className={cn(
-                        "absolute inset-0 text-g-ink-2 transition-[opacity,transform] duration-[280ms] ease-g-spring",
+                        "absolute inset-0 text-g-purple transition-[opacity,transform] duration-[280ms] ease-g-spring",
                         searchMode === "semantic"
                           ? "rotate-0 scale-100 opacity-100"
                           : "rotate-[20deg] scale-75 opacity-0",
@@ -1002,7 +1078,7 @@ export function AICanvasView({
               }
               placeholder={
                 searchMode === "semantic"
-                  ? ghostSamples[ghostIdx] || t("toolbar.semanticSearch")
+                  ? t("toolbar.semanticSearch")
                   : t("aiCanvas.searchPlaceholder")
               }
               onChange={(event) => setQuery(event.target.value)}
@@ -1057,10 +1133,10 @@ export function AICanvasView({
                     <button
                       type="button"
                       className={cn(
-                        "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+                        "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus",
                         searchMode === "semantic"
-                          ? "text-g-ink"
-                          : "text-g-ink-3",
+                          ? "text-g-purple hover:text-g-purple"
+                          : "text-g-ink-3 hover:text-g-ink",
                       )}
                       aria-label={t("toolbar.searchMode")}
                       onClick={() =>
@@ -1085,11 +1161,16 @@ export function AICanvasView({
                     </button>
                   )}
                   {searchBusy && searchMode === "semantic" && (
-                    <span
-                      key={phaseIdx}
-                      className="inline-flex h-5 shrink-0 items-center rounded-g-pill border border-g-line bg-g-surface-2 px-2 font-g-mono text-[10px] tracking-g-mono text-g-ink-3 animate-[fadeIn_400ms_var(--g-ease)_both]"
-                    >
-                      {SEMANTIC_PHASES[phaseIdx]}
+                    <span className="relative ml-1.5 mr-0.5 inline-flex h-[18px] items-center overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--g-purple)_10%,transparent)] px-2 animate-[semanticGlow_2s_ease-in-out_infinite]">
+                      <span className="absolute inset-0 animate-[semanticScan_1.4s_ease-in-out_infinite]">
+                        <span className="block h-full w-[40%] bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--g-purple)_45%,transparent)] to-transparent" />
+                      </span>
+                      <span
+                        key={phaseIdx}
+                        className="relative whitespace-nowrap font-g text-[10px] font-[590] tracking-wide text-g-purple animate-[ghostSwap_1.8s_ease-in-out_both]"
+                      >
+                        {SEMANTIC_PHASES[phaseIdx]}
+                      </span>
                     </span>
                   )}
                 </span>
@@ -1154,7 +1235,7 @@ export function AICanvasView({
                     }}
                   >
                     <Plus size={11} />
-                    {t("aiCanvas.addSelected", {
+                    {t("imageTools.addSelected", {
                       count: searchSelectedIds.size,
                     })}
                   </button>
@@ -1401,28 +1482,64 @@ export function AICanvasView({
                 data-ai-canvas-scroll="true"
                 className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-16"
               >
-                {assistantMessages.length === 0 ? (
+                {chatHistory.length === 0 ? (
                   <div className="py-4 text-center text-g-caption text-white/30">
                     {t("aiCanvas.emptyDesc")}
                   </div>
                 ) : (
-                  assistantMessages.map((entry, i) => (
-                    <article
-                      key={i}
-                      className="max-w-[calc(100%-16px)] self-start rounded-g-lg border border-white/[0.06] bg-white/[0.06] px-4 py-3 text-g-body leading-[1.55] text-white/84"
-                    >
-                      <div className="whitespace-pre-wrap">
-                        {renderMarkdown(entry.content)}
-                      </div>
-                      <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
-                        <CopyButton
-                          value={entry.content}
-                          label={t("ai.copyResult")}
-                          className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
-                        />
-                      </div>
-                    </article>
-                  ))
+                  chatHistory.map((entry, i) => {
+                    const isUser = entry.role === "user";
+                    return (
+                      <article
+                        key={i}
+                        className={cn(
+                          "max-w-[calc(100%-16px)] rounded-g-lg border px-4 py-3 text-g-body leading-[1.55] text-white/84",
+                          isUser
+                            ? "self-end border-white/[0.1] bg-white/[0.12]"
+                            : "self-start border-white/[0.06] bg-white/[0.06]",
+                        )}
+                      >
+                        {entry.mentions && entry.mentions.length > 0 && (
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            {entry.mentions.map((mention) => (
+                              <span
+                                key={mention.id}
+                                className="inline-flex max-w-[200px] items-center gap-2 rounded-[12px] border border-white/[0.08] bg-black/[0.16] py-1 pl-1 pr-2"
+                              >
+                                <AssetThumbnail
+                                  src={mention.src}
+                                  size="sm"
+                                  className="size-7 rounded-[9px] border-white/[0.1] bg-white/[0.06]"
+                                  imageClassName="max-h-5 max-w-5"
+                                  draggable={false}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate font-g-mono text-g-chip font-[510] tracking-g-mono text-white/86">
+                                    @{mention.name}
+                                  </span>
+                                  <span className="block truncate text-[9px] leading-3 text-white/38">
+                                    {mention.meta}
+                                  </span>
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="whitespace-pre-wrap">
+                          {renderMarkdown(entry.content)}
+                        </div>
+                        {!isUser && (
+                          <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
+                            <CopyButton
+                              value={entry.content}
+                              label={t("ai.copyResult")}
+                              className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
+                            />
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })
                 )}
                 {isWorking && (
                   <div className="flex items-center gap-2 self-start rounded-g-md border border-white/[0.06] bg-white/[0.07] px-3 py-2 text-g-caption text-white/56">
@@ -1468,7 +1585,11 @@ export function AICanvasView({
                     >
                       {t("aiCanvas.describe")}
                     </Button>
-                    <Badge tone="line">{t("aiCanvas.autoReview")}</Badge>
+                    <Badge tone={imageOptimizationAdvice ? "amber" : "line"}>
+                      {imageOptimizationAdvice
+                        ? t("aiCanvas.imageOptimizationAdviceShort")
+                        : t("aiCanvas.autoReview")}
+                    </Badge>
                     <Badge tone="line">{t("aiCanvas.modelHigh")}</Badge>
                   </>
                 )}
@@ -1537,6 +1658,44 @@ export function AICanvasView({
                 )}
               </div>
             )}
+            {mentionedImageCards.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2 px-1">
+                {mentionedImageCards.map((card) => (
+                  <span
+                    key={card.id}
+                    className="inline-flex max-w-[220px] items-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.07] py-1 pl-1 pr-1.5 text-white/78"
+                  >
+                    <AssetThumbnail
+                      src={card.src}
+                      size="sm"
+                      className="size-7 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                      imageClassName="max-h-5 max-w-5"
+                      draggable={false}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-g-mono text-g-chip font-[510] tracking-g-mono">
+                        @{card.name}
+                      </span>
+                      <span className="block truncate text-[9px] leading-3 text-white/38">
+                        {card.meta}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t("aiCanvas.removeMention")}
+                      className="grid size-5 shrink-0 place-items-center rounded-full text-white/42 transition-colors duration-[120ms] ease-g hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+                      onClick={() =>
+                        setMentionedCardIds((current) =>
+                          current.filter((id) => id !== card.id),
+                        )
+                      }
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="flex min-h-10 items-center gap-2 pl-1 pr-0.5">
               <DropdownMenuPrimitive.Root>
                 <DropdownMenuPrimitive.Trigger asChild>
@@ -1561,6 +1720,27 @@ export function AICanvasView({
                       <Paperclip size={14} className="shrink-0 text-white/54" />
                       <span>{t("aiCanvas.attachImage")}</span>
                     </DropdownMenuPrimitive.Item>
+                    <div className="flex min-h-12 items-center gap-3 rounded-[12px] px-3 py-2 font-g text-white outline-none transition-colors duration-[120ms] ease-g hover:bg-white/[0.06]">
+                      <WandSparkles
+                        size={14}
+                        className="shrink-0 text-white/54"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-g-ui font-[510]">
+                          {t("aiCanvas.imageOptimizationAdvice")}
+                        </div>
+                        <div className="mt-0.5 text-g-caption text-white/42">
+                          {t("aiCanvas.imageOptimizationAdviceDesc")}
+                        </div>
+                      </div>
+                      <Switch
+                        checked={imageOptimizationAdvice}
+                        onCheckedChange={setImageOptimizationAdvice}
+                        aria-label={t("aiCanvas.imageOptimizationAdvice")}
+                        className="data-[state=checked]:!bg-g-amber-soft"
+                      />
+                    </div>
+                    <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.1]" />
                     <DropdownMenuPrimitive.Item
                       disabled={chatHistory.length === 0}
                       onSelect={clearChatHistory}
@@ -1572,14 +1752,60 @@ export function AICanvasView({
                   </DropdownMenuPrimitive.Content>
                 </DropdownMenuPrimitive.Portal>
               </DropdownMenuPrimitive.Root>
-              <IconButton
-                size="sm"
-                aria-label={t("aiCanvas.mentionAsset")}
-                className={composerIconClass}
-                onClick={mentionSelectedAsset}
-              >
-                <AtSign />
-              </IconButton>
+              <DropdownMenuPrimitive.Root>
+                <DropdownMenuPrimitive.Trigger asChild>
+                  <IconButton
+                    size="sm"
+                    aria-label={t("aiCanvas.mentionAsset")}
+                    className={composerIconClass}
+                  >
+                    <AtSign />
+                  </IconButton>
+                </DropdownMenuPrimitive.Trigger>
+                <DropdownMenuPrimitive.Portal>
+                  <DropdownMenuPrimitive.Content
+                    align="start"
+                    sideOffset={10}
+                    className="z-[80] min-w-[280px] max-w-[360px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                  >
+                    <DropdownMenuPrimitive.Label className="px-3 py-1.5 font-g text-g-caption font-[510] tracking-g-ui text-white/38">
+                      {t("aiCanvas.mentionCanvasImage")}
+                    </DropdownMenuPrimitive.Label>
+                    {mentionableImageCards.length === 0 ? (
+                      <div className="px-3 py-2 text-g-caption text-white/42">
+                        {t("aiCanvas.noMentionImages")}
+                      </div>
+                    ) : (
+                      mentionableImageCards.map((card) => (
+                        <DropdownMenuPrimitive.Item
+                          key={card.id}
+                          onSelect={() => mentionImageCard(card.id)}
+                          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                        >
+                          <AssetThumbnail
+                            src={card.src}
+                            size="sm"
+                            className="size-8 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                            imageClassName="max-h-6 max-w-6"
+                            draggable={false}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
+                              {card.name}
+                            </span>
+                            <span className="block truncate text-g-chip text-white/42">
+                              {card.meta}
+                            </span>
+                          </span>
+                          {mentionedCardIds.includes(card.id) && (
+                            <Check size={14} className="shrink-0 text-white" />
+                          )}
+                        </DropdownMenuPrimitive.Item>
+                      ))
+                    )}
+                  </DropdownMenuPrimitive.Content>
+                </DropdownMenuPrimitive.Portal>
+              </DropdownMenuPrimitive.Root>
               <textarea
                 value={prompt}
                 placeholder={t("aiCanvas.composerPlaceholder")}

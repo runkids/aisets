@@ -8,15 +8,17 @@ import {
   type CanvasChatEvent,
 } from "@/api/canvasChat";
 import type { AssetItem } from "@/types";
+import { fileName } from "@/ui";
 import {
   createCanvasCardId,
   type AssetCanvasCard,
   type CanvasCard,
   type ChatHistoryEntry,
+  type ChatMentionPreview,
   type CommentCanvasCard,
   type ProposalCanvasCard,
 } from "./aiCanvasState";
-import { CARD_WIDTH, nextCardPosition, nowISO } from "./canvasUtils";
+import { CARD_WIDTH, imageMeta, nextCardPosition, nowISO } from "./canvasUtils";
 
 type AICursorState = {
   x: number;
@@ -27,6 +29,26 @@ type AICursorState = {
 
 type WorkingState = "idle" | "search" | "ai" | "imagePreview" | "operation";
 
+function mentionPreviewForCard(card: CanvasCard): ChatMentionPreview | undefined {
+  if (card.kind === "asset") {
+    return {
+      id: card.id,
+      name: fileName(card.asset.repoPath),
+      meta: imageMeta(card.asset),
+      src: card.asset.thumbnailUrl || card.asset.url,
+    };
+  }
+  if (card.kind === "variant") {
+    return {
+      id: card.id,
+      name: card.sourceName,
+      meta: `${card.inputFormat.toUpperCase()} → ${card.outputFormat.toUpperCase()}`,
+      src: card.previewUrl,
+    };
+  }
+  return undefined;
+}
+
 export function useCanvasChat(opts: {
   scanId: number | undefined;
   cards: CanvasCard[];
@@ -34,6 +56,8 @@ export function useCanvasChat(opts: {
   viewport: { x: number; y: number; scale: number };
   chatHistory: ChatHistoryEntry[];
   prompt: string;
+  mentionedCardIds: string[];
+  imageOptimizationAdvice: boolean;
   t: TFunction;
   rootRef: RefObject<HTMLDivElement | null>;
   setCards: Dispatch<SetStateAction<CanvasCard[]>>;
@@ -42,6 +66,7 @@ export function useCanvasChat(opts: {
   setError: Dispatch<SetStateAction<string>>;
   setWorking: Dispatch<SetStateAction<WorkingState>>;
   setPrompt: Dispatch<SetStateAction<string>>;
+  setMentionedCardIds: Dispatch<SetStateAction<string[]>>;
 }) {
   const {
     scanId,
@@ -50,6 +75,8 @@ export function useCanvasChat(opts: {
     viewport,
     chatHistory,
     prompt,
+    mentionedCardIds,
+    imageOptimizationAdvice,
     t,
     rootRef,
     setCards,
@@ -58,6 +85,7 @@ export function useCanvasChat(opts: {
     setError,
     setWorking,
     setPrompt,
+    setMentionedCardIds,
   } = opts;
 
   const abortRef = useRef<AbortController | null>(null);
@@ -72,13 +100,26 @@ export function useCanvasChat(opts: {
     if (!promptText) return;
     const canvasCards = overrides?.cards ?? cards;
     const canvasSelectedCardId = overrides?.selectedCardId ?? selectedCardId;
+    const canvasMentionedCardIds = mentionedCardIds.filter((id) =>
+      canvasCards.some((card) => card.id === id),
+    );
     setPrompt("");
+    setMentionedCardIds([]);
     setError("");
     setWorking("ai");
 
+    const mentionPreviews = canvasMentionedCardIds
+      .map((id) => canvasCards.find((card) => card.id === id))
+      .map((card) => (card ? mentionPreviewForCard(card) : undefined))
+      .filter((mention): mention is ChatMentionPreview => Boolean(mention));
+
     setChatHistory((prev) => [
       ...prev.slice(-9),
-      { role: "user", content: promptText },
+      {
+        role: "user",
+        content: promptText,
+        mentions: mentionPreviews.length > 0 ? mentionPreviews : undefined,
+      },
     ]);
 
     const abort = new AbortController();
@@ -92,6 +133,7 @@ export function useCanvasChat(opts: {
       canvasCards,
       canvasSelectedCardId,
       viewport,
+      canvasMentionedCardIds,
     );
 
     let assistantText = "";
@@ -237,6 +279,7 @@ export function useCanvasChat(opts: {
         messages,
         canvas: snapshot,
         locale: "zh-TW",
+        options: { imageOptimizationAdvice },
         onEvent: handleEvent,
         signal: abort.signal,
       });

@@ -51,6 +51,12 @@ type canvasCardSnapshot struct {
 	Tool           string               `json:"tool,omitempty"`
 	ProposalStatus string               `json:"status,omitempty"`
 	Description    string               `json:"description,omitempty"`
+	SourceAssetID  string               `json:"sourceAssetId,omitempty"`
+	SourceName     string               `json:"sourceName,omitempty"`
+	InputBytes     int64                `json:"inputBytes,omitempty"`
+	OutputBytes    int64                `json:"outputBytes,omitempty"`
+	InputFormat    string               `json:"inputFormat,omitempty"`
+	OutputFormat   string               `json:"outputFormat,omitempty"`
 }
 
 type canvasViewport struct {
@@ -65,10 +71,15 @@ type canvasSnapshot struct {
 	Cards           []canvasCardSnapshot `json:"cards"`
 }
 
+type canvasChatOptions struct {
+	ImageOptimizationAdvice bool `json:"imageOptimizationAdvice"`
+}
+
 type canvasChatRequest struct {
 	Messages []canvasChatMessage `json:"messages"`
 	Canvas   canvasSnapshot      `json:"canvas"`
 	Locale   string              `json:"locale"`
+	Options  canvasChatOptions   `json:"options"`
 }
 
 type canvasAction struct {
@@ -208,7 +219,7 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	return textBody, actions
 }
 
-func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot) string {
+func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, options canvasChatOptions) string {
 	var b strings.Builder
 
 	b.WriteString("## Canvas State\n")
@@ -239,10 +250,20 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot) 
 				fmt.Fprintf(&b, " region=(%.2f,%.2f,%.2f,%.2f)", card.Region.X, card.Region.Y, card.Region.Width, card.Region.Height)
 			}
 		}
+		if card.Kind == "variant" {
+			fmt.Fprintf(&b, " sourceAssetId=%s sourceName=%s %s→%s %dB→%dB", card.SourceAssetID, card.SourceName, card.InputFormat, card.OutputFormat, card.InputBytes, card.OutputBytes)
+		}
 		if card.Kind == "proposal" {
 			fmt.Fprintf(&b, " tool=%s status=%s", card.Tool, card.ProposalStatus)
 		}
 		b.WriteByte('\n')
+	}
+
+	b.WriteString("\n## Assistant Options\n")
+	if options.ImageOptimizationAdvice {
+		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n")
+	} else {
+		b.WriteString("- Image optimization advice is OFF. Do not proactively propose compression, resizing, or format conversion unless the user's latest request explicitly asks for optimization.\n")
 	}
 
 	b.WriteString("\n## Conversation\n")
@@ -288,7 +309,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		locale = "en"
 	}
 	systemPrompt := canvasSystemPrompt(locale)
-	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas)
+	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options)
 
 	var images []vlmImage
 	for _, card := range req.Canvas.Cards {
