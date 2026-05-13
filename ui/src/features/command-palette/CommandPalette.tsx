@@ -40,7 +40,7 @@ import { useCategoryListQuery, useTagsQuery } from "@/tagsQueries";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import { useSearchHistory } from "@/useSearchHistory";
 import { fileName, type Mode } from "@/ui";
-import { AssetThumbnail, ImagePreview } from "@/components/ui";
+import { AssetThumbnail, ImagePreview, Tooltip } from "@/components/ui";
 import {
   DialogOverlay,
   DialogSurface,
@@ -118,6 +118,7 @@ function useEmbedReady(open: boolean, embedEnabled: boolean) {
     total:
       (statsQuery.data?.textCount ?? 0) + (statsQuery.data?.imageCount ?? 0),
     stats: statsQuery.data,
+    checking: statsQuery.isFetching && !statsQuery.data,
   };
 }
 
@@ -377,13 +378,34 @@ function KeyHint({ children }: { children: ReactNode }) {
 function ModeSegment({
   mode,
   embedReady,
+  disabledReason,
   onMode,
 }: {
   mode: SearchMode;
   embedReady: boolean;
+  disabledReason?: string;
   onMode: (mode: SearchMode) => void;
 }) {
   const { t } = useTranslation();
+  const aiButton = (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={mode === "semantic"}
+      aria-disabled={!embedReady}
+      onClick={() => embedReady && onMode("semantic")}
+      className={cn(
+        "inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-[background,color,box-shadow] duration-[160ms] ease-g hover:text-g-ink-2 disabled:cursor-not-allowed disabled:opacity-50",
+        mode === "semantic" &&
+          "bg-[color-mix(in_srgb,var(--g-purple)_14%,var(--g-surface))] font-[590] text-g-purple shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-purple)_35%,transparent)] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,var(--g-purple)_22%,var(--g-surface-2))] [[data-theme=dark]_&]:text-[#c4b5fd]",
+      )}
+      disabled={!embedReady}
+    >
+      <Sparkles size={11} />
+      <span>{t("commandPalette.modeAI")}</span>
+    </button>
+  );
+
   return (
     <div
       className="inline-flex h-6 min-w-max items-center gap-0.5 rounded-g-pill border border-g-line-strong bg-g-surface-2 p-0.5"
@@ -403,22 +425,15 @@ function ModeSegment({
         <Search size={11} />
         <span>{t("commandPalette.modeCatalog")}</span>
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "semantic"}
-        aria-disabled={!embedReady}
-        onClick={() => embedReady && onMode("semantic")}
-        className={cn(
-          "inline-flex h-5 items-center gap-1 rounded-g-pill border-0 bg-transparent px-2.5 font-g text-[11px] font-[510] tracking-g-ui text-g-ink-4 transition-[background,color,box-shadow] duration-[160ms] ease-g hover:text-g-ink-2 disabled:cursor-not-allowed disabled:opacity-50",
-          mode === "semantic" &&
-            "bg-[color-mix(in_srgb,var(--g-purple)_14%,var(--g-surface))] font-[590] text-g-purple shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-purple)_35%,transparent)] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,var(--g-purple)_22%,var(--g-surface-2))] [[data-theme=dark]_&]:text-[#c4b5fd]",
-        )}
-        disabled={!embedReady}
-      >
-        <Sparkles size={11} />
-        <span>{t("commandPalette.modeAI")}</span>
-      </button>
+      {disabledReason ? (
+        <Tooltip label={disabledReason} placement="top">
+          <span className="inline-flex" role="presentation">
+            {aiButton}
+          </span>
+        </Tooltip>
+      ) : (
+        aiButton
+      )}
       <span className="mx-1 font-g-mono text-[9px] font-[510] uppercase tracking-[0.04em] text-g-ink-4 opacity-65">
         Tab
       </span>
@@ -786,6 +801,17 @@ export function CommandPalette({
     embedDimensions > 0
       ? `${embedDimensions}-D`
       : t("commandPalette.embeddingSpace");
+  const semanticDisabledReason = embedReady
+    ? undefined
+    : !settings
+      ? t("commandPalette.aiStatusLoadingReason")
+      : !settings.llmEnabled
+        ? t("commandPalette.aiDisabledReason")
+        : !settings.llmEmbedModel
+          ? t("commandPalette.embedModelMissingReason")
+          : embed.checking
+            ? t("commandPalette.embedCheckingReason")
+            : t("commandPalette.embeddingsMissingReason");
   const projectNameById = useMemo(
     () =>
       new Map(
@@ -1229,6 +1255,7 @@ export function CommandPalette({
                   <ModeSegment
                     mode={searchMode}
                     embedReady={embedReady}
+                    disabledReason={semanticDisabledReason}
                     onMode={switchMode}
                   />
                 </div>

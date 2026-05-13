@@ -66,6 +66,21 @@ type Props = {
   onAssetIdsChange: (assetIds: string[]) => void;
 };
 
+const SEMANTIC_PHASES = [
+  "向量比對中",
+  "Embedding lookup",
+  "計算餘弦距離",
+  "Cosine similarity",
+  "標記相似群集",
+  "k-NN clustering",
+  "語意排序中",
+  "Ranking results",
+  "解析語意特徵",
+  "Parsing features",
+  "ベクトル検索中",
+  "유사도 계산",
+];
+
 const FORMAT_OPTIONS = [
   { value: "webp", label: "WebP" },
   { value: "avif", label: "AVIF" },
@@ -166,15 +181,32 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   );
   const isSemanticActive =
     searchMode === "semantic" && committedSemanticQuery.length > 0;
-  const [semanticBusyUntil, setSemanticBusyUntil] = useState(0);
+  const [semanticBusy, setSemanticBusy] = useState(false);
   const semanticFetching = semanticQuery.isFetching;
   useEffect(() => {
     if (isSemanticActive && semanticFetching) {
-      setSemanticBusyUntil(Date.now() + 800);
+      setSemanticBusy(true);
+      return;
     }
-  }, [isSemanticActive, semanticFetching, committedSemanticQuery]);
-  const showSemanticLoading =
-    isSemanticActive && (semanticFetching || Date.now() < semanticBusyUntil);
+    const id = setTimeout(() => setSemanticBusy(false), 800);
+    return () => clearTimeout(id);
+  }, [isSemanticActive, semanticFetching]);
+  const showSemanticLoading = isSemanticActive && semanticBusy;
+  const [semanticPhase, setSemanticPhase] = useState(0);
+  useEffect(() => {
+    if (!showSemanticLoading) return;
+    setSemanticPhase(Math.floor(Math.random() * SEMANTIC_PHASES.length));
+    const id = setInterval(() => {
+      setSemanticPhase((p) => {
+        let next: number;
+        do {
+          next = Math.floor(Math.random() * SEMANTIC_PHASES.length);
+        } while (next === p && SEMANTIC_PHASES.length > 1);
+        return next;
+      });
+    }, 1800);
+    return () => clearInterval(id);
+  }, [showSemanticLoading]);
 
   const catalogQuery = useCatalogItemsInfiniteQuery(scanId, {
     q:
@@ -242,8 +274,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     setError("");
   }, [assetIds, onAssetIdsChange, staleBasketIds]);
 
-  const semanticHasResults =
-    isSemanticActive && semanticItems.length > 0;
+  const semanticHasResults = isSemanticActive && semanticItems.length > 0;
   const pickerItems = useMemo(() => {
     const source = semanticHasResults ? semanticItems : rawPickerItems;
     return source
@@ -550,14 +581,16 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           </button>
                         )}
                         {showSemanticLoading && (
-                          <span className="ml-1 mr-0.5 inline-flex items-center gap-[3px]">
-                            {[0, 1, 2, 3, 4].map((i) => (
-                              <span
-                                key={i}
-                                className="inline-block size-[5px] rounded-full bg-g-purple animate-[countPulse_1s_ease-in-out_infinite]"
-                                style={{ animationDelay: `${i * 120}ms` }}
-                              />
-                            ))}
+                          <span className="relative ml-1.5 mr-0.5 inline-flex h-[18px] items-center overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--g-purple)_10%,transparent)] px-2 animate-[semanticGlow_2s_ease-in-out_infinite]">
+                            <span className="absolute inset-0 animate-[semanticScan_1.4s_ease-in-out_infinite]">
+                              <span className="block h-full w-[40%] bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--g-purple)_45%,transparent)] to-transparent" />
+                            </span>
+                            <span
+                              key={semanticPhase}
+                              className="relative whitespace-nowrap font-g text-[10px] font-[590] tracking-wide text-g-purple animate-[ghostSwap_1.8s_ease-in-out_both]"
+                            >
+                              {SEMANTIC_PHASES[semanticPhase]}
+                            </span>
                           </span>
                         )}
                       </span>
@@ -769,22 +802,17 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <button
                         type="button"
                         onClick={() => setDrawerAssetId(item.id)}
-                        className="group/q flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong hover:bg-g-surface-2 animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
                         style={{
                           animationDelay: `${Math.min(index, 8) * 40}ms`,
                         }}
                       >
-                        <div className="relative size-10 shrink-0">
-                          <AssetThumbnail
-                            src={item.thumbnailUrl || item.url}
-                            size="md"
-                            className="size-10"
-                            imageClassName="max-h-8 max-w-8"
-                          />
-                          <div className="absolute inset-0 grid place-items-center rounded-g-md bg-black/50 opacity-0 transition-opacity group-hover/q:opacity-100">
-                            <Eye size={14} className="text-white" />
-                          </div>
-                        </div>
+                        <AssetThumbnail
+                          src={item.thumbnailUrl || item.url}
+                          size="md"
+                          className="size-10 shrink-0"
+                          imageClassName="max-h-8 max-w-8"
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
                             {fileName(item.repoPath)}
@@ -794,6 +822,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             {formatBytes(item.bytes)}
                           </div>
                         </div>
+                        <Eye
+                          size={14}
+                          className="shrink-0 text-g-ink-4"
+                          aria-hidden="true"
+                        />
                         <Button
                           variant="ghost"
                           size="sm"
@@ -819,7 +852,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <button
                         type="button"
                         onClick={() => setDrawerUploadIndex(index)}
-                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong hover:bg-g-surface-2 animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
                         style={{
                           animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
                         }}
@@ -839,6 +872,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             {formatBytes(file.size)}
                           </div>
                         </div>
+                        <Eye
+                          size={14}
+                          className="shrink-0 text-g-ink-4"
+                          aria-hidden="true"
+                        />
                         <Button
                           variant="ghost"
                           size="sm"

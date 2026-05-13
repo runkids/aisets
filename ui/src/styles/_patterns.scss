@@ -660,3 +660,30 @@ textarea::-webkit-resizer {
     transform: translateX(200%);
   }
 }
+@keyframes semanticScan {
+  0% {
+    transform: translateX(-100%) skewX(-18deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(250%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+@keyframes semanticGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+    box-shadow: 0 0 4px color-mix(in srgb, var(--g-purple) 30%, transparent);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--g-purple) 55%, transparent);
+  }
+}
