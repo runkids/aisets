@@ -58,9 +58,11 @@ export function ImageToolsPreviewDrawer({
   const [closing, setClosing] = useState(false);
   const [sliderPos, setSliderPos] = useState(50);
   const [activeFormat, setActiveFormat] = useState(settings.outputFormat);
-  const [formatPreviews, setFormatPreviews] = useState<FormatPreview[]>([]);
+  const [formatPreviews, setFormatPreviews] = useState<FormatPreview[]>(
+    () => asset ? FORMAT_CARDS.map((f) => ({ ...f, loading: true })) : [],
+  );
   const [metadata, setMetadata] = useState<ImageToolMetadata | null>(null);
-  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataLoading, setMetadataLoading] = useState(!!asset);
   const sliderRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -85,19 +87,16 @@ export function ImageToolsPreviewDrawer({
     setTimeout(onClose, 200);
   }, [onClose]);
 
+  const assetId = asset?.id;
+
   // Load format previews for project assets
   useEffect(() => {
-    if (!asset) return;
+    if (!assetId) return;
     const controller = new AbortController();
-    const previews: FormatPreview[] = FORMAT_CARDS.map((f) => ({
-      ...f,
-      loading: true,
-    }));
-    setFormatPreviews(previews);
 
     FORMAT_CARDS.forEach((f, i) => {
       renderImageToolPreview({
-        assetId: asset.id,
+        assetId,
         outputFormat: f.format,
         quality: settings.quality,
         maxDimensionPx: settings.maxDimensionPx,
@@ -121,17 +120,18 @@ export function ImageToolsPreviewDrawer({
     });
 
     return () => controller.abort();
-  }, [asset?.id, settings.quality, settings.maxDimensionPx]);
+  }, [assetId, settings.quality, settings.maxDimensionPx]);
 
   // Load metadata for project assets
   useEffect(() => {
-    if (!asset) return;
-    setMetadataLoading(true);
-    getImageToolMetadata(asset.id)
-      .then(setMetadata)
-      .catch(() => setMetadata(null))
-      .finally(() => setMetadataLoading(false));
-  }, [asset?.id]);
+    if (!assetId) return;
+    let cancelled = false;
+    getImageToolMetadata(assetId)
+      .then((data) => !cancelled && setMetadata(data))
+      .catch(() => !cancelled && setMetadata(null))
+      .finally(() => !cancelled && setMetadataLoading(false));
+    return () => { cancelled = true; };
+  }, [assetId]);
 
   // Active format preview data (for Before/After slider)
   const activePreview = useMemo(
