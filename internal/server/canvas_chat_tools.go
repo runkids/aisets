@@ -22,14 +22,14 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "search_assets",
-			Description: "Search the project catalog for assets by name, path, or keyword.",
-			Params:      `{"q": "string — search query", "limit": "int — max results, default 6"}`,
+			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Use this to find assets even when the canvas is empty.",
+			Params:      `{"q": "string — search query (e.g. 'book', 'icon', '貓')", "limit": "int — max results, default 12"}`,
 			Safe:        true,
 		},
 		{
 			Name:        "get_asset_detail",
-			Description: "Get full details about an asset: project, workspace, local path, dimensions, AI tags, OCR text, optimization status, used-by references.",
-			Params:      `{"assetId": "string — catalog asset ID"}`,
+			Description: "Get full details about a specific asset: project, local path, dimensions, AI tags, OCR text, used-by references. Use after search_assets to get details.",
+			Params:      `{"assetId": "string — catalog asset ID from search results"}`,
 			Safe:        true,
 		},
 		{
@@ -126,17 +126,24 @@ Respond in %s. EVERY response MUST include at least one tool call. For each tool
 %s
 
 CRITICAL RULES:
-1. ALWAYS start with focus_card to move your cursor — the user watches where you look.
+1. If there are cards on the canvas, start with focus_card to move your cursor.
 2. EVERY response must have at least one action block. Pure text responses are forbidden.
-3. SAFE tools execute immediately. NEEDS_CONFIRMATION tools become proposal cards the user must approve.
-4. Include "description" and "impact" in every action block.
-5. Use the ASSET ID from the canvas state (the "id" field inside "asset"), NOT the card ID.
+3. SAFE tools (search_assets, get_asset_detail, create_comment, focus_card) execute immediately and you will receive their results. You can then act on the results in a follow-up turn.
+4. NEEDS_CONFIRMATION tools become proposal cards the user must approve.
+5. Include "description" and "impact" in every action block.
+6. Use the ASSET ID from the canvas state (the "id" field inside "asset"), NOT the card ID.
+
+## IMPORTANT: search_assets searches the ENTIRE PROJECT CATALOG
+search_assets is NOT limited to what's on the canvas. It searches ALL assets in the project by filename, path, AI tags, description, and OCR text. When the user asks to "find", "list", "show", or "搜尋/找" assets, ALWAYS use search_assets first. Even if the canvas is empty, you can search the catalog. The results will be returned to you and you can then describe them.
+
+get_asset_detail retrieves full metadata for a specific asset (project, local path, tags, description, OCR, references). Use it after search_assets to get details about specific items.
 
 ## Context-Aware Behavior
-- **When the user asks about a REGION (circled area, comment):** Focus on analyzing THAT specific region. Use create_comment with region coordinates to annotate what you see. Do NOT propose file-level operations (compress, resize, tags) unless the user explicitly asks for them. "優化" in region context means "how to improve this visual area", not "compress the file".
+- **When the canvas is empty and the user asks to find/list assets:** Use search_assets with relevant keywords. You will receive the results. Then describe what you found.
+- **When the user asks about a REGION (circled area, comment):** Focus on analyzing THAT specific region. Use create_comment with region coordinates to annotate what you see. Do NOT propose file-level operations unless explicitly asked.
 - **When the user asks for optimization/compression/format change:** Propose compress_image, resize_image, convert_image as appropriate.
 - **When the user asks to tag or describe:** Propose update_tags or update_description.
-- **When the user asks a general question:** Analyze the asset and suggest the most relevant actions — but prefer create_comment for visual observations.
+- **When the user asks a general question about an asset:** Analyze and suggest relevant actions — prefer create_comment for visual observations.
 - **When you spot visual issues** (edges, contrast, artifacts, wrong crop), use create_comment with a region to CIRCLE the problem area. Regions use normalized 0-1 coordinates: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.
 
 ## Example 1: User asks about an image
