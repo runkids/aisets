@@ -180,6 +180,83 @@ func (s *Server) handleImageToolUploadProcess(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]any{"results": results, "zipToken": zipToken})
 }
 
+type imageToolRenderPreviewRequest struct {
+	AssetID        string `json:"assetId"`
+	OutputFormat   string `json:"outputFormat"`
+	Quality        int    `json:"quality"`
+	MaxDimensionPx int    `json:"maxDimensionPx"`
+}
+
+type imageToolRenderPreviewResponse struct {
+	Token        string `json:"token"`
+	InputBytes   int64  `json:"inputBytes"`
+	OutputBytes  int64  `json:"outputBytes"`
+	InputFormat  string `json:"inputFormat"`
+	OutputFormat string `json:"outputFormat"`
+}
+
+func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Request) {
+	var body imageToolRenderPreviewRequest
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.AssetID == "" {
+		writeError(w, http.StatusBadRequest, apierr.New("empty_selection", "assetId is required"))
+		return
+	}
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.store.CatalogItem(0, body.AssetID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	settings, _ := s.store.Settings()
+	req := optimize.Request{
+		OutputFormat:   body.OutputFormat,
+		Quality:        body.Quality,
+		MaxDimensionPx: body.MaxDimensionPx,
+		AvifSpeed:      settings.OptimizationAvifSpeed,
+		AllowLarger:    true,
+	}
+	op, candidate, err := optimize.ProcessLocalFile(item.LocalPath, item.RepoPath, item.Bytes, item.Image, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	token := imageToolToken("render-preview:" + body.AssetID + ":" + body.OutputFormat)
+	downloadName := imageToolDownloadName(item.RepoPath, op.OutputFormat)
+	s.storeImageToolDownload(token, imageToolDownload{
+		Path:             candidate,
+		Name:             downloadName,
+		ContentType:      contentTypeForName(downloadName),
+		DeleteAfterServe: true,
+		CreatedAt:        time.Now(),
+	})
+	writeJSON(w, http.StatusOK, imageToolRenderPreviewResponse{
+		Token:        token,
+		InputBytes:   op.CurrentBytes,
+		OutputBytes:  op.EstimatedBytes,
+		InputFormat:  op.InputFormat,
+		OutputFormat: op.OutputFormat,
+	})
+}
+
+func (s *Server) handleImageToolPreviewServe(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	download, ok := s.peekImageToolDownload(token)
+	if !ok {
+		writeError(w, http.StatusNotFound, apierr.New("preview_token_invalid", "preview token is invalid or expired"))
+		return
+	}
+	w.Header().Set("Content-Type", download.ContentType)
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeFile(w, r, download.Path)
+}
+
 func (s *Server) handleImageToolDownload(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	download, ok := s.takeImageToolDownload(token)

@@ -477,6 +477,82 @@ func TestImageToolsUploadDownloadAndProjectPreview(t *testing.T) {
 	}
 }
 
+func TestImageToolRenderPreviewAndServe(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	svgPath := filepath.Join(project, "img", "icon.svg")
+	mustWrite(t, svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="red"/></svg>`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 catalog item, got %d", len(items))
+	}
+	itemID := items[0].ID
+
+	// POST render-preview
+	payload, _ := json.Marshal(map[string]any{"assetId": itemID, "outputFormat": "svg", "quality": 80})
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/render-preview", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("render-preview = %d %s", rec.Code, rec.Body.String())
+	}
+	var renderResp struct {
+		Token        string `json:"token"`
+		InputBytes   int64  `json:"inputBytes"`
+		OutputBytes  int64  `json:"outputBytes"`
+		InputFormat  string `json:"inputFormat"`
+		OutputFormat string `json:"outputFormat"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &renderResp); err != nil {
+		t.Fatal(err)
+	}
+	if renderResp.Token == "" {
+		t.Fatalf("render-preview: expected token, got %#v", renderResp)
+	}
+	if renderResp.InputBytes <= 0 {
+		t.Fatalf("render-preview: expected inputBytes > 0, got %d", renderResp.InputBytes)
+	}
+	if renderResp.InputFormat == "" || renderResp.OutputFormat == "" {
+		t.Fatalf("render-preview: expected inputFormat and outputFormat, got %#v", renderResp)
+	}
+
+	// GET preview/{token} — first access (non-consuming)
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/preview/"+renderResp.Token, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview serve = %d %s", rec.Code, rec.Body.String())
+	}
+
+	// GET preview/{token} — second access should also succeed (non-consuming)
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/preview/"+renderResp.Token, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview serve second access = %d %s", rec.Code, rec.Body.String())
+	}
+
+	// GET preview with bad token — should 404
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/preview/badtoken", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("preview serve bad token = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestOptimizationEstimateCostPrioritizesLargeAnimationsLast(t *testing.T) {
 	smallStatic := scanner.AssetItem{
 		ID:    "png",
