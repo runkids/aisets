@@ -225,7 +225,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			"cardId": req.Canvas.SelectedCardIDs[0],
 			"label":  "Examining...",
 		})
-		time.Sleep(400 * time.Millisecond)
+		time.Sleep(800 * time.Millisecond)
 	}
 	sendNDJSON(w, map[string]any{"type": "thinking"})
 

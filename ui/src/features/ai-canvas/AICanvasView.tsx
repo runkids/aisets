@@ -662,31 +662,37 @@ function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
 function AICursor({
   position,
   label,
-  visible,
   status,
 }: {
   position: { x: number; y: number };
   label?: string;
-  visible: boolean;
   status?: "thinking" | "acting" | "idle";
 }) {
-  if (!visible) return null;
+  const active = status === "thinking" || status === "acting";
   return (
     <div
-      className="pointer-events-none absolute z-[60] transition-transform duration-300 ease-out"
+      className="pointer-events-none absolute z-[60] transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
     >
       <div className="flex items-center gap-1.5">
         <div
           className={cn(
-            "size-4 rounded-full border-2 border-g-purple bg-g-purple shadow-g-sm",
+            "size-3.5 rounded-full border-2 border-g-purple shadow-g-sm transition-all duration-500",
+            active
+              ? "bg-g-purple scale-100"
+              : "bg-g-purple/40 scale-90",
             status === "thinking" && "animate-pulse",
           )}
         />
-        <div className="flex items-center gap-1 rounded-g-sm bg-g-purple px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm">
+        <div
+          className={cn(
+            "flex items-center gap-1 rounded-g-sm bg-g-purple px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
+            active ? "opacity-100" : "opacity-50",
+          )}
+        >
           <span>AI</span>
-          {label && (
-            <span className="max-w-[120px] truncate opacity-80">· {label}</span>
+          {active && label && (
+            <span className="max-w-[160px] truncate opacity-80">· {label}</span>
           )}
         </div>
       </div>
@@ -728,9 +734,8 @@ export function AICanvasView({
     x: number;
     y: number;
     label?: string;
-    visible: boolean;
-    status?: "thinking" | "acting" | "idle";
-  }>({ x: 0, y: 0, visible: false });
+    status: "thinking" | "acting" | "idle";
+  }>({ x: 120, y: 60, status: "idle" });
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
@@ -768,10 +773,6 @@ export function AICanvasView({
     selectedAssets.length > 0
       ? selectedAssets.map((card) => fileName(card.asset.repoPath)).join(", ")
       : t("aiCanvas.noSelection");
-  const activityCards = useMemo(
-    () => cards.filter((card) => card.kind !== "asset").slice(-4),
-    [cards],
-  );
   const isWorking = working !== "idle";
   const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
   const selectedProposal = useMemo(() => {
@@ -1223,16 +1224,15 @@ export function AICanvasView({
             x: target.x + CARD_WIDTH / 2,
             y: target.y - 24,
             label: event.label,
-            visible: true,
             status: "acting",
           });
         }
       }
       if (event.type === "focus" && !event.cardId) {
-        setAiCursor((prev) => ({ ...prev, visible: false }));
+        setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
       }
       if (event.type === "thinking") {
-        setAiCursor((prev) => ({ ...prev, status: "thinking", visible: true }));
+        setAiCursor((prev) => ({ ...prev, status: "thinking" }));
       }
       if (event.type === "text") {
         assistantText += (assistantText ? "\n\n" : "") + event.content;
@@ -1267,7 +1267,6 @@ export function AICanvasView({
               x: target.x + CARD_WIDTH / 2,
               y: target.y - 24,
               label: result.label,
-              visible: true,
               status: "acting",
             });
           }
@@ -1317,7 +1316,7 @@ export function AICanvasView({
       }
     } finally {
       setWorking("idle");
-      setAiCursor((prev) => ({ ...prev, visible: false, status: "idle" }));
+      setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
       abortRef.current = null;
     }
   }
@@ -1482,15 +1481,6 @@ export function AICanvasView({
     setComposerAdvancedOpen(true);
   }
 
-  function activityText(card: CanvasCard) {
-    if (card.kind === "assistant") return card.message;
-    if (card.kind === "comment") return card.text || t("aiCanvas.emptyComment");
-    if (card.kind === "variant") return t("aiCanvas.previewGenerated");
-    if (card.kind === "operation") return card.prompt;
-    if (card.kind === "proposal") return `${card.tool}: ${card.description}`;
-    return cardDisplayName(card);
-  }
-
   return (
     <div
       ref={rootRef}
@@ -1556,7 +1546,6 @@ export function AICanvasView({
           <AICursor
             position={{ x: aiCursor.x, y: aiCursor.y }}
             label={aiCursor.label}
-            visible={aiCursor.visible}
             status={aiCursor.status}
           />
         </div>
@@ -1741,28 +1730,29 @@ export function AICanvasView({
 
       <div
         data-ai-canvas-overlay="true"
-        className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto h-[164px] max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+        className={cn(
+          "pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto max-w-[1120px] px-4 pb-3 text-white transition-[height] duration-200 ease-g max-[760px]:px-2 max-[760px]:pb-2",
+          composerCollapsed ? "h-[130px]" : "h-[320px]",
+        )}
       >
         <div className="relative h-full">
           <div
             className={cn(
-              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl transition-[height,border-radius] duration-[160ms] ease-g max-[760px]:inset-x-2",
-              composerCollapsed
-                ? "h-12 rounded-t-[24px] rounded-b-none border-b-0"
-                : "h-[92px] rounded-t-[24px] rounded-b-none",
+              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl transition-[height,border-radius] duration-[160ms] ease-g max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
+              composerCollapsed ? "h-12" : "h-[240px]",
             )}
           >
             <button
               type="button"
               aria-label={t("aiCanvas.resizeComposer")}
-              className="flex h-12 w-full items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+              className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
               onClick={() => setComposerCollapsed((current) => !current)}
             >
               <span>{t("aiCanvas.processed", { time: "" })}</span>
               <span className="min-w-0 flex-1 truncate">
                 {error ||
-                  (activityCards.at(-1)
-                    ? activityText(activityCards.at(-1)!)
+                  (chatHistory.length > 0
+                    ? chatHistory.at(-1)?.content
                     : selectedLabel)}
               </span>
               <span className="text-white/42">
@@ -1770,23 +1760,33 @@ export function AICanvasView({
               </span>
             </button>
             {!composerCollapsed && (
-              <button
-                type="button"
-                className="flex h-10 w-full items-center gap-3 border-t border-white/[0.06] px-5 text-left text-g-caption text-white/42 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white/64 focus-visible:outline-none focus-visible:shadow-g-focus"
-                onClick={() => {
-                  const latest = activityCards.at(-1);
-                  if (latest) setSelectedCardId(latest.id);
-                }}
+              <div
+                data-ai-canvas-scroll="true"
+                className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-3"
               >
-                <MousePointer2 size={13} className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate">
-                  {prompt.trim() ||
-                    (activityCards.at(-1)
-                      ? activityText(activityCards.at(-1)!)
-                      : selectedLabel)}
-                </span>
-                <span>{t("aiCanvas.guide")}</span>
-              </button>
+                {chatHistory.length === 0 ? (
+                  <div className="py-4 text-center text-g-caption text-white/30">
+                    {t("aiCanvas.emptyDesc")}
+                  </div>
+                ) : (
+                  chatHistory.map((entry, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "rounded-g-md px-3 py-2 text-g-caption leading-[1.5]",
+                        entry.role === "user"
+                          ? "self-end bg-white/[0.08] text-white/80"
+                          : "self-start bg-g-purple/20 text-white/70",
+                      )}
+                    >
+                      <div className="mb-1 text-[10px] font-[590] uppercase tracking-wider text-white/40">
+                        {entry.role === "user" ? "You" : "AI"}
+                      </div>
+                      <div className="whitespace-pre-wrap">{entry.content}</div>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
           </div>
 
