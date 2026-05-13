@@ -34,6 +34,7 @@ import { fileName, formatBytes, formatExt } from "@/ui";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import {
+  AssetThumbnail,
   Badge,
   Button,
   Card,
@@ -58,7 +59,7 @@ const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
 ];
 const WALL_CARD_MIN = 132;
-const WALL_GAP = 16;
+const WALL_GAP = 8;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
@@ -428,7 +429,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               key={virtualRow.key}
                               ref={wallVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="absolute left-0 top-0 grid w-full gap-4 pb-4"
+                              className="absolute left-0 top-0 grid w-full gap-4 pb-2"
                               style={{
                                 gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
                                 transform: `translateY(${virtualRow.start}px)`,
@@ -520,242 +521,224 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
             </CardBody>
           </Card>
 
-          {/* RIGHT: Results + Drop zone */}
+          {/* RIGHT: Queue + Results + Drop zone */}
           <Card className="min-h-0">
             <CardBody className="flex h-full min-h-0 flex-col gap-2 p-2.5">
-              {results.length > 0 && (
-                <div className="flex items-center gap-2 border-b border-g-line pb-2">
-                  <span className="font-g text-g-ui font-[590] text-g-ink">
-                    {t("imageTools.results")}
-                  </span>
-                  <span className="flex-1" />
-                  {zipToken && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        downloadImageToolResult(
-                          zipToken,
-                          "aisets-image-tools.zip",
-                        )
-                      }
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="grid content-start gap-2">
+                  {/* Queue items */}
+                  {queuedItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                      style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
                     >
-                      <FileArchive size={14} />
-                      {t("imageTools.downloadZip")}
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setResults([]);
-                      setZipToken("");
-                    }}
-                  >
-                    <RefreshCcw size={14} />
-                    {t("action.clear")}
-                  </Button>
-                </div>
-              )}
+                      <AssetThumbnail
+                        src={item.thumbnailUrl || item.url}
+                        size="md"
+                        className="size-10"
+                        imageClassName="max-h-8 max-w-8"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                          {fileName(item.repoPath)}
+                        </div>
+                        <div className="truncate font-g-mono text-g-chip text-g-ink-4">
+                          {formatExt(item.ext || "").toUpperCase()} · {formatBytes(item.bytes)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleAsset(item.id)}
+                        aria-label={t("action.delete")}
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  ))}
 
-              {results.length === 0 ? (
-                <button
-                  type="button"
-                  className={cn(
-                    "grid min-h-0 flex-1 cursor-pointer place-items-center rounded-g-md border border-dashed border-g-line p-4 text-center transition-[background,border-color,box-shadow] hover:border-g-line-strong hover:bg-g-surface",
-                    dragOver &&
-                      "border-g-accent bg-g-accent-soft shadow-g-focus",
-                  )}
-                  onClick={() => inputRef.current?.click()}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragOver(false);
-                    appendFiles(event.dataTransfer.files);
-                  }}
-                >
-                  <div className="grid gap-2">
-                    <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
-                      <ImagePlus size={22} />
+                  {/* Upload items */}
+                  {files.map((file, index) => (
+                    <div
+                      key={`upload-${file.name}-${index}`}
+                      className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                      style={{ animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms` }}
+                    >
+                      <div className="grid size-10 shrink-0 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4">
+                        <UploadCloud size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                          {file.name}
+                        </div>
+                        <div className="font-g-mono text-g-chip text-g-ink-4">
+                          {formatBytes(file.size)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))}
+                        aria-label={t("action.delete")}
+                      >
+                        <X size={14} />
+                      </Button>
                     </div>
-                    <div className="font-g text-g-ui font-[590] text-g-ink">
-                      {t("imageTools.chooseUploads")}
-                    </div>
-                    <div className="text-g-ui text-g-ink-4">
-                      {t("imageTools.dropHint")}
-                    </div>
-                  </div>
-                </button>
-              ) : (
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <div className="grid content-start gap-2">
-                    {results.map((result, index) => {
-                      const ratio =
-                        result.currentBytes > 0
-                          ? result.outputBytes / result.currentBytes
-                          : 1;
-                      const savingsPct =
-                        result.currentBytes > 0
-                          ? Math.round((1 - ratio) * 100)
-                          : 0;
-                      const barColor = result.errorCode
-                        ? "bg-g-red"
-                        : savingsPct > 20
-                          ? "bg-g-green"
-                          : savingsPct > 0
-                            ? "bg-g-amber"
-                            : "bg-g-ink-4";
-                      const isProject = result.source === "project";
+                  ))}
 
-                      return (
-                        <div
-                          key={`${result.id}-${index}`}
-                          className={cn(
-                            "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
-                            result.errorCode && "border-l-[3px] border-l-g-red",
-                          )}
-                          style={{
-                            animationDelay: `${Math.min(index, 8) * 50}ms`,
-                          }}
+                  {/* Divider between queue and results */}
+                  {hasWorkItems && results.length > 0 && (
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="h-px flex-1 bg-g-line" />
+                      <span className="font-g text-g-chip text-g-ink-4">
+                        {t("imageTools.results")}
+                      </span>
+                      <div className="h-px flex-1 bg-g-line" />
+                    </div>
+                  )}
+
+                  {/* Results header (only when results exist and no queue items) */}
+                  {!hasWorkItems && results.length > 0 && (
+                    <div className="flex items-center gap-2 pb-1">
+                      <span className="font-g text-g-ui font-[590] text-g-ink">
+                        {t("imageTools.processedCount", { count: results.length })}
+                      </span>
+                      <span className="flex-1" />
+                      {zipToken && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => downloadImageToolResult(zipToken, "aisets-image-tools.zip")}
                         >
-                          <div className="flex items-start gap-2.5">
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-g-mono text-g-ui font-[590]">
-                                {fileName(result.outputPath || result.name)}
-                              </div>
-                              <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
-                                {result.inputFormat.toUpperCase()} →{" "}
-                                {result.outputFormat.toUpperCase()}
-                                {" · "}
-                                {formatBytes(result.currentBytes)} →{" "}
-                                {formatBytes(result.outputBytes)}
-                              </div>
-                              {result.errorCode ? (
-                                <div className="mt-1.5 text-g-ui text-g-red">
-                                  {result.errorMessage}
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <div className="h-[6px] flex-1 overflow-hidden rounded-g-pill bg-g-surface-2">
-                                      <div
-                                        className={cn(
-                                          "h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out",
-                                          barColor,
-                                        )}
-                                        style={{
-                                          width: `${Math.round(ratio * 100)}%`,
-                                        }}
-                                      />
-                                    </div>
-                                    <span
-                                      className={cn(
-                                        "shrink-0 font-g-mono text-g-chip font-[590]",
-                                        savingsPct > 0
-                                          ? "text-g-green"
-                                          : savingsPct < 0
-                                            ? "text-g-red"
-                                            : "text-g-ink-4",
-                                      )}
-                                    >
-                                      {savingsPct > 0
-                                        ? `-${savingsPct}%`
-                                        : savingsPct < 0
-                                          ? `+${Math.abs(savingsPct)}%`
-                                          : t("imageTools.noSavingsShort")}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1.5 flex items-center gap-1.5 font-g-mono text-g-chip text-g-ink-3">
-                                    {isProject ? (
-                                      <>
-                                        <FolderOpen
-                                          size={11}
-                                          className="shrink-0 text-g-green"
-                                        />
-                                        <span className="truncate">
-                                          {t("imageTools.savedTo")}
-                                          {result.outputPath
-                                            ? ` · ${result.outputPath}`
-                                            : ""}
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Download
-                                          size={11}
-                                          className="shrink-0 text-g-amber"
-                                        />
-                                        <span>
-                                          {t("imageTools.tempDownload")}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                </>
-                              )}
+                          <FileArchive size={14} />
+                          {t("imageTools.downloadZip")}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setResults([]); setZipToken(""); }}
+                      >
+                        <RefreshCcw size={14} />
+                        {t("action.clear")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Result cards */}
+                  {results.map((result, index) => {
+                    const ratio =
+                      result.currentBytes > 0
+                        ? result.outputBytes / result.currentBytes
+                        : 1;
+                    const savingsPct =
+                      result.currentBytes > 0
+                        ? Math.round((1 - ratio) * 100)
+                        : 0;
+                    const barColor = result.errorCode
+                      ? "bg-g-red"
+                      : savingsPct > 20
+                        ? "bg-g-green"
+                        : savingsPct > 0
+                          ? "bg-g-amber"
+                          : "bg-g-ink-4";
+                    const isProject = result.source === "project";
+
+                    return (
+                      <div
+                        key={`${result.id}-${index}`}
+                        className={cn(
+                          "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
+                          result.errorCode && "border-l-[3px] border-l-g-red",
+                        )}
+                        style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-g-mono text-g-ui font-[590]">
+                              {fileName(result.outputPath || result.name)}
+                            </div>
+                            <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
+                              {result.inputFormat.toUpperCase()} → {result.outputFormat.toUpperCase()}
+                              {" · "}
+                              {formatBytes(result.currentBytes)} → {formatBytes(result.outputBytes)}
                             </div>
                             {result.errorCode ? (
-                              <Badge tone="danger">
-                                {t("imageTools.failed")}
-                              </Badge>
-                            ) : result.token ? (
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  downloadImageToolResult(
-                                    result.token!,
-                                    result.downloadName,
-                                  )
-                                }
-                              >
-                                <Download size={14} />
-                              </Button>
+                              <div className="mt-1.5 text-g-ui text-g-red">
+                                {result.errorMessage}
+                              </div>
                             ) : (
-                              <Badge tone="green">{t("imageTools.done")}</Badge>
+                              <>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <div className="h-[6px] flex-1 overflow-hidden rounded-g-pill bg-g-surface-2">
+                                    <div
+                                      className={cn("h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out", barColor)}
+                                      style={{ width: `${Math.round(ratio * 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className={cn(
+                                    "shrink-0 font-g-mono text-g-chip font-[590]",
+                                    savingsPct > 0 ? "text-g-green" : savingsPct < 0 ? "text-g-red" : "text-g-ink-4",
+                                  )}>
+                                    {savingsPct > 0 ? `-${savingsPct}%` : savingsPct < 0 ? `+${Math.abs(savingsPct)}%` : t("imageTools.noSavingsShort")}
+                                  </span>
+                                </div>
+                                <div className="mt-1.5 flex items-center gap-1.5 font-g-mono text-g-chip text-g-ink-3">
+                                  {isProject ? (
+                                    <>
+                                      <FolderOpen size={11} className="shrink-0 text-g-green" />
+                                      <span className="truncate">
+                                        {t("imageTools.savedTo")}
+                                        {result.outputPath ? ` · ${result.outputPath}` : ""}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download size={11} className="shrink-0 text-g-amber" />
+                                      <span>{t("imageTools.tempDownload")}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </>
                             )}
                           </div>
+                          {result.errorCode ? (
+                            <Badge tone="danger">{t("imageTools.failed")}</Badge>
+                          ) : result.token ? (
+                            <Button
+                              size="sm"
+                              onClick={() => downloadImageToolResult(result.token!, result.downloadName)}
+                            >
+                              <Download size={14} />
+                            </Button>
+                          ) : (
+                            <Badge tone="green">{t("imageTools.done")}</Badge>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
-              {/* Compact drop zone when results exist */}
-              {results.length > 0 && (
-                <div
-                  className={cn(
-                    "mt-auto grid min-h-[56px] shrink-0 place-items-center rounded-g-md border border-dashed border-g-line bg-g-canvas p-2 text-center transition-[background,border-color,box-shadow,transform]",
-                    dragOver &&
-                      "scale-[1.01] border-g-accent bg-g-accent-soft shadow-g-focus",
-                  )}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragOver(false);
-                    appendFiles(event.dataTransfer.files);
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <ImagePlus size={14} className="text-g-ink-4" />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => inputRef.current?.click()}
-                    >
-                      {t("imageTools.chooseUploads")}
-                    </Button>
-                  </div>
+              {/* Drop zone — always at bottom */}
+              <button
+                type="button"
+                className={cn(
+                  "mt-auto grid min-h-[56px] shrink-0 cursor-pointer place-items-center rounded-g-md border border-dashed border-g-line p-2 text-center transition-[background,border-color,box-shadow] hover:border-g-line-strong hover:bg-g-surface",
+                  dragOver && "border-g-accent bg-g-accent-soft shadow-g-focus",
+                )}
+                onClick={() => inputRef.current?.click()}
+                onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(event) => { event.preventDefault(); setDragOver(false); appendFiles(event.dataTransfer.files); }}
+              >
+                <div className="flex items-center gap-2 text-g-ink-4">
+                  <ImagePlus size={14} />
+                  <span className="font-g text-g-ui">{t("imageTools.chooseUploads")}</span>
                 </div>
-              )}
+              </button>
             </CardBody>
           </Card>
         </div>
