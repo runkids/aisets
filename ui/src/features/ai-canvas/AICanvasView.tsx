@@ -91,6 +91,7 @@ import {
   ProposalCardBody,
   VariantCardBody,
 } from "./canvasCards";
+import { useCanvasChat } from "./useCanvasChat";
 import { useCanvasDrag } from "./useCanvasDrag";
 import { useProposalExecution } from "./useProposalExecution";
 
@@ -171,8 +172,6 @@ export function AICanvasView({
     x: number;
     y: number;
   } | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const searchResultsRef = useRef<Array<{ id: string; repoPath: string }>>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -265,6 +264,10 @@ export function AICanvasView({
       : t("aiCanvas.noSelection");
   const { handleApproveProposal, handleRejectProposal } =
     useProposalExecution({ cards, t, setCards });
+  const { handleAsk, handleStop } = useCanvasChat({
+    scanId, cards, selectedCardId, viewport, chatHistory, prompt, t, rootRef,
+    setCards, setChatHistory, setAiCursor, setError, setWorking, setPrompt,
+  });
   const isWorking = working !== "idle";
   const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
   const latestChatContent = chatHistory.at(-1)?.content ?? "";
@@ -516,220 +519,6 @@ export function AICanvasView({
     }
   }
 
-  async function handleAsk() {
-    const promptText = prompt.trim();
-    if (!promptText) return;
-    setPrompt("");
-    setError("");
-    setWorking("ai");
-
-    setChatHistory((prev) => [
-      ...prev.slice(-9),
-      { role: "user", content: promptText },
-    ]);
-
-    const abort = new AbortController();
-    abortRef.current = abort;
-
-    const messages: ChatHistoryEntry[] = [
-      ...chatHistory,
-      { role: "user", content: promptText },
-    ];
-    const snapshot = serializeCanvasSnapshot(cards, selectedCardId, viewport);
-
-    let assistantText = "";
-    const newCards: CanvasCard[] = [];
-
-    function handleEvent(event: CanvasChatEvent) {
-      if (event.type === "focus" && event.cardId) {
-        const target = cards.find((c) => c.id === event.cardId);
-        if (target) {
-          setAiCursor({
-            x: target.x + CARD_WIDTH / 2,
-            y: target.y - 24,
-            label: event.label,
-            status: "acting",
-          });
-        }
-      }
-      if (event.type === "focus" && !event.cardId) {
-        setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
-      }
-      if (event.type === "thinking") {
-        setAiCursor((prev) => ({ ...prev, status: "thinking" }));
-      }
-      if (event.type === "text") {
-        assistantText += (assistantText ? "\n\n" : "") + event.content;
-      }
-      if (event.type === "proposal") {
-        const selectedCard = cards.find((c) => c.id === selectedCardId);
-        const baseX = selectedCard ? selectedCard.x - CARD_WIDTH - 36 : 84;
-        const baseY = selectedCard ? selectedCard.y : 72;
-        const card: ProposalCanvasCard = {
-          id: createCanvasCardId("proposal"),
-          kind: "proposal",
-          x: baseX,
-          y: baseY + newCards.length * 220,
-          createdAt: nowISO(),
-          proposalId: event.id,
-          tool: event.tool,
-          params: event.params,
-          description: event.description,
-          impact: event.impact,
-          status: "pending",
-          sourceAssetId: event.targetAssetId,
-        };
-        newCards.push(card);
-        setCards((current) => [...current, card]);
-      }
-      if (event.type === "action_result" && event.tool === "focus_card") {
-        const result = event.result as { cardId?: string; label?: string };
-        if (result?.cardId) {
-          const target = cards.find((c) => c.id === result.cardId);
-          if (target) {
-            setAiCursor({
-              x: target.x + CARD_WIDTH / 2,
-              y: target.y - 24,
-              label: result.label,
-              status: "acting",
-            });
-          }
-        }
-      }
-      if (event.type === "action_result" && event.tool === "create_comment") {
-        const r = event.result as {
-          anchorCardId?: string;
-          text?: string;
-          region?: { x: number; y: number; width: number; height: number };
-        };
-        if (r?.anchorCardId && r?.text) {
-          const anchor = cards.find((c) => c.id === r.anchorCardId);
-          const card: CommentCanvasCard = {
-            id: createCanvasCardId("comment"),
-            kind: "comment",
-            x: anchor ? anchor.x - CARD_WIDTH - 24 : 84,
-            y: anchor ? anchor.y + 100 + newCards.length * 160 : 72,
-            createdAt: nowISO(),
-            anchorId: r.anchorCardId,
-            text: r.text,
-            region: r.region ?? { x: 0, y: 0, width: 1, height: 1 },
-          };
-          newCards.push(card);
-          setCards((current) => [...current, card]);
-        }
-      }
-      if (event.type === "action_result" && event.tool === "search_assets") {
-        const r = event.result as {
-          q?: string;
-          items?: Array<{ id: string; repoPath: string }>;
-        };
-        if (r?.items?.length) {
-          for (const it of r.items) {
-            if (!searchResultsRef.current.some((s) => s.id === it.id)) {
-              searchResultsRef.current.push({
-                id: it.id,
-                repoPath: it.repoPath,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    try {
-      await canvasChat({
-        messages,
-        canvas: snapshot,
-        locale: "zh-TW",
-        onEvent: handleEvent,
-        signal: abort.signal,
-      });
-
-      if (assistantText) {
-        setChatHistory((prev) => [
-          ...prev.slice(-10),
-          { role: "assistant", content: assistantText },
-        ]);
-      }
-
-      if (searchResultsRef.current.length > 0 && scanId) {
-        try {
-          const wanted = [...searchResultsRef.current];
-          searchResultsRef.current = [];
-          const wantedIds = new Set(wanted.map((w) => w.id));
-          const names = [
-            ...new Set(
-              wanted.map((w) => {
-                const parts = w.repoPath.split("/");
-                return parts[parts.length - 1].replace(/\.[^.]+$/, "");
-              }),
-            ),
-          ];
-          const allItems: AssetItem[] = [];
-          const seenIds = new Set<string>();
-          for (const name of names.slice(0, 12)) {
-            const page = await getCatalogItems({
-              scanId,
-              q: name,
-              limit: 3,
-            });
-            for (const item of page.items) {
-              if (!seenIds.has(item.id)) {
-                seenIds.add(item.id);
-                allItems.push(item);
-              }
-            }
-          }
-          const matchedAssets = allItems.filter((a) => wantedIds.has(a.id));
-          const rect = rootRef.current?.getBoundingClientRect();
-          const containerSize = rect
-            ? { width: rect.width, height: rect.height }
-            : undefined;
-          const addedCards: AssetCanvasCard[] = [];
-          for (const asset of matchedAssets) {
-            const exists = cards.some(
-              (c): c is AssetCanvasCard =>
-                c.kind === "asset" && c.asset.id === asset.id,
-            );
-            if (exists) continue;
-            const pos = nextCardPosition(
-              cards.length + newCards.length + addedCards.length,
-              viewport,
-              containerSize,
-            );
-            const card: AssetCanvasCard = {
-              id: createCanvasCardId("asset"),
-              kind: "asset",
-              x: pos.x + (addedCards.length % 3) * (CARD_WIDTH + 24),
-              y: pos.y + Math.floor(addedCards.length / 3) * 420,
-              createdAt: nowISO(),
-              asset,
-            };
-            addedCards.push(card);
-          }
-          if (addedCards.length > 0) {
-            setCards((cur) => [...cur, ...addedCards]);
-          }
-        } catch {
-          // search result fetch failed — non-critical
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setError(
-          err instanceof Error ? err.message : t("aiCanvas.operationError"),
-        );
-      }
-    } finally {
-      setWorking("idle");
-      setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
-      abortRef.current = null;
-    }
-  }
-
-  function handleStop() {
-    abortRef.current?.abort();
-  }
 
   function clearCanvas() {
     setCards([]);
