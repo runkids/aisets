@@ -595,24 +595,26 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             className="absolute inset-0 h-full w-full object-cover"
                           />
                         </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
-                          {file.name}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                            {file.name}
+                          </div>
+                          <div className="font-g-mono text-g-chip text-g-ink-4">
+                            {formatBytes(file.size)}
+                          </div>
                         </div>
-                        <div className="font-g-mono text-g-chip text-g-ink-4">
-                          {formatBytes(file.size)}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setFiles((prev) => prev.filter((_, i) => i !== index))
-                        }
-                        aria-label={t("action.delete")}
-                      >
-                        <X size={14} />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setFiles((prev) =>
+                              prev.filter((_, i) => i !== index),
+                            )
+                          }
+                          aria-label={t("action.delete")}
+                        >
+                          <X size={14} />
+                        </Button>
                       </div>
                     </ImagePreview>
                   ))}

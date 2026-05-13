@@ -473,8 +473,8 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
   return (
     <div className="flex min-h-full flex-col">
       {/* Editor content */}
-      <div className="flex-1 px-5 py-4 pt-3">
-        <Card padding="none" className="mx-auto max-w-[1040px] p-5">
+      <div className="flex-1 px-3 py-4 pt-3">
+        <Card padding="none" className="mx-auto max-w-[1400px] p-5">
           <div className="flex flex-col gap-6">
             {/* ── Name ── */}
             <TextInput
@@ -647,7 +647,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
 
       {/* Sticky action bar */}
       <div className="sticky bottom-0 z-[5] border-t border-g-line bg-g-surface shadow-g-sm">
-        <div className="mx-auto flex max-w-[1040px] flex-wrap items-center gap-2 px-5 py-2.5">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-5 py-2.5">
           <Button
             variant="primary"
             onClick={handleSave}
