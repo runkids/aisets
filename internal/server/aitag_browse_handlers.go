@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"aisets/internal/config"
+	"aisets/internal/ocr"
 )
 
 func (s *Server) handleTagList(w http.ResponseWriter, r *http.Request) {
@@ -156,6 +157,39 @@ func (s *Server) handleAssetSetDescription(w http.ResponseWriter, r *http.Reques
 		HashAlgorithm: body.HashAlgorithm,
 	}
 	if err := s.store.AITagSetDescription(key, body.Description); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleAssetSetOCRText(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ProjectID     string `json:"projectId"`
+		RepoPath      string `json:"repoPath"`
+		ContentHash   string `json:"contentHash"`
+		HashAlgorithm string `json:"hashAlgorithm"`
+		Text          string `json:"text"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.ProjectID == "" || body.RepoPath == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("projectId and repoPath are required"))
+		return
+	}
+	err := s.store.UpsertOCRResult(ocr.Result{
+		ProjectID:     body.ProjectID,
+		RepoPath:      body.RepoPath,
+		ContentHash:   body.ContentHash,
+		HashAlgorithm: body.HashAlgorithm,
+		EngineName:    "manual",
+		EngineVersion: "user",
+		Status:        "ready",
+		Text:          body.Text,
+	})
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}

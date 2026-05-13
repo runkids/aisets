@@ -188,6 +188,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/tags/categories/clear", s.handleTagCategoryClear)
 	s.mux.HandleFunc("POST /api/assets/tags", s.handleAssetSetTags)
 	s.mux.HandleFunc("POST /api/assets/description", s.handleAssetSetDescription)
+	s.mux.HandleFunc("POST /api/assets/ocr-text", s.handleAssetSetOCRText)
 	s.mux.HandleFunc("POST /api/ai/tag/run", s.handleAITagRun)
 	s.mux.HandleFunc("POST /api/ai/tag/clear", s.handleAITagClear)
 	s.mux.HandleFunc("POST /api/ai/tag/translate", s.handleAITagTranslate)
