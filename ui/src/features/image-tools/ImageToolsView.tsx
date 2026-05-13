@@ -58,7 +58,7 @@ const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
 ];
 const WALL_CARD_MIN = 132;
-const WALL_GAP = 8;
+const WALL_GAP = 10;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
@@ -407,7 +407,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               key={virtualRow.key}
                               ref={wallVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="absolute left-0 top-0 grid w-full gap-2"
+                              className="absolute left-0 top-0 grid w-full gap-2.5"
                               style={{
                                 gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
                                 transform: `translateY(${virtualRow.start}px)`,
@@ -419,7 +419,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                   <button
                                     key={item.id}
                                     type="button"
-                                    className="group relative aspect-square overflow-hidden rounded-g-md text-left focus-visible:shadow-g-focus"
+                                    className={cn(
+                                      "group relative aspect-square overflow-hidden rounded-g-md text-left focus-visible:shadow-g-focus",
+                                      queued && "bg-g-accent",
+                                    )}
                                     aria-pressed={queued}
                                     aria-label={t("imageTools.selectAsset", {
                                       name: fileName(item.repoPath),
@@ -430,11 +433,13 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       src={item.thumbnailUrl || item.url}
                                       alt=""
                                       loading="lazy"
-                                      className="absolute inset-0 h-full w-full object-cover bg-g-surface-2 transition-transform duration-[220ms] ease-g group-hover:scale-[1.06]"
+                                      className={cn(
+                                        "absolute inset-0 h-full w-full bg-g-surface-2 object-cover transition-transform duration-[220ms] ease-g",
+                                        queued
+                                          ? "scale-[0.88] rounded-g-sm"
+                                          : "group-hover:scale-[1.06]",
+                                      )}
                                     />
-                                    {queued && (
-                                      <span className="pointer-events-none absolute inset-0 rounded-g-md ring-2 ring-inset ring-g-accent" />
-                                    )}
                                     <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent px-2 pb-2 pt-8 opacity-0 transition-opacity duration-[160ms] ease-g group-hover:opacity-100">
                                       <span className="min-w-0 flex-1">
                                         <span className="block truncate font-g-mono text-g-chip font-[590] text-white">
