@@ -58,7 +58,7 @@ const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
 ];
 const WALL_CARD_MIN = 132;
-const WALL_GAP = 6;
+const WALL_GAP = 8;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
@@ -407,7 +407,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               key={virtualRow.key}
                               ref={wallVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="absolute left-0 top-0 grid w-full gap-1.5"
+                              className="absolute left-0 top-0 grid w-full gap-2"
                               style={{
                                 gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
                                 transform: `translateY(${virtualRow.start}px)`,
@@ -433,7 +433,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       className="absolute inset-0 h-full w-full object-cover bg-g-surface-2 transition-transform duration-[220ms] ease-g group-hover:scale-[1.06]"
                                     />
                                     {queued && (
-                                      <span className="pointer-events-none absolute inset-0 rounded-g-md ring-[3px] ring-inset ring-g-accent" />
+                                      <span className="pointer-events-none absolute inset-0 rounded-g-md ring-2 ring-inset ring-g-accent" />
                                     )}
                                     <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent px-2 pb-2 pt-8 opacity-0 transition-opacity duration-[160ms] ease-g group-hover:opacity-100">
                                       <span className="min-w-0 flex-1">
@@ -443,9 +443,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                         <span className="block font-g-mono text-[10px] text-white/70">
                                           {formatExt(
                                             item.ext ||
-                                              item.repoPath
-                                                .split(".")
-                                                .pop() ||
+                                              item.repoPath.split(".").pop() ||
                                               "",
                                           ).toUpperCase()}{" "}
                                           · {formatBytes(item.bytes)}
@@ -554,8 +552,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   <div
                     className={cn(
                       "grid w-full max-w-[420px] gap-3 rounded-g-md border border-dashed border-g-line bg-g-surface p-5 shadow-g-sm transition-[border-color,box-shadow,transform]",
-                      dragOver &&
-                        "scale-[1.01] border-g-accent shadow-g-focus",
+                      dragOver && "scale-[1.01] border-g-accent shadow-g-focus",
                     )}
                   >
                     <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
@@ -605,8 +602,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           key={`${result.id}-${index}`}
                           className={cn(
                             "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
-                            result.errorCode &&
-                              "border-l-[3px] border-l-g-red",
+                            result.errorCode && "border-l-[3px] border-l-g-red",
                           )}
                           style={{
                             animationDelay: `${Math.min(index, 8) * 50}ms`,
@@ -662,16 +658,26 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                   <div className="mt-1.5 flex items-center gap-1.5 font-g-mono text-g-chip text-g-ink-3">
                                     {isProject ? (
                                       <>
-                                        <FolderOpen size={11} className="shrink-0 text-g-green" />
+                                        <FolderOpen
+                                          size={11}
+                                          className="shrink-0 text-g-green"
+                                        />
                                         <span className="truncate">
                                           {t("imageTools.savedTo")}
-                                          {result.outputPath ? ` · ${result.outputPath}` : ""}
+                                          {result.outputPath
+                                            ? ` · ${result.outputPath}`
+                                            : ""}
                                         </span>
                                       </>
                                     ) : (
                                       <>
-                                        <Download size={11} className="shrink-0 text-g-amber" />
-                                        <span>{t("imageTools.tempDownload")}</span>
+                                        <Download
+                                          size={11}
+                                          className="shrink-0 text-g-amber"
+                                        />
+                                        <span>
+                                          {t("imageTools.tempDownload")}
+                                        </span>
                                       </>
                                     )}
                                   </div>
@@ -695,9 +701,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                 <Download size={14} />
                               </Button>
                             ) : (
-                              <Badge tone="green">
-                                {t("imageTools.done")}
-                              </Badge>
+                              <Badge tone="green">{t("imageTools.done")}</Badge>
                             )}
                           </div>
                         </div>
@@ -828,9 +832,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     aria-label={t("action.clear")}
                   >
                     <Trash2 size={13} />
-                    <span className="text-g-ink-4">
-                      {files.length}
-                    </span>
+                    <span className="text-g-ink-4">{files.length}</span>
                   </Button>
                 )}
                 <Button
@@ -905,8 +907,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
         multiple
         className="sr-only"
         onChange={(event) => {
-          if (event.currentTarget.files)
-            appendFiles(event.currentTarget.files);
+          if (event.currentTarget.files) appendFiles(event.currentTarget.files);
           event.currentTarget.value = "";
         }}
       />
