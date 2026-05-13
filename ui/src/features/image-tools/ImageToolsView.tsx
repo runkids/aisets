@@ -415,7 +415,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   />
                 </div>
                 <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
-                  {pickerItems.length} / {pickerTotal}
+                  {pickerTotal}
                 </span>
                 {assetIds.length > 0 ? (
                   <Button
@@ -535,6 +535,23 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                         })}
                       </div>
                     </div>
+                    {rawPickerItems.length === 0 &&
+                      !catalogQuery.isLoading && (
+                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                          <div className="grid size-12 place-items-center rounded-full bg-g-surface-2">
+                            <ImagePlus size={20} className="text-g-ink-4" />
+                          </div>
+                          <p className="font-g text-g-ui text-g-ink-4">
+                            {search.trim()
+                              ? t("common.noResults", {
+                                  defaultValue: "No results",
+                                })
+                              : t("imageTools.emptyCatalog", {
+                                  defaultValue: "No images in catalog",
+                                })}
+                          </p>
+                        </div>
+                      )}
                     {catalogQuery.hasNextPage && (
                       <div
                         ref={wallLoadMoreRef}

@@ -219,13 +219,14 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 	sourceMeta := item.Image
 	sourceDisplay := item.RepoPath
 	ext := strings.ToLower(item.Ext)
-	if ext == ".heic" || ext == ".heif" {
-		pngData, convErr := imageproc.HeicToPNG(item.LocalPath)
+	needsPreConvert := ext == ".heic" || ext == ".heif" || ext == ".avif"
+	if needsPreConvert {
+		pngData, convErr := imageproc.ImageToPNG(item.LocalPath, 0)
 		if convErr != nil {
-			writeError(w, http.StatusBadRequest, apierr.New("heic_convert_failed", "cannot convert HEIC for preview"))
+			writeError(w, http.StatusBadRequest, apierr.New("preview_decode_failed", "cannot decode image for preview"))
 			return
 		}
-		tmp, tmpErr := os.CreateTemp("", "aisets-heic-preview-*.png")
+		tmp, tmpErr := os.CreateTemp("", "aisets-preview-*.png")
 		if tmpErr != nil {
 			writeError(w, http.StatusInternalServerError, tmpErr)
 			return
@@ -268,9 +269,9 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 	})
 	inputBytes := op.CurrentBytes
 	inputFormat := op.InputFormat
-	if ext == ".heic" || ext == ".heif" {
+	if needsPreConvert {
 		inputBytes = item.Bytes
-		inputFormat = "heic"
+		inputFormat = strings.TrimPrefix(ext, ".")
 	}
 	writeJSON(w, http.StatusOK, imageToolRenderPreviewResponse{
 		Token:        token,
