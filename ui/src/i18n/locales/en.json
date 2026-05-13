@@ -1989,7 +1989,17 @@
     "downloadZip": "Download ZIP",
     "failed": "Failed",
     "done": "Done",
-    "noSavings": "No savings"
+    "noSavings": "No savings",
+    "statProcessed": "Processed",
+    "statSaved": "Saved",
+    "tabQueue": "Queue",
+    "tabResults": "Results",
+    "processedCount": "{{count}} processed",
+    "compressionPct": "-{{pct}}%",
+    "noSavingsShort": "±0",
+    "sizeIncrease": "+{{pct}}%",
+    "processing": "Processing…",
+    "queued": "Queued"
   },
   "precheck": {
     "title": "Pre-Check",

@@ -1118,7 +1118,17 @@
     "downloadZip": "下載 ZIP",
     "failed": "失敗",
     "done": "完成",
-    "noSavings": "無節省"
+    "noSavings": "無節省",
+    "statProcessed": "已處理",
+    "statSaved": "已節省",
+    "tabQueue": "佇列",
+    "tabResults": "結果",
+    "processedCount": "已處理 {{count}} 張",
+    "compressionPct": "-{{pct}}%",
+    "noSavingsShort": "±0",
+    "sizeIncrease": "+{{pct}}%",
+    "processing": "處理中…",
+    "queued": "佇列中"
   },
   "precheck": {
     "title": "預檢",
