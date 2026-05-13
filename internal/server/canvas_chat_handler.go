@@ -375,7 +375,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return detail
 	case "search_assets":
 		q, _ := act.Params["q"].(string)
-		limit := 6
+		limit := 12
 		if l, ok := act.Params["limit"].(float64); ok && l > 0 {
 			limit = int(l)
 			if limit > 18 {
@@ -395,20 +395,35 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		if err != nil {
 			return map[string]any{"items": []any{}, "error": err.Error()}
 		}
-		type slimAsset struct {
-			ID       string `json:"id"`
-			RepoPath string `json:"repoPath"`
-			Ext      string `json:"ext"`
-			Bytes    int64  `json:"bytes"`
+		type richAsset struct {
+			ID          string   `json:"id"`
+			RepoPath    string   `json:"repoPath"`
+			Ext         string   `json:"ext"`
+			Width       int      `json:"width"`
+			Height      int      `json:"height"`
+			Bytes       int64    `json:"bytes"`
+			Tags        []string `json:"tags,omitempty"`
+			Description string   `json:"description,omitempty"`
+			OcrText     string   `json:"ocrText,omitempty"`
 		}
-		items := make([]slimAsset, 0, len(page.Items))
+		items := make([]richAsset, 0, len(page.Items))
 		for _, item := range page.Items {
-			items = append(items, slimAsset{
+			ra := richAsset{
 				ID:       item.ID,
 				RepoPath: item.RepoPath,
 				Ext:      item.Ext,
+				Width:    item.Image.Width,
+				Height:   item.Image.Height,
 				Bytes:    item.Bytes,
-			})
+			}
+			if item.AITag != nil {
+				ra.Tags = item.AITag.Tags
+				ra.Description = item.AITag.Description
+			}
+			if item.OCR != nil && item.OCR.Text != "" {
+				ra.OcrText = item.OCR.Text
+			}
+			items = append(items, ra)
 		}
 		return map[string]any{"items": items, "total": page.Total, "q": q}
 	case "create_comment":

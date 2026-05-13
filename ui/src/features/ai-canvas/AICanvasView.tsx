@@ -792,7 +792,7 @@ export function AICanvasView({
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const searchResultsRef = useRef<string[]>([]);
+  const searchResultsRef = useRef<Array<{ id: string; repoPath: string }>>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
   const canvasSelectionRef = useRef<CanvasSelection | null>(null);
@@ -1366,16 +1366,19 @@ export function AICanvasView({
       if (event.type === "action_result" && event.tool === "search_assets") {
         const r = event.result as {
           q?: string;
-          items?: Array<{
-            id: string;
-            repoPath: string;
-            ext: string;
-            bytes: number;
-          }>;
-          total?: number;
+          items?: Array<{ id: string; repoPath: string }>;
         };
-        if (r?.items?.length && r.q) {
-          searchResultsRef.current = [r.q];
+        if (r?.items?.length) {
+          for (const it of r.items) {
+            if (
+              !searchResultsRef.current.some((s) => s.id === it.id)
+            ) {
+              searchResultsRef.current.push({
+                id: it.id,
+                repoPath: it.repoPath,
+              });
+            }
+          }
         }
       }
     }
@@ -1416,19 +1419,28 @@ export function AICanvasView({
 
       if (searchResultsRef.current.length > 0 && scanId) {
         try {
-          const queries = searchResultsRef.current;
+          const wanted = [...searchResultsRef.current];
           searchResultsRef.current = [];
+          const wantedIds = new Set(wanted.map((w) => w.id));
+          const names = wanted.map((w) => {
+            const parts = w.repoPath.split("/");
+            return parts[parts.length - 1].replace(/\.[^.]+$/, "");
+          });
+          const q = [...new Set(names)].slice(0, 5).join(" ");
           const page = await getCatalogItems({
             scanId,
-            q: queries[0],
-            limit: 12,
+            q,
+            limit: Math.max(wanted.length * 2, 18),
           });
+          const matchedAssets = page.items.filter((a) =>
+            wantedIds.has(a.id),
+          );
           const rect = rootRef.current?.getBoundingClientRect();
           const containerSize = rect
             ? { width: rect.width, height: rect.height }
             : undefined;
           const addedCards: AssetCanvasCard[] = [];
-          for (const asset of page.items) {
+          for (const asset of matchedAssets) {
             const exists = cards.some(
               (c): c is AssetCanvasCard =>
                 c.kind === "asset" && c.asset.id === asset.id,
@@ -1949,7 +1961,10 @@ export function AICanvasView({
               onClick={() => setComposerCollapsed((current) => !current)}
             >
               {isWorking ? (
-                <LoaderCircle size={14} className="shrink-0 animate-spin text-g-purple" />
+                <LoaderCircle
+                  size={14}
+                  className="shrink-0 animate-spin text-g-purple"
+                />
               ) : (
                 <span>{t("aiCanvas.processed", { time: "" })}</span>
               )}
