@@ -2086,8 +2086,7 @@ export function AICanvasView({
                   };
                   const onMove = (ev: PointerEvent) => {
                     if (!composerDragRef.current) return;
-                    const delta =
-                      composerDragRef.current.startY - ev.clientY;
+                    const delta = composerDragRef.current.startY - ev.clientY;
                     const next = Math.min(
                       Math.max(composerDragRef.current.startH + delta, 200),
                       window.innerHeight * 0.75,
@@ -2393,8 +2392,8 @@ export function AICanvasView({
         <div
           data-ai-canvas-overlay="true"
           className="pointer-events-auto absolute right-3 bottom-[160px] z-40 max-h-[60vh] w-[420px] overflow-auto rounded-g-md border border-white/10 bg-[rgba(20,20,20,0.95)] p-3 font-mono text-[11px] leading-[1.5] text-green-400 shadow-g-pop backdrop-blur-xl"
+          data-ai-canvas-scroll="true"
           onPointerDown={(e) => e.stopPropagation()}
-          onWheel={(e) => e.stopPropagation()}
         >
           <div className="mb-2 flex items-center justify-between text-white/60">
             <span className="font-[590] uppercase tracking-wider">
