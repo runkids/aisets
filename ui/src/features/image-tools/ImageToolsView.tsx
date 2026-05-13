@@ -58,10 +58,6 @@ import {
   TextInputClearButton,
   Tooltip,
 } from "@/components/ui";
-import {
-  LoadingVisualView,
-  type LoadingVisual,
-} from "@/features/semantic-search/SemanticSearchLoading";
 import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
 
 type Props = {
@@ -179,13 +175,6 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   }, [isSemanticActive, semanticFetching, committedSemanticQuery]);
   const showSemanticLoading =
     isSemanticActive && (semanticFetching || Date.now() < semanticBusyUntil);
-  const semanticLoadingStyle = useMemo<LoadingVisual>(() => {
-    const styles: LoadingVisual[] = ["beam", "constellation", "swarm"];
-    const seed = committedSemanticQuery
-      .split("")
-      .reduce((sum, c) => sum + c.charCodeAt(0), 0);
-    return styles[seed % styles.length];
-  }, [committedSemanticQuery]);
 
   const catalogQuery = useCatalogItemsInfiniteQuery(scanId, {
     q:
@@ -492,7 +481,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
           <Card className="min-h-0">
             <CardBody className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 p-2.5">
               <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
+                <div className="min-w-0 flex-1">
                   <TextInput
                     variant="search"
                     value={search}
@@ -560,6 +549,17 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             </kbd>
                           </button>
                         )}
+                        {showSemanticLoading && (
+                          <span className="ml-1 mr-0.5 inline-flex items-center gap-[3px]">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                              <span
+                                key={i}
+                                className="inline-block size-[5px] rounded-full bg-g-purple animate-[countPulse_1s_ease-in-out_infinite]"
+                                style={{ animationDelay: `${i * 120}ms` }}
+                              />
+                            ))}
+                          </span>
+                        )}
                       </span>
                     }
                     onKeyDown={(e) => {
@@ -576,14 +576,6 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       }
                     }}
                   />
-                  {showSemanticLoading && (
-                    <div className="absolute inset-x-0 top-full z-10 mt-1 h-[72px] overflow-hidden rounded-g-md bg-g-surface shadow-g-sm">
-                      <LoadingVisualView
-                        style={semanticLoadingStyle}
-                        dimensionToken=""
-                      />
-                    </div>
-                  )}
                 </div>
                 <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
                   {pickerTotal}
