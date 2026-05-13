@@ -902,6 +902,7 @@ export function AICanvasView({
     };
   });
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -976,6 +977,17 @@ export function AICanvasView({
       // sessionStorage unavailable
     }
   }, [composerCollapsed]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        setDebugOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -2340,6 +2352,63 @@ export function AICanvasView({
           </div>
         </div>
       </div>
+
+      {debugOpen && (
+        <div
+          data-ai-canvas-overlay="true"
+          className="pointer-events-auto absolute right-3 bottom-[160px] z-40 max-h-[60vh] w-[420px] overflow-auto rounded-g-md border border-white/10 bg-[rgba(20,20,20,0.95)] p-3 font-mono text-[11px] leading-[1.5] text-green-400 shadow-g-pop backdrop-blur-xl"
+        >
+          <div className="mb-2 flex items-center justify-between text-white/60">
+            <span className="font-[590] uppercase tracking-wider">
+              Canvas Debug
+            </span>
+            <button
+              type="button"
+              className="text-white/40 hover:text-white"
+              onClick={() => setDebugOpen(false)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <pre className="whitespace-pre-wrap break-all">
+            {JSON.stringify(
+              {
+                viewport,
+                selectedCardId,
+                working,
+                cardsCount: cards.length,
+                cardKinds: cards.map((c) => `${c.kind}:${c.id.slice(0, 8)}`),
+                chatHistoryCount: chatHistory.length,
+                searchResultsRef: searchResultsRef.current.length,
+                aiCursor,
+                cards: cards.map((c) => {
+                  const base: Record<string, unknown> = {
+                    id: c.id,
+                    kind: c.kind,
+                    x: Math.round(c.x),
+                    y: Math.round(c.y),
+                  };
+                  if (c.kind === "asset") {
+                    base.assetId = c.asset.id;
+                    base.repoPath = c.asset.repoPath;
+                  }
+                  if (c.kind === "proposal") {
+                    base.tool = c.tool;
+                    base.status = c.status;
+                  }
+                  if (c.kind === "comment") {
+                    base.anchor = c.anchorId;
+                    base.text = c.text?.slice(0, 40);
+                  }
+                  return base;
+                }),
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
