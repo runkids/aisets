@@ -229,68 +229,87 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	}
 	sendNDJSON(w, map[string]any{"type": "thinking"})
 
-	start := time.Now()
-	content, chatResp, err := s.chatVLM(r.Context(), images, backend, modelName, systemPrompt, userPrompt, "canvas", 120)
-	durationMs := time.Since(start).Milliseconds()
-	if err != nil {
-		sendNDJSON(w, map[string]any{
-			"type":  "error",
-			"error": map[string]string{"code": "canvas_chat_llm_failed", "message": err.Error()},
-		})
-		return
-	}
-
-	textBody, actions := parseCanvasActions(content)
-
+	const maxToolLoops = 3
+	currentPrompt := userPrompt
 	proposalIndex := 0
-	for _, act := range actions {
-		if act.Tool == "focus_card" {
-			sendNDJSON(w, map[string]any{
-				"type":   "focus",
-				"cardId": act.Params["cardId"],
-				"label":  act.Params["label"],
-			})
-			time.Sleep(300 * time.Millisecond)
-			continue
-		}
-		if canvasToolSafe(act.Tool) {
-			sendNDJSON(w, map[string]any{
-				"type":   "action_result",
-				"tool":   act.Tool,
-				"result": s.executeCanvasSafeAction(r, act, settings),
-			})
-		} else {
-			proposalIndex++
-			sendNDJSON(w, map[string]any{
-				"type":          "proposal",
-				"id":            fmt.Sprintf("p%d", proposalIndex),
-				"tool":          act.Tool,
-				"params":        act.Params,
-				"description":   act.Description,
-				"impact":        act.Impact,
-				"targetAssetId": act.Params["assetId"],
-			})
-		}
-		time.Sleep(150 * time.Millisecond)
-	}
+	var totalInputTokens, totalOutputTokens int64
+	start := time.Now()
 
-	if textBody != "" {
-		paragraphs := splitParagraphs(textBody)
-		for _, p := range paragraphs {
-			sendNDJSON(w, map[string]any{"type": "text", "content": p})
-			if len(paragraphs) > 1 {
-				time.Sleep(50 * time.Millisecond)
+	for loop := 0; loop < maxToolLoops; loop++ {
+		content, chatResp, err := s.chatVLM(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", 120)
+		if err != nil {
+			sendNDJSON(w, map[string]any{
+				"type":  "error",
+				"error": map[string]string{"code": "canvas_chat_llm_failed", "message": err.Error()},
+			})
+			return
+		}
+		totalInputTokens += chatResp.InputTokens
+		totalOutputTokens += chatResp.OutputTokens
+
+		textBody, actions := parseCanvasActions(content)
+
+		var toolResults []string
+		for _, act := range actions {
+			if act.Tool == "focus_card" {
+				sendNDJSON(w, map[string]any{
+					"type":   "focus",
+					"cardId": act.Params["cardId"],
+					"label":  act.Params["label"],
+				})
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+			if canvasToolSafe(act.Tool) {
+				result := s.executeCanvasSafeAction(r, act, settings)
+				sendNDJSON(w, map[string]any{
+					"type":   "action_result",
+					"tool":   act.Tool,
+					"result": result,
+				})
+				resultJSON, _ := json.Marshal(result)
+				toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
+			} else {
+				proposalIndex++
+				sendNDJSON(w, map[string]any{
+					"type":          "proposal",
+					"id":            fmt.Sprintf("p%d", proposalIndex),
+					"tool":          act.Tool,
+					"params":        act.Params,
+					"description":   act.Description,
+					"impact":        act.Impact,
+					"targetAssetId": act.Params["assetId"],
+				})
+			}
+			time.Sleep(150 * time.Millisecond)
+		}
+
+		if textBody != "" {
+			paragraphs := splitParagraphs(textBody)
+			for _, p := range paragraphs {
+				sendNDJSON(w, map[string]any{"type": "text", "content": p})
+				if len(paragraphs) > 1 {
+					time.Sleep(50 * time.Millisecond)
+				}
 			}
 		}
+
+		if len(toolResults) == 0 {
+			break
+		}
+		images = nil
+		currentPrompt = currentPrompt + "\n\nassistant: " + content + "\n\n## Tool Results\n" + strings.Join(toolResults, "\n\n") + "\n\nContinue acting on these results. Use the data above to fulfill the user's original request. Remember: EVERY response must include at least one action block."
+		sendNDJSON(w, map[string]any{"type": "thinking"})
 	}
 
+	durationMs := time.Since(start).Milliseconds()
 	sendNDJSON(w, map[string]any{
 		"type":         "done",
 		"providerName": providerName,
 		"modelName":    modelName,
 		"durationMs":   durationMs,
-		"inputTokens":  chatResp.InputTokens,
-		"outputTokens": chatResp.OutputTokens,
+		"inputTokens":  totalInputTokens,
+		"outputTokens": totalOutputTokens,
 	})
 }
 

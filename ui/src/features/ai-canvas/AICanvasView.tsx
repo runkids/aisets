@@ -721,7 +721,7 @@ function AICursor({
         />
         <div
           className={cn(
-            "-mt-1 ml-3 flex items-center gap-1 rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
+            "-mt-1 ml-3 flex items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
             active ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
           )}
         >
@@ -1948,12 +1948,18 @@ export function AICanvasView({
               className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
               onClick={() => setComposerCollapsed((current) => !current)}
             >
-              <span>{t("aiCanvas.processed", { time: "" })}</span>
+              {isWorking ? (
+                <LoaderCircle size={14} className="shrink-0 animate-spin text-g-purple" />
+              ) : (
+                <span>{t("aiCanvas.processed", { time: "" })}</span>
+              )}
               <span className="min-w-0 flex-1 truncate">
-                {error ||
-                  (chatHistory.length > 0
-                    ? chatHistory.at(-1)?.content
-                    : selectedLabel)}
+                {isWorking
+                  ? "AI thinking…"
+                  : error ||
+                    (chatHistory.length > 0
+                      ? chatHistory.at(-1)?.content
+                      : selectedLabel)}
               </span>
               <span className="text-white/42">
                 {composerCollapsed ? "›" : "⌄"}
