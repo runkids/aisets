@@ -10,8 +10,6 @@ import {
   LoaderCircle,
   Maximize2,
   X,
-  MessageSquarePlus,
-  MousePointer2,
   Paperclip,
   Plus,
   Search,
@@ -29,7 +27,6 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -54,11 +51,10 @@ import {
 } from "@/api/canvasChat";
 import { cn } from "@/lib/cn";
 import type { AssetItem } from "@/types";
-import { fileName, formatBytes, formatExt } from "@/ui";
+import { fileName } from "@/ui";
 import {
   CARD_WIDTH,
   DEFAULT_IMAGE_TOOL_SETTINGS,
-  cardTone,
   commentIds,
   imageMeta,
   intersects,
@@ -67,12 +63,10 @@ import {
   renderMarkdown,
   selectedAssetIds,
   selectionBounds,
-  tagLabel,
   type CanvasSelection,
 } from "./canvasUtils";
 import {
   buildAssistantBullets,
-  cardDisplayName,
   cardIdsForDeletion,
   clampCanvasScale,
   commentsForAssets,
@@ -101,6 +95,7 @@ import {
   ProposalCardBody,
   VariantCardBody,
 } from "./canvasCards";
+import { useProposalExecution } from "./useProposalExecution";
 
 const ASSET_CARD_IMAGE_TOP = 38;
 const ASSET_CARD_IMAGE_HEIGHT = 240;
@@ -114,7 +109,6 @@ type Props = {
 };
 
 type WorkingState = "idle" | "search" | "ai" | "imagePreview" | "operation";
-
 
 export function AICanvasView({
   scanId,
@@ -177,6 +171,11 @@ export function AICanvasView({
   );
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
+  const [dragPreview, setDragPreview] = useState<{
+    cardId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const searchResultsRef = useRef<Array<{ id: string; repoPath: string }>>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -220,15 +219,26 @@ export function AICanvasView({
       if (card.kind !== "comment") return [];
       const anchor = assetCards.get(card.anchorId);
       if (!anchor) return [];
+      const anchorPosition =
+        dragPreview?.cardId === anchor.id
+          ? { x: dragPreview.x, y: dragPreview.y }
+          : anchor;
+      const commentPosition =
+        dragPreview?.cardId === card.id
+          ? { x: dragPreview.x, y: dragPreview.y }
+          : card;
 
       const targetX =
-        anchor.x + CARD_WIDTH * (card.region.x + card.region.width / 2);
+        anchorPosition.x + CARD_WIDTH * (card.region.x + card.region.width / 2);
       const targetY =
-        anchor.y +
+        anchorPosition.y +
         ASSET_CARD_IMAGE_TOP +
         ASSET_CARD_IMAGE_HEIGHT * (card.region.y + card.region.height / 2);
-      const fromX = card.x < targetX ? card.x + CARD_WIDTH : card.x;
-      const fromY = card.y + 52;
+      const fromX =
+        commentPosition.x < targetX
+          ? commentPosition.x + CARD_WIDTH
+          : commentPosition.x;
+      const fromY = commentPosition.y + 52;
       const bend = Math.max(56, Math.abs(targetX - fromX) * 0.35);
       const c1x = fromX + (fromX < targetX ? bend : -bend);
       const c2x = targetX + (fromX < targetX ? -bend : bend);
@@ -246,11 +256,13 @@ export function AICanvasView({
         },
       ];
     });
-  }, [cards, selectedCardId]);
+  }, [cards, dragPreview, selectedCardId]);
   const selectedLabel =
     selectedAssets.length > 0
       ? selectedAssets.map((card) => fileName(card.asset.repoPath)).join(", ")
       : t("aiCanvas.noSelection");
+  const { handleApproveProposal, handleRejectProposal } =
+    useProposalExecution({ cards, t, setCards });
   const isWorking = working !== "idle";
   const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
   const latestChatContent = chatHistory.at(-1)?.content ?? "";
@@ -375,6 +387,11 @@ export function AICanvasView({
     if (!drag?.element) return;
     drag.element.style.transform =
       "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+    setDragPreview({
+      cardId: drag.cardId,
+      x: drag.currentX,
+      y: drag.currentY,
+    });
   }, []);
 
   const scheduleDragFrame = useCallback(() => {
@@ -413,6 +430,7 @@ export function AICanvasView({
       element.style.willChange = "transform";
       element.style.zIndex = "35";
     }
+    setDragPreview({ cardId: card.id, x: card.x, y: card.y });
     dragRef.current = {
       cardId: card.id,
       element,
@@ -459,6 +477,7 @@ export function AICanvasView({
           : card,
       ),
     );
+    setDragPreview(null);
     dragRef.current = null;
   }
 
@@ -935,329 +954,6 @@ export function AICanvasView({
     abortRef.current?.abort();
   }
 
-  function updateProposalStatus(
-    proposalId: string,
-    status: ProposalStatus,
-    extra?: Partial<ProposalCanvasCard>,
-  ) {
-    setCards((current) =>
-      current.map((card) =>
-        card.kind === "proposal" && card.proposalId === proposalId
-          ? { ...card, status, ...extra }
-          : card,
-      ),
-    );
-  }
-
-  function resolveAssetId(ref: string | undefined): string | undefined {
-    if (!ref) return undefined;
-    for (const c of cards) {
-      if (c.kind !== "asset") continue;
-      if (c.asset.id === ref || c.id === ref) return c.asset.id;
-    }
-    return undefined;
-  }
-
-  function handleApproveProposal(card: ProposalCanvasCard) {
-    const targetRef =
-      card.sourceAssetId || (card.params.assetId as string) || "";
-    const resolvedId = resolveAssetId(targetRef);
-    const assetStillOnCanvas = !targetRef || resolvedId;
-    if (!assetStillOnCanvas) {
-      updateProposalStatus(card.proposalId, "failed", {
-        error: t("aiCanvas.assetRemovedError"),
-      });
-      return;
-    }
-    updateProposalStatus(card.proposalId, "executing");
-    void executeProposal(card, resolvedId || targetRef);
-  }
-
-  function findAssetData(ref: string) {
-    for (const c of cards) {
-      if (c.kind !== "asset") continue;
-      if (c.asset.id === ref || c.id === ref) return c.asset;
-    }
-    return undefined;
-  }
-
-  async function executeProposal(
-    proposal: ProposalCanvasCard,
-    assetId: string,
-  ) {
-    try {
-      const p = proposal.params;
-      const asset = findAssetData(assetId);
-
-      switch (proposal.tool) {
-        case "compress_image":
-        case "convert_image":
-        case "resize_image": {
-          const result = await renderImageToolPreview({
-            assetId,
-            outputFormat: (p.outputFormat as string) || "webp",
-            quality: (p.quality as number) || 82,
-            maxDimensionPx: (p.maxDimensionPx as number) || 1600,
-          });
-          const variantCard: CanvasCard = {
-            id: createCanvasCardId("variant"),
-            kind: "variant",
-            x: proposal.x,
-            y: proposal.y + 200,
-            createdAt: nowISO(),
-            sourceAssetId: assetId,
-            sourceName: proposal.description,
-            previewUrl: previewImageUrl(result.token),
-            token: result.token,
-            inputBytes: result.inputBytes,
-            outputBytes: result.outputBytes,
-            inputFormat: result.inputFormat,
-            outputFormat: result.outputFormat,
-          };
-          setCards((current) => [...current, variantCard]);
-          updateProposalStatus(proposal.proposalId, "completed", {
-            result: {
-              token: result.token,
-              inputBytes: result.inputBytes,
-              outputBytes: result.outputBytes,
-            },
-          });
-          break;
-        }
-        case "update_tags": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const tags = Array.isArray(p.tags)
-            ? p.tags.filter((t): t is string => typeof t === "string")
-            : [];
-          await request("/api/assets/tags", {
-            method: "POST",
-            body: JSON.stringify({
-              projectId: asset.projectId,
-              repoPath: asset.repoPath,
-              contentHash: asset.contentHash,
-              hashAlgorithm: asset.hashAlgorithm,
-              tags,
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? { ...c, asset: { ...c.asset, tags } }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "update_description": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const desc = (p.description as string) || "";
-          await request("/api/assets/description", {
-            method: "POST",
-            body: JSON.stringify({
-              projectId: asset.projectId,
-              repoPath: asset.repoPath,
-              contentHash: asset.contentHash,
-              hashAlgorithm: asset.hashAlgorithm,
-              description: desc,
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? { ...c, asset: { ...c.asset, description: desc } }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "update_ocr_text": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const text = (p.text as string) || "";
-          await request("/api/assets/ocr-text", {
-            method: "POST",
-            body: JSON.stringify({
-              projectId: asset.projectId,
-              repoPath: asset.repoPath,
-              contentHash: asset.contentHash,
-              hashAlgorithm: asset.hashAlgorithm,
-              text,
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? { ...c, asset: { ...c.asset, ocrText: text } }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "rename_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const newName = (p.newName as string) || "";
-          await request("/api/actions/batch/rename/apply", {
-            method: "POST",
-            body: JSON.stringify({
-              items: [
-                {
-                  assetId: asset.id,
-                  projectId: asset.projectId,
-                  repoPath: asset.repoPath,
-                  newRepoPath: asset.repoPath.replace(/[^/]+$/, "") + newName,
-                },
-              ],
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? {
-                    ...c,
-                    asset: {
-                      ...c.asset,
-                      repoPath:
-                        c.asset.repoPath.replace(/[^/]+$/, "") + newName,
-                    },
-                  }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "move_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const destDir = (p.destDir as string) || "";
-          const fname = asset.repoPath.split("/").pop() || "";
-          const newPath = destDir.replace(/\/$/, "") + "/" + fname;
-          await request("/api/actions/batch/move/apply", {
-            method: "POST",
-            body: JSON.stringify({
-              items: [
-                {
-                  assetId: asset.id,
-                  projectId: asset.projectId,
-                  repoPath: asset.repoPath,
-                  newRepoPath: newPath,
-                },
-              ],
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? { ...c, asset: { ...c.asset, repoPath: newPath } }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "copy_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const destPath = (p.destPath as string) || "";
-          await request("/api/actions/batch/copy", {
-            method: "POST",
-            body: JSON.stringify({
-              items: [
-                {
-                  assetId: asset.id,
-                  projectId: asset.projectId,
-                  repoPath: asset.repoPath,
-                  destPath,
-                },
-              ],
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "delete_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          await request("/api/actions/batch/delete", {
-            method: "POST",
-            body: JSON.stringify({
-              items: [
-                {
-                  assetId: asset.id,
-                  projectId: asset.projectId,
-                  repoPath: asset.repoPath,
-                },
-              ],
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          setCards((current) =>
-            current.filter(
-              (c) => !(c.kind === "asset" && c.asset.id === assetId),
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "favorite_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const fav = p.favorite !== false;
-          await request(
-            `/api/catalog/items/${encodeURIComponent(asset.id)}/favorite`,
-            {
-              method: fav ? "POST" : "DELETE",
-              headers: { "content-type": "application/json" },
-            },
-          );
-          setCards((current) =>
-            current.map((c) =>
-              c.kind === "asset" && c.asset.id === assetId
-                ? { ...c, asset: { ...c.asset, favorite: fav } }
-                : c,
-            ),
-          );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        case "export_asset": {
-          if (!asset) throw new Error("Asset not found on canvas");
-          const outputDir = (p.outputDir as string) || "";
-          await request("/api/actions/batch/export", {
-            method: "POST",
-            body: JSON.stringify({
-              items: [
-                {
-                  assetId: asset.id,
-                  projectId: asset.projectId,
-                  repoPath: asset.repoPath,
-                },
-              ],
-              outputDir,
-            }),
-            headers: { "content-type": "application/json" },
-          });
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
-        }
-        default:
-          updateProposalStatus(proposal.proposalId, "completed");
-      }
-    } catch (err) {
-      updateProposalStatus(proposal.proposalId, "failed", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
-  }
-
-  function handleRejectProposal(card: ProposalCanvasCard) {
-    updateProposalStatus(card.proposalId, "rejected");
-  }
-
   function clearCanvas() {
     setCards([]);
     setSelectedCardId(undefined);
@@ -1309,7 +1005,7 @@ export function AICanvasView({
         >
           {commentConnectors.length > 0 && (
             <svg
-              className="pointer-events-none absolute left-0 top-0 overflow-visible"
+              className="pointer-events-none absolute left-0 top-0 z-[36] overflow-visible"
               width="1"
               height="1"
               aria-hidden="true"
@@ -1364,6 +1060,11 @@ export function AICanvasView({
               onDragEnd={handleDragEnd}
               onDelete={deleteCard}
               onRegister={registerCardElement}
+              position={
+                dragPreview?.cardId === card.id
+                  ? { x: dragPreview.x, y: dragPreview.y }
+                  : undefined
+              }
             >
               {card.kind === "asset" ? (
                 <AssetCardBody
