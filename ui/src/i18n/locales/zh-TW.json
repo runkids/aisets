@@ -131,7 +131,10 @@
     "failed": "失敗",
     "pending": "待確認",
     "stopChat": "停止 AI",
-    "assetRemovedError": "此 asset 已不在畫布上"
+    "assetRemovedError": "此 asset 已不在畫布上",
+    "clearConfirmTitle": "清空畫布",
+    "clearConfirmMessage": "所有卡片、註解、提案和聊天記錄都會被移除，此操作無法復原",
+    "clearConfirmAction": "全部清除"
   },
   "favorites": {
     "add": "加入收藏",

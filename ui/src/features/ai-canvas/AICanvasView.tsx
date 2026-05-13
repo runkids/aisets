@@ -44,6 +44,7 @@ import {
   AssetThumbnail,
   Badge,
   Button,
+  ConfirmDialog,
   IconButton,
   TextInput,
 } from "@/components/ui";
@@ -763,6 +764,7 @@ export function AICanvasView({
     visible: boolean;
     status?: "thinking" | "acting" | "idle";
   }>({ x: 0, y: 0, visible: false });
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -1465,7 +1467,9 @@ export function AICanvasView({
   function clearCanvas() {
     setCards([]);
     setSelectedCardId(undefined);
+    setChatHistory([]);
     setError("");
+    setClearConfirmOpen(false);
   }
 
   function appendPromptToken(token: string) {
@@ -1734,11 +1738,22 @@ export function AICanvasView({
           size="sm"
           aria-label={t("aiCanvas.clear")}
           disabled={cards.length === 0}
-          onClick={clearCanvas}
+          onClick={() => setClearConfirmOpen(true)}
         >
           <Trash2 />
         </IconButton>
       </div>
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        onConfirm={clearCanvas}
+        onCancel={() => setClearConfirmOpen(false)}
+        title={t("aiCanvas.clearConfirmTitle")}
+        message={t("aiCanvas.clearConfirmMessage")}
+        confirmText={t("aiCanvas.clearConfirmAction")}
+        cancelText={t("common.cancel")}
+        variant="danger"
+      />
 
       <div
         data-ai-canvas-overlay="true"
