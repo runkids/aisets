@@ -58,8 +58,10 @@ import {
   TextInputClearButton,
   Tooltip,
 } from "@/components/ui";
-import { LoadingVisualView } from "@/features/semantic-search/SemanticSearchLoading";
-import type { LoadingVisual } from "@/features/semantic-search/SemanticSearchLoading";
+import {
+  LoadingVisualView,
+  type LoadingVisual,
+} from "@/features/semantic-search/SemanticSearchLoading";
 import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
 
 type Props = {
@@ -168,6 +170,15 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   );
   const isSemanticActive =
     searchMode === "semantic" && committedSemanticQuery.length > 0;
+  const [semanticBusyUntil, setSemanticBusyUntil] = useState(0);
+  const semanticFetching = semanticQuery.isFetching;
+  useEffect(() => {
+    if (isSemanticActive && semanticFetching) {
+      setSemanticBusyUntil(Date.now() + 800);
+    }
+  }, [isSemanticActive, semanticFetching, committedSemanticQuery]);
+  const showSemanticLoading =
+    isSemanticActive && (semanticFetching || Date.now() < semanticBusyUntil);
   const semanticLoadingStyle = useMemo<LoadingVisual>(() => {
     const styles: LoadingVisual[] = ["beam", "constellation", "swarm"];
     const seed = committedSemanticQuery
@@ -242,8 +253,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     setError("");
   }, [assetIds, onAssetIdsChange, staleBasketIds]);
 
+  const semanticHasResults =
+    isSemanticActive && semanticItems.length > 0 && !showSemanticLoading;
   const pickerItems = useMemo(() => {
-    const source = isSemanticActive ? semanticItems : rawPickerItems;
+    const source = semanticHasResults ? semanticItems : rawPickerItems;
     return source
       .map((item, index) => ({ item, index }))
       .sort((left, right) => {
@@ -253,8 +266,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
         return left.index - right.index;
       })
       .map(({ item }) => item);
-  }, [queuedAssetIdSet, rawPickerItems, isSemanticActive, semanticItems]);
-  const pickerTotal = isSemanticActive
+  }, [queuedAssetIdSet, rawPickerItems, semanticHasResults, semanticItems]);
+  const pickerTotal = semanticHasResults
     ? semanticItems.length
     : (catalogQuery.data?.pages[0]?.total ?? 0);
   const wallColumns = Math.max(
@@ -547,8 +560,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             </kbd>
                           </button>
                         )}
-                        {isSemanticActive && semanticQuery.isFetching && (
-                          <div className="mr-1 h-5 w-[80px] overflow-hidden rounded-g-sm">
+                        {showSemanticLoading && (
+                          <div className="mr-1 h-[28px] w-[120px] overflow-hidden rounded-g-sm border border-g-purple/20">
                             <LoadingVisualView
                               style={semanticLoadingStyle}
                               dimensionToken=""
