@@ -1370,9 +1370,7 @@ export function AICanvasView({
         };
         if (r?.items?.length) {
           for (const it of r.items) {
-            if (
-              !searchResultsRef.current.some((s) => s.id === it.id)
-            ) {
+            if (!searchResultsRef.current.some((s) => s.id === it.id)) {
               searchResultsRef.current.push({
                 id: it.id,
                 repoPath: it.repoPath,
@@ -1422,19 +1420,30 @@ export function AICanvasView({
           const wanted = [...searchResultsRef.current];
           searchResultsRef.current = [];
           const wantedIds = new Set(wanted.map((w) => w.id));
-          const names = wanted.map((w) => {
-            const parts = w.repoPath.split("/");
-            return parts[parts.length - 1].replace(/\.[^.]+$/, "");
-          });
-          const q = [...new Set(names)].slice(0, 5).join(" ");
-          const page = await getCatalogItems({
-            scanId,
-            q,
-            limit: Math.max(wanted.length * 2, 18),
-          });
-          const matchedAssets = page.items.filter((a) =>
-            wantedIds.has(a.id),
-          );
+          const names = [
+            ...new Set(
+              wanted.map((w) => {
+                const parts = w.repoPath.split("/");
+                return parts[parts.length - 1].replace(/\.[^.]+$/, "");
+              }),
+            ),
+          ];
+          const allItems: AssetItem[] = [];
+          const seenIds = new Set<string>();
+          for (const name of names.slice(0, 12)) {
+            const page = await getCatalogItems({
+              scanId,
+              q: name,
+              limit: 3,
+            });
+            for (const item of page.items) {
+              if (!seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                allItems.push(item);
+              }
+            }
+          }
+          const matchedAssets = allItems.filter((a) => wantedIds.has(a.id));
           const rect = rootRef.current?.getBoundingClientRect();
           const containerSize = rect
             ? { width: rect.width, height: rect.height }
