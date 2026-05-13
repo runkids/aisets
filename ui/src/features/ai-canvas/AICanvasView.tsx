@@ -1258,12 +1258,14 @@ export function AICanvasView({
         assistantText += (assistantText ? "\n\n" : "") + event.content;
       }
       if (event.type === "proposal") {
-        const pos = nextCardPosition(cards.length + newCards.length);
+        const selectedCard = cards.find((c) => c.id === selectedCardId);
+        const baseX = selectedCard ? selectedCard.x - CARD_WIDTH - 36 : 84;
+        const baseY = selectedCard ? selectedCard.y : 72;
         const card: ProposalCanvasCard = {
           id: createCanvasCardId("proposal"),
           kind: "proposal",
-          x: pos.x + CARD_WIDTH + 36,
-          y: pos.y + newCards.length * 60,
+          x: baseX,
+          y: baseY + newCards.length * 220,
           createdAt: nowISO(),
           proposalId: event.id,
           tool: event.tool,
@@ -1358,12 +1360,20 @@ export function AICanvasView({
     );
   }
 
+  function resolveAssetId(ref: string | undefined): string | undefined {
+    if (!ref) return undefined;
+    for (const c of cards) {
+      if (c.kind !== "asset") continue;
+      if (c.asset.id === ref || c.id === ref) return c.asset.id;
+    }
+    return undefined;
+  }
+
   function handleApproveProposal(card: ProposalCanvasCard) {
-    const assetStillOnCanvas =
-      !card.sourceAssetId ||
-      cards.some(
-        (c) => c.kind === "asset" && c.asset.id === card.sourceAssetId,
-      );
+    const targetRef =
+      card.sourceAssetId || (card.params.assetId as string) || "";
+    const resolvedId = resolveAssetId(targetRef);
+    const assetStillOnCanvas = !targetRef || resolvedId;
     if (!assetStillOnCanvas) {
       updateProposalStatus(card.proposalId, "failed", {
         error: t("aiCanvas.assetRemovedError"),
@@ -1371,13 +1381,15 @@ export function AICanvasView({
       return;
     }
     updateProposalStatus(card.proposalId, "executing");
-    void executeProposal(card);
+    void executeProposal(card, resolvedId || targetRef);
   }
 
-  async function executeProposal(proposal: ProposalCanvasCard) {
+  async function executeProposal(
+    proposal: ProposalCanvasCard,
+    assetId: string,
+  ) {
     try {
       const p = proposal.params;
-      const assetId = (p.assetId as string) || proposal.sourceAssetId || "";
 
       switch (proposal.tool) {
         case "compress_image":
