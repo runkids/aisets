@@ -203,12 +203,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     overscan: 5,
   });
 
+  const wallObserverRef = useRef<ResizeObserver | null>(null);
   const setWallMeasureNode = useCallback((node: HTMLDivElement | null) => {
     wallMeasureRef.current = node;
-  }, []);
-
-  useEffect(() => {
-    const node = wallMeasureRef.current;
+    wallObserverRef.current?.disconnect();
+    wallObserverRef.current = null;
     if (!node) return;
     const update = () => {
       const nextWidth = Math.floor(node.getBoundingClientRect().width);
@@ -217,7 +216,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     update();
     const observer = new ResizeObserver(update);
     observer.observe(node);
-    return () => observer.disconnect();
+    wallObserverRef.current = observer;
   }, []);
 
   useEffect(() => {
@@ -355,7 +354,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
             value={successResults.length}
             icon={<Check size={14} />}
             tone={successResults.length > 0 ? "green" : undefined}
-            className={pulseStat === "processed" ? "animate-[countPulse_280ms_var(--g-ease)]" : ""}
+            className={
+              pulseStat === "processed"
+                ? "animate-[countPulse_280ms_var(--g-ease)]"
+                : ""
+            }
           />
           <StatCard
             label={t("imageTools.statSaved")}
@@ -484,131 +487,134 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   size="md"
                 />
               ) : (
-              <div className="min-h-0">
-                <div
-                  ref={wallScrollRef}
-                  className="h-full min-h-0 overflow-y-auto pr-1"
-                >
-                  <div ref={setWallMeasureNode} className="relative w-full">
-                    <div
-                      className="relative w-full"
-                      style={{ height: wallVirtualizer.getTotalSize() }}
-                    >
-                      {wallVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const row = wallRows[virtualRow.index] ?? [];
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            ref={wallVirtualizer.measureElement}
-                            data-index={virtualRow.index}
-                            className="absolute left-0 top-0 grid w-full gap-2"
-                            style={{
-                              gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            {row.map((item) => {
-                              const queued = queuedAssetIdSet.has(item.id);
-                              const checked =
-                                pickerSelected.has(item.id) || queued;
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="group grid overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left shadow-g-sm transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-g hover:-translate-y-0.5 hover:border-g-line-strong hover:shadow-g-md focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:border-g-line-strong data-[selected=true]:bg-g-accent-soft data-[selected=true]:shadow-[inset_4px_0_0_var(--g-accent),var(--g-shadow-sm)]"
-                                  data-selected={checked || undefined}
-                                  aria-pressed={checked}
-                                  aria-label={t("imageTools.selectAsset", {
-                                    name: fileName(item.repoPath),
-                                  })}
-                                  onClick={() => {
-                                    if (queued) {
-                                      removeAsset(item.id);
+                <div className="min-h-0">
+                  <div
+                    ref={wallScrollRef}
+                    className="h-full min-h-0 overflow-y-auto pr-1"
+                  >
+                    <div ref={setWallMeasureNode} className="relative w-full">
+                      <div
+                        className="relative w-full"
+                        style={{ height: wallVirtualizer.getTotalSize() }}
+                      >
+                        {wallVirtualizer.getVirtualItems().map((virtualRow) => {
+                          const row = wallRows[virtualRow.index] ?? [];
+                          return (
+                            <div
+                              key={virtualRow.key}
+                              ref={wallVirtualizer.measureElement}
+                              data-index={virtualRow.index}
+                              className="absolute left-0 top-0 grid w-full gap-2"
+                              style={{
+                                gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                            >
+                              {row.map((item) => {
+                                const queued = queuedAssetIdSet.has(item.id);
+                                const checked =
+                                  pickerSelected.has(item.id) || queued;
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    className="group grid overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left shadow-g-sm transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-g hover:-translate-y-0.5 hover:border-g-line-strong hover:shadow-g-md focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:border-g-line-strong data-[selected=true]:bg-g-accent-soft data-[selected=true]:shadow-[inset_4px_0_0_var(--g-accent),var(--g-shadow-sm)]"
+                                    data-selected={checked || undefined}
+                                    aria-pressed={checked}
+                                    aria-label={t("imageTools.selectAsset", {
+                                      name: fileName(item.repoPath),
+                                    })}
+                                    onClick={() => {
+                                      if (queued) {
+                                        removeAsset(item.id);
+                                        setPickerSelected((prev) => {
+                                          if (!prev.has(item.id)) return prev;
+                                          const next = new Set(prev);
+                                          next.delete(item.id);
+                                          return next;
+                                        });
+                                        return;
+                                      }
                                       setPickerSelected((prev) => {
-                                        if (!prev.has(item.id)) return prev;
                                         const next = new Set(prev);
-                                        next.delete(item.id);
+                                        if (next.has(item.id))
+                                          next.delete(item.id);
+                                        else next.add(item.id);
                                         return next;
                                       });
-                                      return;
-                                    }
-                                    setPickerSelected((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(item.id))
-                                        next.delete(item.id);
-                                      else next.add(item.id);
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-g-line bg-g-canvas">
-                                    <img
-                                      src={item.thumbnailUrl || item.url}
-                                      alt=""
-                                      loading="lazy"
-                                      className="absolute inset-0 m-auto h-full w-full object-contain p-2.5 transition-transform duration-[180ms] ease-g group-hover:scale-[1.03]"
-                                    />
-                                  </span>
-                                  <div className="grid min-h-[42px] gap-1 px-2 py-1.5">
-                                    <div className="truncate font-g-mono text-g-chip font-[590] text-g-ink">
-                                      {fileName(item.repoPath)}
-                                    </div>
-                                    <div className="flex min-w-0 items-center gap-1">
-                                      <Badge>
-                                        {formatExt(
-                                          item.ext ||
-                                            item.repoPath.split(".").pop() ||
-                                            "",
-                                        )}
-                                      </Badge>
-                                      <span className="truncate font-g-mono text-[10px] text-g-ink-4">
-                                        {formatBytes(item.bytes)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span
-                                    className="absolute right-2 top-2 grid size-6 place-items-center rounded-g-sm border border-g-line-strong bg-[color-mix(in_srgb,var(--g-surface)_88%,transparent)] text-[12px] font-[800] text-g-ink-4 opacity-0 shadow-g-sm backdrop-blur data-[checked=true]:border-g-accent data-[checked=true]:bg-g-surface data-[checked=true]:text-g-accent data-[checked=true]:opacity-100 group-hover:opacity-100"
-                                    data-checked={checked || undefined}
-                                    aria-hidden="true"
+                                    }}
                                   >
-                                    {checked ? (
-                                      <Check size={14} />
-                                    ) : (
-                                      <Plus size={13} />
-                                    )}
-                                  </span>
-                                  {queued && (
-                                    <span className="absolute inset-0 grid place-items-center bg-g-accent/10">
-                                      <Badge tone="accent" className="shadow-g-sm">
-                                        {t("imageTools.queued")}
-                                      </Badge>
+                                    <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-g-line bg-g-canvas">
+                                      <img
+                                        src={item.thumbnailUrl || item.url}
+                                        alt=""
+                                        loading="lazy"
+                                        className="absolute inset-0 m-auto h-full w-full object-contain p-2.5 transition-transform duration-[180ms] ease-g group-hover:scale-[1.03]"
+                                      />
                                     </span>
-                                  )}
-                                </button>
-                              );
+                                    <div className="grid min-h-[42px] gap-1 px-2 py-1.5">
+                                      <div className="truncate font-g-mono text-g-chip font-[590] text-g-ink">
+                                        {fileName(item.repoPath)}
+                                      </div>
+                                      <div className="flex min-w-0 items-center gap-1">
+                                        <Badge>
+                                          {formatExt(
+                                            item.ext ||
+                                              item.repoPath.split(".").pop() ||
+                                              "",
+                                          )}
+                                        </Badge>
+                                        <span className="truncate font-g-mono text-[10px] text-g-ink-4">
+                                          {formatBytes(item.bytes)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span
+                                      className="absolute right-2 top-2 grid size-6 place-items-center rounded-g-sm border border-g-line-strong bg-[color-mix(in_srgb,var(--g-surface)_88%,transparent)] text-[12px] font-[800] text-g-ink-4 opacity-0 shadow-g-sm backdrop-blur data-[checked=true]:border-g-accent data-[checked=true]:bg-g-surface data-[checked=true]:text-g-accent data-[checked=true]:opacity-100 group-hover:opacity-100"
+                                      data-checked={checked || undefined}
+                                      aria-hidden="true"
+                                    >
+                                      {checked ? (
+                                        <Check size={14} />
+                                      ) : (
+                                        <Plus size={13} />
+                                      )}
+                                    </span>
+                                    {queued && (
+                                      <span className="absolute inset-0 grid place-items-center bg-g-accent/10">
+                                        <Badge
+                                          tone="accent"
+                                          className="shadow-g-sm"
+                                        >
+                                          {t("imageTools.queued")}
+                                        </Badge>
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {catalogQuery.hasNextPage && (
+                      <div
+                        ref={wallLoadMoreRef}
+                        className="flex h-12 items-center justify-center gap-2 text-g-ui text-g-ink-4"
+                      >
+                        {catalogQuery.isFetchingNextPage && (
+                          <>
+                            <LoaderCircle size={14} className="animate-spin" />
+                            {t("common.loading", {
+                              defaultValue: "Loading",
                             })}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {catalogQuery.hasNextPage && (
-                    <div
-                      ref={wallLoadMoreRef}
-                      className="flex h-12 items-center justify-center gap-2 text-g-ui text-g-ink-4"
-                    >
-                      {catalogQuery.isFetchingNextPage && (
-                        <>
-                          <LoaderCircle size={14} className="animate-spin" />
-                          {t("common.loading", {
-                            defaultValue: "Loading",
-                          })}
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
-              </div>
               )}
             </CardBody>
           </Card>
@@ -723,8 +729,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                 {fileName(item.repoPath)}
                               </div>
                               <div className="truncate font-g-mono text-g-chip text-g-ink-4">
-                                {item.projectName} ·{" "}
-                                {formatBytes(item.bytes)}
+                                {item.projectName} · {formatBytes(item.bytes)}
                               </div>
                             </div>
                             <Badge>{formatExt(item.ext || "")}</Badge>
@@ -935,9 +940,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             <div className="flex items-start gap-2.5">
                               <div className="min-w-0 flex-1">
                                 <div className="truncate font-g-mono text-g-ui font-[590]">
-                                  {fileName(
-                                    result.outputPath || result.name,
-                                  )}
+                                  {fileName(result.outputPath || result.name)}
                                 </div>
                                 <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
                                   {result.inputFormat.toUpperCase()} →{" "}
