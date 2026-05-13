@@ -34,6 +34,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { getCatalogItems, previewImageUrl } from "@/api";
+import { request } from "@/api/client";
 import {
   previewImageToolAssets,
   renderImageToolPreview,
@@ -244,7 +245,11 @@ function AssetCardBody({
   comments: CommentCanvasCard[];
   onOpenAsset?: (assetId: string) => void;
   onSelectComment: (commentId: string) => void;
-  onCreateComment: (assetCard: AssetCanvasCard) => void;
+  onCreateComment: (
+    assetCard: AssetCanvasCard,
+    text?: string,
+    region?: { x: number; y: number; width: number; height: number },
+  ) => void;
   onRenderPreview: (assetCard: AssetCanvasCard) => void;
   onOperationPreview: (assetCard: AssetCanvasCard) => void;
   working: boolean;
@@ -252,10 +257,68 @@ function AssetCardBody({
   const { t } = useTranslation();
   const asset = card.asset;
   const tags = tagLabel(asset);
+  const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const [drawRegion, setDrawRegion] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
+  function toNormalized(clientX: number, clientY: number) {
+    const rect = imageContainerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0)
+      return { nx: 0, ny: 0 };
+    return {
+      nx: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+      ny: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+    };
+  }
+
+  function handleRegionPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    const { nx, ny } = toNormalized(e.clientX, e.clientY);
+    setDrawRegion({ startX: nx, startY: ny, currentX: nx, currentY: ny });
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleRegionPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drawRegion) return;
+    const { nx, ny } = toNormalized(e.clientX, e.clientY);
+    setDrawRegion((prev) => (prev ? { ...prev, currentX: nx, currentY: ny } : null));
+  }
+
+  function handleRegionPointerUp() {
+    if (!drawRegion) return;
+    const x = Math.min(drawRegion.startX, drawRegion.currentX);
+    const y = Math.min(drawRegion.startY, drawRegion.currentY);
+    const width = Math.abs(drawRegion.currentX - drawRegion.startX);
+    const height = Math.abs(drawRegion.currentY - drawRegion.startY);
+    setDrawRegion(null);
+    if (width > 0.03 && height > 0.03) {
+      onCreateComment(card, "", { x, y, width, height });
+    }
+  }
+
+  const drawRect = drawRegion
+    ? {
+        left: `${Math.min(drawRegion.startX, drawRegion.currentX) * 100}%`,
+        top: `${Math.min(drawRegion.startY, drawRegion.currentY) * 100}%`,
+        width: `${Math.abs(drawRegion.currentX - drawRegion.startX) * 100}%`,
+        height: `${Math.abs(drawRegion.currentY - drawRegion.startY) * 100}%`,
+      }
+    : null;
 
   return (
     <div className="flex flex-col">
-      <div className="relative aspect-[4/3] bg-g-surface-2">
+      <div
+        ref={imageContainerRef}
+        className="relative aspect-[4/3] cursor-crosshair bg-g-surface-2"
+        onPointerDown={handleRegionPointerDown}
+        onPointerMove={handleRegionPointerMove}
+        onPointerUp={handleRegionPointerUp}
+        onPointerCancel={() => setDrawRegion(null)}
+      >
         <img
           src={asset.thumbnailUrl || asset.url}
           alt={fileName(asset.repoPath)}
@@ -281,6 +344,12 @@ function AssetCardBody({
             }}
           />
         ))}
+        {drawRect && (
+          <div
+            className="pointer-events-none absolute border-2 border-g-amber bg-g-amber-soft/30"
+            style={drawRect}
+          />
+        )}
       </div>
       <div className="flex flex-col gap-3 p-3">
         <div className="min-w-0">
@@ -525,10 +594,32 @@ function ProposalCardBody({
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex flex-wrap gap-1.5">
-        <Badge tone={isPending ? "amber" : isCompleted ? "green" : isRejected ? "line" : isFailed ? "red" : "blue"}>
+        <Badge
+          tone={
+            isPending
+              ? "amber"
+              : isCompleted
+                ? "green"
+                : isRejected
+                  ? "line"
+                  : isFailed
+                    ? "red"
+                    : "blue"
+          }
+        >
           {card.tool.replaceAll("_", " ")}
         </Badge>
-        <Badge tone={isCompleted ? "green" : isRejected ? "line" : isPending ? "amber" : "line"}>
+        <Badge
+          tone={
+            isCompleted
+              ? "green"
+              : isRejected
+                ? "line"
+                : isPending
+                  ? "amber"
+                  : "line"
+          }
+        >
           {isExecuting
             ? t("aiCanvas.executing")
             : isCompleted
@@ -540,15 +631,18 @@ function ProposalCardBody({
                   : t("aiCanvas.pending")}
         </Badge>
       </div>
-      <p className={cn("text-g-body leading-[1.45] text-g-ink", isRejected && "line-through opacity-50")}>
+      <p
+        className={cn(
+          "text-g-body leading-[1.45] text-g-ink",
+          isRejected && "line-through opacity-50",
+        )}
+      >
         {card.description}
       </p>
       {card.impact && (
         <p className="text-g-caption text-g-ink-3">{card.impact}</p>
       )}
-      {card.error && (
-        <p className="text-g-caption text-g-red">{card.error}</p>
-      )}
+      {card.error && <p className="text-g-caption text-g-red">{card.error}</p>}
       {isPending && (
         <div className="grid grid-cols-2 gap-2">
           <Button
@@ -576,11 +670,7 @@ function ProposalCardBody({
         </div>
       )}
       {isFailed && (
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => onApprove(card)}
-        >
+        <Button size="sm" variant="secondary" onClick={() => onApprove(card)}>
           {t("aiCanvas.retry")}
         </Button>
       )}
@@ -614,7 +704,9 @@ function AICursor({
         />
         <div className="flex items-center gap-1 rounded-g-sm bg-g-purple px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm">
           <span>AI</span>
-          {label && <span className="max-w-[120px] truncate opacity-80">· {label}</span>}
+          {label && (
+            <span className="max-w-[120px] truncate opacity-80">· {label}</span>
+          )}
         </div>
       </div>
     </div>
@@ -1005,7 +1097,11 @@ export function AICanvasView({
     setSelectedCardId(card.id);
   }
 
-  function addComment(assetCard: AssetCanvasCard, text = prompt.trim()) {
+  function addComment(
+    assetCard: AssetCanvasCard,
+    text = prompt.trim(),
+    region?: { x: number; y: number; width: number; height: number },
+  ) {
     const id = createCanvasCardId("comment");
     const card: CommentCanvasCard = {
       id,
@@ -1015,12 +1111,7 @@ export function AICanvasView({
       createdAt: nowISO(),
       anchorId: assetCard.id,
       text: text || t("aiCanvas.defaultComment"),
-      region: {
-        x: 0.32,
-        y: 0.28,
-        width: 0.34,
-        height: 0.24,
-      },
+      region: region ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
     };
     setCards((current) => [...current, card]);
     setSelectedCardId(id);
@@ -1245,9 +1336,11 @@ export function AICanvasView({
   }
 
   function handleApproveProposal(card: ProposalCanvasCard) {
-    const assetStillOnCanvas = !card.sourceAssetId || cards.some(
-      (c) => c.kind === "asset" && c.asset.id === card.sourceAssetId,
-    );
+    const assetStillOnCanvas =
+      !card.sourceAssetId ||
+      cards.some(
+        (c) => c.kind === "asset" && c.asset.id === card.sourceAssetId,
+      );
     if (!assetStillOnCanvas) {
       updateProposalStatus(card.proposalId, "failed", {
         error: t("aiCanvas.assetRemovedError"),
@@ -1258,13 +1351,87 @@ export function AICanvasView({
     void executeProposal(card);
   }
 
-  async function executeProposal(card: ProposalCanvasCard) {
+  async function executeProposal(proposal: ProposalCanvasCard) {
     try {
-      // TODO: wire each tool to its existing API (renderImageToolPreview, /api/assets/tags, etc.)
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      updateProposalStatus(card.proposalId, "completed");
+      const p = proposal.params;
+      const assetId = (p.assetId as string) || proposal.sourceAssetId || "";
+
+      switch (proposal.tool) {
+        case "compress_image":
+        case "convert_image":
+        case "resize_image": {
+          const result = await renderImageToolPreview({
+            assetId,
+            outputFormat: (p.outputFormat as string) || "webp",
+            quality: (p.quality as number) || 82,
+            maxDimensionPx: (p.maxDimensionPx as number) || 1600,
+          });
+          const variantCard: CanvasCard = {
+            id: createCanvasCardId("variant"),
+            kind: "variant",
+            x: proposal.x,
+            y: proposal.y + 200,
+            createdAt: nowISO(),
+            sourceAssetId: assetId,
+            sourceName: proposal.description,
+            previewUrl: previewImageUrl(result.token),
+            token: result.token,
+            inputBytes: result.inputBytes,
+            outputBytes: result.outputBytes,
+            inputFormat: result.inputFormat,
+            outputFormat: result.outputFormat,
+          };
+          setCards((current) => [...current, variantCard]);
+          updateProposalStatus(proposal.proposalId, "completed", {
+            result: {
+              token: result.token,
+              inputBytes: result.inputBytes,
+              outputBytes: result.outputBytes,
+            },
+          });
+          break;
+        }
+        case "update_tags": {
+          const tags = Array.isArray(p.tags)
+            ? p.tags.filter((t): t is string => typeof t === "string")
+            : [];
+          await request("/api/assets/tags", {
+            method: "POST",
+            body: JSON.stringify({ assetId, tags }),
+            headers: { "content-type": "application/json" },
+          });
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "update_description": {
+          await request("/api/assets/description", {
+            method: "POST",
+            body: JSON.stringify({
+              assetId,
+              description: (p.description as string) || "",
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "update_ocr_text": {
+          await request("/api/assets/ocr-text", {
+            method: "POST",
+            body: JSON.stringify({
+              assetId,
+              text: (p.text as string) || "",
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        default:
+          updateProposalStatus(proposal.proposalId, "completed");
+      }
     } catch (err) {
-      updateProposalStatus(card.proposalId, "failed", {
+      updateProposalStatus(proposal.proposalId, "failed", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
     }
