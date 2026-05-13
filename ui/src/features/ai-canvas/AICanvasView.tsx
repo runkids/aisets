@@ -1863,100 +1863,140 @@ export function AICanvasView({
                 )}
               </div>
             )}
-            {(selectedProposal?.status === "pending" || pendingProposals.length > 0) && (
+            {(selectedProposal?.status === "pending" ||
+              pendingProposals.length > 0) && (
               <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 mb-2">
                 {selectedProposal?.status === "pending" ? (
                   <>
-                    <Badge tone="amber">{selectedProposal.tool.replaceAll("_", " ")}</Badge>
-                    <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">{selectedProposal.description}</span>
-                    <Button size="sm" variant="ghost" className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white" leadingIcon={<XCircle />} onClick={() => handleRejectProposal(selectedProposal)}>{t("aiCanvas.reject")}</Button>
-                    <Button size="sm" variant="primary" leadingIcon={<Check />} onClick={() => handleApproveProposal(selectedProposal)}>{t("aiCanvas.approve")}</Button>
+                    <Badge tone="amber">
+                      {selectedProposal.tool.replaceAll("_", " ")}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">
+                      {selectedProposal.description}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      leadingIcon={<XCircle />}
+                      onClick={() => handleRejectProposal(selectedProposal)}
+                    >
+                      {t("aiCanvas.reject")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      leadingIcon={<Check />}
+                      onClick={() => handleApproveProposal(selectedProposal)}
+                    >
+                      {t("aiCanvas.approve")}
+                    </Button>
                   </>
                 ) : (
                   <>
-                    <span className="min-w-0 flex-1 text-g-caption text-white/50">{t("aiCanvas.pendingProposals", { count: pendingProposals.length })}</span>
-                    <Button size="sm" variant="ghost" className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white" onClick={() => { for (const p of pendingProposals) handleRejectProposal(p); }}>{t("aiCanvas.rejectAll")}</Button>
-                    <Button size="sm" variant="primary" onClick={() => { for (const p of pendingProposals) handleApproveProposal(p); }}>{t("aiCanvas.approveAll")}</Button>
+                    <span className="min-w-0 flex-1 text-g-caption text-white/50">
+                      {t("aiCanvas.pendingProposals", {
+                        count: pendingProposals.length,
+                      })}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      onClick={() => {
+                        for (const p of pendingProposals)
+                          handleRejectProposal(p);
+                      }}
+                    >
+                      {t("aiCanvas.rejectAll")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => {
+                        for (const p of pendingProposals)
+                          handleApproveProposal(p);
+                      }}
+                    >
+                      {t("aiCanvas.approveAll")}
+                    </Button>
                   </>
                 )}
               </div>
             )}
             <div className="flex h-12 items-center gap-2">
+              <IconButton
+                size="md"
+                aria-label={t("aiCanvas.addAttachment")}
+                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                onClick={noteUploadPending}
+              >
+                <Plus />
+              </IconButton>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.mentionAsset")}
+                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                onClick={mentionSelectedAsset}
+              >
+                <AtSign />
+              </IconButton>
+              <textarea
+                value={prompt}
+                placeholder={t("aiCanvas.composerPlaceholder")}
+                className="min-h-6 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-6 text-white outline-none placeholder:text-white/35"
+                rows={1}
+                onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void handleAsk();
+                  }
+                }}
+              />
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.previewTools")}
+                className={cn(
+                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
+                  composerPreviewOpen && "bg-white/[0.1] text-white",
+                )}
+                onClick={() => setComposerPreviewOpen((current) => !current)}
+              >
+                <Eye />
+              </IconButton>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.advancedChat")}
+                className={cn(
+                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
+                  composerAdvancedOpen && "bg-white/[0.1] text-white",
+                )}
+                onClick={() => setComposerAdvancedOpen((current) => !current)}
+              >
+                <SlidersHorizontal />
+              </IconButton>
+              {isWorking ? (
                 <IconButton
                   size="md"
-                  aria-label={t("aiCanvas.addAttachment")}
-                  className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
-                  onClick={noteUploadPending}
+                  aria-label={t("aiCanvas.stopChat")}
+                  className="rounded-full border-g-red bg-g-red text-white hover:bg-g-red/90"
+                  onClick={handleStop}
                 >
-                  <Plus />
+                  <Square size={14} />
                 </IconButton>
+              ) : (
                 <IconButton
-                  size="sm"
-                  aria-label={t("aiCanvas.mentionAsset")}
-                  className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
-                  onClick={mentionSelectedAsset}
+                  size="md"
+                  aria-label={t("aiCanvas.ask")}
+                  disabled={prompt.trim() === ""}
+                  className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
+                  onClick={() => void handleAsk()}
                 >
-                  <AtSign />
+                  <ArrowUp />
                 </IconButton>
-                <textarea
-                  value={prompt}
-                  placeholder={t("aiCanvas.composerPlaceholder")}
-                  className="min-h-6 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-6 text-white outline-none placeholder:text-white/35"
-                  rows={1}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (
-                      (event.metaKey || event.ctrlKey) &&
-                      event.key === "Enter"
-                    ) {
-                      event.preventDefault();
-                      void handleAsk();
-                    }
-                  }}
-                />
-                <IconButton
-                  size="sm"
-                  aria-label={t("aiCanvas.previewTools")}
-                  className={cn(
-                    "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
-                    composerPreviewOpen && "bg-white/[0.1] text-white",
-                  )}
-                  onClick={() => setComposerPreviewOpen((current) => !current)}
-                >
-                  <Eye />
-                </IconButton>
-                <IconButton
-                  size="sm"
-                  aria-label={t("aiCanvas.advancedChat")}
-                  className={cn(
-                    "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
-                    composerAdvancedOpen && "bg-white/[0.1] text-white",
-                  )}
-                  onClick={() => setComposerAdvancedOpen((current) => !current)}
-                >
-                  <SlidersHorizontal />
-                </IconButton>
-                {isWorking ? (
-                  <IconButton
-                    size="md"
-                    aria-label={t("aiCanvas.stopChat")}
-                    className="rounded-full border-g-red bg-g-red text-white hover:bg-g-red/90"
-                    onClick={handleStop}
-                  >
-                    <Square size={14} />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    size="md"
-                    aria-label={t("aiCanvas.ask")}
-                    disabled={prompt.trim() === ""}
-                    className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
-                    onClick={() => void handleAsk()}
-                  >
-                    <ArrowUp />
-                  </IconButton>
-                )}
-              </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
