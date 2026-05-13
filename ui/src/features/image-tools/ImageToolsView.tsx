@@ -243,7 +243,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   }, [assetIds, onAssetIdsChange, staleBasketIds]);
 
   const semanticHasResults =
-    isSemanticActive && semanticItems.length > 0 && !showSemanticLoading;
+    isSemanticActive && semanticItems.length > 0;
   const pickerItems = useMemo(() => {
     const source = semanticHasResults ? semanticItems : rawPickerItems;
     return source
