@@ -206,7 +206,7 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if _, err := s.ensureLatestScan(r.Context()); err != nil {
-		writeError(w, http.StatusBadRequest, err)
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	item, err := s.store.CatalogItem(0, body.AssetID)
@@ -253,7 +253,7 @@ func (s *Server) handleImageToolPreviewServe(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.Header().Set("Content-Type", download.ContentType)
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", "private, max-age=300")
 	http.ServeFile(w, r, download.Path)
 }
 
