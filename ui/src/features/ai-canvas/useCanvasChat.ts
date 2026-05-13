@@ -177,6 +177,43 @@ export function useCanvasChat(opts: {
           setCards((current) => [...current, card]);
         }
       }
+      if (event.type === "action_result" && event.tool === "move_card") {
+        const r = event.result as {
+          cardId?: string;
+          x?: number;
+          y?: number;
+        };
+        if (r?.cardId && typeof r.x === "number" && typeof r.y === "number") {
+          setCards((cur) =>
+            cur.map((c) =>
+              c.id === r.cardId ? { ...c, x: r.x!, y: r.y! } : c,
+            ),
+          );
+        }
+      }
+      if (event.type === "action_result" && event.tool === "arrange_cards") {
+        const r = event.result as {
+          positions?: Array<{ cardId?: string; x?: number; y?: number }>;
+        };
+        if (r?.positions?.length) {
+          const posMap = new Map(
+            r.positions
+              .filter(
+                (p): p is { cardId: string; x: number; y: number } =>
+                  typeof p.cardId === "string" &&
+                  typeof p.x === "number" &&
+                  typeof p.y === "number",
+              )
+              .map((p) => [p.cardId, { x: p.x, y: p.y }]),
+          );
+          setCards((cur) =>
+            cur.map((c) => {
+              const pos = posMap.get(c.id);
+              return pos ? { ...c, x: pos.x, y: pos.y } : c;
+            }),
+          );
+        }
+      }
       if (event.type === "action_result" && event.tool === "search_assets") {
         const r = event.result as {
           q?: string;

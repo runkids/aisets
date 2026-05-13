@@ -535,6 +535,16 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			"text":         act.Params["text"],
 			"region":       act.Params["region"],
 		}
+	case "move_card":
+		return map[string]any{
+			"cardId": act.Params["cardId"],
+			"x":      act.Params["x"],
+			"y":      act.Params["y"],
+		}
+	case "arrange_cards":
+		return map[string]any{
+			"positions": act.Params["positions"],
+		}
 	default:
 		return map[string]any{"error": "unknown safe tool: " + act.Tool}
 	}

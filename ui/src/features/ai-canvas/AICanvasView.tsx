@@ -714,6 +714,11 @@ export function AICanvasView({
     setClearConfirmOpen(false);
   }
 
+  function clearChatHistory() {
+    setChatHistory([]);
+    setError("");
+  }
+
   function zoomCanvasBy(factor: number) {
     const bounds = rootRef.current?.getBoundingClientRect();
     const point = bounds
@@ -1533,14 +1538,40 @@ export function AICanvasView({
               </div>
             )}
             <div className="flex min-h-10 items-center gap-2 pl-1 pr-0.5">
-              <IconButton
-                size="md"
-                aria-label={t("aiCanvas.addAttachment")}
-                className={composerIconClass}
-                onClick={noteUploadPending}
-              >
-                <Plus />
-              </IconButton>
+              <DropdownMenuPrimitive.Root>
+                <DropdownMenuPrimitive.Trigger asChild>
+                  <IconButton
+                    size="md"
+                    aria-label={t("aiCanvas.addAttachment")}
+                    className={composerIconClass}
+                  >
+                    <Plus />
+                  </IconButton>
+                </DropdownMenuPrimitive.Trigger>
+                <DropdownMenuPrimitive.Portal>
+                  <DropdownMenuPrimitive.Content
+                    align="start"
+                    sideOffset={10}
+                    className="z-[80] min-w-[220px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                  >
+                    <DropdownMenuPrimitive.Item
+                      onSelect={noteUploadPending}
+                      className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                    >
+                      <Paperclip size={14} className="shrink-0 text-white/54" />
+                      <span>{t("aiCanvas.attachImage")}</span>
+                    </DropdownMenuPrimitive.Item>
+                    <DropdownMenuPrimitive.Item
+                      disabled={chatHistory.length === 0}
+                      onSelect={clearChatHistory}
+                      className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
+                    >
+                      <Trash2 size={14} className="shrink-0 text-white/54" />
+                      <span>{t("aiCanvas.clearChat")}</span>
+                    </DropdownMenuPrimitive.Item>
+                  </DropdownMenuPrimitive.Content>
+                </DropdownMenuPrimitive.Portal>
+              </DropdownMenuPrimitive.Root>
               <IconButton
                 size="sm"
                 aria-label={t("aiCanvas.mentionAsset")}

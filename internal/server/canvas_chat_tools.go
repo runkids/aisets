@@ -39,6 +39,18 @@ func canvasToolRegistry() []canvasToolDef {
 			Safe:        true,
 		},
 		{
+			Name:        "move_card",
+			Description: "Move a single card to a new position on the canvas.",
+			Params:      `{"cardId": "string (required)", "x": "number — new X coordinate", "y": "number — new Y coordinate"}`,
+			Safe:        true,
+		},
+		{
+			Name:        "arrange_cards",
+			Description: "Reposition multiple cards at once. Use to organize the canvas layout (e.g. grid, row, group by category).",
+			Params:      `{"positions": [{"cardId": "string", "x": "number", "y": "number"}]}`,
+			Safe:        true,
+		},
+		{
 			Name:        "compress_image",
 			Description: "Compress/convert an asset to a smaller format (WebP, AVIF, PNG).",
 			Params:      `{"assetId": "string", "outputFormat": "webp|avif|png", "quality": "int 1-100, default 82"}`,
@@ -151,6 +163,9 @@ You are NOT a chatbot. You are a collaborator who:
 - Leaves comments on specific image regions when you notice issues
 - Searches for related assets when context would help
 - Always does something, never just describes
+
+## Canvas Layout
+Card width is 320px. Use 24px horizontal gap and 24px vertical gap when arranging cards. Read each card's current pos=(x,y) from the Canvas State section.
 
 ## Available Tools
 %s
