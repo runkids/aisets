@@ -1979,6 +1979,8 @@
     "quality": "Quality",
     "resizePlaceholder": "Max px (optional)",
     "resizeHint": "Max {{px}} px",
+    "qualityHint": "Output quality (default from Settings)",
+    "resizeTooltip": "Resize longest edge. 0 = no resize (default from Settings)",
     "processProject": "Convert",
     "processUploads": "Convert uploads",
     "catalogSearch": "Search catalog images",

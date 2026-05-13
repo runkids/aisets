@@ -3,6 +3,7 @@ import {
   Download,
   Eye,
   FileArchive,
+  Info,
   FolderOpen,
   ImagePlus,
   Images,
@@ -45,6 +46,7 @@ import {
   Select,
   StatCard,
   TextInput,
+  Tooltip,
 } from "@/components/ui";
 import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
 
@@ -861,7 +863,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   className="w-24"
                 />
                 <div className="flex h-g-btn-md items-center gap-1.5 rounded-g-md border border-g-line bg-g-surface px-2">
-                  <span className="font-g text-g-chip text-g-ink-3">Q</span>
+                  <Tooltip label={t("imageTools.qualityHint")}>
+                    <span className="flex cursor-help items-center gap-0.5 font-g text-g-chip text-g-ink-3">
+                      Q <Info size={11} />
+                    </span>
+                  </Tooltip>
                   <Range
                     min={1}
                     max={100}
@@ -877,6 +883,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     {settings.quality}
                   </span>
                 </div>
+                <Tooltip label={t("imageTools.resizeTooltip")}>
+                  <span className="cursor-help text-g-ink-4">
+                    <Info size={13} />
+                  </span>
+                </Tooltip>
                 <TextInput
                   value={settings.maxDimensionPx || ""}
                   onChange={(event) =>
