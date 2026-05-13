@@ -102,7 +102,8 @@
     "zoomOut": "축소",
     "resetView": "보기 재설정",
     "clear": "캔버스 지우기",
-    "commentCard": "댓글"
+    "commentCard": "댓글",
+    "deleteCard": "카드 삭제"
   },
   "favorites": {
     "add": "즐겨찾기에 추가",

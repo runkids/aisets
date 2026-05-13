@@ -122,6 +122,7 @@ function CardShell({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDelete,
 }: {
   card: CanvasCard;
   selected: boolean;
@@ -133,7 +134,10 @@ function CardShell({
   ) => void;
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onDelete: (card: CanvasCard) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <section
       className={cn(
@@ -156,7 +160,21 @@ function CardShell({
           <MousePointer2 size={13} />
           <span className="truncate">{cardDisplayName(card)}</span>
         </div>
-        <Badge tone={selected ? "accent" : "line"}>{card.kind}</Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <Badge tone={selected ? "accent" : "line"}>{card.kind}</Badge>
+          <IconButton
+            size="sm"
+            aria-label={t("aiCanvas.deleteCard")}
+            className="size-6 text-g-ink-3 hover:text-g-red"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(card);
+            }}
+          >
+            <Trash2 size={13} />
+          </IconButton>
+        </div>
       </div>
       {children}
     </section>
@@ -509,6 +527,25 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     [],
   );
 
+  const deleteCard = useCallback(
+    (target: CanvasCard) => {
+      const removedIds = new Set([target.id]);
+      if (target.kind === "asset") {
+        cards.forEach((card) => {
+          if (card.kind === "comment" && card.anchorId === target.id) {
+            removedIds.add(card.id);
+          }
+        });
+      }
+
+      setCards((current) => current.filter((card) => !removedIds.has(card.id)));
+      setSelectedCardId((current) =>
+        current && removedIds.has(current) ? undefined : current,
+      );
+    },
+    [cards],
+  );
+
   function handleDragStart(
     event: ReactPointerEvent<HTMLDivElement>,
     card: CanvasCard,
@@ -796,6 +833,7 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              onDelete={deleteCard}
             >
               {card.kind === "asset" ? (
                 <AssetCardBody

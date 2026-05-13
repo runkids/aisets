@@ -102,7 +102,8 @@
     "zoomOut": "縮小",
     "resetView": "表示をリセット",
     "clear": "キャンバスをクリア",
-    "commentCard": "コメント"
+    "commentCard": "コメント",
+    "deleteCard": "カードを削除"
   },
   "favorites": {
     "add": "お気に入りに追加",

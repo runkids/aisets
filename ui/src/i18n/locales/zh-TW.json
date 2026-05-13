@@ -102,7 +102,8 @@
     "zoomOut": "縮小",
     "resetView": "重設視角",
     "clear": "清空畫布",
-    "commentCard": "註解"
+    "commentCard": "註解",
+    "deleteCard": "刪除卡片"
   },
   "favorites": {
     "add": "加入收藏",

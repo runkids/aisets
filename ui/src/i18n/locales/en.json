@@ -102,7 +102,8 @@
     "zoomOut": "Zoom out",
     "resetView": "Reset view",
     "clear": "Clear canvas",
-    "commentCard": "Comment"
+    "commentCard": "Comment",
+    "deleteCard": "Delete card"
   },
   "favorites": {
     "add": "Add to Favorites",
