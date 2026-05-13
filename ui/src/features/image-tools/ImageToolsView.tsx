@@ -1,6 +1,7 @@
 import {
   Check,
   Download,
+  Eye,
   FileArchive,
   FolderOpen,
   ImagePlus,
@@ -558,17 +559,22 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <button
                         type="button"
                         onClick={() => setDrawerAssetId(item.id)}
-                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                        className="group/q flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
                         style={{
                           animationDelay: `${Math.min(index, 8) * 40}ms`,
                         }}
                       >
-                        <AssetThumbnail
-                          src={item.thumbnailUrl || item.url}
-                          size="md"
-                          className="size-10"
-                          imageClassName="max-h-8 max-w-8"
-                        />
+                        <div className="relative size-10 shrink-0">
+                          <AssetThumbnail
+                            src={item.thumbnailUrl || item.url}
+                            size="md"
+                            className="size-10"
+                            imageClassName="max-h-8 max-w-8"
+                          />
+                          <div className="absolute inset-0 grid place-items-center rounded-g-md bg-black/50 opacity-0 transition-opacity group-hover/q:opacity-100">
+                            <Eye size={14} className="text-white" />
+                          </div>
+                        </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
                             {fileName(item.repoPath)}

@@ -214,6 +214,35 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
+	sourcePath := item.LocalPath
+	sourceBytes := item.Bytes
+	sourceMeta := item.Image
+	sourceDisplay := item.RepoPath
+	ext := strings.ToLower(item.Ext)
+	if ext == ".heic" || ext == ".heif" {
+		pngData, convErr := imageproc.HeicToPNG(item.LocalPath)
+		if convErr != nil {
+			writeError(w, http.StatusBadRequest, apierr.New("heic_convert_failed", "cannot convert HEIC for preview"))
+			return
+		}
+		tmp, tmpErr := os.CreateTemp("", "aisets-heic-preview-*.png")
+		if tmpErr != nil {
+			writeError(w, http.StatusInternalServerError, tmpErr)
+			return
+		}
+		if _, writeErr := tmp.Write(pngData); writeErr != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+			writeError(w, http.StatusInternalServerError, writeErr)
+			return
+		}
+		tmp.Close()
+		defer os.Remove(tmp.Name())
+		sourcePath = tmp.Name()
+		sourceBytes = int64(len(pngData))
+		sourceMeta.Format = "png"
+		sourceDisplay = strings.TrimSuffix(item.RepoPath, item.Ext) + ".png"
+	}
 	settings, _ := s.store.Settings()
 	req := optimize.Request{
 		OutputFormat:   body.OutputFormat,
@@ -222,7 +251,7 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		AvifSpeed:      settings.OptimizationAvifSpeed,
 		AllowLarger:    true,
 	}
-	op, candidate, err := optimize.ProcessLocalFile(item.LocalPath, item.RepoPath, item.Bytes, item.Image, req)
+	op, candidate, err := optimize.ProcessLocalFile(sourcePath, sourceDisplay, sourceBytes, sourceMeta, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -236,11 +265,17 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		DeleteAfterServe: true,
 		CreatedAt:        time.Now(),
 	})
+	inputBytes := op.CurrentBytes
+	inputFormat := op.InputFormat
+	if ext == ".heic" || ext == ".heif" {
+		inputBytes = item.Bytes
+		inputFormat = "heic"
+	}
 	writeJSON(w, http.StatusOK, imageToolRenderPreviewResponse{
 		Token:        token,
-		InputBytes:   op.CurrentBytes,
+		InputBytes:   inputBytes,
 		OutputBytes:  op.EstimatedBytes,
-		InputFormat:  op.InputFormat,
+		InputFormat:  inputFormat,
 		OutputFormat: op.OutputFormat,
 	})
 }

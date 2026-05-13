@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { Check, GripVertical, LoaderCircle, MapPin, Shield, X } from "lucide-react";
+import {
+  Check,
+  GripVertical,
+  LoaderCircle,
+  MapPin,
+  Shield,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   getImageToolMetadata,
@@ -14,11 +21,7 @@ import {
 import { basePath } from "@/api/client";
 import type { AssetItem } from "@/types";
 import { formatBytes } from "@/ui";
-import {
-  Badge,
-  Button,
-  IconButton,
-} from "@/components/ui";
+import { Badge, Button, IconButton } from "@/components/ui";
 import {
   DialogDrawerSurface,
   DialogOverlay,
@@ -58,8 +61,8 @@ export function ImageToolsPreviewDrawer({
   const [closing, setClosing] = useState(false);
   const [sliderPos, setSliderPos] = useState(50);
   const [activeFormat, setActiveFormat] = useState(settings.outputFormat);
-  const [formatPreviews, setFormatPreviews] = useState<FormatPreview[]>(
-    () => asset ? FORMAT_CARDS.map((f) => ({ ...f, loading: true })) : [],
+  const [formatPreviews, setFormatPreviews] = useState<FormatPreview[]>(() =>
+    asset ? FORMAT_CARDS.map((f) => ({ ...f, loading: true })) : [],
   );
   const [metadata, setMetadata] = useState<ImageToolMetadata | null>(null);
   const [metadataLoading, setMetadataLoading] = useState(!!asset);
@@ -130,7 +133,9 @@ export function ImageToolsPreviewDrawer({
       .then((data) => !cancelled && setMetadata(data))
       .catch(() => !cancelled && setMetadata(null))
       .finally(() => !cancelled && setMetadataLoading(false));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [assetId]);
 
   // Active format preview data (for Before/After slider)
@@ -231,7 +236,7 @@ export function ImageToolsPreviewDrawer({
         </DialogPrimitive.Overlay>
         <DialogPrimitive.Content asChild>
           <DialogDrawerSurface
-            className="!w-[520px]"
+            className="!w-[720px]"
             style={{
               transition: "transform 200ms var(--g-ease)",
               ...(closing ? { transform: "translateX(100%)" } : {}),
@@ -246,9 +251,7 @@ export function ImageToolsPreviewDrawer({
                   </h2>
                 </DialogPrimitive.Title>
                 <div className="mt-0.5 flex items-center gap-1.5 text-g-chip text-g-ink-4">
-                  <Badge tone="default">
-                    {ext}
-                  </Badge>
+                  <Badge tone="default">{ext}</Badge>
                   <span>{formatBytes(bytes)}</span>
                   {dimensions && <span>· {dimensions}</span>}
                 </div>
@@ -360,7 +363,9 @@ export function ImageToolsPreviewDrawer({
                             ? "border-g-accent bg-g-accent/5"
                             : "border-g-line bg-g-surface hover:border-g-line-strong",
                         )}
-                        onClick={() => !fp.loading && handleFormatClick(fp.format)}
+                        onClick={() =>
+                          !fp.loading && handleFormatClick(fp.format)
+                        }
                         disabled={fp.loading}
                       >
                         <div className="flex w-full items-center justify-between">
@@ -463,9 +468,7 @@ function SavingsBadge({
   const { t } = useTranslation();
   const diff = inputBytes - outputBytes;
   const pct =
-    inputBytes > 0
-      ? Math.round((Math.abs(diff) / inputBytes) * 100)
-      : 0;
+    inputBytes > 0 ? Math.round((Math.abs(diff) / inputBytes) * 100) : 0;
   if (diff > 0) {
     return (
       <span
