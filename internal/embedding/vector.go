@@ -22,6 +22,33 @@ func DeserializeVector(b []byte) []float32 {
 	return v
 }
 
+func NormalizeVector(v []float32) []float32 {
+	out := append([]float32(nil), v...)
+	var norm float64
+	for _, f := range out {
+		norm += float64(f) * float64(f)
+	}
+	if norm == 0 {
+		return out
+	}
+	scale := 1 / math.Sqrt(norm)
+	for i := range out {
+		out[i] = float32(float64(out[i]) * scale)
+	}
+	return out
+}
+
+func DotProduct(a, b []float32) float32 {
+	if len(a) != len(b) || len(a) == 0 {
+		return 0
+	}
+	var dot float64
+	for i := range a {
+		dot += float64(a[i]) * float64(b[i])
+	}
+	return float32(dot)
+}
+
 func CosineSimilarity(a, b []float32) float32 {
 	if len(a) != len(b) || len(a) == 0 {
 		return 0

@@ -26,6 +26,7 @@ import { errorMessage } from "@/i18n";
 import type { SettingsInfo } from "@/types";
 import { AiChipIcon } from "@/components/ui/AiChipIcon";
 import { VLMBackendSelect } from "./VLMBackendSelect";
+import { EmbeddingCalibrationPanel } from "./EmbeddingCalibrationPanel";
 import {
   Badge,
   Button,
@@ -706,6 +707,66 @@ export function AISettingsCard({
             </FieldRow>
 
             <FieldRow
+              label={t("settings.embedImageSearchThreshold")}
+              description={t("settings.embedImageSearchThresholdHint")}
+            >
+              <TextInput
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={String(draft.embedImageSearchThreshold ?? 0.24)}
+                onChange={(e) =>
+                  onUpdateDraft((current) => ({
+                    ...current,
+                    embedImageSearchThreshold: Math.max(
+                      0,
+                      Math.min(1, Number(e.target.value) || 0.24),
+                    ),
+                  }))
+                }
+                aria-label={t("settings.embedImageSearchThreshold")}
+                className="min-w-[400px]"
+              />
+            </FieldRow>
+
+            <FieldRow
+              label={t("settings.embedImageDynamic")}
+              description={t("settings.embedImageDynamicHint")}
+            >
+              <div className="flex min-w-[400px] items-center gap-3">
+                <Switch
+                  checked={draft.embedImageDynamicEnabled}
+                  onCheckedChange={(checked) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      embedImageDynamicEnabled: checked,
+                    }))
+                  }
+                  aria-label={t("settings.embedImageDynamic")}
+                />
+                <TextInput
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={String(draft.embedImageDynamicMargin ?? 0.05)}
+                  onChange={(e) =>
+                    onUpdateDraft((current) => ({
+                      ...current,
+                      embedImageDynamicMargin: Math.max(
+                        0,
+                        Math.min(1, Number(e.target.value) || 0.05),
+                      ),
+                    }))
+                  }
+                  aria-label={t("settings.embedImageDynamicMargin")}
+                  className="w-[120px]"
+                />
+              </div>
+            </FieldRow>
+
+            <FieldRow
               label={t("settings.embedSearchLimit")}
               description={t("settings.embedSearchLimitHint")}
             >
@@ -786,6 +847,17 @@ export function AISettingsCard({
                   );
                 })}
               </div>
+            </FieldRow>
+
+            <FieldRow
+              label={t("settings.embedCalibration")}
+              description={t("settings.embedCalibrationHint")}
+            >
+              <EmbeddingCalibrationPanel
+                draft={draft}
+                settings={settings}
+                onUpdateDraft={onUpdateDraft}
+              />
             </FieldRow>
           </>
         )}

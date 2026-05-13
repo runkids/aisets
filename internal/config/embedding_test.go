@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"path/filepath"
 	"testing"
 
@@ -51,7 +52,7 @@ func TestEmbeddingUpsertAndQuery(t *testing.T) {
 	if got.AssetID != "asset1" || got.ProjectID != "proj1" || got.Status != "ready" {
 		t.Fatalf("unexpected: %+v", got.EmbeddingResult)
 	}
-	if len(got.Vector) != 4 || got.Vector[0] != 0.1 || got.Vector[3] != 0.4 {
+	if len(got.Vector) != 4 || math.Abs(float64(got.Vector[0]-0.18257418)) > 1e-6 || math.Abs(float64(got.Vector[3]-0.73029673)) > 1e-6 {
 		t.Fatalf("unexpected vector: %v", got.Vector)
 	}
 }
@@ -270,7 +271,7 @@ func TestEmbeddingForAsset(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected result")
 	}
-	if got.Dimensions != 3 || got.Vector[0] != 0.5 {
+	if got.Dimensions != 3 || math.Abs(float64(got.Vector[0]-0.4767313)) > 1e-6 {
 		t.Fatalf("unexpected: dims=%d vec=%v", got.Dimensions, got.Vector)
 	}
 
@@ -280,6 +281,58 @@ func TestEmbeddingForAsset(t *testing.T) {
 	}
 	if miss != nil {
 		t.Fatal("expected nil for nonexistent asset")
+	}
+}
+
+func TestEmbeddingCalibrationLabels(t *testing.T) {
+	store := openEmbedTestStore(t)
+
+	first, err := store.UpsertEmbeddingCalibrationLabel(EmbeddingCalibrationLabel{
+		Query:      "red icon",
+		SearchType: "image",
+		AssetID:    "asset-1",
+		ProjectID:  "project-1",
+		RepoPath:   "assets/red.png",
+		Label:      "match",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == 0 || first.Label != "match" {
+		t.Fatalf("unexpected label: %+v", first)
+	}
+
+	updated, err := store.UpsertEmbeddingCalibrationLabel(EmbeddingCalibrationLabel{
+		Query:      "red icon",
+		SearchType: "image",
+		AssetID:    "asset-1",
+		ProjectID:  "project-1",
+		RepoPath:   "assets/red.png",
+		Label:      "reject",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != first.ID || updated.Label != "reject" {
+		t.Fatalf("unexpected updated label: %+v", updated)
+	}
+
+	labels, err := store.EmbeddingCalibrationLabelsFor("red icon", "image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(labels) != 1 || labels[0].Label != "reject" {
+		t.Fatalf("labels = %+v", labels)
+	}
+	if err := store.DeleteEmbeddingCalibrationLabel(updated.ID); err != nil {
+		t.Fatal(err)
+	}
+	labels, err = store.EmbeddingCalibrationLabels()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(labels) != 0 {
+		t.Fatalf("expected no labels, got %+v", labels)
 	}
 }
 

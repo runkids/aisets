@@ -76,7 +76,7 @@ func (s *Store) UpsertEmbedding(r EmbeddingResult, vector []float32) error {
 	}
 
 	if r.Status == "ready" && vector != nil {
-		blob := embedding.SerializeVector(vector)
+		blob := embedding.SerializeVector(embedding.NormalizeVector(vector))
 		_, err = tx.Exec(`
 			INSERT INTO embedding_vectors (embedding_id, vector)
 			VALUES (?, ?)
@@ -180,7 +180,7 @@ func (s *Store) ReadyEmbeddings(q EmbeddingQuery) ([]EmbeddingWithVector, error)
 			return nil, err
 		}
 		r.Status = "ready"
-		r.Vector = embedding.DeserializeVector(blob)
+		r.Vector = embedding.NormalizeVector(embedding.DeserializeVector(blob))
 		results = append(results, r)
 	}
 	return results, rows.Err()
@@ -234,7 +234,7 @@ func (s *Store) EmbeddingForAssetScopedInProjects(assetID, embedType, providerNa
 	if err != nil {
 		return nil, err
 	}
-	r.Vector = embedding.DeserializeVector(blob)
+	r.Vector = embedding.NormalizeVector(embedding.DeserializeVector(blob))
 	return &r, nil
 }
 

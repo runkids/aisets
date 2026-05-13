@@ -1,6 +1,8 @@
 import type {
   AITagRunEvent,
   APIErrorBody,
+  EmbeddingCalibrationAnalysis,
+  EmbeddingCalibrationLabel,
   EmbedRepairResponse,
   EmbedRunEvent,
   EmbedStats,
@@ -370,6 +372,10 @@ export function semanticSearch(options: {
   type?: "text" | "image" | "hybrid";
   limit?: number;
   threshold?: number;
+  textThreshold?: number;
+  imageThreshold?: number;
+  imageDynamicEnabled?: boolean;
+  imageDynamicMargin?: number;
   includeItems?: boolean;
   filters?: Partial<CatalogItemsParams>;
 }) {
@@ -377,6 +383,14 @@ export function semanticSearch(options: {
   if (options.type) qp.set("type", options.type);
   if (options.limit) qp.set("limit", String(options.limit));
   if (options.threshold != null) qp.set("threshold", String(options.threshold));
+  if (options.textThreshold != null)
+    qp.set("textThreshold", String(options.textThreshold));
+  if (options.imageThreshold != null)
+    qp.set("imageThreshold", String(options.imageThreshold));
+  if (options.imageDynamicEnabled != null)
+    qp.set("imageDynamicEnabled", String(options.imageDynamicEnabled));
+  if (options.imageDynamicMargin != null)
+    qp.set("imageDynamicMargin", String(options.imageDynamicMargin));
   if (options.includeItems) qp.set("includeItems", "true");
   const filters = options.filters;
   if (filters) {
@@ -415,6 +429,44 @@ export function findSimilar(
 
 export function embeddingStats() {
   return request<EmbedStats>("/api/ai/embed/stats");
+}
+
+export function embeddingCalibrationLabels(options?: {
+  q?: string;
+  type?: "text" | "image" | "hybrid";
+}) {
+  const qp = new URLSearchParams();
+  if (options?.q) qp.set("q", options.q);
+  if (options?.type) qp.set("type", options.type);
+  const params = qp.toString() ? `?${qp}` : "";
+  return request<{ labels: EmbeddingCalibrationLabel[] }>(
+    `/api/ai/embed/calibration/labels${params}`,
+  );
+}
+
+export function saveEmbeddingCalibrationLabel(
+  label: Omit<EmbeddingCalibrationLabel, "id" | "createdAt" | "updatedAt">,
+) {
+  return request<{ label: EmbeddingCalibrationLabel }>(
+    "/api/ai/embed/calibration/labels",
+    {
+      method: "POST",
+      body: JSON.stringify(label),
+    },
+  );
+}
+
+export function deleteEmbeddingCalibrationLabel(id: number) {
+  return request<{ ok: boolean }>(`/api/ai/embed/calibration/labels/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function analyzeEmbeddingCalibration() {
+  return request<EmbeddingCalibrationAnalysis>(
+    "/api/ai/embed/calibration/analyze",
+    { method: "POST" },
+  );
 }
 
 export function installOCR(languages: string[]) {

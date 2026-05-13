@@ -86,6 +86,10 @@ function useSemanticSearchQuery(
   options: {
     limit?: number;
     threshold?: number;
+    textThreshold?: number;
+    imageThreshold?: number;
+    imageDynamicEnabled?: boolean;
+    imageDynamicMargin?: number;
     type?: "text" | "image" | "hybrid";
   },
 ) {
@@ -97,6 +101,10 @@ function useSemanticSearchQuery(
         q,
         limit: options.limit,
         threshold: options.threshold,
+        textThreshold: options.textThreshold,
+        imageThreshold: options.imageThreshold,
+        imageDynamicEnabled: options.imageDynamicEnabled,
+        imageDynamicMargin: options.imageDynamicMargin,
         type: options.type,
       }),
     enabled: enabled && q !== "",
@@ -900,7 +908,10 @@ export function CommandPalette({
     open && semanticActive && committedQuery !== "",
     {
       limit: settings?.embedSearchLimit || 20,
-      threshold: settings?.embedSearchThreshold,
+      textThreshold: settings?.embedSearchThreshold,
+      imageThreshold: settings?.embedImageSearchThreshold,
+      imageDynamicEnabled: settings?.embedImageDynamicEnabled,
+      imageDynamicMargin: settings?.embedImageDynamicMargin,
       type: semanticSearchType,
     },
   );

@@ -32,20 +32,33 @@ type Result struct {
 }
 
 type Response struct {
-	Results         []Result `json:"results"`
-	QueryDurationMs int64    `json:"queryDurationMs"`
-	TotalEmbeddings int      `json:"totalEmbeddings"`
-	Query           string   `json:"query"`
-	TranslatedQuery string   `json:"translatedQuery,omitempty"`
+	Results         []Result          `json:"results"`
+	QueryDurationMs int64             `json:"queryDurationMs"`
+	TotalEmbeddings int               `json:"totalEmbeddings"`
+	Query           string            `json:"query"`
+	TranslatedQuery string            `json:"translatedQuery,omitempty"`
+	Thresholds      AppliedThresholds `json:"thresholds"`
+}
+
+type AppliedThresholds struct {
+	Text                float32 `json:"text"`
+	Image               float32 `json:"image"`
+	ImageDynamicEnabled bool    `json:"imageDynamicEnabled"`
+	ImageDynamicMargin  float32 `json:"imageDynamicMargin"`
 }
 
 type Query struct {
-	Text       string
-	Type       string
-	Limit      int
-	Threshold  float32
-	Filter     config.CatalogItemQuery
-	ProjectIDs []string
+	Text                   string
+	Type                   string
+	Limit                  int
+	Threshold              float32
+	TextThreshold          float32
+	ImageThreshold         float32
+	ImageDynamicEnabled    *bool
+	ImageDynamicMargin     float32
+	DisableDynamicImageCut bool
+	Filter                 config.CatalogItemQuery
+	ProjectIDs             []string
 }
 
 type assetScore struct {
@@ -54,6 +67,11 @@ type assetScore struct {
 	contentHash string
 	similarity  float32
 	embedType   string
+}
+
+type candidateScore struct {
+	assetID string
+	assetScore
 }
 
 func Search(ctx context.Context, store *config.Store, provider llm.Provider, settings config.AppSettings, query Query) (Response, error) {
@@ -87,13 +105,7 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 		limit = 100
 	}
 
-	threshold := query.Threshold
-	if threshold == 0 {
-		threshold = float32(settings.EmbedSearchThreshold)
-	}
-	if threshold == 0 {
-		threshold = 0.4
-	}
+	thresholds := resolveThresholds(settings, query)
 
 	start := time.Now()
 	searchText := text
@@ -129,6 +141,7 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 				QueryDurationMs: time.Since(start).Milliseconds(),
 				Query:           text,
 				TranslatedQuery: translatedQuery(text, searchText),
+				Thresholds:      thresholds,
 			}, nil
 		}
 	}
@@ -140,6 +153,7 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 
 	bestPerAsset := map[string]*assetScore{}
 	totalEmbeddings := 0
+	queryVector := embedding.NormalizeVector(resp.Embedding)
 	for _, currentType := range typesToQuery {
 		embs, err := store.ReadyEmbeddings(config.EmbeddingQuery{
 			EmbedType:    currentType,
@@ -152,35 +166,47 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 			return Response{}, apierr.From(err, "embed_load_failed")
 		}
 		totalEmbeddings += len(embs)
+		candidates := make([]candidateScore, 0, len(embs))
 		for _, emb := range embs {
 			if allowed != nil {
 				if _, ok := allowed[emb.AssetID]; !ok {
 					continue
 				}
 			}
-			similarity := embedding.CosineSimilarity(resp.Embedding, emb.Vector)
-			if prev, ok := bestPerAsset[emb.AssetID]; ok {
-				if similarity > prev.similarity {
-					prev.similarity = similarity
+			similarity := embedding.DotProduct(queryVector, emb.Vector)
+			candidates = append(candidates, candidateScore{
+				assetID: emb.AssetID,
+				assetScore: assetScore{
+					projectID:   emb.ProjectID,
+					repoPath:    emb.RepoPath,
+					contentHash: emb.ContentHash,
+					similarity:  similarity,
+					embedType:   currentType,
+				},
+			})
+		}
+		floor := thresholdForType(thresholds, currentType)
+		if currentType == "image" && thresholds.ImageDynamicEnabled && !query.DisableDynamicImageCut {
+			floor = dynamicImageFloor(candidates, floor, thresholds.ImageDynamicMargin)
+		}
+		for _, candidate := range candidates {
+			if candidate.similarity < floor {
+				continue
+			}
+			if prev, ok := bestPerAsset[candidate.assetID]; ok {
+				if candidate.similarity > prev.similarity {
+					prev.similarity = candidate.similarity
 					prev.embedType = currentType
 				}
 				continue
 			}
-			bestPerAsset[emb.AssetID] = &assetScore{
-				projectID:   emb.ProjectID,
-				repoPath:    emb.RepoPath,
-				contentHash: emb.ContentHash,
-				similarity:  similarity,
-				embedType:   currentType,
-			}
+			score := candidate.assetScore
+			bestPerAsset[candidate.assetID] = &score
 		}
 	}
 
 	results := make([]Result, 0, len(bestPerAsset))
 	for assetID, score := range bestPerAsset {
-		if score.similarity < threshold {
-			continue
-		}
 		results = append(results, Result{
 			AssetID:      assetID,
 			ProjectID:    score.projectID,
@@ -206,7 +232,78 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 		TotalEmbeddings: totalEmbeddings,
 		Query:           text,
 		TranslatedQuery: translatedQuery(text, searchText),
+		Thresholds:      thresholds,
 	}, nil
+}
+
+func resolveThresholds(settings config.AppSettings, query Query) AppliedThresholds {
+	text := float32(settings.EmbedSearchThreshold)
+	if text == 0 {
+		text = config.DefaultEmbedSearchThreshold
+	}
+	image := float32(settings.EmbedImageSearchThreshold)
+	if image == 0 {
+		image = config.DefaultEmbedImageSearchThreshold
+	}
+	if query.Threshold != 0 {
+		text = query.Threshold
+		image = query.Threshold
+	}
+	if query.TextThreshold != 0 {
+		text = query.TextThreshold
+	}
+	if query.ImageThreshold != 0 {
+		image = query.ImageThreshold
+	}
+	margin := float32(settings.EmbedImageDynamicMargin)
+	if margin == 0 {
+		margin = config.DefaultEmbedImageDynamicMargin
+	}
+	if query.ImageDynamicMargin != 0 {
+		margin = query.ImageDynamicMargin
+	}
+	enabled := settings.EmbedImageDynamicEnabled
+	if query.ImageDynamicEnabled != nil {
+		enabled = *query.ImageDynamicEnabled
+	}
+	return AppliedThresholds{
+		Text:                text,
+		Image:               image,
+		ImageDynamicEnabled: enabled,
+		ImageDynamicMargin:  margin,
+	}
+}
+
+func thresholdForType(thresholds AppliedThresholds, embedType string) float32 {
+	if embedType == "image" {
+		return thresholds.Image
+	}
+	return thresholds.Text
+}
+
+func dynamicImageFloor(candidates []candidateScore, floor, margin float32) float32 {
+	if margin <= 0 {
+		return floor
+	}
+	var top float32
+	found := false
+	for _, candidate := range candidates {
+		if candidate.similarity < floor {
+			continue
+		}
+		if !found || candidate.similarity > top {
+			top = candidate.similarity
+			found = true
+		}
+	}
+	if !found {
+		return floor
+	}
+	dynamic := top - margin
+	if dynamic > floor {
+		return dynamic
+	}
+	return floor
 }
 
 func containsNonLatin(s string) bool {

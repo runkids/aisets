@@ -79,3 +79,24 @@ func TestCosineSimilarityEmpty(t *testing.T) {
 		t.Errorf("empty: expected 0, got %f", sim)
 	}
 }
+
+func TestNormalizeVector(t *testing.T) {
+	v := []float32{3, 4}
+	normalized := NormalizeVector(v)
+	if v[0] != 3 || v[1] != 4 {
+		t.Fatal("NormalizeVector should not mutate input")
+	}
+	if math.Abs(float64(normalized[0]-0.6)) > 1e-6 || math.Abs(float64(normalized[1]-0.8)) > 1e-6 {
+		t.Fatalf("normalized vector = %#v", normalized)
+	}
+}
+
+func TestDotProductMatchesCosineForNormalizedVectors(t *testing.T) {
+	a := []float32{1, 2, 3}
+	b := []float32{3, 2, 1}
+	got := DotProduct(NormalizeVector(a), NormalizeVector(b))
+	want := CosineSimilarity(a, b)
+	if math.Abs(float64(got-want)) > 1e-6 {
+		t.Fatalf("dot(normalized) = %f, want cosine %f", got, want)
+	}
+}

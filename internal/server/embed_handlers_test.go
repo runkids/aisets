@@ -186,3 +186,71 @@ func TestEmbedStatsScopesCurrentModel(t *testing.T) {
 		t.Fatalf("unexpected scoped stats: %+v", body)
 	}
 }
+
+func TestEmbedCalibrationAnalyze(t *testing.T) {
+	store := openEmbedServerTestStore(t)
+	enabled := true
+	provider := "ollama"
+	model := "current"
+	if _, err := store.UpdateSettings(config.SettingsUpdate{
+		LLMEnabled:    &enabled,
+		LLMProvider:   &provider,
+		LLMEmbedModel: &model,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	projectRoot := resolvedTempDir(t)
+	if err := store.AddProjects([]string{projectRoot}); err != nil {
+		t.Fatal(err)
+	}
+	projectID := store.Projects()[0].ID
+	if err := store.UpsertEmbedding(config.EmbeddingResult{
+		AssetID:       "current-image",
+		ProjectID:     projectID,
+		RepoPath:      "image.png",
+		ContentHash:   "h1",
+		HashAlgorithm: "xxh3",
+		EmbedType:     "image",
+		ProviderName:  "ollama",
+		ModelName:     "current",
+		Dimensions:    2,
+		Status:        "ready",
+	}, []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpsertEmbeddingCalibrationLabel(config.EmbeddingCalibrationLabel{
+		Query:      "red image",
+		SearchType: "image",
+		AssetID:    "current-image",
+		ProjectID:  projectID,
+		RepoPath:   "image.png",
+		Label:      "match",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.llmProvider = fakeEmbedProvider{}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/embed/calibration/analyze", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Labels              int `json:"labels"`
+		Scored              int `json:"scored"`
+		ImageRecommendation struct {
+			Threshold float32 `json:"threshold"`
+		} `json:"imageRecommendation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Labels != 1 || body.Scored != 1 || body.ImageRecommendation.Threshold == 0 {
+		t.Fatalf("unexpected analysis: %+v body=%s", body, rec.Body.String())
+	}
+}

@@ -154,6 +154,45 @@ export type SemanticSearchResponse = {
   totalEmbeddings: number;
   query?: string;
   translatedQuery?: string;
+  thresholds?: {
+    text: number;
+    image: number;
+    imageDynamicEnabled: boolean;
+    imageDynamicMargin: number;
+  };
+};
+
+export type EmbeddingCalibrationLabel = {
+  id: number;
+  query: string;
+  searchType: "text" | "image" | "hybrid";
+  assetId: string;
+  projectId: string;
+  repoPath: string;
+  contentHash: string;
+  label: "match" | "reject";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmbeddingCalibrationMetric = {
+  threshold: number;
+  margin?: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  tp: number;
+  fp: number;
+  fn: number;
+  tn: number;
+};
+
+export type EmbeddingCalibrationAnalysis = {
+  labels: number;
+  scored: number;
+  skipped: number;
+  textRecommendation: EmbeddingCalibrationMetric;
+  imageRecommendation: EmbeddingCalibrationMetric;
 };
 
 export type EmbedStats = {

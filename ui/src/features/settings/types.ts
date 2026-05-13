@@ -126,6 +126,9 @@ export type SettingsDraft = {
   customAssetFilters: CustomAssetFilter[];
   lintRules: LintRuleSettings;
   embedSearchThreshold: number;
+  embedImageSearchThreshold: number;
+  embedImageDynamicEnabled: boolean;
+  embedImageDynamicMargin: number;
   embedSearchLimit: number;
   embedSearchType: string;
   embedInputFields: string[];

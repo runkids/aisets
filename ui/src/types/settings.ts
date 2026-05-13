@@ -55,6 +55,9 @@ export type AppSettings = {
   vlmBackendCanvas: string;
   aiNickname: string;
   embedSearchThreshold: number;
+  embedImageSearchThreshold: number;
+  embedImageDynamicEnabled: boolean;
+  embedImageDynamicMargin: number;
   embedSearchLimit: number;
   embedSearchType: string;
   embedInputFields: string[];

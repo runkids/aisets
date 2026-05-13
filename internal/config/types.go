@@ -77,6 +77,9 @@ type AppSettings struct {
 	VLMBackendCanvas           string                               `json:"vlmBackendCanvas"`
 	AINickname                 string                               `json:"aiNickname"`
 	EmbedSearchThreshold       float64                              `json:"embedSearchThreshold"`
+	EmbedImageSearchThreshold  float64                              `json:"embedImageSearchThreshold"`
+	EmbedImageDynamicEnabled   bool                                 `json:"embedImageDynamicEnabled"`
+	EmbedImageDynamicMargin    float64                              `json:"embedImageDynamicMargin"`
 	EmbedSearchLimit           int                                  `json:"embedSearchLimit"`
 	EmbedSearchType            string                               `json:"embedSearchType"`
 	EmbedInputFields           []string                             `json:"embedInputFields"`
@@ -135,6 +138,9 @@ type SettingsUpdate struct {
 	VLMBackendCanvas           *string                              `json:"vlmBackendCanvas"`
 	AINickname                 *string                              `json:"aiNickname"`
 	EmbedSearchThreshold       *float64                             `json:"embedSearchThreshold"`
+	EmbedImageSearchThreshold  *float64                             `json:"embedImageSearchThreshold"`
+	EmbedImageDynamicEnabled   *bool                                `json:"embedImageDynamicEnabled"`
+	EmbedImageDynamicMargin    *float64                             `json:"embedImageDynamicMargin"`
 	EmbedSearchLimit           *int                                 `json:"embedSearchLimit"`
 	EmbedSearchType            *string                              `json:"embedSearchType"`
 	EmbedInputFields           []string                             `json:"embedInputFields"`

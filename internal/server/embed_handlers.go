@@ -654,12 +654,26 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 && n <= 100 {
 		limit = n
 	}
-	threshold := float32(settings.EmbedSearchThreshold)
-	if threshold == 0 {
-		threshold = 0.4
-	}
+	threshold := float32(0)
 	if f, err := strconv.ParseFloat(r.URL.Query().Get("threshold"), 32); err == nil {
 		threshold = float32(f)
+	}
+	textThreshold := float32(0)
+	if f, err := strconv.ParseFloat(r.URL.Query().Get("textThreshold"), 32); err == nil {
+		textThreshold = float32(f)
+	}
+	imageThreshold := float32(0)
+	if f, err := strconv.ParseFloat(r.URL.Query().Get("imageThreshold"), 32); err == nil {
+		imageThreshold = float32(f)
+	}
+	imageDynamicMargin := float32(0)
+	if f, err := strconv.ParseFloat(r.URL.Query().Get("imageDynamicMargin"), 32); err == nil {
+		imageDynamicMargin = float32(f)
+	}
+	var imageDynamicEnabled *bool
+	if raw := r.URL.Query().Get("imageDynamicEnabled"); raw != "" {
+		enabled := raw == "true" || raw == "1"
+		imageDynamicEnabled = &enabled
 	}
 	filter, statusCode, err := s.semanticCatalogFilter(r, settings)
 	if err != nil {
@@ -667,12 +681,16 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response, err := semantic.Search(r.Context(), s.store, s.llmProvider, settings, semantic.Query{
-		Text:       q,
-		Type:       embedType,
-		Limit:      limit,
-		Threshold:  threshold,
-		Filter:     filter,
-		ProjectIDs: s.store.ActiveProjectIDs(),
+		Text:                q,
+		Type:                embedType,
+		Limit:               limit,
+		Threshold:           threshold,
+		TextThreshold:       textThreshold,
+		ImageThreshold:      imageThreshold,
+		ImageDynamicEnabled: imageDynamicEnabled,
+		ImageDynamicMargin:  imageDynamicMargin,
+		Filter:              filter,
+		ProjectIDs:          s.store.ActiveProjectIDs(),
 	})
 	if err != nil {
 		writeError(w, semanticSearchErrorStatus(err), err)
@@ -823,11 +841,12 @@ func (s *Server) handleEmbedSimilar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var matches []scoredResult
+	sourceVector := embedding.NormalizeVector(source.Vector)
 	for _, emb := range allEmbeddings {
 		if emb.AssetID == assetID {
 			continue
 		}
-		sim := embedding.CosineSimilarity(source.Vector, emb.Vector)
+		sim := embedding.DotProduct(sourceVector, emb.Vector)
 		if sim > 0 {
 			matches = append(matches, scoredResult{
 				AssetID:      emb.AssetID,

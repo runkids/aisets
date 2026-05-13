@@ -27,6 +27,12 @@ var validAgentAdapters = map[string]bool{
 	agent.AdapterLocalLLM: true,
 }
 
+const (
+	DefaultEmbedSearchThreshold      = 0.4
+	DefaultEmbedImageSearchThreshold = 0.24
+	DefaultEmbedImageDynamicMargin   = 0.05
+)
+
 func validVLMBackend(v string) bool {
 	if v == "" || v == "local-llm" {
 		return true
@@ -239,7 +245,10 @@ func DefaultAppSettings() AppSettings {
 		LLMTranslationLocales:      nil,
 		AgentAdapter:               "auto",
 		AgentModel:                 "",
-		EmbedSearchThreshold:       0.4,
+		EmbedSearchThreshold:       DefaultEmbedSearchThreshold,
+		EmbedImageSearchThreshold:  DefaultEmbedImageSearchThreshold,
+		EmbedImageDynamicEnabled:   true,
+		EmbedImageDynamicMargin:    DefaultEmbedImageDynamicMargin,
 		EmbedSearchLimit:           20,
 		EmbedSearchType:            "hybrid",
 		EmbedInputFields:           []string{"category", "tags", "description"},
@@ -357,6 +366,15 @@ func (s *Store) Settings() (AppSettings, error) {
 	}
 	settings.OptimizationExternalTools = normalizeOptimizationExternalTools(settings.OptimizationExternalTools)
 	settings.OptimizationStrategies = imageproc.NormalizeOptimizationStrategies(settings.OptimizationStrategies)
+	if settings.EmbedSearchThreshold == 0 {
+		settings.EmbedSearchThreshold = DefaultEmbedSearchThreshold
+	}
+	if settings.EmbedImageSearchThreshold == 0 {
+		settings.EmbedImageSearchThreshold = DefaultEmbedImageSearchThreshold
+	}
+	if settings.EmbedImageDynamicMargin == 0 {
+		settings.EmbedImageDynamicMargin = DefaultEmbedImageDynamicMargin
+	}
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	return settings, nil
@@ -598,6 +616,23 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 		}
 		settings.EmbedSearchThreshold = v
 	}
+	if update.EmbedImageSearchThreshold != nil {
+		v := *update.EmbedImageSearchThreshold
+		if v < 0 || v > 1 {
+			return AppSettings{}, apierr.New("settings_embed_image_threshold_invalid", "image embed search threshold must be between 0 and 1")
+		}
+		settings.EmbedImageSearchThreshold = v
+	}
+	if update.EmbedImageDynamicEnabled != nil {
+		settings.EmbedImageDynamicEnabled = *update.EmbedImageDynamicEnabled
+	}
+	if update.EmbedImageDynamicMargin != nil {
+		v := *update.EmbedImageDynamicMargin
+		if v < 0 || v > 1 {
+			return AppSettings{}, apierr.New("settings_embed_image_margin_invalid", "image embed dynamic margin must be between 0 and 1")
+		}
+		settings.EmbedImageDynamicMargin = v
+	}
 	if update.EmbedSearchLimit != nil {
 		v := *update.EmbedSearchLimit
 		if v < 1 || v > 100 {
@@ -654,6 +689,15 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	settings.OptimizationExternalTools = normalizeOptimizationExternalTools(settings.OptimizationExternalTools)
 	settings.OptimizationStrategies = imageproc.NormalizeOptimizationStrategies(settings.OptimizationStrategies)
 	settings.LintRules = lint.NormalizeSettings(settings.LintRules)
+	if settings.EmbedSearchThreshold == 0 {
+		settings.EmbedSearchThreshold = DefaultEmbedSearchThreshold
+	}
+	if settings.EmbedImageSearchThreshold == 0 {
+		settings.EmbedImageSearchThreshold = DefaultEmbedImageSearchThreshold
+	}
+	if settings.EmbedImageDynamicMargin == 0 {
+		settings.EmbedImageDynamicMargin = DefaultEmbedImageDynamicMargin
+	}
 	settings = normalizeScanSettings(settings)
 	settings = normalizeOCRSettings(settings)
 	if len(settings.OCRLanguages) == 0 {

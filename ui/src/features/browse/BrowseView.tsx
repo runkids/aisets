@@ -391,6 +391,9 @@ export function BrowseView({
       semanticSearchType,
       settingsQuery.data?.settings.embedSearchLimit ?? 20,
       settingsQuery.data?.settings.embedSearchThreshold ?? 0.4,
+      settingsQuery.data?.settings.embedImageSearchThreshold ?? 0.24,
+      settingsQuery.data?.settings.embedImageDynamicEnabled ?? true,
+      settingsQuery.data?.settings.embedImageDynamicMargin ?? 0.05,
       semanticFilterParams,
     ],
     queryFn: () =>
@@ -398,7 +401,13 @@ export function BrowseView({
         q: committedSemanticQuery,
         type: semanticSearchType,
         limit: settingsQuery.data?.settings.embedSearchLimit || 20,
-        threshold: settingsQuery.data?.settings.embedSearchThreshold || 0.4,
+        textThreshold: settingsQuery.data?.settings.embedSearchThreshold ?? 0.4,
+        imageThreshold:
+          settingsQuery.data?.settings.embedImageSearchThreshold ?? 0.24,
+        imageDynamicEnabled:
+          settingsQuery.data?.settings.embedImageDynamicEnabled ?? true,
+        imageDynamicMargin:
+          settingsQuery.data?.settings.embedImageDynamicMargin ?? 0.05,
         includeItems: true,
         filters: semanticFilterParams,
       }),

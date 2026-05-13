@@ -1504,6 +1504,21 @@ func (s *Store) migrateEmbeddingsTable() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_embeddings_type_ready
 			ON embeddings (embed_type) WHERE status = 'ready'`,
+		`CREATE TABLE IF NOT EXISTS embedding_calibration_labels (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			query          TEXT    NOT NULL,
+			search_type    TEXT    NOT NULL CHECK(search_type IN ('text', 'image', 'hybrid')),
+			asset_id       TEXT    NOT NULL,
+			project_id     TEXT    NOT NULL DEFAULT '',
+			repo_path      TEXT    NOT NULL DEFAULT '',
+			content_hash   TEXT    NOT NULL DEFAULT '',
+			label          TEXT    NOT NULL CHECK(label IN ('match', 'reject')),
+			created_at     TEXT    NOT NULL,
+			updated_at     TEXT    NOT NULL,
+			UNIQUE(query, search_type, asset_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_embedding_calibration_query
+			ON embedding_calibration_labels (query, search_type)`,
 	}
 	for _, stmt := range statements {
 		if _, err := s.db.Exec(stmt); err != nil {

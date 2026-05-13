@@ -72,6 +72,9 @@ func TestSearchRanksReadyEmbeddingsAndAppliesCatalogFilter(t *testing.T) {
 	if response.TotalEmbeddings != 2 {
 		t.Fatalf("total embeddings = %d, want 2", response.TotalEmbeddings)
 	}
+	if response.Thresholds.Text != 0.1 {
+		t.Fatalf("text threshold = %f, want 0.1", response.Thresholds.Text)
+	}
 
 	filtered, err := Search(context.Background(), store, provider, settings, Query{
 		Text:      "sports car",
@@ -84,6 +87,58 @@ func TestSearchRanksReadyEmbeddingsAndAppliesCatalogFilter(t *testing.T) {
 	}
 	if len(filtered.Results) != 1 || filtered.Results[0].AssetID != "flower" {
 		t.Fatalf("filtered response = %#v", filtered.Results)
+	}
+}
+
+func TestSearchAppliesImageThresholdAndDynamicMargin(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if _, err := store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-12T00:00:00Z",
+		Projects:    []scanner.Project{{ID: "app", Name: "App", Path: root}},
+		Items: []scanner.AssetItem{
+			assetItem(root, "top", "assets/top.png", ".png", "hash-top"),
+			assetItem(root, "near", "assets/near.png", ".png", "hash-near"),
+			assetItem(root, "tail", "assets/tail.png", ".png", "hash-tail"),
+		},
+		Stats: scanner.CatalogStats{TotalFiles: 3},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	insertEmbeddingOfType(t, store, "image", "top", "assets/top.png", "hash-top", []float32{1, 0})
+	insertEmbeddingOfType(t, store, "image", "near", "assets/near.png", "hash-near", []float32{0.97, 0.24})
+	insertEmbeddingOfType(t, store, "image", "tail", "assets/tail.png", "hash-tail", []float32{0.85, 0.52})
+
+	settings := config.AppSettings{
+		LLMEnabled:                true,
+		LLMEmbedModel:             "fake-embed",
+		EmbedSearchType:           "image",
+		EmbedSearchLimit:          10,
+		EmbedSearchThreshold:      0.9,
+		EmbedImageSearchThreshold: 0.2,
+		EmbedImageDynamicEnabled:  true,
+		EmbedImageDynamicMargin:   0.05,
+	}
+	provider := fakeProvider{embedding: []float32{1, 0}}
+
+	response, err := Search(context.Background(), store, provider, settings, Query{Text: "red logo", Type: "image"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Results) != 2 {
+		t.Fatalf("results = %#v, want top and near only", response.Results)
+	}
+	if response.Results[0].AssetID != "top" || response.Results[1].AssetID != "near" {
+		t.Fatalf("unexpected dynamic image results: %#v", response.Results)
+	}
+	if response.Thresholds.Image != 0.2 || !response.Thresholds.ImageDynamicEnabled {
+		t.Fatalf("threshold metadata = %#v", response.Thresholds)
 	}
 }
 
@@ -107,6 +162,10 @@ func assetItem(root, id, repoPath, ext, hash string) scanner.AssetItem {
 }
 
 func insertEmbedding(t *testing.T, store *config.Store, assetID, repoPath, hash string, vector []float32) {
+	insertEmbeddingOfType(t, store, "text", assetID, repoPath, hash, vector)
+}
+
+func insertEmbeddingOfType(t *testing.T, store *config.Store, embedType, assetID, repoPath, hash string, vector []float32) {
 	t.Helper()
 	if err := store.UpsertEmbedding(config.EmbeddingResult{
 		AssetID:       assetID,
@@ -114,7 +173,7 @@ func insertEmbedding(t *testing.T, store *config.Store, assetID, repoPath, hash 
 		RepoPath:      repoPath,
 		ContentHash:   hash,
 		HashAlgorithm: "xxh3",
-		EmbedType:     "text",
+		EmbedType:     embedType,
 		ProviderName:  "fake",
 		ModelName:     "fake-embed",
 		Dimensions:    len(vector),
