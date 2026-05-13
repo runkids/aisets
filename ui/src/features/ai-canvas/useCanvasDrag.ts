@@ -15,6 +15,32 @@ import {
 } from "./canvasUtils";
 import { clampCanvasScale, type CanvasCard } from "./aiCanvasState";
 
+function isScreenStableCard(card: CanvasCard) {
+  return (
+    card.kind === "comment" ||
+    card.kind === "assistant" ||
+    card.kind === "proposal" ||
+    card.kind === "operation"
+  );
+}
+
+function cardTransform(
+  card: CanvasCard,
+  x: number,
+  y: number,
+  viewportScale: number,
+) {
+  const stableScale =
+    isScreenStableCard(card) && viewportScale > 0 ? 1 / viewportScale : 1;
+  return `translate(${x}px, ${y}px) scale(${stableScale})`;
+}
+
+function dragZIndex(card: CanvasCard) {
+  if (card.kind === "comment") return "1200";
+  if (isScreenStableCard(card)) return "1000";
+  return "50";
+}
+
 export function useCanvasDrag(opts: {
   rootRef: React.RefObject<HTMLDivElement | null>;
   viewport: { x: number; y: number; scale: number };
@@ -62,6 +88,7 @@ export function useCanvasDrag(opts: {
   const dragFrameRef = useRef<number | null>(null);
   const dragRef = useRef<{
     cardId: string;
+    card: CanvasCard;
     element: HTMLElement | null;
     startClientX: number;
     startClientY: number;
@@ -73,6 +100,7 @@ export function useCanvasDrag(opts: {
     lastPreviewAt: number;
     peers: Array<{
       id: string;
+      card: CanvasCard;
       el: HTMLElement;
       startX: number;
       startY: number;
@@ -147,13 +175,21 @@ export function useCanvasDrag(opts: {
     if (!drag?.element) return;
     const dx = drag.currentX - drag.startX;
     const dy = drag.currentY - drag.startY;
-    drag.element.style.transform =
-      "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+    drag.element.style.transform = cardTransform(
+      drag.card,
+      drag.currentX,
+      drag.currentY,
+      viewport.scale,
+    );
     const peers = drag.peers;
     for (let i = 0; i < peers.length; i++) {
       const p = peers[i];
-      p.el.style.transform =
-        "translate(" + (p.startX + dx) + "px, " + (p.startY + dy) + "px)";
+      p.el.style.transform = cardTransform(
+        p.card,
+        p.startX + dx,
+        p.startY + dy,
+        viewport.scale,
+      );
     }
     if (drag.previewsConnectors) {
       const now = performance.now();
@@ -166,7 +202,7 @@ export function useCanvasDrag(opts: {
         });
       }
     }
-  }, [setDragPreview]);
+  }, [setDragPreview, viewport.scale]);
 
   const scheduleDragFrame = useCallback(() => {
     if (dragFrameRef.current !== null) return;
@@ -201,15 +237,45 @@ export function useCanvasDrag(opts: {
   }, [flushWheelFrame]);
 
   useEffect(() => {
-    return () => {
+    function cancelActiveDrag() {
+      const drag = dragRef.current;
+      if (!drag) return;
       if (dragFrameRef.current !== null) {
         window.cancelAnimationFrame(dragFrameRef.current);
+        dragFrameRef.current = null;
       }
+      if (drag.element) {
+        drag.element.style.transform = "";
+        drag.element.style.willChange = "";
+        drag.element.style.zIndex = "";
+      }
+      for (const peer of drag.peers) {
+        peer.el.style.transform = "";
+        peer.el.style.willChange = "";
+        peer.el.style.zIndex = "";
+      }
+      if (drag.previewsConnectors) setDragPreview(null);
+      dragRef.current = null;
+    }
+
+    function cancelOnVisibilityChange() {
+      if (document.visibilityState === "hidden") cancelActiveDrag();
+    }
+
+    window.addEventListener("blur", cancelActiveDrag);
+    document.addEventListener("visibilitychange", cancelOnVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", cancelActiveDrag);
+      document.removeEventListener(
+        "visibilitychange",
+        cancelOnVisibilityChange,
+      );
+      cancelActiveDrag();
       if (wheelFrameRef.current !== null) {
         window.cancelAnimationFrame(wheelFrameRef.current);
       }
     };
-  }, []);
+  }, [setDragPreview]);
 
   // --- drag handlers ---
   function handleDragStart(
@@ -222,7 +288,7 @@ export function useCanvasDrag(opts: {
     const element = cardElementsRef.current.get(card.id) ?? null;
     if (element) {
       element.style.willChange = "transform";
-      element.style.zIndex = "35";
+      element.style.zIndex = dragZIndex(card);
     }
     const previewsConnectors =
       card.kind === "comment" ||
@@ -235,6 +301,7 @@ export function useCanvasDrag(opts: {
     }
     const peers: Array<{
       id: string;
+      card: CanvasCard;
       el: HTMLElement;
       startX: number;
       startY: number;
@@ -246,9 +313,10 @@ export function useCanvasDrag(opts: {
         const peerCard = cards.find((c) => c.id === peerId);
         if (peerEl && peerCard) {
           peerEl.style.willChange = "transform";
-          peerEl.style.zIndex = "35";
+          peerEl.style.zIndex = dragZIndex(peerCard);
           peers.push({
             id: peerId,
+            card: peerCard,
             el: peerEl,
             startX: peerCard.x,
             startY: peerCard.y,
@@ -258,6 +326,7 @@ export function useCanvasDrag(opts: {
     }
     dragRef.current = {
       cardId: card.id,
+      card,
       element,
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -295,16 +364,24 @@ export function useCanvasDrag(opts: {
     const dx = drag.currentX - drag.startX;
     const dy = drag.currentY - drag.startY;
     if (drag.element) {
-      drag.element.style.transform =
-        "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+      drag.element.style.transform = cardTransform(
+        drag.card,
+        drag.currentX,
+        drag.currentY,
+        viewport.scale,
+      );
       drag.element.style.willChange = "";
       drag.element.style.zIndex = "";
     }
     const endPeers = drag.peers;
     for (let i = 0; i < endPeers.length; i++) {
       const p = endPeers[i];
-      p.el.style.transform =
-        "translate(" + (p.startX + dx) + "px, " + (p.startY + dy) + "px)";
+      p.el.style.transform = cardTransform(
+        p.card,
+        p.startX + dx,
+        p.startY + dy,
+        viewport.scale,
+      );
       p.el.style.willChange = "";
       p.el.style.zIndex = "";
     }

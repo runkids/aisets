@@ -196,6 +196,7 @@ export function AICanvasStage({
                 selected={selectedCardIds.includes(card.id)}
                 compact={compactCards && card.kind === "asset"}
                 width={cardWidths[card.id]}
+                canvasScale={viewport.scale}
                 onSelect={(id, shiftKey) => {
                   setSelectedCardIds((prev) =>
                     shiftKey
@@ -259,6 +260,7 @@ export function AICanvasStage({
                     compact={compactCards && card.kind === "asset"}
                     hideOverlays={hideCards}
                     commentEnabled={commentMode}
+                    canvasScale={viewport.scale}
                     onOpenAsset={onOpenAsset}
                     onSelectComment={(id) => setSelectedCardIds([id])}
                     onCreateComment={onAddComment}
@@ -304,6 +306,7 @@ export function AICanvasStage({
               label={aiCursor.label}
               status={aiCursor.status}
               nickname={aiNickname}
+              canvasScale={viewport.scale}
             />
           )}
         </div>

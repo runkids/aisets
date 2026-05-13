@@ -20,7 +20,7 @@ export type MentionableImageCard = {
   id: string;
   name: string;
   meta: string;
-  src: string;
+  src?: string;
 };
 
 export type StateSetter<T> = Dispatch<SetStateAction<T>>;

@@ -57,6 +57,7 @@ type AICanvasComposerProps = {
   isWorking: boolean;
   composerStatusLabel: string;
   composerStatusText: string;
+  currentTargets?: MentionableImageCard[];
   latestChatContent: string;
   chatHistory: ChatHistoryEntry[];
   composerToolsOpen: boolean;
@@ -97,6 +98,7 @@ export function AICanvasComposer({
   isWorking,
   composerStatusLabel,
   composerStatusText,
+  currentTargets = [],
   latestChatContent,
   chatHistory,
   composerToolsOpen,
@@ -132,6 +134,17 @@ export function AICanvasComposer({
   );
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
+  const currentTargetPreview = currentTargets.find((target) => target.src);
+  const currentTargetText =
+    currentTargets.length === 0
+      ? t("aiCanvas.noCurrentTarget")
+      : currentTargets.length === 1
+        ? currentTargets[0].name
+        : t("aiCanvas.currentTargetCount", { count: currentTargets.length });
+  const currentTargetTitle = currentTargets
+    .map((target) => target.name)
+    .join("\n");
+
   useEffect(() => {
     if (collapsed) return undefined;
     const el = chatScrollRef.current;
@@ -146,17 +159,14 @@ export function AICanvasComposer({
     <div
       data-ai-canvas-overlay="true"
       className="pointer-events-auto absolute inset-x-0 bottom-0 z-[60] mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
-      style={{ height: collapsed ? 92 : height }}
+      style={{ height: collapsed ? 112 : height }}
     >
       <div className="relative h-full">
-        <div
-          className={cn(
-            "absolute inset-x-7 bottom-[52px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
-            collapsed && "!h-[44px]",
-          )}
-          style={collapsed ? undefined : { height: height - 72 }}
-        >
-          {!collapsed && (
+        {!collapsed && (
+          <div
+            className="absolute inset-x-7 bottom-[52px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0"
+            style={{ height: height - 72 }}
+          >
             <div
               className="flex h-3 cursor-ns-resize items-center justify-center"
               onPointerDown={(e) => {
@@ -185,35 +195,50 @@ export function AICanvasComposer({
             >
               <div className="h-[3px] w-8 rounded-full bg-white/20" />
             </div>
-          )}
-          <button
-            type="button"
-            aria-label={t("aiCanvas.resizeComposer")}
-            className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
-            onClick={() => setCollapsed((current) => !current)}
-          >
-            {isWorking && (
-              <LoaderCircle
-                size={14}
-                className="shrink-0 animate-spin text-white/54"
-              />
-            )}
-            <span className="shrink-0 font-[590] text-white/68">
-              {composerStatusLabel}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-white/58">
-              {composerStatusText}
-            </span>
-            <ChevronDown
-              size={17}
-              className={cn(
-                "shrink-0 text-white/42 transition-transform duration-[160ms] ease-g",
-                !collapsed && "rotate-180",
+            <button
+              type="button"
+              aria-label={t("aiCanvas.resizeComposer")}
+              className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body leading-none text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+              onClick={() => setCollapsed((current) => !current)}
+            >
+              {isWorking && (
+                <LoaderCircle
+                  size={14}
+                  className="shrink-0 animate-spin text-white/54"
+                />
               )}
-              aria-hidden="true"
-            />
-          </button>
-          {!collapsed && (
+              <span className="shrink-0 font-[590] text-white/68">
+                {composerStatusLabel}
+              </span>
+              {currentTargets.length > 0 && (
+                <span
+                  className="inline-flex h-8 max-w-[280px] shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.06] px-2 text-g-caption font-[510] leading-none text-white/74"
+                  title={currentTargetTitle || undefined}
+                >
+                  {currentTargetPreview?.src && (
+                    <AssetThumbnail
+                      src={currentTargetPreview.src}
+                      size="sm"
+                      className="size-6 rounded-[8px] border-white/[0.1] bg-white/[0.06]"
+                      imageClassName="max-h-5 max-w-5"
+                      draggable={false}
+                    />
+                  )}
+                  <span className="shrink-0 text-white/42">
+                    {t("aiCanvas.currentTarget")}
+                  </span>
+                  <span className="min-w-0 truncate">{currentTargetText}</span>
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-white/58">
+                {composerStatusText}
+              </span>
+              <ChevronDown
+                size={17}
+                className="shrink-0 rotate-180 text-white/42 transition-transform duration-[160ms] ease-g"
+                aria-hidden="true"
+              />
+            </button>
             <div
               ref={chatScrollRef}
               data-ai-canvas-scroll="true"
@@ -285,8 +310,35 @@ export function AICanvasComposer({
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {collapsed && (
+          <button
+            type="button"
+            aria-label={t("aiCanvas.resizeComposer")}
+            className="absolute inset-x-7 bottom-[52px] flex h-12 items-center gap-3 rounded-t-[24px] border border-b-0 border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] px-5 text-left text-g-body leading-none text-white/62 shadow-g-pop backdrop-blur-xl transition-colors duration-[120ms] ease-g hover:bg-[rgba(38,38,38,0.84)] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus max-[760px]:inset-x-2"
+            onClick={() => setCollapsed(false)}
+          >
+            {isWorking && (
+              <LoaderCircle
+                size={14}
+                className="shrink-0 animate-spin text-white/54"
+              />
+            )}
+            <span className="shrink-0 font-[590] text-white/68">
+              {composerStatusLabel}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-white/58">
+              {composerStatusText}
+            </span>
+            <ChevronDown
+              size={17}
+              className="shrink-0 text-white/42 transition-transform duration-[160ms] ease-g"
+              aria-hidden="true"
+            />
+          </button>
+        )}
 
         <div className="absolute inset-x-0 bottom-0 rounded-[28px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-2.5 py-2 shadow-g-pop backdrop-blur-xl">
           {composerToolsOpen && (
@@ -334,7 +386,7 @@ export function AICanvasComposer({
           )}
           {(selectedProposal?.status === "pending" ||
             pendingProposals.length > 0) && (
-            <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 mb-2">
+            <div className="mb-2 flex items-center gap-2 border-b border-white/[0.06] px-3 pb-2">
               {selectedProposal?.status === "pending" ? (
                 <>
                   <Badge tone="amber">

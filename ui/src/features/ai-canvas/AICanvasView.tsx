@@ -6,10 +6,12 @@ import {
   previewImageUrl,
   semanticSearch,
 } from "@/api";
+import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
 import {
   previewImageToolAssets,
   renderImageToolPreview,
 } from "@/api/imageTools";
+import { useToast } from "@/components/shared/ToastProvider";
 import { ConfirmDialog } from "@/components/ui";
 import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
@@ -26,6 +28,7 @@ import {
 import { useCanvasCapture } from "./useCanvasCapture";
 import {
   buildAssistantBullets,
+  cardDisplayName,
   cardIdsForDeletion,
   clampCanvasScale,
   commentsForAssets,
@@ -84,7 +87,8 @@ export function AICanvasView({
   onOpenAsset,
   onExitCanvas,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
   const initialSession = useMemo<AICanvasSession>(() => {
     if (typeof window === "undefined") return emptyAICanvasSession();
     return readAICanvasSession(window.sessionStorage);
@@ -169,6 +173,7 @@ export function AICanvasView({
   const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const lastToastedErrorRef = useRef("");
   const [composerHeight, setComposerHeight] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(COMPOSER_HEIGHT_STORAGE_KEY));
@@ -188,6 +193,13 @@ export function AICanvasView({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const focusSearchAfterOpenRef = useRef(false);
   const searchOpenRef = useRef(searchOpen);
+
+  useEffect(() => {
+    if (!error || lastToastedErrorRef.current === error) return;
+    lastToastedErrorRef.current = error;
+    toast.error(error, { title: t("aiCanvas.statusError") });
+  }, [error, t, toast]);
+
   useEffect(() => {
     if (!aiEnabled) return;
     let cancelled = false;
@@ -230,6 +242,7 @@ export function AICanvasView({
     captureViewport,
     captureCanvas,
     captureSelected,
+    captureCanvasForAI,
     isCapturing,
     preview: capturePreview,
     dismissPreview: dismissCapturePreview,
@@ -264,6 +277,31 @@ export function AICanvasView({
     [registerCardElement],
   );
 
+  const cardLayoutMetrics = useMemo<CanvasCardLayoutMetrics>(() => {
+    const metrics: CanvasCardLayoutMetrics = {};
+    cards.forEach((card, layerIndex) => {
+      const size = cardElementSizes[card.id];
+      const stableScale =
+        (card.kind === "comment" ||
+          card.kind === "assistant" ||
+          card.kind === "proposal" ||
+          card.kind === "operation") &&
+        viewport.scale > 0
+          ? 1 / viewport.scale
+          : 1;
+      metrics[card.id] = {
+        width: (cardWidths[card.id] ?? size?.width ?? CARD_WIDTH) * stableScale,
+        height:
+          (size?.height ??
+            (card.kind === "asset" && compactCards
+              ? (cardWidths[card.id] ?? CARD_WIDTH) * 0.75
+              : 240)) * stableScale,
+        layerIndex,
+      };
+    });
+    return metrics;
+  }, [cardElementSizes, cardWidths, cards, compactCards, viewport.scale]);
+
   const groupBounds = useMemo(() => {
     if (selectedCardIds.length <= 1) return null;
     const selected = new Set(selectedCardIds);
@@ -274,11 +312,9 @@ export function AICanvasView({
     let found = 0;
     for (const card of cards) {
       if (!selected.has(card.id)) continue;
-      const size = cardElementSizes[card.id];
-      const width = cardWidths[card.id] ?? size?.width ?? CARD_WIDTH;
-      const height =
-        size?.height ??
-        (card.kind === "asset" && compactCards ? width * 0.75 : 240);
+      const metrics = cardLayoutMetrics[card.id];
+      const width = metrics?.width ?? CARD_WIDTH;
+      const height = metrics?.height ?? 240;
       minX = Math.min(minX, card.x);
       minY = Math.min(minY, card.y);
       maxX = Math.max(maxX, card.x + width);
@@ -287,7 +323,7 @@ export function AICanvasView({
     }
     if (found === 0) return null;
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }, [cardElementSizes, cardWidths, cards, compactCards, selectedCardIds]);
+  }, [cardLayoutMetrics, cards, selectedCardIds]);
 
   const selectedAssets = useMemo(
     () => selectedAssetCards(cards, selectedCardIds),
@@ -369,12 +405,13 @@ export function AICanvasView({
         anchorPosition.y +
         anchorImageTop +
         anchorImageHeight * (card.region.y + card.region.height / 2);
-      const commentWidth = cardWidths[card.id] ?? CARD_WIDTH;
+      const commentScale = viewport.scale > 0 ? 1 / viewport.scale : 1;
+      const commentWidth = (cardWidths[card.id] ?? CARD_WIDTH) * commentScale;
       const fromX =
         commentPosition.x < targetX
           ? commentPosition.x + commentWidth
           : commentPosition.x;
-      const fromY = commentPosition.y + 52;
+      const fromY = commentPosition.y + 52 * commentScale;
       const bend = Math.max(56, Math.abs(targetX - fromX) * 0.35);
       const c1x = fromX + (fromX < targetX ? bend : -bend);
       const c2x = targetX + (fromX < targetX ? -bend : bend);
@@ -394,7 +431,14 @@ export function AICanvasView({
         },
       ];
     });
-  }, [cardWidths, cards, compactCards, dragPreview, selectedCardIds]);
+  }, [
+    cardWidths,
+    cards,
+    compactCards,
+    dragPreview,
+    selectedCardIds,
+    viewport.scale,
+  ]);
   const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
     cards,
     t,
@@ -403,8 +447,14 @@ export function AICanvasView({
   const { handleAsk, handleStop } = useCanvasChat({
     scanId,
     cards,
-    selectedCardId: primarySelectedId,
+    selectedCardIds,
     viewport,
+    cardLayoutMetrics,
+    captureCanvasForAI,
+    captureViewport,
+    captureCanvas,
+    captureSelected,
+    locale: i18n.language,
     chatHistory,
     prompt,
     mentionedCardIds,
@@ -412,8 +462,11 @@ export function AICanvasView({
     t,
     rootRef,
     setCards,
+    setSelectedCardIds,
     setChatHistory,
     setAiCursor,
+    setDragPreview,
+    setCardWidths,
     setError,
     setWorking,
     setPrompt,
@@ -454,6 +507,34 @@ export function AICanvasView({
     const card = cards.find((c) => c.id === primarySelectedId);
     return card?.kind === "proposal" ? card : undefined;
   }, [cards, primarySelectedId]);
+  const currentTargets = useMemo(() => {
+    const selected = new Set(selectedCardIds);
+    return cards
+      .filter((card) => selected.has(card.id))
+      .map((card) => {
+        if (card.kind === "asset") {
+          return {
+            id: card.id,
+            name: fileName(card.asset.repoPath),
+            meta: imageMeta(card.asset),
+            src: card.asset.thumbnailUrl || card.asset.url,
+          };
+        }
+        if (card.kind === "variant") {
+          return {
+            id: card.id,
+            name: card.sourceName,
+            meta: `${card.inputFormat.toUpperCase()} → ${card.outputFormat.toUpperCase()}`,
+            src: card.previewUrl,
+          };
+        }
+        return {
+          id: card.id,
+          name: cardDisplayName(card),
+          meta: t(`aiCanvas.targetKind.${card.kind}`),
+        };
+      });
+  }, [cards, selectedCardIds, t]);
   const pendingProposals = useMemo(
     () =>
       cards.filter(
@@ -882,7 +963,7 @@ export function AICanvasView({
   return (
     <div
       ref={rootRef}
-      className="relative flex min-h-0 flex-1 overscroll-none overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.055)_1px,transparent_0)]"
+      className="relative flex min-h-0 flex-1 origin-center overscroll-none overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] animate-[canvasSearchIn_220ms_var(--g-ease-out)_both] motion-reduce:animate-none [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.055)_1px,transparent_0)]"
     >
       <AICanvasStage
         t={t}
@@ -985,6 +1066,7 @@ export function AICanvasView({
         isWorking={isWorking}
         composerStatusLabel={composerStatusLabel}
         composerStatusText={composerStatusText}
+        currentTargets={currentTargets}
         latestChatContent={latestChatContent}
         chatHistory={chatHistory}
         composerToolsOpen={composerToolsOpen}
