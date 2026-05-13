@@ -199,6 +199,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/ai/embed/search", s.handleEmbedSearch)
 	s.mux.HandleFunc("GET /api/ai/embed/similar/{id}", s.handleEmbedSimilar)
 	s.mux.HandleFunc("GET /api/ai/embed/stats", s.handleEmbedStats)
+	s.mux.HandleFunc("POST /api/ai/canvas/chat", s.handleCanvasChat)
 	s.mux.HandleFunc("GET /api/agent/status", s.handleAgentStatus)
 	s.mux.HandleFunc("POST /api/agent/detect", s.handleAgentDetect)
 	s.mux.HandleFunc("GET /api/prompt-presets", s.handleListPromptPresets)
@@ -290,6 +291,8 @@ func (s *Server) featureBackend(settings config.AppSettings, feature string) str
 		perFeature = settings.VLMBackendPrecheck
 	case agent.FeatureTranslate:
 		perFeature = settings.VLMBackendTranslate
+	case agent.FeatureCanvas:
+		perFeature = settings.VLMBackendCanvas
 	}
 	if perFeature != "" {
 		return perFeature

@@ -24,6 +24,7 @@ const (
 	FeatureDuplicate = "duplicate"
 	FeaturePrecheck  = "precheck"
 	FeatureTranslate = "translate"
+	FeatureCanvas    = "canvas"
 )
 
 func AgentBackendID(backend string) (id string, ok bool) {
