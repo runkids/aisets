@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -80,12 +81,15 @@ type canvasAction struct {
 var actionBlockRe = regexp.MustCompile("(?s)```action\\s*\\n(.*?)\\n```")
 var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(\{.+\})\s*\)?\s*<\|?/?tool_call\|?>`)
 
+var toolCallCleanRe = regexp.MustCompile(`(?s)<\|?/?tool_call\|?>`)
+
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
 
 	if len(matches) == 0 && len(toolMatches) == 0 {
-		return strings.TrimSpace(content), nil
+		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
+		return strings.TrimSpace(cleaned), nil
 	}
 
 	type span struct {
@@ -99,6 +103,7 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	for _, loc := range toolMatches {
 		spans = append(spans, span{loc[0], loc[1], content[loc[2]:loc[3]]})
 	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
 
 	var textParts []string
 	prev := 0
@@ -110,12 +115,16 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 		if err := json.Unmarshal([]byte(s.json), &act); err == nil && act.Tool != "" {
 			actions = append(actions, act)
 		}
-		prev = s.end
+		if s.end > prev {
+			prev = s.end
+		}
 	}
 	if prev < len(content) {
 		textParts = append(textParts, content[prev:])
 	}
-	textBody = strings.TrimSpace(strings.Join(textParts, "\n"))
+	joined := strings.Join(textParts, "\n")
+	joined = toolCallCleanRe.ReplaceAllString(joined, "")
+	textBody = strings.TrimSpace(joined)
 	return textBody, actions
 }
 
