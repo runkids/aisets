@@ -58,7 +58,7 @@ const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
 ];
 const WALL_CARD_MIN = 132;
-const WALL_GAP = 10;
+const WALL_GAP = 14;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
