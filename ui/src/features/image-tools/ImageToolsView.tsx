@@ -561,7 +561,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           </button>
                         )}
                         {showSemanticLoading && (
-                          <div className="mr-1 h-[28px] w-[120px] overflow-hidden rounded-g-sm border border-g-purple/20">
+                          <div className="mr-1 h-[28px] w-[120px] overflow-hidden rounded-g-sm">
                             <LoadingVisualView
                               style={semanticLoadingStyle}
                               dimensionToken=""
