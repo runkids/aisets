@@ -239,7 +239,7 @@ export function BrowseToolbar({
           }
           icon={
             searchMode === "semantic" ? (
-              <WandSparkles size={16} />
+              <WandSparkles size={16} className="text-g-purple" />
             ) : (
               <Search size={16} />
             )

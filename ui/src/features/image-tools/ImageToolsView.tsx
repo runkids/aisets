@@ -58,6 +58,8 @@ import {
   TextInputClearButton,
   Tooltip,
 } from "@/components/ui";
+import { LoadingVisualView } from "@/features/semantic-search/SemanticSearchLoading";
+import type { LoadingVisual } from "@/features/semantic-search/SemanticSearchLoading";
 import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
 
 type Props = {
@@ -166,6 +168,13 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   );
   const isSemanticActive =
     searchMode === "semantic" && committedSemanticQuery.length > 0;
+  const semanticLoadingStyle = useMemo<LoadingVisual>(() => {
+    const styles: LoadingVisual[] = ["beam", "constellation", "swarm"];
+    const seed = committedSemanticQuery
+      .split("")
+      .reduce((sum, c) => sum + c.charCodeAt(0), 0);
+    return styles[seed % styles.length];
+  }, [committedSemanticQuery]);
 
   const catalogQuery = useCatalogItemsInfiniteQuery(scanId, {
     q:
@@ -482,7 +491,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     }
                     icon={
                       searchMode === "semantic" ? (
-                        <WandSparkles size={16} />
+                        <WandSparkles size={16} className="text-g-purple" />
                       ) : (
                         <Search size={16} />
                       )
@@ -491,7 +500,9 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <span className="-mr-1 inline-flex h-full items-center gap-1">
                         {search && (
                           <TextInputClearButton
-                            label={t("toolbar.clearSearch", { defaultValue: "Clear" })}
+                            label={t("toolbar.clearSearch", {
+                              defaultValue: "Clear",
+                            })}
                             onClick={() => {
                               setSearch("");
                               setCommittedSemanticQuery("");
@@ -508,7 +519,9 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                 ? "text-g-purple"
                                 : "text-g-ink-3",
                             )}
-                            aria-label={t("toolbar.searchMode", { defaultValue: "Search mode" })}
+                            aria-label={t("toolbar.searchMode", {
+                              defaultValue: "Search mode",
+                            })}
                             onClick={() =>
                               setSearchMode((m) =>
                                 m === "semantic" ? "catalog" : "semantic",
@@ -522,8 +535,12 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             )}
                             <span>
                               {searchMode === "semantic"
-                                ? t("toolbar.aiSearchMode", { defaultValue: "AI" })
-                                : t("toolbar.catalogSearchMode", { defaultValue: "Catalog" })}
+                                ? t("toolbar.aiSearchMode", {
+                                    defaultValue: "AI",
+                                  })
+                                : t("toolbar.catalogSearchMode", {
+                                    defaultValue: "Catalog",
+                                  })}
                             </span>
                             <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
                               TAB
@@ -531,29 +548,24 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           </button>
                         )}
                         {isSemanticActive && semanticQuery.isFetching && (
-                          <LoaderCircle
-                            size={14}
-                            className="mr-1 animate-spin text-g-purple"
-                          />
+                          <div className="mr-1 h-5 w-[80px] overflow-hidden rounded-g-sm">
+                            <LoadingVisualView
+                              style={semanticLoadingStyle}
+                              dimensionToken=""
+                            />
+                          </div>
                         )}
                       </span>
                     }
                     onKeyDown={(e) => {
-                      if (
-                        e.key === "Tab" &&
-                        !e.shiftKey &&
-                        semanticAvailable
-                      ) {
+                      if (e.key === "Tab" && !e.shiftKey && semanticAvailable) {
                         e.preventDefault();
                         setSearchMode((m) =>
                           m === "semantic" ? "catalog" : "semantic",
                         );
                         return;
                       }
-                      if (
-                        e.key === "Enter" &&
-                        searchMode === "semantic"
-                      ) {
+                      if (e.key === "Enter" && searchMode === "semantic") {
                         e.preventDefault();
                         setCommittedSemanticQuery(search.trim());
                       }
