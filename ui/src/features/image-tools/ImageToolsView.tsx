@@ -45,6 +45,7 @@ import {
   StatCard,
   TextInput,
 } from "@/components/ui";
+import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
 
 type Props = {
   scanId?: number;
@@ -83,6 +84,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const wallLoadMoreRef = useRef<HTMLDivElement>(null);
   const wallMeasureRef = useRef<HTMLDivElement | null>(null);
   const [wallWidth, setWallWidth] = useState(0);
+  const [drawerAssetId, setDrawerAssetId] = useState<string | null>(null);
+  const [drawerUploadIndex, setDrawerUploadIndex] = useState<number | null>(
+    null,
+  );
   const settingsQuery = useSettingsQuery();
   const appSettings = settingsQuery.data?.settings;
 
@@ -241,6 +246,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
       .map((id) => basketItemById.get(id))
       .filter(Boolean) as AssetItem[];
   }, [assetIds, basketItemById]);
+
+  const drawerAsset = useMemo(
+    () => (drawerAssetId ? basketItemById.get(drawerAssetId) || null : null),
+    [drawerAssetId, basketItemById],
+  );
+  const drawerUploadFile =
+    drawerUploadIndex !== null ? files[drawerUploadIndex] || null : null;
+  const showDrawer = drawerAsset !== null || drawerUploadFile !== null;
 
   const hasWorkItems = assetIds.length + files.length > 0;
   const filePreviewUrls = useMemo(() => {
@@ -542,8 +555,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       src={item.url || item.thumbnailUrl || ""}
                       size="md"
                     >
-                      <div
-                        className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                      <button
+                        type="button"
+                        onClick={() => setDrawerAssetId(item.id)}
+                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
                         style={{
                           animationDelay: `${Math.min(index, 8) * 40}ms`,
                         }}
@@ -566,12 +581,15 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleAsset(item.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAsset(item.id);
+                          }}
                           aria-label={t("action.delete")}
                         >
                           <X size={14} />
                         </Button>
-                      </div>
+                      </button>
                     </ImagePreview>
                   ))}
 
@@ -582,8 +600,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       src={filePreviewUrls[index] || ""}
                       size="md"
                     >
-                      <div
-                        className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                      <button
+                        type="button"
+                        onClick={() => setDrawerUploadIndex(index)}
+                        className="flex h-14 w-full items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 text-left shadow-g-sm transition-colors hover:border-g-line-strong animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
                         style={{
                           animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
                         }}
@@ -606,16 +626,17 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setFiles((prev) =>
                               prev.filter((_, i) => i !== index),
-                            )
-                          }
+                            );
+                          }}
                           aria-label={t("action.delete")}
                         >
                           <X size={14} />
                         </Button>
-                      </div>
+                      </button>
                     </ImagePreview>
                   ))}
 
@@ -954,6 +975,21 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
           event.currentTarget.value = "";
         }}
       />
+      {showDrawer && (
+        <ImageToolsPreviewDrawer
+          key={drawerAssetId || `upload-${drawerUploadIndex}`}
+          asset={drawerAsset}
+          uploadFile={drawerUploadFile || undefined}
+          settings={settings}
+          onClose={() => {
+            setDrawerAssetId(null);
+            setDrawerUploadIndex(null);
+          }}
+          onFormatChange={(format) =>
+            setSettings((prev) => ({ ...prev, outputFormat: format }))
+          }
+        />
+      )}
     </div>
   );
 }
