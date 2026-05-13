@@ -152,6 +152,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/image-tools/download/{token}", s.handleImageToolDownload)
 	s.mux.HandleFunc("POST /api/image-tools/assets/render-preview", s.handleImageToolRenderPreview)
 	s.mux.HandleFunc("GET /api/image-tools/preview/{token}", s.handleImageToolPreviewServe)
+	s.mux.HandleFunc("GET /api/image-tools/metadata/{assetId}", s.handleImageToolMetadata)
 	s.mux.HandleFunc("POST /api/actions/rename/preview", s.handleRenamePreview)
 	s.mux.HandleFunc("POST /api/actions/rename/apply", s.handleApply)
 	s.mux.HandleFunc("POST /api/actions/merge-duplicates/preview", s.handleMergePreview)

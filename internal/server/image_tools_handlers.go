@@ -245,6 +245,25 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 	})
 }
 
+func (s *Server) handleImageToolMetadata(w http.ResponseWriter, r *http.Request) {
+	assetID := r.PathValue("assetId")
+	if _, err := s.ensureLatestScan(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	item, err := s.store.CatalogItem(0, assetID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	exif, err := imageproc.ExtractEXIF(item.LocalPath)
+	if err != nil {
+		writeJSON(w, http.StatusOK, imageproc.EXIFData{})
+		return
+	}
+	writeJSON(w, http.StatusOK, exif)
+}
+
 func (s *Server) handleImageToolPreviewServe(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	download, ok := s.peekImageToolDownload(token)

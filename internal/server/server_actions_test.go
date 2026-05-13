@@ -553,6 +553,57 @@ func TestImageToolRenderPreviewAndServe(t *testing.T) {
 	}
 }
 
+func TestImageToolMetadata(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	svgPath := filepath.Join(project, "img", "icon.svg")
+	mustWrite(t, svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="red"/></svg>`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 catalog item, got %d", len(items))
+	}
+	itemID := items[0].ID
+
+	// GET metadata for a valid SVG asset — SVGs have no EXIF.
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/metadata/"+itemID, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("metadata = %d %s", rec.Code, rec.Body.String())
+	}
+	var metaResp struct {
+		HasEXIF bool `json:"hasExif"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &metaResp); err != nil {
+		t.Fatal(err)
+	}
+	if metaResp.HasEXIF {
+		t.Fatalf("expected hasExif=false for SVG, got true")
+	}
+
+	// GET metadata for a nonexistent asset — should 404.
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/metadata/nonexistent", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("nonexistent metadata = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestOptimizationEstimateCostPrioritizesLargeAnimationsLast(t *testing.T) {
 	smallStatic := scanner.AssetItem{
 		ID:    "png",
