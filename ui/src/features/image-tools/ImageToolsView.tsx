@@ -10,31 +10,38 @@ import {
   LoaderCircle,
   Plus,
   RefreshCcw,
+  Search,
   Trash2,
   TrendingDown,
   UploadCloud,
   Wand2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
 import {
   APIError,
   downloadImageToolResult,
+  embeddingStats,
   getCatalogItemDetail,
   processImageToolAssets,
   processImageToolUploads,
+  semanticSearch,
   type ImageToolResult,
   type ImageToolSettings,
 } from "@/api";
 import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "@/queries";
 import type { AssetItem } from "@/types";
 import { fileName, formatBytes, formatExt } from "@/ui";
-import { useImageBackgroundMode, imageBackgroundClassName } from "@/imageBackground";
+import {
+  useImageBackgroundMode,
+  imageBackgroundClassName,
+} from "@/imageBackground";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import {
@@ -48,6 +55,7 @@ import {
   Select,
   StatCard,
   TextInput,
+  TextInputClearButton,
   Tooltip,
 } from "@/components/ui";
 import { ImageToolsPreviewDrawer } from "./ImageToolsPreviewDrawer";
@@ -66,6 +74,7 @@ const FORMAT_OPTIONS = [
 ];
 const WALL_CARD_MIN = 132;
 const WALL_GAP = 8;
+type SearchMode = "catalog" | "semantic";
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
@@ -79,6 +88,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     outputMode: "safeVariants",
   });
   const [search, setSearch] = useState("");
+  const [searchMode, setSearchMode] = useState<SearchMode>("catalog");
+  const [committedSemanticQuery, setCommittedSemanticQuery] = useState("");
   const debouncedSearch = useDebouncedValue(search, 220);
   const [files, setFiles] = useState<File[]>([]);
   const [results, setResults] = useState<ImageToolResult[]>([]);
@@ -109,8 +120,58 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     }));
   }, [appSettings]);
 
+  const embedConfigured = Boolean(
+    appSettings?.llmEnabled && appSettings?.llmEmbedModel,
+  );
+  const embedStatsQuery = useQuery({
+    queryKey: ["embed-stats"],
+    queryFn: embeddingStats,
+    enabled: embedConfigured,
+    staleTime: 10_000,
+  });
+  const semanticAvailable =
+    (embedStatsQuery.data?.textCount ?? 0) > 0 ||
+    (embedStatsQuery.data?.imageCount ?? 0) > 0;
+  const semanticSearchType: "text" | "image" | "hybrid" =
+    appSettings?.embedSearchType === "text" ||
+    appSettings?.embedSearchType === "image" ||
+    appSettings?.embedSearchType === "hybrid"
+      ? appSettings.embedSearchType
+      : "hybrid";
+  const semanticQuery = useQuery({
+    queryKey: [
+      "image-tools-semantic",
+      committedSemanticQuery,
+      semanticSearchType,
+      appSettings?.embedSearchLimit ?? 20,
+      appSettings?.embedSearchThreshold ?? 0.5,
+    ],
+    queryFn: () =>
+      semanticSearch({
+        q: committedSemanticQuery,
+        type: semanticSearchType,
+        limit: appSettings?.embedSearchLimit || 20,
+        threshold: appSettings?.embedSearchThreshold || 0.5,
+        includeItems: true,
+      }),
+    enabled: searchMode === "semantic" && committedSemanticQuery.length > 0,
+    staleTime: 30_000,
+  });
+  const semanticItems: AssetItem[] = useMemo(
+    () =>
+      (semanticQuery.data?.results
+        ?.map((r) => r.item)
+        .filter(Boolean) as AssetItem[]) ?? [],
+    [semanticQuery.data],
+  );
+  const isSemanticActive =
+    searchMode === "semantic" && committedSemanticQuery.length > 0;
+
   const catalogQuery = useCatalogItemsInfiniteQuery(scanId, {
-    q: debouncedSearch.trim() || undefined,
+    q:
+      searchMode === "catalog"
+        ? debouncedSearch.trim() || undefined
+        : undefined,
     limit: 60,
     sort: "recent",
   });
@@ -172,20 +233,21 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     setError("");
   }, [assetIds, onAssetIdsChange, staleBasketIds]);
 
-  const pickerItems = useMemo(
-    () =>
-      rawPickerItems
-        .map((item, index) => ({ item, index }))
-        .sort((left, right) => {
-          const leftQueued = queuedAssetIdSet.has(left.item.id);
-          const rightQueued = queuedAssetIdSet.has(right.item.id);
-          if (leftQueued !== rightQueued) return leftQueued ? -1 : 1;
-          return left.index - right.index;
-        })
-        .map(({ item }) => item),
-    [queuedAssetIdSet, rawPickerItems],
-  );
-  const pickerTotal = catalogQuery.data?.pages[0]?.total ?? 0;
+  const pickerItems = useMemo(() => {
+    const source = isSemanticActive ? semanticItems : rawPickerItems;
+    return source
+      .map((item, index) => ({ item, index }))
+      .sort((left, right) => {
+        const leftQueued = queuedAssetIdSet.has(left.item.id);
+        const rightQueued = queuedAssetIdSet.has(right.item.id);
+        if (leftQueued !== rightQueued) return leftQueued ? -1 : 1;
+        return left.index - right.index;
+      })
+      .map(({ item }) => item);
+  }, [queuedAssetIdSet, rawPickerItems, isSemanticActive, semanticItems]);
+  const pickerTotal = isSemanticActive
+    ? semanticItems.length
+    : (catalogQuery.data?.pages[0]?.total ?? 0);
   const wallColumns = Math.max(
     1,
     Math.floor((wallWidth + WALL_GAP) / (WALL_CARD_MIN + WALL_GAP)),
@@ -412,8 +474,90 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   <TextInput
                     variant="search"
                     value={search}
-                    onChange={(event) => setSearch(event.currentTarget.value)}
-                    placeholder={t("imageTools.catalogSearch")}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                    placeholder={
+                      searchMode === "semantic"
+                        ? t("toolbar.semanticSearch")
+                        : t("imageTools.catalogSearch")
+                    }
+                    icon={
+                      searchMode === "semantic" ? (
+                        <WandSparkles size={16} />
+                      ) : (
+                        <Search size={16} />
+                      )
+                    }
+                    suffix={
+                      <span className="-mr-1 inline-flex h-full items-center gap-1">
+                        {search && (
+                          <TextInputClearButton
+                            label={t("toolbar.clearSearch", { defaultValue: "Clear" })}
+                            onClick={() => {
+                              setSearch("");
+                              setCommittedSemanticQuery("");
+                            }}
+                            className="mr-0.5"
+                          />
+                        )}
+                        {semanticAvailable && (
+                          <button
+                            type="button"
+                            className={cn(
+                              "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+                              searchMode === "semantic"
+                                ? "text-g-purple"
+                                : "text-g-ink-3",
+                            )}
+                            aria-label={t("toolbar.searchMode", { defaultValue: "Search mode" })}
+                            onClick={() =>
+                              setSearchMode((m) =>
+                                m === "semantic" ? "catalog" : "semantic",
+                              )
+                            }
+                          >
+                            {searchMode === "semantic" ? (
+                              <WandSparkles size={13} aria-hidden="true" />
+                            ) : (
+                              <Search size={13} aria-hidden="true" />
+                            )}
+                            <span>
+                              {searchMode === "semantic"
+                                ? t("toolbar.aiSearchMode", { defaultValue: "AI" })
+                                : t("toolbar.catalogSearchMode", { defaultValue: "Catalog" })}
+                            </span>
+                            <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
+                              TAB
+                            </kbd>
+                          </button>
+                        )}
+                        {isSemanticActive && semanticQuery.isFetching && (
+                          <LoaderCircle
+                            size={14}
+                            className="mr-1 animate-spin text-g-purple"
+                          />
+                        )}
+                      </span>
+                    }
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Tab" &&
+                        !e.shiftKey &&
+                        semanticAvailable
+                      ) {
+                        e.preventDefault();
+                        setSearchMode((m) =>
+                          m === "semantic" ? "catalog" : "semantic",
+                        );
+                        return;
+                      }
+                      if (
+                        e.key === "Enter" &&
+                        searchMode === "semantic"
+                      ) {
+                        e.preventDefault();
+                        setCommittedSemanticQuery(search.trim());
+                      }
+                    }}
                   />
                 </div>
                 <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
