@@ -538,11 +538,13 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
               )}
 
               {results.length === 0 ? (
-                <div
+                <button
+                  type="button"
                   className={cn(
-                    "grid min-h-0 flex-1 place-items-center p-4 text-center transition-[background,border-color,box-shadow]",
-                    dragOver && "bg-g-accent-soft",
+                    "grid min-h-0 flex-1 cursor-pointer place-items-center rounded-g-md border border-dashed border-g-line p-4 text-center transition-[background,border-color,box-shadow] hover:border-g-line-strong hover:bg-g-surface",
+                    dragOver && "border-g-accent bg-g-accent-soft shadow-g-focus",
                   )}
+                  onClick={() => inputRef.current?.click()}
                   onDragOver={(event) => {
                     event.preventDefault();
                     setDragOver(true);
@@ -554,33 +556,18 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     appendFiles(event.dataTransfer.files);
                   }}
                 >
-                  <div
-                    className={cn(
-                      "grid w-full max-w-[420px] gap-3 rounded-g-md border border-dashed border-g-line bg-g-surface p-5 shadow-g-sm transition-[border-color,box-shadow,transform]",
-                      dragOver && "scale-[1.01] border-g-accent shadow-g-focus",
-                    )}
-                  >
+                  <div className="grid gap-2">
                     <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
                       <ImagePlus size={22} />
                     </div>
                     <div className="font-g text-g-ui font-[590] text-g-ink">
-                      {hasWorkItems
-                        ? t("imageTools.readyHint")
-                        : t("imageTools.selectOrDrop")}
+                      {t("imageTools.chooseUploads")}
                     </div>
                     <div className="text-g-ui text-g-ink-4">
                       {t("imageTools.dropHint")}
                     </div>
-                    <div>
-                      <Button
-                        variant="secondary"
-                        onClick={() => inputRef.current?.click()}
-                      >
-                        {t("imageTools.chooseUploads")}
-                      </Button>
-                    </div>
                   </div>
-                </div>
+                </button>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   <div className="grid content-start gap-2">
