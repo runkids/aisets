@@ -52,6 +52,7 @@ export type AppSettings = {
   vlmBackendDuplicate: string;
   vlmBackendPrecheck: string;
   vlmBackendTranslate: string;
+  vlmBackendCanvas: string;
   embedSearchThreshold: number;
   embedSearchLimit: number;
   embedSearchType: string;

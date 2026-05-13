@@ -583,6 +583,11 @@ export function AISettingsCard({
                 label: t("settings.vlmBackendFeatureTranslate"),
                 showInherit: true,
               },
+              {
+                key: "vlmBackendCanvas" as const,
+                label: t("settings.vlmBackendFeatureCanvas"),
+                showInherit: true,
+              },
             ].map((row) => (
               <div
                 key={row.key}
@@ -660,13 +665,13 @@ export function AISettingsCard({
                 min={0}
                 max={1}
                 step={0.05}
-                value={String(draft.embedSearchThreshold ?? 0.5)}
+                value={String(draft.embedSearchThreshold ?? 0.4)}
                 onChange={(e) =>
                   onUpdateDraft((current) => ({
                     ...current,
                     embedSearchThreshold: Math.max(
                       0,
-                      Math.min(1, Number(e.target.value) || 0.5),
+                      Math.min(1, Number(e.target.value) || 0.4),
                     ),
                   }))
                 }

@@ -1308,6 +1308,7 @@
     "vlmBackendFeatureDuplicate": "Duplicate Explain",
     "vlmBackendFeaturePrecheck": "Precheck",
     "vlmBackendFeatureTranslate": "Tag Translate",
+    "vlmBackendFeatureCanvas": "AI Canvas",
     "vlmBackendAgentGroup": "Agent CLI",
     "vlmBackendAgentModelPlaceholder": "Model (optional)",
     "vlmBackendLocalDefault": "Default",

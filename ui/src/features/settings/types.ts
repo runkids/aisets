@@ -112,6 +112,7 @@ export type SettingsDraft = {
   vlmBackendDuplicate: string;
   vlmBackendPrecheck: string;
   vlmBackendTranslate: string;
+  vlmBackendCanvas: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;

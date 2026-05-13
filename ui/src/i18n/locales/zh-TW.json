@@ -2226,6 +2226,7 @@
     "vlmBackendFeatureDuplicate": "近似重複",
     "vlmBackendFeaturePrecheck": "預檢",
     "vlmBackendFeatureTranslate": "標籤翻譯",
+    "vlmBackendFeatureCanvas": "AI 畫布",
     "vlmBackendAgentGroup": "Agent CLI",
     "vlmBackendAgentModelPlaceholder": "模型（選填）",
     "vlmBackendLocalDefault": "預設模型",

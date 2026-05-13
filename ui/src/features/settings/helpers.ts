@@ -395,6 +395,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     vlmBackendDuplicate: settings?.vlmBackendDuplicate ?? "",
     vlmBackendPrecheck: settings?.vlmBackendPrecheck ?? "",
     vlmBackendTranslate: settings?.vlmBackendTranslate ?? "",
+    vlmBackendCanvas: settings?.vlmBackendCanvas ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -415,7 +416,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
       settings?.optimizationStrategies ?? defaultOptimizationStrategies,
     customAssetFilters: settings?.customAssetFilters ?? [],
     lintRules: settings?.lintRules ?? defaultLintRules,
-    embedSearchThreshold: settings?.embedSearchThreshold ?? 0.5,
+    embedSearchThreshold: settings?.embedSearchThreshold ?? 0.4,
     embedSearchLimit: settings?.embedSearchLimit ?? 20,
     embedSearchType: settings?.embedSearchType ?? "hybrid",
     embedInputFields: settings?.embedInputFields ?? [
@@ -468,6 +469,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     vlmBackendDuplicate: draft.vlmBackendDuplicate,
     vlmBackendPrecheck: draft.vlmBackendPrecheck,
     vlmBackendTranslate: draft.vlmBackendTranslate,
+    vlmBackendCanvas: draft.vlmBackendCanvas,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -547,6 +549,7 @@ export function resetSectionDraft(
         vlmBackendDuplicate: defaults.vlmBackendDuplicate,
         vlmBackendPrecheck: defaults.vlmBackendPrecheck,
         vlmBackendTranslate: defaults.vlmBackendTranslate,
+        vlmBackendCanvas: defaults.vlmBackendCanvas,
       };
     case "customFilters":
       return {
