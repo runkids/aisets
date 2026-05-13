@@ -1,7 +1,14 @@
-import { Check, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Loader2,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   analyzeEmbeddingCalibration,
   embeddingCalibrationLabels,
@@ -10,6 +17,7 @@ import {
 } from "@/api";
 import type {
   EmbeddingCalibrationAnalysis,
+  EmbeddingCalibrationLabel,
   SemanticSearchResult,
   SettingsInfo,
 } from "@/types";
@@ -30,6 +38,11 @@ type Props = {
 };
 
 type SearchType = "text" | "image" | "hybrid";
+type LabelsResponse = { labels: EmbeddingCalibrationLabel[] };
+
+function labelsQueryKey(query: string, searchType: SearchType) {
+  return ["embed-calibration-labels", query, searchType] as const;
+}
 
 function pct(value: number | undefined) {
   if (value == null || Number.isNaN(value)) return "0%";
@@ -40,21 +53,56 @@ function score(value: number) {
   return value.toFixed(3);
 }
 
+function MetricCard({
+  label,
+  tone,
+  threshold,
+  margin,
+  f1,
+  t,
+}: {
+  label: string;
+  tone: "blue" | "purple";
+  threshold: string;
+  margin?: string;
+  f1: string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-g-md border border-g-line bg-g-surface px-2.5 py-2">
+      <Badge tone={tone}>{label}</Badge>
+      <div className="flex items-center gap-1.5 font-g-mono text-g-chip tabular-nums">
+        <span className="text-g-ink-4">{t("settings.embedCalibrationThreshold")}</span>
+        <span className="font-[590] text-g-ink">{threshold}</span>
+      </div>
+      {margin != null && (
+        <div className="flex items-center gap-1.5 font-g-mono text-g-chip tabular-nums">
+          <span className="text-g-ink-4">{t("settings.embedCalibrationMargin")}</span>
+          <span className="font-[590] text-g-ink">{margin}</span>
+        </div>
+      )}
+      <Badge tone="green">F1 {f1}</Badge>
+    </div>
+  );
+}
+
 export function EmbeddingCalibrationPanel({
   draft,
   settings,
   onUpdateDraft,
 }: Props) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [searchType, setSearchType] = useState<SearchType>("hybrid");
   const [analysis, setAnalysis] = useState<EmbeddingCalibrationAnalysis | null>(
     null,
   );
   const q = query.trim();
+  const labelKey = labelsQueryKey(q, searchType);
 
   const labelsQuery = useQuery({
-    queryKey: ["embed-calibration-labels", q, searchType],
+    queryKey: labelKey,
     queryFn: () => embeddingCalibrationLabels({ q, type: searchType }),
     enabled: q !== "",
   });
@@ -83,12 +131,16 @@ export function EmbeddingCalibrationPanel({
     mutationFn: ({
       result,
       label,
+      query,
+      searchType,
     }: {
       result: SemanticSearchResult;
       label: "match" | "reject";
+      query: string;
+      searchType: SearchType;
     }) =>
       saveEmbeddingCalibrationLabel({
-        query: q,
+        query,
         searchType,
         assetId: result.assetId,
         projectId: result.projectId,
@@ -96,8 +148,56 @@ export function EmbeddingCalibrationPanel({
         contentHash: result.item?.contentHash ?? "",
         label,
       }),
-    onSuccess: () => {
-      void labelsQuery.refetch();
+    onMutate: async (variables) => {
+      const key = labelsQueryKey(variables.query, variables.searchType);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<LabelsResponse>(key);
+      const optimistic: EmbeddingCalibrationLabel = {
+        id: previous?.labels.find(
+          (label) => label.assetId === variables.result.assetId,
+        )?.id ?? 0,
+        query: variables.query,
+        searchType: variables.searchType,
+        assetId: variables.result.assetId,
+        projectId: variables.result.projectId,
+        repoPath: variables.result.repoPath,
+        contentHash: variables.result.item?.contentHash ?? "",
+        label: variables.label,
+        createdAt: "",
+        updatedAt: "",
+      };
+      queryClient.setQueryData<LabelsResponse>(key, (current) => ({
+        labels: [
+          optimistic,
+          ...(current?.labels ?? []).filter(
+            (label) => label.assetId !== variables.result.assetId,
+          ),
+        ],
+      }));
+      return { previous, queryKey: key };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<LabelsResponse>(
+        context.queryKey,
+        context.previous ?? { labels: [] },
+      );
+    },
+    onSuccess: (data, variables) => {
+      const key = labelsQueryKey(variables.query, variables.searchType);
+      queryClient.setQueryData<LabelsResponse>(key, (current) => ({
+        labels: [
+          data.label,
+          ...(current?.labels ?? []).filter(
+            (label) => label.assetId !== data.label.assetId,
+          ),
+        ],
+      }));
+    },
+    onSettled: (_data, _err, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: labelsQueryKey(variables.query, variables.searchType),
+      });
     },
   });
   const analyzeMutation = useMutation({
@@ -111,6 +211,8 @@ export function EmbeddingCalibrationPanel({
     previewMutation.isPending ||
     saveLabelMutation.isPending ||
     analyzeMutation.isPending;
+  const mutationError =
+    previewMutation.error ?? saveLabelMutation.error ?? analyzeMutation.error;
 
   function applyRecommendation() {
     if (!analysis) return;
@@ -131,6 +233,7 @@ export function EmbeddingCalibrationPanel({
 
   return (
     <div className="min-w-[400px] space-y-3 rounded-g-md border border-g-line bg-g-surface-2 p-3">
+      {/* ── Search row ───────────────────────────────── */}
       <div className="grid gap-2 min-[760px]:grid-cols-[1fr_140px_auto]">
         <TextInput
           value={query}
@@ -151,24 +254,45 @@ export function EmbeddingCalibrationPanel({
         <Button
           type="button"
           variant="secondary"
-          leadingIcon={<Search size={14} />}
+          leadingIcon={
+            previewMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Search size={14} />
+            )
+          }
           disabled={!canSearch || busy}
           onClick={() => previewMutation.mutate()}
         >
-          {t("settings.embedCalibrationPreview")}
+          {previewMutation.isPending
+            ? t("settings.embedCalibrationPreviewing")
+            : t("settings.embedCalibrationPreview")}
         </Button>
       </div>
 
-      {previewMutation.error && (
+      {mutationError && (
         <div className="text-g-caption text-g-red">
-          {errorMessage(previewMutation.error)}
+          {errorMessage(mutationError)}
         </div>
       )}
 
+      {previewMutation.isPending && (
+        <div className="flex items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2 py-2 font-g text-g-ui text-g-ink-3">
+          <Loader2 size={14} className="animate-spin" />
+          <span>{t("settings.embedCalibrationLoading")}</span>
+        </div>
+      )}
+
+      {/* ── Results list ─────────────────────────────── */}
       {results.length > 0 && (
         <div className="grid gap-1.5">
           {results.map((result) => {
             const label = labelsByAsset.get(result.assetId);
+            const pendingLabel =
+              saveLabelMutation.isPending &&
+              saveLabelMutation.variables?.result.assetId === result.assetId
+                ? saveLabelMutation.variables.label
+                : null;
             return (
               <div
                 key={result.assetId}
@@ -200,10 +324,21 @@ export function EmbeddingCalibrationPanel({
                     type="button"
                     size="sm"
                     variant={label === "match" ? "primary" : "secondary"}
-                    leadingIcon={<Check size={13} />}
+                    leadingIcon={
+                      pendingLabel === "match" ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Check size={13} />
+                      )
+                    }
                     disabled={busy}
                     onClick={() =>
-                      saveLabelMutation.mutate({ result, label: "match" })
+                      saveLabelMutation.mutate({
+                        result,
+                        label: "match",
+                        query: q,
+                        searchType,
+                      })
                     }
                   >
                     {t("settings.embedCalibrationMatch")}
@@ -212,10 +347,21 @@ export function EmbeddingCalibrationPanel({
                     type="button"
                     size="sm"
                     variant={label === "reject" ? "danger" : "secondary"}
-                    leadingIcon={<X size={13} />}
+                    leadingIcon={
+                      pendingLabel === "reject" ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <X size={13} />
+                      )
+                    }
                     disabled={busy}
                     onClick={() =>
-                      saveLabelMutation.mutate({ result, label: "reject" })
+                      saveLabelMutation.mutate({
+                        result,
+                        label: "reject",
+                        query: q,
+                        searchType,
+                      })
                     }
                   >
                     {t("settings.embedCalibrationReject")}
@@ -227,37 +373,57 @@ export function EmbeddingCalibrationPanel({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-g-line pt-3">
-        <Button
-          type="button"
-          variant="secondary"
-          leadingIcon={<SlidersHorizontal size={14} />}
-          disabled={busy}
-          onClick={() => analyzeMutation.mutate()}
-        >
-          {t("settings.embedCalibrationAnalyze")}
-        </Button>
+      {/* ── Analysis section ─────────────────────────── */}
+      <div className="space-y-2.5 border-t border-g-line pt-3">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            leadingIcon={
+              analyzeMutation.isPending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <SlidersHorizontal size={14} />
+              )
+            }
+            disabled={busy}
+            onClick={() => analyzeMutation.mutate()}
+          >
+            {analyzeMutation.isPending
+              ? t("settings.embedCalibrationAnalyzing")
+              : t("settings.embedCalibrationAnalyze")}
+          </Button>
+          {!analysis && (
+            <span className="font-g text-g-caption text-g-ink-4">
+              {t("settings.embedCalibrationNoLabels")}
+            </span>
+          )}
+        </div>
+
         {analysis && (
-          <div className="flex flex-wrap items-center gap-2 font-g-mono text-g-chip text-g-ink-3">
-            <span>
-              {t("settings.embedCalibrationTextMetric", {
-                threshold: score(analysis.textRecommendation.threshold),
-                f1: pct(analysis.textRecommendation.f1),
-              })}
-            </span>
-            <span>
-              {t("settings.embedCalibrationImageMetric", {
-                threshold: score(analysis.imageRecommendation.threshold),
-                margin: score(analysis.imageRecommendation.margin ?? 0),
-                f1: pct(analysis.imageRecommendation.f1),
-              })}
-            </span>
+          <div className="flex flex-wrap items-stretch gap-2">
+            <MetricCard
+              label={t("settings.embedCalibrationTextLabel")}
+              tone="blue"
+              threshold={score(analysis.textRecommendation.threshold)}
+              f1={pct(analysis.textRecommendation.f1)}
+              t={t}
+            />
+            <MetricCard
+              label={t("settings.embedCalibrationImageLabel")}
+              tone="purple"
+              threshold={score(analysis.imageRecommendation.threshold)}
+              margin={score(analysis.imageRecommendation.margin ?? 0)}
+              f1={pct(analysis.imageRecommendation.f1)}
+              t={t}
+            />
             <Button
               type="button"
-              size="sm"
               variant="primary"
+              trailingIcon={<ArrowRight size={14} />}
               disabled={busy}
               onClick={applyRecommendation}
+              className="self-center"
             >
               {t("settings.embedCalibrationApply")}
             </Button>

@@ -607,7 +607,7 @@ export function AICanvasComposer({
                   !event.nativeEvent.isComposing
                 ) {
                   event.preventDefault();
-                  void handleAsk();
+                  if (!isWorking) void handleAsk();
                 }
               }}
             />

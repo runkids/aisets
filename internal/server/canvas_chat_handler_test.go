@@ -53,6 +53,18 @@ func TestParseCanvasActions_MultipleActions(t *testing.T) {
 	}
 }
 
+func TestCanvasActionBlockLikelyTruncated(t *testing.T) {
+	if !canvasActionBlockLikelyTruncated("intro\n```action\n{\"tool\": \"arrange_cards\", \"params\": {") {
+		t.Fatal("expected truncated action block")
+	}
+	if canvasActionBlockLikelyTruncated("```action\n{broken}\n```") {
+		t.Fatal("closed action block should not be treated as truncated")
+	}
+	if canvasActionBlockLikelyTruncated("plain text") {
+		t.Fatal("plain text should not be treated as truncated")
+	}
+}
+
 func TestParseCanvasActions_BadJSON(t *testing.T) {
 	input := "Here:\n```action\n{invalid json\n```\nStill works."
 	text, actions := parseCanvasActions(input)
@@ -366,6 +378,20 @@ func TestParseCanvasActions_PlainToolNameCallFormat(t *testing.T) {
 	}
 	if actions[0].Params["label"] != "book_zukan_body.png (第一個圖卡)" {
 		t.Fatalf("label = %#v", actions[0].Params["label"])
+	}
+}
+
+func TestParseCanvasActions_LooseQuotedCallSyntax(t *testing.T) {
+	input := `call: "focus_card", "params": {"cardId": "asset-1", "label": "target"}`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected empty text, got %q", text)
+	}
+	if len(actions) != 1 || actions[0].Tool != "focus_card" {
+		t.Fatalf("actions = %#v", actions)
+	}
+	if actions[0].Params["cardId"] != "asset-1" {
+		t.Fatalf("params = %#v", actions[0].Params)
 	}
 }
 

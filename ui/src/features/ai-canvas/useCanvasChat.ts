@@ -12,6 +12,7 @@ import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
 import {
   createCanvasCardId,
+  sanitizeCanvasChatContent,
   type AssetCanvasCard,
   type CanvasCard,
   type ChatHistoryEntry,
@@ -41,14 +42,17 @@ function isScreenStableCard(card: CanvasCard) {
 
 function focusCursorPosition(
   card: CanvasCard,
+  metrics: CanvasCardLayoutMetrics,
   viewportScale: number,
 ): Pick<AICursorState, "x" | "y"> {
   const stableScale =
     isScreenStableCard(card) && viewportScale > 0 ? 1 / viewportScale : 1;
-  const screenOffset = viewportScale > 0 ? 24 / viewportScale : 24;
+  const width = metrics[card.id]?.width ?? CARD_WIDTH * stableScale;
+  const pointerXOffset = viewportScale > 0 ? 6 / viewportScale : 6;
+  const pointerYOffset = viewportScale > 0 ? 8 / viewportScale : 8;
   return {
-    x: card.x + (CARD_WIDTH * stableScale) / 2,
-    y: card.y - screenOffset,
+    x: card.x + width / 2 - pointerXOffset,
+    y: card.y - pointerYOffset,
   };
 }
 
@@ -172,6 +176,7 @@ export function useCanvasChat(opts: {
     selectedCardId?: string;
     cards?: CanvasCard[];
   }) {
+    if (abortRef.current) return;
     const promptText = (overrides?.prompt ?? prompt).trim();
     if (!promptText) return;
     const canvasCards = overrides?.cards ?? cards;
@@ -256,8 +261,8 @@ export function useCanvasChat(opts: {
       const fromWidth = cardLayoutMetrics[cardId]?.width ?? CARD_WIDTH;
       const toWidth = Math.max(200, Math.min(800, width));
       const height = cardLayoutMetrics[cardId]?.height ?? fromWidth * 0.75;
-      const steps = 18;
-      const stepMs = 28;
+      const steps = 28;
+      const stepMs = 36;
       animationEndMs = Math.max(animationEndMs, delay + (steps + 1) * stepMs);
       queueTimer(() => {
         setAiCursor({
@@ -296,12 +301,13 @@ export function useCanvasChat(opts: {
       if (!card) return;
       const from = { x: card.x, y: card.y };
       const to = { x, y };
-      const steps = 18;
-      const stepMs = 28;
+      const cardWidth = cardLayoutMetrics[cardId]?.width ?? CARD_WIDTH;
+      const steps = 30;
+      const stepMs = 34;
       animationEndMs = Math.max(animationEndMs, delay + (steps + 1) * stepMs);
       queueTimer(() => {
         setAiCursor({
-          x: from.x + CARD_WIDTH / 2,
+          x: from.x + cardWidth / 2,
           y: from.y + 18,
           label: t("aiCanvas.draggingCard"),
           status: "acting",
@@ -319,7 +325,7 @@ export function useCanvasChat(opts: {
               y: from.y + (to.y - from.y) * eased,
             };
             setAiCursor({
-              x: next.x + CARD_WIDTH / 2,
+              x: next.x + cardWidth / 2,
               y: next.y + 18,
               label: t("aiCanvas.draggingCard"),
               status: "acting",
@@ -353,7 +359,7 @@ export function useCanvasChat(opts: {
         const target = canvasCards.find((c) => c.id === event.cardId);
         if (target) {
           setAiCursor({
-            ...focusCursorPosition(target, viewport.scale),
+            ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
             label: event.label,
             status: "acting",
           });
@@ -366,7 +372,10 @@ export function useCanvasChat(opts: {
         setAiCursor((prev) => ({ ...prev, status: "thinking" }));
       }
       if (event.type === "text") {
-        assistantText += (assistantText ? "\n\n" : "") + event.content;
+        const text = sanitizeCanvasChatContent(event.content);
+        if (text) {
+          assistantText += (assistantText ? "\n\n" : "") + text;
+        }
       }
       if (event.type === "proposal") {
         if (isCaptureTool(event.tool)) {
@@ -408,7 +417,7 @@ export function useCanvasChat(opts: {
           const target = canvasCards.find((c) => c.id === ids[0]);
           if (target) {
             setAiCursor({
-              ...focusCursorPosition(target, viewport.scale),
+              ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label:
                 result.label ??
                 t("aiCanvas.selectedAssets", { count: ids.length }),
@@ -436,7 +445,7 @@ export function useCanvasChat(opts: {
           const target = canvasCards.find((c) => c.id === ids[0]);
           if (target) {
             setAiCursor({
-              ...focusCursorPosition(target, viewport.scale),
+              ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label:
                 result.label ??
                 t("aiCanvas.removedCards", { count: ids.length }),
@@ -451,7 +460,7 @@ export function useCanvasChat(opts: {
           const target = canvasCards.find((c) => c.id === result.cardId);
           if (target) {
             setAiCursor({
-              ...focusCursorPosition(target, viewport.scale),
+              ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label: result.label,
               status: "acting",
             });
@@ -525,7 +534,7 @@ export function useCanvasChat(opts: {
           const target = canvasCards.find((c) => c.id === ids[0]);
           if (target) {
             setAiCursor({
-              ...focusCursorPosition(target, viewport.scale),
+              ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label: r.label || t("aiCanvas.layerChanged"),
               status: "acting",
             });
@@ -572,7 +581,7 @@ export function useCanvasChat(opts: {
           let delay = 0;
           for (const [cardId, pos] of posMap) {
             simulateAICardDrag(cardId, pos.x, pos.y, delay);
-            delay += 620;
+            delay += 1100;
           }
         }
       }
@@ -611,6 +620,7 @@ export function useCanvasChat(opts: {
         signal: abort.signal,
       });
 
+      assistantText = sanitizeCanvasChatContent(assistantText);
       if (assistantText) {
         setChatHistory((prev) => [
           ...prev.slice(-10),

@@ -122,6 +122,17 @@ export type AICanvasPromptIntent =
   | "imageEdit"
   | "describe";
 
+export function sanitizeCanvasChatContent(content: string) {
+  return content
+    .replace(
+      /(^|\n)\s*call:\s*"[A-Za-z_][A-Za-z0-9_]*"\s*,\s*"params"\s*:\s*\{[^\n]*\}\s*/g,
+      "$1",
+    )
+    .replace(/(^|\n)\s*call:\s*[A-Za-z_][A-Za-z0-9_]*\s*\{[^\n]*\}\s*/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 export const DEFAULT_CANVAS_VIEWPORT: CanvasViewport = {
@@ -350,6 +361,14 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
             typeof e.role === "string" &&
             typeof e.content === "string",
         )
+        .map((entry) => ({
+          ...entry,
+          content:
+            entry.role === "assistant"
+              ? sanitizeCanvasChatContent(entry.content)
+              : entry.content,
+        }))
+        .filter((entry) => entry.content || entry.mentions?.length)
         .slice(-10)
     : [];
 

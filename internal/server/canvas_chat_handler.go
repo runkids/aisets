@@ -148,6 +148,67 @@ func normalizeCanvasActionJSON(raw string) string {
 	return unquotedJSONKeyRe.ReplaceAllString(raw, `$1"$2":`)
 }
 
+func findLooseQuotedCanvasCallSpans(content string) []canvasActionSpan {
+	var spans []canvasActionSpan
+	searchStart := 0
+	for {
+		idx := strings.Index(content[searchStart:], "call:")
+		if idx < 0 {
+			break
+		}
+		start := searchStart + idx
+		pos := start + len("call:")
+		for pos < len(content) && strings.ContainsRune(" \n\r\t", rune(content[pos])) {
+			pos++
+		}
+		if pos >= len(content) || content[pos] != '"' {
+			searchStart = start + len("call:")
+			continue
+		}
+		toolStart := pos + 1
+		toolEndRel := strings.Index(content[toolStart:], "\"")
+		if toolEndRel < 0 {
+			searchStart = start + len("call:")
+			continue
+		}
+		toolEnd := toolStart + toolEndRel
+		toolName := strings.TrimSpace(content[toolStart:toolEnd])
+		paramsKeyRel := strings.Index(content[toolEnd:], "params")
+		if toolName == "" || paramsKeyRel < 0 {
+			searchStart = start + len("call:")
+			continue
+		}
+		paramsPos := toolEnd + paramsKeyRel + len("params")
+		colonRel := strings.Index(content[paramsPos:], ":")
+		if colonRel < 0 {
+			searchStart = start + len("call:")
+			continue
+		}
+		jsonStart := paramsPos + colonRel + 1
+		for jsonStart < len(content) && strings.ContainsRune(" \n\r\t", rune(content[jsonStart])) {
+			jsonStart++
+		}
+		if jsonStart >= len(content) || content[jsonStart] != '{' {
+			searchStart = start + len("call:")
+			continue
+		}
+		jsonEnd := balancedJSONObjectEnd(content, jsonStart)
+		if jsonEnd < 0 {
+			searchStart = start + len("call:")
+			continue
+		}
+		var params map[string]any
+		if err := json.Unmarshal([]byte(normalizeCanvasActionJSON(content[jsonStart:jsonEnd])), &params); err != nil {
+			searchStart = start + len("call:")
+			continue
+		}
+		payload, _ := json.Marshal(canvasAction{Tool: toolName, Params: params})
+		spans = append(spans, canvasActionSpan{start: start, end: jsonEnd, json: string(payload)})
+		searchStart = jsonEnd
+	}
+	return spans
+}
+
 func findPlainCanvasCallSpans(content string) []canvasActionSpan {
 	var spans []canvasActionSpan
 	searchStart := 0
@@ -219,12 +280,22 @@ func findPlainCanvasCallSpans(content string) []canvasActionSpan {
 	return spans
 }
 
+func canvasActionBlockLikelyTruncated(content string) bool {
+	idx := strings.LastIndex(content, "```action")
+	if idx < 0 {
+		return false
+	}
+	rest := content[idx+len("```action"):]
+	return !strings.Contains(rest, "```")
+}
+
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
 	plainCallSpans := findPlainCanvasCallSpans(content)
+	looseQuotedCallSpans := findLooseQuotedCanvasCallSpans(content)
 
-	if len(matches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 {
+	if len(matches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 {
 		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
 		return strings.TrimSpace(cleaned), nil
 	}
@@ -237,6 +308,7 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 		spans = append(spans, canvasActionSpan{loc[0], loc[1], content[loc[2]:loc[3]]})
 	}
 	spans = append(spans, plainCallSpans...)
+	spans = append(spans, looseQuotedCallSpans...)
 	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
 
 	var textParts []string
@@ -282,7 +354,38 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 			fmt.Fprintf(&b, "Selected asset targets (%d):\n- %s\n", len(selectedAssets), strings.Join(selectedAssets, "\n- "))
 		}
 	}
-	fmt.Fprintf(&b, "Total cards: %d\n\n", len(canvas.Cards))
+	fmt.Fprintf(&b, "Total cards: %d\n", len(canvas.Cards))
+	fmt.Fprintf(&b, "Viewport: pan=(%.0f,%.0f) scale=%.2f\n\n", canvas.Viewport.X, canvas.Viewport.Y, canvas.Viewport.Scale)
+
+	hasBounds := false
+	var minX, minY, maxX, maxY float64
+	for _, card := range canvas.Cards {
+		cardW := card.Width
+		if cardW <= 0 {
+			cardW = 320
+		}
+		cardH := card.Height
+		if cardH <= 0 {
+			cardH = 240
+		}
+		if !hasBounds {
+			minX, minY, maxX, maxY = card.X, card.Y, card.X+cardW, card.Y+cardH
+			hasBounds = true
+		} else {
+			if card.X < minX {
+				minX = card.X
+			}
+			if card.Y < minY {
+				minY = card.Y
+			}
+			if card.X+cardW > maxX {
+				maxX = card.X + cardW
+			}
+			if card.Y+cardH > maxY {
+				maxY = card.Y + cardH
+			}
+		}
+	}
 
 	for _, card := range canvas.Cards {
 		fmt.Fprintf(&b, "- [%s] id=%s pos=(%.0f,%.0f)", card.Kind, card.ID, card.X, card.Y)
@@ -325,10 +428,15 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	if options.CanvasImageAttached {
 		b.WriteString("- A hidden AI-only screenshot of the current canvas is attached. Use it to judge visual overlap, spacing, scale, and composition before arranging cards.\n")
 	}
+	if hasBounds {
+		fmt.Fprintf(&b, "- Current card cluster bounds: x=%.0f y=%.0f width=%.0f height=%.0f.\n", minX, minY, maxX-minX, maxY-minY)
+	}
+	b.WriteString("- The canvas is large/unbounded. You may use much wider coordinates than the current cluster; do NOT assume the visible whitespace is unavailable.\n")
 	b.WriteString("- Card positions are top-left canvas coordinates. Use each card's size when spacing items; do not assume all cards are 320px wide.\n")
 	b.WriteString("- Higher layer values render later/on top. arrange_cards and move_card only change x/y, not z-index, so avoid overlap instead of relying on stacking.\n")
 	b.WriteString("- resize_card changes only the visual displayed card width. Use it to make a hero image larger or supporting images smaller before arranging.\n")
-	b.WriteString("- For a spread-out layout, leave at least 80px horizontal and vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
+	b.WriteString("- For a spread-out layout, leave at least 160px horizontal and 120px vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
+	b.WriteString("- For 8+ cards, spread them across a broad board (roughly 1600-2400px wide, multiple rows/columns). Avoid piling every card near the center or around one hero image.\n")
 
 	b.WriteString("\n## Assistant Options\n")
 	if options.ImageOptimizationAdvice {
@@ -665,8 +773,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	var totalInputTokens, totalOutputTokens int64
 	start := time.Now()
 
+	const canvasOutputTokenLimit = 900
 	for loop := 0; loop < maxToolLoops; loop++ {
-		content, chatResp, err := s.chatVLM(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", 120)
+		content, chatResp, err := s.chatVLM(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", canvasOutputTokenLimit)
 		if err != nil {
 			sendNDJSON(w, map[string]any{
 				"type":  "error",
@@ -678,6 +787,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		totalOutputTokens += chatResp.OutputTokens
 
 		textBody, actions := parseCanvasActions(content)
+		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas)
 		for _, act := range actions {
 			if canvasToolIsCapture(act.Tool) {
@@ -724,7 +834,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(150 * time.Millisecond)
 		}
 
-		if textBody != "" {
+		if textBody != "" && !truncatedAction {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})
@@ -734,7 +844,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if len(toolResults) == 0 && !missingCapture {
+		if len(toolResults) == 0 && !missingCapture && !truncatedAction {
 			break
 		}
 		images = nil
@@ -742,7 +852,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if len(toolResults) > 0 {
 			currentPrompt += "\n\n## Tool Results\n" + strings.Join(toolResults, "\n\n")
 		}
-		if missingCapture {
+		if truncatedAction {
+			currentPrompt += "\n\n## Required Follow-up\nYour previous action block was truncated before the JSON finished. Reply with ONLY complete action blocks in ```action fences. Do not include explanatory prose. If arranging many cards, include all positions in one compact arrange_cards JSON object."
+		} else if missingCapture {
 			currentPrompt += "\n\n## Required Follow-up\n" + canvasCaptureRepairPrompt(latestUserMessage)
 		} else {
 			currentPrompt += "\n\nContinue acting on these results. Use the data above to fulfill the user's original request. Remember: EVERY response must include at least one action block."

@@ -893,7 +893,7 @@ export function AICursor({
   const stableScale = canvasScale > 0 ? 1 / canvasScale : 1;
   return (
     <div
-      className="pointer-events-none absolute z-[60] transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+      className="pointer-events-none absolute z-[60] transition-[transform] duration-[620ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{
         transform: `translate(${position.x}px, ${position.y}px) scale(${stableScale})`,
         transformOrigin: "left top",
