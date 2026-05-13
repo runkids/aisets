@@ -243,6 +243,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   }, [assetIds, basketItemById]);
 
   const hasWorkItems = assetIds.length + files.length > 0;
+  const filePreviewUrls = useMemo(() => {
+    const urls = files.map((file) => URL.createObjectURL(file));
+    return urls;
+  }, [files]);
+  useEffect(() => {
+    return () => filePreviewUrls.forEach(URL.revokeObjectURL);
+  }, [filePreviewUrls]);
+
   const successResults = useMemo(
     () => results.filter((r) => !r.errorCode),
     [results],
@@ -544,7 +552,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           {fileName(item.repoPath)}
                         </div>
                         <div className="truncate font-g-mono text-g-chip text-g-ink-4">
-                          {formatExt(item.ext || "").toUpperCase()} · {formatBytes(item.bytes)}
+                          {formatExt(item.ext || "").toUpperCase()} ·{" "}
+                          {formatBytes(item.bytes)}
                         </div>
                       </div>
                       <Button
@@ -563,10 +572,16 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     <div
                       key={`upload-${file.name}-${index}`}
                       className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
-                      style={{ animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms` }}
+                      style={{
+                        animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
+                      }}
                     >
-                      <div className="grid size-10 shrink-0 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4">
-                        <UploadCloud size={16} />
+                      <div className="relative size-10 shrink-0 overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
+                        <img
+                          src={filePreviewUrls[index]}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
@@ -579,7 +594,9 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))}
+                        onClick={() =>
+                          setFiles((prev) => prev.filter((_, i) => i !== index))
+                        }
                         aria-label={t("action.delete")}
                       >
                         <X size={14} />
@@ -602,14 +619,21 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   {!hasWorkItems && results.length > 0 && (
                     <div className="flex items-center gap-2 pb-1">
                       <span className="font-g text-g-ui font-[590] text-g-ink">
-                        {t("imageTools.processedCount", { count: results.length })}
+                        {t("imageTools.processedCount", {
+                          count: results.length,
+                        })}
                       </span>
                       <span className="flex-1" />
                       {zipToken && (
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => downloadImageToolResult(zipToken, "aisets-image-tools.zip")}
+                          onClick={() =>
+                            downloadImageToolResult(
+                              zipToken,
+                              "aisets-image-tools.zip",
+                            )
+                          }
                         >
                           <FileArchive size={14} />
                           {t("imageTools.downloadZip")}
@@ -618,7 +642,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { setResults([]); setZipToken(""); }}
+                        onClick={() => {
+                          setResults([]);
+                          setZipToken("");
+                        }}
                       >
                         <RefreshCcw size={14} />
                         {t("action.clear")}
@@ -652,7 +679,9 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                           "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
                           result.errorCode && "border-l-[3px] border-l-g-red",
                         )}
-                        style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
+                        style={{
+                          animationDelay: `${Math.min(index, 8) * 50}ms`,
+                        }}
                       >
                         <div className="flex items-start gap-2.5">
                           <div className="min-w-0 flex-1">
@@ -660,9 +689,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               {fileName(result.outputPath || result.name)}
                             </div>
                             <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
-                              {result.inputFormat.toUpperCase()} → {result.outputFormat.toUpperCase()}
+                              {result.inputFormat.toUpperCase()} →{" "}
+                              {result.outputFormat.toUpperCase()}
                               {" · "}
-                              {formatBytes(result.currentBytes)} → {formatBytes(result.outputBytes)}
+                              {formatBytes(result.currentBytes)} →{" "}
+                              {formatBytes(result.outputBytes)}
                             </div>
                             {result.errorCode ? (
                               <div className="mt-1.5 text-g-ui text-g-red">
@@ -673,30 +704,55 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                 <div className="mt-2 flex items-center gap-2">
                                   <div className="h-[6px] flex-1 overflow-hidden rounded-g-pill bg-g-surface-2">
                                     <div
-                                      className={cn("h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out", barColor)}
-                                      style={{ width: `${Math.round(ratio * 100)}%` }}
+                                      className={cn(
+                                        "h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out",
+                                        barColor,
+                                      )}
+                                      style={{
+                                        width: `${Math.round(ratio * 100)}%`,
+                                      }}
                                     />
                                   </div>
-                                  <span className={cn(
-                                    "shrink-0 font-g-mono text-g-chip font-[590]",
-                                    savingsPct > 0 ? "text-g-green" : savingsPct < 0 ? "text-g-red" : "text-g-ink-4",
-                                  )}>
-                                    {savingsPct > 0 ? `-${savingsPct}%` : savingsPct < 0 ? `+${Math.abs(savingsPct)}%` : t("imageTools.noSavingsShort")}
+                                  <span
+                                    className={cn(
+                                      "shrink-0 font-g-mono text-g-chip font-[590]",
+                                      savingsPct > 0
+                                        ? "text-g-green"
+                                        : savingsPct < 0
+                                          ? "text-g-red"
+                                          : "text-g-ink-4",
+                                    )}
+                                  >
+                                    {savingsPct > 0
+                                      ? `-${savingsPct}%`
+                                      : savingsPct < 0
+                                        ? `+${Math.abs(savingsPct)}%`
+                                        : t("imageTools.noSavingsShort")}
                                   </span>
                                 </div>
                                 <div className="mt-1.5 flex items-center gap-1.5 font-g-mono text-g-chip text-g-ink-3">
                                   {isProject ? (
                                     <>
-                                      <FolderOpen size={11} className="shrink-0 text-g-green" />
+                                      <FolderOpen
+                                        size={11}
+                                        className="shrink-0 text-g-green"
+                                      />
                                       <span className="truncate">
                                         {t("imageTools.savedTo")}
-                                        {result.outputPath ? ` · ${result.outputPath}` : ""}
+                                        {result.outputPath
+                                          ? ` · ${result.outputPath}`
+                                          : ""}
                                       </span>
                                     </>
                                   ) : (
                                     <>
-                                      <Download size={11} className="shrink-0 text-g-amber" />
-                                      <span>{t("imageTools.tempDownload")}</span>
+                                      <Download
+                                        size={11}
+                                        className="shrink-0 text-g-amber"
+                                      />
+                                      <span>
+                                        {t("imageTools.tempDownload")}
+                                      </span>
                                     </>
                                   )}
                                 </div>
@@ -704,11 +760,18 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             )}
                           </div>
                           {result.errorCode ? (
-                            <Badge tone="danger">{t("imageTools.failed")}</Badge>
+                            <Badge tone="danger">
+                              {t("imageTools.failed")}
+                            </Badge>
                           ) : result.token ? (
                             <Button
                               size="sm"
-                              onClick={() => downloadImageToolResult(result.token!, result.downloadName)}
+                              onClick={() =>
+                                downloadImageToolResult(
+                                  result.token!,
+                                  result.downloadName,
+                                )
+                              }
                             >
                               <Download size={14} />
                             </Button>
@@ -730,13 +793,22 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   dragOver && "border-g-accent bg-g-accent-soft shadow-g-focus",
                 )}
                 onClick={() => inputRef.current?.click()}
-                onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={(event) => { event.preventDefault(); setDragOver(false); appendFiles(event.dataTransfer.files); }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOver(false);
+                  appendFiles(event.dataTransfer.files);
+                }}
               >
                 <div className="flex items-center gap-2 text-g-ink-4">
                   <ImagePlus size={14} />
-                  <span className="font-g text-g-ui">{t("imageTools.chooseUploads")}</span>
+                  <span className="font-g text-g-ui">
+                    {t("imageTools.chooseUploads")}
+                  </span>
                 </div>
               </button>
             </CardBody>
