@@ -903,6 +903,10 @@ export function AICanvasView({
   });
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(320);
+  const composerDragRef = useRef<{ startY: number; startH: number } | null>(
+    null,
+  );
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -2058,18 +2062,50 @@ export function AICanvasView({
 
       <div
         data-ai-canvas-overlay="true"
-        className={cn(
-          "pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto max-w-[1120px] px-4 pb-3 text-white transition-[height] duration-200 ease-g max-[760px]:px-2 max-[760px]:pb-2",
-          composerCollapsed ? "h-[130px]" : "h-[320px]",
-        )}
+        className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+        style={{ height: composerCollapsed ? 130 : composerHeight }}
       >
         <div className="relative h-full">
           <div
             className={cn(
-              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl transition-[height,border-radius] duration-[160ms] ease-g max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
-              composerCollapsed ? "h-12" : "h-[240px]",
+              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl max-[760px]:inset-x-2 rounded-t-[24px] rounded-b-none border-b-0",
+              composerCollapsed && "!h-12",
             )}
+            style={
+              composerCollapsed ? undefined : { height: composerHeight - 90 }
+            }
           >
+            {!composerCollapsed && (
+              <div
+                className="flex h-3 cursor-ns-resize items-center justify-center"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  composerDragRef.current = {
+                    startY: e.clientY,
+                    startH: composerHeight,
+                  };
+                  const onMove = (ev: PointerEvent) => {
+                    if (!composerDragRef.current) return;
+                    const delta =
+                      composerDragRef.current.startY - ev.clientY;
+                    const next = Math.min(
+                      Math.max(composerDragRef.current.startH + delta, 200),
+                      window.innerHeight * 0.75,
+                    );
+                    setComposerHeight(next);
+                  };
+                  const onUp = () => {
+                    composerDragRef.current = null;
+                    document.removeEventListener("pointermove", onMove);
+                    document.removeEventListener("pointerup", onUp);
+                  };
+                  document.addEventListener("pointermove", onMove);
+                  document.addEventListener("pointerup", onUp);
+                }}
+              >
+                <div className="h-[3px] w-8 rounded-full bg-white/20" />
+              </div>
+            )}
             <button
               type="button"
               aria-label={t("aiCanvas.resizeComposer")}
@@ -2357,6 +2393,8 @@ export function AICanvasView({
         <div
           data-ai-canvas-overlay="true"
           className="pointer-events-auto absolute right-3 bottom-[160px] z-40 max-h-[60vh] w-[420px] overflow-auto rounded-g-md border border-white/10 bg-[rgba(20,20,20,0.95)] p-3 font-mono text-[11px] leading-[1.5] text-green-400 shadow-g-pop backdrop-blur-xl"
+          onPointerDown={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
         >
           <div className="mb-2 flex items-center justify-between text-white/60">
             <span className="font-[590] uppercase tracking-wider">
