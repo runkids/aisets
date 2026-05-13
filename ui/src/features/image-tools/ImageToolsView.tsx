@@ -40,6 +40,7 @@ import {
   Card,
   CardBody,
   EmptyState,
+  ImagePreview,
   Range,
   Select,
   StatCard,
@@ -336,13 +337,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-g-canvas p-3 max-[768px]:p-2">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1540px] flex-col gap-3">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-col gap-3">
         {/* StatCards */}
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatCard
             label={t("imageTools.statQueued")}
             value={totalWorkCount}
             icon={<Images size={14} />}
+            meta={t("asset.assets", { count: totalWorkCount })}
           />
           <StatCard
             label={t("imageTools.statUploads")}
@@ -536,53 +538,64 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                 <div className="grid content-start gap-2">
                   {/* Queue items */}
                   {queuedItems.map((item, index) => (
-                    <div
+                    <ImagePreview
                       key={item.id}
-                      className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
-                      style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                      src={item.url || item.thumbnailUrl || ""}
+                      size="md"
                     >
-                      <AssetThumbnail
-                        src={item.thumbnailUrl || item.url}
-                        size="md"
-                        className="size-10"
-                        imageClassName="max-h-8 max-w-8"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
-                          {fileName(item.repoPath)}
-                        </div>
-                        <div className="truncate font-g-mono text-g-chip text-g-ink-4">
-                          {formatExt(item.ext || "").toUpperCase()} ·{" "}
-                          {formatBytes(item.bytes)}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleAsset(item.id)}
-                        aria-label={t("action.delete")}
+                      <div
+                        className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                        style={{
+                          animationDelay: `${Math.min(index, 8) * 40}ms`,
+                        }}
                       >
-                        <X size={14} />
-                      </Button>
-                    </div>
+                        <AssetThumbnail
+                          src={item.thumbnailUrl || item.url}
+                          size="md"
+                          className="size-10"
+                          imageClassName="max-h-8 max-w-8"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                            {fileName(item.repoPath)}
+                          </div>
+                          <div className="truncate font-g-mono text-g-chip text-g-ink-4">
+                            {formatExt(item.ext || "").toUpperCase()} ·{" "}
+                            {formatBytes(item.bytes)}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleAsset(item.id)}
+                          aria-label={t("action.delete")}
+                        >
+                          <X size={14} />
+                        </Button>
+                      </div>
+                    </ImagePreview>
                   ))}
 
                   {/* Upload items */}
                   {files.map((file, index) => (
-                    <div
+                    <ImagePreview
                       key={`upload-${file.name}-${index}`}
-                      className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
-                      style={{
-                        animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
-                      }}
+                      src={filePreviewUrls[index] || ""}
+                      size="md"
                     >
-                      <div className="relative size-10 shrink-0 overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-                        <img
-                          src={filePreviewUrls[index]}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      </div>
+                      <div
+                        className="flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                        style={{
+                          animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
+                        }}
+                      >
+                        <div className="relative size-10 shrink-0 overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
+                          <img
+                            src={filePreviewUrls[index]}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
                           {file.name}
@@ -601,7 +614,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       >
                         <X size={14} />
                       </Button>
-                    </div>
+                      </div>
+                    </ImagePreview>
                   ))}
 
                   {/* Divider between queue and results */}
@@ -653,132 +667,91 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                     </div>
                   )}
 
-                  {/* Result cards */}
+                  {/* Result cards — compact single-row */}
                   {results.map((result, index) => {
-                    const ratio =
-                      result.currentBytes > 0
-                        ? result.outputBytes / result.currentBytes
-                        : 1;
                     const savingsPct =
                       result.currentBytes > 0
-                        ? Math.round((1 - ratio) * 100)
+                        ? Math.round(
+                            (1 - result.outputBytes / result.currentBytes) *
+                              100,
+                          )
                         : 0;
-                    const barColor = result.errorCode
-                      ? "bg-g-red"
-                      : savingsPct > 20
-                        ? "bg-g-green"
-                        : savingsPct > 0
-                          ? "bg-g-amber"
-                          : "bg-g-ink-4";
                     const isProject = result.source === "project";
 
                     return (
                       <div
                         key={`${result.id}-${index}`}
                         className={cn(
-                          "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
+                          "flex h-14 items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2.5 py-2 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
                           result.errorCode && "border-l-[3px] border-l-g-red",
                         )}
                         style={{
                           animationDelay: `${Math.min(index, 8) * 50}ms`,
                         }}
                       >
-                        <div className="flex items-start gap-2.5">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-g-mono text-g-ui font-[590]">
-                              {fileName(result.outputPath || result.name)}
-                            </div>
-                            <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
-                              {result.inputFormat.toUpperCase()} →{" "}
-                              {result.outputFormat.toUpperCase()}
-                              {" · "}
-                              {formatBytes(result.currentBytes)} →{" "}
-                              {formatBytes(result.outputBytes)}
-                            </div>
-                            {result.errorCode ? (
-                              <div className="mt-1.5 text-g-ui text-g-red">
-                                {result.errorMessage}
-                              </div>
-                            ) : (
-                              <>
-                                <div className="mt-2 flex items-center gap-2">
-                                  <div className="h-[6px] flex-1 overflow-hidden rounded-g-pill bg-g-surface-2">
-                                    <div
-                                      className={cn(
-                                        "h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out",
-                                        barColor,
-                                      )}
-                                      style={{
-                                        width: `${Math.round(ratio * 100)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <span
-                                    className={cn(
-                                      "shrink-0 font-g-mono text-g-chip font-[590]",
-                                      savingsPct > 0
-                                        ? "text-g-green"
-                                        : savingsPct < 0
-                                          ? "text-g-red"
-                                          : "text-g-ink-4",
-                                    )}
-                                  >
-                                    {savingsPct > 0
-                                      ? `-${savingsPct}%`
-                                      : savingsPct < 0
-                                        ? `+${Math.abs(savingsPct)}%`
-                                        : t("imageTools.noSavingsShort")}
-                                  </span>
-                                </div>
-                                <div className="mt-1.5 flex items-center gap-1.5 font-g-mono text-g-chip text-g-ink-3">
-                                  {isProject ? (
-                                    <>
-                                      <FolderOpen
-                                        size={11}
-                                        className="shrink-0 text-g-green"
-                                      />
-                                      <span className="truncate">
-                                        {t("imageTools.savedTo")}
-                                        {result.outputPath
-                                          ? ` · ${result.outputPath}`
-                                          : ""}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Download
-                                        size={11}
-                                        className="shrink-0 text-g-amber"
-                                      />
-                                      <span>
-                                        {t("imageTools.tempDownload")}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
+                        <div
+                          className={cn(
+                            "grid size-8 shrink-0 place-items-center rounded-full",
+                            result.errorCode
+                              ? "bg-g-red-soft text-g-red"
+                              : isProject
+                                ? "bg-g-green/10 text-g-green"
+                                : "bg-g-blue/10 text-g-blue",
+                          )}
+                        >
                           {result.errorCode ? (
-                            <Badge tone="danger">
-                              {t("imageTools.failed")}
-                            </Badge>
-                          ) : result.token ? (
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                downloadImageToolResult(
-                                  result.token!,
-                                  result.downloadName,
-                                )
-                              }
-                            >
-                              <Download size={14} />
-                            </Button>
+                            <X size={14} />
+                          ) : isProject ? (
+                            <FolderOpen size={14} />
                           ) : (
-                            <Badge tone="green">{t("imageTools.done")}</Badge>
+                            <Download size={14} />
                           )}
                         </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-g-mono text-g-ui font-[590]">
+                            {fileName(result.outputPath || result.name)}
+                          </div>
+                          <div className="font-g-mono text-g-chip text-g-ink-4">
+                            {result.errorCode
+                              ? result.errorMessage
+                              : `${result.inputFormat.toUpperCase()} → ${result.outputFormat.toUpperCase()} · ${formatBytes(result.currentBytes)} → ${formatBytes(result.outputBytes)}`}
+                          </div>
+                        </div>
+                        {!result.errorCode && (
+                          <span
+                            className={cn(
+                              "shrink-0 font-g-mono text-g-ui font-[590]",
+                              savingsPct > 20
+                                ? "text-g-green"
+                                : savingsPct > 0
+                                  ? "text-g-amber"
+                                  : "text-g-ink-4",
+                            )}
+                          >
+                            {savingsPct > 0
+                              ? `-${savingsPct}%`
+                              : savingsPct < 0
+                                ? `+${Math.abs(savingsPct)}%`
+                                : t("imageTools.noSavingsShort")}
+                          </span>
+                        )}
+                        {result.token && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              downloadImageToolResult(
+                                result.token!,
+                                result.downloadName,
+                              )
+                            }
+                            aria-label={t("action.download", {
+                              defaultValue: "Download",
+                            })}
+                          >
+                            <Download size={14} />
+                          </Button>
+                        )}
                       </div>
                     );
                   })}
