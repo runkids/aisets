@@ -436,7 +436,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       className={cn(
                                         "absolute inset-0 h-full w-full bg-g-surface-2 object-cover transition-transform duration-[220ms] ease-g",
                                         queued
-                                          ? "scale-[0.88] rounded-g-sm"
+                                          ? "scale-[0.94] rounded-g-xs"
                                           : "group-hover:scale-[1.06]",
                                       )}
                                     />
