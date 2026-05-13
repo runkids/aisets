@@ -249,6 +249,7 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		Quality:        body.Quality,
 		MaxDimensionPx: body.MaxDimensionPx,
 		AvifSpeed:      settings.OptimizationAvifSpeed,
+		ExternalTools:  settings.OptimizationExternalTools,
 		AllowLarger:    true,
 	}
 	op, candidate, err := optimize.ProcessLocalFile(sourcePath, sourceDisplay, sourceBytes, sourceMeta, req)
