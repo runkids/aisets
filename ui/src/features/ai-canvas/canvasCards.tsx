@@ -1,14 +1,17 @@
 import {
+  ArrowUp,
   ImagePlus,
   Layers3,
   LoaderCircle,
-  MessageSquarePlus,
+  MessageCircle,
   MousePointer2,
   Trash2,
 } from "lucide-react";
 import {
   useRef,
   useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -26,6 +29,66 @@ import {
   type VariantCanvasCard,
 } from "./aiCanvasState";
 import { cardTone, imageMeta, renderMarkdown, tagLabel } from "./canvasUtils";
+
+type CommentRegion = { x: number; y: number; width: number; height: number };
+
+const FIGMA_COMMENT_CURSOR =
+  'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2730%27 height=%2730%27 viewBox=%270 0 30 30%27%3E%3Cfilter id=%27s%27 x=%27-30%25%27 y=%27-30%25%27 width=%27160%25%27 height=%27160%25%27%3E%3CfeDropShadow dx=%270%27 dy=%271.5%27 stdDeviation=%271.5%27 flood-color=%27%23000000%27 flood-opacity=%27.2%27/%3E%3C/filter%3E%3Cpath filter=%27url(%23s)%27 d=%27M6 15a9.5 9.5 0 0 1 9.5-9.5h1A9.5 9.5 0 0 1 26 15v1a9.5 9.5 0 0 1-9.5 9.5H6Z%27 fill=%27white%27 stroke=%27%23111%27 stroke-width=%271.6%27/%3E%3C/svg%3E") 6 25, crosshair';
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function pointCommentRegion(x: number, y: number): CommentRegion {
+  const width = 0.24;
+  const height = 0.2;
+  return {
+    x: clamp01(x - width / 2),
+    y: clamp01(y - height / 2),
+    width,
+    height,
+  };
+}
+
+function FigmaCommentIcon({ size = "sm" }: { size?: "xs" | "sm" | "lg" }) {
+  const iconSize = size === "lg" ? 18 : size === "xs" ? 11 : 14;
+  return (
+    <span
+      className={cn(
+        "inline-grid shrink-0 place-items-center border border-g-line bg-g-surface text-g-ink-2 shadow-g-sm",
+        size === "lg"
+          ? "size-12 rounded-[15px]"
+          : size === "xs"
+            ? "size-4 rounded-[6px]"
+            : "size-5 rounded-[7px]",
+      )}
+      aria-hidden="true"
+    >
+      <MessageCircle size={iconSize} strokeWidth={2.4} />
+    </span>
+  );
+}
+
+function FigmaCommentMarker({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-block size-6 shrink-0 rounded-[12px] rounded-bl-[3px] border-2 border-g-ink bg-g-surface shadow-g-md",
+        className,
+      )}
+      aria-hidden="true"
+    />
+  );
+}
+
+function figmaCommentBoxPosition(region: CommentRegion) {
+  const x = clamp01(region.x + region.width / 2);
+  const y = clamp01(region.y + region.height / 2);
+  return {
+    left: `${x * 100}%`,
+    top: `${y * 100}%`,
+  };
+}
 
 export function CardShell({
   card,
@@ -58,9 +121,10 @@ export function CardShell({
   return (
     <section
       className={cn(
-        "absolute w-[320px] touch-none select-none overflow-hidden rounded-g-md border bg-g-surface shadow-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
+        "absolute w-[320px] touch-none select-none rounded-g-md border bg-g-surface shadow-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
+        card.kind === "asset" ? "overflow-visible" : "overflow-hidden",
         cardTone(card),
-        selected && "border-g-active-bg shadow-g-lg",
+        selected && "z-40 border-g-active-bg shadow-g-lg",
       )}
       ref={(node) => onRegister(card.id, node)}
       style={{
@@ -78,7 +142,11 @@ export function CardShell({
         onPointerCancel={onDragEnd}
       >
         <div className="flex min-w-0 items-center gap-2 text-g-caption font-[590] tracking-g-ui text-g-ink-2">
-          <MousePointer2 size={13} />
+          {card.kind === "comment" ? (
+            <FigmaCommentIcon size="xs" />
+          ) : (
+            <MousePointer2 size={13} />
+          )}
           <span className="truncate">{cardDisplayName(card)}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -135,6 +203,10 @@ export function AssetCardBody({
     currentX: number;
     currentY: number;
   } | null>(null);
+  const [pendingComment, setPendingComment] = useState<CommentRegion | null>(
+    null,
+  );
+  const [pendingCommentText, setPendingCommentText] = useState("");
 
   function toNormalized(clientX: number, clientY: number) {
     const rect = imageContainerRef.current?.getBoundingClientRect();
@@ -145,14 +217,19 @@ export function AssetCardBody({
     };
   }
 
-  function handleRegionPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button !== 0) return;
+  function openCommentComposer(region: CommentRegion) {
+    setPendingComment(region);
+    setPendingCommentText("");
+  }
+
+  function handleRegionPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.button !== 0 || pendingComment) return;
     const { nx, ny } = toNormalized(e.clientX, e.clientY);
     setDrawRegion({ startX: nx, startY: ny, currentX: nx, currentY: ny });
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
-  function handleRegionPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function handleRegionPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (!drawRegion) return;
     const { nx, ny } = toNormalized(e.clientX, e.clientY);
     setDrawRegion((prev) =>
@@ -168,7 +245,31 @@ export function AssetCardBody({
     const height = Math.abs(drawRegion.currentY - drawRegion.startY);
     setDrawRegion(null);
     if (width > 0.03 && height > 0.03) {
-      onCreateComment(card, "", { x, y, width, height });
+      openCommentComposer({ x, y, width, height });
+      return;
+    }
+    openCommentComposer(
+      pointCommentRegion(drawRegion.startX, drawRegion.startY),
+    );
+  }
+
+  function submitPendingComment(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (!pendingComment) return;
+    const text = pendingCommentText.trim();
+    if (!text) return;
+    onCreateComment(card, text, pendingComment);
+    setPendingComment(null);
+    setPendingCommentText("");
+  }
+
+  function handlePendingCommentKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setPendingComment(null);
+      setPendingCommentText("");
     }
   }
 
@@ -181,11 +282,21 @@ export function AssetCardBody({
       }
     : null;
 
+  const pendingCommentRect = pendingComment
+    ? {
+        left: `${pendingComment.x * 100}%`,
+        top: `${pendingComment.y * 100}%`,
+        width: `${pendingComment.width * 100}%`,
+        height: `${pendingComment.height * 100}%`,
+      }
+    : null;
+
   return (
     <div className="flex flex-col">
       <div
         ref={imageContainerRef}
-        className="relative aspect-[4/3] cursor-crosshair bg-g-surface-2"
+        className="relative aspect-[4/3] bg-g-surface-2"
+        style={{ cursor: FIGMA_COMMENT_CURSOR }}
         onPointerDown={handleRegionPointerDown}
         onPointerMove={handleRegionPointerMove}
         onPointerUp={handleRegionPointerUp}
@@ -203,13 +314,14 @@ export function AssetCardBody({
             key={comment.id}
             type="button"
             aria-label={comment.text || t("aiCanvas.commentCard")}
-            className="absolute rounded-g-sm border-2 border-g-amber bg-transparent shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-amber-soft/20 focus-visible:outline-none focus-visible:shadow-g-focus"
+            className="absolute rounded-g-sm border-2 border-g-blue bg-g-blue/10 shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-blue/20 focus-visible:outline-none focus-visible:shadow-g-focus"
             style={{
               left: `${comment.region.x * 100}%`,
               top: `${comment.region.y * 100}%`,
               width: `${comment.region.width * 100}%`,
               height: `${comment.region.height * 100}%`,
             }}
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
               onSelectComment(comment.id);
@@ -218,9 +330,45 @@ export function AssetCardBody({
         ))}
         {drawRect && (
           <div
-            className="pointer-events-none absolute border-2 border-g-amber bg-g-amber-soft/30"
+            className="pointer-events-none absolute z-[60] border-2 border-g-blue bg-g-blue/10"
             style={drawRect}
           />
+        )}
+        {pendingCommentRect && (
+          <div
+            className="pointer-events-none absolute z-[60] border-2 border-g-blue bg-g-blue/10"
+            style={pendingCommentRect}
+          />
+        )}
+        {pendingComment && (
+          <div
+            className="pointer-events-auto absolute z-[80]"
+            style={figmaCommentBoxPosition(pendingComment)}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <FigmaCommentMarker className="absolute left-0 top-0 -translate-y-full" />
+            <form
+              className="absolute left-7 top-[-32px] flex h-9 w-[min(240px,calc(100vw-32px))] items-center gap-2 rounded-[15px] bg-[rgba(31,31,31,0.96)] px-3 text-white shadow-g-pop"
+              onSubmit={submitPendingComment}
+            >
+              <input
+                autoFocus
+                value={pendingCommentText}
+                placeholder={t("aiCanvas.addCommentPlaceholder")}
+                className="min-w-0 flex-1 border-0 bg-transparent font-g text-g-body leading-none text-white outline-none placeholder:text-white/45"
+                onChange={(event) => setPendingCommentText(event.target.value)}
+                onKeyDown={handlePendingCommentKeyDown}
+              />
+              <button
+                type="submit"
+                aria-label={t("aiCanvas.saveComment")}
+                disabled={pendingCommentText.trim() === ""}
+                className="grid size-7 shrink-0 place-items-center rounded-full bg-white/20 text-white transition-colors duration-[120ms] ease-g hover:bg-white/28 disabled:opacity-40"
+              >
+                <ArrowUp size={16} aria-hidden="true" />
+              </button>
+            </form>
+          </div>
         )}
       </div>
       <div className="flex flex-col gap-3 p-3">
@@ -272,8 +420,15 @@ export function AssetCardBody({
           <Button
             size="sm"
             variant="ghost"
-            leadingIcon={<MessageSquarePlus />}
-            onClick={() => onCreateComment(card)}
+            leadingIcon={<FigmaCommentIcon />}
+            onClick={() =>
+              openCommentComposer({
+                x: 0.22,
+                y: 0.2,
+                width: 0.56,
+                height: 0.37,
+              })
+            }
           >
             {t("aiCanvas.comment")}
           </Button>
@@ -299,12 +454,6 @@ export function CommentCardBody({ card }: { card: CommentCanvasCard }) {
       <p className="whitespace-pre-wrap text-g-body leading-[1.45] text-g-ink">
         {card.text || t("aiCanvas.emptyComment")}
       </p>
-      <div className="grid grid-cols-4 gap-1 text-center font-g-mono text-[10px] tracking-g-mono text-g-ink-3">
-        <span>x {Math.round(card.region.x * 100)}%</span>
-        <span>y {Math.round(card.region.y * 100)}%</span>
-        <span>w {Math.round(card.region.width * 100)}%</span>
-        <span>h {Math.round(card.region.height * 100)}%</span>
-      </div>
     </div>
   );
 }

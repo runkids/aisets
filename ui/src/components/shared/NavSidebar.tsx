@@ -2,6 +2,7 @@ import {
   FileWarning,
   FolderKanban,
   FolderOpen,
+  Frame,
   Gauge,
   History,
   Images,
@@ -9,7 +10,6 @@ import {
   Recycle,
   Settings,
   ShieldCheck,
-  Sparkles,
   Tags,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -179,7 +179,7 @@ export function NavSidebar({
         {
           id: "aiCanvas",
           label: t("nav.aiCanvas"),
-          icon: <Sparkles size={18} />,
+          icon: <Frame size={18} />,
         },
         {
           id: "prompts",

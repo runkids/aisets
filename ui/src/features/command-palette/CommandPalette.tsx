@@ -37,6 +37,7 @@ import { MODE_ITEMS, type ModeItem } from "./pageRegistry";
 import { semanticSearch, embeddingStats } from "@/api";
 import { embedStatsQueryKey, useCatalogItemsInfiniteQuery } from "@/queries";
 import { useCategoryListQuery, useTagsQuery } from "@/tagsQueries";
+import { useRotatingGhost } from "@/hooks/useRotatingGhost";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import { useSearchHistory } from "@/useSearchHistory";
 import { fileName, type Mode } from "@/ui";
@@ -182,18 +183,6 @@ function seededRank(value: string, seed: number) {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-}
-
-function useRotatingGhost(enabled: boolean, count: number) {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    if (!enabled || count < 2) return undefined;
-    const id = window.setInterval(() => {
-      setIdx((i) => (i + 1) % count);
-    }, 3200);
-    return () => window.clearInterval(id);
-  }, [count, enabled]);
-  return idx;
 }
 
 function VectorField({

@@ -8,7 +8,7 @@ import {
   ImagePlus,
   Layers3,
   LoaderCircle,
-  Maximize2,
+  LocateFixed,
   X,
   Paperclip,
   Plus,
@@ -16,13 +16,19 @@ import {
   SlidersHorizontal,
   Square,
   Trash2,
+  WandSparkles,
   XCircle,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getCatalogItems, previewImageUrl } from "@/api";
+import {
+  embeddingStats,
+  getCatalogItems,
+  previewImageUrl,
+  semanticSearch,
+} from "@/api";
 import {
   previewImageToolAssets,
   renderImageToolPreview,
@@ -34,6 +40,7 @@ import {
   ConfirmDialog,
   IconButton,
   TextInput,
+  TextInputClearButton,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { AssetItem } from "@/types";
@@ -79,9 +86,25 @@ import {
   ProposalCardBody,
   VariantCardBody,
 } from "./canvasCards";
+import { useRotatingGhost } from "@/hooks/useRotatingGhost";
 import { useCanvasChat } from "./useCanvasChat";
 import { useCanvasDrag } from "./useCanvasDrag";
 import { useProposalExecution } from "./useProposalExecution";
+
+const SEMANTIC_PHASES = [
+  "向量比對中",
+  "Embedding lookup",
+  "計算餘弦距離",
+  "Cosine similarity",
+  "標記相似群集",
+  "k-NN clustering",
+  "語意排序中",
+  "Ranking results",
+  "解析語意特徵",
+  "Parsing features",
+  "ベクトル検索中",
+  "유사도 계산",
+];
 
 const ASSET_CARD_IMAGE_TOP = 38;
 const ASSET_CARD_IMAGE_HEIGHT = 240;
@@ -118,6 +141,35 @@ export function AICanvasView({
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchOpen, setSearchOpen] = useState(true);
   const [searchError, setSearchError] = useState("");
+  const [searchMode, setSearchMode] = useState<"catalog" | "semantic">(
+    "catalog",
+  );
+  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchSelectedIds, setSearchSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const ghostSamples = useMemo(
+    () => [
+      t("commandPalette.sampleQuery1"),
+      t("commandPalette.sampleQuery2"),
+      t("commandPalette.sampleQuery3"),
+    ],
+    [t],
+  );
+  const ghostIdx = useRotatingGhost(
+    searchMode === "semantic" && !query.trim() && !searchBusy,
+    ghostSamples.length,
+  );
+  const [phaseIdx, setPhaseIdx] = useState(0);
+  useEffect(() => {
+    if (!searchBusy || searchMode !== "semantic") return;
+    const id = window.setInterval(() => {
+      setPhaseIdx((i) => (i + 1) % SEMANTIC_PHASES.length);
+    }, 1200);
+    return () => window.clearInterval(id);
+  }, [searchBusy, searchMode]);
+  const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
@@ -162,8 +214,25 @@ export function AICanvasView({
   } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!aiEnabled) return;
+    let cancelled = false;
+    embeddingStats()
+      .then((stats) => {
+        if (!cancelled) {
+          setSemanticAvailable(
+            (stats.textCount ?? 0) > 0 || (stats.imageCount ?? 0) > 0,
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [aiEnabled]);
   const {
     canvasSelection,
+    cardElementsRef,
     registerCardElement,
     handleDragStart,
     handleDragMove,
@@ -350,22 +419,38 @@ export function AICanvasView({
 
   async function runSearch() {
     const q = query.trim();
-    if (!scanId) {
+    if (!q) return;
+    if (searchMode === "catalog" && !scanId) {
       setSearchError(t("aiCanvas.missingScan"));
       return;
     }
-    setWorking("search");
+    setSearchBusy(true);
     setSearchError("");
+    setSearchActiveIndex(-1);
+    setSearchSelectedIds(new Set());
     try {
-      const page = await getCatalogItems({ scanId, q, limit: 18 });
-      setSearchResults(page.items);
-      setSearchTotal(page.total);
+      if (searchMode === "semantic") {
+        const result = await semanticSearch({
+          q,
+          includeItems: true,
+          limit: 18,
+        });
+        const items = result.results
+          .map((r) => r.item)
+          .filter((item): item is AssetItem => item != null);
+        setSearchResults(items);
+        setSearchTotal(result.results.length);
+      } else {
+        const page = await getCatalogItems({ scanId: scanId!, q, limit: 18 });
+        setSearchResults(page.items);
+        setSearchTotal(page.total);
+      }
     } catch (err) {
       setSearchError(
         err instanceof Error ? err.message : t("aiCanvas.searchError"),
       );
     } finally {
-      setWorking("idle");
+      setSearchBusy(false);
     }
   }
 
@@ -425,12 +510,21 @@ export function AICanvasView({
     setSelectedCardId(card.id);
   }
 
+  function commentRequestsAi(text: string) {
+    return /(^|\s)@ai(?=\s|$|[,.，。!?！？])/i.test(text);
+  }
+
+  function aiPromptFromComment(text: string) {
+    return text.replace(/(^|\s)@ai(?=\s|$|[,.，。!?！？])/gi, " ").trim();
+  }
+
   function addComment(
     assetCard: AssetCanvasCard,
     text = prompt.trim(),
     region?: { x: number; y: number; width: number; height: number },
   ) {
     const id = createCanvasCardId("comment");
+    const commentText = text || t("aiCanvas.defaultComment");
     const card: CommentCanvasCard = {
       id,
       kind: "comment",
@@ -438,11 +532,20 @@ export function AICanvasView({
       y: assetCard.y + 32,
       createdAt: nowISO(),
       anchorId: assetCard.id,
-      text: text || t("aiCanvas.defaultComment"),
+      text: commentText,
       region: region ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
     };
+    const nextCards = [...cards, card];
     setCards((current) => [...current, card]);
     setSelectedCardId(id);
+
+    if (commentRequestsAi(commentText)) {
+      void handleAsk({
+        prompt: aiPromptFromComment(commentText) || commentText,
+        selectedCardId: id,
+        cards: nextCards,
+      });
+    }
   }
 
   async function createImagePreview(
@@ -537,6 +640,49 @@ export function AICanvasView({
     setViewport((current) => {
       const nextScale = clampCanvasScale(current.scale * factor);
       return zoomViewportAtPoint(current, point, nextScale);
+    });
+  }
+
+  function centerCanvasView() {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    setViewport((current) => {
+      if (cards.length === 0) {
+        return {
+          ...current,
+          x: bounds.width / 2,
+          y: bounds.height / 2,
+        };
+      }
+
+      const contentBounds = cards.reduce(
+        (acc, card) => {
+          const element = cardElementsRef.current.get(card.id);
+          const width = element?.offsetWidth ?? CARD_WIDTH;
+          const height = element?.offsetHeight ?? 240;
+          return {
+            minX: Math.min(acc.minX, card.x),
+            minY: Math.min(acc.minY, card.y),
+            maxX: Math.max(acc.maxX, card.x + width),
+            maxY: Math.max(acc.maxY, card.y + height),
+          };
+        },
+        {
+          minX: Number.POSITIVE_INFINITY,
+          minY: Number.POSITIVE_INFINITY,
+          maxX: Number.NEGATIVE_INFINITY,
+          maxY: Number.NEGATIVE_INFINITY,
+        },
+      );
+      const centerX = (contentBounds.minX + contentBounds.maxX) / 2;
+      const centerY = (contentBounds.minY + contentBounds.maxY) / 2;
+
+      return {
+        ...current,
+        x: bounds.width / 2 - centerX * current.scale,
+        y: bounds.height / 2 - centerY * current.scale,
+      };
     });
   }
 
@@ -694,10 +840,10 @@ export function AICanvasView({
       {searchOpen ? (
         <aside
           data-ai-canvas-overlay="true"
-          className="pointer-events-auto absolute left-3 top-3 z-50 flex w-[min(620px,calc(100%-24px))] flex-col gap-1 rounded-g-md border border-g-line bg-g-surface/95 p-1 shadow-g-md backdrop-blur"
+          className="pointer-events-auto absolute left-3 top-3 z-50 flex w-[min(480px,calc(100%-24px))] origin-top-left flex-col gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none"
         >
           <form
-            className="flex items-center gap-1"
+            className="flex items-center gap-1.5"
             onSubmit={(event) => {
               event.preventDefault();
               void runSearch();
@@ -705,34 +851,165 @@ export function AICanvasView({
           >
             <TextInput
               value={query}
-              variant="search"
-              icon={<Search size={14} />}
-              placeholder={t("aiCanvas.searchPlaceholder")}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <Button
-              type="submit"
-              size="md"
-              variant="primary"
-              disabled={working === "search"}
-              leadingIcon={
-                working === "search" ? (
-                  <LoaderCircle className="animate-spin" />
+              variant="command"
+              size="sm"
+              icon={
+                searchBusy ? (
+                  <LoaderCircle
+                    size={14}
+                    className="animate-spin text-g-ink-3"
+                  />
+                ) : searchMode === "semantic" && !query.trim() ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <WandSparkles
+                      size={14}
+                      className="shrink-0 text-g-purple"
+                    />
+                    <span className="rounded-g-pill border border-g-purple/20 bg-g-purple-soft px-1 py-px font-g-mono text-[8px] uppercase tracking-[0.04em] text-g-purple opacity-75">
+                      {t("commandPalette.tryPrefix")}
+                    </span>
+                  </span>
                 ) : (
-                  <Search />
+                  <span className="relative inline-grid size-[14px] place-items-center">
+                    <Search
+                      size={14}
+                      className={cn(
+                        "absolute inset-0 transition-[opacity,transform] duration-[280ms] ease-g-spring",
+                        searchMode === "catalog"
+                          ? "rotate-0 scale-100 opacity-100"
+                          : "rotate-[-20deg] scale-75 opacity-0",
+                      )}
+                    />
+                    <WandSparkles
+                      size={14}
+                      className={cn(
+                        "absolute inset-0 text-g-purple transition-[opacity,transform] duration-[280ms] ease-g-spring",
+                        searchMode === "semantic"
+                          ? "rotate-0 scale-100 opacity-100"
+                          : "rotate-[20deg] scale-75 opacity-0",
+                      )}
+                    />
+                  </span>
                 )
               }
-            >
-              {t("aiCanvas.search")}
-            </Button>
-            <IconButton
-              size="sm"
+              placeholder={
+                searchMode === "semantic"
+                  ? ghostSamples[ghostIdx] || t("toolbar.semanticSearch")
+                  : t("aiCanvas.searchPlaceholder")
+              }
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" && !e.shiftKey && semanticAvailable) {
+                  e.preventDefault();
+                  setSearchMode((m) =>
+                    m === "catalog" ? "semantic" : "catalog",
+                  );
+                  return;
+                }
+                if (e.key === "ArrowDown" && searchResults.length > 0) {
+                  e.preventDefault();
+                  setSearchActiveIndex((i) =>
+                    Math.min(i + 1, searchResults.length - 1),
+                  );
+                  return;
+                }
+                if (e.key === "ArrowUp" && searchResults.length > 0) {
+                  e.preventDefault();
+                  setSearchActiveIndex((i) => Math.max(i - 1, -1));
+                  return;
+                }
+                if (e.key === "Enter") {
+                  e.stopPropagation();
+                  if (
+                    searchActiveIndex >= 0 &&
+                    searchResults[searchActiveIndex]
+                  ) {
+                    e.preventDefault();
+                    setSearchSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      const id = searchResults[searchActiveIndex].id;
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    });
+                  }
+                  return;
+                }
+              }}
+              suffix={
+                <span className="-mr-1 inline-flex h-full items-center gap-1">
+                  {query && (
+                    <TextInputClearButton
+                      label={t("toolbar.clearSearch")}
+                      onClick={() => setQuery("")}
+                      className="mr-0.5"
+                    />
+                  )}
+                  {semanticAvailable && (
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
+                        searchMode === "semantic"
+                          ? "text-g-purple"
+                          : "text-g-ink-3",
+                      )}
+                      aria-label={t("toolbar.searchMode")}
+                      onClick={() =>
+                        setSearchMode((m) =>
+                          m === "catalog" ? "semantic" : "catalog",
+                        )
+                      }
+                    >
+                      {searchMode === "semantic" ? (
+                        <WandSparkles size={13} aria-hidden="true" />
+                      ) : (
+                        <Search size={13} aria-hidden="true" />
+                      )}
+                      <span>
+                        {searchMode === "semantic"
+                          ? t("toolbar.aiSearchMode")
+                          : t("toolbar.catalogSearchMode")}
+                      </span>
+                      <kbd className="ml-0.5 font-g-mono text-[10px] font-[650] text-g-ink-4 opacity-70">
+                        TAB
+                      </kbd>
+                    </button>
+                  )}
+                  {searchBusy && searchMode === "semantic" && (
+                    <span
+                      key={phaseIdx}
+                      className="inline-flex h-5 shrink-0 items-center rounded-g-pill border border-g-purple/25 bg-g-purple-soft px-2 font-g-mono text-[10px] tracking-g-mono text-g-purple animate-[fadeIn_400ms_var(--g-ease)_both]"
+                    >
+                      {SEMANTIC_PHASES[phaseIdx]}
+                    </span>
+                  )}
+                </span>
+              }
+              className="flex-1"
+              inputClassName={cn(
+                "font-g text-g-ui tracking-g-ui",
+                searchMode === "semantic" &&
+                  (query.trim() ? "caret-g-purple" : "caret-transparent"),
+              )}
+            />
+            <button
+              type="button"
               aria-label={t("aiCanvas.closeSearch")}
-              className="text-g-ink-3 hover:text-g-ink"
-              onClick={() => setSearchOpen(false)}
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-g-sm text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+              onClick={() => {
+                if (searchResults.length > 0) {
+                  setSearchResults([]);
+                  setSearchTotal(0);
+                  setSearchSelectedIds(new Set());
+                  setQuery("");
+                } else {
+                  setSearchOpen(false);
+                }
+              }}
             >
-              <X size={14} />
-            </IconButton>
+              <X size={14} aria-hidden="true" />
+            </button>
           </form>
 
           {searchError && (
@@ -741,53 +1018,107 @@ export function AICanvasView({
             </div>
           )}
 
-          {searchResults.length > 0 && (
-            <>
-              <div className="flex items-center justify-between text-g-caption text-g-ink-3">
+          <div
+            className={cn(
+              "grid transition-[grid-template-rows,opacity] duration-200 ease-g-out motion-reduce:transition-none",
+              searchResults.length > 0
+                ? "grid-rows-[1fr] opacity-100"
+                : "grid-rows-[0fr] opacity-0",
+            )}
+          >
+            <div className="overflow-hidden">
+              <div className="flex items-center justify-between px-1.5 pb-0.5 text-g-chip font-[510] tracking-[0.02em] text-g-ink-4">
                 <span>
                   {t("aiCanvas.searchResults", { count: searchTotal })}
                 </span>
-                <span>{t("aiCanvas.addHint")}</span>
+                {searchSelectedIds.size > 0 ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-g-pill bg-g-accent px-2 py-0.5 font-g text-[11px] font-[590] text-white transition-opacity duration-[100ms] ease-g hover:opacity-85 focus-visible:outline-none focus-visible:shadow-g-focus"
+                    onClick={() => {
+                      searchResults
+                        .filter((a) => searchSelectedIds.has(a.id))
+                        .forEach(addAsset);
+                      setSearchResults([]);
+                      setSearchTotal(0);
+                      setSearchActiveIndex(-1);
+                      setSearchSelectedIds(new Set());
+                    }}
+                  >
+                    <Plus size={11} />
+                    {t("aiCanvas.addSelected", {
+                      count: searchSelectedIds.size,
+                    })}
+                  </button>
+                ) : (
+                  <span>{t("aiCanvas.addHint")}</span>
+                )}
               </div>
               <div
                 data-ai-canvas-scroll="true"
                 className="max-h-[320px] overflow-y-auto"
               >
-                {searchResults.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-g-md px-2 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
-                    onClick={() => addAsset(asset)}
-                  >
-                    <AssetThumbnail
-                      src={asset.thumbnailUrl || asset.url}
-                      size="sm"
-                      className="size-10"
-                      imageClassName="select-none"
-                      draggable={false}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-g-caption font-[590] text-g-ink">
-                        {fileName(asset.repoPath)}
+                {searchResults.map((asset, i) => {
+                  const selected = searchSelectedIds.has(asset.id);
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      data-active={searchActiveIndex === i || undefined}
+                      className={cn(
+                        "group flex w-full items-center gap-2.5 px-1.5 py-1.5 text-left transition-colors duration-[100ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus data-[active]:bg-g-surface-2",
+                        selected && "bg-g-accent-soft",
+                        i === 0 && "rounded-t-g-sm",
+                        i === searchResults.length - 1 && "rounded-b-g-sm",
+                        i < searchResults.length - 1 &&
+                          "border-b border-g-line/50",
+                      )}
+                      onMouseEnter={() => setSearchActiveIndex(i)}
+                      onClick={() => {
+                        setSearchSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(asset.id)) next.delete(asset.id);
+                          else next.add(asset.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      <AssetThumbnail
+                        src={asset.thumbnailUrl || asset.url}
+                        size="sm"
+                        className="size-8 rounded-g-sm"
+                        imageClassName="select-none"
+                        draggable={false}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-g-ink">
+                          {fileName(asset.repoPath)}
+                        </span>
+                        <span className="block truncate text-g-chip text-g-ink-3">
+                          {asset.projectName} · {imageMeta(asset)}
+                        </span>
                       </span>
-                      <span className="block truncate text-g-caption text-g-ink-3">
-                        {asset.projectName} · {imageMeta(asset)}
-                      </span>
-                    </span>
-                    <Plus size={14} className="shrink-0 text-g-ink-3" />
-                  </button>
-                ))}
+                      {selected ? (
+                        <Check size={14} className="shrink-0 text-g-accent" />
+                      ) : (
+                        <Plus
+                          size={14}
+                          className="shrink-0 text-g-ink-4 opacity-0 transition-opacity duration-[100ms] ease-g group-hover:opacity-100"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </aside>
       ) : (
         <IconButton
           data-ai-canvas-overlay="true"
           size="md"
           aria-label={t("aiCanvas.openSearch")}
-          className="pointer-events-auto absolute left-3 top-3 z-50 border border-g-line bg-g-surface shadow-g-md"
+          className="pointer-events-auto absolute left-3 top-3 z-50 border border-g-line bg-g-surface shadow-g-pop animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] motion-reduce:animate-none"
           onClick={() => setSearchOpen(true)}
         >
           <Search />
@@ -796,7 +1127,7 @@ export function AICanvasView({
 
       <div
         data-ai-canvas-overlay="true"
-        className="pointer-events-auto absolute right-3 top-3 z-50 flex items-center gap-1 rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-md"
+        className="pointer-events-auto absolute right-3 top-3 z-50 flex items-center gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl"
       >
         {onExitCanvas && (
           <Button
@@ -825,10 +1156,10 @@ export function AICanvasView({
         </IconButton>
         <IconButton
           size="sm"
-          aria-label={t("aiCanvas.resetView")}
-          onClick={() => setViewport({ x: 0, y: 0, scale: 1 })}
+          aria-label={t("aiCanvas.centerView")}
+          onClick={centerCanvasView}
         >
-          <Maximize2 />
+          <LocateFixed />
         </IconButton>
         <IconButton
           size="sm"

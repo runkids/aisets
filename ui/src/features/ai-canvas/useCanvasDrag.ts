@@ -7,6 +7,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import {
+  canvasWheelZoomFactor,
   intersects,
   selectionBounds,
   zoomViewportAtPoint,
@@ -277,16 +278,7 @@ export function useCanvasDrag(opts: {
       const point = bounds
         ? { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
         : { x: 0, y: 0 };
-      const normalizedDelta =
-        event.deltaMode === 1
-          ? event.deltaY * 16
-          : event.deltaMode === 2
-            ? event.deltaY * 800
-            : event.deltaY;
-      const factor = Math.max(
-        0.94,
-        Math.min(1.06, Math.pow(2, -normalizedDelta / 600)),
-      );
+      const factor = canvasWheelZoomFactor(event.deltaY, event.deltaMode);
       wheelPendingRef.current.zoomFactor *= factor;
       wheelPendingRef.current.point = point;
       scheduleWheelFrame();

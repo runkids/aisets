@@ -398,7 +398,16 @@ export function cardIdsForDeletion(cards: CanvasCard[], targetId: string) {
 
 export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "asset") return fileName(card.asset.repoPath);
-  if (card.kind === "comment") return card.text || "Comment";
+  if (card.kind === "comment") {
+    const timestamp = Date.parse(card.createdAt);
+    if (Number.isFinite(timestamp)) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(timestamp);
+    }
+    return "Comment";
+  }
   if (card.kind === "assistant") return card.prompt || "AI";
   if (card.kind === "variant") return card.sourceName;
   if (card.kind === "proposal") return card.description || card.tool;

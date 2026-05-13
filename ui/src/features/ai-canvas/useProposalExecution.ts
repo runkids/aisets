@@ -5,7 +5,6 @@ import { request } from "@/api/client";
 import { renderImageToolPreview } from "@/api/imageTools";
 import {
   createCanvasCardId,
-  type AssetCanvasCard,
   type CanvasCard,
   type ProposalCanvasCard,
   type ProposalStatus,

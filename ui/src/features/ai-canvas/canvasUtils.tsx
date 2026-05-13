@@ -16,6 +16,9 @@ export type CanvasSelection = {
 };
 
 export const CARD_WIDTH = 320;
+const CANVAS_WHEEL_ZOOM_CURVE = 240;
+const CANVAS_WHEEL_ZOOM_MIN_FACTOR = 0.82;
+const CANVAS_WHEEL_ZOOM_MAX_FACTOR = 1.22;
 
 export const DEFAULT_IMAGE_TOOL_SETTINGS: ImageToolSettings = {
   outputFormat: "webp",
@@ -202,6 +205,18 @@ export function imageMeta(asset: AssetItem) {
 
 export function tagLabel(asset: AssetItem) {
   return asset.aiTag?.tags?.slice(0, 4).join(", ") || "";
+}
+
+export function canvasWheelZoomFactor(deltaY: number, deltaMode: number) {
+  const normalizedDelta =
+    deltaMode === 1 ? deltaY * 16 : deltaMode === 2 ? deltaY * 800 : deltaY;
+  return Math.max(
+    CANVAS_WHEEL_ZOOM_MIN_FACTOR,
+    Math.min(
+      CANVAS_WHEEL_ZOOM_MAX_FACTOR,
+      Math.pow(2, -normalizedDelta / CANVAS_WHEEL_ZOOM_CURVE),
+    ),
+  );
 }
 
 export function zoomViewportAtPoint(

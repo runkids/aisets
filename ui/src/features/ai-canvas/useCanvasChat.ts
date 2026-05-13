@@ -63,9 +63,15 @@ export function useCanvasChat(opts: {
   const abortRef = useRef<AbortController | null>(null);
   const searchResultsRef = useRef<Array<{ id: string; repoPath: string }>>([]);
 
-  async function handleAsk() {
-    const promptText = prompt.trim();
+  async function handleAsk(overrides?: {
+    prompt?: string;
+    selectedCardId?: string;
+    cards?: CanvasCard[];
+  }) {
+    const promptText = (overrides?.prompt ?? prompt).trim();
     if (!promptText) return;
+    const canvasCards = overrides?.cards ?? cards;
+    const canvasSelectedCardId = overrides?.selectedCardId ?? selectedCardId;
     setPrompt("");
     setError("");
     setWorking("ai");
@@ -82,14 +88,18 @@ export function useCanvasChat(opts: {
       ...chatHistory,
       { role: "user", content: promptText },
     ];
-    const snapshot = serializeCanvasSnapshot(cards, selectedCardId, viewport);
+    const snapshot = serializeCanvasSnapshot(
+      canvasCards,
+      canvasSelectedCardId,
+      viewport,
+    );
 
     let assistantText = "";
     const newCards: CanvasCard[] = [];
 
     function handleEvent(event: CanvasChatEvent) {
       if (event.type === "focus" && event.cardId) {
-        const target = cards.find((c) => c.id === event.cardId);
+        const target = canvasCards.find((c) => c.id === event.cardId);
         if (target) {
           setAiCursor({
             x: target.x + CARD_WIDTH / 2,
@@ -109,7 +119,9 @@ export function useCanvasChat(opts: {
         assistantText += (assistantText ? "\n\n" : "") + event.content;
       }
       if (event.type === "proposal") {
-        const selectedCard = cards.find((c) => c.id === selectedCardId);
+        const selectedCard = canvasCards.find(
+          (c) => c.id === canvasSelectedCardId,
+        );
         const baseX = selectedCard ? selectedCard.x - CARD_WIDTH - 36 : 84;
         const baseY = selectedCard ? selectedCard.y : 72;
         const card: ProposalCanvasCard = {
@@ -132,7 +144,7 @@ export function useCanvasChat(opts: {
       if (event.type === "action_result" && event.tool === "focus_card") {
         const result = event.result as { cardId?: string; label?: string };
         if (result?.cardId) {
-          const target = cards.find((c) => c.id === result.cardId);
+          const target = canvasCards.find((c) => c.id === result.cardId);
           if (target) {
             setAiCursor({
               x: target.x + CARD_WIDTH / 2,
@@ -150,7 +162,7 @@ export function useCanvasChat(opts: {
           region?: { x: number; y: number; width: number; height: number };
         };
         if (r?.anchorCardId && r?.text) {
-          const anchor = cards.find((c) => c.id === r.anchorCardId);
+          const anchor = canvasCards.find((c) => c.id === r.anchorCardId);
           const card: CommentCanvasCard = {
             id: createCanvasCardId("comment"),
             kind: "comment",
@@ -234,13 +246,13 @@ export function useCanvasChat(opts: {
             : undefined;
           const addedCards: AssetCanvasCard[] = [];
           for (const asset of matchedAssets) {
-            const exists = cards.some(
+            const exists = canvasCards.some(
               (c): c is AssetCanvasCard =>
                 c.kind === "asset" && c.asset.id === asset.id,
             );
             if (exists) continue;
             const pos = nextCardPosition(
-              cards.length + newCards.length + addedCards.length,
+              canvasCards.length + newCards.length + addedCards.length,
               viewport,
               containerSize,
             );
