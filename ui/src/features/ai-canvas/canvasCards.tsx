@@ -28,7 +28,13 @@ import {
   type ProposalCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
-import { cardTone, imageMeta, renderMarkdown, tagLabel } from "./canvasUtils";
+import {
+  CARD_WIDTH,
+  cardTone,
+  imageMeta,
+  renderMarkdown,
+  tagLabel,
+} from "./canvasUtils";
 
 type CommentRegion = { x: number; y: number; width: number; height: number };
 
@@ -93,17 +99,22 @@ function figmaCommentBoxPosition(region: CommentRegion) {
 export function CardShell({
   card,
   selected,
+  compact,
+  width,
   children,
   onSelect,
   onDragStart,
   onDragMove,
   onDragEnd,
   onDelete,
+  onResize,
   onRegister,
   position,
 }: {
   card: CanvasCard;
   selected: boolean;
+  compact?: boolean;
+  width?: number;
   children: ReactNode;
   position?: { x: number; y: number };
   onSelect: (id: string) => void;
@@ -114,58 +125,113 @@ export function CardShell({
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDelete: (card: CanvasCard) => void;
+  onResize?: (id: string, width: number) => void;
   onRegister: (id: string, node: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
+  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startW: width ?? CARD_WIDTH };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleResizeMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!resizeRef.current || !onResize) return;
+    const delta = e.clientX - resizeRef.current.startX;
+    const next = Math.max(200, Math.min(800, resizeRef.current.startW + delta));
+    onResize(card.id, next);
+  }
+
+  function handleResizeUp() {
+    resizeRef.current = null;
+  }
 
   return (
     <section
       className={cn(
-        "absolute w-[320px] touch-none select-none rounded-g-md border bg-g-surface shadow-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
-        card.kind === "asset" ? "overflow-visible" : "overflow-hidden",
-        cardTone(card),
-        selected && "z-40 border-g-active-bg shadow-g-lg",
+        "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
+        compact
+          ? cn(
+              "border-2 border-transparent shadow-none",
+              selected && "z-40 border-[#0d99ff] shadow-[0_0_0_1px_#0d99ff]",
+            )
+          : cn(
+              "border bg-g-surface shadow-g-md",
+              card.kind === "asset" ? "overflow-visible" : "overflow-hidden",
+              cardTone(card),
+              selected && "z-40 border-g-active-bg shadow-g-lg",
+            ),
       )}
       ref={(node) => onRegister(card.id, node)}
       style={{
+        width: width ?? CARD_WIDTH,
         transform: `translate(${position?.x ?? card.x}px, ${position?.y ?? card.y}px)`,
       }}
       data-ai-canvas-card="true"
       data-selected={selected || undefined}
       onPointerDown={() => onSelect(card.id)}
     >
-      <div
-        className="flex cursor-grab items-center justify-between gap-2 border-b border-g-line bg-g-surface-2 px-3 py-2 active:cursor-grabbing"
-        onPointerDown={(event) => onDragStart(event, card)}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
-      >
-        <div className="flex min-w-0 items-center gap-2 text-g-caption font-[590] tracking-g-ui text-g-ink-2">
-          {card.kind === "comment" ? (
-            <FigmaCommentIcon size="xs" />
-          ) : (
-            <MousePointer2 size={13} />
-          )}
-          <span className="truncate">{cardDisplayName(card)}</span>
+      {compact ? (
+        <div
+          className="cursor-grab active:cursor-grabbing"
+          onPointerDown={(event) => onDragStart(event, card)}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+        >
+          {children}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Badge tone={selected ? "accent" : "line"}>{card.kind}</Badge>
-          <IconButton
-            size="sm"
-            aria-label={t("aiCanvas.deleteCard")}
-            className="size-6 text-g-ink-3 hover:text-g-red"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(card);
-            }}
+      ) : (
+        <>
+          <div
+            className="flex cursor-grab items-center justify-between gap-2 border-b border-g-line bg-g-surface-2 px-3 py-2 active:cursor-grabbing"
+            onPointerDown={(event) => onDragStart(event, card)}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
           >
-            <Trash2 size={13} />
-          </IconButton>
-        </div>
-      </div>
-      {children}
+            <div className="flex min-w-0 items-center gap-2 text-g-caption font-[590] tracking-g-ui text-g-ink-2">
+              {card.kind === "comment" ? (
+                <FigmaCommentIcon size="xs" />
+              ) : (
+                <MousePointer2 size={13} />
+              )}
+              <span className="truncate">{cardDisplayName(card)}</span>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Badge tone={selected ? "accent" : "line"}>{card.kind}</Badge>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.deleteCard")}
+                className="size-6 text-g-ink-3 hover:text-g-red"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(card);
+                }}
+              >
+                <Trash2 size={13} />
+              </IconButton>
+            </div>
+          </div>
+          {children}
+        </>
+      )}
+      {selected && onResize && (
+        <div
+          className={cn(
+            "absolute -bottom-1.5 -right-1.5 z-50 size-3 cursor-nwse-resize rounded-full border-2 bg-g-surface shadow-g-sm",
+            compact ? "border-[#0d99ff]" : "border-g-active-bg",
+          )}
+          onPointerDown={handleResizeDown}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          onPointerCancel={handleResizeUp}
+        />
+      )}
     </section>
   );
 }
@@ -173,6 +239,9 @@ export function CardShell({
 export function AssetCardBody({
   card,
   comments,
+  compact,
+  hideOverlays,
+  commentEnabled,
   onOpenAsset,
   onSelectComment,
   onCreateComment,
@@ -182,6 +251,9 @@ export function AssetCardBody({
 }: {
   card: AssetCanvasCard;
   comments: CommentCanvasCard[];
+  compact?: boolean;
+  hideOverlays?: boolean;
+  commentEnabled?: boolean;
   onOpenAsset?: (assetId: string) => void;
   onSelectComment: (commentId: string) => void;
   onCreateComment: (
@@ -295,12 +367,29 @@ export function AssetCardBody({
     <div className="flex flex-col">
       <div
         ref={imageContainerRef}
-        className="relative aspect-[4/3] bg-g-surface-2"
-        style={{ cursor: FIGMA_COMMENT_CURSOR }}
-        onPointerDown={handleRegionPointerDown}
-        onPointerMove={handleRegionPointerMove}
-        onPointerUp={handleRegionPointerUp}
-        onPointerCancel={() => setDrawRegion(null)}
+        className={cn(
+          "relative aspect-[4/3]",
+          compact ? "bg-transparent" : "bg-g-surface-2",
+        )}
+        style={
+          commentEnabled && !hideOverlays
+            ? { cursor: FIGMA_COMMENT_CURSOR }
+            : undefined
+        }
+        onPointerDown={
+          commentEnabled && !hideOverlays ? handleRegionPointerDown : undefined
+        }
+        onPointerMove={
+          commentEnabled && !hideOverlays ? handleRegionPointerMove : undefined
+        }
+        onPointerUp={
+          commentEnabled && !hideOverlays ? handleRegionPointerUp : undefined
+        }
+        onPointerCancel={
+          commentEnabled && !hideOverlays
+            ? () => setDrawRegion(null)
+            : undefined
+        }
       >
         <img
           src={asset.thumbnailUrl || asset.url}
@@ -309,25 +398,26 @@ export function AssetCardBody({
           draggable={false}
           loading="lazy"
         />
-        {comments.map((comment) => (
-          <button
-            key={comment.id}
-            type="button"
-            aria-label={comment.text || t("aiCanvas.commentCard")}
-            className="absolute rounded-g-sm border-2 border-g-blue bg-g-blue/10 shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-blue/20 focus-visible:outline-none focus-visible:shadow-g-focus"
-            style={{
-              left: `${comment.region.x * 100}%`,
-              top: `${comment.region.y * 100}%`,
-              width: `${comment.region.width * 100}%`,
-              height: `${comment.region.height * 100}%`,
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelectComment(comment.id);
-            }}
-          />
-        ))}
+        {!hideOverlays &&
+          comments.map((comment) => (
+            <button
+              key={comment.id}
+              type="button"
+              aria-label={comment.text || t("aiCanvas.commentCard")}
+              className="absolute rounded-g-sm border-2 border-g-blue bg-g-blue/10 shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-blue/20 focus-visible:outline-none focus-visible:shadow-g-focus"
+              style={{
+                left: `${comment.region.x * 100}%`,
+                top: `${comment.region.y * 100}%`,
+                width: `${comment.region.width * 100}%`,
+                height: `${comment.region.height * 100}%`,
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectComment(comment.id);
+              }}
+            />
+          ))}
         {drawRect && (
           <div
             className="pointer-events-none absolute z-[60] border-2 border-g-blue bg-g-blue/10"
@@ -371,77 +461,79 @@ export function AssetCardBody({
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-3 p-3">
-        <div className="min-w-0">
-          <div className="truncate text-g-body font-[590] tracking-g-ui text-g-ink">
-            {fileName(asset.repoPath)}
+      {!compact && (
+        <div className="flex flex-col gap-3 p-3">
+          <div className="min-w-0">
+            <div className="truncate text-g-body font-[590] tracking-g-ui text-g-ink">
+              {fileName(asset.repoPath)}
+            </div>
+            <div className="mt-1 truncate text-g-caption text-g-ink-3">
+              {asset.repoPath}
+            </div>
           </div>
-          <div className="mt-1 truncate text-g-caption text-g-ink-3">
-            {asset.repoPath}
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          <Badge tone="line">{formatExt(asset.ext)}</Badge>
-          <Badge tone="line">{imageMeta(asset)}</Badge>
-          {asset.usedBy.length > 0 && (
-            <Badge tone="green">
-              {t("aiCanvas.references", { count: asset.usedBy.length })}
-            </Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge tone="line">{formatExt(asset.ext)}</Badge>
+            <Badge tone="line">{imageMeta(asset)}</Badge>
+            {asset.usedBy.length > 0 && (
+              <Badge tone="green">
+                {t("aiCanvas.references", { count: asset.usedBy.length })}
+              </Badge>
+            )}
+            {tags && <Badge tone="purple">{tags}</Badge>}
+          </div>
+
+          {asset.aiTag?.description && (
+            <p className="line-clamp-2 text-g-caption leading-[1.45] text-g-ink-3">
+              {asset.aiTag.description}
+            </p>
           )}
-          {tags && <Badge tone="purple">{tags}</Badge>}
-        </div>
 
-        {asset.aiTag?.description && (
-          <p className="line-clamp-2 text-g-caption leading-[1.45] text-g-ink-3">
-            {asset.aiTag.description}
-          </p>
-        )}
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            leadingIcon={<ImagePlus />}
-            disabled={working}
-            onClick={() => onRenderPreview(card)}
-          >
-            {t("aiCanvas.previewWebp")}
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            leadingIcon={<Layers3 />}
-            disabled={working}
-            onClick={() => onOperationPreview(card)}
-          >
-            {t("aiCanvas.safeVariant")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            leadingIcon={<FigmaCommentIcon />}
-            onClick={() =>
-              openCommentComposer({
-                x: 0.22,
-                y: 0.2,
-                width: 0.56,
-                height: 0.37,
-              })
-            }
-          >
-            {t("aiCanvas.comment")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={!onOpenAsset}
-            onClick={() => onOpenAsset?.(asset.id)}
-          >
-            {t("aiCanvas.openAsset")}
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              leadingIcon={<ImagePlus />}
+              disabled={working}
+              onClick={() => onRenderPreview(card)}
+            >
+              {t("aiCanvas.previewWebp")}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              leadingIcon={<Layers3 />}
+              disabled={working}
+              onClick={() => onOperationPreview(card)}
+            >
+              {t("aiCanvas.safeVariant")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              leadingIcon={<FigmaCommentIcon />}
+              onClick={() =>
+                openCommentComposer({
+                  x: 0.22,
+                  y: 0.2,
+                  width: 0.56,
+                  height: 0.37,
+                })
+              }
+            >
+              {t("aiCanvas.comment")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!onOpenAsset}
+              onClick={() => onOpenAsset?.(asset.id)}
+            >
+              {t("aiCanvas.openAsset")}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -467,7 +559,7 @@ export function AssistantCardBody({
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center gap-2">
-        <Badge tone="purple">{t("aiCanvas.aiContext")}</Badge>
+        <Badge tone="line">{t("aiCanvas.aiContext")}</Badge>
         <span className="truncate text-g-caption text-g-ink-3">
           {card.assetIds.length > 0
             ? t("aiCanvas.selectedAssets", { count: card.assetIds.length })
@@ -692,8 +784,8 @@ export function AICursor({
           className={cn(
             "drop-shadow-md transition-all duration-500",
             active
-              ? "fill-g-purple text-black"
-              : "fill-g-purple/40 text-black/40",
+              ? "fill-g-purple text-white"
+              : "fill-g-purple/60 text-white/70",
             status === "thinking" && "animate-pulse",
           )}
         />

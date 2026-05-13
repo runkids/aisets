@@ -4,16 +4,17 @@ import {
   AtSign,
   Check,
   CheckCircle2,
+  ChevronDown,
   Eye,
-  ImagePlus,
+  EyeOff,
   Layers3,
   LoaderCircle,
   LocateFixed,
+  MessageCircle,
   X,
   Paperclip,
   Plus,
   Search,
-  SlidersHorizontal,
   Square,
   Trash2,
   WandSparkles,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import {
   embeddingStats,
   getCatalogItems,
@@ -38,6 +40,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  CopyButton,
   IconButton,
   TextInput,
   TextInputClearButton,
@@ -108,11 +111,31 @@ const SEMANTIC_PHASES = [
 
 const ASSET_CARD_IMAGE_TOP = 38;
 const ASSET_CARD_IMAGE_HEIGHT = 240;
+const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
+const DEFAULT_COMPOSER_HEIGHT = 320;
+const composerActionClass =
+  "border-white/[0.08] bg-white/[0.07] text-white/72 hover:bg-white/[0.12] hover:text-white";
+const composerIconClass =
+  "rounded-full border-transparent bg-transparent text-white/52 hover:bg-white/[0.08] hover:text-white";
+const composerConfirmClass =
+  "border-white/80 bg-white text-black hover:bg-white/90";
+
+type AIBackendOption = {
+  value: string;
+  label: string;
+  group: string;
+  disabled?: boolean;
+};
 
 type Props = {
   scanId?: number;
   aiEnabled: boolean;
   aiNickname?: string;
+  aiBackendLabel?: string;
+  aiBackendValue?: string;
+  aiBackendOptions?: AIBackendOption[];
+  aiBackendPending?: boolean;
+  onAiBackendChange?: (value: string) => void;
   onOpenAsset?: (assetId: string) => void;
   onExitCanvas?: () => void;
 };
@@ -123,6 +146,11 @@ export function AICanvasView({
   scanId,
   aiEnabled,
   aiNickname,
+  aiBackendLabel,
+  aiBackendValue,
+  aiBackendOptions = [],
+  aiBackendPending,
+  onAiBackendChange,
   onOpenAsset,
   onExitCanvas,
 }: Props) {
@@ -180,7 +208,6 @@ export function AICanvasView({
       return true;
     }
   });
-  const [composerPreviewOpen, setComposerPreviewOpen] = useState(false);
   const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
     initialSession.chatHistory ?? [],
@@ -201,9 +228,27 @@ export function AICanvasView({
       status: "idle" as const,
     };
   });
+  const [viewMode, setViewMode] = useState<"normal" | "compact" | "hidden">(
+    initialSession.viewMode ?? "normal",
+  );
+  const compactCards = viewMode === "compact" || viewMode === "hidden";
+  const hideCards = viewMode === "hidden";
+  const [cardWidths, setCardWidths] = useState<Record<string, number>>(
+    initialSession.cardWidths ?? {},
+  );
+  const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
-  const [composerHeight, setComposerHeight] = useState(320);
+  const [composerHeight, setComposerHeight] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(COMPOSER_HEIGHT_STORAGE_KEY));
+      return Number.isFinite(saved) && saved >= 200
+        ? saved
+        : DEFAULT_COMPOSER_HEIGHT;
+    } catch {
+      return DEFAULT_COMPOSER_HEIGHT;
+    }
+  });
   const composerDragRef = useRef<{ startY: number; startH: number } | null>(
     null,
   );
@@ -314,10 +359,6 @@ export function AICanvasView({
       ];
     });
   }, [cards, dragPreview, selectedCardId]);
-  const selectedLabel =
-    selectedAssets.length > 0
-      ? selectedAssets.map((card) => fileName(card.asset.repoPath)).join(", ")
-      : t("aiCanvas.noSelection");
   const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
     cards,
     t,
@@ -340,8 +381,35 @@ export function AICanvasView({
     setPrompt,
   });
   const isWorking = working !== "idle";
-  const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
-  const latestChatContent = chatHistory.at(-1)?.content ?? "";
+  const composerToolsOpen = composerAdvancedOpen;
+  const assistantMessages = useMemo(
+    () => chatHistory.filter((entry) => entry.role === "assistant"),
+    [chatHistory],
+  );
+  const latestChatContent = assistantMessages.at(-1)?.content ?? "";
+  const composerStatusLabel = error
+    ? t("aiCanvas.statusError")
+    : isWorking
+      ? t("aiCanvas.statusProcessing")
+      : latestChatContent
+        ? t("aiCanvas.statusLatest")
+        : t("aiCanvas.statusReady");
+  const composerStatusText =
+    error ||
+    (isWorking
+      ? t("aiCanvas.statusProcessingDetail")
+      : latestChatContent
+        ? t("aiCanvas.statusLatestDetail")
+        : t("aiCanvas.statusReadyDetail"));
+  const groupedBackendOptions = useMemo(() => {
+    const groups: Array<{ group: string; options: AIBackendOption[] }> = [];
+    for (const option of aiBackendOptions) {
+      const existing = groups.find((g) => g.group === option.group);
+      if (existing) existing.options.push(option);
+      else groups.push({ group: option.group, options: [option] });
+    }
+    return groups;
+  }, [aiBackendOptions]);
   const selectedProposal = useMemo(() => {
     if (!selectedCardId) return undefined;
     const card = cards.find((c) => c.id === selectedCardId);
@@ -364,8 +432,10 @@ export function AICanvasView({
       selectedCardId,
       viewport,
       chatHistory: chatHistory.slice(-10),
+      cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
+      viewMode: viewMode !== "normal" ? viewMode : undefined,
     });
-  }, [cards, selectedCardId, viewport, chatHistory]);
+  }, [cards, selectedCardId, viewport, chatHistory, cardWidths, viewMode]);
 
   useEffect(() => {
     try {
@@ -377,6 +447,14 @@ export function AICanvasView({
       // sessionStorage unavailable
     }
   }, [composerCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COMPOSER_HEIGHT_STORAGE_KEY, String(composerHeight));
+    } catch {
+      // localStorage unavailable
+    }
+  }, [composerHeight]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -727,7 +805,7 @@ export function AICanvasView({
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
           }}
         >
-          {commentConnectors.length > 0 && (
+          {commentConnectors.length > 0 && !hideCards && (
             <svg
               className="pointer-events-none absolute left-0 top-0 z-[36] overflow-visible"
               width="1"
@@ -773,60 +851,82 @@ export function AICanvasView({
               ))}
             </svg>
           )}
-          {cards.map((card) => (
-            <CardShell
-              key={card.id}
-              card={card}
-              selected={selectedCardId === card.id}
-              onSelect={setSelectedCardId}
-              onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
-              onDelete={deleteCard}
-              onRegister={registerCardElement}
-              position={
-                dragPreview?.cardId === card.id
-                  ? { x: dragPreview.x, y: dragPreview.y }
-                  : undefined
-              }
-            >
-              {card.kind === "asset" ? (
-                <AssetCardBody
-                  card={card}
-                  comments={commentsByAnchor.get(card.id) ?? []}
-                  onOpenAsset={onOpenAsset}
-                  onSelectComment={setSelectedCardId}
-                  onCreateComment={addComment}
-                  onRenderPreview={(assetCard) =>
-                    void createImagePreview(assetCard, "")
-                  }
-                  onOperationPreview={(assetCard) =>
-                    void createOperationPreview(
-                      [assetCard],
-                      t("aiCanvas.safeVariantPrompt"),
-                    )
-                  }
-                  working={isWorking}
-                />
-              ) : card.kind === "comment" ? (
-                <CommentCardBody card={card} />
-              ) : card.kind === "assistant" ? (
-                <AssistantCardBody card={card} />
-              ) : card.kind === "variant" ? (
-                <VariantCardBody card={card} />
-              ) : card.kind === "proposal" ? (
-                <ProposalCardBody card={card} />
-              ) : card.kind === "operation" ? (
-                <OperationCardBody card={card} />
-              ) : null}
-            </CardShell>
-          ))}
-          <AICursor
-            position={{ x: aiCursor.x, y: aiCursor.y }}
-            label={aiCursor.label}
-            status={aiCursor.status}
-            nickname={aiNickname}
-          />
+          {cards.map((card) => {
+            if (hideCards && card.kind !== "asset") return null;
+            return (
+              <CardShell
+                key={card.id}
+                card={card}
+                selected={selectedCardId === card.id}
+                compact={compactCards && card.kind === "asset"}
+                width={cardWidths[card.id]}
+                onSelect={(id) => {
+                  setSelectedCardId(id);
+                  setCards((prev) => {
+                    const idx = prev.findIndex((c) => c.id === id);
+                    if (idx < 0 || idx === prev.length - 1) return prev;
+                    const next = [...prev];
+                    next.push(next.splice(idx, 1)[0]);
+                    return next;
+                  });
+                }}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+                onDelete={deleteCard}
+                onResize={(id, w) =>
+                  setCardWidths((prev) => ({ ...prev, [id]: w }))
+                }
+                onRegister={registerCardElement}
+                position={
+                  dragPreview?.cardId === card.id
+                    ? { x: dragPreview.x, y: dragPreview.y }
+                    : undefined
+                }
+              >
+                {card.kind === "asset" ? (
+                  <AssetCardBody
+                    card={card}
+                    comments={commentsByAnchor.get(card.id) ?? []}
+                    compact={compactCards && card.kind === "asset"}
+                    hideOverlays={hideCards}
+                    commentEnabled={commentMode}
+                    onOpenAsset={onOpenAsset}
+                    onSelectComment={setSelectedCardId}
+                    onCreateComment={addComment}
+                    onRenderPreview={(assetCard) =>
+                      void createImagePreview(assetCard, "")
+                    }
+                    onOperationPreview={(assetCard) =>
+                      void createOperationPreview(
+                        [assetCard],
+                        t("aiCanvas.safeVariantPrompt"),
+                      )
+                    }
+                    working={isWorking}
+                  />
+                ) : card.kind === "comment" ? (
+                  <CommentCardBody card={card} />
+                ) : card.kind === "assistant" ? (
+                  <AssistantCardBody card={card} />
+                ) : card.kind === "variant" ? (
+                  <VariantCardBody card={card} />
+                ) : card.kind === "proposal" ? (
+                  <ProposalCardBody card={card} />
+                ) : card.kind === "operation" ? (
+                  <OperationCardBody card={card} />
+                ) : null}
+              </CardShell>
+            );
+          })}
+          {!hideCards && (
+            <AICursor
+              position={{ x: aiCursor.x, y: aiCursor.y }}
+              label={aiCursor.label}
+              status={aiCursor.status}
+              nickname={aiNickname}
+            />
+          )}
         </div>
       </div>
 
@@ -861,11 +961,8 @@ export function AICanvasView({
                   />
                 ) : searchMode === "semantic" && !query.trim() ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <WandSparkles
-                      size={14}
-                      className="shrink-0 text-g-purple"
-                    />
-                    <span className="rounded-g-pill border border-g-purple/20 bg-g-purple-soft px-1 py-px font-g-mono text-[8px] uppercase tracking-[0.04em] text-g-purple opacity-75">
+                    <WandSparkles size={14} className="shrink-0 text-g-ink-3" />
+                    <span className="rounded-g-pill border border-g-line bg-g-surface-2 px-1 py-px font-g-mono text-[8px] uppercase tracking-[0.04em] text-g-ink-3 opacity-75">
                       {t("commandPalette.tryPrefix")}
                     </span>
                   </span>
@@ -883,7 +980,7 @@ export function AICanvasView({
                     <WandSparkles
                       size={14}
                       className={cn(
-                        "absolute inset-0 text-g-purple transition-[opacity,transform] duration-[280ms] ease-g-spring",
+                        "absolute inset-0 text-g-ink-2 transition-[opacity,transform] duration-[280ms] ease-g-spring",
                         searchMode === "semantic"
                           ? "rotate-0 scale-100 opacity-100"
                           : "rotate-[20deg] scale-75 opacity-0",
@@ -951,7 +1048,7 @@ export function AICanvasView({
                       className={cn(
                         "inline-flex h-5 items-center gap-1 border-l border-g-line px-2 pr-1 font-g text-[12px] font-[650] tracking-g-ui transition-colors duration-[140ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus",
                         searchMode === "semantic"
-                          ? "text-g-purple"
+                          ? "text-g-ink"
                           : "text-g-ink-3",
                       )}
                       aria-label={t("toolbar.searchMode")}
@@ -979,7 +1076,7 @@ export function AICanvasView({
                   {searchBusy && searchMode === "semantic" && (
                     <span
                       key={phaseIdx}
-                      className="inline-flex h-5 shrink-0 items-center rounded-g-pill border border-g-purple/25 bg-g-purple-soft px-2 font-g-mono text-[10px] tracking-g-mono text-g-purple animate-[fadeIn_400ms_var(--g-ease)_both]"
+                      className="inline-flex h-5 shrink-0 items-center rounded-g-pill border border-g-line bg-g-surface-2 px-2 font-g-mono text-[10px] tracking-g-mono text-g-ink-3 animate-[fadeIn_400ms_var(--g-ease)_both]"
                     >
                       {SEMANTIC_PHASES[phaseIdx]}
                     </span>
@@ -990,7 +1087,7 @@ export function AICanvasView({
               inputClassName={cn(
                 "font-g text-g-ui tracking-g-ui",
                 searchMode === "semantic" &&
-                  (query.trim() ? "caret-g-purple" : "caret-transparent"),
+                  (query.trim() ? "caret-g-ink" : "caret-transparent"),
               )}
             />
             <button
@@ -1163,6 +1260,39 @@ export function AICanvasView({
         </IconButton>
         <IconButton
           size="sm"
+          aria-label={t("aiCanvas.commentMode")}
+          data-active={commentMode || undefined}
+          className={cn(commentMode && "bg-g-surface-3 text-g-ink")}
+          onClick={() => setCommentMode((v) => !v)}
+        >
+          <MessageCircle />
+        </IconButton>
+        <IconButton
+          size="sm"
+          aria-label={t("aiCanvas.viewMode")}
+          data-active={viewMode !== "normal" || undefined}
+          className={cn(viewMode !== "normal" && "bg-g-surface-3 text-g-ink")}
+          onClick={() => {
+            setViewMode((m) =>
+              m === "normal"
+                ? "compact"
+                : m === "compact"
+                  ? "hidden"
+                  : "normal",
+            );
+            setSelectedCardId(undefined);
+          }}
+        >
+          {viewMode === "hidden" ? (
+            <EyeOff />
+          ) : viewMode === "compact" ? (
+            <Layers3 />
+          ) : (
+            <Eye />
+          )}
+        </IconButton>
+        <IconButton
+          size="sm"
           aria-label={t("aiCanvas.clear")}
           disabled={cards.length === 0}
           onClick={() => setClearConfirmOpen(true)}
@@ -1233,25 +1363,26 @@ export function AICanvasView({
               className="flex h-12 w-full shrink-0 items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
               onClick={() => setComposerCollapsed((current) => !current)}
             >
-              {isWorking ? (
+              {isWorking && (
                 <LoaderCircle
                   size={14}
-                  className="shrink-0 animate-spin text-g-purple"
+                  className="shrink-0 animate-spin text-white/54"
                 />
-              ) : (
-                <span>{t("aiCanvas.processed", { time: "" })}</span>
               )}
-              <span className="min-w-0 flex-1 truncate">
-                {isWorking
-                  ? "AI thinking…"
-                  : error ||
-                    (chatHistory.length > 0
-                      ? chatHistory.at(-1)?.content
-                      : selectedLabel)}
+              <span className="shrink-0 font-[590] text-white/68">
+                {composerStatusLabel}
               </span>
-              <span className="text-white/42">
-                {composerCollapsed ? "›" : "⌄"}
+              <span className="min-w-0 flex-1 truncate text-white/58">
+                {composerStatusText}
               </span>
+              <ChevronDown
+                size={17}
+                className={cn(
+                  "shrink-0 text-white/42 transition-transform duration-[160ms] ease-g",
+                  !composerCollapsed && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
             </button>
             {!composerCollapsed && (
               <div
@@ -1259,34 +1390,33 @@ export function AICanvasView({
                 data-ai-canvas-scroll="true"
                 className="flex h-[calc(100%-48px)] flex-col gap-2 overflow-y-auto px-5 pb-16"
               >
-                {chatHistory.length === 0 ? (
+                {assistantMessages.length === 0 ? (
                   <div className="py-4 text-center text-g-caption text-white/30">
                     {t("aiCanvas.emptyDesc")}
                   </div>
                 ) : (
-                  chatHistory.map((entry, i) => (
-                    <div
+                  assistantMessages.map((entry, i) => (
+                    <article
                       key={i}
-                      className={cn(
-                        "max-w-[80%] rounded-g-md px-3 py-2 text-g-caption leading-[1.5]",
-                        entry.role === "user"
-                          ? "self-end bg-white/[0.08] text-white/80"
-                          : "self-start bg-g-purple/20 text-white/70",
-                      )}
+                      className="max-w-[calc(100%-16px)] self-start rounded-g-lg border border-white/[0.06] bg-white/[0.06] px-4 py-3 text-g-body leading-[1.55] text-white/84"
                     >
-                      <div className="mb-1 text-[10px] font-[590] uppercase tracking-wider text-white/40">
-                        {entry.role === "user" ? "You" : "AI"}
-                      </div>
                       <div className="whitespace-pre-wrap">
                         {renderMarkdown(entry.content)}
                       </div>
-                    </div>
+                      <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
+                        <CopyButton
+                          value={entry.content}
+                          label={t("ai.copyResult")}
+                          className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
+                        />
+                      </div>
+                    </article>
                   ))
                 )}
                 {isWorking && (
-                  <div className="flex items-center gap-2 self-start rounded-g-md bg-g-purple/20 px-3 py-2 text-g-caption text-white/50">
+                  <div className="flex items-center gap-2 self-start rounded-g-md border border-white/[0.06] bg-white/[0.07] px-3 py-2 text-g-caption text-white/56">
                     <LoaderCircle size={12} className="animate-spin" />
-                    AI thinking…
+                    {t("aiCanvas.statusProcessingDetail")}
                   </div>
                 )}
               </div>
@@ -1296,46 +1426,13 @@ export function AICanvasView({
           <div className="absolute inset-x-0 bottom-0 rounded-[28px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-2.5 py-2 shadow-g-pop backdrop-blur-xl">
             {composerToolsOpen && (
               <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/[0.06] pb-3 text-g-caption text-white/58">
-                {composerPreviewOpen && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="chip"
-                      leadingIcon={<ImagePlus />}
-                      disabled={selectedAssets.length === 0 || isWorking}
-                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
-                      onClick={() => {
-                        const target = selectedAssets[0];
-                        if (target) void createImagePreview(target, "");
-                      }}
-                    >
-                      {t("aiCanvas.previewWebp")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="chip"
-                      leadingIcon={<Layers3 />}
-                      disabled={selectedAssets.length === 0 || isWorking}
-                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
-                      onClick={() =>
-                        void createOperationPreview(
-                          selectedAssets,
-                          t("aiCanvas.safeVariantPrompt"),
-                        )
-                      }
-                    >
-                      {t("aiCanvas.safeVariant")}
-                    </Button>
-                    <Badge tone="green">{t("aiCanvas.previewOnly")}</Badge>
-                  </>
-                )}
                 {composerAdvancedOpen && (
                   <>
                     <Button
                       size="sm"
                       variant="chip"
                       leadingIcon={<AtSign />}
-                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      className={composerActionClass}
                       onClick={mentionSelectedAsset}
                     >
                       {t("aiCanvas.mentionAsset")}
@@ -1344,7 +1441,7 @@ export function AICanvasView({
                       size="sm"
                       variant="chip"
                       leadingIcon={<Paperclip />}
-                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      className={composerActionClass}
                       onClick={noteUploadPending}
                     >
                       {t("aiCanvas.attachImage")}
@@ -1353,7 +1450,7 @@ export function AICanvasView({
                       size="sm"
                       variant="chip"
                       leadingIcon={<CheckCircle2 />}
-                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      className={composerActionClass}
                       onClick={() =>
                         addAssistantCard(t("aiCanvas.describePrompt"))
                       }
@@ -1380,7 +1477,7 @@ export function AICanvasView({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
                       leadingIcon={<XCircle />}
                       onClick={() => handleRejectProposal(selectedProposal)}
                     >
@@ -1390,6 +1487,7 @@ export function AICanvasView({
                       size="sm"
                       variant="primary"
                       leadingIcon={<Check />}
+                      className={composerConfirmClass}
                       onClick={() => handleApproveProposal(selectedProposal)}
                     >
                       {t("aiCanvas.approve")}
@@ -1405,7 +1503,7 @@ export function AICanvasView({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
                       onClick={() => {
                         for (const p of pendingProposals)
                           handleRejectProposal(p);
@@ -1416,6 +1514,7 @@ export function AICanvasView({
                     <Button
                       size="sm"
                       variant="primary"
+                      className={composerConfirmClass}
                       onClick={() => {
                         for (const p of pendingProposals)
                           handleApproveProposal(p);
@@ -1427,11 +1526,11 @@ export function AICanvasView({
                 )}
               </div>
             )}
-            <div className="flex min-h-9 items-center gap-1.5">
+            <div className="flex min-h-10 items-center gap-2 pl-1 pr-0.5">
               <IconButton
                 size="md"
                 aria-label={t("aiCanvas.addAttachment")}
-                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                className={composerIconClass}
                 onClick={noteUploadPending}
               >
                 <Plus />
@@ -1439,7 +1538,7 @@ export function AICanvasView({
               <IconButton
                 size="sm"
                 aria-label={t("aiCanvas.mentionAsset")}
-                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                className={composerIconClass}
                 onClick={mentionSelectedAsset}
               >
                 <AtSign />
@@ -1461,47 +1560,89 @@ export function AICanvasView({
                   }
                 }}
               />
-              <IconButton
-                size="sm"
-                aria-label={t("aiCanvas.previewTools")}
-                className={cn(
-                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
-                  composerPreviewOpen && "bg-white/[0.1] text-white",
-                )}
-                onClick={() => setComposerPreviewOpen((current) => !current)}
-              >
-                <Eye />
-              </IconButton>
-              <IconButton
-                size="sm"
-                aria-label={t("aiCanvas.advancedChat")}
-                className={cn(
-                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
-                  composerAdvancedOpen && "bg-white/[0.1] text-white",
-                )}
-                onClick={() => setComposerAdvancedOpen((current) => !current)}
-              >
-                <SlidersHorizontal />
-              </IconButton>
+              {aiBackendLabel && (
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      disabled={
+                        aiBackendPending ||
+                        !onAiBackendChange ||
+                        aiBackendOptions.length === 0
+                      }
+                      className="flex h-7 max-w-[220px] shrink-0 items-center gap-1.5 truncate rounded-full px-2 font-g text-g-caption font-[510] tracking-g-ui text-white/72 transition-colors duration-[120ms] ease-g hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-default disabled:opacity-60"
+                    >
+                      <span className="truncate">{aiBackendLabel}</span>
+                      <ChevronDown
+                        size={14}
+                        className="shrink-0 text-white/42"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="end"
+                      sideOffset={10}
+                      className="z-[80] min-w-[240px] max-w-[360px] overflow-auto rounded-[18px] border border-white/[0.08] bg-[rgba(42,42,42,0.98)] p-3 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
+                      style={{ maxHeight: 320 }}
+                    >
+                      {groupedBackendOptions.map((group, groupIndex) => (
+                        <DropdownMenuPrimitive.Group key={group.group}>
+                          {groupIndex > 0 && (
+                            <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.12]" />
+                          )}
+                          <DropdownMenuPrimitive.Label className="px-3 py-1 font-g text-g-caption font-[510] tracking-g-ui text-white/38">
+                            {group.group}
+                          </DropdownMenuPrimitive.Label>
+                          {group.options.map((option) => {
+                            const selected = option.value === aiBackendValue;
+                            return (
+                              <DropdownMenuPrimitive.Item
+                                key={option.value}
+                                disabled={option.disabled || aiBackendPending}
+                                onSelect={() =>
+                                  onAiBackendChange?.(option.value)
+                                }
+                                className={cn(
+                                  "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[14px] px-3 py-1.5 font-g text-g-ui font-[510] leading-[1.35] text-white outline-none transition-[background,color,box-shadow] duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]",
+                                  selected && "bg-white/[0.13]",
+                                )}
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {option.label}
+                                </span>
+                                <span className="grid size-4 shrink-0 place-items-center text-white">
+                                  {selected && <Check size={15} />}
+                                </span>
+                              </DropdownMenuPrimitive.Item>
+                            );
+                          })}
+                        </DropdownMenuPrimitive.Group>
+                      ))}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
+              )}
               {isWorking ? (
-                <IconButton
-                  size="md"
+                <button
+                  type="button"
                   aria-label={t("aiCanvas.stopChat")}
-                  className="rounded-full border-g-red bg-g-red text-white hover:bg-g-red/90"
+                  className="grid size-10 shrink-0 place-items-center rounded-full border border-g-red bg-g-red text-white transition-colors duration-[120ms] ease-g hover:bg-g-red/90 focus-visible:outline-none focus-visible:shadow-g-focus"
                   onClick={handleStop}
                 >
-                  <Square size={14} />
-                </IconButton>
+                  <Square size={15} aria-hidden="true" />
+                </button>
               ) : (
-                <IconButton
-                  size="md"
+                <button
+                  type="button"
                   aria-label={t("aiCanvas.ask")}
                   disabled={prompt.trim() === ""}
-                  className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
+                  className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.82] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                   onClick={() => void handleAsk()}
                 >
-                  <ArrowUp />
-                </IconButton>
+                  <ArrowUp size={20} strokeWidth={2.1} aria-hidden="true" />
+                </button>
               )}
             </div>
           </div>
@@ -1519,13 +1660,53 @@ export function AICanvasView({
             <span className="font-[590] uppercase tracking-wider">
               Canvas Debug
             </span>
-            <button
-              type="button"
-              className="text-white/40 hover:text-white"
-              onClick={() => setDebugOpen(false)}
-            >
-              <X size={14} />
-            </button>
+            <div className="flex items-center gap-2">
+              <CopyButton
+                value={JSON.stringify(
+                  {
+                    version: 1,
+                    viewport,
+                    selectedCardId,
+                    cardWidths,
+                    cards: cards.map((c) => {
+                      const base: Record<string, unknown> = {
+                        id: c.id,
+                        kind: c.kind,
+                        x: Math.round(c.x),
+                        y: Math.round(c.y),
+                        width: cardWidths[c.id] ?? CARD_WIDTH,
+                      };
+                      if (c.kind === "asset") {
+                        base.assetId = c.asset.id;
+                        base.repoPath = c.asset.repoPath;
+                      }
+                      if (c.kind === "proposal") {
+                        base.tool = c.tool;
+                        base.status = c.status;
+                      }
+                      if (c.kind === "comment") {
+                        base.anchor = c.anchorId;
+                        base.text = c.text;
+                        base.region = c.region;
+                      }
+                      return base;
+                    }),
+                    chatHistory,
+                  },
+                  null,
+                  2,
+                )}
+                size="sm"
+                className="text-white/40 hover:text-white"
+              />
+              <button
+                type="button"
+                className="text-white/40 hover:text-white"
+                onClick={() => setDebugOpen(false)}
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
           <pre className="whitespace-pre-wrap break-all">
             {JSON.stringify(
@@ -1534,6 +1715,7 @@ export function AICanvasView({
                 selectedCardId,
                 working,
                 cardsCount: cards.length,
+                cardWidths,
                 cardKinds: cards.map((c) => `${c.kind}:${c.id.slice(0, 8)}`),
                 chatHistoryCount: chatHistory.length,
                 aiCursor,
@@ -1543,6 +1725,7 @@ export function AICanvasView({
                     kind: c.kind,
                     x: Math.round(c.x),
                     y: Math.round(c.y),
+                    width: cardWidths[c.id] ?? CARD_WIDTH,
                   };
                   if (c.kind === "asset") {
                     base.assetId = c.asset.id;

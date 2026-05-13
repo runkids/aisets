@@ -259,7 +259,7 @@ export function intersects(
 export function cardTone(card: CanvasCard) {
   if (card.kind === "asset") return "border-g-line";
   if (card.kind === "comment") return "border-g-amber/50";
-  if (card.kind === "assistant") return "border-g-purple/50";
+  if (card.kind === "assistant") return "border-g-line-strong";
   if (card.kind === "variant") return "border-g-blue/50";
   return "border-g-green/50";
 }

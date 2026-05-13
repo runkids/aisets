@@ -100,6 +100,8 @@ export type AICanvasSession = {
   selectedCardId?: string;
   viewport: CanvasViewport;
   chatHistory?: ChatHistoryEntry[];
+  cardWidths?: Record<string, number>;
+  viewMode?: "normal" | "compact" | "hidden";
 };
 
 export type AICanvasPromptIntent =
@@ -329,6 +331,13 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
         .slice(-10)
     : [];
 
+  const cardWidths: Record<string, number> = {};
+  if (isRecord(value.cardWidths)) {
+    for (const [k, v] of Object.entries(value.cardWidths)) {
+      if (typeof v === "number" && v > 0) cardWidths[k] = v;
+    }
+  }
+
   return {
     version: 1,
     cards,
@@ -339,6 +348,11 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
       scale: clampCanvasScale(Number(viewport.scale) || 1),
     },
     chatHistory,
+    cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
+    viewMode:
+      value.viewMode === "compact" || value.viewMode === "hidden"
+        ? value.viewMode
+        : undefined,
   };
 }
 

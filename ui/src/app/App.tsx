@@ -60,6 +60,7 @@ import {
   useScanCatalogMutation,
   useScanStatusQuery,
   useSettingsQuery,
+  useUpdateSettingsMutation,
 } from "@/queries";
 import {
   APIError,
@@ -119,6 +120,7 @@ import type {
   CatalogSummary,
   ProjectScanIntent,
   ScanEvent,
+  SettingsInfo,
 } from "@/types";
 import {
   clearBrowseSearchParams,
@@ -179,6 +181,101 @@ const DEFAULT_IMAGE_PREVIEW_SIZE: ImagePreviewSize = {
 const BROWSE_STATE_STORAGE_KEY = "aisets-browse-state";
 const SCAN_COMPLETE_DISMISS_MS = 1200;
 const SCAN_ERROR_DISMISS_MS = 3500;
+
+function agentAdapterLabel(id: string) {
+  switch (id) {
+    case "claude":
+      return "Claude Code";
+    case "codex":
+      return "Codex";
+    case "cursor-agent":
+      return "Cursor Agent";
+    case "gemini":
+      return "Gemini";
+    case "copilot":
+      return "Copilot";
+    case "pi":
+      return "Pi";
+    default:
+      return id;
+  }
+}
+
+function canvasBackendLabel(settings?: SettingsInfo) {
+  if (!settings) return "";
+  const backend =
+    settings.vlmBackendCanvas || settings.vlmBackend || "local-llm";
+  if (backend.startsWith("agent:")) {
+    const rest = backend.slice("agent:".length);
+    const slash = rest.indexOf("/");
+    const adapterId = slash >= 0 ? rest.slice(0, slash) : rest;
+    const backendModel = slash >= 0 ? rest.slice(slash + 1) : "";
+    const adapterName =
+      settings.agentRuntime.adapters.find((adapter) => adapter.id === adapterId)
+        ?.name ?? agentAdapterLabel(adapterId);
+    const model = backendModel || settings.agentModel;
+    return model ? `${adapterName} ${model}` : adapterName;
+  }
+  const localModel = backend.startsWith("local-llm/")
+    ? backend.slice("local-llm/".length)
+    : settings.llmVisionModel || settings.llmRuntime.visionModel;
+  const provider = settings.llmProvider || "LLM";
+  return localModel ? `${provider} ${localModel}` : provider;
+}
+
+type CanvasBackendOption = { value: string; label: string; group: string };
+
+type CanvasBackendLabels = {
+  canvas: string;
+  defaultOption: string;
+  llm: string;
+  localLLM: string;
+  agent: string;
+};
+
+function canvasBackendOptions(
+  settings: SettingsInfo | undefined,
+  labels: CanvasBackendLabels,
+): CanvasBackendOption[] {
+  if (!settings) return [];
+  const options: CanvasBackendOption[] = [];
+  const inherited = canvasBackendLabel({ ...settings, vlmBackendCanvas: "" });
+  options.push({
+    value: "",
+    label: inherited
+      ? `${labels.defaultOption} · ${inherited}`
+      : labels.defaultOption,
+    group: labels.canvas,
+  });
+
+  const localDefault =
+    settings.llmVisionModel || settings.llmRuntime.visionModel;
+  if (settings.llmRuntime.connected || localDefault) {
+    options.push({
+      value: "local-llm",
+      label: localDefault ? `${labels.llm} · ${localDefault}` : labels.localLLM,
+      group: labels.llm,
+    });
+  }
+  for (const model of settings.llmRuntime.models) {
+    options.push({
+      value: `local-llm/${model.name}`,
+      label: model.name,
+      group: labels.llm,
+    });
+  }
+
+  for (const adapter of settings.agentRuntime.adapters.filter(
+    (adapter) => adapter.id !== "local-llm",
+  )) {
+    options.push({
+      value: `agent:${adapter.id}`,
+      label: adapter.name || agentAdapterLabel(adapter.id),
+      group: labels.agent,
+    });
+  }
+  return options;
+}
 
 function browseRouteState(value: unknown): BrowseRouteState {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -488,6 +585,7 @@ export function App() {
     };
   }, [scanStatusQuery.data, scanMutation.isPending, queryClient]);
   const settingsQuery = useSettingsQuery();
+  const updateSettingsMutation = useUpdateSettingsMutation();
   const addProjectMutation = useAddProjectMutation();
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
   const renamePreviewMutation = useRenamePreviewMutation();
@@ -1284,6 +1382,30 @@ export function App() {
               scanId={catalogSummary?.scanId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
               aiNickname={settingsQuery.data?.settings.aiNickname || ""}
+              aiBackendLabel={canvasBackendLabel(settingsQuery.data?.settings)}
+              aiBackendValue={
+                settingsQuery.data?.settings.vlmBackendCanvas ?? ""
+              }
+              aiBackendOptions={canvasBackendOptions(
+                settingsQuery.data?.settings,
+                {
+                  canvas: t("aiCanvas.backendGroupCanvas"),
+                  defaultOption: t("aiCanvas.backendDefault"),
+                  llm: t("aiCanvas.backendGroupLLM"),
+                  localLLM: t("aiCanvas.backendLocalLLM"),
+                  agent: t("aiCanvas.backendGroupAgent"),
+                },
+              )}
+              aiBackendPending={updateSettingsMutation.isPending}
+              onAiBackendChange={(value) =>
+                updateSettingsMutation.mutate(
+                  { vlmBackendCanvas: value },
+                  {
+                    onSuccess: () => toast.success(t("toast.settingsSaved")),
+                    onError: (err) => toast.error(errorMessage(err)),
+                  },
+                )
+              }
               onOpenAsset={setDrawerId}
               onExitCanvas={() => changeMode("browse")}
             />
