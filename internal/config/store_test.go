@@ -714,6 +714,7 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 		Status:         ocr.StatusReady,
 		Text:           "TREASURE BOWI",
 		NormalizedText: "treasure bowi",
+		Languages:      []string{"jpn", "chi_tra"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -723,6 +724,42 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 	}
 	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
 		t.Fatalf("OCR fuzzy search page = %#v", page)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Query: "日文", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("OCR language alias search page = %#v", page)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Query: "中文", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("OCR Chinese language search page = %#v", page)
+	}
+	if err := store.UpsertAITagResult(aitag.Result{
+		ProjectID:     icon.ProjectID,
+		RepoPath:      icon.RepoPath,
+		ContentHash:   icon.ContentHash,
+		HashAlgorithm: icon.HashAlgorithm,
+		ProviderName:  "test-ai",
+		ModelName:     "test",
+		Status:        aitag.StatusReady,
+		Category:      "icon",
+		Tags:          []string{"sample"},
+		Description:   "sample icon",
+		Languages:     []string{"jpn"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{Query: "日語", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 2 || len(page.Items) != 2 {
+		t.Fatalf("AI/OCR language alias search page = %#v", page)
 	}
 }
 

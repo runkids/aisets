@@ -750,6 +750,62 @@ func escapeLike(value string) string {
 	return value
 }
 
+func catalogLanguageSearchTerms(query string) []string {
+	normalized := strings.ToLower(strings.TrimSpace(query))
+	compact := strings.ReplaceAll(normalized, " ", "")
+	terms := []string{normalized}
+	add := func(values ...string) {
+		for _, value := range values {
+			value = strings.ToLower(strings.TrimSpace(value))
+			if value != "" {
+				terms = append(terms, value)
+			}
+		}
+	}
+
+	switch compact {
+	case "english", "eng", "en", "英文", "英語", "英语":
+		add("eng", "en", "english")
+	case "chinese", "中文", "漢語", "汉语", "華語", "华语", "zh", "zho":
+		add("chi_tra", "chi_sim", "zho", "zh", "chinese", "繁體中文", "繁体中文", "簡體中文", "简体中文")
+	case "traditionalchinese", "繁體中文", "繁体中文", "繁中", "chi_tra", "zh-tw":
+		add("chi_tra", "zh-tw", "traditional chinese", "繁體中文", "繁体中文")
+	case "simplifiedchinese", "簡體中文", "简体中文", "簡中", "简中", "chi_sim", "zh-cn":
+		add("chi_sim", "zh-cn", "simplified chinese", "簡體中文", "简体中文")
+	case "japanese", "jpn", "ja", "日文", "日語", "日语", "日本語":
+		add("jpn", "ja", "japanese", "日文", "日語", "日语", "日本語")
+	case "korean", "kor", "ko", "韓文", "韓語", "韩文", "韩语", "한국어":
+		add("kor", "ko", "korean", "韓文", "韓語", "韩文", "韩语", "한국어")
+	}
+
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, term := range terms {
+		if term == "" {
+			continue
+		}
+		if _, ok := seen[term]; ok {
+			continue
+		}
+		seen[term] = struct{}{}
+		out = append(out, term)
+	}
+	return out
+}
+
+func jsonTextLikeAnySQL(expr string, terms []string) (string, []any) {
+	parts := make([]string, 0, len(terms))
+	args := make([]any, 0, len(terms))
+	for _, term := range terms {
+		parts = append(parts, "LOWER("+expr+") LIKE ? ESCAPE '\\'")
+		args = append(args, "%"+escapeLike(strings.ToLower(term))+"%")
+	}
+	if len(parts) == 0 {
+		return "0 = 1", nil
+	}
+	return "(" + strings.Join(parts, " OR ") + ")", args
+}
+
 func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, []any, error) {
 	clauses := []string{"a.scan_id = ?"}
 	args := []any{scanID}
@@ -774,6 +830,9 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 		args = append(args, escapeLike(folder)+"/%")
 	}
 	if q := strings.TrimSpace(query.Query); q != "" {
+		languageTerms := catalogLanguageSearchTerms(q)
+		ocrLanguageSQL, ocrLanguageArgs := jsonTextLikeAnySQL("oq_lang.languages_json", languageTerms)
+		aiLanguageSQL, aiLanguageArgs := jsonTextLikeAnySQL("ait_lang.languages_json", languageTerms)
 		clauses = append(clauses, `(a.repo_path LIKE ? OR a.project_name LIKE ? OR EXISTS (
 			SELECT 1 FROM ocr_results oq
 			WHERE oq.project_id = a.project_id
@@ -782,6 +841,13 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND oq.hash_algorithm = a.hash_algorithm
 				AND (oq.normalized_text LIKE ? OR oq.text LIKE ? OR ocr_search_match(COALESCE(oq.normalized_text, oq.text, ''), ?) = 1)
 		) OR EXISTS (
+			SELECT 1 FROM ocr_results oq_lang
+			WHERE oq_lang.project_id = a.project_id
+				AND oq_lang.repo_path = a.repo_path
+				AND oq_lang.content_hash = a.content_hash
+				AND oq_lang.hash_algorithm = a.hash_algorithm
+				AND `+ocrLanguageSQL+`
+		) OR EXISTS (
 			SELECT 1 FROM ai_tags ait2
 			WHERE ait2.project_id = a.project_id
 				AND ait2.repo_path = a.repo_path
@@ -789,9 +855,21 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ait2.hash_algorithm = a.hash_algorithm
 				AND ait2.status = ?
 				AND (ait2.tags_json LIKE ? OR ait2.tags_i18n_json LIKE ? OR ait2.description LIKE ? OR ait2.description_i18n_json LIKE ?)
+		) OR EXISTS (
+			SELECT 1 FROM ai_tags ait_lang
+			WHERE ait_lang.project_id = a.project_id
+				AND ait_lang.repo_path = a.repo_path
+				AND ait_lang.content_hash = a.content_hash
+				AND ait_lang.hash_algorithm = a.hash_algorithm
+				AND ait_lang.status = ?
+				AND `+aiLanguageSQL+`
 		))`)
 		like := "%" + q + "%"
-		args = append(args, like, like, like, like, q, aitag.StatusReady, like, like, like, like)
+		args = append(args, like, like, like, like, q)
+		args = append(args, ocrLanguageArgs...)
+		args = append(args, aitag.StatusReady, like, like, like, like)
+		args = append(args, aitag.StatusReady)
+		args = append(args, aiLanguageArgs...)
 	}
 	switch strings.TrimSpace(query.Status) {
 	case "unused":

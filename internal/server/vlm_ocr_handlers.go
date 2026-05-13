@@ -387,8 +387,8 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, back
 	content := llm.CleanJSON(rawContent)
 
 	var parsed struct {
-		Text      string   `json:"text"`
-		Languages []string `json:"languages"`
+		Text      json.RawMessage `json:"text"`
+		Languages json.RawMessage `json:"languages"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		preview := rawContent
@@ -402,9 +402,9 @@ func (s *Server) processVLMOCR(ctx context.Context, item scanner.AssetItem, back
 		return result, resp
 	}
 
-	result.Text = parsed.Text
-	result.NormalizedText = ocr.NormalizeText(parsed.Text)
-	result.Languages = parsed.Languages
+	result.Text = unmarshalOCRText(parsed.Text)
+	result.NormalizedText = ocr.NormalizeText(result.Text)
+	result.Languages = unmarshalStringArray(parsed.Languages)
 	if result.Languages == nil {
 		result.Languages = []string{}
 	}
@@ -421,4 +421,19 @@ func copyOCRResultForVLMItem(result ocr.Result, item scanner.AssetItem) ocr.Resu
 	result.UpdatedAt = ""
 	ocr.FinalizeResult(&result)
 	return result
+}
+
+func unmarshalOCRText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		return text
+	}
+	var lines []string
+	if json.Unmarshal(raw, &lines) == nil {
+		return strings.Join(lines, "\n")
+	}
+	return ""
 }

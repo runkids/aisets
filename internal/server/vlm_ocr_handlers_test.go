@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -46,5 +47,19 @@ func TestBuildVLMOCRPromptAddsGuardToCustomPrompt(t *testing.T) {
 func TestVLMOCRPromptVersionInvalidatesCaptionProneCache(t *testing.T) {
 	if vlmOCRPromptVersion != "aisets-vlm-ocr-v2" {
 		t.Fatalf("unexpected VLM OCR prompt version: %s", vlmOCRPromptVersion)
+	}
+}
+
+func TestUnmarshalOCRTextToleratesArrayResponse(t *testing.T) {
+	got := unmarshalOCRText(json.RawMessage(`["ずかん","日本語"]`))
+	if got != "ずかん\n日本語" {
+		t.Fatalf("OCR text = %q", got)
+	}
+}
+
+func TestUnmarshalOCRTextKeepsStringResponse(t *testing.T) {
+	got := unmarshalOCRText(json.RawMessage(`"ずかん"`))
+	if got != "ずかん" {
+		t.Fatalf("OCR text = %q", got)
 	}
 }
