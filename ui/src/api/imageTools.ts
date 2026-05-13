@@ -40,6 +40,51 @@ export function previewImageToolAssets(params: {
   );
 }
 
+export type RenderPreviewResponse = {
+  token: string;
+  inputBytes: number;
+  outputBytes: number;
+  inputFormat: string;
+  outputFormat: string;
+};
+
+export function renderImageToolPreview(params: {
+  assetId: string;
+  outputFormat: string;
+  quality: number;
+  maxDimensionPx: number;
+}) {
+  return request<RenderPreviewResponse>(
+    "/api/image-tools/assets/render-preview",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+  );
+}
+
+export type ImageToolMetadata = {
+  hasExif: boolean;
+  gpsLatitude?: number;
+  gpsLongitude?: number;
+  cameraMake?: string;
+  cameraModel?: string;
+  dateTimeOriginal?: string;
+  orientation?: number;
+  dpiX?: number;
+  dpiY?: number;
+};
+
+export function getImageToolMetadata(assetId: string) {
+  return request<ImageToolMetadata>(
+    `/api/image-tools/metadata/${encodeURIComponent(assetId)}`,
+  );
+}
+
+export function previewImageUrl(token: string) {
+  return `${basePath}/api/image-tools/preview/${encodeURIComponent(token)}`;
+}
+
 export function processImageToolAssets(params: {
   assetIds: string[];
   settings: ImageToolSettings;
