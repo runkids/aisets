@@ -258,6 +258,8 @@ export function AICanvasView({
   } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const focusSearchAfterOpenRef = useRef(false);
+  const searchOpenRef = useRef(searchOpen);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!aiEnabled) return;
@@ -512,22 +514,34 @@ export function AICanvasView({
   }, [imageOptimizationAdvice]);
 
   useEffect(() => {
+    searchOpenRef.current = searchOpen;
+    if (!searchOpen || !focusSearchAfterOpenRef.current) return;
+    focusSearchAfterOpenRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchOpen]);
+
+  useEffect(() => {
     function onCanvasSearchShortcut(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "p") return;
       e.preventDefault();
       e.stopPropagation();
-      setSearchOpen(true);
-      window.requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      });
+      e.stopImmediatePropagation();
+
+      const nextOpen = !searchOpenRef.current;
+      searchOpenRef.current = nextOpen;
+      focusSearchAfterOpenRef.current = nextOpen;
+      setSearchOpen(nextOpen);
     }
 
-    document.addEventListener("keydown", onCanvasSearchShortcut, {
+    window.addEventListener("keydown", onCanvasSearchShortcut, {
       capture: true,
     });
     return () => {
-      document.removeEventListener("keydown", onCanvasSearchShortcut, {
+      window.removeEventListener("keydown", onCanvasSearchShortcut, {
         capture: true,
       });
     };
