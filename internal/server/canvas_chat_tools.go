@@ -74,6 +74,42 @@ func canvasToolRegistry() []canvasToolDef {
 			Params:      `{"assetId": "string", "text": "string"}`,
 			Safe:        false,
 		},
+		{
+			Name:        "rename_asset",
+			Description: "Rename an asset file. Provide the new filename (with extension).",
+			Params:      `{"assetId": "string", "newName": "string — new filename with extension, e.g. 'fortune_cat.png'"}`,
+			Safe:        false,
+		},
+		{
+			Name:        "move_asset",
+			Description: "Move an asset to a different directory within the project.",
+			Params:      `{"assetId": "string", "destDir": "string — destination directory path, e.g. 'assets/icons'"}`,
+			Safe:        false,
+		},
+		{
+			Name:        "copy_asset",
+			Description: "Copy an asset to a new location.",
+			Params:      `{"assetId": "string", "destPath": "string — full destination path including filename"}`,
+			Safe:        false,
+		},
+		{
+			Name:        "delete_asset",
+			Description: "Delete an asset file from the project. This is destructive and cannot be undone.",
+			Params:      `{"assetId": "string"}`,
+			Safe:        false,
+		},
+		{
+			Name:        "favorite_asset",
+			Description: "Toggle favorite status on an asset.",
+			Params:      `{"assetId": "string", "favorite": "boolean — true to add, false to remove"}`,
+			Safe:        false,
+		},
+		{
+			Name:        "export_asset",
+			Description: "Export/download an asset to a specified output directory.",
+			Params:      `{"assetId": "string", "outputDir": "string — output directory path"}`,
+			Safe:        false,
+		},
 	}
 }
 

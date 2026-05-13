@@ -1768,6 +1768,153 @@ export function AICanvasView({
           updateProposalStatus(proposal.proposalId, "completed");
           break;
         }
+        case "rename_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const newName = (p.newName as string) || "";
+          await request("/api/actions/batch/rename/apply", {
+            method: "POST",
+            body: JSON.stringify({
+              items: [
+                {
+                  assetId: asset.id,
+                  projectId: asset.projectId,
+                  repoPath: asset.repoPath,
+                  newRepoPath:
+                    asset.repoPath.replace(/[^/]+$/, "") + newName,
+                },
+              ],
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? {
+                    ...c,
+                    asset: {
+                      ...c.asset,
+                      repoPath:
+                        c.asset.repoPath.replace(/[^/]+$/, "") + newName,
+                    },
+                  }
+                : c,
+            ),
+          );
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "move_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const destDir = (p.destDir as string) || "";
+          const fname = asset.repoPath.split("/").pop() || "";
+          const newPath = destDir.replace(/\/$/, "") + "/" + fname;
+          await request("/api/actions/batch/move/apply", {
+            method: "POST",
+            body: JSON.stringify({
+              items: [
+                {
+                  assetId: asset.id,
+                  projectId: asset.projectId,
+                  repoPath: asset.repoPath,
+                  newRepoPath: newPath,
+                },
+              ],
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? { ...c, asset: { ...c.asset, repoPath: newPath } }
+                : c,
+            ),
+          );
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "copy_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const destPath = (p.destPath as string) || "";
+          await request("/api/actions/batch/copy", {
+            method: "POST",
+            body: JSON.stringify({
+              items: [
+                {
+                  assetId: asset.id,
+                  projectId: asset.projectId,
+                  repoPath: asset.repoPath,
+                  destPath,
+                },
+              ],
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "delete_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          await request("/api/actions/batch/delete", {
+            method: "POST",
+            body: JSON.stringify({
+              items: [
+                {
+                  assetId: asset.id,
+                  projectId: asset.projectId,
+                  repoPath: asset.repoPath,
+                },
+              ],
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          setCards((current) =>
+            current.filter(
+              (c) => !(c.kind === "asset" && c.asset.id === assetId),
+            ),
+          );
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "favorite_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const fav = p.favorite !== false;
+          await request(
+            `/api/catalog/items/${encodeURIComponent(asset.id)}/favorite`,
+            {
+              method: fav ? "POST" : "DELETE",
+              headers: { "content-type": "application/json" },
+            },
+          );
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? { ...c, asset: { ...c.asset, favorite: fav } }
+                : c,
+            ),
+          );
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
+        case "export_asset": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const outputDir = (p.outputDir as string) || "";
+          await request("/api/actions/batch/export", {
+            method: "POST",
+            body: JSON.stringify({
+              items: [
+                {
+                  assetId: asset.id,
+                  projectId: asset.projectId,
+                  repoPath: asset.repoPath,
+                },
+              ],
+              outputDir,
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
         default:
           updateProposalStatus(proposal.proposalId, "completed");
       }
