@@ -381,6 +381,27 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                 <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
                   {pickerItems.length} / {pickerTotal}
                 </span>
+                {assetIds.length > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onAssetIdsChange([])}
+                  >
+                    <X size={13} />
+                    {t("action.deselectAll")}
+                  </Button>
+                ) : pickerItems.length > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      onAssetIdsChange(pickerItems.map((item) => item.id))
+                    }
+                  >
+                    <Check size={13} />
+                    {t("action.selectAll")}
+                  </Button>
+                ) : null}
               </div>
               {!scanId ? (
                 <EmptyState
@@ -542,7 +563,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   type="button"
                   className={cn(
                     "grid min-h-0 flex-1 cursor-pointer place-items-center rounded-g-md border border-dashed border-g-line p-4 text-center transition-[background,border-color,box-shadow] hover:border-g-line-strong hover:bg-g-surface",
-                    dragOver && "border-g-accent bg-g-accent-soft shadow-g-focus",
+                    dragOver &&
+                      "border-g-accent bg-g-accent-soft shadow-g-focus",
                   )}
                   onClick={() => inputRef.current?.click()}
                   onDragOver={(event) => {
