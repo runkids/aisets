@@ -92,6 +92,29 @@ func TestCanvasToolSafe(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_ToolCallFormat(t *testing.T) {
+	input := `<tool_call>call({"tool": "search_assets", "params": {"q": "書", "limit": 12}, "description": "搜尋書籍", "impact": "找到相關圖片"})</tool_call>`
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "search_assets" {
+		t.Fatalf("expected search_assets, got %s", actions[0].Tool)
+	}
+	q, _ := actions[0].Params["q"].(string)
+	if q != "書" {
+		t.Fatalf("expected q=書, got %q", q)
+	}
+}
+
+func TestParseCanvasActions_ToolCallNoCall(t *testing.T) {
+	input := `<tool_call>{"tool": "focus_card", "params": {"cardId": "abc"}, "description": "look", "impact": "cursor"}</tool_call>`
+	_, actions := parseCanvasActions(input)
+	if len(actions) != 1 || actions[0].Tool != "focus_card" {
+		t.Fatalf("expected focus_card, got %v", actions)
+	}
+}
+
 func TestSplitParagraphs(t *testing.T) {
 	ps := splitParagraphs("Hello\n\nWorld\n\nDone")
 	if len(ps) != 3 {

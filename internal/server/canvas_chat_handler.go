@@ -78,25 +78,39 @@ type canvasAction struct {
 }
 
 var actionBlockRe = regexp.MustCompile("(?s)```action\\s*\\n(.*?)\\n```")
+var toolCallRe = regexp.MustCompile(`(?s)<tool_call>\s*(?:call\()?\s*(\{.*?\})\s*\)?\s*</?(tool_call|/tool_call)>`)
 
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
-	if len(matches) == 0 {
+	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
+
+	if len(matches) == 0 && len(toolMatches) == 0 {
 		return strings.TrimSpace(content), nil
+	}
+
+	type span struct {
+		start, end int
+		json       string
+	}
+	var spans []span
+	for _, loc := range matches {
+		spans = append(spans, span{loc[0], loc[1], content[loc[2]:loc[3]]})
+	}
+	for _, loc := range toolMatches {
+		spans = append(spans, span{loc[0], loc[1], content[loc[2]:loc[3]]})
 	}
 
 	var textParts []string
 	prev := 0
-	for _, loc := range matches {
-		if loc[0] > prev {
-			textParts = append(textParts, content[prev:loc[0]])
+	for _, s := range spans {
+		if s.start > prev {
+			textParts = append(textParts, content[prev:s.start])
 		}
-		jsonStr := content[loc[2]:loc[3]]
 		var act canvasAction
-		if err := json.Unmarshal([]byte(jsonStr), &act); err == nil && act.Tool != "" {
+		if err := json.Unmarshal([]byte(s.json), &act); err == nil && act.Tool != "" {
 			actions = append(actions, act)
 		}
-		prev = loc[1]
+		prev = s.end
 	}
 	if prev < len(content) {
 		textParts = append(textParts, content[prev:])
