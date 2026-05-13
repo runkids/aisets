@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"image"
@@ -143,6 +144,39 @@ func TestAPIHealthCatalogScanAssetsThumbsAndOptimizationPreview(t *testing.T) {
 	s.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"canApply":false`) {
 		t.Fatalf("optimization preview = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAnimatedWebPThumbFallsBackToSource(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
+	webpBytes, err := base64.StdEncoding.DecodeString("UklGRsoAAABXRUJQVlA4WAoAAAACAAAAAQAAAQAAQU5JTQYAAAAAAAAAAABBTk1GSgAAAAAAAAAAAAEAAAEAAGQAAAJWUDggMgAAADABAJ0BKgIAAgABQCYloAADcAD+8ut///mwP/bz/wR6Af//0uD//pcH//S4P/SkAAAAQU5NRkwAAAAAAAAAAAABAAABAABkAAAAVlA4IDQAAAA0AQCdASoCAAIAAAAmJaAAA3AA/ukiH//3nz//ufP/+58/6M///yn7//I4//8jj/5QIAAA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetPath := filepath.Join(root, "src", "loading.webp")
+	mustWriteBytes(t, assetPath, webpBytes)
+	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import loading from "./loading.webp"`)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddProjects([]string{root}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id := catalogAssetID(t, s)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/thumbs/"+id, nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("content-type") != "image/webp" || rec.Body.Len() != len(webpBytes) {
+		t.Fatalf("animated webp thumb fallback = %d %s len=%d", rec.Code, rec.Header().Get("content-type"), rec.Body.Len())
 	}
 }
 

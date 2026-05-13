@@ -514,6 +514,12 @@ func (s *Server) handleThumb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		if strings.EqualFold(item.Ext, ".webp") {
+			w.Header().Set("content-type", "image/webp")
+			w.Header().Set("cache-control", "public, max-age=31536000, immutable")
+			http.ServeFile(w, r, item.LocalPath)
+			return
+		}
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}

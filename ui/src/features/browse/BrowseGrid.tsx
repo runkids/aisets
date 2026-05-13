@@ -255,7 +255,15 @@ export function BrowseGrid({
               src={imgSrc}
               alt=""
               loading="lazy"
-              className="absolute inset-3 m-auto max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain"
+              className="absolute inset-0 h-full w-full p-3 object-contain"
+              onError={(event) => {
+                if (
+                  imgSrc !== item.url &&
+                  event.currentTarget.getAttribute("src") !== item.url
+                ) {
+                  event.currentTarget.src = item.url;
+                }
+              }}
             />
             {(duplicate ||
               isUnused ||
