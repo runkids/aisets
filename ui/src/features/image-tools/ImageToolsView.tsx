@@ -518,8 +518,12 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                   <button
                                     key={item.id}
                                     type="button"
-                                    className="group relative aspect-square overflow-hidden rounded-g-md bg-g-surface-2 text-left transition-[box-shadow,transform] duration-[160ms] ease-g hover:-translate-y-0.5 hover:shadow-g-md focus-visible:shadow-g-focus data-[selected=true]:ring-2 data-[selected=true]:ring-g-accent"
-                                    data-selected={checked || undefined}
+                                    className={cn(
+                                      "group relative aspect-square rounded-g-lg text-left transition-[background,padding] duration-[180ms] ease-g focus-visible:shadow-g-focus",
+                                      checked
+                                        ? "bg-g-accent p-1"
+                                        : "bg-transparent p-0",
+                                    )}
                                     aria-pressed={checked}
                                     aria-label={t("imageTools.selectAsset", {
                                       name: fileName(item.repoPath),
@@ -544,39 +548,51 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       });
                                     }}
                                   >
-                                    <img
-                                      src={item.thumbnailUrl || item.url}
-                                      alt=""
-                                      loading="lazy"
-                                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-[220ms] ease-g group-hover:scale-[1.06]"
-                                    />
-                                    <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent px-2 pb-2 pt-8 opacity-0 transition-opacity duration-[160ms] ease-g group-hover:opacity-100">
-                                      <span className="min-w-0 flex-1">
-                                        <span className="block truncate font-g-mono text-g-chip font-[590] text-white">
-                                          {fileName(item.repoPath)}
-                                        </span>
-                                        <span className="block font-g-mono text-[10px] text-white/70">
-                                          {formatExt(item.ext || item.repoPath.split(".").pop() || "").toUpperCase()} · {formatBytes(item.bytes)}
+                                    <span className="relative block h-full w-full overflow-hidden rounded-g-md bg-g-surface-2">
+                                      <img
+                                        src={item.thumbnailUrl || item.url}
+                                        alt=""
+                                        loading="lazy"
+                                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-[220ms] ease-g group-hover:scale-[1.06]"
+                                      />
+                                      <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent px-2 pb-2 pt-8 opacity-0 transition-opacity duration-[160ms] ease-g group-hover:opacity-100">
+                                        <span className="min-w-0 flex-1">
+                                          <span className="block truncate font-g-mono text-g-chip font-[590] text-white">
+                                            {fileName(item.repoPath)}
+                                          </span>
+                                          <span className="block font-g-mono text-[10px] text-white/70">
+                                            {formatExt(
+                                              item.ext ||
+                                                item.repoPath
+                                                  .split(".")
+                                                  .pop() ||
+                                                "",
+                                            ).toUpperCase()}{" "}
+                                            · {formatBytes(item.bytes)}
+                                          </span>
                                         </span>
                                       </span>
-                                    </span>
-                                    <span
-                                      className={cn(
-                                        "absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full text-white shadow-g-sm transition-[opacity,background] duration-[120ms]",
-                                        checked
-                                          ? "bg-g-accent opacity-100"
-                                          : "bg-black/40 opacity-0 backdrop-blur group-hover:opacity-100",
-                                      )}
-                                      aria-hidden="true"
-                                    >
-                                      {checked ? (
-                                        <Check size={13} />
-                                      ) : (
-                                        <Plus size={13} />
-                                      )}
+                                      <span
+                                        className={cn(
+                                          "absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full shadow-g-sm transition-[opacity,background,transform] duration-[120ms]",
+                                          checked
+                                            ? "scale-110 bg-white text-g-accent opacity-100"
+                                            : "bg-black/40 text-white opacity-0 backdrop-blur group-hover:opacity-100",
+                                        )}
+                                        aria-hidden="true"
+                                      >
+                                        {checked ? (
+                                          <Check
+                                            size={14}
+                                            strokeWidth={3}
+                                          />
+                                        ) : (
+                                          <Plus size={13} />
+                                        )}
+                                      </span>
                                     </span>
                                     {queued && (
-                                      <span className="absolute left-1.5 top-1.5">
+                                      <span className="absolute left-2.5 top-2.5">
                                         <Badge
                                           tone="accent"
                                           className="shadow-g-sm"
