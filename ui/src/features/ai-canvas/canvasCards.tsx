@@ -1,5 +1,6 @@
 import {
   ArrowUp,
+  Bot,
   ImagePlus,
   Layers3,
   LoaderCircle,
@@ -153,6 +154,7 @@ export function CardShell({
     <section
       className={cn(
         "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
+        card.kind === "comment" && (selected ? "z-[80]" : "z-[70]"),
         compact
           ? cn(
               "border-2 border-transparent shadow-none",
@@ -162,7 +164,12 @@ export function CardShell({
               "border bg-g-surface shadow-g-md",
               card.kind === "asset" ? "overflow-visible" : "overflow-hidden",
               cardTone(card),
-              selected && "z-40 border-g-active-bg shadow-g-lg",
+              selected &&
+                card.kind !== "comment" &&
+                "z-40 border-g-active-bg shadow-g-lg",
+              selected &&
+                card.kind === "comment" &&
+                "border-g-active-bg shadow-g-lg",
             ),
       )}
       ref={(node) => onRegister(card.id, node)}
@@ -295,6 +302,7 @@ export function AssetCardBody({
   }
 
   function handleRegionPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
     if (e.button !== 0 || pendingComment) return;
     const { nx, ny } = toNormalized(e.clientX, e.clientY);
     setDrawRegion({ startX: nx, startY: ny, currentX: nx, currentY: ny });
@@ -302,6 +310,7 @@ export function AssetCardBody({
   }
 
   function handleRegionPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
     if (!drawRegion) return;
     const { nx, ny } = toNormalized(e.clientX, e.clientY);
     setDrawRegion((prev) =>
@@ -309,7 +318,8 @@ export function AssetCardBody({
     );
   }
 
-  function handleRegionPointerUp() {
+  function handleRegionPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
     if (!drawRegion) return;
     const x = Math.min(drawRegion.startX, drawRegion.currentX);
     const y = Math.min(drawRegion.startY, drawRegion.currentY);
@@ -325,6 +335,12 @@ export function AssetCardBody({
     );
   }
 
+  const showAiMentionSuggestion = /(^|\s)@$/.test(pendingCommentText);
+
+  function acceptAiMentionSuggestion() {
+    setPendingCommentText((current) => current.replace(/(^|\s)@$/, "$1@ai "));
+  }
+
   function submitPendingComment(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (!pendingComment) return;
@@ -338,6 +354,14 @@ export function AssetCardBody({
   function handlePendingCommentKeyDown(
     event: ReactKeyboardEvent<HTMLInputElement>,
   ) {
+    if (
+      showAiMentionSuggestion &&
+      (event.key === "Enter" || event.key === "Tab")
+    ) {
+      event.preventDefault();
+      acceptAiMentionSuggestion();
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       setPendingComment(null);
@@ -387,7 +411,10 @@ export function AssetCardBody({
         }
         onPointerCancel={
           commentEnabled && !hideOverlays
-            ? () => setDrawRegion(null)
+            ? (event) => {
+                event.stopPropagation();
+                setDrawRegion(null);
+              }
             : undefined
         }
       >
@@ -457,6 +484,19 @@ export function AssetCardBody({
               >
                 <ArrowUp size={16} aria-hidden="true" />
               </button>
+              {showAiMentionSuggestion && (
+                <button
+                  type="button"
+                  className="absolute left-0 top-11 flex min-h-9 w-[220px] items-center gap-2 rounded-[14px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] px-3 py-2 text-left font-g text-g-ui text-white shadow-g-pop backdrop-blur-xl transition-colors duration-[120ms] ease-g hover:bg-[rgba(48,48,48,0.98)] focus-visible:outline-none focus-visible:shadow-g-focus"
+                  onClick={acceptAiMentionSuggestion}
+                >
+                  <Bot size={14} className="shrink-0 text-white/64" />
+                  <span className="font-[590]">@ai</span>
+                  <span className="min-w-0 flex-1 truncate text-white/46">
+                    {t("aiCanvas.ask")}
+                  </span>
+                </button>
+              )}
             </form>
           </div>
         )}

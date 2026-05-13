@@ -110,7 +110,6 @@ const SEMANTIC_PHASES = [
 ];
 
 const ASSET_CARD_IMAGE_TOP = 38;
-const ASSET_CARD_IMAGE_HEIGHT = 240;
 const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
 const DEFAULT_COMPOSER_HEIGHT = 320;
 const composerActionClass =
@@ -330,15 +329,20 @@ export function AICanvasView({
           ? { x: dragPreview.x, y: dragPreview.y }
           : card;
 
+      const anchorWidth = cardWidths[anchor.id] ?? CARD_WIDTH;
+      const anchorImageTop = compactCards ? 0 : ASSET_CARD_IMAGE_TOP;
+      const anchorImageHeight = anchorWidth * 0.75;
       const targetX =
-        anchorPosition.x + CARD_WIDTH * (card.region.x + card.region.width / 2);
+        anchorPosition.x +
+        anchorWidth * (card.region.x + card.region.width / 2);
       const targetY =
         anchorPosition.y +
-        ASSET_CARD_IMAGE_TOP +
-        ASSET_CARD_IMAGE_HEIGHT * (card.region.y + card.region.height / 2);
+        anchorImageTop +
+        anchorImageHeight * (card.region.y + card.region.height / 2);
+      const commentWidth = cardWidths[card.id] ?? CARD_WIDTH;
       const fromX =
         commentPosition.x < targetX
-          ? commentPosition.x + CARD_WIDTH
+          ? commentPosition.x + commentWidth
           : commentPosition.x;
       const fromY = commentPosition.y + 52;
       const bend = Math.max(56, Math.abs(targetX - fromX) * 0.35);
@@ -358,7 +362,7 @@ export function AICanvasView({
         },
       ];
     });
-  }, [cards, dragPreview, selectedCardId]);
+  }, [cardWidths, cards, compactCards, dragPreview, selectedCardId]);
   const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
     cards,
     t,
@@ -874,8 +878,10 @@ export function AICanvasView({
                 onDragMove={handleDragMove}
                 onDragEnd={handleDragEnd}
                 onDelete={deleteCard}
-                onResize={(id, w) =>
-                  setCardWidths((prev) => ({ ...prev, [id]: w }))
+                onResize={
+                  card.kind === "asset"
+                    ? (id, w) => setCardWidths((prev) => ({ ...prev, [id]: w }))
+                    : undefined
                 }
                 onRegister={registerCardElement}
                 position={
@@ -1628,10 +1634,10 @@ export function AICanvasView({
                 <button
                   type="button"
                   aria-label={t("aiCanvas.stopChat")}
-                  className="grid size-10 shrink-0 place-items-center rounded-full border border-g-red bg-g-red text-white transition-colors duration-[120ms] ease-g hover:bg-g-red/90 focus-visible:outline-none focus-visible:shadow-g-focus"
+                  className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.92] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus"
                   onClick={handleStop}
                 >
-                  <Square size={15} aria-hidden="true" />
+                  <Square size={15} fill="currentColor" aria-hidden="true" />
                 </button>
               ) : (
                 <button
