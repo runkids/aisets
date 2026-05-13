@@ -256,6 +256,15 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     drawerUploadIndex !== null ? files[drawerUploadIndex] || null : null;
   const showDrawer = drawerAsset !== null || drawerUploadFile !== null;
 
+  const maxQueuedDimension = useMemo(() => {
+    let max = 0;
+    for (const item of queuedItems) {
+      if (item.image?.width) max = Math.max(max, item.image.width);
+      if (item.image?.height) max = Math.max(max, item.image.height);
+    }
+    return max;
+  }, [queuedItems]);
+
   const hasWorkItems = assetIds.length + files.length > 0;
   const filePreviewUrls = useMemo(() => {
     const urls = files.map((file) => URL.createObjectURL(file));
@@ -876,7 +885,13 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       maxDimensionPx: Number(event.currentTarget.value) || 0,
                     }))
                   }
-                  placeholder={t("imageTools.resizePlaceholder")}
+                  placeholder={
+                    maxQueuedDimension > 0
+                      ? t("imageTools.resizeHint", {
+                          px: maxQueuedDimension,
+                        })
+                      : t("imageTools.resizePlaceholder")
+                  }
                   className="w-32"
                 />
                 <span className="flex-1" />

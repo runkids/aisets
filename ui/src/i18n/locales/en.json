@@ -1978,6 +1978,7 @@
     "outputFormat": "Output format",
     "quality": "Quality",
     "resizePlaceholder": "Max px (optional)",
+    "resizeHint": "Max {{px}} px",
     "processProject": "Convert",
     "processUploads": "Convert uploads",
     "catalogSearch": "Search catalog images",

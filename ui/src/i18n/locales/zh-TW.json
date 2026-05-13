@@ -1107,6 +1107,7 @@
     "outputFormat": "輸出格式",
     "quality": "品質",
     "resizePlaceholder": "最大邊 px（可選）",
+    "resizeHint": "最大 {{px}} px",
     "processProject": "轉換",
     "processUploads": "轉換上傳",
     "catalogSearch": "搜尋專案圖片",
