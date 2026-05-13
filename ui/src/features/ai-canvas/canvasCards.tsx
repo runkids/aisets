@@ -1,7 +1,6 @@
 import {
   ArrowUp,
   Bot,
-  Check,
   ImagePlus,
   Layers3,
   LoaderCircle,
@@ -192,14 +191,6 @@ export function CardShell({
           onPointerCancel={onDragEnd}
         >
           {children}
-          {selected && (
-            <span
-              className="pointer-events-none absolute right-2 top-2 grid size-10 place-items-center rounded-g-pill bg-g-surface text-g-accent shadow-g-md"
-              aria-hidden="true"
-            >
-              <Check size={22} strokeWidth={2.6} />
-            </span>
-          )}
         </div>
       ) : (
         <>
