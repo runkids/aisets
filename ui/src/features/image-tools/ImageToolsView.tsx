@@ -41,7 +41,6 @@ import {
   Range,
   Select,
   StatCard,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
   Tabs,
   TextInput,
 } from "@/components/ui";
@@ -243,8 +242,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
       .map((id) => basketItemById.get(id))
       .filter(Boolean) as AssetItem[];
   }, [assetIds, basketItemById]);
-  const queuedBytes = queuedItems.reduce((sum, item) => sum + item.bytes, 0);
-  const uploadBytes = files.reduce((sum, file) => sum + file.size, 0);
+  /* queuedBytes / uploadBytes removed — totals now in StatCards */
   const hasWorkItems = assetIds.length + files.length > 0;
   const successResults = useMemo(
     () => results.filter((r) => !r.errorCode),
@@ -254,7 +252,6 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     (sum, r) => sum + r.savingsBytes,
     0,
   );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
   const [activeTab, setActiveTab] = useState<"queue" | "results">("queue");
   const [prevResultCount, setPrevResultCount] = useState(0);
   const [pulseStat, setPulseStat] = useState("");
@@ -617,270 +614,260 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
           </Card>
 
           <Card className="min-h-0">
-            <CardBody
-              className={cn(
-                "grid h-full min-h-0 gap-3 p-3",
-                hasWorkItems
-                  ? "grid-rows-[auto_minmax(0,1fr)_auto_minmax(0,0.72fr)]"
-                  : "grid-rows-[auto_minmax(0,1fr)_minmax(0,0.72fr)]",
-              )}
-            >
-              <div className="flex items-center gap-2 border-b border-g-line pb-2">
-                <div className="grid size-8 place-items-center rounded-g-md bg-g-accent-soft text-g-accent">
-                  <Images size={16} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-g text-g-ui font-[590] text-g-ink">
-                    {t("imageTools.queue")}
-                  </div>
-                  <div className="font-g-mono text-g-caption text-g-ink-4">
-                    {queuedItems.length + files.length} ·{" "}
-                    {formatBytes(queuedBytes + uploadBytes)}
-                  </div>
-                </div>
-                <Badge tone={working ? "green" : "line"}>
-                  {settings.outputFormat.toUpperCase()}
-                </Badge>
-              </div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*,.svg"
-                multiple
-                className="sr-only"
-                onChange={(event) => {
-                  if (event.currentTarget.files)
-                    appendFiles(event.currentTarget.files);
-                  event.currentTarget.value = "";
-                }}
+            <CardBody className="flex h-full min-h-0 flex-col gap-2 p-2.5">
+              <Tabs
+                value={activeTab}
+                items={[
+                  {
+                    value: "queue" as const,
+                    label: t("imageTools.tabQueue"),
+                    badge: (
+                      <span className="font-[400] text-g-ink-4">
+                        {queuedItems.length + files.length}
+                      </span>
+                    ),
+                  },
+                  {
+                    value: "results" as const,
+                    label: t("imageTools.tabResults"),
+                    badge:
+                      results.length > 0 ? (
+                        <span className="font-[400] text-g-ink-4">
+                          {results.length}
+                        </span>
+                      ) : undefined,
+                  },
+                ]}
+                onChange={setActiveTab}
+                ariaLabel="Image Tools tabs"
+                size="sm"
               />
 
-              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-g-md border border-g-line bg-g-canvas shadow-g-inset">
-                <div className="relative h-8 overflow-hidden border-b border-g-line bg-g-surface-2">
-                  <div
-                    className={cn(
-                      "absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(90deg,color-mix(in_srgb,var(--g-accent)_20%,transparent)_0_10px,transparent_10px_20px)]",
-                      working &&
-                        "opacity-85 animate-[imageToolConveyor_680ms_linear_infinite]",
-                    )}
-                  />
-                  <div className="absolute inset-y-2 left-3 right-3 overflow-hidden rounded-g-pill bg-g-canvas shadow-g-inset">
-                    <span
-                      className={cn(
-                        "block h-full w-1/4 rounded-g-pill bg-[linear-gradient(90deg,transparent,var(--g-accent),transparent)] opacity-40",
-                        working &&
-                          "w-1/3 opacity-100 animate-[imageToolBeam_1.1s_var(--g-ease-out)_infinite]",
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {hydratingBasket ? (
-                  <div className="grid min-h-0 place-items-center p-4 text-center text-g-ui text-g-ink-4">
-                    <div className="inline-flex items-center gap-2">
-                      <LoaderCircle size={14} className="animate-spin" />
-                      {t("common.loading", { defaultValue: "Loading" })}
+              {/* Queue tab — stays mounted, hidden via CSS */}
+              <div
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col gap-2",
+                  activeTab !== "queue" && "hidden",
+                )}
+              >
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {hydratingBasket ? (
+                    <div className="grid min-h-0 place-items-center p-4 text-center text-g-ui text-g-ink-4">
+                      <div className="inline-flex items-center gap-2">
+                        <LoaderCircle size={14} className="animate-spin" />
+                        {t("common.loading", { defaultValue: "Loading" })}
+                      </div>
                     </div>
-                  </div>
-                ) : !hasWorkItems ? (
-                  <div
-                    className={cn(
-                      "grid min-h-0 place-items-center p-4 text-center transition-[background,border-color,box-shadow]",
-                      dragOver && "bg-g-accent-soft",
-                    )}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setDragOver(false);
-                      appendFiles(event.dataTransfer.files);
-                    }}
-                  >
+                  ) : !hasWorkItems ? (
                     <div
                       className={cn(
-                        "grid w-full max-w-[420px] gap-3 rounded-g-md border border-dashed border-g-line bg-g-surface p-5 shadow-g-sm transition-[border-color,box-shadow,transform]",
-                        dragOver &&
-                          "scale-[1.01] border-g-accent shadow-g-focus",
+                        "grid min-h-0 flex-1 place-items-center p-4 text-center transition-[background,border-color,box-shadow]",
+                        dragOver && "bg-g-accent-soft",
                       )}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        setDragOver(false);
+                        appendFiles(event.dataTransfer.files);
+                      }}
                     >
-                      <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
-                        <ImagePlus size={22} />
+                      <div
+                        className={cn(
+                          "grid w-full max-w-[420px] gap-3 rounded-g-md border border-dashed border-g-line bg-g-surface p-5 shadow-g-sm transition-[border-color,box-shadow,transform]",
+                          dragOver &&
+                            "scale-[1.01] border-g-accent shadow-g-focus",
+                        )}
+                      >
+                        <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
+                          <ImagePlus size={22} />
+                        </div>
+                        <div className="font-g text-g-ui font-[590] text-g-ink">
+                          {t("imageTools.emptyQueue")}
+                        </div>
+                        <div className="text-g-ui text-g-ink-4">
+                          {t("imageTools.dropHint")}
+                        </div>
+                        <div>
+                          <Button
+                            variant="secondary"
+                            onClick={() => inputRef.current?.click()}
+                          >
+                            {t("imageTools.chooseUploads")}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="font-g text-g-ui font-[590] text-g-ink">
-                        {t("imageTools.emptyQueue")}
-                      </div>
-                      <div className="text-g-ui text-g-ink-4">
-                        {t("imageTools.dropHint")}
-                      </div>
-                      <div>
+                    </div>
+                  ) : (
+                    <div className="grid min-h-0 auto-rows-[64px] content-start gap-2 overflow-y-auto">
+                      {queuedItems.map((item, index) => (
+                        <div
+                          key={item.id}
+                          className="relative h-16 overflow-hidden rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                          style={{
+                            animationDelay: `${Math.min(index, 8) * 40}ms`,
+                          }}
+                        >
+                          <div className="flex h-full items-center gap-2">
+                            <AssetThumbnail
+                              src={item.thumbnailUrl || item.url}
+                              size="md"
+                              className="size-11"
+                              imageClassName="max-h-9 max-w-9"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                                {fileName(item.repoPath)}
+                              </div>
+                              <div className="truncate font-g-mono text-g-chip text-g-ink-4">
+                                {item.projectName} ·{" "}
+                                {formatBytes(item.bytes)}
+                              </div>
+                            </div>
+                            <Badge>{formatExt(item.ext || "")}</Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAsset(item.id)}
+                              aria-label={t("action.delete")}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {files.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="relative h-16 overflow-hidden rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]"
+                          style={{
+                            animationDelay: `${Math.min(index + queuedItems.length, 8) * 40}ms`,
+                          }}
+                        >
+                          <div className="flex h-full items-center gap-2">
+                            <div className="grid size-11 shrink-0 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4">
+                              <UploadCloud size={18} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
+                                {file.name}
+                              </div>
+                              <div className="font-g-mono text-g-chip text-g-ink-4">
+                                {formatBytes(file.size)}
+                              </div>
+                            </div>
+                            <Badge>{t("imageTools.uploadSource")}</Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setFiles((prev) =>
+                                  prev.filter((_, i) => i !== index),
+                                )
+                              }
+                              aria-label={t("action.delete")}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {hasWorkItems && (
+                  <div className="mt-auto flex flex-col gap-2">
+                    <div
+                      className={cn(
+                        "grid min-h-[72px] place-items-center rounded-g-md border border-dashed border-g-line bg-g-canvas p-3 text-center transition-[background,border-color,box-shadow,transform]",
+                        dragOver &&
+                          "scale-[1.01] border-g-accent bg-g-accent-soft shadow-g-focus",
+                      )}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        setDragOver(false);
+                        appendFiles(event.dataTransfer.files);
+                      }}
+                    >
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <div className="grid size-8 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
+                          <ImagePlus size={17} />
+                        </div>
                         <Button
                           variant="secondary"
+                          size="sm"
                           onClick={() => inputRef.current?.click()}
                         >
                           {t("imageTools.chooseUploads")}
                         </Button>
+                        <div className="text-g-ui text-g-ink-4">
+                          {t("imageTools.dropHint")}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid min-h-0 auto-rows-[64px] content-start gap-2 overflow-y-auto p-2">
-                    {queuedItems.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          "relative h-16 overflow-hidden rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]",
-                          working &&
-                            index === 0 &&
-                            "border-g-accent bg-g-accent-soft shadow-[inset_4px_0_0_var(--g-accent),var(--g-shadow-sm)]",
-                          working &&
-                            "after:absolute after:inset-y-0 after:left-[-35%] after:w-1/3 after:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--g-accent)_24%,transparent),transparent)] after:animate-[imageToolScan_1.35s_var(--g-ease-out)_infinite]",
-                        )}
-                        style={{
-                          animationDelay: `${Math.min(index, 8) * 36}ms`,
-                        }}
-                      >
-                        <div className="flex h-full items-center gap-2">
-                          <AssetThumbnail
-                            src={item.thumbnailUrl || item.url}
-                            size="md"
-                            className="size-11"
-                            imageClassName="max-h-9 max-w-9"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
-                              {fileName(item.repoPath)}
-                            </div>
-                            <div className="truncate font-g-mono text-g-chip text-g-ink-4">
-                              {item.projectName} · {formatBytes(item.bytes)}
-                            </div>
-                          </div>
-                          <Badge>{formatExt(item.ext || "")}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeAsset(item.id)}
-                            aria-label={t("action.delete")}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
+                    {files.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge tone="blue">
+                          {t("imageTools.uploadCount", {
+                            count: files.length,
+                          })}
+                        </Badge>
+                        <span className="flex-1" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFiles([])}
+                        >
+                          <Trash2 size={13} />
+                          {t("action.clear")}
+                        </Button>
                       </div>
-                    ))}
-                    {files.map((file, index) => (
-                      <div
-                        key={`${file.name}-${index}`}
-                        className={cn(
-                          "relative h-16 overflow-hidden rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolCardIn_360ms_var(--g-ease-out)]",
-                          working &&
-                            queuedItems.length === 0 &&
-                            index === 0 &&
-                            "border-g-accent bg-g-accent-soft shadow-[inset_4px_0_0_var(--g-accent),var(--g-shadow-sm)]",
-                          working &&
-                            "after:absolute after:inset-y-0 after:left-[-35%] after:w-1/3 after:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--g-accent)_24%,transparent),transparent)] after:animate-[imageToolScan_1.35s_var(--g-ease-out)_infinite]",
-                        )}
-                        style={{
-                          animationDelay: `${Math.min(index + queuedItems.length, 8) * 36}ms`,
-                        }}
-                      >
-                        <div className="flex h-full items-center gap-2">
-                          <div className="grid size-11 shrink-0 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4">
-                            <UploadCloud size={18} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-g-mono text-g-ui font-[590] text-g-ink">
-                              {file.name}
-                            </div>
-                            <div className="font-g-mono text-g-chip text-g-ink-4">
-                              {formatBytes(file.size)}
-                            </div>
-                          </div>
-                          <Badge>{t("imageTools.uploadSource")}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setFiles((prev) =>
-                                prev.filter((_, i) => i !== index),
-                              )
-                            }
-                            aria-label={t("action.delete")}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                    )}
                   </div>
                 )}
+
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*,.svg"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    if (event.currentTarget.files)
+                      appendFiles(event.currentTarget.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
               </div>
 
-              {hasWorkItems && (
-                <div className="grid gap-2">
-                  <div
-                    className={cn(
-                      "grid min-h-[92px] place-items-center rounded-g-md border border-dashed border-g-line bg-g-canvas p-3 text-center transition-[background,border-color,box-shadow,transform]",
-                      dragOver &&
-                        "scale-[1.01] border-g-accent bg-g-accent-soft shadow-g-focus",
-                    )}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setDragOver(false);
-                      appendFiles(event.dataTransfer.files);
-                    }}
-                  >
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <div className="grid size-8 place-items-center rounded-g-md border border-g-line bg-g-surface-2 text-g-ink-4 shadow-g-inset">
-                        <ImagePlus size={17} />
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => inputRef.current?.click()}
-                      >
-                        {t("imageTools.chooseUploads")}
-                      </Button>
-                      <div className="text-g-ui text-g-ink-4">
-                        {t("imageTools.dropHint")}
-                      </div>
-                    </div>
-                  </div>
-                  {files.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Badge tone="blue">
-                        {t("imageTools.uploadCount", { count: files.length })}
-                      </Badge>
-                      <span className="flex-1" />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFiles([])}
-                      >
-                        <Trash2 size={13} />
-                        {t("action.clear")}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-g-md border border-g-line bg-g-canvas shadow-g-inset">
-                <div className="flex items-center gap-2 border-b border-g-line bg-g-surface-2 px-2 py-1.5">
+              {/* Results tab — stays mounted, hidden via CSS */}
+              <div
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col gap-2",
+                  activeTab !== "results" && "hidden",
+                )}
+              >
+                <div className="flex items-center gap-2 border-b border-g-line pb-2">
                   <span className="font-g text-g-ui font-[590] text-g-ink">
-                    {t("imageTools.results")}
+                    {t("imageTools.processedCount", {
+                      count: results.length,
+                    })}
                   </span>
                   <span className="flex-1" />
                   {zipToken && (
                     <Button
                       variant="secondary"
                       size="sm"
+                      className="animate-[resultSlideIn_240ms_var(--g-ease-out)]"
                       onClick={() =>
                         downloadImageToolResult(
                           zipToken,
@@ -892,71 +879,114 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       {t("imageTools.downloadZip")}
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setResults([])}
-                  >
-                    <RefreshCcw size={14} />
-                    {t("action.clear")}
-                  </Button>
+                  {results.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setResults([]);
+                        setZipToken("");
+                      }}
+                    >
+                      <RefreshCcw size={14} />
+                      {t("action.clear")}
+                    </Button>
+                  )}
                 </div>
+
                 {results.length === 0 ? (
-                  <div className="grid min-h-0 place-items-center p-4 text-center text-g-ui text-g-ink-4">
-                    <div className="grid gap-2">
-                      <div className="mx-auto grid size-10 place-items-center rounded-g-md border border-g-line bg-g-surface text-g-ink-4 shadow-g-inset">
-                        <FileArchive size={20} />
-                      </div>
-                      <div>{t("imageTools.emptyResults")}</div>
-                    </div>
-                  </div>
+                  <EmptyState
+                    icon={<FileArchive size={20} />}
+                    title={t("imageTools.emptyResults")}
+                    size="md"
+                  />
                 ) : (
-                  <div className="grid min-h-0 content-start gap-2 overflow-y-auto p-2">
-                    {results.map((result, index) => (
-                      <div
-                        key={`${result.id}-${index}`}
-                        className="rounded-g-md border border-g-line bg-g-surface p-2 shadow-g-sm animate-[imageToolPackageIn_520ms_var(--g-ease-out)]"
-                        style={{
-                          animationDelay: `${Math.min(index, 8) * 42}ms`,
-                        }}
-                      >
-                        <div className="grid gap-2">
-                          <div className="flex items-start gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-g-mono text-g-ui font-[510]">
-                                {fileName(result.outputPath || result.name)}
-                              </div>
-                              <div className="font-g-mono text-g-chip text-g-ink-4">
-                                {result.inputFormat.toUpperCase()} →{" "}
-                                {result.outputFormat.toUpperCase()}
-                              </div>
-                              {(result.outputPath || result.repoPath) && (
-                                <div className="mt-1 truncate font-g-mono text-g-chip text-g-ink-3">
-                                  {t("imageTools.outputPath")}:{" "}
-                                  {result.outputPath || result.repoPath}
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div className="grid content-start gap-2">
+                      {results.map((result, index) => {
+                        const ratio =
+                          result.currentBytes > 0
+                            ? result.outputBytes / result.currentBytes
+                            : 1;
+                        const savingsPct =
+                          result.currentBytes > 0
+                            ? Math.round((1 - ratio) * 100)
+                            : 0;
+                        const barColor = result.errorCode
+                          ? "bg-g-red"
+                          : savingsPct > 20
+                            ? "bg-g-green"
+                            : savingsPct > 0
+                              ? "bg-g-amber"
+                              : "bg-g-ink-4";
+
+                        return (
+                          <div
+                            key={`${result.id}-${index}`}
+                            className={cn(
+                              "rounded-g-md border border-g-line bg-g-surface p-2.5 shadow-g-sm animate-[resultSlideIn_360ms_var(--g-ease-out)]",
+                              result.errorCode &&
+                                "border-l-[3px] border-l-g-red",
+                            )}
+                            style={{
+                              animationDelay: `${Math.min(index, 8) * 50}ms`,
+                            }}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-g-mono text-g-ui font-[590]">
+                                  {fileName(
+                                    result.outputPath || result.name,
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <Badge tone={result.errorCode ? "danger" : "green"}>
-                              {result.errorCode
-                                ? t("imageTools.failed")
-                                : t("imageTools.done")}
-                            </Badge>
-                          </div>
-                          {result.errorCode ? (
-                            <div className="text-g-ui text-g-red">
-                              {result.errorMessage}
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge>{formatBytes(result.currentBytes)}</Badge>
-                              <Badge>{formatBytes(result.outputBytes)}</Badge>
-                              <Badge>
-                                {result.savingsBytes > 0
-                                  ? `-${formatBytes(result.savingsBytes)}`
-                                  : t("imageTools.noSavings")}
-                              </Badge>
-                              {result.token && (
+                                <div className="mt-0.5 font-g-mono text-g-chip text-g-ink-4">
+                                  {result.inputFormat.toUpperCase()} →{" "}
+                                  {result.outputFormat.toUpperCase()}
+                                  {" · "}
+                                  {formatBytes(result.currentBytes)} →{" "}
+                                  {formatBytes(result.outputBytes)}
+                                </div>
+                                {result.errorCode ? (
+                                  <div className="mt-1.5 text-g-ui text-g-red">
+                                    {result.errorMessage}
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <div className="h-[6px] flex-1 overflow-hidden rounded-g-pill bg-g-surface-2">
+                                      <div
+                                        className={cn(
+                                          "h-full rounded-g-pill transition-[width] duration-[600ms] ease-g-out",
+                                          barColor,
+                                        )}
+                                        style={{
+                                          width: `${Math.round(ratio * 100)}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <span
+                                      className={cn(
+                                        "shrink-0 font-g-mono text-g-chip font-[590]",
+                                        savingsPct > 0
+                                          ? "text-g-green"
+                                          : savingsPct < 0
+                                            ? "text-g-red"
+                                            : "text-g-ink-4",
+                                      )}
+                                    >
+                                      {savingsPct > 0
+                                        ? `-${savingsPct}%`
+                                        : savingsPct < 0
+                                          ? `+${Math.abs(savingsPct)}%`
+                                          : t("imageTools.noSavingsShort")}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {result.errorCode ? (
+                                <Badge tone="danger">
+                                  {t("imageTools.failed")}
+                                </Badge>
+                              ) : result.token ? (
                                 <Button
                                   size="sm"
                                   onClick={() =>
@@ -967,16 +997,17 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                   }
                                 >
                                   <Download size={14} />
-                                  {t("action.download", {
-                                    defaultValue: "Download",
-                                  })}
                                 </Button>
+                              ) : (
+                                <Badge tone="green">
+                                  {t("imageTools.done")}
+                                </Badge>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
