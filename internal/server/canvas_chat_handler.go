@@ -41,8 +41,8 @@ type canvasAssetSnapshot struct {
 type canvasCardSnapshot struct {
 	ID             string               `json:"id"`
 	Kind           string               `json:"kind"`
-	X              int                  `json:"x"`
-	Y              int                  `json:"y"`
+	X              float64              `json:"x"`
+	Y              float64              `json:"y"`
 	Asset          *canvasAssetSnapshot `json:"asset,omitempty"`
 	AnchorID       string               `json:"anchorId,omitempty"`
 	Text           string               `json:"text,omitempty"`
@@ -115,7 +115,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot) 
 	fmt.Fprintf(&b, "Total cards: %d\n\n", len(canvas.Cards))
 
 	for _, card := range canvas.Cards {
-		fmt.Fprintf(&b, "- [%s] id=%s pos=(%d,%d)", card.Kind, card.ID, card.X, card.Y)
+		fmt.Fprintf(&b, "- [%s] id=%s pos=(%.0f,%.0f)", card.Kind, card.ID, card.X, card.Y)
 		if card.Asset != nil {
 			a := card.Asset
 			fmt.Fprintf(&b, " path=%s ext=%s %dx%d %dB", a.RepoPath, a.Ext, a.Width, a.Height, a.Bytes)
