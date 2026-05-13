@@ -991,9 +991,6 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
             setDrawerAssetId(null);
             setDrawerUploadIndex(null);
           }}
-          onFormatChange={(format) =>
-            setSettings((prev) => ({ ...prev, outputFormat: format }))
-          }
         />
       )}
     </div>

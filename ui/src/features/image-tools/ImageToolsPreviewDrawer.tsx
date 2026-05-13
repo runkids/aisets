@@ -47,7 +47,6 @@ type Props = {
   uploadFile?: File;
   settings: ImageToolSettings;
   onClose: () => void;
-  onFormatChange: (format: string) => void;
 };
 
 export function ImageToolsPreviewDrawer({
@@ -55,7 +54,6 @@ export function ImageToolsPreviewDrawer({
   uploadFile,
   settings,
   onClose,
-  onFormatChange,
 }: Props) {
   const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
@@ -176,13 +174,9 @@ export function ImageToolsPreviewDrawer({
     dragging.current = false;
   }, []);
 
-  const handleFormatClick = useCallback(
-    (format: string) => {
-      setActiveFormat(format);
-      onFormatChange(format);
-    },
-    [onFormatChange],
-  );
+  const handleFormatClick = useCallback((format: string) => {
+    setActiveFormat(format);
+  }, []);
 
   const metadataFields = useMemo(() => {
     if (!metadata?.hasExif) return [];
