@@ -561,6 +561,23 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
             <CardBody className="flex h-full min-h-0 flex-col gap-2 p-2.5">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="grid content-start gap-2">
+                  {/* Empty state */}
+                  {!hasWorkItems && results.length === 0 && (
+                    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                      <div className="grid size-12 place-items-center rounded-full bg-g-surface-2">
+                        <Images size={20} className="text-g-ink-4" />
+                      </div>
+                      <div>
+                        <p className="font-g text-g-ui font-[590] text-g-ink-3">
+                          {t("imageTools.emptyQueue")}
+                        </p>
+                        <p className="mt-1 font-g text-g-chip text-g-ink-4">
+                          {t("imageTools.dropHint")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Queue items */}
                   {queuedItems.map((item, index) => (
                     <ImagePreview
