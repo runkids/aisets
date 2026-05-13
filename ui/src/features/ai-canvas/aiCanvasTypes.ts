@@ -1,0 +1,26 @@
+import type { Dispatch, SetStateAction } from "react";
+
+export type AIBackendOption = {
+  value: string;
+  label: string;
+  group: string;
+  disabled?: boolean;
+};
+
+export type WorkingState =
+  | "idle"
+  | "search"
+  | "ai"
+  | "imagePreview"
+  | "operation";
+
+export type CanvasViewMode = "normal" | "compact" | "hidden";
+
+export type MentionableImageCard = {
+  id: string;
+  name: string;
+  meta: string;
+  src?: string;
+};
+
+export type StateSetter<T> = Dispatch<SetStateAction<T>>;

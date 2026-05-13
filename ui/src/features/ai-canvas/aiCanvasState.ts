@@ -320,9 +320,15 @@ function normalizeCard(value: unknown): CanvasCard | null {
 export function normalizeAICanvasSession(value: unknown): AICanvasSession {
   if (!isRecord(value)) return emptyAICanvasSession();
   const cards = Array.isArray(value.cards)
-    ? value.cards
-        .map(normalizeCard)
-        .filter((card): card is CanvasCard => !!card)
+    ? value.cards.map(normalizeCard).filter((card): card is CanvasCard => {
+        if (!card) return false;
+        return !(
+          card.kind === "proposal" &&
+          (card.tool === "capture_viewport" ||
+            card.tool === "capture_canvas" ||
+            card.tool === "capture_selected")
+        );
+      })
     : [];
   const viewport = isRecord(value.viewport) ? value.viewport : {};
   let rawIds: string[] = [];

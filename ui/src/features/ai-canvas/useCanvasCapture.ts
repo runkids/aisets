@@ -219,8 +219,9 @@ function drawCanvasBackground(
   const dotColor =
     document.documentElement.dataset.theme === "dark"
       ? "rgba(255,255,255,0.055)"
-      : getComputedStyle(document.documentElement).getPropertyValue("--g-line") ||
-        "rgba(0,0,0,0.12)";
+      : getComputedStyle(document.documentElement).getPropertyValue(
+          "--g-line",
+        ) || "rgba(0,0,0,0.12)";
   ctx.fillStyle = dotColor;
   for (let x = 1; x < width; x += 24) {
     for (let y = 1; y < height; y += 24) {
@@ -235,6 +236,15 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
       if (blob) resolve(blob);
       else reject(new Error("capture failed"));
     }, "image/png");
+  });
+}
+
+function blobToDataURL(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("capture failed"));
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -281,13 +291,7 @@ export function downloadBlob(blob: Blob) {
 }
 
 export function useCanvasCapture(opts: CaptureOpts) {
-  const {
-    rootRef,
-    cardElementsRef,
-    cards,
-    selectedCardIds,
-    viewport,
-  } = opts;
+  const { rootRef, cardElementsRef, cards, selectedCardIds, viewport } = opts;
   const [isCapturing, setIsCapturing] = useState(false);
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const prevUrlRef = useRef<string | null>(null);
@@ -402,10 +406,28 @@ export function useCanvasCapture(opts: CaptureOpts) {
     [selectedCardIds, captureWithIds],
   );
 
+  const captureCanvasForAI = useCallback(async () => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const frames = assetRenderFrames(
+      cards,
+      new Set(cards.map((c) => c.id)),
+      cardElementsRef.current,
+      root,
+      viewport,
+    );
+    if (frames.length === 0) return undefined;
+    const crop = captureCropForFrames(frames);
+    if (!crop) return undefined;
+    const blob = await captureRenderedFrames(root, frames, crop, 1, false);
+    return blobToDataURL(blob);
+  }, [rootRef, cards, cardElementsRef, viewport]);
+
   return {
     captureViewport,
     captureCanvas,
     captureSelected,
+    captureCanvasForAI,
     isCapturing,
     preview,
     dismissPreview,

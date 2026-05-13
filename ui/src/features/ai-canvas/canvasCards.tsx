@@ -97,6 +97,21 @@ function figmaCommentBoxPosition(region: CommentRegion) {
   };
 }
 
+function isScreenStableCard(card: CanvasCard) {
+  return (
+    card.kind === "comment" ||
+    card.kind === "assistant" ||
+    card.kind === "proposal" ||
+    card.kind === "operation"
+  );
+}
+
+function floatingCardLayer(card: CanvasCard, selected: boolean) {
+  if (card.kind === "comment") return selected ? "z-[1200]" : "z-[1100]";
+  if (isScreenStableCard(card)) return selected ? "z-[1000]" : "z-[900]";
+  return selected ? "z-40" : undefined;
+}
+
 export function CardShell({
   card,
   selected,
@@ -111,6 +126,7 @@ export function CardShell({
   onResize,
   onRegister,
   position,
+  canvasScale = 1,
 }: {
   card: CanvasCard;
   selected: boolean;
@@ -118,6 +134,7 @@ export function CardShell({
   width?: number;
   children: ReactNode;
   position?: { x: number; y: number };
+  canvasScale?: number;
   onSelect: (id: string, shiftKey?: boolean) => void;
   onDragStart: (
     event: ReactPointerEvent<HTMLDivElement>,
@@ -131,6 +148,8 @@ export function CardShell({
 }) {
   const { t } = useTranslation();
   const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const screenStableScale =
+    isScreenStableCard(card) && canvasScale > 0 ? 1 / canvasScale : 1;
 
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
     e.stopPropagation();
@@ -154,12 +173,12 @@ export function CardShell({
     <section
       className={cn(
         "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
-        card.kind === "comment" && (selected ? "z-[80]" : "z-[70]"),
+        floatingCardLayer(card, selected),
+        "[&:has([data-ai-canvas-comment-composer='true'])]:z-[1050]",
         compact
           ? cn(
               "border-2 border-transparent shadow-none",
-              selected &&
-                "z-40 border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
+              selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
             )
           : cn(
               "border bg-g-surface shadow-g-md",
@@ -167,7 +186,7 @@ export function CardShell({
               cardTone(card),
               selected &&
                 card.kind !== "comment" &&
-                "z-40 border-g-active-bg shadow-g-lg",
+                "border-g-active-bg shadow-g-lg",
               selected &&
                 card.kind === "comment" &&
                 "border-g-active-bg shadow-g-lg",
@@ -176,7 +195,8 @@ export function CardShell({
       ref={(node) => onRegister(card.id, node)}
       style={{
         width: width ?? CARD_WIDTH,
-        transform: `translate(${position?.x ?? card.x}px, ${position?.y ?? card.y}px)`,
+        transform: `translate(${position?.x ?? card.x}px, ${position?.y ?? card.y}px) scale(${screenStableScale})`,
+        transformOrigin: "left top",
       }}
       data-ai-canvas-card="true"
       data-selected={selected || undefined}
@@ -250,6 +270,7 @@ export function AssetCardBody({
   compact,
   hideOverlays,
   commentEnabled,
+  canvasScale = 1,
   onOpenAsset,
   onSelectComment,
   onCreateComment,
@@ -262,6 +283,7 @@ export function AssetCardBody({
   compact?: boolean;
   hideOverlays?: boolean;
   commentEnabled?: boolean;
+  canvasScale?: number;
   onOpenAsset?: (assetId: string) => void;
   onSelectComment: (commentId: string) => void;
   onCreateComment: (
@@ -336,6 +358,7 @@ export function AssetCardBody({
     );
   }
 
+  const commentComposerScale = canvasScale > 0 ? 1 / canvasScale : 1;
   const showAiMentionSuggestion = /(^|\s)@$/.test(pendingCommentText);
 
   function acceptAiMentionSuggestion() {
@@ -461,8 +484,13 @@ export function AssetCardBody({
         )}
         {pendingComment && (
           <div
+            data-ai-canvas-comment-composer="true"
             className="pointer-events-auto absolute z-[80]"
-            style={figmaCommentBoxPosition(pendingComment)}
+            style={{
+              ...figmaCommentBoxPosition(pendingComment),
+              transform: `scale(${commentComposerScale})`,
+              transformOrigin: "left top",
+            }}
             onPointerDown={(event) => event.stopPropagation()}
           >
             <FigmaCommentMarker className="absolute left-0 top-0 -translate-y-full" />
@@ -732,6 +760,22 @@ export function OperationCardBody({ card }: { card: OperationCanvasCard }) {
   );
 }
 
+function proposalParamString(
+  params: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = params[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function proposalParamTags(params: Record<string, unknown>) {
+  const value = params.tags;
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (tag): tag is string => typeof tag === "string" && tag.trim().length > 0,
+  );
+}
+
 export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   const { t } = useTranslation();
   const isPending = card.status === "pending";
@@ -739,6 +783,12 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   const isCompleted = card.status === "completed";
   const isFailed = card.status === "failed";
   const isRejected = card.status === "rejected";
+  const proposalTags =
+    card.tool === "update_tags" ? proposalParamTags(card.params) : [];
+  const proposalDescription =
+    card.tool === "update_description"
+      ? proposalParamString(card.params, "description")
+      : undefined;
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -791,6 +841,30 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
       {card.impact && (
         <p className="text-g-caption text-g-ink-3">{card.impact}</p>
       )}
+      {proposalTags.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 py-2">
+          <div className="font-g-mono text-[10px] font-[590] tracking-g-mono text-g-ink-4">
+            {t("aiCanvas.proposalTags")}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {proposalTags.map((tag) => (
+              <Badge key={tag} tone="line" className="max-w-full truncate">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {proposalDescription && (
+        <div className="flex flex-col gap-1.5 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 py-2">
+          <div className="font-g-mono text-[10px] font-[590] tracking-g-mono text-g-ink-4">
+            {t("aiCanvas.proposalDescription")}
+          </div>
+          <p className="text-g-caption leading-[1.45] text-g-ink-2 break-words">
+            {proposalDescription}
+          </p>
+        </div>
+      )}
       {card.error && <p className="text-g-caption text-g-red">{card.error}</p>}
       {isExecuting && (
         <div className="flex items-center gap-2 text-g-caption text-g-ink-3">
@@ -807,17 +881,23 @@ export function AICursor({
   label,
   status,
   nickname,
+  canvasScale = 1,
 }: {
   position: { x: number; y: number };
   label?: string;
   status?: "thinking" | "acting" | "idle";
   nickname?: string;
+  canvasScale?: number;
 }) {
   const active = status === "thinking" || status === "acting";
+  const stableScale = canvasScale > 0 ? 1 / canvasScale : 1;
   return (
     <div
-      className="pointer-events-none absolute z-[60] transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
-      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      className="pointer-events-none absolute z-[60] transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+      style={{
+        transform: `translate(${position.x}px, ${position.y}px) scale(${stableScale})`,
+        transformOrigin: "left top",
+      }}
     >
       <div className="flex flex-col items-start">
         <MousePointer2
@@ -839,7 +919,9 @@ export function AICursor({
         >
           <span>{nickname || "AI"}</span>
           {active && label && (
-            <span className="max-w-[160px] truncate opacity-80">· {label}</span>
+            <span className="max-w-[360px] min-w-0 whitespace-nowrap opacity-80">
+              · {label}
+            </span>
           )}
         </div>
       </div>

@@ -36,6 +36,11 @@ export type CanvasChatEvent =
 
 type CanvasChatDone = Extract<CanvasChatEvent, { type: "done" }>;
 
+export type CanvasCardLayoutMetrics = Record<
+  string,
+  { width?: number; height?: number; layerIndex?: number }
+>;
+
 type CanvasSnapshotPayload = {
   viewport: CanvasViewport;
   selectedCardIds: string[];
@@ -48,15 +53,18 @@ type CanvasChatOptions = {
 
 export function serializeCanvasSnapshot(
   cards: CanvasCard[],
-  selectedCardId: string | undefined,
+  selectedCardId: string | string[] | undefined,
   viewport: CanvasViewport,
   extraSelectedCardIds: string[] = [],
+  layoutMetrics: CanvasCardLayoutMetrics = {},
 ): CanvasSnapshotPayload {
+  const baseSelectedCardIds = Array.isArray(selectedCardId)
+    ? selectedCardId
+    : selectedCardId
+      ? [selectedCardId]
+      : [];
   const selectedCardIds = [
-    ...new Set([
-      ...(selectedCardId ? [selectedCardId] : []),
-      ...extraSelectedCardIds,
-    ]),
+    ...new Set([...baseSelectedCardIds, ...extraSelectedCardIds]),
   ];
   const selectedSet = new Set(selectedCardIds);
 
@@ -64,11 +72,17 @@ export function serializeCanvasSnapshot(
     viewport,
     selectedCardIds,
     cards: cards.map((card) => {
+      const metrics = layoutMetrics[card.id];
       const base: Record<string, unknown> = {
         id: card.id,
         kind: card.kind,
         x: card.x,
         y: card.y,
+        ...(metrics?.width ? { width: Math.round(metrics.width) } : {}),
+        ...(metrics?.height ? { height: Math.round(metrics.height) } : {}),
+        ...(typeof metrics?.layerIndex === "number"
+          ? { layerIndex: metrics.layerIndex }
+          : {}),
       };
       if (card.kind === "asset") {
         const a = card.asset;
@@ -116,6 +130,7 @@ export async function canvasChat(options: {
   canvas: CanvasSnapshotPayload;
   locale: string;
   options?: CanvasChatOptions;
+  canvasImage?: string;
   onEvent?: (event: CanvasChatEvent) => void;
   signal?: AbortSignal;
 }): Promise<CanvasChatDone | null> {
@@ -124,6 +139,7 @@ export async function canvasChat(options: {
     canvas: options.canvas,
     locale: options.locale,
     options: options.options,
+    canvasImage: options.canvasImage,
   });
 
   const response = await fetch(`${basePath}/api/ai/canvas/chat`, {

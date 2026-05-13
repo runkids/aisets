@@ -1,6 +1,7 @@
 package server
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -75,7 +76,7 @@ func TestParseCanvasActions_MixedGoodBadBlocks(t *testing.T) {
 }
 
 func TestCanvasToolSafe(t *testing.T) {
-	safes := []string{"focus_card", "search_assets", "create_comment"}
+	safes := []string{"focus_card", "search_assets", "create_comment", "select_cards", "remove_cards", "move_card", "arrange_cards", "resize_card", "bring_cards_to_front", "inspect_canvas", "capture_viewport", "capture_canvas", "capture_selected"}
 	for _, name := range safes {
 		if !canvasToolSafe(name) {
 			t.Errorf("%s should be safe", name)
@@ -89,6 +90,231 @@ func TestCanvasToolSafe(t *testing.T) {
 	}
 	if canvasToolSafe("nonexistent") {
 		t.Error("unknown tool should not be safe")
+	}
+}
+
+func TestCanvasSystemPrompt_ImageOptimizationAdviceOffRestrictsProposals(t *testing.T) {
+	prompt := canvasSystemPrompt("zh-TW", canvasChatOptions{ImageOptimizationAdvice: false})
+	for _, want := range []string{
+		"Image optimization advice is OFF",
+		"Do NOT proactively create NEEDS_CONFIRMATION proposal cards",
+		"Use SAFE tools only",
+		"latest request explicitly asks",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	for _, forbidden := range []string{
+		"Proposes concrete actions (compress, tag, rename) proactively",
+		"The existing tags are generic — let me suggest better ones",
+		"This is a 640×480 PNG at 58KB. It's large for an icon",
+	} {
+		if strings.Contains(prompt, forbidden) {
+			t.Fatalf("prompt still contains proactive proposal wording %q:\n%s", forbidden, prompt)
+		}
+	}
+}
+
+func TestCanvasSystemPrompt_AutoLocaleUsesBuiltInLanguages(t *testing.T) {
+	cases := map[string]string{
+		"en":    "Respond in English",
+		"zh-TW": "Respond in Traditional Chinese (繁體中文)",
+		"zh-CN": "Respond in Simplified Chinese (简体中文)",
+		"ja":    "Respond in Japanese (日本語)",
+		"ko":    "Respond in Korean (한국어)",
+	}
+	for locale, want := range cases {
+		prompt := canvasSystemPrompt(locale, canvasChatOptions{AutoLocale: true})
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("%s prompt missing %q:\n%s", locale, want, prompt)
+		}
+	}
+}
+
+func TestCanvasSystemPrompt_AutoLocaleOffUsesEnglish(t *testing.T) {
+	prompt := canvasSystemPrompt("zh-TW", canvasChatOptions{AutoLocale: false})
+	if !strings.Contains(prompt, "Respond in English") {
+		t.Fatalf("prompt should default to English when auto locale is off:\n%s", prompt)
+	}
+}
+
+func TestCanvasSystemPrompt_ImageOptimizationAdviceOnAllowsOptimizationProposals(t *testing.T) {
+	prompt := canvasSystemPrompt("en", canvasChatOptions{ImageOptimizationAdvice: true})
+	for _, want := range []string{
+		"Image optimization advice is ON",
+		"proactively inspect selected or visible image assets",
+		"compress_image, resize_image, or convert_image",
+		"Keep non-optimization proposals",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestBuildCanvasUserPrompt_ImageOptimizationAdviceOff(t *testing.T) {
+	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "看看這張圖"}}, canvasSnapshot{}, canvasChatOptions{ImageOptimizationAdvice: false})
+	if !strings.Contains(prompt, "Image optimization advice is OFF") {
+		t.Fatalf("prompt should include OFF state:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "Do not proactively propose compression, resizing, or format conversion") {
+		t.Fatalf("prompt should restrict proactive optimization:\n%s", prompt)
+	}
+}
+
+func TestCanvasProposalAllowed_BlocksUnsolicitedProposalsWhenAdviceOff(t *testing.T) {
+	latest := "幫我看看這張圖有什麼問題"
+	options := canvasChatOptions{ImageOptimizationAdvice: false}
+	for _, tool := range []string{"compress_image", "resize_image", "convert_image", "update_tags", "update_description"} {
+		if canvasProposalAllowed(tool, latest, options) {
+			t.Fatalf("%s should be blocked for a general request when advice is off", tool)
+		}
+	}
+}
+
+func TestCanvasProposalAllowed_AllowsExplicitMetadataRequests(t *testing.T) {
+	options := canvasChatOptions{ImageOptimizationAdvice: false}
+	if !canvasProposalAllowed("update_tags", "幫這張圖加上搜尋標籤", options) {
+		t.Fatal("explicit tag update should be allowed")
+	}
+	if !canvasProposalAllowed("update_description", "幫這張圖補充描述並儲存", options) {
+		t.Fatal("explicit description update should be allowed")
+	}
+	if canvasProposalAllowed("update_description", "描述這張圖給我聽", options) {
+		t.Fatal("plain describe request should not create a metadata proposal")
+	}
+}
+
+func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testing.T) {
+	if !canvasProposalAllowed("compress_image", "幫我看看這張圖", canvasChatOptions{ImageOptimizationAdvice: true}) {
+		t.Fatal("optimization advice on should allow proactive optimization proposals")
+	}
+	if !canvasProposalAllowed("compress_image", "幫我壓縮這張圖", canvasChatOptions{ImageOptimizationAdvice: false}) {
+		t.Fatal("explicit optimization request should be allowed even when advice is off")
+	}
+}
+
+func TestCanvasImageTempFile_DecodesDataURI(t *testing.T) {
+	path, cleanup, err := canvasImageTempFile("data:image/png;base64,AQID")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "\x01\x02\x03" {
+		t.Fatalf("unexpected data: %v", data)
+	}
+}
+
+func TestBuildCanvasUserPrompt_NotesAttachedCanvasImage(t *testing.T) {
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{}, canvasChatOptions{CanvasImageAttached: true})
+	if !strings.Contains(prompt, "hidden AI-only screenshot") {
+		t.Fatalf("prompt should mention attached screenshot:\n%s", prompt)
+	}
+}
+
+func TestBuildCanvasUserPrompt_IncludesSelectedAssetTargets(t *testing.T) {
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{
+		SelectedCardIDs: []string{"asset-card-1", "asset-card-2"},
+		Cards: []canvasCardSnapshot{
+			{ID: "asset-card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1", RepoPath: "assets/a.png"}},
+			{ID: "asset-card-2", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a2", RepoPath: "assets/b.png"}},
+		},
+	}, canvasChatOptions{})
+	for _, want := range []string{"Selected asset targets (2)", "assetId=a1", "assetId=a2"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCanvasCaptureRequested(t *testing.T) {
+	for _, input := range []string{
+		"幫我排版後拍一張去背照",
+		"匯出畫布給我看",
+		"export the canvas",
+		"download this layout",
+	} {
+		if !canvasCaptureRequested(input) {
+			t.Fatalf("expected capture intent for %q", input)
+		}
+	}
+	if canvasCaptureRequested("幫我排版") {
+		t.Fatal("plain arrange request should not require capture")
+	}
+}
+
+func TestFallbackCanvasCaptureAction(t *testing.T) {
+	action := fallbackCanvasCaptureAction("幫我排版後拍一張去背照", canvasSnapshot{})
+	if action.Tool != "capture_canvas" {
+		t.Fatalf("tool = %s", action.Tool)
+	}
+	if action.Params["transparent"] != true {
+		t.Fatalf("transparent = %#v", action.Params["transparent"])
+	}
+
+	action = fallbackCanvasCaptureAction("截取選取範圍", canvasSnapshot{SelectedCardIDs: []string{"a"}})
+	if action.Tool != "capture_selected" {
+		t.Fatalf("selected tool = %s", action.Tool)
+	}
+}
+
+func TestCanvasCaptureRepairPrompt_AsksModelToChooseMode(t *testing.T) {
+	prompt := canvasCaptureRepairPrompt("幫我截取選取範圍")
+	for _, want := range []string{"capture_viewport", "capture_canvas", "capture_selected", "Reply with exactly one action block"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("repair prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestExpandCanvasMultiSelectedActions_FansOutSinglePerAssetAction(t *testing.T) {
+	actions := []canvasAction{{
+		Tool:        "update_tags",
+		Params:      map[string]any{"assetId": "a1", "tags": []any{"family"}},
+		Description: "update tags",
+		Impact:      "better search",
+	}}
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1", "card-2", "card-3"},
+		Cards: []canvasCardSnapshot{
+			{ID: "card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1"}},
+			{ID: "card-2", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a2"}},
+			{ID: "card-3", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a3"}},
+		},
+	}
+
+	expanded := expandCanvasMultiSelectedActions(actions, canvas)
+	if len(expanded) != 3 {
+		t.Fatalf("expected 3 actions, got %d", len(expanded))
+	}
+	for i, want := range []string{"a1", "a2", "a3"} {
+		if expanded[i].Params["assetId"] != want {
+			t.Fatalf("action %d assetId = %v, want %s", i, expanded[i].Params["assetId"], want)
+		}
+	}
+}
+
+func TestExpandCanvasMultiSelectedActions_DoesNotFanOutWhenModelAlreadyEmitsPerAsset(t *testing.T) {
+	actions := []canvasAction{
+		{Tool: "update_tags", Params: map[string]any{"assetId": "a1"}},
+		{Tool: "update_tags", Params: map[string]any{"assetId": "a2"}},
+	}
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1", "card-2"},
+		Cards: []canvasCardSnapshot{
+			{ID: "card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1"}},
+			{ID: "card-2", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a2"}},
+		},
+	}
+
+	expanded := expandCanvasMultiSelectedActions(actions, canvas)
+	if len(expanded) != 2 {
+		t.Fatalf("expected original 2 actions, got %d", len(expanded))
 	}
 }
 
@@ -123,6 +349,23 @@ func TestParseCanvasActions_GemmaFormat(t *testing.T) {
 	}
 	if actions[0].Tool != "search_assets" {
 		t.Fatalf("expected search_assets, got %s", actions[0].Tool)
+	}
+}
+
+func TestParseCanvasActions_PlainToolNameCallFormat(t *testing.T) {
+	input := `call:focus_card{cardId:<|"|>asset-mp41yi1d-kdk4o2<|"|>,label:<|"|>book_zukan_body.png (第一個圖卡)<|"|>}`
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "focus_card" {
+		t.Fatalf("tool = %s", actions[0].Tool)
+	}
+	if actions[0].Params["cardId"] != "asset-mp41yi1d-kdk4o2" {
+		t.Fatalf("cardId = %#v", actions[0].Params["cardId"])
+	}
+	if actions[0].Params["label"] != "book_zukan_body.png (第一個圖卡)" {
+		t.Fatalf("label = %#v", actions[0].Params["label"])
 	}
 }
 
