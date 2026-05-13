@@ -492,7 +492,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
           <Card className="min-h-0">
             <CardBody className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 p-2.5">
               <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
+                <div className="relative min-w-0 flex-1">
                   <TextInput
                     variant="search"
                     value={search}
@@ -560,14 +560,6 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                             </kbd>
                           </button>
                         )}
-                        {showSemanticLoading && (
-                          <div className="mr-1 h-[28px] w-[120px] overflow-hidden rounded-g-sm">
-                            <LoadingVisualView
-                              style={semanticLoadingStyle}
-                              dimensionToken=""
-                            />
-                          </div>
-                        )}
                       </span>
                     }
                     onKeyDown={(e) => {
@@ -584,6 +576,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                       }
                     }}
                   />
+                  {showSemanticLoading && (
+                    <div className="absolute inset-x-0 top-full z-10 mt-1 h-[72px] overflow-hidden rounded-g-md bg-g-surface shadow-g-sm">
+                      <LoadingVisualView
+                        style={semanticLoadingStyle}
+                        dimensionToken=""
+                      />
+                    </div>
+                  )}
                 </div>
                 <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
                   {pickerTotal}
