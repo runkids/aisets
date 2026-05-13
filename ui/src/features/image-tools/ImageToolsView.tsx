@@ -183,7 +183,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
     wallWidth > 0
       ? (wallWidth - WALL_GAP * (wallColumns - 1)) / wallColumns
       : WALL_CARD_MIN;
-  const wallRowEstimate = Math.ceil((wallCardWidth * 3) / 4 + 42 + WALL_GAP);
+  const wallRowEstimate = Math.ceil(wallCardWidth + WALL_GAP);
   const wallRowCount = Math.ceil(pickerItems.length / wallColumns);
   const wallRows = useMemo(
     () =>
@@ -518,7 +518,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                   <button
                                     key={item.id}
                                     type="button"
-                                    className="group grid overflow-hidden rounded-g-md border border-g-line bg-g-surface text-left shadow-g-sm transition-[border-color,box-shadow,transform,background] duration-[160ms] ease-g hover:-translate-y-0.5 hover:border-g-line-strong hover:shadow-g-md focus-visible:border-g-accent focus-visible:shadow-g-focus data-[selected=true]:border-g-line-strong data-[selected=true]:bg-g-accent-soft data-[selected=true]:shadow-[inset_4px_0_0_var(--g-accent),var(--g-shadow-sm)]"
+                                    className="group relative aspect-square overflow-hidden rounded-g-md bg-g-surface-2 text-left transition-[box-shadow,transform] duration-[160ms] ease-g hover:-translate-y-0.5 hover:shadow-g-md focus-visible:shadow-g-focus data-[selected=true]:ring-2 data-[selected=true]:ring-g-accent"
                                     data-selected={checked || undefined}
                                     aria-pressed={checked}
                                     aria-label={t("imageTools.selectAsset", {
@@ -544,44 +544,39 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       });
                                     }}
                                   >
-                                    <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-g-line bg-g-canvas">
-                                      <img
-                                        src={item.thumbnailUrl || item.url}
-                                        alt=""
-                                        loading="lazy"
-                                        className="absolute inset-0 m-auto h-full w-full object-contain p-2.5 transition-transform duration-[180ms] ease-g group-hover:scale-[1.03]"
-                                      />
-                                    </span>
-                                    <div className="grid min-h-[42px] gap-1 px-2 py-1.5">
-                                      <div className="truncate font-g-mono text-g-chip font-[590] text-g-ink">
-                                        {fileName(item.repoPath)}
-                                      </div>
-                                      <div className="flex min-w-0 items-center gap-1">
-                                        <Badge>
-                                          {formatExt(
-                                            item.ext ||
-                                              item.repoPath.split(".").pop() ||
-                                              "",
-                                          )}
-                                        </Badge>
-                                        <span className="truncate font-g-mono text-[10px] text-g-ink-4">
-                                          {formatBytes(item.bytes)}
+                                    <img
+                                      src={item.thumbnailUrl || item.url}
+                                      alt=""
+                                      loading="lazy"
+                                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-[220ms] ease-g group-hover:scale-[1.06]"
+                                    />
+                                    <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent px-2 pb-2 pt-8 opacity-0 transition-opacity duration-[160ms] ease-g group-hover:opacity-100">
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-g-mono text-g-chip font-[590] text-white">
+                                          {fileName(item.repoPath)}
                                         </span>
-                                      </div>
-                                    </div>
+                                        <span className="block font-g-mono text-[10px] text-white/70">
+                                          {formatExt(item.ext || item.repoPath.split(".").pop() || "").toUpperCase()} · {formatBytes(item.bytes)}
+                                        </span>
+                                      </span>
+                                    </span>
                                     <span
-                                      className="absolute right-2 top-2 grid size-6 place-items-center rounded-g-sm border border-g-line-strong bg-[color-mix(in_srgb,var(--g-surface)_88%,transparent)] text-[12px] font-[800] text-g-ink-4 opacity-0 shadow-g-sm backdrop-blur data-[checked=true]:border-g-accent data-[checked=true]:bg-g-surface data-[checked=true]:text-g-accent data-[checked=true]:opacity-100 group-hover:opacity-100"
-                                      data-checked={checked || undefined}
+                                      className={cn(
+                                        "absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full text-white shadow-g-sm transition-[opacity,background] duration-[120ms]",
+                                        checked
+                                          ? "bg-g-accent opacity-100"
+                                          : "bg-black/40 opacity-0 backdrop-blur group-hover:opacity-100",
+                                      )}
                                       aria-hidden="true"
                                     >
                                       {checked ? (
-                                        <Check size={14} />
+                                        <Check size={13} />
                                       ) : (
                                         <Plus size={13} />
                                       )}
                                     </span>
                                     {queued && (
-                                      <span className="absolute inset-0 grid place-items-center bg-g-accent/10">
+                                      <span className="absolute left-1.5 top-1.5">
                                         <Badge
                                           tone="accent"
                                           className="shadow-g-sm"
