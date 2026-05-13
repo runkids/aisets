@@ -58,7 +58,7 @@ const FORMAT_OPTIONS = [
   { value: "png", label: "PNG" },
 ];
 const WALL_CARD_MIN = 132;
-const WALL_GAP = 12;
+const WALL_GAP = 16;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
@@ -428,7 +428,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                               key={virtualRow.key}
                               ref={wallVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="absolute left-0 top-0 grid w-full gap-2.5"
+                              className="absolute left-0 top-0 grid w-full gap-4"
                               style={{
                                 gridTemplateColumns: `repeat(${wallColumns}, minmax(0, 1fr))`,
                                 transform: `translateY(${virtualRow.start}px)`,
