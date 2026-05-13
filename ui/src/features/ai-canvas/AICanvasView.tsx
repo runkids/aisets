@@ -106,11 +106,23 @@ function nowISO() {
   return new Date().toISOString();
 }
 
-function nextCardPosition(count: number) {
-  return {
-    x: 84 + (count % 5) * 34,
-    y: 72 + (count % 4) * 42,
-  };
+function nextCardPosition(
+  count: number,
+  viewport?: { x: number; y: number; scale: number },
+  containerSize?: { width: number; height: number },
+) {
+  const jitterX = (count % 5) * 34;
+  const jitterY = (count % 4) * 42;
+  if (viewport && containerSize && containerSize.width > 0) {
+    const cx =
+      (-viewport.x + containerSize.width / 2) / viewport.scale -
+      CARD_WIDTH / 2 +
+      jitterX;
+    const cy =
+      (-viewport.y + containerSize.height / 2) / viewport.scale - 120 + jitterY;
+    return { x: Math.round(cx), y: Math.round(cy) };
+  }
+  return { x: 84 + jitterX, y: 72 + jitterY };
 }
 
 function selectedAssetIds(cards: AssetCanvasCard[]) {
@@ -267,8 +279,7 @@ function AssetCardBody({
 
   function toNormalized(clientX: number, clientY: number) {
     const rect = imageContainerRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0)
-      return { nx: 0, ny: 0 };
+    if (!rect || rect.width === 0 || rect.height === 0) return { nx: 0, ny: 0 };
     return {
       nx: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
       ny: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
@@ -285,7 +296,9 @@ function AssetCardBody({
   function handleRegionPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!drawRegion) return;
     const { nx, ny } = toNormalized(e.clientX, e.clientY);
-    setDrawRegion((prev) => (prev ? { ...prev, currentX: nx, currentY: ny } : null));
+    setDrawRegion((prev) =>
+      prev ? { ...prev, currentX: nx, currentY: ny } : null,
+    );
   }
 
   function handleRegionPointerUp() {
@@ -1059,7 +1072,11 @@ export function AICanvasView({
       return;
     }
     const id = createCanvasCardId("asset");
-    const position = nextCardPosition(cards.length);
+    const rect = rootRef.current?.getBoundingClientRect();
+    const containerSize = rect
+      ? { width: rect.width, height: rect.height }
+      : undefined;
+    const position = nextCardPosition(cards.length, viewport, containerSize);
     const card: AssetCanvasCard = {
       id,
       kind: "asset",
@@ -1078,7 +1095,11 @@ export function AICanvasView({
       cards,
       assetCards.map((card) => card.id),
     );
-    const position = nextCardPosition(cards.length);
+    const rect = rootRef.current?.getBoundingClientRect();
+    const containerSize = rect
+      ? { width: rect.width, height: rect.height }
+      : undefined;
+    const position = nextCardPosition(cards.length, viewport, containerSize);
     const card: CanvasCard = {
       id: createCanvasCardId("ai"),
       kind: "assistant",
