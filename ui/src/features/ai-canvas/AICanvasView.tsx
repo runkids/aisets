@@ -589,15 +589,7 @@ function OperationCardBody({ card }: { card: OperationCanvasCard }) {
   );
 }
 
-function ProposalCardBody({
-  card,
-  onApprove,
-  onReject,
-}: {
-  card: ProposalCanvasCard;
-  onApprove: (card: ProposalCanvasCard) => void;
-  onReject: (card: ProposalCanvasCard) => void;
-}) {
+function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   const { t } = useTranslation();
   const isPending = card.status === "pending";
   const isExecuting = card.status === "executing";
@@ -657,36 +649,11 @@ function ProposalCardBody({
         <p className="text-g-caption text-g-ink-3">{card.impact}</p>
       )}
       {card.error && <p className="text-g-caption text-g-red">{card.error}</p>}
-      {isPending && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            variant="primary"
-            leadingIcon={<Check />}
-            onClick={() => onApprove(card)}
-          >
-            {t("aiCanvas.approve")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            leadingIcon={<XCircle />}
-            onClick={() => onReject(card)}
-          >
-            {t("aiCanvas.reject")}
-          </Button>
-        </div>
-      )}
       {isExecuting && (
         <div className="flex items-center gap-2 text-g-caption text-g-ink-3">
           <LoaderCircle size={14} className="animate-spin" />
           {t("aiCanvas.executing")}
         </div>
-      )}
-      {isFailed && (
-        <Button size="sm" variant="secondary" onClick={() => onApprove(card)}>
-          {t("aiCanvas.retry")}
-        </Button>
       )}
     </div>
   );
@@ -807,6 +774,19 @@ export function AICanvasView({
   );
   const isWorking = working !== "idle";
   const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
+  const selectedProposal = useMemo(() => {
+    if (!selectedCardId) return undefined;
+    const card = cards.find((c) => c.id === selectedCardId);
+    return card?.kind === "proposal" ? card : undefined;
+  }, [cards, selectedCardId]);
+  const pendingProposals = useMemo(
+    () =>
+      cards.filter(
+        (c): c is ProposalCanvasCard =>
+          c.kind === "proposal" && c.status === "pending",
+      ),
+    [cards],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1571,11 +1551,7 @@ export function AICanvasView({
               ) : card.kind === "variant" ? (
                 <VariantCardBody card={card} />
               ) : card.kind === "proposal" ? (
-                <ProposalCardBody
-                  card={card}
-                  onApprove={handleApproveProposal}
-                  onReject={handleRejectProposal}
-                />
+                <ProposalCardBody card={card} />
               ) : card.kind === "operation" ? (
                 <OperationCardBody card={card} />
               ) : null}
@@ -1891,6 +1867,60 @@ export function AICanvasView({
                 )}
               </div>
             )}
+            {selectedProposal && selectedProposal.status === "pending" ? (
+              <div className="flex h-12 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Badge tone="amber">{selectedProposal.tool.replaceAll("_", " ")}</Badge>
+                  <span className="min-w-0 flex-1 truncate text-g-body text-white/80">
+                    {selectedProposal.description}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                  leadingIcon={<XCircle />}
+                  onClick={() => handleRejectProposal(selectedProposal)}
+                >
+                  {t("aiCanvas.reject")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  leadingIcon={<Check />}
+                  onClick={() => handleApproveProposal(selectedProposal)}
+                >
+                  {t("aiCanvas.approve")}
+                </Button>
+              </div>
+            ) : pendingProposals.length > 0 ? (
+              <div className="flex h-12 items-center gap-2">
+                <span className="min-w-0 flex-1 text-g-body text-white/50">
+                  {t("aiCanvas.pendingProposals", {
+                    count: pendingProposals.length,
+                  })}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="border-white/[0.08] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                  onClick={() => {
+                    for (const p of pendingProposals) handleRejectProposal(p);
+                  }}
+                >
+                  {t("aiCanvas.rejectAll")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    for (const p of pendingProposals) handleApproveProposal(p);
+                  }}
+                >
+                  {t("aiCanvas.approveAll")}
+                </Button>
+              </div>
+            ) : (
             <div className="flex h-12 items-center gap-2">
               <IconButton
                 size="md"
@@ -1967,6 +1997,7 @@ export function AICanvasView({
                 </IconButton>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

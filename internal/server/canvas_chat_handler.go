@@ -225,6 +225,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			"cardId": req.Canvas.SelectedCardIDs[0],
 			"label":  "Examining...",
 		})
+		time.Sleep(400 * time.Millisecond)
 	}
 	sendNDJSON(w, map[string]any{"type": "thinking"})
 
@@ -243,12 +244,20 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 	proposalIndex := 0
 	for _, act := range actions {
+		if act.Tool == "focus_card" {
+			sendNDJSON(w, map[string]any{
+				"type":   "focus",
+				"cardId": act.Params["cardId"],
+				"label":  act.Params["label"],
+			})
+			time.Sleep(300 * time.Millisecond)
+			continue
+		}
 		if canvasToolSafe(act.Tool) {
-			result := s.executeCanvasSafeAction(r, act, settings)
 			sendNDJSON(w, map[string]any{
 				"type":   "action_result",
 				"tool":   act.Tool,
-				"result": result,
+				"result": s.executeCanvasSafeAction(r, act, settings),
 			})
 		} else {
 			proposalIndex++
@@ -262,7 +271,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				"targetAssetId": act.Params["assetId"],
 			})
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 	}
 
 	if textBody != "" {

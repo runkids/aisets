@@ -134,7 +134,10 @@
     "assetRemovedError": "This asset is no longer on the canvas.",
     "clearConfirmTitle": "Clear canvas",
     "clearConfirmMessage": "All cards, comments, proposals, and chat history will be removed. This cannot be undone.",
-    "clearConfirmAction": "Clear all"
+    "clearConfirmAction": "Clear all",
+    "pendingProposals": "{{count}} pending proposals — select one or approve all",
+    "approveAll": "Approve all",
+    "rejectAll": "Reject all"
   },
   "favorites": {
     "add": "Add to Favorites",
