@@ -37,7 +37,6 @@ import {
   Button,
   Card,
   CardBody,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
   EmptyState,
   Range,
   Select,
@@ -457,19 +456,19 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
         {/* Dual-column content */}
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.25fr)_minmax(320px,0.8fr)] gap-3 max-[1080px]:grid-cols-1">
           <Card className="min-h-0">
-            <CardBody className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 p-2.5">
+            <CardBody className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 p-2.5">
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
-                  <div className="font-g text-g-ui font-[590] text-g-ink">
-                    {t("imageTools.catalog")}
-                  </div>
-                  <div className="text-g-caption text-g-ink-4">
-                    {t("imageTools.catalogCount", {
-                      loaded: pickerItems.length,
-                      total: pickerTotal,
-                    })}
-                  </div>
+                  <TextInput
+                    variant="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.currentTarget.value)}
+                    placeholder={t("imageTools.catalogSearch")}
+                  />
                 </div>
+                <span className="shrink-0 font-g-mono text-g-caption text-g-ink-4">
+                  {pickerItems.length} / {pickerTotal}
+                </span>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -480,12 +479,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   {t("imageTools.addSelected", { count: pickerSelected.size })}
                 </Button>
               </div>
-              <TextInput
-                variant="search"
-                value={search}
-                onChange={(event) => setSearch(event.currentTarget.value)}
-                placeholder={t("imageTools.catalogSearch")}
-              />
+              {!scanId ? (
+                <EmptyState
+                  icon={<Images size={20} />}
+                  title={t("imageTools.catalog")}
+                  description={t("imageTools.emptyQueue")}
+                  size="md"
+                />
+              ) : (
               <div className="min-h-0">
                 <div
                   ref={wallScrollRef}
@@ -579,6 +580,13 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                       <Plus size={13} />
                                     )}
                                   </span>
+                                  {queued && (
+                                    <span className="absolute inset-0 grid place-items-center bg-g-accent/10">
+                                      <Badge tone="accent" className="shadow-g-sm">
+                                        {t("imageTools.queued")}
+                                      </Badge>
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })}
@@ -604,6 +612,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                   )}
                 </div>
               </div>
+              )}
             </CardBody>
           </Card>
 
