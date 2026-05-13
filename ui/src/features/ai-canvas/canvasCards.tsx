@@ -1,6 +1,7 @@
 import {
   ArrowUp,
   Bot,
+  Check,
   ImagePlus,
   Layers3,
   LoaderCircle,
@@ -158,7 +159,8 @@ export function CardShell({
         compact
           ? cn(
               "border-2 border-transparent shadow-none",
-              selected && "z-40 border-[#0d99ff] shadow-[0_0_0_1px_#0d99ff]",
+              selected &&
+                "z-40 border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
             )
           : cn(
               "border bg-g-surface shadow-g-md",
@@ -190,6 +192,14 @@ export function CardShell({
           onPointerCancel={onDragEnd}
         >
           {children}
+          {selected && (
+            <span
+              className="pointer-events-none absolute right-2 top-2 grid size-10 place-items-center rounded-g-pill bg-g-surface text-g-accent shadow-g-md"
+              aria-hidden="true"
+            >
+              <Check size={22} strokeWidth={2.6} />
+            </span>
+          )}
         </div>
       ) : (
         <>
