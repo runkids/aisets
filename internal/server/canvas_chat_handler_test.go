@@ -115,6 +115,17 @@ func TestParseCanvasActions_ToolCallNoCall(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_GemmaFormat(t *testing.T) {
+	input := "<|tool_call>call{\"tool\": \"search_assets\", \"params\": {\"q\": \"書\", \"limit\": 12}, \"description\": \"搜尋書\", \"impact\": \"列表\"}<tool_call|>"
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action from Gemma format, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "search_assets" {
+		t.Fatalf("expected search_assets, got %s", actions[0].Tool)
+	}
+}
+
 func TestSplitParagraphs(t *testing.T) {
 	ps := splitParagraphs("Hello\n\nWorld\n\nDone")
 	if len(ps) != 3 {

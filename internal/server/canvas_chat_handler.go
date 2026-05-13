@@ -78,7 +78,7 @@ type canvasAction struct {
 }
 
 var actionBlockRe = regexp.MustCompile("(?s)```action\\s*\\n(.*?)\\n```")
-var toolCallRe = regexp.MustCompile(`(?s)<tool_call>\s*(?:call\()?\s*(\{.*?\})\s*\)?\s*</?(tool_call|/tool_call)>`)
+var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(\{.+\})\s*\)?\s*<\|?/?tool_call\|?>`)
 
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
