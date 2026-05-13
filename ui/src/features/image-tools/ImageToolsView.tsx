@@ -171,6 +171,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
       }),
     enabled: searchMode === "semantic" && committedSemanticQuery.length > 0,
     staleTime: 30_000,
+    placeholderData: (previousData) => previousData,
   });
   const semanticItems: AssetItem[] = useMemo(
     () =>

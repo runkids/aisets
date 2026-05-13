@@ -9,6 +9,7 @@ import {
   Recycle,
   Settings,
   ShieldCheck,
+  Sparkles,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -32,6 +33,7 @@ export const MODE_ITEMS: ModeItem[] = [
   { id: "lint", labelKey: "nav.lint", icon: <FileWarning size={14} /> },
   { id: "precheck", labelKey: "nav.precheck", icon: <ShieldCheck size={14} /> },
   { id: "imageTools", labelKey: "nav.imageTools", icon: <Images size={14} /> },
+  { id: "aiCanvas", labelKey: "nav.aiCanvas", icon: <Sparkles size={14} /> },
   {
     id: "prompts",
     labelKey: "nav.prompts",

@@ -9,6 +9,7 @@ import {
   Recycle,
   Settings,
   ShieldCheck,
+  Sparkles,
   Tags,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -174,6 +175,11 @@ export function NavSidebar({
           icon: <Images size={18} />,
           badge: "imageTools",
           tone: "blue",
+        },
+        {
+          id: "aiCanvas",
+          label: t("nav.aiCanvas"),
+          icon: <Sparkles size={18} />,
         },
         {
           id: "prompts",
