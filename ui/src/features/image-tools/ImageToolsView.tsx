@@ -34,6 +34,7 @@ import {
 import { useCatalogItemsInfiniteQuery, useSettingsQuery } from "@/queries";
 import type { AssetItem } from "@/types";
 import { fileName, formatBytes, formatExt } from "@/ui";
+import { useImageBackgroundMode, imageBackgroundClassName } from "@/imageBackground";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useDebouncedValue } from "@/useDebouncedValue";
 import {
@@ -68,6 +69,7 @@ const WALL_GAP = 8;
 
 export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const { t } = useTranslation();
+  const bgMode = useImageBackgroundMode();
   const inputRef = useRef<HTMLInputElement>(null);
   const settingsDefaultsAppliedRef = useRef(false);
   const [settings, setSettings] = useState<ImageToolSettings>({
@@ -478,7 +480,9 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                                     type="button"
                                     className={cn(
                                       "group relative aspect-square overflow-hidden rounded-g-md text-left focus-visible:shadow-g-focus",
-                                      queued && "bg-g-accent",
+                                      queued
+                                        ? "bg-g-accent"
+                                        : imageBackgroundClassName(bgMode),
                                     )}
                                     aria-pressed={queued}
                                     aria-label={t("imageTools.selectAsset", {
@@ -535,23 +539,22 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                         })}
                       </div>
                     </div>
-                    {rawPickerItems.length === 0 &&
-                      !catalogQuery.isLoading && (
-                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                          <div className="grid size-12 place-items-center rounded-full bg-g-surface-2">
-                            <ImagePlus size={20} className="text-g-ink-4" />
-                          </div>
-                          <p className="font-g text-g-ui text-g-ink-4">
-                            {search.trim()
-                              ? t("common.noResults", {
-                                  defaultValue: "No results",
-                                })
-                              : t("imageTools.emptyCatalog", {
-                                  defaultValue: "No images in catalog",
-                                })}
-                          </p>
+                    {rawPickerItems.length === 0 && !catalogQuery.isLoading && (
+                      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                        <div className="grid size-12 place-items-center rounded-full bg-g-surface-2">
+                          <ImagePlus size={20} className="text-g-ink-4" />
                         </div>
-                      )}
+                        <p className="font-g text-g-ui text-g-ink-4">
+                          {search.trim()
+                            ? t("common.noResults", {
+                                defaultValue: "No results",
+                              })
+                            : t("imageTools.emptyCatalog", {
+                                defaultValue: "No images in catalog",
+                              })}
+                        </p>
+                      </div>
+                    )}
                     {catalogQuery.hasNextPage && (
                       <div
                         ref={wallLoadMoreRef}
