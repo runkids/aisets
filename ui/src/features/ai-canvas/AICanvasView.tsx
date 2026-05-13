@@ -174,10 +174,7 @@ function renderMarkdown(text: string) {
               {body.map((row, ri) => (
                 <tr key={ri}>
                   {row.map((cell, ci) => (
-                    <td
-                      key={ci}
-                      className="border border-white/10 px-2 py-1"
-                    >
+                    <td key={ci} className="border border-white/10 px-2 py-1">
                       {renderInline(cell, `td-${i}-${ri}-${ci}`)}
                     </td>
                   ))}
@@ -246,9 +243,7 @@ function renderMarkdown(text: string) {
       continue;
     }
 
-    elements.push(
-      <div key={`p-${i}`}>{renderInline(line, `p-${i}`)}</div>,
-    );
+    elements.push(<div key={`p-${i}`}>{renderInline(line, `p-${i}`)}</div>);
     i++;
   }
   return elements;
