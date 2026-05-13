@@ -7,8 +7,8 @@ import {
   LoaderCircle,
   Plus,
   RefreshCcw,
-  Settings2,
   Trash2,
+  TrendingDown,
   UploadCloud,
   Wand2,
 } from "lucide-react";
@@ -37,8 +37,13 @@ import {
   Button,
   Card,
   CardBody,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
+  EmptyState,
   Range,
   Select,
+  StatCard,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
+  Tabs,
   TextInput,
 } from "@/components/ui";
 
@@ -242,6 +247,28 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   const queuedBytes = queuedItems.reduce((sum, item) => sum + item.bytes, 0);
   const uploadBytes = files.reduce((sum, file) => sum + file.size, 0);
   const hasWorkItems = assetIds.length + files.length > 0;
+  const successResults = useMemo(
+    () => results.filter((r) => !r.errorCode),
+    [results],
+  );
+  const totalSavings = successResults.reduce(
+    (sum, r) => sum + r.savingsBytes,
+    0,
+  );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in Task 5
+  const [activeTab, setActiveTab] = useState<"queue" | "results">("queue");
+  const [prevResultCount, setPrevResultCount] = useState(0);
+  const [pulseStat, setPulseStat] = useState("");
+
+  useEffect(() => {
+    if (results.length > prevResultCount) {
+      setPrevResultCount(results.length);
+      setPulseStat("processed");
+      const timer = setTimeout(() => setPulseStat(""), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [results.length, prevResultCount]);
+
   function addPickerSelection() {
     const next = Array.from(new Set([...assetIds, ...pickerSelected]));
     onAssetIdsChange(next);
@@ -313,14 +340,38 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-g-canvas p-3 max-[768px]:p-2">
-      <div className="mx-auto grid h-full min-h-0 w-full max-w-[1540px] grid-rows-[auto_minmax(0,1fr)] gap-3">
-        <div className="rounded-g-md border border-g-line bg-g-surface-2 p-1.5 shadow-g-inset">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-g-canvas p-3 max-[768px]:p-2">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1540px] flex-col gap-3">
+        {/* StatCards */}
+        <div className="flex flex-wrap gap-2">
+          <StatCard
+            label={t("imageTools.statQueued")}
+            value={queuedItems.length + files.length}
+            icon={<Images size={14} />}
+          />
+          <StatCard
+            label={t("imageTools.statUploads")}
+            value={files.length}
+            icon={<UploadCloud size={14} />}
+          />
+          <StatCard
+            label={t("imageTools.statProcessed")}
+            value={successResults.length}
+            icon={<Check size={14} />}
+            tone={successResults.length > 0 ? "green" : undefined}
+            className={pulseStat === "processed" ? "animate-[countPulse_280ms_var(--g-ease)]" : ""}
+          />
+          <StatCard
+            label={t("imageTools.statSaved")}
+            value={totalSavings > 0 ? formatBytes(totalSavings) : "—"}
+            icon={<TrendingDown size={14} />}
+            tone={totalSavings > 0 ? "green" : undefined}
+          />
+        </div>
+
+        {/* Sticky Toolbar */}
+        <div className="sticky top-0 z-[5] rounded-g-md border border-g-line bg-[color-mix(in_srgb,var(--g-canvas)_92%,transparent)] px-2 py-1.5 shadow-g-sm backdrop-blur-[12px] [-webkit-backdrop-filter:blur(12px)]">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-g-sm px-2 font-g text-g-ui font-[510] text-g-ink-3">
-              <Settings2 size={14} />
-              {t("imageTools.outputFormat")}
-            </span>
             <Select
               value={settings.outputFormat}
               options={FORMAT_OPTIONS}
@@ -330,7 +381,7 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
               aria-label={t("imageTools.outputFormat")}
               className="w-28"
             />
-            <div className="flex h-g-btn-md min-w-[220px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2">
+            <div className="flex h-g-btn-md min-w-[180px] items-center gap-2 rounded-g-md border border-g-line bg-g-surface px-2">
               <span className="font-g text-g-ui text-g-ink-3">
                 {t("imageTools.quality")}
               </span>
@@ -358,13 +409,16 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
                 }))
               }
               placeholder={t("imageTools.resizePlaceholder")}
-              className="w-44"
+              className="w-36"
             />
             <span className="min-h-[34px] flex-1" />
             <Button
               variant="secondary"
               disabled={working || hydratingBasket || queuedItems.length === 0}
-              onClick={runProjectAssets}
+              onClick={() => {
+                setActiveTab("results");
+                runProjectAssets();
+              }}
             >
               {working ? (
                 <LoaderCircle size={14} className="animate-spin" />
@@ -375,7 +429,10 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
             </Button>
             <Button
               disabled={working || files.length === 0}
-              onClick={runUploads}
+              onClick={() => {
+                setActiveTab("results");
+                runUploads();
+              }}
             >
               {working ? (
                 <LoaderCircle size={14} className="animate-spin" />
@@ -385,6 +442,11 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
               {t("imageTools.processUploads")}
             </Button>
           </div>
+          {working && (
+            <div className="mt-1.5 h-[2px] overflow-hidden rounded-g-pill bg-g-surface-2">
+              <div className="h-full w-1/2 rounded-g-pill bg-g-accent animate-[toolbarProgress_1.1s_var(--g-ease-out)_infinite]" />
+            </div>
+          )}
           {error && (
             <div className="mt-1.5 rounded-g-md border border-g-red/30 bg-g-red-soft px-3 py-2 text-g-ui text-g-red">
               {error}
@@ -392,7 +454,8 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
           )}
         </div>
 
-        <div className="grid min-h-0 grid-cols-[minmax(0,1.25fr)_minmax(320px,0.8fr)] gap-3 max-[1080px]:grid-cols-1">
+        {/* Dual-column content */}
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.25fr)_minmax(320px,0.8fr)] gap-3 max-[1080px]:grid-cols-1">
           <Card className="min-h-0">
             <CardBody className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 p-2.5">
               <div className="flex items-center gap-2">
