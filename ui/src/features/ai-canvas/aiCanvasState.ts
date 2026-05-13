@@ -82,6 +82,7 @@ export type AICanvasPromptIntent =
   | "comment"
   | "operationPreview"
   | "imagePreview"
+  | "imageEdit"
   | "describe";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -315,6 +316,19 @@ export function commentsForAssets(cards: CanvasCard[], assetCardIds: string[]) {
   );
 }
 
+export function cardIdsForDeletion(cards: CanvasCard[], targetId: string) {
+  const target = cards.find((card) => card.id === targetId);
+  const ids = new Set<string>(target ? [target.id] : []);
+  if (target?.kind === "asset") {
+    cards.forEach((card) => {
+      if (card.kind === "comment" && card.anchorId === target.id) {
+        ids.add(card.id);
+      }
+    });
+  }
+  return ids;
+}
+
 export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "asset") return fileName(card.asset.repoPath);
   if (card.kind === "comment") return card.text || "Comment";
@@ -333,10 +347,16 @@ export function inferPromptIntent(prompt: string): AICanvasPromptIntent {
   ) {
     return "operationPreview";
   }
-  if (
-    /preview|render|generate|edit|image|預覽|生圖|生成|改圖|圖片/.test(lower)
-  ) {
+  if (/preview|render|generate|image|預覽|生圖|生成|改圖|圖片/.test(lower)) {
     return "imagePreview";
+  }
+  if (
+    /edit|recolor|colour|remove|replace|改色|換色|改顏色|顏色|紅|藍|綠|移除|替換|去背|編輯|改成/.test(
+      lower,
+    ) ||
+    /\b(color|red|blue|green)\b/.test(lower)
+  ) {
+    return "imageEdit";
   }
   return "describe";
 }

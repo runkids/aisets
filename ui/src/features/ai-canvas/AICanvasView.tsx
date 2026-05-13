@@ -1,17 +1,21 @@
 import {
-  Bot,
+  ArrowLeft,
+  ArrowUp,
+  AtSign,
   CheckCircle2,
+  Eye,
   ImagePlus,
   Layers3,
   LoaderCircle,
   Maximize2,
+  X,
   MessageSquarePlus,
   MousePointer2,
+  Paperclip,
   Plus,
   Search,
-  Sparkles,
+  SlidersHorizontal,
   Trash2,
-  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -38,7 +42,6 @@ import {
   Button,
   IconButton,
   TextInput,
-  Textarea,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { AssetItem } from "@/types";
@@ -46,6 +49,7 @@ import { fileName, formatBytes, formatExt } from "@/ui";
 import {
   buildAssistantBullets,
   cardDisplayName,
+  cardIdsForDeletion,
   clampCanvasScale,
   commentsForAssets,
   createCanvasCardId,
@@ -66,6 +70,7 @@ type Props = {
   scanId?: number;
   aiEnabled: boolean;
   onOpenAsset?: (assetId: string) => void;
+  onExitCanvas?: () => void;
 };
 
 type WorkingState = "idle" | "search" | "ai" | "imagePreview" | "operation";
@@ -78,6 +83,13 @@ const DEFAULT_IMAGE_TOOL_SETTINGS: ImageToolSettings = {
 };
 
 const CARD_WIDTH = 320;
+
+type CanvasSelection = {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+};
 
 function nowISO() {
   return new Date().toISOString();
@@ -106,6 +118,29 @@ function tagLabel(asset: AssetItem) {
   return asset.aiTag?.tags?.slice(0, 4).join(", ") || "";
 }
 
+function selectionBounds(selection: CanvasSelection) {
+  const left = Math.min(selection.startX, selection.currentX);
+  const top = Math.min(selection.startY, selection.currentY);
+  return {
+    left,
+    top,
+    width: Math.abs(selection.currentX - selection.startX),
+    height: Math.abs(selection.currentY - selection.startY),
+  };
+}
+
+function intersects(
+  a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number },
+) {
+  return (
+    a.left < b.left + b.width &&
+    a.left + a.width > b.left &&
+    a.top < b.top + b.height &&
+    a.top + a.height > b.top
+  );
+}
+
 function cardTone(card: CanvasCard) {
   if (card.kind === "asset") return "border-g-line";
   if (card.kind === "comment") return "border-g-amber/50";
@@ -123,6 +158,7 @@ function CardShell({
   onDragMove,
   onDragEnd,
   onDelete,
+  onRegister,
 }: {
   card: CanvasCard;
   selected: boolean;
@@ -135,17 +171,20 @@ function CardShell({
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDelete: (card: CanvasCard) => void;
+  onRegister: (id: string, node: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
 
   return (
     <section
       className={cn(
-        "absolute w-[320px] overflow-hidden rounded-g-md border bg-g-surface shadow-g-md transition-[border-color,box-shadow,transform] duration-[120ms] ease-g",
+        "absolute w-[320px] touch-none select-none overflow-hidden rounded-g-md border bg-g-surface shadow-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
         cardTone(card),
         selected && "border-g-active-bg shadow-g-lg",
       )}
+      ref={(node) => onRegister(card.id, node)}
       style={{ transform: `translate(${card.x}px, ${card.y}px)` }}
+      data-ai-canvas-card="true"
       data-selected={selected || undefined}
       onPointerDown={() => onSelect(card.id)}
     >
@@ -210,7 +249,8 @@ function AssetCardBody({
         <img
           src={asset.thumbnailUrl || asset.url}
           alt={fileName(asset.repoPath)}
-          className="size-full object-contain p-3"
+          className="size-full select-none object-contain p-3"
+          draggable={false}
           loading="lazy"
         />
         {comments.map((comment) => (
@@ -218,7 +258,7 @@ function AssetCardBody({
             key={comment.id}
             type="button"
             aria-label={comment.text || t("aiCanvas.commentCard")}
-            className="absolute rounded-g-sm border border-g-amber bg-g-amber-soft shadow-g-sm focus-visible:outline-none focus-visible:shadow-g-focus"
+            className="absolute rounded-g-sm border-2 border-g-amber bg-transparent shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-amber-soft/20 focus-visible:outline-none focus-visible:shadow-g-focus"
             style={{
               left: `${comment.region.x * 100}%`,
               top: `${comment.region.y * 100}%`,
@@ -358,7 +398,8 @@ function VariantCardBody({ card }: { card: VariantCanvasCard }) {
         <img
           src={card.previewUrl}
           alt={card.sourceName}
-          className="size-full object-contain p-3"
+          className="size-full select-none object-contain p-3"
+          draggable={false}
           loading="lazy"
         />
       </div>
@@ -455,7 +496,12 @@ function OperationCardBody({ card }: { card: OperationCanvasCard }) {
   );
 }
 
-export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
+export function AICanvasView({
+  scanId,
+  aiEnabled,
+  onOpenAsset,
+  onExitCanvas,
+}: Props) {
   const { t } = useTranslation();
   const initialSession = useMemo<AICanvasSession>(() => {
     if (typeof window === "undefined") return emptyAICanvasSession();
@@ -469,28 +515,34 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AssetItem[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(true);
+  const [searchError, setSearchError] = useState("");
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
+  const [composerCollapsed, setComposerCollapsed] = useState(false);
+  const [composerPreviewOpen, setComposerPreviewOpen] = useState(false);
+  const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
+  const [canvasSelection, setCanvasSelection] =
+    useState<CanvasSelection | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const cardElementsRef = useRef(new Map<string, HTMLElement>());
+  const canvasSelectionRef = useRef<CanvasSelection | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
   const dragRef = useRef<{
     cardId: string;
+    element: HTMLElement | null;
     startClientX: number;
     startClientY: number;
     startX: number;
     startY: number;
+    currentX: number;
+    currentY: number;
   } | null>(null);
 
   const selectedAssets = useMemo(
     () => selectedAssetCards(cards, selectedCardId),
     [cards, selectedCardId],
-  );
-  const selectedComments = useMemo(
-    () =>
-      commentsForAssets(
-        cards,
-        selectedAssets.map((card) => card.id),
-      ),
-    [cards, selectedAssets],
   );
   const commentsByAnchor = useMemo(() => {
     const map = new Map<string, CommentCanvasCard[]>();
@@ -506,7 +558,12 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     selectedAssets.length > 0
       ? selectedAssets.map((card) => fileName(card.asset.repoPath)).join(", ")
       : t("aiCanvas.noSelection");
+  const activityCards = useMemo(
+    () => cards.filter((card) => card.kind !== "asset").slice(-4),
+    [cards],
+  );
   const isWorking = working !== "idle";
+  const composerToolsOpen = composerPreviewOpen || composerAdvancedOpen;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -518,25 +575,75 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     });
   }, [cards, selectedCardId, viewport]);
 
-  const updateCardPosition = useCallback(
-    (cardId: string, x: number, y: number) => {
-      setCards((current) =>
-        current.map((card) => (card.id === cardId ? { ...card, x, y } : card)),
-      );
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const options = { capture: true, passive: false } as const;
+    const preventGesture = (event: Event) => event.preventDefault();
+    const preventCanvasWheel = (event: WheelEvent) => {
+      const target = event.target;
+      const scrollContainer =
+        target instanceof Element &&
+        target.closest("[data-ai-canvas-scroll='true']");
+      const verticalScroll = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+      if (
+        scrollContainer &&
+        verticalScroll &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+    };
+
+    root.addEventListener("gesturestart", preventGesture, options);
+    root.addEventListener("gesturechange", preventGesture, options);
+    root.addEventListener("gestureend", preventGesture, options);
+    root.addEventListener("wheel", preventCanvasWheel, options);
+
+    return () => {
+      root.removeEventListener("gesturestart", preventGesture, true);
+      root.removeEventListener("gesturechange", preventGesture, true);
+      root.removeEventListener("gestureend", preventGesture, true);
+      root.removeEventListener("wheel", preventCanvasWheel, true);
+    };
+  }, []);
+
+  const registerCardElement = useCallback(
+    (cardId: string, node: HTMLElement | null) => {
+      if (node) {
+        cardElementsRef.current.set(cardId, node);
+        return;
+      }
+      cardElementsRef.current.delete(cardId);
     },
     [],
   );
 
+  const renderDragFrame = useCallback(() => {
+    dragFrameRef.current = null;
+    const drag = dragRef.current;
+    if (!drag?.element) return;
+    drag.element.style.transform =
+      "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+  }, []);
+
+  const scheduleDragFrame = useCallback(() => {
+    if (dragFrameRef.current !== null) return;
+    dragFrameRef.current = window.requestAnimationFrame(renderDragFrame);
+  }, [renderDragFrame]);
+
+  useEffect(() => {
+    return () => {
+      if (dragFrameRef.current === null) return;
+      window.cancelAnimationFrame(dragFrameRef.current);
+    };
+  }, []);
+
   const deleteCard = useCallback(
     (target: CanvasCard) => {
-      const removedIds = new Set([target.id]);
-      if (target.kind === "asset") {
-        cards.forEach((card) => {
-          if (card.kind === "comment" && card.anchorId === target.id) {
-            removedIds.add(card.id);
-          }
-        });
-      }
+      const removedIds = cardIdsForDeletion(cards, target.id);
 
       setCards((current) => current.filter((card) => !removedIds.has(card.id)));
       setSelectedCardId((current) =>
@@ -551,37 +658,64 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     card: CanvasCard,
   ) {
     if (event.button !== 0) return;
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    const element = cardElementsRef.current.get(card.id) ?? null;
+    if (element) {
+      element.style.willChange = "transform";
+      element.style.zIndex = "35";
+    }
     dragRef.current = {
       cardId: card.id,
+      element,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: card.x,
       startY: card.y,
+      currentX: card.x,
+      currentY: card.y,
     };
   }
 
   function handleDragMove(event: ReactPointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag) return;
-    updateCardPosition(
-      drag.cardId,
-      drag.startX + (event.clientX - drag.startClientX) / viewport.scale,
-      drag.startY + (event.clientY - drag.startClientY) / viewport.scale,
-    );
+    event.preventDefault();
+    drag.currentX =
+      drag.startX + (event.clientX - drag.startClientX) / viewport.scale;
+    drag.currentY =
+      drag.startY + (event.clientY - drag.startClientY) / viewport.scale;
+    scheduleDragFrame();
   }
 
   function handleDragEnd(event: ReactPointerEvent<HTMLDivElement>) {
-    if (
-      dragRef.current &&
-      event.currentTarget.hasPointerCapture(event.pointerId)
-    ) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (dragFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    if (drag.element) {
+      drag.element.style.transform =
+        "translate(" + drag.currentX + "px, " + drag.currentY + "px)";
+      drag.element.style.willChange = "";
+      drag.element.style.zIndex = "";
+    }
+    setCards((current) =>
+      current.map((card) =>
+        card.id === drag.cardId
+          ? { ...card, x: drag.currentX, y: drag.currentY }
+          : card,
+      ),
+    );
     dragRef.current = null;
   }
 
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       const direction = event.deltaY > 0 ? -0.08 : 0.08;
@@ -598,20 +732,89 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     }));
   }
 
+  function canvasPoint(event: ReactPointerEvent<HTMLDivElement>) {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    if (!bounds) return { x: event.clientX, y: event.clientY };
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  }
+
+  function handleCanvasPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      (target.closest("[data-ai-canvas-card='true']") ||
+        target.closest("[data-ai-canvas-overlay='true']"))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = canvasPoint(event);
+    const selection = {
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
+    };
+    canvasSelectionRef.current = selection;
+    setCanvasSelection(selection);
+  }
+
+  function handleCanvasPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    setCanvasSelection((current) => {
+      if (!current) return current;
+      event.preventDefault();
+      const point = canvasPoint(event);
+      const next = { ...current, currentX: point.x, currentY: point.y };
+      canvasSelectionRef.current = next;
+      return next;
+    });
+  }
+
+  function handleCanvasPointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    const selection = canvasSelectionRef.current;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!selection) return;
+    const bounds = selectionBounds(selection);
+    const rootBounds = rootRef.current?.getBoundingClientRect();
+    const selected =
+      rootBounds && bounds.width > 4 && bounds.height > 4
+        ? cards.find((card) => {
+            const element = cardElementsRef.current.get(card.id);
+            if (!element) return false;
+            const rect = element.getBoundingClientRect();
+            return intersects(bounds, {
+              left: rect.left - rootBounds.left,
+              top: rect.top - rootBounds.top,
+              width: rect.width,
+              height: rect.height,
+            });
+          })
+        : undefined;
+    setSelectedCardId(selected?.id);
+    canvasSelectionRef.current = null;
+    setCanvasSelection(null);
+  }
+
   async function runSearch() {
     const q = query.trim();
     if (!scanId) {
-      setError(t("aiCanvas.missingScan"));
+      setSearchError(t("aiCanvas.missingScan"));
       return;
     }
     setWorking("search");
-    setError("");
+    setSearchError("");
     try {
       const page = await getCatalogItems({ scanId, q, limit: 18 });
       setSearchResults(page.items);
       setSearchTotal(page.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("aiCanvas.searchError"));
+      setSearchError(
+        err instanceof Error ? err.message : t("aiCanvas.searchError"),
+      );
     } finally {
       setWorking("idle");
     }
@@ -684,6 +887,45 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     };
     setCards((current) => [...current, card]);
     setSelectedCardId(id);
+  }
+
+  function createEditTask(assetCard: AssetCanvasCard, promptText: string) {
+    const createdAt = nowISO();
+    const comment: CommentCanvasCard = {
+      id: createCanvasCardId("comment"),
+      kind: "comment",
+      x: assetCard.x + CARD_WIDTH + 36,
+      y: assetCard.y + 40,
+      createdAt,
+      anchorId: assetCard.id,
+      text: promptText,
+      region: {
+        x: 0.32,
+        y: 0.28,
+        width: 0.34,
+        height: 0.24,
+      },
+    };
+    const assistant: CanvasCard = {
+      id: createCanvasCardId("ai"),
+      kind: "assistant",
+      x: assetCard.x + CARD_WIDTH + 36,
+      y: assetCard.y + 260,
+      createdAt,
+      prompt: promptText,
+      message: t("aiCanvas.editTaskCreated"),
+      bullets: [
+        ...buildAssistantBullets(promptText, [...cards, comment], assetCard.id),
+        t("aiCanvas.editTaskLimit"),
+        t("aiCanvas.editTaskNext"),
+      ],
+      assetIds: [assetCard.asset.id],
+      commentIds: [comment.id],
+    };
+
+    setCards((current) => [...current, comment, assistant]);
+    setSelectedCardId(assistant.id);
+    setError("");
   }
 
   async function createImagePreview(
@@ -790,6 +1032,17 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
       return;
     }
 
+    if (intent === "imageEdit") {
+      const target = assetCards[0];
+      if (!target) {
+        setError(t("aiCanvas.selectionRequired"));
+        addAssistantCard(promptText, t("aiCanvas.selectionRequired"));
+        return;
+      }
+      createEditTask(target, promptText);
+      return;
+    }
+
     if (intent === "imagePreview") {
       const target = assetCards[0];
       if (!target) {
@@ -812,10 +1065,47 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
     setError("");
   }
 
+  function appendPromptToken(token: string) {
+    setPrompt((current) => {
+      const trimmed = current.trimEnd();
+      return trimmed ? `${trimmed} ${token}` : token;
+    });
+  }
+
+  function mentionSelectedAsset() {
+    const target = selectedAssets[0];
+    appendPromptToken(
+      "@" +
+        (target
+          ? fileName(target.asset.repoPath)
+          : t("aiCanvas.selectedMention")),
+    );
+  }
+
+  function noteUploadPending() {
+    setError(t("aiCanvas.uploadPending"));
+    setComposerAdvancedOpen(true);
+  }
+
+  function activityText(card: CanvasCard) {
+    if (card.kind === "assistant") return card.message;
+    if (card.kind === "comment") return card.text || t("aiCanvas.emptyComment");
+    if (card.kind === "variant") return t("aiCanvas.previewGenerated");
+    if (card.kind === "operation") return card.prompt;
+    return cardDisplayName(card);
+  }
+
   return (
-    <div className="relative flex min-h-0 flex-1 overflow-hidden bg-g-canvas">
+    <div
+      ref={rootRef}
+      className="relative flex min-h-0 flex-1 overscroll-none overflow-hidden bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.055)_1px,transparent_0)]"
+    >
       <div
-        className="absolute inset-0 cursor-move overflow-hidden"
+        className="absolute inset-0 cursor-default overscroll-none overflow-hidden"
+        onPointerDown={handleCanvasPointerDown}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerEnd}
+        onPointerCancel={handleCanvasPointerEnd}
         onWheel={handleWheel}
       >
         <div
@@ -834,6 +1124,7 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
               onDelete={deleteCard}
+              onRegister={registerCardElement}
             >
               {card.kind === "asset" ? (
                 <AssetCardBody
@@ -867,106 +1158,130 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
         </div>
       </div>
 
-      {cards.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center px-6 text-center">
-          <div className="max-w-sm">
-            <div className="mx-auto grid size-11 place-items-center rounded-g-md border border-g-line bg-g-surface text-g-ink-2 shadow-g-sm">
-              <Sparkles size={20} />
-            </div>
-            <h2 className="mt-4 text-g-heading font-[650] tracking-g-heading text-g-ink">
-              {t("aiCanvas.emptyTitle")}
-            </h2>
-            <p className="mt-2 text-g-body leading-[1.55] text-g-ink-3">
-              {t("aiCanvas.emptyDesc")}
-            </p>
-          </div>
-        </div>
+      {canvasSelection && (
+        <div
+          className="pointer-events-none absolute z-10 border border-[#0d99ff] bg-[#0d99ff]/10"
+          style={selectionBounds(canvasSelection)}
+        />
       )}
 
-      <aside className="pointer-events-auto absolute left-3 top-3 z-20 flex w-[min(380px,calc(100%-24px))] flex-col gap-2 rounded-g-md border border-g-line bg-g-surface p-3 shadow-g-md">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-g-body font-[650] tracking-g-ui text-g-ink">
-              <Wand2 size={16} />
-              <span>{t("mode.aiCanvas")}</span>
-            </div>
-            <div className="mt-0.5 truncate text-g-caption text-g-ink-3">
-              {t("aiCanvas.searchPanelDesc")}
-            </div>
-          </div>
-          <Badge tone={aiEnabled ? "purple" : "line"}>
-            {aiEnabled ? t("aiCanvas.aiReady") : t("aiCanvas.aiContext")}
-          </Badge>
-        </div>
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void runSearch();
-          }}
+      {searchOpen ? (
+        <aside
+          data-ai-canvas-overlay="true"
+          className="pointer-events-auto absolute left-3 top-3 z-20 flex w-[min(620px,calc(100%-24px))] flex-col gap-1 rounded-g-md border border-g-line bg-g-surface/95 p-1 shadow-g-md backdrop-blur"
         >
-          <TextInput
-            value={query}
-            variant="search"
-            icon={<Search size={14} />}
-            placeholder={t("aiCanvas.searchPlaceholder")}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Button
-            type="submit"
-            size="md"
-            variant="primary"
-            disabled={working === "search"}
-            leadingIcon={
-              working === "search" ? (
-                <LoaderCircle className="animate-spin" />
-              ) : (
-                <Search />
-              )
-            }
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void runSearch();
+            }}
           >
-            {t("aiCanvas.search")}
-          </Button>
-        </form>
-        {error && (
-          <div className="rounded-g-md border border-g-red/40 bg-g-red-soft px-3 py-2 text-g-caption text-g-red">
-            {error}
-          </div>
-        )}
-        {searchResults.length > 0 && (
-          <div className="flex items-center justify-between text-g-caption text-g-ink-3">
-            <span>{t("aiCanvas.searchResults", { count: searchTotal })}</span>
-            <span>{t("aiCanvas.addHint")}</span>
-          </div>
-        )}
-        <div className="max-h-[360px] overflow-y-auto">
-          {searchResults.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              className="flex w-full items-center gap-2 rounded-g-md px-2 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
-              onClick={() => addAsset(asset)}
+            <TextInput
+              value={query}
+              variant="search"
+              icon={<Search size={14} />}
+              placeholder={t("aiCanvas.searchPlaceholder")}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <Button
+              type="submit"
+              size="md"
+              variant="primary"
+              disabled={working === "search"}
+              leadingIcon={
+                working === "search" ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <Search />
+                )
+              }
             >
-              <AssetThumbnail
-                src={asset.thumbnailUrl || asset.url}
-                size="sm"
-                className="size-10"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-g-caption font-[590] text-g-ink">
-                  {fileName(asset.repoPath)}
-                </span>
-                <span className="block truncate text-g-caption text-g-ink-3">
-                  {asset.projectName} · {imageMeta(asset)}
-                </span>
-              </span>
-              <Plus size={14} className="shrink-0 text-g-ink-3" />
-            </button>
-          ))}
-        </div>
-      </aside>
+              {t("aiCanvas.search")}
+            </Button>
+            <IconButton
+              size="sm"
+              aria-label={t("aiCanvas.closeSearch")}
+              className="text-g-ink-3 hover:text-g-ink"
+              onClick={() => setSearchOpen(false)}
+            >
+              <X size={14} />
+            </IconButton>
+          </form>
 
-      <div className="pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-1 rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-md">
+          {searchError && (
+            <div className="rounded-g-sm border border-g-red/40 bg-g-red-soft px-2 py-1.5 text-g-caption text-g-red">
+              {searchError}
+            </div>
+          )}
+
+          {searchResults.length > 0 && (
+            <>
+              <div className="flex items-center justify-between text-g-caption text-g-ink-3">
+                <span>
+                  {t("aiCanvas.searchResults", { count: searchTotal })}
+                </span>
+                <span>{t("aiCanvas.addHint")}</span>
+              </div>
+              <div
+                data-ai-canvas-scroll="true"
+                className="max-h-[320px] overflow-y-auto"
+              >
+                {searchResults.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-g-md px-2 py-2 text-left transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus"
+                    onClick={() => addAsset(asset)}
+                  >
+                    <AssetThumbnail
+                      src={asset.thumbnailUrl || asset.url}
+                      size="sm"
+                      className="size-10"
+                      imageClassName="select-none"
+                      draggable={false}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-g-caption font-[590] text-g-ink">
+                        {fileName(asset.repoPath)}
+                      </span>
+                      <span className="block truncate text-g-caption text-g-ink-3">
+                        {asset.projectName} · {imageMeta(asset)}
+                      </span>
+                    </span>
+                    <Plus size={14} className="shrink-0 text-g-ink-3" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </aside>
+      ) : (
+        <IconButton
+          data-ai-canvas-overlay="true"
+          size="md"
+          aria-label={t("aiCanvas.openSearch")}
+          className="pointer-events-auto absolute left-3 top-3 z-20 border border-g-line bg-g-surface shadow-g-md"
+          onClick={() => setSearchOpen(true)}
+        >
+          <Search />
+        </IconButton>
+      )}
+
+      <div
+        data-ai-canvas-overlay="true"
+        className="pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-1 rounded-g-md border border-g-line bg-g-surface p-1 shadow-g-md"
+      >
+        {onExitCanvas && (
+          <Button
+            size="sm"
+            variant="ghost"
+            leadingIcon={<ArrowLeft />}
+            onClick={onExitCanvas}
+          >
+            {t("aiCanvas.exitCanvas")}
+          </Button>
+        )}
         <IconButton
           size="sm"
           aria-label={t("aiCanvas.zoomOut")}
@@ -1009,95 +1324,200 @@ export function AICanvasView({ scanId, aiEnabled, onOpenAsset }: Props) {
         </IconButton>
       </div>
 
-      <div className="pointer-events-auto absolute inset-x-3 bottom-3 z-30 mx-auto max-w-5xl rounded-g-md border border-g-line bg-g-surface p-3 shadow-g-lg">
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-g-caption text-g-ink-3">
-          <Badge tone={selectedAssets.length > 0 ? "blue" : "line"}>
-            {selectedAssets.length > 0
-              ? t("aiCanvas.selectedAssets", { count: selectedAssets.length })
-              : t("aiCanvas.noSelection")}
-          </Badge>
-          <span className="min-w-0 flex-1 truncate">{selectedLabel}</span>
-          {selectedComments.length > 0 && (
-            <Badge tone="amber">
-              {t("aiCanvas.comments", { count: selectedComments.length })}
-            </Badge>
-          )}
-          <Badge tone="green">{t("aiCanvas.previewOnly")}</Badge>
-        </div>
-        <div className="flex items-end gap-2 max-[760px]:flex-col max-[760px]:items-stretch">
-          <Textarea
-            value={prompt}
-            placeholder={t("aiCanvas.composerPlaceholder")}
-            className="flex-1"
-            textareaClassName="min-h-12 resize-none text-g-body"
-            onChange={(event) => setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                event.preventDefault();
-                void handleAsk();
-              }
-            }}
-          />
-          <div className="flex shrink-0 gap-2">
-            <Button
-              variant="secondary"
-              disabled={selectedAssets.length === 0}
-              leadingIcon={<MessageSquarePlus />}
-              onClick={() => {
-                const target = selectedAssets[0];
-                if (target) addComment(target);
-              }}
+      <div
+        data-ai-canvas-overlay="true"
+        className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 mx-auto h-[164px] max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+      >
+        <div className="relative h-full">
+          <div
+            className={cn(
+              "absolute inset-x-7 bottom-[70px] overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[rgba(28,28,28,0.78)] shadow-g-pop backdrop-blur-xl transition-[height,border-radius] duration-[160ms] ease-g max-[760px]:inset-x-2",
+              composerCollapsed
+                ? "h-12 rounded-t-[24px] rounded-b-none border-b-0"
+                : "h-[92px] rounded-t-[24px] rounded-b-none",
+            )}
+          >
+            <button
+              type="button"
+              aria-label={t("aiCanvas.resizeComposer")}
+              className="flex h-12 w-full items-center gap-3 px-5 text-left text-g-body text-white/62 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
+              onClick={() => setComposerCollapsed((current) => !current)}
             >
-              {t("aiCanvas.mark")}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={prompt.trim() === "" || isWorking}
-              leadingIcon={
-                isWorking ? <LoaderCircle className="animate-spin" /> : <Bot />
-              }
-              onClick={() => void handleAsk()}
-            >
-              {t("aiCanvas.ask")}
-            </Button>
+              <span>{t("aiCanvas.processed", { time: "" })}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {error ||
+                  (activityCards.at(-1)
+                    ? activityText(activityCards.at(-1)!)
+                    : selectedLabel)}
+              </span>
+              <span className="text-white/42">
+                {composerCollapsed ? "›" : "⌄"}
+              </span>
+            </button>
+            {!composerCollapsed && (
+              <button
+                type="button"
+                className="flex h-10 w-full items-center gap-3 border-t border-white/[0.06] px-5 text-left text-g-caption text-white/42 transition-colors duration-[120ms] ease-g hover:bg-white/[0.04] hover:text-white/64 focus-visible:outline-none focus-visible:shadow-g-focus"
+                onClick={() => {
+                  const latest = activityCards.at(-1);
+                  if (latest) setSelectedCardId(latest.id);
+                }}
+              >
+                <MousePointer2 size={13} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  {prompt.trim() ||
+                    (activityCards.at(-1)
+                      ? activityText(activityCards.at(-1)!)
+                      : selectedLabel)}
+                </span>
+                <span>{t("aiCanvas.guide")}</span>
+              </button>
+            )}
           </div>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="chip"
-            leadingIcon={<ImagePlus />}
-            disabled={selectedAssets.length === 0 || isWorking}
-            onClick={() => {
-              const target = selectedAssets[0];
-              if (target) void createImagePreview(target, "");
-            }}
-          >
-            {t("aiCanvas.previewWebp")}
-          </Button>
-          <Button
-            size="sm"
-            variant="chip"
-            leadingIcon={<Layers3 />}
-            disabled={selectedAssets.length === 0 || isWorking}
-            onClick={() =>
-              void createOperationPreview(
-                selectedAssets,
-                t("aiCanvas.safeVariantPrompt"),
-              )
-            }
-          >
-            {t("aiCanvas.safeVariant")}
-          </Button>
-          <Button
-            size="sm"
-            variant="chip"
-            leadingIcon={<CheckCircle2 />}
-            disabled={isWorking}
-            onClick={() => addAssistantCard(t("aiCanvas.describePrompt"))}
-          >
-            {t("aiCanvas.describe")}
-          </Button>
+
+          <div className="absolute inset-x-0 bottom-0 rounded-[32px] border border-[rgba(255,255,255,0.08)] bg-[rgba(31,31,31,0.96)] px-3 py-3 shadow-g-pop backdrop-blur-xl">
+            {composerToolsOpen && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/[0.06] pb-3 text-g-caption text-white/58">
+                {composerPreviewOpen && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="chip"
+                      leadingIcon={<ImagePlus />}
+                      disabled={selectedAssets.length === 0 || isWorking}
+                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      onClick={() => {
+                        const target = selectedAssets[0];
+                        if (target) void createImagePreview(target, "");
+                      }}
+                    >
+                      {t("aiCanvas.previewWebp")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="chip"
+                      leadingIcon={<Layers3 />}
+                      disabled={selectedAssets.length === 0 || isWorking}
+                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      onClick={() =>
+                        void createOperationPreview(
+                          selectedAssets,
+                          t("aiCanvas.safeVariantPrompt"),
+                        )
+                      }
+                    >
+                      {t("aiCanvas.safeVariant")}
+                    </Button>
+                    <Badge tone="green">{t("aiCanvas.previewOnly")}</Badge>
+                  </>
+                )}
+                {composerAdvancedOpen && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="chip"
+                      leadingIcon={<AtSign />}
+                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      onClick={mentionSelectedAsset}
+                    >
+                      {t("aiCanvas.mentionAsset")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="chip"
+                      leadingIcon={<Paperclip />}
+                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      onClick={noteUploadPending}
+                    >
+                      {t("aiCanvas.attachImage")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="chip"
+                      leadingIcon={<CheckCircle2 />}
+                      className="border-white/[0.08] bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                      onClick={() =>
+                        addAssistantCard(t("aiCanvas.describePrompt"))
+                      }
+                    >
+                      {t("aiCanvas.describe")}
+                    </Button>
+                    <Badge tone="line">{t("aiCanvas.autoReview")}</Badge>
+                    <Badge tone="line">{t("aiCanvas.modelHigh")}</Badge>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="flex h-12 items-center gap-2">
+              <IconButton
+                size="md"
+                aria-label={t("aiCanvas.addAttachment")}
+                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                onClick={noteUploadPending}
+              >
+                <Plus />
+              </IconButton>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.mentionAsset")}
+                className="rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white"
+                onClick={mentionSelectedAsset}
+              >
+                <AtSign />
+              </IconButton>
+              <textarea
+                value={prompt}
+                placeholder={t("aiCanvas.composerPlaceholder")}
+                className="min-h-6 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-6 text-white outline-none placeholder:text-white/35"
+                rows={1}
+                onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key === "Enter"
+                  ) {
+                    event.preventDefault();
+                    void handleAsk();
+                  }
+                }}
+              />
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.previewTools")}
+                className={cn(
+                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
+                  composerPreviewOpen && "bg-white/[0.1] text-white",
+                )}
+                onClick={() => setComposerPreviewOpen((current) => !current)}
+              >
+                <Eye />
+              </IconButton>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.advancedChat")}
+                className={cn(
+                  "rounded-full border-transparent bg-transparent text-white/58 hover:bg-white/[0.08] hover:text-white",
+                  composerAdvancedOpen && "bg-white/[0.1] text-white",
+                )}
+                onClick={() => setComposerAdvancedOpen((current) => !current)}
+              >
+                <SlidersHorizontal />
+              </IconButton>
+              <IconButton
+                size="md"
+                aria-label={t("aiCanvas.ask")}
+                disabled={prompt.trim() === "" || isWorking}
+                className="rounded-full border-white bg-white text-black hover:bg-white/90 disabled:opacity-[0.38]"
+                onClick={() => void handleAsk()}
+              >
+                {isWorking ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <ArrowUp />
+                )}
+              </IconButton>
+            </div>
+          </div>
         </div>
       </div>
     </div>

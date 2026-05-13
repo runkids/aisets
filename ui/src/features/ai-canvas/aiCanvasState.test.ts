@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AssetItem } from "@/types";
 import {
   buildAssistantBullets,
+  cardIdsForDeletion,
   commentsForAssets,
   inferPromptIntent,
   normalizeAICanvasSession,
@@ -101,8 +102,35 @@ describe("inferPromptIntent", () => {
     expect(inferPromptIntent("compress as webp safe variant")).toBe(
       "operationPreview",
     );
+    expect(inferPromptIntent("幫我改顏色 -> RED")).toBe("imageEdit");
     expect(inferPromptIntent("幫我預覽改圖")).toBe("imagePreview");
+    expect(inferPromptIntent("rendered preview")).toBe("imagePreview");
+    expect(inferPromptIntent("describe background")).toBe("describe");
     expect(inferPromptIntent("describe context")).toBe("describe");
+  });
+});
+
+describe("cardIdsForDeletion", () => {
+  it("removes anchored comments only when deleting the asset card", () => {
+    const asset = makeAssetCard("hero");
+    const comment: CommentCanvasCard = {
+      id: "comment-1",
+      kind: "comment",
+      x: 40,
+      y: 50,
+      createdAt: "2026-05-13T00:00:00.000Z",
+      anchorId: asset.id,
+      text: "Make this area brighter",
+      region: { x: 0.2, y: 0.3, width: 0.4, height: 0.2 },
+    };
+
+    expect([...cardIdsForDeletion([asset, comment], asset.id)]).toEqual([
+      asset.id,
+      comment.id,
+    ]);
+    expect([...cardIdsForDeletion([asset, comment], comment.id)]).toEqual([
+      comment.id,
+    ]);
   });
 });
 

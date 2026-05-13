@@ -70,6 +70,7 @@ import {
   runAITagTranslate,
 } from "@/api";
 import { errorMessage } from "@/i18n";
+import { cn } from "@/lib/cn";
 import {
   initialOCRActivityState,
   isOCRActivityBusy,
@@ -1149,9 +1150,18 @@ export function App() {
     [setAutoScrollAssetId],
   );
 
+  const canvasMode = mode === "aiCanvas";
+
   const appShell = (
-    <main className="grid h-screen w-screen grid-cols-[240px_1fr] grid-rows-[60px_1fr] bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)] max-[960px]:grid-cols-[64px_1fr]">
-      <div className="col-span-2 row-start-1 z-[100]">
+    <main
+      className={cn(
+        "grid h-screen w-screen bg-g-canvas bg-[radial-gradient(circle_at_1px_1px,var(--g-line)_1px,transparent_0)] bg-[length:24px_24px] [[data-theme='dark']_&]:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.035)_1px,transparent_0)]",
+        canvasMode
+          ? "grid-cols-1 grid-rows-1"
+          : "grid-cols-[240px_1fr] grid-rows-[60px_1fr] max-[960px]:grid-cols-[64px_1fr]",
+      )}
+    >
+      <div className={canvasMode ? "hidden" : "col-span-2 row-start-1 z-[100]"}>
         <AppTopbar
           working={working}
           catalogActionsDisabled={catalogActionsDisabled}
@@ -1188,23 +1198,25 @@ export function App() {
           onOpenSettings={() => navigate({ pathname: pathForMode("settings") })}
         />
       </div>
-      <NavSidebar
-        mode={mode}
-        badges={badges}
-        workspaceName={workspaceName}
-        workspaces={workspaces}
-        activeWorkspaceId={activeWorkspaceId}
-        projects={projectSwitchProjects}
-        selectedProjectId={effectiveSelectedProjectId}
-        totalAssets={catalogSummary?.stats.totalFiles ?? 0}
-        lastScanAt={catalogSummary?.generatedAt}
-        lastScanStartedAt={catalogSummary?.startedAt}
-        workspaceSwitchDisabled={workspaceSwitchDisabled}
-        workspaceSwitchDisabledTooltip={workspaceSwitchDisabledTooltip}
-        onSelectWorkspace={onSwitchWorkspace}
-        onSelectProject={setSelectedProjectId}
-        onSelect={changeMode}
-      />
+      <div className={canvasMode ? "hidden" : "contents"}>
+        <NavSidebar
+          mode={mode}
+          badges={badges}
+          workspaceName={workspaceName}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          projects={projectSwitchProjects}
+          selectedProjectId={effectiveSelectedProjectId}
+          totalAssets={catalogSummary?.stats.totalFiles ?? 0}
+          lastScanAt={catalogSummary?.generatedAt}
+          lastScanStartedAt={catalogSummary?.startedAt}
+          workspaceSwitchDisabled={workspaceSwitchDisabled}
+          workspaceSwitchDisabledTooltip={workspaceSwitchDisabledTooltip}
+          onSelectWorkspace={onSwitchWorkspace}
+          onSelectProject={setSelectedProjectId}
+          onSelect={changeMode}
+        />
+      </div>
       <section className="flex flex-col overflow-hidden bg-transparent">
         <NoticeStack items={notices} />
 
@@ -1272,6 +1284,7 @@ export function App() {
               scanId={catalogSummary?.scanId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
               onOpenAsset={setDrawerId}
+              onExitCanvas={() => changeMode("browse")}
             />
           ) : mode === "settings" ? (
             <SettingsView
