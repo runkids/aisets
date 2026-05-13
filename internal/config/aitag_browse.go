@@ -921,6 +921,32 @@ func syncI18nTags(oldTagsRaw, oldI18nRaw string, newTags []string) string {
 	return string(out)
 }
 
+// AITagSetDescription updates the description for a specific asset's ai_tags row.
+func (s *Store) AITagSetDescription(key AITagSetForAssetKey, description string) error {
+	if key.ProjectID == "" || key.RepoPath == "" {
+		return fmt.Errorf("aitag set description: projectID and repoPath must be non-empty")
+	}
+
+	res, err := s.db.Exec(`
+		UPDATE ai_tags SET description = ?, updated_at = datetime('now')
+		WHERE project_id = ? AND repo_path = ? AND content_hash = ? AND hash_algorithm = ? AND status = 'ready'
+	`, description, key.ProjectID, key.RepoPath, key.ContentHash, key.HashAlgorithm)
+	if err != nil {
+		return fmt.Errorf("aitag set description: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		_, err = s.db.Exec(`
+			INSERT INTO ai_tags (project_id, repo_path, content_hash, hash_algorithm, status, tags_json, category, description, provider_name, model_name, updated_at)
+			VALUES (?, ?, ?, ?, 'ready', '[]', '', ?, 'manual', 'user', datetime('now'))
+		`, key.ProjectID, key.RepoPath, key.ContentHash, key.HashAlgorithm, description)
+		if err != nil {
+			return fmt.Errorf("aitag set description insert: %w", err)
+		}
+	}
+	return nil
+}
+
 // AITagSuggest returns tag values matching the given prefix for autocomplete.
 func (s *Store) AITagSuggest(prefix string, limit int) ([]string, error) {
 	return s.AITagSuggestForProjects(prefix, limit, nil)

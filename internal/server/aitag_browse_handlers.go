@@ -133,6 +133,35 @@ func (s *Server) handleAssetSetTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "tags": body.Tags})
 }
 
+func (s *Server) handleAssetSetDescription(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ProjectID     string `json:"projectId"`
+		RepoPath      string `json:"repoPath"`
+		ContentHash   string `json:"contentHash"`
+		HashAlgorithm string `json:"hashAlgorithm"`
+		Description   string `json:"description"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.ProjectID == "" || body.RepoPath == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("projectId and repoPath are required"))
+		return
+	}
+	key := config.AITagSetForAssetKey{
+		ProjectID:     body.ProjectID,
+		RepoPath:      body.RepoPath,
+		ContentHash:   body.ContentHash,
+		HashAlgorithm: body.HashAlgorithm,
+	}
+	if err := s.store.AITagSetDescription(key, body.Description); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (s *Server) handleTagCategories(w http.ResponseWriter, r *http.Request) {
 	cats, err := s.store.AITagCategoriesForProjects(s.store.ActiveProjectIDs())
 	if err != nil {

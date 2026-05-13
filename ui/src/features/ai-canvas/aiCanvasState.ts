@@ -277,8 +277,7 @@ function normalizeCard(value: unknown): CanvasCard | null {
       x,
       y,
       createdAt,
-      proposalId:
-        typeof value.proposalId === "string" ? value.proposalId : id,
+      proposalId: typeof value.proposalId === "string" ? value.proposalId : id,
       tool: value.tool,
       params: isRecord(value.params)
         ? (value.params as Record<string, unknown>)

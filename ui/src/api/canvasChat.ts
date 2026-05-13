@@ -139,10 +139,7 @@ export async function canvasChat(options: {
         const event = JSON.parse(line) as CanvasChatEvent;
         options.onEvent?.(event);
         if (event.type === "error") {
-          throw new APIError(
-            event.error.code,
-            event.error.message,
-          );
+          throw new APIError(event.error.code, event.error.message);
         }
         return event;
       } catch (e) {

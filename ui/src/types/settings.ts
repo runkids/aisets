@@ -53,6 +53,7 @@ export type AppSettings = {
   vlmBackendPrecheck: string;
   vlmBackendTranslate: string;
   vlmBackendCanvas: string;
+  aiNickname: string;
   embedSearchThreshold: number;
   embedSearchLimit: number;
   embedSearchType: string;

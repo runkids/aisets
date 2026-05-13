@@ -113,6 +113,7 @@ export type SettingsDraft = {
   vlmBackendPrecheck: string;
   vlmBackendTranslate: string;
   vlmBackendCanvas: string;
+  aiNickname: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
   optimizationDefaultQuality: number;

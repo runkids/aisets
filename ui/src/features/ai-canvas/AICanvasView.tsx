@@ -81,6 +81,7 @@ import {
 type Props = {
   scanId?: number;
   aiEnabled: boolean;
+  aiNickname?: string;
   onOpenAsset?: (assetId: string) => void;
   onExitCanvas?: () => void;
 };
@@ -120,7 +121,10 @@ function renderMarkdown(text: string) {
         parts.push(<strong key={`${i}-${j}`}>{t.slice(2, -2)}</strong>);
       } else if (t.startsWith("`") && t.endsWith("`")) {
         parts.push(
-          <code key={`${i}-${j}`} className="rounded bg-black/10 px-1 py-0.5 text-[0.9em] dark:bg-white/10">
+          <code
+            key={`${i}-${j}`}
+            className="rounded bg-black/10 px-1 py-0.5 text-[0.9em] dark:bg-white/10"
+          >
             {t.slice(1, -1)}
           </code>,
         );
@@ -492,7 +496,9 @@ function AssistantCardBody({
             : t("aiCanvas.noSelection")}
         </span>
       </div>
-      <p className="text-g-body leading-[1.45] text-g-ink">{renderMarkdown(card.message)}</p>
+      <p className="text-g-body leading-[1.45] text-g-ink">
+        {renderMarkdown(card.message)}
+      </p>
       <ul className="flex flex-col gap-1.5">
         {card.bullets.map((bullet) => (
           <li
@@ -688,10 +694,12 @@ function AICursor({
   position,
   label,
   status,
+  nickname,
 }: {
   position: { x: number; y: number };
   label?: string;
   status?: "thinking" | "acting" | "idle";
+  nickname?: string;
 }) {
   const active = status === "thinking" || status === "acting";
   return (
@@ -717,7 +725,7 @@ function AICursor({
             active ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
           )}
         >
-          <span>AI</span>
+          <span>{nickname || "AI"}</span>
           {active && label && (
             <span className="max-w-[160px] truncate opacity-80">· {label}</span>
           )}
@@ -730,6 +738,7 @@ function AICursor({
 export function AICanvasView({
   scanId,
   aiEnabled,
+  aiNickname,
   onOpenAsset,
   onExitCanvas,
 }: Props) {
@@ -769,9 +778,10 @@ export function AICanvasView({
     label?: string;
     status: "thinking" | "acting" | "idle";
   }>(() => {
-    const rect = typeof window !== "undefined"
-      ? { width: window.innerWidth, height: window.innerHeight }
-      : { width: 1440, height: 900 };
+    const rect =
+      typeof window !== "undefined"
+        ? { width: window.innerWidth, height: window.innerHeight }
+        : { width: 1440, height: 900 };
     return {
       x: rect.width / 2 - CARD_WIDTH / 2,
       y: rect.height / 2 - 100,
@@ -782,6 +792,7 @@ export function AICanvasView({
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const searchResultsRef = useRef<string[]>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
   const canvasSelectionRef = useRef<CanvasSelection | null>(null);
@@ -1257,6 +1268,11 @@ export function AICanvasView({
     setError("");
     setWorking("ai");
 
+    setChatHistory((prev) => [
+      ...prev.slice(-9),
+      { role: "user", content: promptText },
+    ]);
+
     const abort = new AbortController();
     abortRef.current = abort;
 
@@ -1325,6 +1341,43 @@ export function AICanvasView({
           }
         }
       }
+      if (event.type === "action_result" && event.tool === "create_comment") {
+        const r = event.result as {
+          anchorCardId?: string;
+          text?: string;
+          region?: { x: number; y: number; width: number; height: number };
+        };
+        if (r?.anchorCardId && r?.text) {
+          const anchor = cards.find((c) => c.id === r.anchorCardId);
+          const card: CommentCanvasCard = {
+            id: createCanvasCardId("comment"),
+            kind: "comment",
+            x: anchor ? anchor.x - CARD_WIDTH - 24 : 84,
+            y: anchor ? anchor.y + 100 + newCards.length * 160 : 72,
+            createdAt: nowISO(),
+            anchorId: r.anchorCardId,
+            text: r.text,
+            region: r.region ?? { x: 0, y: 0, width: 1, height: 1 },
+          };
+          newCards.push(card);
+          setCards((current) => [...current, card]);
+        }
+      }
+      if (event.type === "action_result" && event.tool === "search_assets") {
+        const r = event.result as {
+          q?: string;
+          items?: Array<{
+            id: string;
+            repoPath: string;
+            ext: string;
+            bytes: number;
+          }>;
+          total?: number;
+        };
+        if (r?.items?.length && r.q) {
+          searchResultsRef.current = [r.q];
+        }
+      }
     }
 
     try {
@@ -1354,13 +1407,55 @@ export function AICanvasView({
         setSelectedCardId(card.id);
       }
 
-      setChatHistory((prev) => [
-        ...prev.slice(-9),
-        { role: "user", content: promptText },
-        ...(assistantText
-          ? [{ role: "assistant", content: assistantText }]
-          : []),
-      ]);
+      if (assistantText) {
+        setChatHistory((prev) => [
+          ...prev.slice(-10),
+          { role: "assistant", content: assistantText },
+        ]);
+      }
+
+      if (searchResultsRef.current.length > 0 && scanId) {
+        try {
+          const queries = searchResultsRef.current;
+          searchResultsRef.current = [];
+          const page = await getCatalogItems({
+            scanId,
+            q: queries[0],
+            limit: 12,
+          });
+          const rect = rootRef.current?.getBoundingClientRect();
+          const containerSize = rect
+            ? { width: rect.width, height: rect.height }
+            : undefined;
+          const addedCards: AssetCanvasCard[] = [];
+          for (const asset of page.items) {
+            const exists = cards.some(
+              (c): c is AssetCanvasCard =>
+                c.kind === "asset" && c.asset.id === asset.id,
+            );
+            if (exists) continue;
+            const pos = nextCardPosition(
+              cards.length + newCards.length + addedCards.length,
+              viewport,
+              containerSize,
+            );
+            const card: AssetCanvasCard = {
+              id: createCanvasCardId("asset"),
+              kind: "asset",
+              x: pos.x + (addedCards.length % 3) * (CARD_WIDTH + 24),
+              y: pos.y + Math.floor(addedCards.length / 3) * 420,
+              createdAt: nowISO(),
+              asset,
+            };
+            addedCards.push(card);
+          }
+          if (addedCards.length > 0) {
+            setCards((cur) => [...cur, ...addedCards]);
+          }
+        } catch {
+          // search result fetch failed — non-critical
+        }
+      }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setError(
@@ -1483,13 +1578,64 @@ export function AICanvasView({
             }),
             headers: { "content-type": "application/json" },
           });
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? { ...c, asset: { ...c.asset, tags } }
+                : c,
+            ),
+          );
           updateProposalStatus(proposal.proposalId, "completed");
           break;
         }
-        case "update_description":
-        case "update_ocr_text":
+        case "update_description": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const desc = (p.description as string) || "";
+          await request("/api/assets/description", {
+            method: "POST",
+            body: JSON.stringify({
+              projectId: asset.projectId,
+              repoPath: asset.repoPath,
+              contentHash: asset.contentHash,
+              hashAlgorithm: asset.hashAlgorithm,
+              description: desc,
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? { ...c, asset: { ...c.asset, description: desc } }
+                : c,
+            ),
+          );
           updateProposalStatus(proposal.proposalId, "completed");
           break;
+        }
+        case "update_ocr_text": {
+          if (!asset) throw new Error("Asset not found on canvas");
+          const text = (p.text as string) || "";
+          await request("/api/assets/ocr-text", {
+            method: "POST",
+            body: JSON.stringify({
+              projectId: asset.projectId,
+              repoPath: asset.repoPath,
+              contentHash: asset.contentHash,
+              hashAlgorithm: asset.hashAlgorithm,
+              text,
+            }),
+            headers: { "content-type": "application/json" },
+          });
+          setCards((current) =>
+            current.map((c) =>
+              c.kind === "asset" && c.asset.id === assetId
+                ? { ...c, asset: { ...c.asset, ocrText: text } }
+                : c,
+            ),
+          );
+          updateProposalStatus(proposal.proposalId, "completed");
+          break;
+        }
         default:
           updateProposalStatus(proposal.proposalId, "completed");
       }
@@ -1600,6 +1746,7 @@ export function AICanvasView({
             position={{ x: aiCursor.x, y: aiCursor.y }}
             label={aiCursor.label}
             status={aiCursor.status}
+            nickname={aiNickname}
           />
         </div>
       </div>
@@ -1838,7 +1985,9 @@ export function AICanvasView({
                       <div className="mb-1 text-[10px] font-[590] uppercase tracking-wider text-white/40">
                         {entry.role === "user" ? "You" : "AI"}
                       </div>
-                      <div className="whitespace-pre-wrap">{renderMarkdown(entry.content)}</div>
+                      <div className="whitespace-pre-wrap">
+                        {renderMarkdown(entry.content)}
+                      </div>
                     </div>
                   ))
                 )}
@@ -2010,7 +2159,11 @@ export function AICanvasView({
                 rows={1}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
+                  if (
+                    event.key === "Enter" &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
                     event.preventDefault();
                     void handleAsk();
                   }

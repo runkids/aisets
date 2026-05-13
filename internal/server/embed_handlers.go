@@ -656,7 +656,7 @@ func (s *Server) handleEmbedSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	threshold := float32(settings.EmbedSearchThreshold)
 	if threshold == 0 {
-		threshold = 0.5
+		threshold = 0.4
 	}
 	if f, err := strconv.ParseFloat(r.URL.Query().Get("threshold"), 32); err == nil {
 		threshold = float32(f)

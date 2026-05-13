@@ -390,7 +390,7 @@ export function BrowseView({
       committedSemanticQuery,
       semanticSearchType,
       settingsQuery.data?.settings.embedSearchLimit ?? 20,
-      settingsQuery.data?.settings.embedSearchThreshold ?? 0.5,
+      settingsQuery.data?.settings.embedSearchThreshold ?? 0.4,
       semanticFilterParams,
     ],
     queryFn: () =>
@@ -398,7 +398,7 @@ export function BrowseView({
         q: committedSemanticQuery,
         type: semanticSearchType,
         limit: settingsQuery.data?.settings.embedSearchLimit || 20,
-        threshold: settingsQuery.data?.settings.embedSearchThreshold || 0.5,
+        threshold: settingsQuery.data?.settings.embedSearchThreshold || 0.4,
         includeItems: true,
         filters: semanticFilterParams,
       }),

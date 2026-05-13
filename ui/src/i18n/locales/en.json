@@ -1315,6 +1315,7 @@
     "vlmBackendFeaturePrecheck": "Precheck",
     "vlmBackendFeatureTranslate": "Tag Translate",
     "vlmBackendFeatureCanvas": "AI Canvas",
+    "aiNickname": "AI Nickname",
     "vlmBackendAgentGroup": "Agent CLI",
     "vlmBackendAgentModelPlaceholder": "Model (optional)",
     "vlmBackendLocalDefault": "Default",

@@ -159,14 +159,14 @@ export function ImageToolsView({ scanId, assetIds, onAssetIdsChange }: Props) {
       committedSemanticQuery,
       semanticSearchType,
       appSettings?.embedSearchLimit ?? 20,
-      appSettings?.embedSearchThreshold ?? 0.5,
+      appSettings?.embedSearchThreshold ?? 0.4,
     ],
     queryFn: () =>
       semanticSearch({
         q: committedSemanticQuery,
         type: semanticSearchType,
         limit: appSettings?.embedSearchLimit || 20,
-        threshold: appSettings?.embedSearchThreshold || 0.5,
+        threshold: appSettings?.embedSearchThreshold || 0.4,
         includeItems: true,
       }),
     enabled: searchMode === "semantic" && committedSemanticQuery.length > 0,

@@ -239,7 +239,7 @@ func DefaultAppSettings() AppSettings {
 		LLMTranslationLocales:      nil,
 		AgentAdapter:               "auto",
 		AgentModel:                 "",
-		EmbedSearchThreshold:       0.5,
+		EmbedSearchThreshold:       0.4,
 		EmbedSearchLimit:           20,
 		EmbedSearchType:            "hybrid",
 		EmbedInputFields:           []string{"category", "tags", "description"},
@@ -616,6 +616,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	}
 	if update.EmbedInputFields != nil {
 		settings.EmbedInputFields = update.EmbedInputFields
+	}
+	if update.AINickname != nil {
+		settings.AINickname = strings.TrimSpace(*update.AINickname)
 	}
 	if settings.ActiveWorkspaceID == "" {
 		settings.ActiveWorkspaceID = defaultWorkspaceID

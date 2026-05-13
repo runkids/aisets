@@ -316,6 +316,44 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			"cardId": act.Params["cardId"],
 			"label":  act.Params["label"],
 		}
+	case "get_asset_detail":
+		assetID, _ := act.Params["assetId"].(string)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"error": "no scan available"}
+		}
+		item, err := s.store.CatalogItem(scanID, assetID)
+		if err != nil {
+			return map[string]any{"error": "asset not found: " + err.Error()}
+		}
+		detail := map[string]any{
+			"id":            item.ID,
+			"repoPath":      item.RepoPath,
+			"localPath":     item.LocalPath,
+			"projectId":     item.ProjectID,
+			"projectName":   item.ProjectName,
+			"ext":           item.Ext,
+			"width":         item.Image.Width,
+			"height":        item.Image.Height,
+			"bytes":         item.Bytes,
+			"contentHash":   item.ContentHash,
+			"hashAlgorithm": item.HashAlgorithm,
+			"usedByCount":   len(item.UsedBy),
+		}
+		if item.AITag != nil {
+			detail["aiTag"] = map[string]any{
+				"category":    item.AITag.Category,
+				"tags":        item.AITag.Tags,
+				"description": item.AITag.Description,
+			}
+		}
+		if item.OCR != nil && item.OCR.Text != "" {
+			detail["ocrText"] = item.OCR.Text
+		}
+		if len(item.UsedBy) > 0 && len(item.UsedBy) <= 10 {
+			detail["usedBy"] = item.UsedBy
+		}
+		return detail
 	case "search_assets":
 		q, _ := act.Params["q"].(string)
 		limit := 6
@@ -353,7 +391,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 				Bytes:    item.Bytes,
 			})
 		}
-		return map[string]any{"items": items, "total": page.Total}
+		return map[string]any{"items": items, "total": page.Total, "q": q}
 	case "create_comment":
 		return map[string]any{
 			"anchorCardId": act.Params["anchorCardId"],

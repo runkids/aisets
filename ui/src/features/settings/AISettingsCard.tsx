@@ -617,6 +617,31 @@ export function AISettingsCard({
                 />
               </div>
             ))}
+            <div className="mt-3 flex items-center justify-between gap-4 border-t border-g-line pt-3">
+              <span className="font-g text-g-ui tracking-g-ui text-g-ink-2">
+                {t("settings.aiNickname")}
+              </span>
+              <TextInput
+                value={draft.aiNickname ?? ""}
+                placeholder="AI"
+                className="w-48"
+                onChange={(e) =>
+                  onUpdateDraft((c) => ({
+                    ...c,
+                    aiNickname: e.target.value,
+                  }))
+                }
+                onBlur={() => {
+                  vlmBackendMutation.mutate(
+                    { aiNickname: draft.aiNickname },
+                    {
+                      onSuccess: () => toast.success(t("toast.settingsSaved")),
+                      onError: (err: unknown) => toast.error(errorMessage(err)),
+                    },
+                  );
+                }}
+              />
+            </div>
           </div>
         )}
 

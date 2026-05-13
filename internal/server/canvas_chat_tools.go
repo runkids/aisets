@@ -27,6 +27,12 @@ func canvasToolRegistry() []canvasToolDef {
 			Safe:        true,
 		},
 		{
+			Name:        "get_asset_detail",
+			Description: "Get full details about an asset: project, workspace, local path, dimensions, AI tags, OCR text, optimization status, used-by references.",
+			Params:      `{"assetId": "string — catalog asset ID"}`,
+			Safe:        true,
+		},
+		{
 			Name:        "create_comment",
 			Description: "Leave a comment on an asset card, optionally pinned to a region.",
 			Params:      `{"anchorCardId": "string — asset card ID to attach to", "text": "string", "region": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0} (optional, normalized 0-1)}`,

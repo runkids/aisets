@@ -92,7 +92,7 @@ func Search(ctx context.Context, store *config.Store, provider llm.Provider, set
 		threshold = float32(settings.EmbedSearchThreshold)
 	}
 	if threshold == 0 {
-		threshold = 0.5
+		threshold = 0.4
 	}
 
 	start := time.Now()

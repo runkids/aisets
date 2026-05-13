@@ -1283,6 +1283,7 @@ export function App() {
               key={activeWorkspaceId}
               scanId={catalogSummary?.scanId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
+              aiNickname={settingsQuery.data?.settings.aiNickname || ""}
               onOpenAsset={setDrawerId}
               onExitCanvas={() => changeMode("browse")}
             />

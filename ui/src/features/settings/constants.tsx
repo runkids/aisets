@@ -228,6 +228,7 @@ export const defaultSettings: SettingsUpdate = {
   vlmBackendPrecheck: "",
   vlmBackendTranslate: "",
   vlmBackendCanvas: "",
+  aiNickname: "",
   llmTranslationLocales: ["en"],
   embedSearchThreshold: 0.4,
   embedSearchLimit: 20,

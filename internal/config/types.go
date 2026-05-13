@@ -75,6 +75,7 @@ type AppSettings struct {
 	VLMBackendPrecheck         string                               `json:"vlmBackendPrecheck"`
 	VLMBackendTranslate        string                               `json:"vlmBackendTranslate"`
 	VLMBackendCanvas           string                               `json:"vlmBackendCanvas"`
+	AINickname                 string                               `json:"aiNickname"`
 	EmbedSearchThreshold       float64                              `json:"embedSearchThreshold"`
 	EmbedSearchLimit           int                                  `json:"embedSearchLimit"`
 	EmbedSearchType            string                               `json:"embedSearchType"`
@@ -132,6 +133,7 @@ type SettingsUpdate struct {
 	VLMBackendPrecheck         *string                              `json:"vlmBackendPrecheck"`
 	VLMBackendTranslate        *string                              `json:"vlmBackendTranslate"`
 	VLMBackendCanvas           *string                              `json:"vlmBackendCanvas"`
+	AINickname                 *string                              `json:"aiNickname"`
 	EmbedSearchThreshold       *float64                             `json:"embedSearchThreshold"`
 	EmbedSearchLimit           *int                                 `json:"embedSearchLimit"`
 	EmbedSearchType            *string                              `json:"embedSearchType"`

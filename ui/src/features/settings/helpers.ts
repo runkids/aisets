@@ -396,6 +396,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     vlmBackendPrecheck: settings?.vlmBackendPrecheck ?? "",
     vlmBackendTranslate: settings?.vlmBackendTranslate ?? "",
     vlmBackendCanvas: settings?.vlmBackendCanvas ?? "",
+    aiNickname: settings?.aiNickname ?? "",
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -470,6 +471,7 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     vlmBackendPrecheck: draft.vlmBackendPrecheck,
     vlmBackendTranslate: draft.vlmBackendTranslate,
     vlmBackendCanvas: draft.vlmBackendCanvas,
+    aiNickname: draft.aiNickname,
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -550,6 +552,7 @@ export function resetSectionDraft(
         vlmBackendPrecheck: defaults.vlmBackendPrecheck,
         vlmBackendTranslate: defaults.vlmBackendTranslate,
         vlmBackendCanvas: defaults.vlmBackendCanvas,
+        aiNickname: defaults.aiNickname,
       };
     case "customFilters":
       return {
