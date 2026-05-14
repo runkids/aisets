@@ -68,6 +68,16 @@ const IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY =
   "aisets.canvas.imageOptimizationAdvice";
 const DEFAULT_COMPOSER_HEIGHT = 320;
 
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
+}
+
 type Props = {
   scanId?: number;
   aiEnabled: boolean;
@@ -121,6 +131,7 @@ export function AICanvasView({
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [mentionedCardIds, setMentionedCardIds] = useState<string[]>([]);
+  const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
   const [composerCollapsed, setComposerCollapsed] = useState(() => {
@@ -665,14 +676,31 @@ export function AICanvasView({
   }, []);
 
   useEffect(() => {
-    if (!commentMode) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape" || e.isComposing) return;
-      setCommentMode(false);
+      if (e.isComposing || isTypingTarget(e.target)) return;
+      if (e.key === "Escape") {
+        setCommentMode(false);
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.shiftKey && e.key === "@") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setComposerCollapsed(true);
+        setMentionMenuOpen(true);
+        return;
+      }
+      if (!e.shiftKey || e.key.toLowerCase() !== "c") return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      setCommentMode((enabled) => !enabled);
     }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [commentMode]);
+    document.addEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      document.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, []);
 
   const uploadRef = useRef<(files: File[]) => void>(handleUploadAndCreateCards);
   useEffect(() => {
@@ -1010,9 +1038,16 @@ export function AICanvasView({
   }
 
   function appendPromptToken(token: string) {
+    appendPromptTokens([token]);
+  }
+
+  function appendPromptTokens(tokens: string[]) {
+    const clean = tokens.filter(Boolean);
+    if (clean.length === 0) return;
     setPrompt((current) => {
       const trimmed = current.trimEnd();
-      return trimmed ? `${trimmed} ${token}` : token;
+      const suffix = clean.join(" ");
+      return trimmed ? `${trimmed} ${suffix}` : suffix;
     });
   }
 
@@ -1027,9 +1062,21 @@ export function AICanvasView({
   }
 
   function mentionSelectedAsset() {
-    const target = selectedAssets[0];
-    if (target) {
-      mentionImageCard(target.id);
+    const targets = selectedAssets
+      .map((asset) =>
+        mentionableImageCards.find((card) => card.id === asset.id),
+      )
+      .filter((card): card is (typeof mentionableImageCards)[number] =>
+        Boolean(card),
+      );
+    if (targets.length > 0) {
+      const ids = targets.map((target) => target.id);
+      setMentionedCardIds((current) => [
+        ...current,
+        ...ids.filter((id) => !current.includes(id)),
+      ]);
+      setSelectedCardIds(ids);
+      appendPromptTokens(targets.map((target) => `@${target.name}`));
       return;
     }
     appendPromptToken("@" + t("aiCanvas.selectedMention"));
@@ -1198,6 +1245,8 @@ export function AICanvasView({
         composerAdvancedOpen={composerAdvancedOpen}
         imageOptimizationAdvice={imageOptimizationAdvice}
         setImageOptimizationAdvice={setImageOptimizationAdvice}
+        mentionMenuOpen={mentionMenuOpen}
+        setMentionMenuOpen={setMentionMenuOpen}
         mentionSelectedAsset={mentionSelectedAsset}
         handleAttachImage={handleAttachImage}
         handleExtractText={handleExtractText}

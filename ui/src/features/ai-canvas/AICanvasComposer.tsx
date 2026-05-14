@@ -25,6 +25,7 @@ import {
   CopyButton,
   IconButton,
   Switch,
+  Tooltip,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
@@ -66,6 +67,8 @@ type AICanvasComposerProps = {
   composerAdvancedOpen: boolean;
   imageOptimizationAdvice: boolean;
   setImageOptimizationAdvice: StateSetter<boolean>;
+  mentionMenuOpen: boolean;
+  setMentionMenuOpen: StateSetter<boolean>;
   mentionSelectedAsset: () => void;
   handleAttachImage: () => void;
   handleExtractText: () => void | Promise<void>;
@@ -112,6 +115,8 @@ export function AICanvasComposer({
   composerAdvancedOpen,
   imageOptimizationAdvice,
   setImageOptimizationAdvice,
+  mentionMenuOpen,
+  setMentionMenuOpen,
   mentionSelectedAsset,
   handleAttachImage,
   handleExtractText,
@@ -610,26 +615,45 @@ export function AICanvasComposer({
             >
               <Paperclip />
             </IconButton>
-            <IconButton
-              size="sm"
-              aria-label={t("aiCanvas.commentMode")}
-              className={cn(
-                composerIconClass,
-                commentMode && "!bg-white/[0.15] !text-white",
-              )}
-              onClick={() => setCommentMode((v) => !v)}
+            <Tooltip
+              label={t("aiCanvas.commentMode")}
+              shortcut="Shift C"
+              placement="top"
             >
-              <MessageCircle />
-            </IconButton>
-            <DropdownMenuPrimitive.Root>
+              <IconButton
+                size="sm"
+                aria-label={t("aiCanvas.commentMode")}
+                aria-keyshortcuts="Shift+C"
+                className={cn(
+                  composerIconClass,
+                  commentMode && "!bg-white/[0.15] !text-white",
+                )}
+                onClick={() => setCommentMode((v) => !v)}
+              >
+                <MessageCircle />
+              </IconButton>
+            </Tooltip>
+            <DropdownMenuPrimitive.Root
+              open={mentionMenuOpen}
+              onOpenChange={setMentionMenuOpen}
+            >
               <DropdownMenuPrimitive.Trigger asChild>
-                <IconButton
-                  size="sm"
-                  aria-label={t("aiCanvas.mentionAsset")}
-                  className={composerIconClass}
-                >
-                  <AtSign />
-                </IconButton>
+                <span>
+                  <Tooltip
+                    label={t("aiCanvas.mentionAsset")}
+                    shortcut="Shift @"
+                    placement="top"
+                  >
+                    <IconButton
+                      size="sm"
+                      aria-label={t("aiCanvas.mentionAsset")}
+                      aria-keyshortcuts="Shift+@"
+                      className={composerIconClass}
+                    >
+                      <AtSign />
+                    </IconButton>
+                  </Tooltip>
+                </span>
               </DropdownMenuPrimitive.Trigger>
               <DropdownMenuPrimitive.Portal>
                 <DropdownMenuPrimitive.Content
@@ -648,7 +672,10 @@ export function AICanvasComposer({
                     mentionableImageCards.map((card) => (
                       <DropdownMenuPrimitive.Item
                         key={card.id}
-                        onSelect={() => mentionImageCard(card.id)}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          mentionImageCard(card.id);
+                        }}
                         className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
                       >
                         <AssetThumbnail
