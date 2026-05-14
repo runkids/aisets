@@ -3,11 +3,13 @@ import type { AssetItem } from "@/types";
 import {
   buildAssistantBullets,
   cardIdsForBulkDeletion,
+  compactAICanvasSessionForStorage,
   cardIdsForDeletion,
   commentsForAssets,
   inferPromptIntent,
   normalizeAICanvasSession,
   selectedAssetCards,
+  writeAICanvasSession,
   type AssetCanvasCard,
   type CommentCanvasCard,
   type UploadCanvasCard,
@@ -114,6 +116,66 @@ describe("normalizeAICanvasSession", () => {
 
     expect(session.chatHistory).toHaveLength(2);
     expect(session.chatHistory![1].attachments).toHaveLength(1);
+  });
+});
+
+describe("writeAICanvasSession", () => {
+  const upload: UploadCanvasCard = {
+    id: "upload-1",
+    kind: "upload",
+    x: 0,
+    y: 0,
+    createdAt: "2026-05-14T00:00:00.000Z",
+    token: "tok-1",
+    thumbnailDataUrl: "data:image/png;base64," + "x".repeat(100),
+    fileName: "photo.png",
+    uploadWidth: 100,
+    uploadHeight: 100,
+  };
+
+  it("strips upload thumbnail data urls before persisting", () => {
+    const compact = compactAICanvasSessionForStorage({
+      version: 1,
+      cards: [upload],
+      viewport: { x: 0, y: 0, scale: 1 },
+      chatHistory: [
+        {
+          role: "user",
+          content: "",
+          attachments: [
+            {
+              token: "att-1",
+              thumbnailDataUrl: upload.thumbnailDataUrl,
+              fileName: "photo.png",
+              width: 100,
+              height: 100,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect((compact.cards[0] as UploadCanvasCard).thumbnailDataUrl).toBe("");
+    expect(compact.chatHistory![0].attachments![0].thumbnailDataUrl).toBe("");
+    expect(compact.chatHistory![0].attachments![0].token).toBe("att-1");
+  });
+
+  it("does not throw when sessionStorage quota is exceeded", () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("quota", "QuotaExceededError");
+      },
+    };
+
+    expect(() =>
+      writeAICanvasSession(storage, {
+        version: 1,
+        cards: [upload],
+        viewport: { x: 0, y: 0, scale: 1 },
+        chatHistory: [{ role: "user", content: "hello" }],
+      }),
+    ).not.toThrow();
   });
 });
 

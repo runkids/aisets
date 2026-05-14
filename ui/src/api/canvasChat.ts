@@ -8,6 +8,7 @@ import { APIError, basePath, streamNDJSON } from "./client";
 export type CanvasChatEvent =
   | { type: "focus"; cardId: string | null; label?: string }
   | { type: "thinking" }
+  | { type: "status"; phase?: string; content: string }
   | { type: "text"; content: string }
   | {
       type: "action_result";
@@ -132,6 +133,12 @@ export function serializeCanvasSnapshot(
           height: a.image.height,
           bytes: a.bytes,
           usedByCount: a.usedBy?.length ?? 0,
+          searchCategory: a.aiTag?.category,
+          searchTags: a.aiTag?.tags,
+          searchDescription: a.aiTag?.description,
+          searchCategoryI18n: a.aiTag?.categoryI18n,
+          searchTagsI18n: a.aiTag?.tagsI18n,
+          searchDescriptionI18n: a.aiTag?.descriptionI18n,
           ...(isSelected && {
             tags: a.aiTag?.tags,
             description: a.aiTag?.description,

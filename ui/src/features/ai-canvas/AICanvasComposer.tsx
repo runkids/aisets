@@ -69,6 +69,7 @@ type AICanvasComposerProps = {
   isWorking: boolean;
   composerStatusLabel: string;
   composerStatusText: string;
+  elapsedLabel?: string | null;
   currentTargets?: MentionableImageCard[];
   latestChatContent: string;
   chatHistory: ChatHistoryEntry[];
@@ -121,6 +122,7 @@ export function AICanvasComposer({
   isWorking,
   composerStatusLabel,
   composerStatusText,
+  elapsedLabel,
   currentTargets = [],
   latestChatContent,
   chatHistory,
@@ -214,7 +216,7 @@ export function AICanvasComposer({
   return (
     <div
       data-ai-canvas-overlay="true"
-      className="pointer-events-auto absolute inset-x-0 bottom-0 z-[60] mx-auto max-w-[1120px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
+      className="pointer-events-auto absolute inset-x-0 bottom-0 z-[60] mx-auto max-w-[900px] px-4 pb-3 text-white max-[760px]:px-2 max-[760px]:pb-2"
       style={{ height: collapsed ? 112 : height }}
     >
       <div className="relative h-full">
@@ -289,6 +291,11 @@ export function AICanvasComposer({
               <span className="min-w-0 flex-1 truncate text-white/58">
                 {composerStatusText}
               </span>
+              {elapsedLabel && (
+                <span className="shrink-0 text-g-caption text-white/38">
+                  {elapsedLabel}
+                </span>
+              )}
               <ChevronDown
                 size={17}
                 className="shrink-0 rotate-180 text-white/42 transition-transform duration-[160ms] ease-g"
@@ -311,7 +318,7 @@ export function AICanvasComposer({
                     <article
                       key={i}
                       className={cn(
-                        "max-w-[min(760px,calc(100%-16px))] rounded-g-lg border px-3 py-2 text-g-body leading-[1.45] text-white/84",
+                        "max-w-[min(610px,calc(100%-16px))] rounded-g-lg border px-3 py-2 text-g-body leading-[1.45] text-white/84",
                         isUser
                           ? "self-end border-white/[0.1] bg-white/[0.12]"
                           : "self-start border-white/[0.06] bg-white/[0.06]",
@@ -422,6 +429,11 @@ export function AICanvasComposer({
             <span className="min-w-0 flex-1 truncate text-white/58">
               {composerStatusText}
             </span>
+            {elapsedLabel && (
+              <span className="shrink-0 text-g-caption text-white/38">
+                {elapsedLabel}
+              </span>
+            )}
             <ChevronDown
               size={17}
               className="shrink-0 text-white/42 transition-transform duration-[160ms] ease-g"
@@ -896,6 +908,23 @@ export function AICanvasComposer({
                   }
                 }
 
+                if (event.key === "@" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  setMentionMenuOpen(true);
+                  return;
+                }
+                if (
+                  event.key === "C" &&
+                  event.shiftKey &&
+                  !event.altKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  setCommentMode((v) => !v);
+                  return;
+                }
                 if (
                   event.key === "Enter" &&
                   !event.shiftKey &&

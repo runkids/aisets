@@ -294,6 +294,9 @@ export function compactImageAspectRatio(card: CanvasCard) {
     const { width, height } = card.asset.image;
     if (width > 0 && height > 0) return width / height;
   }
+  if (card.kind === "variant" && card.width && card.height) {
+    return card.width / card.height;
+  }
   return DEFAULT_IMAGE_ASPECT_RATIO;
 }
 

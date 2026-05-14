@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  canvasSessionThumbnailUrl,
   createCanvasSession,
   deleteCanvasSession,
+  getCanvasSession,
   listCanvasSessions,
   renameCanvasSession,
   updateCanvasSession,
@@ -42,6 +44,33 @@ export function useRenameCanvasSessionMutation() {
   return useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       renameCanvasSession(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CANVAS_SESSIONS_KEY }),
+  });
+}
+
+export function useDuplicateCanvasSessionMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sourceId,
+      name,
+    }: {
+      sourceId: string;
+      name: string;
+    }) => {
+      const [{ session: source }, thumbnail] = await Promise.all([
+        getCanvasSession(sourceId),
+        fetch(canvasSessionThumbnailUrl(sourceId))
+          .then((r) => (r.ok ? r.blob() : undefined))
+          .catch(() => undefined),
+      ]);
+      return createCanvasSession({
+        name,
+        stateJson: source.stateJson,
+        cardCount: source.cardCount,
+        thumbnail: thumbnail instanceof Blob ? thumbnail : undefined,
+      });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: CANVAS_SESSIONS_KEY }),
   });
 }

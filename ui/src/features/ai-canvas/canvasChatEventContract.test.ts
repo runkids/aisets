@@ -86,6 +86,7 @@ describe("canvas chat frontend event contract", () => {
       ok: true,
       body: streamFromChunks([
         '{"type":"focus","cardId":"card-a","label":"Inspect"}\n',
+        '{"type":"status","phase":"confirming","content":"Confirming target: Inspect"}\n',
         '{"type":"action_result","tool":"select_cards","result":{"cardIds":["card-a","missing","card-b"],"label":"Selected"}}\n',
         '{"type":"proposal","id":"proposal-1","tool":"rotate_image","params":{"assetId":"asset-a","degrees":90},"description":"Rotate asset","impact":"Creates a rotated variant","targetAssetIds":["asset-a"]}\n',
         '{"type":"done","providerName":"fake","modelName":"fixture","durationMs":12}\n',
@@ -113,6 +114,7 @@ describe("canvas chat frontend event contract", () => {
     });
     expect(events.map((event) => event.type)).toEqual([
       "focus",
+      "status",
       "action_result",
       "proposal",
       "done",
@@ -131,7 +133,11 @@ describe("canvas chat frontend event contract", () => {
         ),
     ).toEqual({ x: 114, y: 92 });
 
-    const selectEvent = events[1];
+    const statusEvent = events[1];
+    if (statusEvent.type !== "status") throw new Error("expected status event");
+    expect(statusEvent.content).toBe("Confirming target: Inspect");
+
+    const selectEvent = events[2];
     if (selectEvent.type !== "action_result") {
       throw new Error("expected action_result event");
     }
@@ -140,7 +146,7 @@ describe("canvas chat frontend event contract", () => {
       "card-b",
     ]);
 
-    const proposalEvent = events[2];
+    const proposalEvent = events[3];
     if (proposalEvent.type !== "proposal") {
       throw new Error("expected proposal event");
     }

@@ -46,6 +46,9 @@ export type RenderPreviewResponse = {
   outputBytes: number;
   inputFormat: string;
   outputFormat: string;
+  width: number;
+  height: number;
+  alpha: boolean;
 };
 
 export function renderImageToolPreview(params: {

@@ -265,9 +265,15 @@ textarea::-webkit-resizer {
 @keyframes canvasCardIn {
   from {
     opacity: 0;
+    filter: blur(8px) brightness(1.08);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0) brightness(1.06);
   }
   to {
     opacity: 1;
+    filter: blur(0) brightness(1);
   }
 }
 @keyframes canvasSearchIn {
@@ -771,19 +777,46 @@ textarea::-webkit-resizer {
   }
 }
 @keyframes cursorFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-3px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
 }
 @keyframes cursorWrite {
-  0%, 100% { transform: rotate(0deg); }
-  25%      { transform: rotate(-6deg); }
-  75%      { transform: rotate(6deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
 }
 @keyframes cursorPulse {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(1.1); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 @keyframes cursorDot {
-  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
-  40%           { opacity: 1;    transform: scale(1.2); }
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }

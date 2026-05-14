@@ -25,7 +25,7 @@ import { useTranslation } from "react-i18next";
 import { basePath } from "@/api/client";
 import { Badge, IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { fileName, formatBytes, formatExt } from "@/ui";
+import { fileName, formatExt } from "@/ui";
 import {
   cardDisplayName,
   type AssetCanvasCard,
@@ -663,6 +663,10 @@ function floatingCardLayer(card: CanvasCard, selected: boolean) {
   return selected ? "z-40" : undefined;
 }
 
+function isChromelessImageCard(card: CanvasCard) {
+  return isImageCard(card) || card.kind === "variant";
+}
+
 export function CardShell({
   card,
   selected,
@@ -717,11 +721,13 @@ export function CardShell({
   const shellScale = stableCard
     ? "var(--ai-canvas-stable-scale, 1)"
     : String(screenStableScale);
-  const chromeless = isImageCard(card);
+  const chromeless = isChromelessImageCard(card);
   const imageLabel = chromeless
     ? card.kind === "asset"
       ? fileName(card.asset.repoPath)
-      : card.fileName
+      : card.kind === "upload"
+        ? card.fileName
+        : card.sourceName
     : undefined;
 
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -786,7 +792,7 @@ export function CardShell({
   const sectionCls = cn(
     "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow,filter] duration-[120ms] ease-g",
     isNewCard &&
-      "animate-[canvasCardIn_280ms_var(--g-ease-out)_both] motion-reduce:animate-none",
+      "animate-[canvasCardIn_420ms_var(--g-ease-out)_both] motion-reduce:animate-none",
     floatingCardLayer(card, selected),
     ctxMenuPos && "!z-[1300]",
     chromeless
@@ -1105,40 +1111,19 @@ export function UploadCardBody({
 }
 
 export function VariantCardBody({ card }: { card: VariantCanvasCard }) {
-  const { t } = useTranslation();
-  const savings = card.inputBytes - card.outputBytes;
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div className="aspect-[4/3] overflow-hidden rounded-g-md border border-g-line bg-g-surface-2">
-        <img
-          src={card.previewUrl}
-          alt={card.sourceName}
-          className="size-full select-none object-contain p-3"
-          draggable={false}
-          loading="lazy"
-        />
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        <Badge tone="blue">
-          {t("aiCanvas.renderedPreview", {
-            input: card.inputFormat.toUpperCase(),
-            output: card.outputFormat.toUpperCase(),
-          })}
-        </Badge>
-        <Badge tone={savings > 0 ? "green" : "line"}>
-          {card.inputBytes > 0 && card.outputBytes > 0
-            ? `${formatBytes(card.inputBytes)} → ${formatBytes(card.outputBytes)}`
-            : t("aiCanvas.previewOnly")}
-        </Badge>
-      </div>
-      {savings > 0 && (
-        <div className="text-g-caption text-g-green">
-          {t("aiCanvas.savings", { size: formatBytes(savings) })}
-        </div>
-      )}
-      <div className="font-g-mono text-[10px] tracking-g-mono text-g-ink-4">
-        {card.token}
-      </div>
+    <div
+      data-ai-canvas-image-frame="true"
+      className="relative"
+      style={{ aspectRatio: compactImageAspectRatio(card) }}
+    >
+      <img
+        src={card.previewUrl}
+        alt={card.sourceName}
+        className="size-full select-none rounded-[inherit] object-contain"
+        draggable={false}
+        loading="lazy"
+      />
     </div>
   );
 }
@@ -1478,20 +1463,18 @@ export function AICursor({
         {renderIcon()}
         <div
           className={cn(
-            "-mt-1 ml-3 flex items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-all duration-500",
+            "-mt-1 ml-3 flex max-w-[280px] min-w-0 items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-all duration-500",
             showLabel ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
           )}
         >
-          <span>{nickname || "Aisets"}</span>
+          <span className="shrink-0">{nickname || "Aisets"}</span>
           {showGreeting && !active && greeting && (
-            <span className="max-w-[360px] min-w-0 whitespace-nowrap opacity-80 animate-[fadeIn_400ms_var(--g-ease)]">
+            <span className="min-w-0 truncate opacity-80 animate-[fadeIn_400ms_var(--g-ease)]">
               · {greeting}
             </span>
           )}
           {active && label && (
-            <span className="max-w-[360px] min-w-0 whitespace-nowrap opacity-80">
-              · {label}
-            </span>
+            <span className="min-w-0 truncate opacity-80">· {label}</span>
           )}
         </div>
       </div>

@@ -232,6 +232,9 @@ export function useProposalExecution(opts: {
             outputBytes: result.outputBytes,
             inputFormat: result.inputFormat,
             outputFormat: result.outputFormat,
+            width: result.width,
+            height: result.height,
+            alpha: result.alpha,
           };
           setCards((current) => [...current, variantCard]);
           return complete({

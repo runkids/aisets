@@ -1,11 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type { TFunction } from "i18next";
-import { FolderOpen, Layers, Pencil, Trash2, X } from "lucide-react";
+import { Copy, FolderOpen, Layers, Pencil, Trash2, X } from "lucide-react";
 import { canvasSessionThumbnailUrl } from "@/api";
-import { Button, IconButton } from "@/components/ui";
+import { Button, IconButton, TextInput } from "@/components/ui";
 import {
   DialogBody,
+  DialogDescription,
   DialogHeader,
   DialogOverlay,
   DialogSurface,
@@ -16,6 +17,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import {
   useCanvasSessionsQuery,
   useDeleteCanvasSessionMutation,
+  useDuplicateCanvasSessionMutation,
   useRenameCanvasSessionMutation,
 } from "@/queries";
 import type { CanvasSessionMeta } from "@/types";
@@ -29,12 +31,20 @@ type Props = {
   t: TFunction;
 };
 
-function relativeTime(iso: string) {
+function relativeTime(iso: string, t: TFunction) {
   const diff = Date.now() - Date.parse(iso);
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
+  if (diff < 60_000) return t("aiCanvas.relativeTimeJustNow");
+  if (diff < 3_600_000)
+    return t("aiCanvas.relativeTimeMinutesAgo", {
+      count: Math.floor(diff / 60_000),
+    });
+  if (diff < 86_400_000)
+    return t("aiCanvas.relativeTimeHoursAgo", {
+      count: Math.floor(diff / 3_600_000),
+    });
+  return t("aiCanvas.relativeTimeDaysAgo", {
+    count: Math.floor(diff / 86_400_000),
+  });
 }
 
 function SessionCard({
@@ -42,6 +52,7 @@ function SessionCard({
   isCurrent,
   onLoad,
   onRename,
+  onDuplicate,
   onDelete,
   t,
 }: {
@@ -49,6 +60,7 @@ function SessionCard({
   isCurrent: boolean;
   onLoad: () => void;
   onRename: (name: string) => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   t: TFunction;
 }) {
@@ -65,12 +77,21 @@ function SessionCard({
   }, [editValue, session.name, onRename]);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${t("aiCanvas.loadSession")}: ${session.name}`}
       onClick={() => {
         if (!editing) onLoad();
       }}
-      className="group relative flex flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface-2/60 text-left transition-colors hover:border-g-line-strong hover:bg-g-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-accent data-[current]:border-g-accent/50"
+      onKeyDown={(e) => {
+        if (e.currentTarget !== e.target || editing) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onLoad();
+        }
+      }}
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-g-md border border-g-line bg-g-surface-2/60 text-left transition-colors hover:border-g-line-strong hover:bg-g-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-accent data-[current]:border-g-accent/50"
       data-current={isCurrent || undefined}
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-g-surface-3">
@@ -95,9 +116,12 @@ function SessionCard({
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-3 py-2">
         {editing ? (
-          <input
+          <TextInput
             ref={inputRef}
-            className="w-full rounded-g-sm border border-g-line bg-g-surface px-1.5 py-0.5 font-g text-g-ui text-g-ink outline-none focus:border-g-accent"
+            size="sm"
+            variant="outline"
+            className="w-full"
+            inputClassName="font-g text-g-ui"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitRename}
@@ -116,7 +140,7 @@ function SessionCard({
         <span className="truncate font-g text-[12px] text-g-ink-3">
           {t("aiCanvas.sessionCards", { count: session.cardCount })}
           {" · "}
-          {relativeTime(session.updatedAt)}
+          {relativeTime(session.updatedAt, t)}
         </span>
       </div>
 
@@ -141,6 +165,14 @@ function SessionCard({
         </IconButton>
         <IconButton
           size="sm"
+          aria-label={t("aiCanvas.duplicateSession")}
+          className="bg-g-surface/80 backdrop-blur-sm"
+          onClick={onDuplicate}
+        >
+          <Copy size={14} />
+        </IconButton>
+        <IconButton
+          size="sm"
           aria-label={t("aiCanvas.deleteSession")}
           className="bg-g-surface/80 backdrop-blur-sm text-red-500 hover:text-red-400"
           onClick={onDelete}
@@ -148,7 +180,7 @@ function SessionCard({
           <Trash2 size={14} />
         </IconButton>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -163,6 +195,7 @@ export function CanvasSessionsDialog({
   const toast = useToast();
   const { data, isLoading } = useCanvasSessionsQuery();
   const renameMut = useRenameCanvasSessionMutation();
+  const duplicateMut = useDuplicateCanvasSessionMutation();
   const deleteMut = useDeleteCanvasSessionMutation();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
@@ -181,6 +214,20 @@ export function CanvasSessionsDialog({
       );
     },
     [renameMut, toast, t, onSessionRenamed],
+  );
+
+  const handleDuplicate = useCallback(
+    (session: CanvasSessionMeta) => {
+      const name = t("aiCanvas.sessionCopyName", { name: session.name });
+      duplicateMut.mutate(
+        { sourceId: session.id, name },
+        {
+          onSuccess: () => toast.success(t("aiCanvas.sessionDuplicated")),
+          onError: () => toast.error(t("aiCanvas.sessionDuplicateError")),
+        },
+      );
+    },
+    [duplicateMut, toast, t],
   );
 
   const handleDelete = useCallback(
@@ -215,9 +262,14 @@ export function CanvasSessionsDialog({
                   <DialogPrimitive.Title asChild>
                     <DialogTitle>{t("aiCanvas.savedSessions")}</DialogTitle>
                   </DialogPrimitive.Title>
+                  <DialogPrimitive.Description asChild>
+                    <DialogDescription className="sr-only">
+                      {t("aiCanvas.openSessions")}
+                    </DialogDescription>
+                  </DialogPrimitive.Description>
                 </div>
                 <DialogPrimitive.Close asChild>
-                  <IconButton size="sm" aria-label="Close">
+                  <IconButton size="sm" aria-label={t("common.close")}>
                     <X />
                   </IconButton>
                 </DialogPrimitive.Close>
@@ -226,7 +278,7 @@ export function CanvasSessionsDialog({
               <DialogBody padding="md" className="min-h-[300px]">
                 {isLoading ? (
                   <div className="flex h-[200px] items-center justify-center text-g-ink-3">
-                    Loading…
+                    {t("aiCanvas.sessionsLoading")}
                   </div>
                 ) : sessions.length === 0 ? (
                   <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-center">
@@ -251,6 +303,7 @@ export function CanvasSessionsDialog({
                         isCurrent={session.id === currentSessionId}
                         onLoad={() => onLoad(session.id)}
                         onRename={(name) => handleRename(session.id, name)}
+                        onDuplicate={() => handleDuplicate(session)}
                         onDelete={() => setDeleteTarget(session.id)}
                         t={t}
                       />

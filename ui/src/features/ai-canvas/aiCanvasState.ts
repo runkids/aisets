@@ -55,6 +55,9 @@ export type VariantCanvasCard = CanvasCardBase & {
   outputBytes: number;
   inputFormat: string;
   outputFormat: string;
+  width?: number;
+  height?: number;
+  alpha?: boolean;
 };
 
 export type OperationCanvasCard = CanvasCardBase & {
@@ -157,6 +160,36 @@ export function sanitizeCanvasChatContent(content: string) {
 }
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+function compactUploadCardForStorage(card: CanvasCard): CanvasCard {
+  if (card.kind !== "upload" || !card.thumbnailDataUrl) return card;
+  return { ...card, thumbnailDataUrl: "" };
+}
+
+function compactChatHistoryForStorage(
+  chatHistory: ChatHistoryEntry[] | undefined,
+) {
+  return chatHistory?.map((entry) => {
+    if (!entry.attachments?.length) return entry;
+    return {
+      ...entry,
+      attachments: entry.attachments.map((attachment) => ({
+        ...attachment,
+        thumbnailDataUrl: "",
+      })),
+    };
+  });
+}
+
+export function compactAICanvasSessionForStorage(
+  session: AICanvasSession,
+): AICanvasSession {
+  return {
+    ...session,
+    cards: session.cards.map(compactUploadCardForStorage),
+    chatHistory: compactChatHistoryForStorage(session.chatHistory),
+  };
+}
 
 export const DEFAULT_CANVAS_VIEWPORT: CanvasViewport = {
   x: 0,
@@ -296,6 +329,9 @@ function normalizeCard(value: unknown): CanvasCard | null {
         typeof value.inputFormat === "string" ? value.inputFormat : "input",
       outputFormat:
         typeof value.outputFormat === "string" ? value.outputFormat : "output",
+      width: Number(value.width) > 0 ? Number(value.width) : undefined,
+      height: Number(value.height) > 0 ? Number(value.height) : undefined,
+      alpha: typeof value.alpha === "boolean" ? value.alpha : undefined,
     };
   }
 
@@ -459,7 +495,26 @@ export function writeAICanvasSession(
   storage: StorageLike,
   session: AICanvasSession,
 ) {
-  storage.setItem(AI_CANVAS_STORAGE_KEY, JSON.stringify(session));
+  try {
+    storage.setItem(
+      AI_CANVAS_STORAGE_KEY,
+      JSON.stringify(compactAICanvasSessionForStorage(session)),
+    );
+  } catch {
+    try {
+      storage.setItem(
+        AI_CANVAS_STORAGE_KEY,
+        JSON.stringify(
+          compactAICanvasSessionForStorage({
+            ...session,
+            chatHistory: undefined,
+          }),
+        ),
+      );
+    } catch {
+      // Storage may be full or unavailable; keep the in-memory canvas usable.
+    }
+  }
 }
 
 export function selectedAssetCards(
