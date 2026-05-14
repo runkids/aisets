@@ -1,5 +1,6 @@
 export * from "./actions";
 export * from "./ai";
+export * from "./canvasSessions";
 export * from "./catalog";
 export * from "./client";
 export * from "./imageTools";

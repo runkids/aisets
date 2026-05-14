@@ -1,5 +1,6 @@
 export * from "./actions";
 export * from "./activity";
+export * from "./canvasSessions";
 export * from "./catalog";
 export * from "./customFilters";
 export * from "./project";

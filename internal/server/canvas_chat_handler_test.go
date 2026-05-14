@@ -517,6 +517,20 @@ func TestParseCanvasActions_ToolCallNoCall(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_JSONFenceArray(t *testing.T) {
+	input := "I will inspect the current canvas.\n```json\n[\n  {\"tool\":\"focus_card\",\"params\":{\"cardId\":\"copy-1\",\"label\":\"target\"}},\n  {\"tool\":\"find_similar_assets\",\"params\":{\"assetIds\":[\"386481964017\"],\"limit\":5}}\n]\n```"
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "focus_card" || actions[1].Tool != "find_similar_assets" {
+		t.Fatalf("actions = %#v", actions)
+	}
+	if strings.Contains(text, "tool") || strings.Contains(text, "find_similar_assets") {
+		t.Fatalf("text leaked JSON action payload: %q", text)
+	}
+}
+
 func TestParseCanvasActions_GemmaFormat(t *testing.T) {
 	input := "<|tool_call>call{\"tool\": \"search_assets\", \"params\": {\"q\": \"書\", \"limit\": 12}, \"description\": \"搜尋書\", \"impact\": \"列表\"}<tool_call|>"
 	text, actions := parseCanvasActions(input)

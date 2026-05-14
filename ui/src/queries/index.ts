@@ -1,4 +1,5 @@
 export * from "./actionQueries";
+export * from "./canvasSessionQueries";
 export * from "./catalogQueries";
 export * from "./favorites";
 export * from "./llmQueries";

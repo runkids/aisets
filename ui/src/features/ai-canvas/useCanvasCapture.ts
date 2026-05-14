@@ -460,11 +460,28 @@ export function useCanvasCapture(opts: CaptureOpts) {
     return blobToDataURL(blob);
   }, [rootRef, cards, cardElementsRef, viewport]);
 
+  const captureCanvasBlob = useCallback(async (): Promise<Blob | undefined> => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const frames = imageRenderFrames(
+      cards,
+      new Set(cards.map((c) => c.id)),
+      cardElementsRef.current,
+      root,
+      viewport,
+    );
+    if (frames.length === 0) return undefined;
+    const crop = captureCropForFrames(frames);
+    if (!crop) return undefined;
+    return captureRenderedFrames(root, frames, crop, 0.5, false);
+  }, [rootRef, cards, cardElementsRef, viewport]);
+
   return {
     captureViewport,
     captureCanvas,
     captureSelected,
     captureCanvasForAI,
+    captureCanvasBlob,
     isCapturing,
     preview,
     dismissPreview,

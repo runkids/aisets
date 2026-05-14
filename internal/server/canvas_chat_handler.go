@@ -110,6 +110,7 @@ type canvasAction struct {
 }
 
 var actionBlockRe = regexp.MustCompile("(?s)```action\\s*\\n(.*?)\\n```")
+var jsonActionBlockRe = regexp.MustCompile("(?s)```json\\s*\\n(.*?)\\n```")
 var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(\{.+\})\s*\)?\s*<\|?/?tool_call\|?>`)
 
 var toolCallCleanRe = regexp.MustCompile(`(?s)<\|?/?tool_call\|?>`)
@@ -123,6 +124,7 @@ var assetStemTokenRe = regexp.MustCompile(`[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)+`)
 type canvasActionSpan struct {
 	start, end int
 	json       string
+	actions    []canvasAction
 }
 
 func balancedJSONObjectEnd(s string, start int) int {
@@ -163,6 +165,28 @@ func normalizeCanvasActionJSON(raw string) string {
 	raw = strings.ReplaceAll(raw, `<|“|>`, `"`)
 	raw = strings.ReplaceAll(raw, `<|”|>`, `"`)
 	return unquotedJSONKeyRe.ReplaceAllString(raw, `$1"$2":`)
+}
+
+func parseCanvasActionJSON(raw string) []canvasAction {
+	raw = normalizeCanvasActionJSON(strings.TrimSpace(raw))
+	if raw == "" {
+		return nil
+	}
+	var list []canvasAction
+	if err := json.Unmarshal([]byte(raw), &list); err == nil {
+		var actions []canvasAction
+		for _, act := range list {
+			if act.Tool != "" {
+				actions = append(actions, act)
+			}
+		}
+		return actions
+	}
+	var act canvasAction
+	if err := json.Unmarshal([]byte(raw), &act); err == nil && act.Tool != "" {
+		return []canvasAction{act}
+	}
+	return nil
 }
 
 func findLooseQuotedCanvasCallSpans(content string) []canvasActionSpan {
@@ -308,21 +332,29 @@ func canvasActionBlockLikelyTruncated(content string) bool {
 
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
+	jsonMatches := jsonActionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
 	plainCallSpans := findPlainCanvasCallSpans(content)
 	looseQuotedCallSpans := findLooseQuotedCanvasCallSpans(content)
 
-	if len(matches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 {
+	if len(matches) == 0 && len(jsonMatches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 {
 		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
 		return strings.TrimSpace(cleaned), nil
 	}
 
 	var spans []canvasActionSpan
 	for _, loc := range matches {
-		spans = append(spans, canvasActionSpan{loc[0], loc[1], content[loc[2]:loc[3]]})
+		spans = append(spans, canvasActionSpan{start: loc[0], end: loc[1], json: content[loc[2]:loc[3]]})
+	}
+	for _, loc := range jsonMatches {
+		parsed := parseCanvasActionJSON(content[loc[2]:loc[3]])
+		if len(parsed) == 0 {
+			continue
+		}
+		spans = append(spans, canvasActionSpan{start: loc[0], end: loc[1], actions: parsed})
 	}
 	for _, loc := range toolMatches {
-		spans = append(spans, canvasActionSpan{loc[0], loc[1], content[loc[2]:loc[3]]})
+		spans = append(spans, canvasActionSpan{start: loc[0], end: loc[1], json: content[loc[2]:loc[3]]})
 	}
 	spans = append(spans, plainCallSpans...)
 	spans = append(spans, looseQuotedCallSpans...)
@@ -334,9 +366,10 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 		if s.start > prev {
 			textParts = append(textParts, content[prev:s.start])
 		}
-		var act canvasAction
-		if err := json.Unmarshal([]byte(normalizeCanvasActionJSON(s.json)), &act); err == nil && act.Tool != "" {
-			actions = append(actions, act)
+		if len(s.actions) > 0 {
+			actions = append(actions, s.actions...)
+		} else {
+			actions = append(actions, parseCanvasActionJSON(s.json)...)
 		}
 		if s.end > prev {
 			prev = s.end
@@ -1102,6 +1135,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 		var toolResults []string
 		captureExecutedThisLoop := false
+		toolExecutedThisLoop := false
 		for _, act := range actions {
 			if act.Tool == "focus_card" {
 				sendNDJSON(w, map[string]any{
@@ -1109,6 +1143,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"cardId": act.Params["cardId"],
 					"label":  act.Params["label"],
 				})
+				toolExecutedThisLoop = true
 				time.Sleep(300 * time.Millisecond)
 				continue
 			}
@@ -1126,6 +1161,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"tool":   act.Tool,
 					"result": result,
 				})
+				toolExecutedThisLoop = true
 				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
 					resultJSON, _ := json.Marshal(result)
 					toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
@@ -1150,11 +1186,12 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"targetAssetId":  targetAssetID,
 					"targetAssetIds": targetAssetIDs,
 				})
+				toolExecutedThisLoop = true
 			}
 			time.Sleep(150 * time.Millisecond)
 		}
 
-		if textBody != "" && !truncatedAction {
+		if textBody != "" && !truncatedAction && !toolExecutedThisLoop {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})

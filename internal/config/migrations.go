@@ -368,6 +368,9 @@ func (s *Store) migrate() error {
 	if err := s.migrateEmbeddingsTable(); err != nil {
 		return err
 	}
+	if err := s.migrateCanvasSessionsTable(); err != nil {
+		return err
+	}
 	if err := s.ensureDefaultWorkspace(); err != nil {
 		return err
 	}

@@ -266,7 +266,7 @@ export function useCanvasChat(opts: {
   function shouldAttachCanvasImage(promptText: string, selectedCount: number) {
     return (
       selectedCount >= 2 ||
-      /排版|擺放|布局|佈局|合照|散開|分散|靠近|對齊|移動|拖|放大|縮小|縮放|拍照|截圖|layout|arrange|spread|align|move|drag|resize/i.test(
+      /排版|擺放|布局|佈局|合照|散開|分散|靠近|對齊|移動|拖|放大|縮小|縮放|拍照|截圖|辨識|識別|認得|看得出|找得到|找不到|有沒有|畫布上|layout|arrange|spread|align|move|drag|resize|identify|recognize|match|find.*canvas|on canvas/i.test(
         promptText,
       )
     );

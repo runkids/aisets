@@ -42,6 +42,10 @@ All stack-specific rules and conventions live in `.skillshare/extras/rules/` and
 - **Canvas OCR targets are mixed identity types.** Catalog images use `assetIds`, while uploaded canvas images use `cardIds`; composer target counts, prompt target descriptions, tool schema, and backend resolvers must all support both or OCR silently ignores uploads.
 - **Normalize provider errors before presenting OCR results.** OpenAI-compatible backends may wrap useful failures inside JSON error bodies. Extract the provider `error.message` for per-image OCR output so the user sees the actionable cause instead of repeated raw transport payloads.
 
+### 2.2 File size conventions
+
+- **Keep source files under 1,000 lines.** Split files before they exceed 1,000 lines so code stays reviewable and navigable. If a file must exceed this limit for a specific reason, add a file-level comment explaining why the exception is necessary.
+
 ---
 
 ## 3. Quick links

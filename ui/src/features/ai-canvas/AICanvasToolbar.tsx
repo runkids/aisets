@@ -4,8 +4,11 @@ import {
   Camera,
   Eye,
   EyeOff,
+  FilePlus2,
+  FolderOpen,
   LoaderCircle,
   LocateFixed,
+  Save,
   Trash2,
   ZoomIn,
   ZoomOut,
@@ -35,6 +38,13 @@ type AICanvasToolbarProps = {
   onClear: () => void;
   debugOpen: boolean;
   onToggleDebug: () => void;
+  onSave: () => void;
+  onOpenSessions: () => void;
+  onNewCanvas: () => void;
+  isSaving: boolean;
+  isDirty: boolean;
+  hasSession: boolean;
+  sessionName?: string;
 };
 
 export function AICanvasToolbar({
@@ -57,6 +67,13 @@ export function AICanvasToolbar({
   onClear,
   debugOpen,
   onToggleDebug,
+  onSave,
+  onOpenSessions,
+  onNewCanvas,
+  isSaving,
+  isDirty,
+  hasSession,
+  sessionName,
 }: AICanvasToolbarProps) {
   return (
     <div
@@ -95,6 +112,42 @@ export function AICanvasToolbar({
       >
         <LocateFixed />
       </IconButton>
+      <span className="mx-0.5 h-4 w-px bg-g-line" />
+      {hasSession && (
+        <IconButton
+          size="sm"
+          aria-label={t("aiCanvas.newCanvas")}
+          onClick={onNewCanvas}
+        >
+          <FilePlus2 />
+        </IconButton>
+      )}
+      <IconButton
+        size="sm"
+        aria-label={t("aiCanvas.openSessions")}
+        onClick={onOpenSessions}
+      >
+        <FolderOpen />
+      </IconButton>
+      <div className="relative">
+        <IconButton
+          size="sm"
+          aria-label={t("aiCanvas.save")}
+          onClick={onSave}
+          disabled={isSaving || cardsCount === 0}
+        >
+          {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
+        </IconButton>
+        {isDirty && !isSaving && (
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-g-accent" />
+        )}
+      </div>
+      {sessionName && (
+        <span className="max-w-[120px] truncate font-g text-[12px] text-g-ink-2">
+          {sessionName}
+        </span>
+      )}
+      <span className="mx-0.5 h-4 w-px bg-g-line" />
       <DropdownMenuPrimitive.Root>
         <DropdownMenuPrimitive.Trigger asChild>
           <IconButton

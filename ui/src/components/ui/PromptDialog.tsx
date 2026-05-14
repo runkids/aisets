@@ -23,6 +23,7 @@ type PromptDialogProps = {
   confirmText: string;
   cancelText: string;
   loading?: boolean;
+  allowUnchanged?: boolean;
 };
 
 function PromptDialogContent({
@@ -35,14 +36,18 @@ function PromptDialogContent({
   confirmText,
   cancelText,
   loading,
+  allowUnchanged,
 }: Omit<PromptDialogProps, "open"> & {
   defaultValue: string;
   loading: boolean;
+  allowUnchanged: boolean;
 }) {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit = value.trim().length > 0 && value.trim() !== defaultValue;
+  const canSubmit =
+    value.trim().length > 0 &&
+    (allowUnchanged || value.trim() !== defaultValue);
   const handleSubmit = () => {
     if (canSubmit) onConfirm(value.trim());
   };
@@ -120,6 +125,7 @@ export function PromptDialog({
   open,
   defaultValue = "",
   loading = false,
+  allowUnchanged = false,
   ...props
 }: PromptDialogProps) {
   if (!open) return null;
@@ -128,6 +134,7 @@ export function PromptDialog({
       key={defaultValue}
       defaultValue={defaultValue}
       loading={loading}
+      allowUnchanged={allowUnchanged}
       {...props}
     />
   );

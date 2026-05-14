@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   embeddingStats,
@@ -10,7 +11,12 @@ import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
 import { uploadCanvasImages } from "@/api/canvasChat";
 import { renderImageToolPreview } from "@/api/imageTools";
 import { useToast } from "@/components/shared/ToastProvider";
-import { ConfirmDialog } from "@/components/ui";
+import { ConfirmDialog, PromptDialog } from "@/components/ui";
+import { getCanvasSession } from "@/api";
+import {
+  useCreateCanvasSessionMutation,
+  useUpdateCanvasSessionMutation,
+} from "@/queries";
 import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
 import {
@@ -38,6 +44,7 @@ import {
   commentsForAssets,
   createCanvasCardId,
   emptyAICanvasSession,
+  normalizeAICanvasSession,
   readAICanvasSession,
   selectedAssetCards,
   writeAICanvasSession,
@@ -58,6 +65,7 @@ import { AICanvasCapturePreview, AICanvasDebugPanel } from "./AICanvasOverlays";
 import { AICanvasSearchPanel } from "./AICanvasSearchPanel";
 import { AICanvasStage } from "./AICanvasStage";
 import { AICanvasToolbar } from "./AICanvasToolbar";
+import { CanvasSessionsDialog } from "./CanvasSessionsDialog";
 import type { AIBackendOption, WorkingState } from "./aiCanvasTypes";
 
 const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
@@ -102,6 +110,8 @@ export function AICanvasView({
 }: Props) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSessionId = searchParams.get("session") ?? undefined;
   const initialSession = useMemo<AICanvasSession>(() => {
     if (typeof window === "undefined") return emptyAICanvasSession();
     return readAICanvasSession(window.sessionStorage);
@@ -186,6 +196,23 @@ export function AICanvasView({
   const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(
+    urlSessionId,
+  );
+  const [currentSessionName, setCurrentSessionName] = useState<
+    string | undefined
+  >();
+  const [isDirty, setIsDirty] = useState(false);
+  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
+  const [newCanvasConfirmOpen, setNewCanvasConfirmOpen] = useState(false);
+  const [saveNameDialogOpen, setSaveNameDialogOpen] = useState(false);
+  const [saveNameDefault, setSaveNameDefault] = useState("");
+  const [saveAsMode, setSaveAsMode] = useState(false);
+  const dirtyVersionRef = useRef(0);
+  const savedVersionRef = useRef(0);
+  const createSessionMut = useCreateCanvasSessionMutation();
+  const updateSessionMut = useUpdateCanvasSessionMutation();
+  const isSaving = createSessionMut.isPending || updateSessionMut.isPending;
   const lastToastedErrorRef = useRef("");
   const [composerHeight, setComposerHeight] = useState(() => {
     try {
@@ -257,6 +284,7 @@ export function AICanvasView({
     captureCanvas,
     captureSelected,
     captureCanvasForAI,
+    captureCanvasBlob,
     isCapturing,
     preview: capturePreview,
     dismissPreview: dismissCapturePreview,
@@ -584,7 +612,14 @@ export function AICanvasView({
       cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
       viewMode: hideNonImageCards ? "hidden" : undefined,
     });
-  }, [cards, selectedCardIds, viewport, chatHistory, cardWidths, hideNonImageCards]);
+  }, [
+    cards,
+    selectedCardIds,
+    viewport,
+    chatHistory,
+    cardWidths,
+    hideNonImageCards,
+  ]);
 
   useEffect(() => {
     try {
@@ -596,6 +631,55 @@ export function AICanvasView({
       // sessionStorage unavailable
     }
   }, [composerCollapsed]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (currentSessionId) {
+          next.set("session", currentSessionId);
+        } else {
+          next.delete("session");
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [currentSessionId, setSearchParams]);
+
+  useEffect(() => {
+    if (!urlSessionId) return;
+    let cancelled = false;
+    getCanvasSession(urlSessionId)
+      .then(({ session }) => {
+        if (cancelled) return;
+        const parsed = normalizeAICanvasSession(JSON.parse(session.stateJson));
+        suppressDirtyRef.current = true;
+        setCards(parsed.cards);
+        setSelectedCardIds(parsed.selectedCardIds ?? []);
+        setViewport(parsed.viewport);
+        setChatHistory(parsed.chatHistory ?? []);
+        setCardWidths(parsed.cardWidths ?? {});
+        setHideNonImageCards(parsed.viewMode === "hidden");
+        setCurrentSessionId(session.id);
+        setCurrentSessionName(session.name);
+        dirtyVersionRef.current = 0;
+        savedVersionRef.current = 0;
+        setIsDirty(false);
+        requestAnimationFrame(() => {
+          suppressDirtyRef.current = false;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          suppressDirtyRef.current = false;
+          toast.error(t("aiCanvas.saveError"));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     try {
@@ -637,6 +721,22 @@ export function AICanvasView({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [searchOpen]);
+
+  useEffect(() => {
+    function onSaveShortcut(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.shiftKey) {
+        handleSaveAsRef.current();
+      } else {
+        handleSaveRef.current();
+      }
+    }
+    window.addEventListener("keydown", onSaveShortcut, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onSaveShortcut, { capture: true });
+  }, []);
 
   useEffect(() => {
     function onCanvasSearchShortcut(e: KeyboardEvent) {
@@ -932,13 +1032,136 @@ export function AICanvasView({
     }
   }
 
-
   function clearCanvas() {
+    suppressDirtyRef.current = true;
     setCards([]);
     setSelectedCardIds([]);
     setChatHistory([]);
     setError("");
     setClearConfirmOpen(false);
+    setCurrentSessionId(undefined);
+    setCurrentSessionName(undefined);
+    setIsDirty(false);
+    dirtyVersionRef.current = 0;
+    savedVersionRef.current = 0;
+    requestAnimationFrame(() => {
+      suppressDirtyRef.current = false;
+    });
+  }
+
+  const suppressDirtyRef = useRef(!!urlSessionId);
+  useEffect(() => {
+    if (suppressDirtyRef.current) return;
+    dirtyVersionRef.current += 1;
+    setIsDirty(dirtyVersionRef.current !== savedVersionRef.current);
+  }, [cards, chatHistory, cardWidths, viewport]);
+
+  function autoSessionName() {
+    const firstAsset = cards.find((c) => c.kind === "asset");
+    if (firstAsset && firstAsset.kind === "asset") {
+      const name = fileName(firstAsset.asset.repoPath);
+      const extra = cards.length - 1;
+      return extra > 0 ? `${name} +${extra}` : name;
+    }
+    return `Canvas ${new Date().toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+  }
+
+  function buildStateJson(): string {
+    const session: AICanvasSession = {
+      version: 1,
+      cards,
+      selectedCardIds: selectedCardIds.length > 0 ? selectedCardIds : undefined,
+      viewport,
+      chatHistory: chatHistory.slice(-10),
+      cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
+      viewMode: viewMode !== "normal" ? viewMode : undefined,
+    };
+    return JSON.stringify(session);
+  }
+
+  async function doSave(name: string, asNew: boolean) {
+    const thumbnail = await captureCanvasBlob();
+    const stateJson = buildStateJson();
+    const cardCount = cards.length;
+
+    if (currentSessionId && !asNew) {
+      updateSessionMut.mutate(
+        { id: currentSessionId, name, stateJson, thumbnail, cardCount },
+        {
+          onSuccess: (res) => {
+            savedVersionRef.current = dirtyVersionRef.current;
+            setIsDirty(false);
+            setCurrentSessionName(res.session.name);
+            toast.success(t("aiCanvas.saveSuccess"));
+          },
+          onError: () => toast.error(t("aiCanvas.saveError")),
+        },
+      );
+    } else {
+      createSessionMut.mutate(
+        { name, stateJson, thumbnail, cardCount },
+        {
+          onSuccess: (res) => {
+            savedVersionRef.current = dirtyVersionRef.current;
+            setIsDirty(false);
+            setCurrentSessionId(res.session.id);
+            setCurrentSessionName(res.session.name);
+            toast.success(t("aiCanvas.saveSuccess"));
+          },
+          onError: () => toast.error(t("aiCanvas.saveError")),
+        },
+      );
+    }
+  }
+
+  function handleSave() {
+    if (cards.length === 0) return;
+    if (currentSessionId) {
+      void doSave(currentSessionName ?? autoSessionName(), false);
+    } else {
+      setSaveAsMode(false);
+      setSaveNameDefault(autoSessionName());
+      setSaveNameDialogOpen(true);
+    }
+  }
+
+  function handleSaveAs() {
+    if (cards.length === 0) return;
+    setSaveAsMode(true);
+    setSaveNameDefault(autoSessionName());
+    setSaveNameDialogOpen(true);
+  }
+
+  const handleSaveRef = useRef(handleSave);
+  const handleSaveAsRef = useRef(handleSaveAs);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+    handleSaveAsRef.current = handleSaveAs;
+  });
+
+  async function handleLoadSession(sessionId: string) {
+    setSessionsDialogOpen(false);
+    try {
+      const { session } = await getCanvasSession(sessionId);
+      const parsed = normalizeAICanvasSession(JSON.parse(session.stateJson));
+      suppressDirtyRef.current = true;
+      setCards(parsed.cards);
+      setSelectedCardIds(parsed.selectedCardIds ?? []);
+      setViewport(parsed.viewport);
+      setChatHistory(parsed.chatHistory ?? []);
+      setCardWidths(parsed.cardWidths ?? {});
+      setHideNonImageCards(parsed.viewMode === "hidden");
+      setCurrentSessionId(session.id);
+      setCurrentSessionName(session.name);
+      dirtyVersionRef.current = 0;
+      savedVersionRef.current = 0;
+      setIsDirty(false);
+      requestAnimationFrame(() => {
+        suppressDirtyRef.current = false;
+      });
+    } catch {
+      toast.error(t("aiCanvas.saveError"));
+    }
   }
 
   function clearChatHistory() {
@@ -1180,6 +1403,17 @@ export function AICanvasView({
         onClear={() => setClearConfirmOpen(true)}
         debugOpen={debugOpen}
         onToggleDebug={() => setDebugOpen((v) => !v)}
+        onSave={handleSave}
+        onOpenSessions={() => setSessionsDialogOpen(true)}
+        onNewCanvas={() => {
+          if (isDirty || cards.length > 0) {
+            setNewCanvasConfirmOpen(true);
+          }
+        }}
+        isSaving={isSaving}
+        isDirty={isDirty}
+        hasSession={!!currentSessionId}
+        sessionName={currentSessionName}
       />
 
       <ConfirmDialog
@@ -1191,6 +1425,46 @@ export function AICanvasView({
         confirmText={t("aiCanvas.clearConfirmAction")}
         cancelText={t("common.cancel")}
         variant="danger"
+      />
+
+      <ConfirmDialog
+        open={newCanvasConfirmOpen}
+        onConfirm={() => {
+          setNewCanvasConfirmOpen(false);
+          clearCanvas();
+        }}
+        onCancel={() => setNewCanvasConfirmOpen(false)}
+        title={t("aiCanvas.newCanvas")}
+        message={t("aiCanvas.newCanvasMessage")}
+        confirmText={t("aiCanvas.newCanvasConfirm")}
+        cancelText={t("common.cancel")}
+      />
+
+      <CanvasSessionsDialog
+        open={sessionsDialogOpen}
+        onClose={() => setSessionsDialogOpen(false)}
+        onLoad={(sessionId) => void handleLoadSession(sessionId)}
+        onSessionRenamed={(id, name) => {
+          if (id === currentSessionId) setCurrentSessionName(name);
+        }}
+        currentSessionId={currentSessionId}
+        t={t}
+      />
+
+      <PromptDialog
+        open={saveNameDialogOpen}
+        onConfirm={(name) => {
+          setSaveNameDialogOpen(false);
+          void doSave(name, saveAsMode);
+        }}
+        onCancel={() => setSaveNameDialogOpen(false)}
+        title={saveAsMode ? t("aiCanvas.saveAs") : t("aiCanvas.save")}
+        placeholder={t("aiCanvas.sessionNamePlaceholder")}
+        defaultValue={saveNameDefault}
+        confirmText={t("aiCanvas.save")}
+        cancelText={t("common.cancel")}
+        loading={isSaving}
+        allowUnchanged
       />
 
       <AICanvasComposer

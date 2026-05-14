@@ -786,7 +786,6 @@ export function AICanvasDebugPanel({
                 <DebugActionButton
                   label="Dump full state to console"
                   onClick={() => {
-                    // eslint-disable-next-line no-console
                     console.log("[Canvas Debug]", sessionDebug);
                   }}
                 />
