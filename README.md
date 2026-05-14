@@ -32,6 +32,10 @@
   <a href="#development">Development</a>
 </p>
 
+> [!IMPORTANT]
+> This project is in active development. Expect breaking changes with new releases.
+> Please review the [release changelog](https://github.com/runkids/aisets/releases) before updating.
+
 ## Why Aisets
 
 Every codebase accumulates image debt: duplicates nobody notices, 4 MB PNGs that should be AVIF, unused assets that survive every refactor, inconsistent naming that breaks imports. Manual cleanup doesn't scale.
