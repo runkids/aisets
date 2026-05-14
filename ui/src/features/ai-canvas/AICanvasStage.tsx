@@ -68,6 +68,7 @@ type AICanvasStageProps = {
     x: number;
     y: number;
     label?: string;
+    emoji?: string;
     status: "thinking" | "acting" | "idle";
   };
   aiNickname?: string;
@@ -355,6 +356,7 @@ export function AICanvasStage({
             <AICursor
               position={{ x: aiCursor.x, y: aiCursor.y }}
               label={aiCursor.label}
+              emoji={aiCursor.emoji}
               status={aiCursor.status}
               nickname={aiNickname}
               greeting={aiGreeting}

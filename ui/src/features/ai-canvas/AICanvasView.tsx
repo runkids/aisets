@@ -165,6 +165,7 @@ export function AICanvasView({
     x: number;
     y: number;
     label?: string;
+    emoji?: string;
     status: "thinking" | "acting" | "idle";
   }>(() => {
     const v = initialSession.viewport;

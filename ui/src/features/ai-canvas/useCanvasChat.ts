@@ -33,6 +33,7 @@ type AICursorState = {
   x: number;
   y: number;
   label?: string;
+  emoji?: string;
   status: "thinking" | "acting" | "idle";
 };
 
@@ -372,6 +373,7 @@ export function useCanvasChat(opts: {
           x: card.x + fromWidth,
           y: card.y + height,
           label: t("aiCanvas.resizingCard"),
+          emoji: "move",
           status: "acting",
         });
         for (let i = 1; i <= steps; i++) {
@@ -387,6 +389,7 @@ export function useCanvasChat(opts: {
               x: card.x + nextWidth,
               y: card.y + height,
               label: t("aiCanvas.resizingCard"),
+              emoji: "move",
               status: "acting",
             });
           }, i * stepMs);
@@ -413,6 +416,7 @@ export function useCanvasChat(opts: {
           x: from.x + cardWidth / 2,
           y: from.y + 18,
           label: t("aiCanvas.draggingCard"),
+          emoji: "move",
           status: "acting",
         });
         setDragPreview({ cardId, x: from.x, y: from.y });
@@ -431,6 +435,7 @@ export function useCanvasChat(opts: {
               x: next.x + cardWidth / 2,
               y: next.y + 18,
               label: t("aiCanvas.draggingCard"),
+              emoji: "move",
               status: "acting",
             });
             setDragPreview({ cardId, x: next.x, y: next.y });
@@ -515,6 +520,7 @@ export function useCanvasChat(opts: {
         label:
           (result as { label?: string }).label ||
           t("aiCanvas.duplicatedImages", { count: created.length }),
+        emoji: "duplicate",
         status: "acting",
       });
     }
@@ -631,6 +637,7 @@ export function useCanvasChat(opts: {
           setAiCursor({
             ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
             label: event.label,
+            emoji: "select",
             status: "acting",
           });
         }
@@ -701,6 +708,7 @@ export function useCanvasChat(opts: {
               label:
                 result.label ??
                 t("aiCanvas.selectedAssets", { count: ids.length }),
+              emoji: "select",
               status: "acting",
             });
           }
@@ -729,6 +737,7 @@ export function useCanvasChat(opts: {
               label:
                 result.label ??
                 t("aiCanvas.removedCards", { count: ids.length }),
+              emoji: "remove",
               status: "acting",
             });
           }
@@ -745,6 +754,7 @@ export function useCanvasChat(opts: {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label: result.label,
+              emoji: "select",
               status: "acting",
             });
           }
@@ -777,6 +787,14 @@ export function useCanvasChat(opts: {
           };
           newCards.push(card);
           setCards((current) => [...current, card]);
+          if (anchor) {
+            setAiCursor({
+              ...focusCursorPosition(anchor, cardLayoutMetrics, viewport.scale),
+              label: t("aiCanvas.addedComment"),
+              emoji: "comment",
+              status: "acting",
+            });
+          }
         }
       }
       if (event.type === "action_result" && event.tool === "update_comment") {
@@ -846,6 +864,7 @@ export function useCanvasChat(opts: {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
               label: r.label || t("aiCanvas.layerChanged"),
+              emoji: "layer",
               status: "acting",
             });
           }

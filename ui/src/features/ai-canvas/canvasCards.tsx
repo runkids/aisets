@@ -11,6 +11,9 @@ import {
   LoaderCircle,
   MessageCircle,
   MousePointer2,
+  Move,
+  Plus,
+  Search,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -1374,9 +1377,42 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   );
 }
 
+const CURSOR_EMOJI_MAP: Record<
+  string,
+  { icon: typeof Sparkles; anim: string }
+> = {
+  search: {
+    icon: Search,
+    anim: "animate-[cursorFloat_1.2s_ease-in-out_infinite]",
+  },
+  move: { icon: Move, anim: "animate-[cursorFloat_1s_ease-in-out_infinite]" },
+  create: { icon: Plus, anim: "animate-[cursorFloat_1s_ease-in-out_infinite]" },
+  remove: {
+    icon: Trash2,
+    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
+  },
+  comment: {
+    icon: MessageCircle,
+    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
+  },
+  select: {
+    icon: MousePointer2,
+    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
+  },
+  layer: {
+    icon: Layers3,
+    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
+  },
+  duplicate: {
+    icon: Copy,
+    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
+  },
+};
+
 export function AICursor({
   position,
   label,
+  emoji,
   status,
   nickname,
   greeting,
@@ -1384,6 +1420,7 @@ export function AICursor({
 }: {
   position: { x: number; y: number };
   label?: string;
+  emoji?: string;
   status?: "thinking" | "acting" | "idle";
   nickname?: string;
   greeting?: string;
@@ -1399,6 +1436,55 @@ export function AICursor({
   }, [greeting]);
   const showGreeting = Boolean(greeting) && dismissedGreeting !== greeting;
   const showLabel = active || showGreeting;
+
+  const mapped = emoji ? CURSOR_EMOJI_MAP[emoji] : undefined;
+
+  function renderIcon() {
+    if (showGreeting) {
+      return (
+        <span
+          className="inline-block text-[22px] leading-none drop-shadow-md animate-[wave_800ms_ease-in-out_2]"
+          style={{ transformOrigin: "70% 70%" }}
+        >
+          👋
+        </span>
+      );
+    }
+    if (status === "thinking") {
+      return (
+        <div className="flex h-7 w-7 items-center justify-center gap-[3px] rounded-full bg-g-purple/15">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="block h-[5px] w-[5px] rounded-full bg-g-purple animate-[cursorDot_1.2s_ease-in-out_infinite]"
+              style={{ animationDelay: `${i * 160}ms` }}
+            />
+          ))}
+        </div>
+      );
+    }
+    if (active && mapped) {
+      const Icon = mapped.icon;
+      return (
+        <div
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full bg-g-purple/15",
+            mapped.anim,
+          )}
+        >
+          <Icon size={15} strokeWidth={1.8} className="text-g-purple" />
+        </div>
+      );
+    }
+    return (
+      <MousePointer2
+        size={22}
+        strokeWidth={2.5}
+        className="fill-g-purple/60 text-g-purple/70 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-all duration-500"
+      />
+    );
+  }
+
   return (
     <div
       className="pointer-events-none absolute z-[1400] transition-[transform] duration-[620ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -1412,39 +1498,8 @@ export function AICursor({
           "flex flex-col items-start",
           showGreeting && "animate-[cursorBounce_600ms_ease-in-out]",
         )}
-        style={
-          showGreeting
-            ? ({
-                "--bounce-1": "-12px",
-                "--bounce-2": "4px",
-                "--bounce-3": "-6px",
-                "--bounce-4": "2px",
-              } as React.CSSProperties)
-            : undefined
-        }
       >
-        {showGreeting ? (
-          <span
-            className="inline-block text-[22px] leading-none drop-shadow-md animate-[wave_800ms_ease-in-out_2]"
-            style={{ transformOrigin: "70% 70%" }}
-          >
-            👋
-          </span>
-        ) : status === "thinking" ? (
-          <span className="inline-block text-[18px] leading-none drop-shadow-md animate-[cursorFloat_1.2s_ease-in-out_infinite]">
-            🤔
-          </span>
-        ) : status === "acting" ? (
-          <span className="inline-block text-[18px] leading-none drop-shadow-md animate-[cursorWrite_600ms_ease-in-out_infinite]">
-            ✍️
-          </span>
-        ) : (
-          <MousePointer2
-            size={22}
-            strokeWidth={2.5}
-            className="drop-shadow-md transition-all duration-500 fill-g-purple/60 text-white/70"
-          />
-        )}
+        {renderIcon()}
         <div
           className={cn(
             "-mt-1 ml-3 flex items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-all duration-500",

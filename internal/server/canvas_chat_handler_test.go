@@ -252,6 +252,19 @@ func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testi
 	}
 }
 
+func TestCanvasUserAsksAnnotation(t *testing.T) {
+	for _, msg := range []string{"幫我圈出牙齒", "在這張圖加註解", "highlight the low contrast area"} {
+		if !canvasUserAsksAnnotation(msg) {
+			t.Fatalf("expected annotation request: %q", msg)
+		}
+	}
+	for _, msg := range []string{"放大我看不清楚他的牙齒", "有蛀牙嗎", "這是啥"} {
+		if canvasUserAsksAnnotation(msg) {
+			t.Fatalf("should not be annotation request: %q", msg)
+		}
+	}
+}
+
 func TestCanvasImageTempFile_DecodesDataURI(t *testing.T) {
 	path, cleanup, err := canvasImageTempFile("data:image/png;base64,AQID")
 	if err != nil {
@@ -583,6 +596,18 @@ func TestCanvasActionsFromToolCallsNestedActionEnvelope(t *testing.T) {
 	}
 }
 
+func TestCanvasActionsOnlyFocus(t *testing.T) {
+	if canvasActionsOnlyFocus(nil) {
+		t.Fatal("empty actions should not be focus-only")
+	}
+	if !canvasActionsOnlyFocus([]canvasAction{{Tool: "focus_card"}}) {
+		t.Fatal("single focus_card should be focus-only")
+	}
+	if canvasActionsOnlyFocus([]canvasAction{{Tool: "focus_card"}, {Tool: "search_assets"}}) {
+		t.Fatal("mixed actions should not be focus-only")
+	}
+}
+
 func TestParseCanvasActions_JSONFenceArray(t *testing.T) {
 	input := "I will inspect the current canvas.\n```json\n[\n  {\"tool\":\"focus_card\",\"params\":{\"cardId\":\"copy-1\",\"label\":\"target\"}},\n  {\"tool\":\"find_similar_assets\",\"params\":{\"assetIds\":[\"386481964017\"],\"limit\":5}}\n]\n```"
 	text, actions := parseCanvasActions(input)
@@ -622,6 +647,31 @@ func TestParseCanvasActions_PlainToolNameCallFormat(t *testing.T) {
 	}
 	if actions[0].Params["label"] != "book_zukan_body.png (第一個圖卡)" {
 		t.Fatalf("label = %#v", actions[0].Params["label"])
+	}
+}
+
+func TestParseCanvasActions_PlainToolNameCallConsumesTrailingMetadata(t *testing.T) {
+	input := `call:focus_card{cardId:<|"|>asset-1<|"|>,label:<|"|>target<|"|>}, "description": "將游標移動到圖片上。", "impact": "視覺焦點轉移到指定圖片卡片。"`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected no leaked metadata text, got %q", text)
+	}
+	if len(actions) != 1 || actions[0].Tool != "focus_card" {
+		t.Fatalf("actions = %#v", actions)
+	}
+	if actions[0].Params["cardId"] != "asset-1" {
+		t.Fatalf("params = %#v", actions[0].Params)
+	}
+}
+
+func TestParseCanvasActions_PlainToolNameCallConsumesSentinelMetadata(t *testing.T) {
+	input := `call:create_comment{anchorCardId:<|"|>asset-1<|"|>,text:<|"|>note<|"|>},description:<|"|>註解圖片<|"|>,impact:<|"|>新增註解<|"|>`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected no leaked metadata text, got %q", text)
+	}
+	if len(actions) != 1 || actions[0].Tool != "create_comment" {
+		t.Fatalf("actions = %#v", actions)
 	}
 }
 

@@ -175,6 +175,7 @@
     "draggingCard": "Dragging card",
     "resizingCard": "Resizing card",
     "layerChanged": "Changed layer",
+    "addedComment": "Added comment",
     "proposalTags": "Tags",
     "proposalDescription": "Description",
     "proposalTool": {

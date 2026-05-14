@@ -175,6 +175,7 @@
     "draggingCard": "拖移卡片",
     "resizingCard": "縮放卡片",
     "layerChanged": "調整圖層",
+    "addedComment": "已新增註解",
     "proposalTags": "標籤",
     "proposalDescription": "描述",
     "proposalTool": {

@@ -244,8 +244,9 @@ func findLooseQuotedCanvasCallSpans(content string) []canvasActionSpan {
 			continue
 		}
 		payload, _ := json.Marshal(canvasAction{Tool: toolName, Params: params})
-		spans = append(spans, canvasActionSpan{start: start, end: jsonEnd, json: string(payload)})
-		searchStart = jsonEnd
+		end := extendCanvasActionMetadataEnd(content, jsonEnd)
+		spans = append(spans, canvasActionSpan{start: start, end: end, json: string(payload)})
+		searchStart = end
 	}
 	return spans
 }
@@ -315,10 +316,106 @@ func findPlainCanvasCallSpans(content string) []canvasActionSpan {
 				jsonBody = string(payload)
 			}
 		}
+		end = extendCanvasActionMetadataEnd(content, end)
 		spans = append(spans, canvasActionSpan{start: start, end: end, json: jsonBody})
 		searchStart = end
 	}
 	return spans
+}
+
+func extendCanvasActionMetadataEnd(content string, end int) int {
+	extended := end
+	for {
+		next, ok := canvasActionMetadataPairEnd(content, extended)
+		if !ok {
+			return extended
+		}
+		extended = next
+	}
+}
+
+func canvasActionMetadataPairEnd(content string, start int) (int, bool) {
+	pos := start
+	for pos < len(content) && strings.ContainsRune(" \n\r\t", rune(content[pos])) {
+		pos++
+	}
+	if pos >= len(content) || content[pos] != ',' {
+		return start, false
+	}
+	pos++
+	for pos < len(content) && strings.ContainsRune(" \n\r\t", rune(content[pos])) {
+		pos++
+	}
+	keyStart := pos
+	if pos < len(content) && content[pos] == '"' {
+		pos++
+		keyStart = pos
+		for pos < len(content) && content[pos] != '"' {
+			pos++
+		}
+		if pos >= len(content) {
+			return start, false
+		}
+	} else {
+		for pos < len(content) && isCanvasCallIdentChar(content[pos]) {
+			pos++
+		}
+	}
+	key := content[keyStart:pos]
+	if pos < len(content) && content[pos] == '"' {
+		pos++
+	}
+	if key != "description" && key != "impact" {
+		return start, false
+	}
+	for pos < len(content) && strings.ContainsRune(" \n\r\t", rune(content[pos])) {
+		pos++
+	}
+	if pos >= len(content) || content[pos] != ':' {
+		return start, false
+	}
+	pos++
+	for pos < len(content) && strings.ContainsRune(" \n\r\t", rune(content[pos])) {
+		pos++
+	}
+	valueEnd := canvasActionMetadataValueEnd(content, pos)
+	if valueEnd < 0 {
+		return start, false
+	}
+	return valueEnd, true
+}
+
+func canvasActionMetadataValueEnd(content string, start int) int {
+	if strings.HasPrefix(content[start:], `<|"|>`) || strings.HasPrefix(content[start:], `<|“|>`) || strings.HasPrefix(content[start:], `<|”|>`) {
+		quoteEnd := strings.Index(content[start+5:], "<|")
+		if quoteEnd < 0 {
+			return -1
+		}
+		return start + 5 + quoteEnd + len(`<|"|>`)
+	}
+	if start >= len(content) {
+		return -1
+	}
+	switch content[start] {
+	case '"':
+		escaped := false
+		for i := start + 1; i < len(content); i++ {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if content[i] == '\\' {
+				escaped = true
+				continue
+			}
+			if content[i] == '"' {
+				return i + 1
+			}
+		}
+	case '{':
+		return balancedJSONObjectEnd(content, start)
+	}
+	return -1
 }
 
 func findBareCanvasCallSpans(content string) []canvasActionSpan {
@@ -482,6 +579,18 @@ func canvasActionsFromToolCalls(calls []llm.ChatToolCall) []canvasAction {
 		})
 	}
 	return actions
+}
+
+func canvasActionsOnlyFocus(actions []canvasAction) bool {
+	if len(actions) == 0 {
+		return false
+	}
+	for _, act := range actions {
+		if act.Tool != "focus_card" {
+			return false
+		}
+	}
+	return true
 }
 
 func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
@@ -715,6 +824,13 @@ func canvasUserAsksOptimizationReview(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
 		"issue", "problem", "quality", "review", "audit", "delivery", "performance", "file size", "too large",
 		"問題", "品质", "品質", "檢查", "检查", "看看有沒有問題", "看看有没有问题", "載入", "加载", "速度", "太大", "檔案太大", "文件太大",
+	)
+}
+
+func canvasUserAsksAnnotation(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"annotate", "annotation", "comment", "add a note", "leave a note", "mark", "mark up", "circle", "highlight", "pin",
+		"註解", "注解", "留言", "加註", "加注", "標註", "标注", "標記", "标记", "圈出", "圈起來", "圈起来", "指出來", "指出来", "高亮",
 	)
 }
 
@@ -1259,6 +1375,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		var toolResults []string
 		captureExecutedThisLoop := false
 		nonFocusToolExecutedThisLoop := false
+		blockedCommentNeedsAnswer := false
 		for _, act := range actions {
 			if act.Tool == "focus_card" {
 				sendNDJSON(w, map[string]any{
@@ -1267,6 +1384,10 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"label":  act.Params["label"],
 				})
 				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+			if act.Tool == "create_comment" && !canvasUserAsksAnnotation(latestUserMessage) {
+				blockedCommentNeedsAnswer = true
 				continue
 			}
 			if canvasToolSafe(act.Tool) {
@@ -1330,7 +1451,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if captureExecutedThisLoop && !truncatedAction {
 			break
 		}
-		if len(toolResults) == 0 && !missingCapture && !truncatedAction {
+		focusOnlyNeedsAnswer := canvasActionsOnlyFocus(actions) && textBody == "" && loop < maxToolLoops-1
+		if len(toolResults) == 0 && !missingCapture && !truncatedAction && !focusOnlyNeedsAnswer && !blockedCommentNeedsAnswer {
 			break
 		}
 		images = nil
@@ -1342,6 +1464,10 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			currentPrompt += "\n\n## Required Follow-up\nYour previous action block was truncated before the JSON finished. Reply with ONLY complete action blocks in ```action fences. Do not include explanatory prose. If arranging many cards, include all positions in one compact arrange_cards JSON object."
 		} else if missingCapture {
 			currentPrompt += "\n\n## Required Follow-up\n" + canvasCaptureRepairPrompt(latestUserMessage)
+		} else if focusOnlyNeedsAnswer {
+			currentPrompt += "\n\n## Required Follow-up\nYour previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
+		} else if blockedCommentNeedsAnswer {
+			currentPrompt += "\n\n## Required Follow-up\nYour previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
 		} else {
 			currentPrompt += "\n\nContinue acting on these results. Use the data above to fulfill the user's original request. Remember: EVERY response must include at least one action block."
 		}
