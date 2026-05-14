@@ -78,7 +78,7 @@ export function AICanvasToolbar({
   return (
     <div
       data-ai-canvas-overlay="true"
-      className="pointer-events-auto absolute right-3 top-3 z-50 flex items-center gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl"
+      className="pointer-events-auto absolute right-3 top-3 z-50 flex items-center gap-1 rounded-g-lg border border-transparent bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
     >
       {onExitCanvas && (
         <Button

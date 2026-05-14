@@ -97,7 +97,7 @@ export function AICanvasSearchPanel({
         data-ai-canvas-overlay="true"
         type="button"
         aria-label={t("aiCanvas.openSearch")}
-        className="pointer-events-auto absolute left-[130px] top-3 z-50 inline-flex h-[44px] w-[44px] items-center justify-center rounded-g-lg bg-g-surface/75 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus motion-reduce:animate-none"
+        className="pointer-events-auto absolute left-[130px] top-3 z-50 inline-flex h-[44px] w-[44px] items-center justify-center rounded-g-lg border border-transparent bg-g-surface/75 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80 [[data-theme='dark']_&]:hover:bg-g-surface-3"
         onClick={() => setOpen(true)}
       >
         <Search size={20} className="text-g-ink-2" />
@@ -108,7 +108,7 @@ export function AICanvasSearchPanel({
   return (
     <aside
       data-ai-canvas-overlay="true"
-      className="pointer-events-auto absolute left-[130px] top-3 z-50 flex w-[min(480px,calc(100%-142px))] origin-top-left flex-col gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none"
+      className="pointer-events-auto absolute left-[130px] top-3 z-50 flex w-[min(480px,calc(100%-142px))] origin-top-left flex-col gap-1 rounded-g-lg border border-transparent bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
     >
       <form
         className="flex items-center gap-1.5"
