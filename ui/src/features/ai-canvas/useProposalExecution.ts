@@ -41,19 +41,38 @@ export function useProposalExecution(opts: {
     return undefined;
   }
 
+  function proposalTargetRefs(card: ProposalCanvasCard) {
+    const refs: string[] = [];
+    const seen = new Set<string>();
+    const add = (value: unknown) => {
+      if (typeof value !== "string" || !value.trim() || seen.has(value)) return;
+      seen.add(value);
+      refs.push(value);
+    };
+    if (Array.isArray(card.sourceAssetIds)) {
+      for (const id of card.sourceAssetIds) add(id);
+    }
+    const paramAssetIds = card.params.assetIds;
+    if (Array.isArray(paramAssetIds)) {
+      for (const id of paramAssetIds) add(id);
+    }
+    add(card.sourceAssetId);
+    add(card.params.assetId);
+    return refs;
+  }
+
   function handleApproveProposal(card: ProposalCanvasCard) {
-    const targetRef =
-      card.sourceAssetId || (card.params.assetId as string) || "";
-    const resolvedId = resolveAssetId(targetRef);
-    const assetStillOnCanvas = !targetRef || resolvedId;
-    if (!assetStillOnCanvas) {
+    const targetRefs = proposalTargetRefs(card);
+    const resolvedIds = targetRefs.map((ref) => resolveAssetId(ref));
+    const missing = targetRefs.filter((_, index) => !resolvedIds[index]);
+    if (missing.length > 0) {
       updateProposalStatus(card.proposalId, "failed", {
         error: t("aiCanvas.assetRemovedError"),
       });
       return;
     }
     updateProposalStatus(card.proposalId, "executing");
-    void executeProposal(card, resolvedId || targetRef);
+    void executeProposalBatch(card, resolvedIds.filter(Boolean) as string[]);
   }
 
   function findAssetData(ref: string) {
@@ -64,13 +83,90 @@ export function useProposalExecution(opts: {
     return undefined;
   }
 
+  function perAssetText(
+    params: Record<string, unknown>,
+    assetId: string,
+    field: string,
+    perAssetField: string,
+  ) {
+    const rows = params[perAssetField];
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        if (!row || typeof row !== "object") continue;
+        const record = row as Record<string, unknown>;
+        if (record.assetId === assetId && typeof record[field] === "string") {
+          return record[field] as string;
+        }
+      }
+    }
+    return typeof params[field] === "string" ? (params[field] as string) : "";
+  }
+
+  async function executeProposalBatch(
+    proposal: ProposalCanvasCard,
+    assetIds: string[],
+  ) {
+    if (assetIds.length <= 1) {
+      await executeProposal(proposal, assetIds[0] || "");
+      return;
+    }
+    const itemStatuses: Array<{
+      assetId: string;
+      repoPath?: string;
+      status: "completed" | "failed";
+      error?: string;
+    }> = [];
+    for (const assetId of assetIds) {
+      const asset = findAssetData(assetId);
+      try {
+        await executeProposal(proposal, assetId, false);
+        itemStatuses.push({
+          assetId,
+          repoPath: asset?.repoPath,
+          status: "completed",
+        });
+      } catch (err) {
+        itemStatuses.push({
+          assetId,
+          repoPath: asset?.repoPath,
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+    const failed = itemStatuses.filter((item) => item.status === "failed");
+    updateProposalStatus(
+      proposal.proposalId,
+      failed.length ? "failed" : "completed",
+      {
+        result: {
+          count: itemStatuses.length,
+          completed: itemStatuses.length - failed.length,
+          failed: failed.length,
+          itemStatuses,
+        },
+        error: failed.length
+          ? t("aiCanvas.batchPartialFailure", { count: failed.length })
+          : undefined,
+      },
+    );
+  }
+
   async function executeProposal(
     proposal: ProposalCanvasCard,
     assetId: string,
+    updateStatus = true,
   ) {
     try {
       const p = proposal.params;
       const asset = findAssetData(assetId);
+
+      const complete = (result?: unknown) => {
+        if (updateStatus) {
+          updateProposalStatus(proposal.proposalId, "completed", { result });
+        }
+        return result;
+      };
 
       switch (proposal.tool) {
         case "compress_image":
@@ -98,16 +194,14 @@ export function useProposalExecution(opts: {
             outputFormat: result.outputFormat,
           };
           setCards((current) => [...current, variantCard]);
-          updateProposalStatus(proposal.proposalId, "completed", {
-            result: {
-              token: result.token,
-              inputBytes: result.inputBytes,
-              outputBytes: result.outputBytes,
-            },
+          return complete({
+            token: result.token,
+            inputBytes: result.inputBytes,
+            outputBytes: result.outputBytes,
           });
-          break;
         }
-        case "update_tags": {
+        case "update_tags":
+        case "batch_update_tags": {
           if (!asset) throw new Error("Asset not found on canvas");
           const tags = Array.isArray(p.tags)
             ? p.tags.filter((t): t is string => typeof t === "string")
@@ -130,12 +224,16 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "update_description": {
           if (!asset) throw new Error("Asset not found on canvas");
-          const desc = (p.description as string) || "";
+          const desc = perAssetText(
+            p,
+            assetId,
+            "description",
+            "perAssetDescriptions",
+          );
           await request("/api/assets/description", {
             method: "POST",
             body: JSON.stringify({
@@ -154,12 +252,11 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "update_ocr_text": {
           if (!asset) throw new Error("Asset not found on canvas");
-          const text = (p.text as string) || "";
+          const text = perAssetText(p, assetId, "text", "perAssetTexts");
           await request("/api/assets/ocr-text", {
             method: "POST",
             body: JSON.stringify({
@@ -178,8 +275,7 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "rename_asset": {
           if (!asset) throw new Error("Asset not found on canvas");
@@ -212,8 +308,7 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "move_asset": {
           if (!asset) throw new Error("Asset not found on canvas");
@@ -241,12 +336,15 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "copy_asset": {
           if (!asset) throw new Error("Asset not found on canvas");
-          const destPath = (p.destPath as string) || "";
+          const destDir = (p.destDir as string) || "";
+          const fname = asset.repoPath.split("/").pop() || "";
+          const destPath =
+            (p.destPath as string) ||
+            (destDir ? destDir.replace(/\/$/, "") + "/" + fname : "");
           await request("/api/actions/batch/copy", {
             method: "POST",
             body: JSON.stringify({
@@ -261,8 +359,7 @@ export function useProposalExecution(opts: {
             }),
             headers: { "content-type": "application/json" },
           });
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "delete_asset": {
           if (!asset) throw new Error("Asset not found on canvas");
@@ -284,10 +381,10 @@ export function useProposalExecution(opts: {
               (c) => !(c.kind === "asset" && c.asset.id === assetId),
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
-        case "favorite_asset": {
+        case "favorite_asset":
+        case "batch_favorite_assets": {
           if (!asset) throw new Error("Asset not found on canvas");
           const fav = p.favorite !== false;
           await request(
@@ -304,8 +401,7 @@ export function useProposalExecution(opts: {
                 : c,
             ),
           );
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         case "export_asset": {
           if (!asset) throw new Error("Asset not found on canvas");
@@ -324,13 +420,13 @@ export function useProposalExecution(opts: {
             }),
             headers: { "content-type": "application/json" },
           });
-          updateProposalStatus(proposal.proposalId, "completed");
-          break;
+          return complete();
         }
         default:
-          updateProposalStatus(proposal.proposalId, "completed");
+          return complete();
       }
     } catch (err) {
+      if (!updateStatus) throw err;
       updateProposalStatus(proposal.proposalId, "failed", {
         error: err instanceof Error ? err.message : "Unknown error",
       });

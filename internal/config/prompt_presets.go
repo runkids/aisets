@@ -149,6 +149,15 @@ func defaultPromptPresets(now string) []PromptPreset {
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
+		{
+			ID:        "canvas-built-in-default",
+			Type:      "canvas",
+			Name:      "Built-in Default",
+			Content:   PromptPresetContent{Template: DefaultCanvasPrompt(), Variables: map[string]PromptVariable{}},
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
 	}
 }
 
@@ -193,8 +202,8 @@ func (s *Store) CreatePromptPreset(p PromptPreset) (PromptPreset, error) {
 	if p.Name == "" {
 		return PromptPreset{}, fmt.Errorf("preset name is required")
 	}
-	if p.Type != "tag" && p.Type != "ocr" && p.Type != "optimize" && p.Type != "duplicate" && p.Type != "system" && p.Type != "precheck" {
-		return PromptPreset{}, fmt.Errorf("preset type must be 'tag', 'ocr', 'optimize', 'duplicate', 'system', or 'precheck'")
+	if p.Type != "tag" && p.Type != "ocr" && p.Type != "optimize" && p.Type != "duplicate" && p.Type != "system" && p.Type != "precheck" && p.Type != "canvas" {
+		return PromptPreset{}, fmt.Errorf("preset type must be 'tag', 'ocr', 'optimize', 'duplicate', 'system', 'precheck', or 'canvas'")
 	}
 
 	p.ID = uuid.NewString()

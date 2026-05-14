@@ -23,6 +23,7 @@ export type CanvasChatEvent =
       description: string;
       impact: string;
       targetAssetId?: string;
+      targetAssetIds?: string[];
     }
   | {
       type: "done";
@@ -119,6 +120,8 @@ export function serializeCanvasSnapshot(
         base.tool = card.tool;
         base.status = card.status;
         base.description = card.description;
+        base.sourceAssetId = card.sourceAssetId;
+        base.sourceAssetIds = card.sourceAssetIds;
       }
       if (card.kind === "upload") {
         base.uploadToken = card.token;

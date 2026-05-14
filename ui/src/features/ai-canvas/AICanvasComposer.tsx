@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Paperclip,
   Plus,
+  ScanText,
   Square,
   Trash2,
   WandSparkles,
@@ -67,6 +68,9 @@ type AICanvasComposerProps = {
   setImageOptimizationAdvice: StateSetter<boolean>;
   mentionSelectedAsset: () => void;
   handleAttachImage: () => void;
+  handleExtractText: () => void | Promise<void>;
+  extractTextTargetCount: number;
+  extractTextDisabled: boolean;
   commentMode: boolean;
   setCommentMode: StateSetter<boolean>;
   addAssistantCard: (promptText: string, message?: string) => void;
@@ -110,6 +114,9 @@ export function AICanvasComposer({
   setImageOptimizationAdvice,
   mentionSelectedAsset,
   handleAttachImage,
+  handleExtractText,
+  extractTextTargetCount,
+  extractTextDisabled,
   commentMode,
   setCommentMode,
   addAssistantCard,
@@ -513,16 +520,66 @@ export function AICanvasComposer({
                     <Paperclip size={14} className="shrink-0 text-white/54" />
                     <span>{t("aiCanvas.attachImage")}</span>
                   </DropdownMenuPrimitive.Item>
-                  <div className="flex min-h-12 items-center gap-3 rounded-[12px] px-3 py-2 font-g text-white outline-none transition-colors duration-[120ms] ease-g hover:bg-white/[0.06]">
+                  <DropdownMenuPrimitive.Item
+                    disabled={extractTextDisabled || isWorking}
+                    title={
+                      extractTextDisabled
+                        ? t("aiCanvas.extractTextDisabled")
+                        : undefined
+                    }
+                    onSelect={(event) => {
+                      if (extractTextDisabled || isWorking) {
+                        event.preventDefault();
+                        return;
+                      }
+                      void handleExtractText();
+                    }}
+                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
+                  >
+                    <ScanText size={14} className="shrink-0 text-white/54" />
+                    <span className="min-w-0 flex-1">
+                      {t("aiCanvas.extractText")}
+                    </span>
+                    {extractTextTargetCount > 0 && (
+                      <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-g-mono text-[10px] text-white/50">
+                        {extractTextTargetCount}
+                      </span>
+                    )}
+                  </DropdownMenuPrimitive.Item>
+                  <div
+                    className={cn(
+                      "flex min-h-12 items-center gap-3 rounded-[12px] px-3 py-2 font-g text-white outline-none transition-[background,box-shadow] duration-[120ms] ease-g",
+                      imageOptimizationAdvice
+                        ? "bg-[color-mix(in_srgb,var(--g-amber)_16%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-amber)_34%,transparent)] hover:bg-[color-mix(in_srgb,var(--g-amber)_22%,transparent)]"
+                        : "hover:bg-white/[0.06]",
+                    )}
+                  >
                     <WandSparkles
                       size={14}
-                      className="shrink-0 text-white/54"
+                      className={cn(
+                        "shrink-0",
+                        imageOptimizationAdvice
+                          ? "text-g-amber"
+                          : "text-white/54",
+                      )}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-g-ui font-[510]">
+                      <div
+                        className={cn(
+                          "text-g-ui font-[510]",
+                          imageOptimizationAdvice && "text-g-amber",
+                        )}
+                      >
                         {t("aiCanvas.imageOptimizationAdvice")}
                       </div>
-                      <div className="mt-0.5 text-g-caption text-white/42">
+                      <div
+                        className={cn(
+                          "mt-0.5 text-g-caption",
+                          imageOptimizationAdvice
+                            ? "text-white/60"
+                            : "text-white/42",
+                        )}
+                      >
                         {t("aiCanvas.imageOptimizationAdviceDesc")}
                       </div>
                     </div>
@@ -530,7 +587,7 @@ export function AICanvasComposer({
                       checked={imageOptimizationAdvice}
                       onCheckedChange={setImageOptimizationAdvice}
                       aria-label={t("aiCanvas.imageOptimizationAdvice")}
-                      className="data-[state=checked]:!bg-g-amber-soft"
+                      className="data-[state=checked]:!bg-[color-mix(in_srgb,var(--g-amber)_72%,var(--g-surface-3))]"
                     />
                   </div>
                   <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.1]" />

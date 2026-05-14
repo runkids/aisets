@@ -11,6 +11,7 @@ type canvasToolDef struct {
 	Name        string
 	Description string
 	Params      string
+	Cardinality string
 	Safe        bool
 }
 
@@ -20,156 +21,273 @@ func canvasToolRegistry() []canvasToolDef {
 			Name:        "focus_card",
 			Description: "Move your cursor to a card on the canvas. Use before examining or modifying an asset.",
 			Params:      `{"cardId": "string (required)", "label": "string — brief description of what you're looking at"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "search_assets",
-			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Use this to find assets even when the canvas is empty.",
+			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Returns full AssetItem objects that can be added directly to the canvas.",
 			Params:      `{"q": "string — search query (e.g. 'book', 'icon', '貓')", "limit": "int — max results, default 12"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "add_assets_to_canvas",
+			Description: "Add one or more catalog assets to the canvas by asset ID. Use after search_assets when specific search results should become cards.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "label": "string — brief reason"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "extract_ocr_text",
+			Description: "Extract visible text from one or more selected/mentioned catalog or uploaded canvas images using VLM OCR and return the text in chat. Use assetIds for catalog assets and cardIds for uploaded image cards. Does not write metadata unless saveToMetadata is explicitly true.",
+			Params:      `{"assetIds": ["string optional for catalog assets"], "assetId": "string optional legacy single catalog asset id", "cardIds": ["string optional for uploaded or mixed canvas image cards"], "cardId": "string optional legacy single canvas image card id", "mode": "vlm", "saveToMetadata": "boolean optional, default false"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "get_asset_detail",
 			Description: "Get full details about a specific asset: project, local path, dimensions, AI tags, OCR text, used-by references. Use after search_assets to get details.",
 			Params:      `{"assetId": "string — catalog asset ID from search results"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "create_comment",
 			Description: "Leave a comment on an asset card, optionally pinned to a region.",
 			Params:      `{"anchorCardId": "string — asset card ID to attach to", "text": "string", "region": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0} (optional, normalized 0-1)}`,
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "update_comment",
+			Description: "Update one existing comment card on the canvas. This changes canvas notes only, not project files.",
+			Params:      `{"commentCardId": "string", "text": "string"}`,
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "delete_comment",
+			Description: "Delete one existing comment card from the canvas. This changes canvas notes only, not project files.",
+			Params:      `{"commentCardId": "string"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "select_cards",
 			Description: "Select one or more cards on the canvas. Use when the user asks to select/focus multiple items or when subsequent actions should target a group.",
 			Params:      `{"cardIds": ["string"], "label": "string — brief reason for the selection"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "remove_cards",
 			Description: "Remove one or more cards from the canvas only. This is safe and does NOT delete project files. Use to clean up extra search results, wrong candidates, comments, proposals, or temporary cards.",
 			Params:      `{"cardIds": ["string"], "label": "string — brief reason for removing them"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "duplicate_cards",
+			Description: "Duplicate one or more image cards on the canvas. Use when the user asks to copy/clone an image visually, such as making five copies of a dog image and arranging them like a walking sequence. This does not edit pixels or source files.",
+			Params:      `{"cardIds": ["string"], "cardId": "string optional legacy single id", "count": "int — number of new copies per source card, default 1, max 12", "layout": "string optional, e.g. 'walk', 'row', 'scatter'", "label": "string — brief reason"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "move_card",
 			Description: "Move a single card to a new position on the canvas.",
 			Params:      `{"cardId": "string (required)", "x": "number — new X coordinate", "y": "number — new Y coordinate"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "arrange_cards",
 			Description: "Reposition multiple cards at once. Use to organize the canvas layout (e.g. grid, row, group by category).",
 			Params:      `{"positions": [{"cardId": "string", "x": "number", "y": "number"}]}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "align_cards",
+			Description: "Align multiple cards by left, center, right, top, middle, or bottom without changing source files.",
+			Params:      `{"cardIds": ["string"], "axis": "left|center|right|top|middle|bottom", "label": "string — brief reason"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "distribute_cards",
+			Description: "Evenly distribute multiple cards horizontally or vertically on the canvas without changing source files.",
+			Params:      `{"cardIds": ["string"], "direction": "horizontal|vertical", "gap": "number optional px", "label": "string — brief reason"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "resize_card",
 			Description: "Resize an asset card visually on the canvas by setting its displayed width. Use with arrange_cards when a layout needs larger hero images or smaller supporting images. This does not modify the source file.",
 			Params:      `{"cardId": "string", "width": "number — displayed card width in px, 200-800"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "bring_cards_to_front",
 			Description: "Move one or more cards to a higher visual layer. Use when the user asks to put an image on top/in front/above another image. If afterCardId is provided, insert the cards immediately above that target card; otherwise move them to the very front. This changes canvas layer order, not position or file contents.",
 			Params:      `{"cardIds": ["string"], "afterCardId": "string optional — put these cards directly above this card", "label": "string — brief reason for changing layer order"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "inspect_canvas",
 			Description: "Create a hidden AI-only rendered snapshot of the current canvas layout and attach it to the next reasoning step. Use when you are unsure about visual overlap, stacking, spacing, or composition. This does NOT show a preview to the user.",
 			Params:      `{"reason": "string — what you need to inspect visually"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "capture_viewport",
 			Description: "Trigger the frontend screenshot control to capture the currently visible canvas viewport and show the normal screenshot preview.",
 			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "capture_canvas",
 			Description: "Trigger the frontend screenshot control to capture the entire canvas and show the normal screenshot preview.",
 			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "capture_selected",
 			Description: "Trigger the frontend screenshot control to capture the selected cards and show the normal screenshot preview.",
 			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "compare_assets",
+			Description: "Compare two assets by default, or N assets as a comparison table with dimensions, size, format, tags, OCR availability, duplicate and similarity metadata.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy first id"}`,
+			Cardinality: "pair",
+			Safe:        true,
+		},
+		{
+			Name:        "find_similar_assets",
+			Description: "Find duplicate or near-similar assets for one or more source images and de-duplicate the result list.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "limit": "int optional, default 12"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "inspect_image_quality",
+			Description: "Inspect image quality and optimization findings for one or more assets. Multi-image results include grouped summary and per-asset issues.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id"}`,
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "generate_alt_text",
+			Description: "Prepare per-asset alt text proposal guidance for one or more assets. For multiple images, return one proposal per asset.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "style": "concise|descriptive optional"}`,
+			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "compress_image",
 			Description: "Compress/convert an asset to a smaller format (WebP, AVIF, PNG).",
-			Params:      `{"assetId": "string", "outputFormat": "webp|avif|png", "quality": "int 1-100, default 82"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "outputFormat": "webp|avif|png", "quality": "int 1-100, default 82"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "resize_image",
 			Description: "Resize an asset to fit within a max dimension.",
-			Params:      `{"assetId": "string", "maxDimensionPx": "int — longest side in pixels"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "maxDimensionPx": "int — longest side in pixels"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "convert_image",
 			Description: "Convert an asset to a different format without quality change.",
-			Params:      `{"assetId": "string", "outputFormat": "webp|avif|png|jpg"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "outputFormat": "webp|avif|png|jpg"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "update_tags",
 			Description: "Set the tags for an asset. Replaces existing tags.",
-			Params:      `{"assetId": "string", "tags": ["string"]}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "tags": ["string"]}`,
+			Cardinality: "multi",
+			Safe:        false,
+		},
+		{
+			Name:        "batch_update_tags",
+			Description: "Set the same tag list on multiple assets in one batch proposal.",
+			Params:      `{"assetIds": ["string"], "tags": ["string"]}`,
+			Cardinality: "batchOnly",
 			Safe:        false,
 		},
 		{
 			Name:        "update_description",
-			Description: "Set the description for an asset.",
-			Params:      `{"assetId": "string", "description": "string"}`,
+			Description: "Set the description for one or more assets. For multiple assets, use perAssetDescriptions unless the user explicitly asked for the same text on all images.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "description": "string", "perAssetDescriptions": [{"assetId":"string","description":"string"}] optional}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "update_ocr_text",
-			Description: "Set or override the OCR text for an asset.",
-			Params:      `{"assetId": "string", "text": "string"}`,
+			Description: "Set or override OCR text. For multiple assets, only write per-asset OCR results; do not apply the same text to all images unless the user explicitly asked for that.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "text": "string", "perAssetTexts": [{"assetId":"string","text":"string"}] optional}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "rename_asset",
 			Description: "Rename an asset file. Provide the new filename (with extension).",
 			Params:      `{"assetId": "string", "newName": "string — new filename with extension, e.g. 'fortune_cat.png'"}`,
+			Cardinality: "single",
 			Safe:        false,
 		},
 		{
 			Name:        "move_asset",
 			Description: "Move an asset to a different directory within the project.",
-			Params:      `{"assetId": "string", "destDir": "string — destination directory path, e.g. 'assets/icons'"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "destDir": "string — destination directory path, e.g. 'assets/icons'"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "copy_asset",
 			Description: "Copy an asset to a new location.",
-			Params:      `{"assetId": "string", "destPath": "string — full destination path including filename"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "destPath": "string — full destination path including filename", "destDir": "string optional for batch copy"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "delete_asset",
 			Description: "Delete an asset file from the project. This is destructive and cannot be undone.",
-			Params:      `{"assetId": "string"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "favorite_asset",
 			Description: "Toggle favorite status on an asset.",
-			Params:      `{"assetId": "string", "favorite": "boolean — true to add, false to remove"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "favorite": "boolean — true to add, false to remove"}`,
+			Cardinality: "multi",
+			Safe:        false,
+		},
+		{
+			Name:        "batch_favorite_assets",
+			Description: "Toggle favorite status on multiple assets in one batch proposal.",
+			Params:      `{"assetIds": ["string"], "favorite": "boolean — true to add, false to remove"}`,
+			Cardinality: "batchOnly",
 			Safe:        false,
 		},
 		{
 			Name:        "export_asset",
 			Description: "Export/download an asset to a specified output directory.",
-			Params:      `{"assetId": "string", "outputDir": "string — output directory path"}`,
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "outputDir": "string — output directory path"}`,
+			Cardinality: "multi",
 			Safe:        false,
 		},
 	}
@@ -184,6 +302,15 @@ func canvasToolSafe(name string) bool {
 	return false
 }
 
+func canvasToolCardinality(name string) string {
+	for _, t := range canvasToolRegistry() {
+		if t.Name == name {
+			return t.Cardinality
+		}
+	}
+	return ""
+}
+
 func canvasToolsBlock() string {
 	var b strings.Builder
 	for _, t := range canvasToolRegistry() {
@@ -191,17 +318,17 @@ func canvasToolsBlock() string {
 		if !t.Safe {
 			safety = "NEEDS_CONFIRMATION"
 		}
-		fmt.Fprintf(&b, "- %s [%s]: %s\n  params: %s\n", t.Name, safety, t.Description, t.Params)
+		fmt.Fprintf(&b, "- %s [%s, cardinality=%s]: %s\n  params: %s\n", t.Name, safety, t.Cardinality, t.Description, t.Params)
 	}
 	return b.String()
 }
 
 func canvasProposalGuidance(options canvasChatOptions) string {
 	if options.ImageOptimizationAdvice {
-		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (update_tags, update_description, rename, move, delete, export, favorite) tied to the user's explicit request."
+		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
 	}
 
-	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only (focus_card, create_comment, search_assets, get_asset_detail) unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, or export_asset just because an asset seems improvable."
+	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
 }
 
 func canvasSystemPrompt(locale string, options canvasChatOptions) string {
@@ -241,12 +368,18 @@ Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVER
 CRITICAL RULES:
 1. If there are cards on the canvas, start with focus_card to move your cursor.
 2. EVERY response must have at least one action block. Pure text responses are forbidden.
-3. SAFE tools (search_assets, get_asset_detail, create_comment, focus_card) execute immediately and you will receive their results. You can then act on the results in a follow-up turn.
+3. SAFE tools execute immediately and you will receive their results. You can then act on the results in a follow-up turn.
 4. NEEDS_CONFIRMATION tools become proposal cards the user must approve.
 5. Include "description" and "impact" in every action block.
 6. For canvas tools (focus_card, select_cards, remove_cards, move_card, arrange_cards, resize_card, bring_cards_to_front, create_comment), use the card ID. For file/catalog tools that require assetId, use the ASSET ID from the canvas state (the "id" field inside "asset").
 7. Never say you cannot take a screenshot/photo or export the canvas. You CAN trigger the real frontend screenshot/export preview by calling capture_viewport, capture_canvas, or capture_selected.
 8. For large layouts, output compact JSON action blocks first and keep natural-language explanation to one short sentence after tools. Do not write a long plan before arrange_cards.
+9. Every tool has cardinality. With multiple selected/mentioned image assets, default to ALL selected/mentioned assets and pass assetIds. Use assetId only for a clearly single target such as "this one", "first image", or "only this card".
+10. Destructive or file-writing multi-image tools must be one batch proposal with assetIds, not many separate proposal cards. The UI will show per-asset status.
+11. For OCR extraction, use extract_ocr_text with {"mode":"vlm","saveToMetadata":false}. For catalog assets, pass assetIds; for uploaded image cards, pass cardIds. This returns text to chat. Only use update_ocr_text to save OCR metadata after the user explicitly approves saving.
+
+## Canvas Strategy Preset
+%s
 
 ## Proposal Discipline
 %s
@@ -259,6 +392,7 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 ## Context-Aware Behavior
 - **When the user asks to select one or more cards:** Use select_cards with the exact card IDs. Single-card and multi-card selection are both supported.
 - **When the user asks to remove/delete extra cards from the canvas:** Use remove_cards. This only cleans the canvas and does not delete files. Do NOT use delete_asset unless the user explicitly asks to delete source files from the project.
+- **When the user asks to copy/clone an image visually on the canvas** (e.g. "複製五隻小狗", "make five copies", "clone this image"): Use duplicate_cards with the image card ID and count equal to the number of new copies. Then use arrange_cards, align_cards, or distribute_cards with the returned new card IDs to create the requested feeling or layout. This is canvas-level duplication, not pixel editing.
 - **When the user asks to find one asset/image:** Use search_assets with limit: 1. Do not dump all matches onto the canvas. If the request includes a filename, use the filename stem as the first query.
 - **When the canvas is empty and the user asks to find/list assets:** Use search_assets with relevant keywords. You will receive the results. Then describe what you found.
 - **When creating comments/annotations:** Place comment cards away from image content. Do not cover or overlap the asset being discussed; keep roughly 80px+ distance from the image/card when possible. Use the region field to point to the relevant image area instead of placing the comment on top of it.
@@ -266,7 +400,7 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When arranging cards:** Use the current size=WIDTHxHEIGHT for every selected/visible card and place bounding boxes with clear whitespace. The canvas is large/unbounded, so use the surrounding empty space instead of clustering everything near the center. For 8+ cards, prefer a broad multi-row layout about 1600-2400px wide with 160px+ horizontal and 120px+ vertical gaps unless the user explicitly asks for a tight collage. Do not place large cards partly under smaller cards unless the user explicitly asks for overlap/collage. If the layout would improve with a focal image or smaller supporting images, use resize_card first/alongside arrange_cards; resize_card is visual only and safe. If you are unsure whether the layout visually overlaps or layers correctly, call inspect_canvas to see a hidden AI-only snapshot before finalizing.
 - **When the user asks to place an image on top / in front / above another image:** Use bring_cards_to_front for the card that should visually cover the others. Moving x/y is not enough to change stacking order. If the user says "put A in front of B" or "A above B", pass B as afterCardId so A is inserted directly above B instead of blindly moving A above every card.
 - **When the user asks to take a picture / screenshot / export the canvas / 拍照 / 截圖 / 匯出畫布:** After any arrange/resize/layer steps, call capture_viewport, capture_canvas, or capture_selected. If the user says 去背 or transparent, pass {"transparent": true}. This triggers the real frontend screenshot/export preview. Do not apologize or claim you cannot create an image file. Use inspect_canvas only for your own hidden visual check; it is not the user's final screenshot.
-- **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For per-asset changes, emit one action per selected asset with that asset's assetId, unless the user explicitly says only one.
+- **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For catalog/file tools, emit one action with assetIds so the UI can show a batch proposal and per-asset status.
 - **When the user explicitly asks for optimization/compression/format change:** Propose compress_image, resize_image, convert_image as appropriate.
 - **When the user explicitly asks to tag or write/save a description:** Propose update_tags or update_description for every selected asset card, not just the first one.
 - **When the user asks a general question about an asset:** Analyze and suggest SAFE actions — prefer focus_card, get_asset_detail, or create_comment for visual observations. Do NOT create file/metadata proposal cards unless Proposal Discipline allows it.
@@ -317,6 +451,7 @@ This 4096×3344 PNG at 13.5MB is too large for web use.
 		lang,
 		lang,
 		"```", "```",
+		options.CanvasStrategy,
 		canvasProposalGuidance(options),
 		"```", "```",
 		"```", "```",

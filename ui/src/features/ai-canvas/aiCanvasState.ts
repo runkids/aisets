@@ -92,6 +92,7 @@ export type ProposalCanvasCard = CanvasCardBase & {
   result?: unknown;
   error?: string;
   sourceAssetId?: string;
+  sourceAssetIds?: string[];
 };
 
 export type CanvasCard =

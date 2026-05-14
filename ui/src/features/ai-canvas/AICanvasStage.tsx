@@ -1,19 +1,23 @@
-import type {
-  Dispatch,
-  PointerEvent as ReactPointerEvent,
-  SetStateAction,
-  WheelEvent as ReactWheelEvent,
+import {
+  useState,
+  type Dispatch,
+  type PointerEvent as ReactPointerEvent,
+  type SetStateAction,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import type { TFunction } from "i18next";
+import { ConfirmDialog } from "@/components/ui";
 import {
   AICursor,
   AssetCardBody,
+  AssetContextMenu,
   AssistantCardBody,
   CardShell,
   CommentCardBody,
   OperationCardBody,
   ProposalCardBody,
   UploadCardBody,
+  UploadContextMenu,
   VariantCardBody,
 } from "./canvasCards";
 import {
@@ -62,6 +66,7 @@ type AICanvasStageProps = {
   };
   aiNickname?: string;
   commentMode: boolean;
+  setCommentMode: Dispatch<SetStateAction<boolean>>;
   isWorking: boolean;
   onOpenAsset?: (assetId: string) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -75,6 +80,7 @@ type AICanvasStageProps = {
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDeleteCard: (target: CanvasCard) => void;
+  onDuplicateCard: (target: CanvasCard) => void;
   onRegisterCard: (cardId: string, node: HTMLElement | null) => void;
   onAddComment: (
     anchorCard: CanvasCard,
@@ -110,6 +116,7 @@ export function AICanvasStage({
   aiCursor,
   aiNickname,
   commentMode,
+  setCommentMode,
   isWorking,
   onOpenAsset,
   onCanvasPointerDown,
@@ -120,11 +127,16 @@ export function AICanvasStage({
   onDragMove,
   onDragEnd,
   onDeleteCard,
+  onDuplicateCard,
   onRegisterCard,
   onAddComment,
   onCreateImagePreview,
   onCreateOperationPreview,
 }: AICanvasStageProps) {
+  const [deleteConfirmCard, setDeleteConfirmCard] = useState<CanvasCard | null>(
+    null,
+  );
+
   return (
     <>
       <div
@@ -196,7 +208,7 @@ export function AICanvasStage({
                 key={card.id}
                 card={card}
                 selected={selectedCardIds.includes(card.id)}
-                compact={compactCards && isImageCard(card)}
+                compact={compactCards && !isImageCard(card)}
                 width={cardWidths[card.id]}
                 canvasScale={viewport.scale}
                 onSelect={(id, shiftKey) => {
@@ -251,28 +263,54 @@ export function AICanvasStage({
                     ? { x: dragPreview.x, y: dragPreview.y }
                     : undefined
                 }
+                contextMenu={
+                  card.kind === "asset" ? (
+                    <AssetContextMenu
+                      card={card}
+                      onOpenAsset={
+                        onOpenAsset
+                          ? () => onOpenAsset(card.asset.id)
+                          : undefined
+                      }
+                      onRenderPreview={() =>
+                        void onCreateImagePreview(card, "")
+                      }
+                      onOperationPreview={() =>
+                        void onCreateOperationPreview(
+                          [card],
+                          t("aiCanvas.safeVariantPrompt"),
+                        )
+                      }
+                      onAddComment={() => {
+                        setSelectedCardIds([card.id]);
+                        setCommentMode(true);
+                      }}
+                      onDuplicate={() => onDuplicateCard(card)}
+                      onDelete={() => setDeleteConfirmCard(card)}
+                      working={isWorking}
+                    />
+                  ) : card.kind === "upload" ? (
+                    <UploadContextMenu
+                      card={card}
+                      onAddComment={() => {
+                        setSelectedCardIds([card.id]);
+                        setCommentMode(true);
+                      }}
+                      onDuplicate={() => onDuplicateCard(card)}
+                      onDelete={() => setDeleteConfirmCard(card)}
+                    />
+                  ) : undefined
+                }
               >
                 {card.kind === "asset" ? (
                   <AssetCardBody
                     card={card}
                     comments={commentsByAnchor.get(card.id) ?? []}
-                    compact={compactCards && card.kind === "asset"}
                     hideOverlays={hideCards}
                     commentEnabled={commentMode}
                     canvasScale={viewport.scale}
-                    onOpenAsset={onOpenAsset}
                     onSelectComment={(id) => setSelectedCardIds([id])}
                     onCreateComment={onAddComment}
-                    onRenderPreview={(assetCard) =>
-                      void onCreateImagePreview(assetCard, "")
-                    }
-                    onOperationPreview={(assetCard) =>
-                      void onCreateOperationPreview(
-                        [assetCard],
-                        t("aiCanvas.safeVariantPrompt"),
-                      )
-                    }
-                    working={isWorking}
                   />
                 ) : card.kind === "comment" ? (
                   <CommentCardBody card={card} />
@@ -288,7 +326,6 @@ export function AICanvasStage({
                   <UploadCardBody
                     card={card}
                     comments={commentsByAnchor.get(card.id) ?? []}
-                    compact={compactCards && card.kind === "upload"}
                     commentEnabled={commentMode}
                     canvasScale={viewport.scale}
                     onSelectComment={(id) => setSelectedCardIds([id])}
@@ -327,6 +364,20 @@ export function AICanvasStage({
           style={selectionBounds(canvasSelection)}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteConfirmCard}
+        onConfirm={() => {
+          if (deleteConfirmCard) onDeleteCard(deleteConfirmCard);
+          setDeleteConfirmCard(null);
+        }}
+        onCancel={() => setDeleteConfirmCard(null)}
+        title={t("aiCanvas.deleteCard")}
+        message={t("aiCanvas.deleteConfirmMessage")}
+        confirmText={t("aiCanvas.deleteCard")}
+        cancelText={t("common.cancel")}
+        variant="danger"
+      />
     </>
   );
 }

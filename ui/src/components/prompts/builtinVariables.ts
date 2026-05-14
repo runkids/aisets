@@ -219,6 +219,8 @@ export const PRECHECK_BUILTIN_VARIABLES: BuiltinVariableDef[] = [
   },
 ];
 
+export const CANVAS_BUILTIN_VARIABLES: BuiltinVariableDef[] = [];
+
 export function getBuiltinVariables(
   type: PromptPresetType,
 ): BuiltinVariableDef[] {
@@ -228,6 +230,7 @@ export function getBuiltinVariables(
   if (type === "optimize") return OPTIMIZE_BUILTIN_VARIABLES;
   if (type === "duplicate") return DUPLICATE_BUILTIN_VARIABLES;
   if (type === "precheck") return PRECHECK_BUILTIN_VARIABLES;
+  if (type === "canvas") return CANVAS_BUILTIN_VARIABLES;
   return [];
 }
 

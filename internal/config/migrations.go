@@ -362,6 +362,9 @@ func (s *Store) migrate() error {
 	if err := s.seedPrecheckBuiltInDefault(); err != nil {
 		return err
 	}
+	if err := s.seedCanvasBuiltInDefault(); err != nil {
+		return err
+	}
 	if err := s.migrateEmbeddingsTable(); err != nil {
 		return err
 	}
@@ -1472,6 +1475,68 @@ func (s *Store) seedPrecheckBuiltInDefault() error {
 
 func defaultPrecheckPrompt() string {
 	return precheck.PrecheckAIPrompt
+}
+
+func DefaultCanvasPrompt() string {
+	return `Canvas operating strategy:
+- Treat multi-image selection as the default target set. Use assetIds for selected or mentioned catalog images, and cardIds for uploaded image cards, unless the user clearly narrows to one image.
+- Prefer safe canvas actions first: search, select, arrange, align, distribute, inspect, compare, OCR extraction, and screenshots.
+- search_assets returns complete AssetItem objects; use add_assets_to_canvas only when you need to add known IDs that are not already added by search.
+- OCR extraction should answer in chat first. Saving OCR back to metadata requires an update_ocr_text proposal.
+- Multi-image file or metadata writes must stay as one batch proposal and must preserve per-asset status.
+- Keep descriptions and proposal impacts specific to the selected files; do not invent file changes that the tool will not perform.`
+}
+
+func (s *Store) seedCanvasBuiltInDefault() error {
+	var ddl string
+	_ = s.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_presets'`).Scan(&ddl)
+	if ddl != "" && !strings.Contains(ddl, "'canvas'") {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		stmts := []string{
+			`ALTER TABLE prompt_presets RENAME TO _prompt_presets_old`,
+			`CREATE TABLE prompt_presets (
+				id         TEXT    PRIMARY KEY,
+				type       TEXT    NOT NULL CHECK(type IN ('tag', 'ocr', 'optimize', 'duplicate', 'system', 'precheck', 'canvas')),
+				name       TEXT    NOT NULL,
+				content    TEXT    NOT NULL DEFAULT '{}',
+				is_default INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT    NOT NULL,
+				updated_at TEXT    NOT NULL
+			)`,
+			`INSERT INTO prompt_presets SELECT * FROM _prompt_presets_old`,
+			`DROP TABLE _prompt_presets_old`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_presets_default_per_type ON prompt_presets (type) WHERE is_default = 1`,
+		}
+		for _, stmt := range stmts {
+			if _, err := tx.Exec(stmt); err != nil {
+				return fmt.Errorf("prompt_presets canvas type migration: %w", err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+
+	content := PromptPresetContent{
+		Template:  DefaultCanvasPrompt(),
+		Variables: map[string]PromptVariable{},
+	}
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	now := nowUTC()
+	_, err = s.db.Exec(
+		`INSERT INTO prompt_presets (id, type, name, content, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+		 WHERE prompt_presets.content != excluded.content`,
+		"canvas-built-in-default", "canvas", "Built-in Default", string(contentJSON), 1, now, now,
+	)
+	return err
 }
 
 func (s *Store) migrateEmbeddingsTable() error {

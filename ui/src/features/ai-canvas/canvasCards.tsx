@@ -1,22 +1,28 @@
 import {
   ArrowUp,
   Bot,
+  Copy,
+  ExternalLink,
   ImagePlus,
   Layers3,
+  Lightbulb,
   LoaderCircle,
   MessageCircle,
   MousePointer2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { createPortal } from "react-dom";
 import { basePath } from "@/api/client";
-import { Badge, Button, IconButton } from "@/components/ui";
+import { Badge, IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fileName, formatBytes, formatExt } from "@/ui";
 import {
@@ -32,13 +38,72 @@ import {
 import {
   AI_MENTION_TAG,
   CARD_WIDTH,
-  cardTone,
   compactImageAspectRatio,
   imageMeta,
   isImageCard,
   renderMarkdown,
   tagLabel,
 } from "./canvasUtils";
+
+const CONTEXT_MENU_HINT_KEY = "aisets.canvas.contextMenuHintSeen";
+
+function cardKindIcon(kind: CanvasCard["kind"], size = 13) {
+  switch (kind) {
+    case "comment":
+      return <MessageCircle size={size} />;
+    case "assistant":
+      return <Bot size={size} />;
+    case "variant":
+      return <ImagePlus size={size} />;
+    case "proposal":
+      return <Lightbulb size={size} />;
+    case "operation":
+      return <Layers3 size={size} />;
+    default:
+      return <Sparkles size={size} />;
+  }
+}
+
+function cardKindAccent(kind: CanvasCard["kind"]) {
+  switch (kind) {
+    case "comment":
+      return {
+        text: "text-g-amber",
+        bg: "bg-g-amber/10",
+        border: "border-g-amber/20",
+      };
+    case "assistant":
+      return {
+        text: "text-g-purple",
+        bg: "bg-g-purple/10",
+        border: "border-g-purple/20",
+      };
+    case "variant":
+      return {
+        text: "text-g-blue",
+        bg: "bg-g-blue/10",
+        border: "border-g-blue/20",
+      };
+    case "proposal":
+      return {
+        text: "text-g-green",
+        bg: "bg-g-green/10",
+        border: "border-g-green/20",
+      };
+    case "operation":
+      return {
+        text: "text-g-green",
+        bg: "bg-g-green/10",
+        border: "border-g-green/20",
+      };
+    default:
+      return {
+        text: "text-g-ink-3",
+        bg: "bg-g-surface-2",
+        border: "border-g-line",
+      };
+  }
+}
 
 type CommentRegion = { x: number; y: number; width: number; height: number };
 
@@ -61,25 +126,6 @@ function pointCommentRegion(x: number, y: number): CommentRegion {
     width,
     height,
   };
-}
-
-function FigmaCommentIcon({ size = "sm" }: { size?: "xs" | "sm" | "lg" }) {
-  const iconSize = size === "lg" ? 18 : size === "xs" ? 11 : 14;
-  return (
-    <span
-      className={cn(
-        "inline-grid shrink-0 place-items-center border border-g-line bg-g-surface text-g-ink-2 shadow-g-sm",
-        size === "lg"
-          ? "size-12 rounded-[15px]"
-          : size === "xs"
-            ? "size-4 rounded-[6px]"
-            : "size-5 rounded-[7px]",
-      )}
-      aria-hidden="true"
-    >
-      <MessageCircle size={iconSize} strokeWidth={2.4} />
-    </span>
-  );
 }
 
 function FigmaCommentMarker({ className }: { className?: string }) {
@@ -321,6 +367,196 @@ function CommentRegionButtons({
   ));
 }
 
+const ctxMenuContentCls =
+  "z-[1300] min-w-[220px] max-w-[320px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-1.5 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]";
+const ctxMenuItemCls =
+  "flex w-full min-h-8 cursor-pointer items-center gap-2 rounded-[10px] px-3 py-1.5 font-g text-g-ui text-white outline-none transition-colors duration-[120ms] ease-g hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-default";
+const ctxMenuSepCls = "mx-2 my-1 h-px bg-white/[0.08]";
+const ctxMenuLabelCls =
+  "px-3 py-1.5 font-g text-g-caption text-white/50 select-text";
+
+export type ImageCardContextMenuProps = {
+  onAddComment?: () => void;
+  onDuplicate?: () => void;
+  onDelete: () => void;
+};
+
+export type AssetContextMenuProps = ImageCardContextMenuProps & {
+  card: AssetCanvasCard;
+  onOpenAsset?: () => void;
+  onRenderPreview?: () => void;
+  onOperationPreview?: () => void;
+  working?: boolean;
+};
+
+export function AssetContextMenu({
+  card,
+  onOpenAsset,
+  onRenderPreview,
+  onOperationPreview,
+  onAddComment,
+  onDuplicate,
+  onDelete,
+  working,
+}: AssetContextMenuProps) {
+  const { t } = useTranslation();
+  const asset = card.asset;
+  const tags = tagLabel(asset);
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">
+          {fileName(asset.repoPath)}
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-white/36">
+          {asset.repoPath}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      <div className="px-3 py-1.5 font-g text-[11px] text-white/50">
+        <span>{formatExt(asset.ext).toUpperCase()}</span>
+        <span className="mx-1.5 text-white/20">·</span>
+        <span>{imageMeta(asset)}</span>
+        {asset.usedBy.length > 0 && (
+          <>
+            <span className="mx-1.5 text-white/20">·</span>
+            <span className="text-white/60">
+              {t("aiCanvas.references", { count: asset.usedBy.length })}
+            </span>
+          </>
+        )}
+        {tags && <div className="mt-1 truncate text-white/40">{tags}</div>}
+      </div>
+      {asset.aiTag?.description && (
+        <div className="line-clamp-2 px-3 pb-1 font-g text-[11px] leading-[1.45] text-white/36">
+          {asset.aiTag.description}
+        </div>
+      )}
+      <div className={ctxMenuSepCls} />
+      {onRenderPreview && (
+        <button
+          type="button"
+          className={ctxMenuItemCls}
+          disabled={working}
+          onClick={onRenderPreview}
+        >
+          <ImagePlus size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.previewWebp")}
+        </button>
+      )}
+      {onOperationPreview && (
+        <button
+          type="button"
+          className={ctxMenuItemCls}
+          disabled={working}
+          onClick={onOperationPreview}
+        >
+          <Layers3 size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.safeVariant")}
+        </button>
+      )}
+      {onAddComment && (
+        <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
+          <MessageCircle size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.comment")}
+        </button>
+      )}
+      {onOpenAsset && (
+        <button type="button" className={ctxMenuItemCls} onClick={onOpenAsset}>
+          <ExternalLink size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.openAsset")}
+        </button>
+      )}
+      {onDuplicate && (
+        <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
+          <Copy size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.duplicateImage")}
+        </button>
+      )}
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
+export type UploadContextMenuProps = ImageCardContextMenuProps & {
+  card: UploadCanvasCard;
+};
+
+export function UploadContextMenu({
+  card,
+  onAddComment,
+  onDuplicate,
+  onDelete,
+}: UploadContextMenuProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">{card.fileName}</div>
+        <div className="mt-0.5 text-[11px] text-white/36">
+          {card.uploadWidth}×{card.uploadHeight} · upload
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      {onAddComment && (
+        <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
+          <MessageCircle size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.comment")}
+        </button>
+      )}
+      {onDuplicate && (
+        <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
+          <Copy size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.duplicateImage")}
+        </button>
+      )}
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
+function ContextMenuHint() {
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(
+    () => !localStorage.getItem(CONTEXT_MENU_HINT_KEY),
+  );
+
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => {
+      setVisible(false);
+      localStorage.setItem(CONTEXT_MENU_HINT_KEY, "1");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
+      <div className="rounded-g-sm bg-g-ink/70 px-2.5 py-1 font-g text-[11px] text-white/90 shadow-g-sm backdrop-blur-sm animate-[canvasCardIn_280ms_var(--g-ease-out)_both]">
+        {t("aiCanvas.rightClickHint")}
+      </div>
+    </div>
+  );
+}
+
 function isScreenStableCard(card: CanvasCard) {
   return (
     card.kind === "comment" ||
@@ -342,6 +578,7 @@ export function CardShell({
   compact,
   width,
   children,
+  contextMenu,
   onSelect,
   onDragStart,
   onDragMove,
@@ -357,6 +594,7 @@ export function CardShell({
   compact?: boolean;
   width?: number;
   children: ReactNode;
+  contextMenu?: ReactNode;
   position?: { x: number; y: number };
   canvasScale?: number;
   onSelect: (id: string, shiftKey?: boolean) => void;
@@ -375,8 +613,22 @@ export function CardShell({
   const [isNewCard] = useState(
     () => Date.now() - Date.parse(card.createdAt) < 1200,
   );
+  const [hovered, setHovered] = useState(false);
+  const [hintDismissed, setHintDismissed] = useState(
+    () => !!localStorage.getItem(CONTEXT_MENU_HINT_KEY),
+  );
+  const [ctxMenuPos, setCtxMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const screenStableScale =
     isScreenStableCard(card) && canvasScale > 0 ? 1 / canvasScale : 1;
+  const chromeless = isImageCard(card);
+  const imageLabel = chromeless
+    ? card.kind === "asset"
+      ? fileName(card.asset.repoPath)
+      : card.fileName
+    : undefined;
 
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
     e.stopPropagation();
@@ -396,31 +648,69 @@ export function CardShell({
     resizeRef.current = null;
   }
 
-  return (
+  function dismissHint() {
+    if (!hintDismissed) {
+      setHintDismissed(true);
+      localStorage.setItem(CONTEXT_MENU_HINT_KEY, "1");
+    }
+  }
+
+  function handleContextMenu(e: React.MouseEvent) {
+    if (!chromeless || !contextMenu) return;
+    e.preventDefault();
+    dismissHint();
+    setCtxMenuPos({ x: e.clientX, y: e.clientY });
+  }
+
+  const ctxMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!ctxMenuPos) return;
+    function dismiss(e: Event) {
+      if (
+        ctxMenuRef.current &&
+        e.target instanceof Node &&
+        ctxMenuRef.current.contains(e.target)
+      )
+        return;
+      setCtxMenuPos(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setCtxMenuPos(null);
+    }
+    document.addEventListener("mousedown", dismiss);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", dismiss);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [ctxMenuPos]);
+
+  const sectionCls = cn(
+    "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow,filter] duration-[120ms] ease-g",
+    isNewCard &&
+      "animate-[canvasCardIn_280ms_var(--g-ease-out)_both] motion-reduce:animate-none",
+    floatingCardLayer(card, selected),
+    "[&:has([data-ai-canvas-comment-composer='true'])]:z-[1050]",
+    chromeless
+      ? cn(
+          "overflow-visible border-2 border-transparent shadow-none transition-[border-color,box-shadow,filter]",
+          hovered && !selected && "brightness-[1.04] shadow-g-md",
+          selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
+        )
+      : compact
+        ? cn(
+            "border-2 border-transparent shadow-none",
+            selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
+          )
+        : cn(
+            "overflow-hidden rounded-g-lg bg-g-surface/75 shadow-g-pop backdrop-blur-xl",
+            selected && "ring-2 ring-g-active-bg",
+          ),
+  );
+
+  const cardContent = (
     <section
-      className={cn(
-        "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow] duration-[120ms] ease-g",
-        isNewCard &&
-          "animate-[canvasCardIn_280ms_var(--g-ease-out)_both] motion-reduce:animate-none",
-        floatingCardLayer(card, selected),
-        "[&:has([data-ai-canvas-comment-composer='true'])]:z-[1050]",
-        compact
-          ? cn(
-              "border-2 border-transparent shadow-none",
-              selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
-            )
-          : cn(
-              "border bg-g-surface shadow-g-md",
-              isImageCard(card) ? "overflow-visible" : "overflow-hidden",
-              cardTone(card),
-              selected &&
-                card.kind !== "comment" &&
-                "border-g-active-bg shadow-g-lg",
-              selected &&
-                card.kind === "comment" &&
-                "border-g-active-bg shadow-g-lg",
-            ),
-      )}
+      className={sectionCls}
       ref={(node) => onRegister(card.id, node)}
       style={{
         width: width ?? CARD_WIDTH,
@@ -430,8 +720,34 @@ export function CardShell({
       data-ai-canvas-card="true"
       data-selected={selected || undefined}
       onPointerDown={(e) => onSelect(card.id, e.shiftKey)}
+      onContextMenu={handleContextMenu}
     >
-      {compact ? (
+      {chromeless ? (
+        <div
+          className="relative cursor-grab active:cursor-grabbing"
+          onPointerDown={(event) => onDragStart(event, card)}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          {children}
+          {imageLabel && (
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-x-0 bottom-0 rounded-b-[inherit] bg-gradient-to-t from-black/50 to-transparent px-2.5 pb-2 pt-6 transition-opacity duration-150 ease-g",
+                hovered ? "opacity-100" : "opacity-0",
+              )}
+            >
+              <div className="truncate font-g text-[12px] font-[590] tracking-g-ui text-white drop-shadow-sm">
+                {imageLabel}
+              </div>
+            </div>
+          )}
+          {!hintDismissed && <ContextMenuHint />}
+        </div>
+      ) : compact ? (
         <div
           className="cursor-grab active:cursor-grabbing"
           onPointerDown={(event) => onDragStart(event, card)}
@@ -444,22 +760,34 @@ export function CardShell({
       ) : (
         <>
           <div
-            className="flex cursor-grab items-center justify-between gap-2 border-b border-g-line bg-g-surface-2 px-3 py-2 active:cursor-grabbing"
+            className="flex cursor-grab items-center justify-between gap-2 border-b border-g-line px-3 py-2 active:cursor-grabbing"
             onPointerDown={(event) => onDragStart(event, card)}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
             onPointerCancel={onDragEnd}
           >
             <div className="flex min-w-0 items-center gap-2 text-g-caption font-[590] tracking-g-ui text-g-ink-2">
-              {card.kind === "comment" ? (
-                <FigmaCommentIcon size="xs" />
-              ) : (
-                <MousePointer2 size={13} />
-              )}
+              <span className={cn("shrink-0", cardKindAccent(card.kind).text)}>
+                {cardKindIcon(card.kind)}
+              </span>
               <span className="truncate">{cardDisplayName(card)}</span>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Badge tone={selected ? "accent" : "line"}>{card.kind}</Badge>
+              {(() => {
+                const accent = cardKindAccent(card.kind);
+                return (
+                  <span
+                    className={cn(
+                      "rounded-[8px] border px-1.5 py-0.5 font-g text-[10px] font-[590] tracking-g-ui",
+                      accent.text,
+                      accent.bg,
+                      accent.border,
+                    )}
+                  >
+                    {t(`aiCanvas.cardKind.${card.kind}`)}
+                  </span>
+                );
+              })()}
               <IconButton
                 size="sm"
                 aria-label={t("aiCanvas.deleteCard")}
@@ -481,7 +809,7 @@ export function CardShell({
         <div
           className={cn(
             "absolute -bottom-1.5 -right-1.5 z-50 size-3 cursor-nwse-resize rounded-full border-2 bg-g-surface shadow-g-sm",
-            compact ? "border-[#0d99ff]" : "border-g-active-bg",
+            chromeless || compact ? "border-[#0d99ff]" : "border-g-active-bg",
           )}
           onPointerDown={handleResizeDown}
           onPointerMove={handleResizeMove}
@@ -491,148 +819,86 @@ export function CardShell({
       )}
     </section>
   );
+
+  return (
+    <>
+      {cardContent}
+      {ctxMenuPos &&
+        contextMenu &&
+        createPortal(
+          <div
+            ref={ctxMenuRef}
+            className={ctxMenuContentCls}
+            style={{
+              position: "fixed",
+              left: ctxMenuPos.x,
+              top: ctxMenuPos.y,
+            }}
+            onClick={() => setCtxMenuPos(null)}
+          >
+            {contextMenu}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
 }
 
 export function AssetCardBody({
   card,
   comments,
-  compact,
   hideOverlays,
   commentEnabled,
   canvasScale = 1,
-  onOpenAsset,
   onSelectComment,
   onCreateComment,
-  onRenderPreview,
-  onOperationPreview,
-  working,
 }: {
   card: AssetCanvasCard;
   comments: CommentCanvasCard[];
-  compact?: boolean;
   hideOverlays?: boolean;
   commentEnabled?: boolean;
   canvasScale?: number;
-  onOpenAsset?: (assetId: string) => void;
   onSelectComment: (commentId: string) => void;
   onCreateComment: (
     anchorCard: CanvasCard,
     text?: string,
     region?: { x: number; y: number; width: number; height: number },
   ) => void;
-  onRenderPreview: (assetCard: AssetCanvasCard) => void;
-  onOperationPreview: (assetCard: AssetCanvasCard) => void;
-  working: boolean;
 }) {
-  const { t } = useTranslation();
   const asset = card.asset;
-  const tags = tagLabel(asset);
-  const { containerRef, pointerProps, overlay, openCommentComposer } =
-    useCommentOverlay({
-      enabled: !!commentEnabled && !hideOverlays,
-      canvasScale,
-      onSubmit: (text, region) => onCreateComment(card, text, region),
-    });
+  const ar =
+    asset.image.width > 0 && asset.image.height > 0
+      ? asset.image.width / asset.image.height
+      : 4 / 3;
+  const {
+    containerRef: commentContainerRef,
+    pointerProps: commentPointerProps,
+    overlay: commentOverlay,
+  } = useCommentOverlay({
+    enabled: !!commentEnabled && !hideOverlays,
+    canvasScale,
+    onSubmit: (text, region) => onCreateComment(card, text, region),
+  });
 
   return (
-    <div className="flex flex-col">
-      <div
-        ref={containerRef}
-        data-ai-canvas-asset-frame="true"
-        className={cn(
-          "relative aspect-[4/3]",
-          compact ? "bg-transparent" : "bg-g-surface-2",
-        )}
-        {...pointerProps}
-      >
-        <img
-          src={asset.thumbnailUrl || asset.url}
-          alt={fileName(asset.repoPath)}
-          className="size-full select-none object-contain p-3"
-          draggable={false}
-          loading="lazy"
-        />
-        {!hideOverlays && (
-          <CommentRegionButtons
-            comments={comments}
-            onSelect={onSelectComment}
-          />
-        )}
-        {overlay}
-      </div>
-      {!compact && (
-        <div className="flex flex-col gap-3 p-3">
-          <div className="min-w-0">
-            <div className="truncate text-g-body font-[590] tracking-g-ui text-g-ink">
-              {fileName(asset.repoPath)}
-            </div>
-            <div className="mt-1 truncate text-g-caption text-g-ink-3">
-              {asset.repoPath}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            <Badge tone="line">{formatExt(asset.ext)}</Badge>
-            <Badge tone="line">{imageMeta(asset)}</Badge>
-            {asset.usedBy.length > 0 && (
-              <Badge tone="green">
-                {t("aiCanvas.references", { count: asset.usedBy.length })}
-              </Badge>
-            )}
-            {tags && <Badge tone="purple">{tags}</Badge>}
-          </div>
-
-          {asset.aiTag?.description && (
-            <p className="line-clamp-2 text-g-caption leading-[1.45] text-g-ink-3">
-              {asset.aiTag.description}
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<ImagePlus />}
-              disabled={working}
-              onClick={() => onRenderPreview(card)}
-            >
-              {t("aiCanvas.previewWebp")}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<Layers3 />}
-              disabled={working}
-              onClick={() => onOperationPreview(card)}
-            >
-              {t("aiCanvas.safeVariant")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              leadingIcon={<FigmaCommentIcon />}
-              onClick={() =>
-                openCommentComposer({
-                  x: 0.22,
-                  y: 0.2,
-                  width: 0.56,
-                  height: 0.37,
-                })
-              }
-            >
-              {t("aiCanvas.comment")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!onOpenAsset}
-              onClick={() => onOpenAsset?.(asset.id)}
-            >
-              {t("aiCanvas.openAsset")}
-            </Button>
-          </div>
-        </div>
+    <div
+      ref={commentContainerRef}
+      data-ai-canvas-asset-frame="true"
+      className="relative"
+      style={{ aspectRatio: ar }}
+      {...commentPointerProps}
+    >
+      <img
+        src={asset.thumbnailUrl || asset.url}
+        alt={fileName(asset.repoPath)}
+        className="size-full select-none rounded-[inherit] object-contain"
+        draggable={false}
+        loading="lazy"
+      />
+      {!hideOverlays && (
+        <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
       )}
+      {commentOverlay}
     </div>
   );
 }
@@ -685,7 +951,6 @@ export function AssistantCardBody({
 export function UploadCardBody({
   card,
   comments,
-  compact,
   commentEnabled,
   canvasScale = 1,
   onSelectComment,
@@ -693,7 +958,6 @@ export function UploadCardBody({
 }: {
   card: UploadCanvasCard;
   comments: CommentCanvasCard[];
-  compact?: boolean;
   commentEnabled?: boolean;
   canvasScale?: number;
   onSelectComment: (commentId: string) => void;
@@ -704,7 +968,11 @@ export function UploadCardBody({
   ) => void;
 }) {
   const previewSrc = `${basePath}/api/image-tools/preview/${card.token}`;
-  const { containerRef, pointerProps, overlay } = useCommentOverlay({
+  const {
+    containerRef: commentContainerRef,
+    pointerProps: commentPointerProps,
+    overlay: commentOverlay,
+  } = useCommentOverlay({
     enabled: !!commentEnabled,
     canvasScale,
     onSubmit: (text, region) => onCreateComment?.(card, text, region),
@@ -712,23 +980,15 @@ export function UploadCardBody({
 
   return (
     <div
-      ref={containerRef}
-      className={cn(
-        "relative",
-        compact ? "bg-transparent" : "aspect-[4/3] bg-g-surface-2",
-      )}
-      style={
-        compact ? { aspectRatio: compactImageAspectRatio(card) } : undefined
-      }
-      {...pointerProps}
+      ref={commentContainerRef}
+      className="relative"
+      style={{ aspectRatio: compactImageAspectRatio(card) }}
+      {...commentPointerProps}
     >
       <img
         src={previewSrc}
         alt={card.fileName}
-        className={cn(
-          "size-full select-none object-contain",
-          !compact && "p-3",
-        )}
+        className="size-full select-none rounded-[inherit] object-contain"
         draggable={false}
         onError={(e) => {
           if (card.thumbnailDataUrl)
@@ -736,7 +996,7 @@ export function UploadCardBody({
         }}
       />
       <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
-      {overlay}
+      {commentOverlay}
     </div>
   );
 }
@@ -864,6 +1124,39 @@ function proposalParamTags(params: Record<string, unknown>) {
   );
 }
 
+function proposalAssetIds(card: ProposalCanvasCard) {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim() || seen.has(value)) return;
+    seen.add(value);
+    ids.push(value);
+  };
+  card.sourceAssetIds?.forEach(add);
+  const paramIds = card.params.assetIds;
+  if (Array.isArray(paramIds)) paramIds.forEach(add);
+  add(card.sourceAssetId);
+  add(card.params.assetId);
+  return ids;
+}
+
+type ProposalItemStatus = {
+  assetId?: string;
+  repoPath?: string;
+  status?: string;
+  error?: string;
+};
+
+function proposalItemStatuses(result: unknown): ProposalItemStatus[] {
+  if (!result || typeof result !== "object") return [];
+  const items = (result as { itemStatuses?: unknown }).itemStatuses;
+  if (!Array.isArray(items)) return [];
+  return items.filter(
+    (item): item is ProposalItemStatus =>
+      Boolean(item) && typeof item === "object",
+  );
+}
+
 export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   const { t } = useTranslation();
   const isPending = card.status === "pending";
@@ -872,11 +1165,15 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   const isFailed = card.status === "failed";
   const isRejected = card.status === "rejected";
   const proposalTags =
-    card.tool === "update_tags" ? proposalParamTags(card.params) : [];
+    card.tool === "update_tags" || card.tool === "batch_update_tags"
+      ? proposalParamTags(card.params)
+      : [];
   const proposalDescription =
     card.tool === "update_description"
       ? proposalParamString(card.params, "description")
       : undefined;
+  const targetAssetIds = proposalAssetIds(card);
+  const itemStatuses = proposalItemStatuses(card.result);
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -896,6 +1193,13 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
         >
           {card.tool.replaceAll("_", " ")}
         </Badge>
+        {targetAssetIds.length > 1 && (
+          <Badge tone="blue">
+            {t("aiCanvas.batchAssetCount", {
+              count: targetAssetIds.length,
+            })}
+          </Badge>
+        )}
         <Badge
           tone={
             isCompleted
@@ -951,6 +1255,37 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
           <p className="text-g-caption leading-[1.45] text-g-ink-2 break-words">
             {proposalDescription}
           </p>
+        </div>
+      )}
+      {itemStatuses.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 py-2">
+          <div className="font-g-mono text-[10px] font-[590] tracking-g-mono text-g-ink-4">
+            {t("aiCanvas.batchStatus")}
+          </div>
+          <div className="flex flex-col gap-1">
+            {itemStatuses.slice(0, 6).map((item) => (
+              <div
+                key={item.assetId ?? item.repoPath}
+                className="flex min-w-0 items-center gap-2 text-g-caption"
+              >
+                <Badge tone={item.status === "completed" ? "green" : "red"}>
+                  {item.status === "completed"
+                    ? t("aiCanvas.completed")
+                    : t("aiCanvas.failed")}
+                </Badge>
+                <span className="min-w-0 flex-1 truncate text-g-ink-2">
+                  {item.repoPath ? fileName(item.repoPath) : item.assetId}
+                </span>
+              </div>
+            ))}
+            {itemStatuses.length > 6 && (
+              <div className="text-g-caption text-g-ink-4">
+                {t("aiCanvas.batchMore", {
+                  count: itemStatuses.length - 6,
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
       {card.error && <p className="text-g-caption text-g-red">{card.error}</p>}

@@ -269,11 +269,31 @@ export function isImageCard(
 }
 
 export function compactImageAspectRatio(card: CanvasCard) {
-  if (card.kind !== "upload") return DEFAULT_IMAGE_ASPECT_RATIO;
-  if (card.uploadWidth <= 0 || card.uploadHeight <= 0) {
+  if (card.kind === "upload") {
+    if (card.uploadWidth > 0 && card.uploadHeight > 0) {
+      return card.uploadWidth / card.uploadHeight;
+    }
     return DEFAULT_IMAGE_ASPECT_RATIO;
   }
-  return card.uploadWidth / card.uploadHeight;
+  if (card.kind === "asset") {
+    const { width, height } = card.asset.image;
+    if (width > 0 && height > 0) return width / height;
+  }
+  return DEFAULT_IMAGE_ASPECT_RATIO;
+}
+
+export function suggestedPreviewLabel(
+  ext: string,
+  configuredFormat: string,
+): string {
+  const src = ext.toLowerCase().replace(/^\./, "");
+  const target =
+    src === configuredFormat
+      ? src === "webp"
+        ? "avif"
+        : "webp"
+      : configuredFormat;
+  return `${src.toUpperCase()} → ${target.toUpperCase()}`;
 }
 
 export function cardTone(card: CanvasCard) {

@@ -62,7 +62,6 @@ import { AICanvasStage } from "./AICanvasStage";
 import { AICanvasToolbar } from "./AICanvasToolbar";
 import type { AIBackendOption, WorkingState } from "./aiCanvasTypes";
 
-const ASSET_CARD_IMAGE_TOP = 38;
 const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
 const IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY =
   "aisets.canvas.imageOptimizationAdvice";
@@ -299,7 +298,7 @@ export function AICanvasView({
         width: (cardWidths[card.id] ?? size?.width ?? CARD_WIDTH) * stableScale,
         height:
           (size?.height ??
-            (isImageCard(card) && compactCards
+            (isImageCard(card)
               ? (cardWidths[card.id] ?? CARD_WIDTH) /
                 compactImageAspectRatio(card)
               : 240)) * stableScale,
@@ -307,7 +306,7 @@ export function AICanvasView({
       };
     });
     return metrics;
-  }, [cardElementSizes, cardWidths, cards, compactCards, viewport.scale]);
+  }, [cardElementSizes, cardWidths, cards, viewport.scale]);
 
   const groupBounds = useMemo(() => {
     if (selectedCardIds.length <= 1) return null;
@@ -359,6 +358,16 @@ export function AICanvasView({
             },
           ];
         }
+        if (card.kind === "upload") {
+          return [
+            {
+              id: card.id,
+              name: card.fileName,
+              meta: `${card.uploadWidth}×${card.uploadHeight} · upload`,
+              src: card.thumbnailDataUrl,
+            },
+          ];
+        }
         return [];
       }),
     [cards],
@@ -372,6 +381,19 @@ export function AICanvasView({
         ),
     [mentionableImageCards, mentionedCardIds],
   );
+  const extractTextTargetCount = useMemo(() => {
+    const targetIds = new Set<string>();
+    for (const card of cards) {
+      if (card.kind !== "asset" && card.kind !== "upload") continue;
+      if (
+        selectedCardIds.includes(card.id) ||
+        mentionedCardIds.includes(card.id)
+      ) {
+        targetIds.add(card.id);
+      }
+    }
+    return targetIds.size;
+  }, [cards, mentionedCardIds, selectedCardIds]);
   const commentsByAnchor = useMemo(() => {
     const map = new Map<string, CommentCanvasCard[]>();
     cards.forEach((card) => {
@@ -401,8 +423,8 @@ export function AICanvasView({
           : card;
 
       const anchorWidth = cardWidths[anchor.id] ?? CARD_WIDTH;
-      const anchorImageTop = compactCards ? 0 : ASSET_CARD_IMAGE_TOP;
-      const anchorImageHeight = anchorWidth * 0.75;
+      const anchorImageTop = 0;
+      const anchorImageHeight = anchorWidth / compactImageAspectRatio(anchor);
       const targetX =
         anchorPosition.x +
         anchorWidth * (card.region.x + card.region.width / 2);
@@ -436,14 +458,7 @@ export function AICanvasView({
         },
       ];
     });
-  }, [
-    cardWidths,
-    cards,
-    compactCards,
-    dragPreview,
-    selectedCardIds,
-    viewport.scale,
-  ]);
+  }, [cardWidths, cards, dragPreview, selectedCardIds, viewport.scale]);
   const { handleApproveProposal, handleRejectProposal } = useProposalExecution({
     cards,
     t,
@@ -686,6 +701,33 @@ export function AICanvasView({
       );
     },
     [cards],
+  );
+
+  const duplicateCard = useCallback(
+    (target: CanvasCard) => {
+      if (
+        target.kind !== "asset" &&
+        target.kind !== "upload" &&
+        target.kind !== "variant"
+      ) {
+        return;
+      }
+      const cloneId = createCanvasCardId("copy");
+      const clone = {
+        ...target,
+        id: cloneId,
+        x: target.x + 42,
+        y: target.y + 42,
+        createdAt: nowISO(),
+      } as AssetCanvasCard | UploadCanvasCard | VariantCanvasCard;
+      setCards((current) => [...current, clone]);
+      setSelectedCardIds([cloneId]);
+      const width = cardWidths[target.id];
+      if (width) {
+        setCardWidths((current) => ({ ...current, [cloneId]: width }));
+      }
+    },
+    [cardWidths],
   );
 
   async function runSearch() {
@@ -1022,6 +1064,14 @@ export function AICanvasView({
     input.click();
   }
 
+  function handleExtractText() {
+    if (extractTextTargetCount === 0) {
+      setError(t("aiCanvas.noOCRTargets"));
+      return;
+    }
+    void handleAsk({ prompt: t("aiCanvas.extractTextPrompt") });
+  }
+
   return (
     <div
       ref={rootRef}
@@ -1046,6 +1096,7 @@ export function AICanvasView({
         aiCursor={aiCursor}
         aiNickname={aiNickname}
         commentMode={commentMode}
+        setCommentMode={setCommentMode}
         isWorking={isWorking}
         onOpenAsset={onOpenAsset}
         onCanvasPointerDown={handleCanvasPointerDown}
@@ -1056,6 +1107,7 @@ export function AICanvasView({
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onDeleteCard={deleteCard}
+        onDuplicateCard={duplicateCard}
         onRegisterCard={registerMeasuredCardElement}
         onAddComment={addComment}
         onCreateImagePreview={createImagePreview}
@@ -1135,6 +1187,9 @@ export function AICanvasView({
         setImageOptimizationAdvice={setImageOptimizationAdvice}
         mentionSelectedAsset={mentionSelectedAsset}
         handleAttachImage={handleAttachImage}
+        handleExtractText={handleExtractText}
+        extractTextTargetCount={extractTextTargetCount}
+        extractTextDisabled={extractTextTargetCount === 0}
         commentMode={commentMode}
         setCommentMode={setCommentMode}
         addAssistantCard={addAssistantCard}

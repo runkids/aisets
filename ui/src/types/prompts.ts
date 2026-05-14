@@ -4,7 +4,8 @@ export type PromptPresetType =
   | "ocr"
   | "optimize"
   | "duplicate"
-  | "precheck";
+  | "precheck"
+  | "canvas";
 export type PromptVariableType = "tags" | "text" | "select";
 
 export type PromptVariable = {

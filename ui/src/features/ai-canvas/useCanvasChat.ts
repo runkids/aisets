@@ -1,7 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useRef } from "react";
 import type { TFunction } from "i18next";
-import { getCatalogItems } from "@/api";
 import {
   canvasChat,
   serializeCanvasSnapshot,
@@ -19,6 +18,8 @@ import {
   type ChatMentionPreview,
   type CommentCanvasCard,
   type ProposalCanvasCard,
+  type UploadCanvasCard,
+  type VariantCanvasCard,
 } from "./aiCanvasState";
 import { CARD_WIDTH, imageMeta, nextCardPosition, nowISO } from "./canvasUtils";
 
@@ -63,6 +64,99 @@ function isCaptureTool(tool: string) {
     tool === "capture_canvas" ||
     tool === "capture_selected"
   );
+}
+
+function isAssetItem(value: unknown): value is AssetItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<AssetItem>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.repoPath === "string" &&
+    typeof item.projectId === "string" &&
+    Boolean(item.image) &&
+    typeof item.url === "string" &&
+    typeof item.thumbnailUrl === "string"
+  );
+}
+
+function assetsFromActionResult(result: unknown): AssetItem[] {
+  if (!result || typeof result !== "object") return [];
+  const items = (result as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  return items.filter(isAssetItem);
+}
+
+function actionResultCardIds(result: unknown, cards: CanvasCard[]) {
+  if (!result || typeof result !== "object") return [];
+  const raw = (result as { cardIds?: unknown }).cardIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (id): id is string =>
+      typeof id === "string" && cards.some((card) => card.id === id),
+  );
+}
+
+type OCRTextActionItem = {
+  assetId?: string;
+  cardId?: string;
+  repoPath?: string;
+  fileName?: string;
+  source?: string;
+  status?: string;
+  text?: string;
+  languages?: string[];
+  errorMessage?: string;
+};
+
+function ocrItemsFromActionResult(result: unknown): OCRTextActionItem[] {
+  if (!result || typeof result !== "object") return [];
+  const items = (result as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  return items.filter(
+    (item): item is OCRTextActionItem =>
+      Boolean(item) && typeof item === "object",
+  );
+}
+
+type DuplicateCardCopy = {
+  sourceCardId?: string;
+  cardId?: string;
+};
+
+function duplicateCardCopiesFromActionResult(result: unknown) {
+  if (!result || typeof result !== "object") return [];
+  const copies = (result as { copies?: unknown }).copies;
+  if (!Array.isArray(copies)) return [];
+  return copies.filter(
+    (copy): copy is DuplicateCardCopy =>
+      Boolean(copy) && typeof copy === "object",
+  );
+}
+
+function formatOCRActionText(result: unknown, t: TFunction) {
+  const items = ocrItemsFromActionResult(result);
+  if (items.length === 0) return "";
+  const lines = [
+    `**${t("aiCanvas.ocrResultTitle", { count: items.length })}**`,
+  ];
+  for (const item of items) {
+    const name = item.fileName
+      ? item.fileName
+      : item.repoPath
+        ? fileName(item.repoPath)
+        : item.assetId || item.cardId || "";
+    lines.push("", `**${name}**`);
+    if (item.status === "ready") {
+      lines.push(item.text?.trim() || t("aiCanvas.ocrEmptyText"));
+    } else {
+      lines.push(
+        t("aiCanvas.ocrFailed", {
+          error: item.errorMessage || item.status || "unknown",
+        }),
+      );
+    }
+  }
+  return lines.join("\n");
 }
 
 function requestedSearchCardLimit(promptText: string): number | undefined {
@@ -161,7 +255,7 @@ export function useCanvasChat(opts: {
   } = opts;
 
   const abortRef = useRef<AbortController | null>(null);
-  const searchResultsRef = useRef<Array<{ id: string; repoPath: string }>>([]);
+  const searchResultsRef = useRef<AssetItem[]>([]);
 
   function shouldAttachCanvasImage(promptText: string, selectedCount: number) {
     return (
@@ -358,6 +452,164 @@ export function useCanvasChat(opts: {
       }, delay);
     }
 
+    function duplicateCardsFromResult(result: unknown) {
+      const copies = duplicateCardCopiesFromActionResult(result);
+      if (copies.length === 0) return;
+      const layout = (result as { layout?: unknown }).layout;
+      const walking =
+        typeof layout === "string" && /walk|散步|走路|walking/i.test(layout);
+      const perSourceIndex = new Map<string, number>();
+      const created: Array<
+        AssetCanvasCard | UploadCanvasCard | VariantCanvasCard
+      > = [];
+      const nextWidths: Record<string, number> = {};
+      for (const copy of copies) {
+        if (!copy.sourceCardId || !copy.cardId) continue;
+        const source = canvasCards.find(
+          (card) => card.id === copy.sourceCardId,
+        );
+        if (
+          !source ||
+          (source.kind !== "asset" &&
+            source.kind !== "upload" &&
+            source.kind !== "variant")
+        ) {
+          continue;
+        }
+        const index = perSourceIndex.get(source.id) ?? 0;
+        perSourceIndex.set(source.id, index + 1);
+        const sourceWidth = cardLayoutMetrics[source.id]?.width ?? CARD_WIDTH;
+        const stepX = walking ? Math.max(108, sourceWidth * 0.46) : 36;
+        const stepY = walking ? (index % 2 === 0 ? 18 : -12) : 36;
+        const base = {
+          ...source,
+          id: copy.cardId,
+          x: source.x + (index + 1) * stepX,
+          y: source.y + (index + 1) * stepY,
+          createdAt: nowISO(),
+        };
+        if (source.kind === "asset") created.push(base as AssetCanvasCard);
+        if (source.kind === "upload") created.push(base as UploadCanvasCard);
+        if (source.kind === "variant") created.push(base as VariantCanvasCard);
+        if (sourceWidth) {
+          nextWidths[copy.cardId] = sourceWidth;
+        }
+      }
+      if (created.length === 0) return;
+      newCards.push(...created);
+      setCards((current) => [...current, ...created]);
+      setSelectedCardIds(created.map((card) => card.id));
+      if (Object.keys(nextWidths).length > 0) {
+        setCardWidths((current) => ({ ...current, ...nextWidths }));
+      }
+      const first = created[0];
+      setAiCursor({
+        ...focusCursorPosition(first, cardLayoutMetrics, viewport.scale),
+        label:
+          (result as { label?: string }).label ||
+          t("aiCanvas.duplicatedImages", { count: created.length }),
+        status: "acting",
+      });
+    }
+
+    function cardBox(card: CanvasCard) {
+      const width = cardLayoutMetrics[card.id]?.width ?? CARD_WIDTH;
+      const height = cardLayoutMetrics[card.id]?.height ?? width * 0.75;
+      return {
+        id: card.id,
+        x: card.x,
+        y: card.y,
+        width,
+        height,
+        right: card.x + width,
+        bottom: card.y + height,
+        cx: card.x + width / 2,
+        cy: card.y + height / 2,
+      };
+    }
+
+    function runAlignTool(result: unknown) {
+      const ids = actionResultCardIds(result, canvasCards);
+      if (ids.length < 2) return;
+      const axis = (result as { axis?: string }).axis;
+      const boxes = ids
+        .map((id) => canvasCards.find((card) => card.id === id))
+        .filter((card): card is CanvasCard => Boolean(card))
+        .map(cardBox);
+      const target =
+        axis === "right"
+          ? Math.max(...boxes.map((box) => box.right))
+          : axis === "center"
+            ? boxes.reduce((sum, box) => sum + box.cx, 0) / boxes.length
+            : axis === "bottom"
+              ? Math.max(...boxes.map((box) => box.bottom))
+              : axis === "middle"
+                ? boxes.reduce((sum, box) => sum + box.cy, 0) / boxes.length
+                : axis === "top"
+                  ? Math.min(...boxes.map((box) => box.y))
+                  : Math.min(...boxes.map((box) => box.x));
+      let delay = 0;
+      for (const box of boxes) {
+        const x =
+          axis === "right"
+            ? target - box.width
+            : axis === "center"
+              ? target - box.width / 2
+              : axis === "left"
+                ? target
+                : box.x;
+        const y =
+          axis === "bottom"
+            ? target - box.height
+            : axis === "middle"
+              ? target - box.height / 2
+              : axis === "top"
+                ? target
+                : box.y;
+        simulateAICardDrag(box.id, x, y, delay);
+        delay += 220;
+      }
+    }
+
+    function runDistributeTool(result: unknown) {
+      const ids = actionResultCardIds(result, canvasCards);
+      if (ids.length < 3) return;
+      const direction = (result as { direction?: string }).direction;
+      const rawGap = (result as { gap?: unknown }).gap;
+      const gap =
+        typeof rawGap === "number" && Number.isFinite(rawGap)
+          ? Math.max(0, rawGap)
+          : undefined;
+      const boxes = ids
+        .map((id) => canvasCards.find((card) => card.id === id))
+        .filter((card): card is CanvasCard => Boolean(card))
+        .map(cardBox)
+        .sort((a, b) => (direction === "vertical" ? a.y - b.y : a.x - b.x));
+      if (direction === "vertical") {
+        const top = Math.min(...boxes.map((box) => box.y));
+        const bottom = Math.max(...boxes.map((box) => box.bottom));
+        const totalHeight = boxes.reduce((sum, box) => sum + box.height, 0);
+        const resolvedGap =
+          gap ?? Math.max(0, (bottom - top - totalHeight) / (boxes.length - 1));
+        let y = top;
+        boxes.forEach((box, index) => {
+          simulateAICardDrag(box.id, box.x, y, index * 220);
+          y += box.height + resolvedGap;
+        });
+        return;
+      }
+      const left = Math.min(...boxes.map((box) => box.x));
+      const right = Math.max(...boxes.map((box) => box.right));
+      const totalWidth = boxes.reduce((sum, box) => sum + box.width, 0);
+      const resolvedGap =
+        gap ?? Math.max(0, (right - left - totalWidth) / (boxes.length - 1));
+      let x = left;
+      boxes.forEach((box, index) => {
+        simulateAICardDrag(box.id, x, box.y, index * 220);
+        x += box.width + resolvedGap;
+      });
+    }
+
     function handleEvent(event: CanvasChatEvent) {
       if (event.type === "focus" && event.cardId) {
         const target = canvasCards.find((c) => c.id === event.cardId);
@@ -403,7 +655,8 @@ export function useCanvasChat(opts: {
           description: event.description,
           impact: event.impact,
           status: "pending",
-          sourceAssetId: event.targetAssetId,
+          sourceAssetId: event.targetAssetId ?? event.targetAssetIds?.[0],
+          sourceAssetIds: event.targetAssetIds,
         };
         newCards.push(card);
         setCards((current) => [...current, card]);
@@ -458,6 +711,9 @@ export function useCanvasChat(opts: {
           }
         }
       }
+      if (event.type === "action_result" && event.tool === "duplicate_cards") {
+        duplicateCardsFromResult(event.result);
+      }
       if (event.type === "action_result" && event.tool === "focus_card") {
         const result = event.result as { cardId?: string; label?: string };
         if (result?.cardId) {
@@ -492,6 +748,26 @@ export function useCanvasChat(opts: {
           };
           newCards.push(card);
           setCards((current) => [...current, card]);
+        }
+      }
+      if (event.type === "action_result" && event.tool === "update_comment") {
+        const r = event.result as { commentCardId?: string; text?: string };
+        if (r?.commentCardId && typeof r.text === "string") {
+          setCards((current) =>
+            current.map((card) =>
+              card.kind === "comment" && card.id === r.commentCardId
+                ? { ...card, text: r.text ?? "" }
+                : card,
+            ),
+          );
+        }
+      }
+      if (event.type === "action_result" && event.tool === "delete_comment") {
+        const r = event.result as { commentCardId?: string };
+        if (r?.commentCardId) {
+          setCards((current) =>
+            current.filter((card) => card.id !== r.commentCardId),
+          );
         }
       }
       if (event.type === "action_result" && event.tool === "move_card") {
@@ -590,26 +866,65 @@ export function useCanvasChat(opts: {
           }
         }
       }
-      if (event.type === "action_result" && event.tool === "search_assets") {
-        const r = event.result as {
-          q?: string;
-          items?: Array<{ id: string; repoPath: string }>;
-        };
-        if (r?.items?.length) {
-          for (const it of r.items) {
+      if (event.type === "action_result" && event.tool === "align_cards") {
+        runAlignTool(event.result);
+      }
+      if (event.type === "action_result" && event.tool === "distribute_cards") {
+        runDistributeTool(event.result);
+      }
+      if (
+        event.type === "action_result" &&
+        (event.tool === "search_assets" ||
+          event.tool === "add_assets_to_canvas")
+      ) {
+        const assets = assetsFromActionResult(event.result);
+        if (assets.length) {
+          for (const asset of assets) {
             if (
               searchCardLimit != null &&
               searchResultsRef.current.length >= searchCardLimit
             ) {
               break;
             }
-            if (!searchResultsRef.current.some((s) => s.id === it.id)) {
-              searchResultsRef.current.push({
-                id: it.id,
-                repoPath: it.repoPath,
-              });
+            if (!searchResultsRef.current.some((s) => s.id === asset.id)) {
+              searchResultsRef.current.push(asset);
             }
           }
+        }
+      }
+      if (event.type === "action_result" && event.tool === "extract_ocr_text") {
+        const text = formatOCRActionText(event.result, t);
+        if (text) {
+          assistantText += (assistantText ? "\n\n" : "") + text;
+        }
+        const ocrItems = ocrItemsFromActionResult(event.result);
+        const readyByAssetId = new Map(
+          ocrItems
+            .filter((item) => item.assetId && item.status === "ready")
+            .map((item) => [item.assetId as string, item]),
+        );
+        if (readyByAssetId.size > 0) {
+          setCards((current) =>
+            current.map((card) => {
+              if (card.kind !== "asset") return card;
+              const item = readyByAssetId.get(card.asset.id);
+              if (!item) return card;
+              return {
+                ...card,
+                asset: {
+                  ...card.asset,
+                  ocr: {
+                    ...(card.asset.ocr ?? {}),
+                    status: "ready",
+                    engineName: "vlm",
+                    mode: "vlm",
+                    text: item.text ?? "",
+                    languages: item.languages ?? [],
+                  },
+                },
+              };
+            }),
+          );
         }
       }
     }
@@ -640,37 +955,18 @@ export function useCanvasChat(opts: {
               ? [...searchResultsRef.current]
               : searchResultsRef.current.slice(0, searchCardLimit);
           searchResultsRef.current = [];
-          const wantedIds = new Set(wanted.map((w) => w.id));
-          const names = [
-            ...new Set(
-              wanted.map((w) => {
-                const parts = w.repoPath.split("/");
-                return parts[parts.length - 1].replace(/\.[^.]+$/, "");
-              }),
-            ),
-          ];
-          const allItems: AssetItem[] = [];
-          const seenIds = new Set<string>();
-          for (const name of names.slice(0, 12)) {
-            const page = await getCatalogItems({
-              scanId,
-              q: name,
-              limit: 3,
-            });
-            for (const item of page.items) {
-              if (!seenIds.has(item.id)) {
-                seenIds.add(item.id);
-                allItems.push(item);
-              }
-            }
-          }
-          const matchedAssets = allItems.filter((a) => wantedIds.has(a.id));
           const rect = rootRef.current?.getBoundingClientRect();
           const containerSize = rect
             ? { width: rect.width, height: rect.height }
             : undefined;
           const addedCards: AssetCanvasCard[] = [];
-          for (const asset of matchedAssets) {
+          const existingAssetIds = new Set(
+            canvasCards
+              .filter((card): card is AssetCanvasCard => card.kind === "asset")
+              .map((card) => card.asset.id),
+          );
+          for (const asset of wanted) {
+            if (existingAssetIds.has(asset.id)) continue;
             const pos = nextCardPosition(
               canvasCards.length + newCards.length + addedCards.length,
               viewport,
@@ -685,6 +981,7 @@ export function useCanvasChat(opts: {
               asset,
             };
             addedCards.push(card);
+            existingAssetIds.add(asset.id);
           }
           if (addedCards.length > 0) {
             setCards((cur) => [...cur, ...addedCards]);

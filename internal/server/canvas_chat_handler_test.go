@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -269,6 +270,20 @@ func TestBuildCanvasUserPrompt_IncludesSelectedAssetTargets(t *testing.T) {
 	}
 }
 
+func TestBuildCanvasUserPrompt_IncludesSelectedUploadTargets(t *testing.T) {
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{
+		SelectedCardIDs: []string{"upload-card-1"},
+		Cards: []canvasCardSnapshot{
+			{ID: "upload-card-1", Kind: "upload", UploadToken: "tok", UploadFileName: "receipt.png", UploadWidth: 640, UploadHeight: 480},
+		},
+	}, canvasChatOptions{}, "en")
+	for _, want := range []string{"Selected upload targets (1)", "card=upload-card-1", "file=receipt.png"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
 func TestCanvasCaptureRequested(t *testing.T) {
 	for _, input := range []string{
 		"幫我排版後拍一張去背照",
@@ -309,7 +324,7 @@ func TestCanvasCaptureRepairPrompt_AsksModelToChooseMode(t *testing.T) {
 	}
 }
 
-func TestExpandCanvasMultiSelectedActions_FansOutSinglePerAssetAction(t *testing.T) {
+func TestExpandCanvasMultiSelectedActions_BatchesSinglePerAssetAction(t *testing.T) {
 	actions := []canvasAction{{
 		Tool:        "update_tags",
 		Params:      map[string]any{"assetId": "a1", "tags": []any{"family"}},
@@ -325,14 +340,14 @@ func TestExpandCanvasMultiSelectedActions_FansOutSinglePerAssetAction(t *testing
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas)
-	if len(expanded) != 3 {
-		t.Fatalf("expected 3 actions, got %d", len(expanded))
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "幫這些圖片加標籤")
+	if len(expanded) != 1 {
+		t.Fatalf("expected 1 batch action, got %d", len(expanded))
 	}
-	for i, want := range []string{"a1", "a2", "a3"} {
-		if expanded[i].Params["assetId"] != want {
-			t.Fatalf("action %d assetId = %v, want %s", i, expanded[i].Params["assetId"], want)
-		}
+	got := canvasActionAssetIDs(expanded[0])
+	want := []string{"a1", "a2", "a3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("assetIds = %#v, want %#v", got, want)
 	}
 }
 
@@ -349,9 +364,119 @@ func TestExpandCanvasMultiSelectedActions_DoesNotFanOutWhenModelAlreadyEmitsPerA
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas)
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "幫這些圖片加標籤")
 	if len(expanded) != 2 {
 		t.Fatalf("expected original 2 actions, got %d", len(expanded))
+	}
+}
+
+func TestExpandCanvasMultiSelectedActions_RespectsExplicitSingleTarget(t *testing.T) {
+	actions := []canvasAction{{
+		Tool:   "update_tags",
+		Params: map[string]any{"assetId": "a1", "tags": []any{"family"}},
+	}}
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1", "card-2"},
+		Cards: []canvasCardSnapshot{
+			{ID: "card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1"}},
+			{ID: "card-2", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a2"}},
+		},
+	}
+
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "只處理第一張")
+	if len(expanded) != 1 {
+		t.Fatalf("expected original single action, got %d", len(expanded))
+	}
+	if got := canvasActionAssetIDs(expanded[0]); !reflect.DeepEqual(got, []string{"a1"}) {
+		t.Fatalf("asset IDs = %#v, want [a1]", got)
+	}
+}
+
+func TestExpandCanvasMultiSelectedActions_DefaultsDuplicateCardsToSelectedImages(t *testing.T) {
+	actions := []canvasAction{{
+		Tool:   "duplicate_cards",
+		Params: map[string]any{"count": float64(5), "layout": "walk"},
+	}}
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1", "comment-1"},
+		Cards: []canvasCardSnapshot{
+			{ID: "card-1", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "a1"}},
+			{ID: "comment-1", Kind: "comment"},
+		},
+	}
+
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "複製五隻小狗讓牠散步")
+	if len(expanded) != 1 {
+		t.Fatalf("expected one duplicate action, got %d", len(expanded))
+	}
+	if got := canvasActionCardIDs(expanded[0]); !reflect.DeepEqual(got, []string{"card-1"}) {
+		t.Fatalf("card IDs = %#v, want [card-1]", got)
+	}
+}
+
+func TestExpandCanvasMultiSelectedActions_DefaultsOCRToSelectedUploadCards(t *testing.T) {
+	actions := []canvasAction{{
+		Tool:   "extract_ocr_text",
+		Params: map[string]any{"mode": "vlm", "saveToMetadata": false},
+	}}
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"upload-1", "comment-1"},
+		Cards: []canvasCardSnapshot{
+			{ID: "upload-1", Kind: "upload", UploadToken: "tok", UploadFileName: "receipt.png", UploadWidth: 640, UploadHeight: 480},
+			{ID: "comment-1", Kind: "comment"},
+		},
+	}
+
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "擷取圖片文字")
+	if len(expanded) != 1 {
+		t.Fatalf("expected one OCR action, got %d", len(expanded))
+	}
+	if got := canvasActionCardIDs(expanded[0]); !reflect.DeepEqual(got, []string{"upload-1"}) {
+		t.Fatalf("card IDs = %#v, want [upload-1]", got)
+	}
+}
+
+func TestCanvasActionAssetIDs_NormalizesLegacyAndBatchParams(t *testing.T) {
+	act := canvasAction{
+		Tool: "delete_asset",
+		Params: map[string]any{
+			"assetIds": []any{"a1", "a2", "a1", ""},
+			"assetId":  "a3",
+		},
+	}
+	got := canvasActionAssetIDs(act)
+	want := []string{"a1", "a2", "a3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("asset IDs = %#v, want %#v", got, want)
+	}
+}
+
+func TestCanvasActionCardIDs_NormalizesLegacyAndBatchParams(t *testing.T) {
+	act := canvasAction{
+		Tool: "duplicate_cards",
+		Params: map[string]any{
+			"cardIds": []any{"c1", "c2", "c1", ""},
+			"cardId":  "c3",
+		},
+	}
+	got := canvasActionCardIDs(act)
+	want := []string{"c1", "c2", "c3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("card IDs = %#v, want %#v", got, want)
+	}
+}
+
+func TestCanvasToolsDeclareCardinality(t *testing.T) {
+	for _, tool := range canvasToolRegistry() {
+		if tool.Cardinality == "" {
+			t.Fatalf("%s missing cardinality", tool.Name)
+		}
+	}
+	if got := canvasToolCardinality("extract_ocr_text"); got != "multi" {
+		t.Fatalf("extract_ocr_text cardinality = %q, want multi", got)
+	}
+	if !canvasToolSafe("extract_ocr_text") {
+		t.Fatal("extract_ocr_text should be safe")
 	}
 }
 

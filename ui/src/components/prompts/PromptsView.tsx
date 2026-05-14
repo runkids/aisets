@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Copy,
+  Frame,
   GitCompareArrows,
   MessageSquarePlus,
   Plus,
@@ -201,6 +202,13 @@ function PresetList({
             icon={<ShieldCheck size={15} />}
             label={t("prompts.precheckPresets")}
             onClick={() => onTypeChange("precheck")}
+          />
+          <RailItem
+            variant="settings"
+            active={type === "canvas"}
+            icon={<Frame size={15} />}
+            label={t("prompts.canvasPresets")}
+            onClick={() => onTypeChange("canvas")}
           />
         </RailSection>
 
@@ -454,6 +462,7 @@ function PresetEditor({ preset }: { preset: PromptPreset }) {
       ocr: `Analyze this image and respond with a JSON object:\n- "text": {{text}}\n- "languages": {{languages}}\n\nRespond ONLY with valid JSON, no markdown or explanation.`,
       optimize: `Analyze this image and provide compression advice.\n\n{{fileMetadata}}\n\n{{lintFindings}}\n\n{{optimizationFindings}}\n\nBased on the image content AND the analysis above, respond as JSON:\n{\n  "contentType": one of {{contentTypes}},\n  "recommendedFormat": one of {{formats}},\n  "recommendedQuality": <number 1-100 or null for lossless>,\n  "lossless": <true|false>,\n  "rationale": "<2-3 sentences: explain your recommendation considering the lint findings and file characteristics>"\n}\n\n{{rules}}\n\nImportant:\n- If lint findings identify structural issues (embedded bitmaps, oversized raster), address them in your rationale\n- Your recommendation should complement, not contradict, the lint findings\n- Be specific about expected savings when possible\n- Always name the concrete target format in the rationale (e.g. "extract the embedded bitmap and convert to WebP at quality 80")\n- For files with mixed content (e.g. SVG containing embedded raster), recommend a specific format for the extracted raster portion, not just the container format\n\nRespond ONLY with the JSON object, no other text.`,
       duplicate: `Compare these two images that were flagged as near-duplicates (dHash distance: {{distance}}/64).\n\nImage 1: {{leftMetadata}}\nImage 2: {{rightMetadata}}\n\nExplain:\n1. What the images show\n2. The specific visual differences between them\n3. Which one to keep and why (consider: resolution, quality, file size)\n\nRespond ONLY with a JSON object:\n{\n  "summary": "one-sentence description of what these images are",\n  "differences": "specific visual differences between the two",\n  "recommendation": "keep image 1 or image 2, with the filename",\n  "rationale": "why this one is better to keep"\n}`,
+      canvas: `Canvas operating strategy:\n- Treat multi-image selection as the default target set. Use assetIds for selected or mentioned catalog images, and cardIds for uploaded image cards, unless the user clearly narrows to one image.\n- Prefer safe canvas actions first: search, select, arrange, align, distribute, inspect, compare, OCR extraction, and screenshots.\n- OCR extraction should answer in chat first. Saving OCR back to metadata requires an update_ocr_text proposal.\n- Multi-image file or metadata writes must stay as one batch proposal and must preserve per-asset status.`,
     };
     const defaultTemplate = templates[preset.type] ?? "";
     setTemplate(defaultTemplate);

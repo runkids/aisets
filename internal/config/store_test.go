@@ -1913,7 +1913,7 @@ func TestExportImportAndResetData(t *testing.T) {
 	} else if s.WorkspaceName != "Aisets" || s.ActiveWorkspaceID != "default" {
 		t.Fatalf("settings after reset = %#v", s)
 	}
-	for _, presetType := range []string{"tag", "ocr", "optimize", "duplicate", "precheck"} {
+	for _, presetType := range []string{"tag", "ocr", "optimize", "duplicate", "precheck", "canvas"} {
 		presets, err := store.ListPromptPresets(presetType)
 		if err != nil {
 			t.Fatal(err)

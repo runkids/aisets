@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,10 @@ import (
 	"aisets/internal/agent"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
+	"aisets/internal/imageproc"
+	"aisets/internal/llm"
+	"aisets/internal/ocr"
+	"aisets/internal/scanner"
 )
 
 type canvasChatMessage struct {
@@ -58,6 +63,7 @@ type canvasCardSnapshot struct {
 	ProposalStatus string               `json:"status,omitempty"`
 	Description    string               `json:"description,omitempty"`
 	SourceAssetID  string               `json:"sourceAssetId,omitempty"`
+	SourceAssetIDs []string             `json:"sourceAssetIds,omitempty"`
 	SourceName     string               `json:"sourceName,omitempty"`
 	InputBytes     int64                `json:"inputBytes,omitempty"`
 	OutputBytes    int64                `json:"outputBytes,omitempty"`
@@ -82,9 +88,10 @@ type canvasSnapshot struct {
 }
 
 type canvasChatOptions struct {
-	ImageOptimizationAdvice bool `json:"imageOptimizationAdvice"`
-	CanvasImageAttached     bool `json:"-"`
-	AutoLocale              bool `json:"-"`
+	ImageOptimizationAdvice bool   `json:"imageOptimizationAdvice"`
+	CanvasImageAttached     bool   `json:"-"`
+	AutoLocale              bool   `json:"-"`
+	CanvasStrategy          string `json:"-"`
 }
 
 type canvasChatRequest struct {
@@ -367,6 +374,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	if len(canvas.SelectedCardIDs) > 0 {
 		fmt.Fprintf(&b, "Selected cards: %s\n", strings.Join(canvas.SelectedCardIDs, ", "))
 		var selectedAssets []string
+		var selectedUploads []string
 		selected := map[string]bool{}
 		for _, id := range canvas.SelectedCardIDs {
 			selected[id] = true
@@ -375,9 +383,15 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 			if selected[card.ID] && card.Asset != nil {
 				selectedAssets = append(selectedAssets, fmt.Sprintf("card=%s assetId=%s path=%s", card.ID, card.Asset.ID, card.Asset.RepoPath))
 			}
+			if selected[card.ID] && card.Kind == "upload" && card.UploadToken != "" {
+				selectedUploads = append(selectedUploads, fmt.Sprintf("card=%s file=%s %dx%d", card.ID, card.UploadFileName, card.UploadWidth, card.UploadHeight))
+			}
 		}
 		if len(selectedAssets) > 0 {
 			fmt.Fprintf(&b, "Selected asset targets (%d):\n- %s\n", len(selectedAssets), strings.Join(selectedAssets, "\n- "))
+		}
+		if len(selectedUploads) > 0 {
+			fmt.Fprintf(&b, "Selected upload targets (%d):\n- %s\n", len(selectedUploads), strings.Join(selectedUploads, "\n- "))
 		}
 	}
 	fmt.Fprintf(&b, "Total cards: %d\n", len(canvas.Cards))
@@ -574,7 +588,7 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 	)
 
 	switch tool {
-	case "update_tags":
+	case "update_tags", "batch_update_tags":
 		return mutationIntent && containsAnyText(latestUserMessage, "tag", "tags", "標籤", "标签")
 	case "update_description":
 		return mutationIntent && containsAnyText(latestUserMessage, "description", "describe", "caption", "描述", "說明", "说明")
@@ -588,7 +602,7 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 		return containsAnyText(latestUserMessage, "copy", "duplicate", "複製", "复制")
 	case "delete_asset":
 		return containsAnyText(latestUserMessage, "delete", "remove", "刪除", "删除", "移除")
-	case "favorite_asset":
+	case "favorite_asset", "batch_favorite_assets":
 		return containsAnyText(latestUserMessage, "favorite", "favourite", "收藏")
 	case "export_asset":
 		return containsAnyText(latestUserMessage, "export", "download", "匯出", "导出", "下載", "下载")
@@ -617,10 +631,173 @@ func selectedCanvasAssetIDs(canvas canvasSnapshot) []string {
 	return ids
 }
 
-func canvasToolTargetsOneAsset(tool string) bool {
+func selectedCanvasImageCardIDs(canvas canvasSnapshot) []string {
+	selected := make(map[string]bool, len(canvas.SelectedCardIDs))
+	for _, id := range canvas.SelectedCardIDs {
+		selected[id] = true
+	}
+	var ids []string
+	seen := map[string]bool{}
+	for _, card := range canvas.Cards {
+		if !selected[card.ID] || seen[card.ID] {
+			continue
+		}
+		if card.Kind != "asset" && card.Kind != "upload" && card.Kind != "variant" {
+			continue
+		}
+		seen[card.ID] = true
+		ids = append(ids, card.ID)
+	}
+	return ids
+}
+
+func selectedCanvasOCRCardIDs(canvas canvasSnapshot) []string {
+	selected := make(map[string]bool, len(canvas.SelectedCardIDs))
+	for _, id := range canvas.SelectedCardIDs {
+		selected[id] = true
+	}
+	var ids []string
+	seen := map[string]bool{}
+	for _, card := range canvas.Cards {
+		if !selected[card.ID] || seen[card.ID] {
+			continue
+		}
+		if card.Kind != "asset" && card.Kind != "upload" {
+			continue
+		}
+		seen[card.ID] = true
+		ids = append(ids, card.ID)
+	}
+	return ids
+}
+
+func canvasParamStringSlice(value any) []string {
+	var ids []string
+	seen := map[string]bool{}
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	switch v := value.(type) {
+	case []string:
+		for _, id := range v {
+			add(id)
+		}
+	case []any:
+		for _, raw := range v {
+			if id, ok := raw.(string); ok {
+				add(id)
+			}
+		}
+	case string:
+		add(v)
+	}
+	return ids
+}
+
+func setCanvasActionCardIDs(act *canvasAction, ids []string) {
+	if act.Params == nil {
+		act.Params = map[string]any{}
+	} else {
+		next := make(map[string]any, len(act.Params)+1)
+		for k, v := range act.Params {
+			next[k] = v
+		}
+		act.Params = next
+	}
+	act.Params["cardIds"] = ids
+	if len(ids) > 0 {
+		act.Params["cardId"] = ids[0]
+	}
+}
+
+func canvasActionCardIDs(act canvasAction) []string {
+	if act.Params == nil {
+		return nil
+	}
+	ids := canvasParamStringSlice(act.Params["cardIds"])
+	seen := map[string]bool{}
+	for _, id := range ids {
+		seen[id] = true
+	}
+	if id, ok := act.Params["cardId"].(string); ok {
+		id = strings.TrimSpace(id)
+		if id != "" && !seen[id] {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func canvasActionAssetIDs(act canvasAction) []string {
+	if act.Params == nil {
+		return nil
+	}
+	ids := canvasParamStringSlice(act.Params["assetIds"])
+	seen := map[string]bool{}
+	for _, id := range ids {
+		seen[id] = true
+	}
+	if id, ok := act.Params["assetId"].(string); ok {
+		id = strings.TrimSpace(id)
+		if id != "" && !seen[id] {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func setCanvasActionAssetIDs(act *canvasAction, ids []string) {
+	if act.Params == nil {
+		act.Params = map[string]any{}
+	} else {
+		next := make(map[string]any, len(act.Params)+1)
+		for k, v := range act.Params {
+			next[k] = v
+		}
+		act.Params = next
+	}
+	act.Params["assetIds"] = ids
+	if len(ids) > 0 {
+		act.Params["assetId"] = ids[0]
+	}
+}
+
+func canvasToolTargetsCatalogAssets(tool string) bool {
 	switch tool {
-	case "update_tags", "update_description", "update_ocr_text", "compress_image", "resize_image", "convert_image":
+	case "add_assets_to_canvas",
+		"extract_ocr_text",
+		"compare_assets",
+		"find_similar_assets",
+		"inspect_image_quality",
+		"generate_alt_text",
+		"update_tags",
+		"batch_update_tags",
+		"update_description",
+		"update_ocr_text",
+		"compress_image",
+		"resize_image",
+		"convert_image",
+		"move_asset",
+		"copy_asset",
+		"delete_asset",
+		"favorite_asset",
+		"batch_favorite_assets",
+		"export_asset":
 		return true
+	default:
+		return false
+	}
+}
+
+func canvasToolCanUseSelectedAssetIDs(tool string) bool {
+	switch canvasToolCardinality(tool) {
+	case "multi", "pair", "batchOnly":
+		return canvasToolTargetsCatalogAssets(tool)
 	default:
 		return false
 	}
@@ -713,34 +890,71 @@ func canvasImageTempFile(dataURI string) (string, func(), error) {
 	return path, func() { os.Remove(path) }, nil
 }
 
-func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnapshot) []canvasAction {
+func canvasUserLimitsToSingleAsset(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"only this", "only first", "first image", "single image",
+		"只處理第一", "只处理第一", "只要第一", "只看第一", "第一張", "第一张",
+		"只處理這張", "只处理这张", "只看這張", "只看这张", "這張", "这张",
+	)
+}
+
+func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
 	selectedAssetIDs := selectedCanvasAssetIDs(canvas)
-	if len(selectedAssetIDs) <= 1 {
-		return actions
-	}
+	selectedImageCardIDs := selectedCanvasImageCardIDs(canvas)
+	selectedOCRCardIDs := selectedCanvasOCRCardIDs(canvas)
+	limitToSingle := canvasUserLimitsToSingleAsset(latestUserMessage)
 
 	toolCounts := map[string]int{}
 	for _, act := range actions {
-		if canvasToolTargetsOneAsset(act.Tool) {
+		if canvasToolCanUseSelectedAssetIDs(act.Tool) {
 			toolCounts[act.Tool]++
 		}
 	}
 
 	var expanded []canvasAction
 	for _, act := range actions {
-		if !canvasToolTargetsOneAsset(act.Tool) || toolCounts[act.Tool] != 1 {
+		if act.Tool == "extract_ocr_text" && len(canvasActionAssetIDs(act)) == 0 && len(canvasActionCardIDs(act)) == 0 && len(selectedOCRCardIDs) > 0 {
+			clone := act
+			cardIDs := selectedOCRCardIDs
+			if limitToSingle {
+				cardIDs = selectedOCRCardIDs[:1]
+			}
+			setCanvasActionCardIDs(&clone, cardIDs)
+			expanded = append(expanded, clone)
+			continue
+		}
+		if act.Tool == "duplicate_cards" && len(canvasActionCardIDs(act)) == 0 && len(selectedImageCardIDs) > 0 {
+			clone := act
+			cardIDs := selectedImageCardIDs
+			if limitToSingle {
+				cardIDs = selectedImageCardIDs[:1]
+			}
+			setCanvasActionCardIDs(&clone, cardIDs)
+			expanded = append(expanded, clone)
+			continue
+		}
+		targetAssetIDs := canvasActionAssetIDs(act)
+		if !canvasToolCanUseSelectedAssetIDs(act.Tool) || toolCounts[act.Tool] != 1 || len(targetAssetIDs) > 1 || len(selectedAssetIDs) == 0 {
 			expanded = append(expanded, act)
 			continue
 		}
-		for _, assetID := range selectedAssetIDs {
-			clone := act
-			clone.Params = make(map[string]any, len(act.Params))
-			for k, v := range act.Params {
-				clone.Params[k] = v
+		if limitToSingle {
+			if len(targetAssetIDs) == 0 {
+				clone := act
+				setCanvasActionAssetIDs(&clone, selectedAssetIDs[:1])
+				expanded = append(expanded, clone)
+				continue
 			}
-			clone.Params["assetId"] = assetID
-			expanded = append(expanded, clone)
+			expanded = append(expanded, act)
+			continue
 		}
+		if len(selectedAssetIDs) <= 1 && len(targetAssetIDs) > 0 {
+			expanded = append(expanded, act)
+			continue
+		}
+		clone := act
+		setCanvasActionAssetIDs(&clone, selectedAssetIDs)
+		expanded = append(expanded, clone)
 	}
 	return expanded
 }
@@ -774,6 +988,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Options.CanvasImageAttached = req.CanvasImage != ""
 	req.Options.AutoLocale = settings.LLMAutoLocale
+	req.Options.CanvasStrategy = s.canvasStrategyPrompt()
 	systemPrompt := canvasSystemPrompt(locale, req.Options)
 	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options, locale)
 
@@ -875,7 +1090,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 		textBody, actions := parseCanvasActions(content)
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
-		actions = expandCanvasMultiSelectedActions(actions, req.Canvas)
+		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
 		hasCaptureAction := false
 		for _, act := range actions {
 			if canvasToolIsCapture(act.Tool) {
@@ -905,13 +1120,13 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					captureSeen = true
 					captureExecutedThisLoop = true
 				}
-				result := s.executeCanvasSafeAction(r, act, settings)
+				result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
 				sendNDJSON(w, map[string]any{
 					"type":   "action_result",
 					"tool":   act.Tool,
 					"result": result,
 				})
-				if !canvasToolIsCapture(act.Tool) {
+				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
 					resultJSON, _ := json.Marshal(result)
 					toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
 				}
@@ -920,14 +1135,20 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				proposalIndex++
+				targetAssetIDs := canvasActionAssetIDs(act)
+				var targetAssetID any
+				if len(targetAssetIDs) > 0 {
+					targetAssetID = targetAssetIDs[0]
+				}
 				sendNDJSON(w, map[string]any{
-					"type":          "proposal",
-					"id":            fmt.Sprintf("p%d", proposalIndex),
-					"tool":          act.Tool,
-					"params":        act.Params,
-					"description":   act.Description,
-					"impact":        act.Impact,
-					"targetAssetId": act.Params["assetId"],
+					"type":           "proposal",
+					"id":             fmt.Sprintf("p%d", proposalIndex),
+					"tool":           act.Tool,
+					"params":         act.Params,
+					"description":    act.Description,
+					"impact":         act.Impact,
+					"targetAssetId":  targetAssetID,
+					"targetAssetIds": targetAssetIDs,
 				})
 			}
 			time.Sleep(150 * time.Millisecond)
@@ -966,7 +1187,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 	if captureRequested && !captureSeen {
 		act := fallbackCanvasCaptureAction(latestUserMessage, req.Canvas)
-		result := s.executeCanvasSafeAction(r, act, settings)
+		result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
 		sendNDJSON(w, map[string]any{
 			"type":   "action_result",
 			"tool":   act.Tool,
@@ -1000,7 +1221,88 @@ func splitParagraphs(text string) []string {
 	return result
 }
 
-func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, settings config.AppSettings) any {
+func (s *Server) enrichCanvasCatalogItems(ctx context.Context, scanID int64, items []scanner.AssetItem, settings config.AppSettings) ([]scanner.AssetItem, error) {
+	catalog := scanner.Catalog{Items: items}
+	var err error
+	catalog, err = s.enrichCatalogOCR(ctx, catalog)
+	if err != nil {
+		return nil, err
+	}
+	catalog, err = s.enrichCatalogAITag(catalog, settings)
+	if err != nil {
+		return nil, err
+	}
+	catalog, err = s.enrichCatalogEXIF(catalog, scanID)
+	if err != nil {
+		return nil, err
+	}
+	return catalog.Items, nil
+}
+
+func (s *Server) fetchCanvasCatalogItemsByIDs(ctx context.Context, scanID int64, assetIDs []string, settings config.AppSettings) ([]scanner.AssetItem, error) {
+	if len(assetIDs) == 0 {
+		return nil, nil
+	}
+	items, err := s.store.CatalogItemsByIDs(scanID, assetIDs)
+	if err != nil {
+		return nil, err
+	}
+	return s.enrichCanvasCatalogItems(ctx, scanID, items, settings)
+}
+
+func canvasAssetSummary(item scanner.AssetItem) map[string]any {
+	summary := map[string]any{
+		"id":             item.ID,
+		"repoPath":       item.RepoPath,
+		"projectId":      item.ProjectID,
+		"projectName":    item.ProjectName,
+		"ext":            item.Ext,
+		"bytes":          item.Bytes,
+		"width":          item.Image.Width,
+		"height":         item.Image.Height,
+		"animated":       item.Image.Animated,
+		"alpha":          item.Image.Alpha,
+		"usedByCount":    len(item.UsedBy),
+		"favorite":       item.Favorite,
+		"duplicates":     item.Duplicates,
+		"similar":        item.Similar,
+		"optimization":   item.Optimization,
+		"duplicateGroup": item.DuplicateGroupID,
+	}
+	if item.AITag != nil {
+		summary["tags"] = item.AITag.Tags
+		summary["description"] = item.AITag.Description
+		summary["category"] = item.AITag.Category
+	}
+	if item.OCR != nil {
+		summary["ocrStatus"] = item.OCR.Status
+		summary["ocrText"] = item.OCR.Text
+	}
+	return summary
+}
+
+func canvasPerAssetTextParam(params map[string]any, assetID string, field string, perAssetField string) string {
+	if params == nil {
+		return ""
+	}
+	if rows, ok := params[perAssetField].([]any); ok {
+		for _, raw := range rows {
+			row, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := row["assetId"].(string)
+			value, _ := row[field].(string)
+			if id == assetID {
+				return value
+			}
+		}
+	}
+	value, _ := params[field].(string)
+	return value
+}
+
+func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, settings config.AppSettings, canvas canvasSnapshot) any {
 	switch act.Tool {
 	case "focus_card":
 		return map[string]any{
@@ -1075,42 +1377,38 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 				break
 			}
 		}
-		type richAsset struct {
-			ID          string   `json:"id"`
-			RepoPath    string   `json:"repoPath"`
-			Ext         string   `json:"ext"`
-			Width       int      `json:"width"`
-			Height      int      `json:"height"`
-			Bytes       int64    `json:"bytes"`
-			Tags        []string `json:"tags,omitempty"`
-			Description string   `json:"description,omitempty"`
-			OcrText     string   `json:"ocrText,omitempty"`
-		}
-		items := make([]richAsset, 0, len(page.Items))
-		for _, item := range page.Items {
-			ra := richAsset{
-				ID:       item.ID,
-				RepoPath: item.RepoPath,
-				Ext:      item.Ext,
-				Width:    item.Image.Width,
-				Height:   item.Image.Height,
-				Bytes:    item.Bytes,
-			}
-			if item.AITag != nil {
-				ra.Tags = item.AITag.Tags
-				ra.Description = item.AITag.Description
-			}
-			if item.OCR != nil && item.OCR.Text != "" {
-				ra.OcrText = item.OCR.Text
-			}
-			items = append(items, ra)
+		items, err := s.enrichCanvasCatalogItems(r.Context(), scanID, page.Items, settings)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
 		}
 		return map[string]any{"items": items, "total": page.Total, "q": q}
+	case "add_assets_to_canvas":
+		assetIDs := canvasActionAssetIDs(act)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"items": []any{}, "error": "no scan available"}
+		}
+		items, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, assetIDs, settings)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		return map[string]any{"items": items, "count": len(items), "assetIds": assetIDs, "label": act.Params["label"]}
+	case "extract_ocr_text":
+		return s.executeCanvasOCRText(r, act, settings, canvas)
 	case "create_comment":
 		return map[string]any{
 			"anchorCardId": act.Params["anchorCardId"],
 			"text":         act.Params["text"],
 			"region":       act.Params["region"],
+		}
+	case "update_comment":
+		return map[string]any{
+			"commentCardId": act.Params["commentCardId"],
+			"text":          act.Params["text"],
+		}
+	case "delete_comment":
+		return map[string]any{
+			"commentCardId": act.Params["commentCardId"],
 		}
 	case "select_cards":
 		return map[string]any{
@@ -1122,6 +1420,39 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			"cardIds": act.Params["cardIds"],
 			"label":   act.Params["label"],
 		}
+	case "duplicate_cards":
+		sourceCardIDs := canvasActionCardIDs(act)
+		count := 1
+		if l, ok := act.Params["count"].(float64); ok && l > 0 {
+			count = int(l)
+		}
+		count = min(max(count, 1), 12)
+		type cardCopy struct {
+			SourceCardID string `json:"sourceCardId"`
+			CardID       string `json:"cardId"`
+		}
+		copies := make([]cardCopy, 0, len(sourceCardIDs)*count)
+		now := time.Now().UnixNano()
+		for sourceIndex, sourceCardID := range sourceCardIDs {
+			for copyIndex := 0; copyIndex < count; copyIndex++ {
+				copies = append(copies, cardCopy{
+					SourceCardID: sourceCardID,
+					CardID:       fmt.Sprintf("dup-%x-%d-%d", now, sourceIndex, copyIndex),
+				})
+			}
+		}
+		cardIDs := make([]string, 0, len(copies))
+		for _, copy := range copies {
+			cardIDs = append(cardIDs, copy.CardID)
+		}
+		return map[string]any{
+			"cardIds":    sourceCardIDs,
+			"count":      count,
+			"copies":     copies,
+			"newCardIds": cardIDs,
+			"layout":     act.Params["layout"],
+			"label":      act.Params["label"],
+		}
 	case "move_card":
 		return map[string]any{
 			"cardId": act.Params["cardId"],
@@ -1131,6 +1462,19 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 	case "arrange_cards":
 		return map[string]any{
 			"positions": act.Params["positions"],
+		}
+	case "align_cards":
+		return map[string]any{
+			"cardIds": act.Params["cardIds"],
+			"axis":    act.Params["axis"],
+			"label":   act.Params["label"],
+		}
+	case "distribute_cards":
+		return map[string]any{
+			"cardIds":   act.Params["cardIds"],
+			"direction": act.Params["direction"],
+			"gap":       act.Params["gap"],
+			"label":     act.Params["label"],
 		}
 	case "resize_card":
 		return map[string]any{
@@ -1152,8 +1496,326 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"transparent": act.Params["transparent"],
 		}
+	case "compare_assets":
+		assetIDs := canvasActionAssetIDs(act)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"items": []any{}, "error": "no scan available"}
+		}
+		items, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, assetIDs, settings)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		summaries := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			summaries = append(summaries, canvasAssetSummary(item))
+		}
+		return map[string]any{"items": summaries, "count": len(summaries)}
+	case "find_similar_assets":
+		assetIDs := canvasActionAssetIDs(act)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"sources": []any{}, "items": []any{}, "error": "no scan available"}
+		}
+		items, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, assetIDs, settings)
+		if err != nil {
+			return map[string]any{"sources": []any{}, "items": []any{}, "error": err.Error()}
+		}
+		relatedSet := map[string]bool{}
+		sources := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			for _, id := range item.Duplicates {
+				relatedSet[id] = true
+			}
+			for _, id := range item.Similar {
+				relatedSet[id] = true
+			}
+			sources = append(sources, map[string]any{
+				"id":         item.ID,
+				"repoPath":   item.RepoPath,
+				"duplicates": item.Duplicates,
+				"similar":    item.Similar,
+			})
+		}
+		relatedIDs := make([]string, 0, len(relatedSet))
+		for id := range relatedSet {
+			relatedIDs = append(relatedIDs, id)
+		}
+		sort.Strings(relatedIDs)
+		if l, ok := act.Params["limit"].(float64); ok && l > 0 && int(l) < len(relatedIDs) {
+			relatedIDs = relatedIDs[:int(l)]
+		}
+		related, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, relatedIDs, settings)
+		if err != nil {
+			return map[string]any{"sources": sources, "items": []any{}, "error": err.Error()}
+		}
+		return map[string]any{"sources": sources, "items": related, "count": len(related)}
+	case "inspect_image_quality":
+		assetIDs := canvasActionAssetIDs(act)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"items": []any{}, "error": "no scan available"}
+		}
+		items, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, assetIDs, settings)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		summaries := make([]map[string]any, 0, len(items))
+		grouped := map[string]int{}
+		for _, item := range items {
+			for _, rec := range item.Optimization {
+				grouped[rec.Category]++
+			}
+			summaries = append(summaries, canvasAssetSummary(item))
+		}
+		return map[string]any{"items": summaries, "groups": grouped, "count": len(summaries)}
+	case "generate_alt_text":
+		assetIDs := canvasActionAssetIDs(act)
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"items": []any{}, "error": "no scan available"}
+		}
+		items, err := s.fetchCanvasCatalogItemsByIDs(r.Context(), scanID, assetIDs, settings)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		summaries := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			summaries = append(summaries, canvasAssetSummary(item))
+		}
+		return map[string]any{"items": summaries, "style": act.Params["style"], "instruction": "Generate one alt text candidate per asset from the metadata and visible image context available in the canvas."}
 	default:
 		return map[string]any{"error": "unknown safe tool: " + act.Tool}
+	}
+}
+
+func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, settings config.AppSettings, canvas canvasSnapshot) any {
+	if !s.hasVLMBackend(settings) {
+		return map[string]any{"items": []any{}, "error": "AI provider or agent adapter not configured"}
+	}
+	const maxCanvasOCRAssets = 12
+
+	backend, providerName, modelName := s.resolveVLMProviderForFeature(settings, agent.FeatureOCR)
+	engineVersion := providerName + "/" + modelName
+	settingsHash := vlmOCRSettingsHash(modelName)
+	prompt := buildVLMOCRPrompt(settings.LLMOcrPrompt, settings.LLMAutoLocale, r.URL.Query().Get("lang"))
+	systemPrompt := llm.SystemPrompt(settings.LLMSystemPromptEnabled, settings.LLMSystemPrompt)
+	timeoutSec := settings.LLMTimeout
+	saveRequested, _ := act.Params["saveToMetadata"].(bool)
+
+	type itemResult struct {
+		AssetID      string   `json:"assetId"`
+		RepoPath     string   `json:"repoPath"`
+		CardID       string   `json:"cardId,omitempty"`
+		FileName     string   `json:"fileName,omitempty"`
+		Source       string   `json:"source,omitempty"`
+		Status       string   `json:"status"`
+		Text         string   `json:"text,omitempty"`
+		Languages    []string `json:"languages,omitempty"`
+		ErrorMessage string   `json:"errorMessage,omitempty"`
+		CacheHit     bool     `json:"cacheHit,omitempty"`
+	}
+
+	type ocrTarget struct {
+		item     scanner.AssetItem
+		assetID  string
+		cardID   string
+		repoPath string
+		fileName string
+		source   string
+	}
+
+	var targets []ocrTarget
+	var results []itemResult
+	assetIDs := canvasActionAssetIDs(act)
+	assetCardIDs := map[string]string{}
+	seenAssets := map[string]bool{}
+	addAssetID := func(assetID, cardID string) {
+		assetID = strings.TrimSpace(assetID)
+		if assetID == "" || seenAssets[assetID] {
+			return
+		}
+		seenAssets[assetID] = true
+		assetIDs = append(assetIDs, assetID)
+		if cardID != "" {
+			assetCardIDs[assetID] = cardID
+		}
+	}
+
+	for _, assetID := range assetIDs {
+		seenAssets[assetID] = true
+	}
+
+	cardsByID := make(map[string]canvasCardSnapshot, len(canvas.Cards))
+	for _, card := range canvas.Cards {
+		cardsByID[card.ID] = card
+	}
+	seenUploadCards := map[string]bool{}
+	for _, cardID := range canvasActionCardIDs(act) {
+		card, ok := cardsByID[cardID]
+		if !ok {
+			results = append(results, itemResult{CardID: cardID, Source: "canvas", Status: ocr.StatusFailed, ErrorMessage: "canvas card not found"})
+			continue
+		}
+		switch card.Kind {
+		case "asset":
+			if card.Asset == nil || card.Asset.ID == "" {
+				results = append(results, itemResult{CardID: cardID, Source: "catalog", Status: ocr.StatusFailed, ErrorMessage: "canvas asset card has no asset id"})
+				continue
+			}
+			addAssetID(card.Asset.ID, card.ID)
+		case "upload":
+			if seenUploadCards[card.ID] {
+				continue
+			}
+			seenUploadCards[card.ID] = true
+			if card.UploadToken == "" {
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "upload token missing"})
+				continue
+			}
+			download, ok := s.peekImageToolDownload(card.UploadToken)
+			if !ok {
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "uploaded image is no longer available"})
+				continue
+			}
+			info, err := os.Stat(download.Path)
+			if err != nil {
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: err.Error()})
+				continue
+			}
+			ext := strings.ToLower(filepath.Ext(card.UploadFileName))
+			if ext == "" {
+				ext = strings.ToLower(filepath.Ext(download.Path))
+			}
+			item := scanner.AssetItem{
+				ID:          "upload:" + card.ID,
+				ProjectID:   "canvas-upload",
+				ProjectName: "Canvas Upload",
+				RepoPath:    card.UploadFileName,
+				LocalPath:   download.Path,
+				Ext:         ext,
+				Bytes:       info.Size(),
+				Image: imageproc.Metadata{
+					Format: strings.TrimPrefix(ext, "."),
+					Width:  card.UploadWidth,
+					Height: card.UploadHeight,
+				},
+			}
+			targets = append(targets, ocrTarget{
+				item:     item,
+				cardID:   card.ID,
+				repoPath: card.UploadFileName,
+				fileName: card.UploadFileName,
+				source:   "upload",
+			})
+		default:
+			results = append(results, itemResult{CardID: card.ID, Source: card.Kind, Status: ocr.StatusSkipped, ErrorMessage: "card is not an OCR image target"})
+		}
+	}
+
+	if len(assetIDs) > 0 {
+		if len(assetIDs) > maxCanvasOCRAssets {
+			assetIDs = assetIDs[:maxCanvasOCRAssets]
+		}
+		scanID := s.latestScanID()
+		if scanID == 0 {
+			return map[string]any{"items": []any{}, "error": "no scan available for catalog OCR targets"}
+		}
+		items, err := s.store.CatalogItemsByIDs(scanID, assetIDs)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		for _, item := range items {
+			targets = append(targets, ocrTarget{
+				item:     item,
+				assetID:  item.ID,
+				cardID:   assetCardIDs[item.ID],
+				repoPath: item.RepoPath,
+				fileName: filepath.Base(item.RepoPath),
+				source:   "catalog",
+			})
+		}
+	}
+
+	if len(targets) == 0 && len(results) == 0 {
+		return map[string]any{"items": []any{}, "error": "no assetIds or upload cardIds provided"}
+	}
+	if len(targets) > maxCanvasOCRAssets {
+		targets = targets[:maxCanvasOCRAssets]
+	}
+
+	counts := vlmOcrCounts{Queued: len(targets) + len(results)}
+	for _, result := range results {
+		switch result.Status {
+		case ocr.StatusSkipped:
+			counts.Skipped++
+		default:
+			counts.Failed++
+		}
+	}
+	for _, target := range targets {
+		item := target.item
+		entry := itemResult{AssetID: target.assetID, RepoPath: target.repoPath, CardID: target.cardID, FileName: target.fileName, Source: target.source}
+		if !eligibleForVLMOCR(item) {
+			entry.Status = ocr.StatusSkipped
+			entry.ErrorMessage = "asset is not eligible for VLM OCR"
+			counts.Skipped++
+			results = append(results, entry)
+			continue
+		}
+		if item.ContentHash == "" || item.HashAlgorithm == "" {
+			sum, algorithm, herr := scanner.ContentHash(r.Context(), item.LocalPath)
+			if herr != nil {
+				entry.Status = ocr.StatusFailed
+				entry.ErrorMessage = herr.Error()
+				counts.Failed++
+				results = append(results, entry)
+				continue
+			}
+			item.ContentHash = sum
+			item.HashAlgorithm = algorithm
+		}
+
+		var result ocr.Result
+		if cached, found, cerr := s.store.VLMOCRResultForContentHash(item.ContentHash, item.HashAlgorithm, engineVersion, settingsHash); cerr != nil {
+			entry.Status = ocr.StatusFailed
+			entry.ErrorMessage = cerr.Error()
+			counts.Failed++
+			results = append(results, entry)
+			continue
+		} else if found && cached.Status == ocr.StatusReady {
+			result = copyOCRResultForVLMItem(cached, item)
+			entry.CacheHit = true
+			counts.CacheHit++
+		} else {
+			processed, chatResp := s.processVLMOCR(r.Context(), item, backend, providerName, modelName, systemPrompt, prompt, timeoutSec)
+			result = processed
+			counts.InputTokens += chatResp.InputTokens
+			counts.OutputTokens += chatResp.OutputTokens
+		}
+
+		entry.Status = result.Status
+		entry.Text = result.Text
+		entry.Languages = result.Languages
+		entry.ErrorMessage = result.ErrorMessage
+		counts.Processed++
+		if result.Status == ocr.StatusReady {
+			counts.Ready++
+		} else {
+			counts.Failed++
+		}
+		results = append(results, entry)
+	}
+
+	return map[string]any{
+		"items":                   results,
+		"counts":                  counts,
+		"providerName":            providerName,
+		"modelName":               modelName,
+		"mode":                    vlmOCRMode,
+		"saveToMetadataRequested": saveRequested,
+		"saveToMetadata":          false,
+		"saveInstruction":         "Use update_ocr_text proposal to save OCR text into metadata.",
 	}
 }
 
@@ -1163,4 +1825,20 @@ func (s *Server) latestScanID() int64 {
 		return 0
 	}
 	return scan.ID
+}
+
+func (s *Server) canvasStrategyPrompt() string {
+	presets, err := s.store.ListPromptPresets("canvas")
+	if err != nil {
+		return config.DefaultCanvasPrompt()
+	}
+	for _, preset := range presets {
+		if preset.IsDefault {
+			return config.FormatPrompt(preset.Content)
+		}
+	}
+	if len(presets) > 0 {
+		return config.FormatPrompt(presets[0].Content)
+	}
+	return config.DefaultCanvasPrompt()
 }
