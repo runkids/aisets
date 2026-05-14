@@ -97,7 +97,7 @@ func TestCanvasToolSafe(t *testing.T) {
 			t.Errorf("%s should be safe", name)
 		}
 	}
-	unsafes := []string{"compress_image", "resize_image", "convert_image", "update_tags", "update_description", "update_ocr_text"}
+	unsafes := []string{"compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image", "update_tags", "update_description", "update_ocr_text"}
 	for _, name := range unsafes {
 		if canvasToolSafe(name) {
 			t.Errorf("%s should NOT be safe", name)
@@ -184,7 +184,7 @@ func TestBuildCanvasUserPrompt_ImageOptimizationAdviceOff(t *testing.T) {
 	if !strings.Contains(prompt, "Image optimization advice is OFF") {
 		t.Fatalf("prompt should include OFF state:\n%s", prompt)
 	}
-	if !strings.Contains(prompt, "Do not proactively propose compression, resizing, or format conversion") {
+	if !strings.Contains(prompt, "Do not proactively propose compression, resizing, format conversion, mirroring, or rotation") {
 		t.Fatalf("prompt should restrict proactive optimization:\n%s", prompt)
 	}
 }
@@ -261,6 +261,19 @@ func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testi
 	}
 	if !canvasProposalAllowed("compress_image", "幫我壓縮這張圖", canvasChatOptions{ImageOptimizationAdvice: false}) {
 		t.Fatal("explicit optimization request should be allowed even when advice is off")
+	}
+}
+
+func TestCanvasProposalAllowed_AllowsExplicitImageTransforms(t *testing.T) {
+	options := canvasChatOptions{ImageOptimizationAdvice: false}
+	if !canvasProposalAllowed("mirror_image", "幫這張圖做水平鏡像", options) {
+		t.Fatal("explicit mirror request should be allowed")
+	}
+	if !canvasProposalAllowed("rotate_image", "把這張圖旋轉 90 度", options) {
+		t.Fatal("explicit rotate request should be allowed")
+	}
+	if canvasProposalAllowed("rotate_image", "幫我看看這張圖", options) {
+		t.Fatal("plain review request should not create a rotate proposal")
 	}
 }
 

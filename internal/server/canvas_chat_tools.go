@@ -214,6 +214,20 @@ func canvasToolRegistry() []canvasToolDef {
 			Safe:        false,
 		},
 		{
+			Name:        "mirror_image",
+			Description: "Create a mirrored/flipped image variant using Rust imgtools. Use for horizontal or vertical mirror/flip requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "flip": "horizontal|vertical|both, default horizontal", "outputFormat": "png|jpg|webp|avif optional"}`,
+			Cardinality: "multi",
+			Safe:        false,
+		},
+		{
+			Name:        "rotate_image",
+			Description: "Create a rotated image variant using Rust imgtools. Use for clockwise 90, 180, or 270 degree rotation requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "degrees": "90|180|270, default 90", "outputFormat": "png|jpg|webp|avif optional"}`,
+			Cardinality: "multi",
+			Safe:        false,
+		},
+		{
 			Name:        "update_tags",
 			Description: "Set the tags for an asset. Replaces existing tags.",
 			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "tags": ["string"]}`,
@@ -347,10 +361,10 @@ func canvasToolSafetyLabel(safe bool) string {
 
 func canvasProposalGuidance(options canvasChatOptions) string {
 	if options.ImageOptimizationAdvice {
-		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
+		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
 	}
 
-	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
+	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
 }
 
 func canvasSystemPrompt(locale string, options canvasChatOptions) string {
@@ -434,6 +448,7 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When the user asks to take a picture / screenshot / export the canvas / 拍照 / 截圖 / 匯出畫布:** After any arrange/resize/layer steps, call capture_viewport, capture_canvas, or capture_selected. If the user says 去背 or transparent, pass {"transparent": true}. This triggers the real frontend screenshot/export preview. Do not apologize or claim you cannot create an image file. Use inspect_canvas only for your own hidden visual check; it is not the user's final screenshot.
 - **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For catalog/file tools, emit one action with assetIds so the UI can show a batch proposal and per-asset status.
 - **When the user explicitly asks for optimization/compression/format change:** Propose compress_image, resize_image, convert_image as appropriate.
+- **When the user explicitly asks to mirror/flip or rotate an image:** Propose mirror_image or rotate_image for the selected/mentioned catalog assets. Use flip=horizontal for left-right mirror unless the user asks for vertical/top-bottom. Use degrees=90 by default for rotate if the user does not specify a degree.
 - **When the user explicitly asks to tag or write/save a description:** Propose update_tags or update_description for every selected asset card, not just the first one.
 - **When the user asks a general question about an asset:** Analyze and answer in chat. Use focus_card or get_asset_detail when useful. Do NOT create comments, file proposals, or metadata proposals unless the user explicitly asks for that action.
 - **When you spot visual issues** (edges, contrast, artifacts, wrong crop), describe them in chat. Only use create_comment to circle/mark the issue if the user explicitly asks for annotation. Regions use normalized 0-1 coordinates: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.

@@ -182,6 +182,8 @@
       "compress_image": "壓縮圖片",
       "resize_image": "調整圖片尺寸",
       "convert_image": "轉換圖片格式",
+      "mirror_image": "鏡像圖片",
+      "rotate_image": "旋轉圖片",
       "update_tags": "更新標籤",
       "batch_update_tags": "更新標籤",
       "update_description": "更新描述",

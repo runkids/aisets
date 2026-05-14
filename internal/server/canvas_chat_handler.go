@@ -733,7 +733,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	if options.ImageOptimizationAdvice {
 		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n")
 	} else {
-		b.WriteString("- Image optimization advice is OFF. Do not proactively propose compression, resizing, or format conversion unless the user's latest request explicitly asks for optimization.\n")
+		b.WriteString("- Image optimization advice is OFF. Do not proactively propose compression, resizing, format conversion, mirroring, or rotation unless the user's latest request explicitly asks for that image operation.\n")
 	}
 
 	b.WriteString("\n## Conversation\n")
@@ -810,6 +810,15 @@ func isCanvasOptimizationTool(tool string) bool {
 	}
 }
 
+func isCanvasImageTransformTool(tool string) bool {
+	switch tool {
+	case "mirror_image", "rotate_image":
+		return true
+	default:
+		return false
+	}
+}
+
 func canvasToolSuppressesSameTurnText(tool string) bool {
 	return tool != "focus_card"
 }
@@ -848,6 +857,12 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 			"optimize", "optimization", "compress", "resize", "convert", "webp", "avif",
 			"優化", "最佳化", "壓縮", "縮小", "調整尺寸", "轉檔", "轉成",
 			"转换", "压缩", "优化",
+		)
+	}
+	if isCanvasImageTransformTool(tool) {
+		return containsAnyText(latestUserMessage,
+			"mirror", "flip", "flipped", "rotate", "rotation", "turn",
+			"鏡像", "镜像", "翻轉", "翻转", "水平翻", "垂直翻", "左右翻", "上下翻", "旋轉", "旋转", "選轉", "选转",
 		)
 	}
 
@@ -1052,6 +1067,8 @@ func canvasToolTargetsCatalogAssets(tool string) bool {
 		"compress_image",
 		"resize_image",
 		"convert_image",
+		"mirror_image",
+		"rotate_image",
 		"move_asset",
 		"copy_asset",
 		"delete_asset",

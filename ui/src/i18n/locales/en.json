@@ -182,6 +182,8 @@
       "compress_image": "Compress image",
       "resize_image": "Resize image",
       "convert_image": "Convert image",
+      "mirror_image": "Mirror image",
+      "rotate_image": "Rotate image",
       "update_tags": "Update tags",
       "batch_update_tags": "Update tags",
       "update_description": "Update description",

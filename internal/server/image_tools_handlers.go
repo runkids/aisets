@@ -183,9 +183,13 @@ func (s *Server) handleImageToolUploadProcess(w http.ResponseWriter, r *http.Req
 
 type imageToolRenderPreviewRequest struct {
 	AssetID        string `json:"assetId"`
+	Operation      string `json:"operation"`
 	OutputFormat   string `json:"outputFormat"`
 	Quality        int    `json:"quality"`
 	MaxDimensionPx int    `json:"maxDimensionPx"`
+	Flip           string `json:"flip"`
+	RotateDegrees  int    `json:"rotateDegrees"`
+	Degrees        int    `json:"degrees"`
 }
 
 type imageToolRenderPreviewResponse struct {
@@ -245,6 +249,10 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		sourceMeta.Format = "png"
 		sourceDisplay = strings.TrimSuffix(item.RepoPath, item.Ext) + ".png"
 	}
+	if imageToolRenderPreviewIsTransform(body) {
+		s.handleImageToolTransformPreview(w, item, sourcePath, sourceBytes, sourceDisplay, needsPreConvert, body)
+		return
+	}
 	settings, _ := s.store.Settings()
 	req := optimize.Request{
 		OutputFormat:   body.OutputFormat,
@@ -281,6 +289,124 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		InputFormat:  inputFormat,
 		OutputFormat: op.OutputFormat,
 	})
+}
+
+func imageToolRenderPreviewIsTransform(body imageToolRenderPreviewRequest) bool {
+	switch strings.ToLower(strings.TrimSpace(body.Operation)) {
+	case "mirror_image", "rotate_image", "transform_image":
+		return true
+	default:
+		return body.Flip != "" || body.RotateDegrees != 0 || body.Degrees != 0
+	}
+}
+
+func (s *Server) handleImageToolTransformPreview(w http.ResponseWriter, item scanner.AssetItem, sourcePath string, sourceBytes int64, sourceDisplay string, needsPreConvert bool, body imageToolRenderPreviewRequest) {
+	opts, err := imageToolTransformOptions(body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, apierr.New("image_transform_invalid", err.Error()))
+		return
+	}
+	outputFormat := imageToolTransformOutputFormat(body.OutputFormat, sourceDisplay)
+	tmp, err := os.CreateTemp("", "aisets-transform-*."+outputFormat)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	targetPath := tmp.Name()
+	_ = tmp.Close()
+	if err := imageproc.TransformImage(sourcePath, targetPath, opts); err != nil {
+		_ = os.Remove(targetPath)
+		writeError(w, http.StatusBadRequest, apierr.New("image_transform_failed", err.Error()))
+		return
+	}
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		_ = os.Remove(targetPath)
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	token := imageToolToken(fmt.Sprintf("render-preview:%s:%s:%s:%d:%s", item.ID, body.Operation, opts.Flip, opts.RotateDegrees, outputFormat))
+	downloadName := imageToolTransformDownloadName(item.RepoPath, outputFormat, opts)
+	s.storeImageToolDownload(token, imageToolDownload{
+		Path:             targetPath,
+		Name:             downloadName,
+		ContentType:      contentTypeForName(downloadName),
+		DeleteAfterServe: true,
+		CreatedAt:        time.Now(),
+	})
+
+	inputBytes := sourceBytes
+	inputFormat := strings.TrimPrefix(strings.ToLower(filepath.Ext(sourceDisplay)), ".")
+	if needsPreConvert {
+		inputBytes = item.Bytes
+		inputFormat = strings.TrimPrefix(strings.ToLower(item.Ext), ".")
+	}
+	writeJSON(w, http.StatusOK, imageToolRenderPreviewResponse{
+		Token:        token,
+		InputBytes:   inputBytes,
+		OutputBytes:  info.Size(),
+		InputFormat:  inputFormat,
+		OutputFormat: outputFormat,
+	})
+}
+
+func imageToolTransformOptions(body imageToolRenderPreviewRequest) (imageproc.TransformOptions, error) {
+	operation := strings.ToLower(strings.TrimSpace(body.Operation))
+	flip := strings.ToLower(strings.TrimSpace(body.Flip))
+	degrees := body.RotateDegrees
+	if degrees == 0 {
+		degrees = body.Degrees
+	}
+	if operation == "mirror_image" && flip == "" {
+		flip = "horizontal"
+	}
+	if operation == "rotate_image" && degrees == 0 {
+		degrees = 90
+	}
+	if flip == "" {
+		flip = "none"
+	}
+	degrees = ((degrees % 360) + 360) % 360
+	switch degrees {
+	case 0, 90, 180, 270:
+	default:
+		return imageproc.TransformOptions{}, fmt.Errorf("rotation must be one of 0, 90, 180, 270 degrees")
+	}
+	if flip == "none" && degrees == 0 {
+		return imageproc.TransformOptions{}, fmt.Errorf("no image transform requested")
+	}
+	return imageproc.TransformOptions{Flip: flip, RotateDegrees: degrees}, nil
+}
+
+func imageToolTransformOutputFormat(rawFormat, sourceDisplay string) string {
+	format := imageproc.NormalizeOptimizationFormat(rawFormat)
+	if format == "jpeg" {
+		format = "jpg"
+	}
+	switch format {
+	case "png", "jpg", "webp", "avif", "gif":
+		return format
+	}
+	sourceFormat := imageproc.NormalizeOptimizationFormat(filepath.Ext(sourceDisplay))
+	switch sourceFormat {
+	case "png", "jpg", "webp", "avif":
+		return sourceFormat
+	default:
+		return "png"
+	}
+}
+
+func imageToolTransformDownloadName(name, outputFormat string, opts imageproc.TransformOptions) string {
+	base := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
+	parts := []string{base}
+	if opts.Flip != "" && opts.Flip != "none" {
+		parts = append(parts, "mirrored")
+	}
+	if opts.RotateDegrees != 0 {
+		parts = append(parts, fmt.Sprintf("rotated%d", opts.RotateDegrees))
+	}
+	return strings.Join(parts, "-") + "." + outputFormat
 }
 
 func (s *Server) handleImageToolMetadata(w http.ResponseWriter, r *http.Request) {

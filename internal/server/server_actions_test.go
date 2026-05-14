@@ -553,6 +553,61 @@ func TestImageToolRenderPreviewAndServe(t *testing.T) {
 	}
 }
 
+func TestImageToolRenderPreviewTransform(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "img", "icon.png"))
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	items := catalogItemsForTest(t, s)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 catalog item, got %d", len(items))
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"assetId":      items[0].ID,
+		"operation":    "rotate_image",
+		"degrees":      90,
+		"outputFormat": "png",
+	})
+	rec := httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/render-preview", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("render-preview transform = %d %s", rec.Code, rec.Body.String())
+	}
+	var renderResp struct {
+		Token        string `json:"token"`
+		OutputBytes  int64  `json:"outputBytes"`
+		OutputFormat string `json:"outputFormat"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &renderResp); err != nil {
+		t.Fatal(err)
+	}
+	if renderResp.Token == "" || renderResp.OutputBytes <= 0 || renderResp.OutputFormat != "png" {
+		t.Fatalf("render-preview transform body = %#v", renderResp)
+	}
+
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/image-tools/preview/"+renderResp.Token, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("transform preview serve = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestImageToolMetadata(t *testing.T) {
 	root := resolvedTempDir(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))

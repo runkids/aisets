@@ -50,9 +50,13 @@ export type RenderPreviewResponse = {
 
 export function renderImageToolPreview(params: {
   assetId: string;
+  operation?: string;
   outputFormat: string;
   quality: number;
   maxDimensionPx: number;
+  flip?: string;
+  rotateDegrees?: number;
+  degrees?: number;
 }) {
   return request<RenderPreviewResponse>(
     "/api/image-tools/assets/render-preview",

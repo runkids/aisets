@@ -124,6 +124,40 @@ func TestDHashAndMirroredHash(t *testing.T) {
 	}
 }
 
+func TestTransformImageMirrorAndRotate(t *testing.T) {
+	root := t.TempDir()
+	input := filepath.Join(root, "input.png")
+	output := filepath.Join(root, "output.png")
+
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+	img.SetNRGBA(1, 0, color.NRGBA{B: 255, A: 255})
+	writePNG(t, input, img)
+
+	if err := TransformImage(input, output, TransformOptions{Flip: "horizontal", RotateDegrees: 90}); err != nil {
+		t.Fatal(err)
+	}
+
+	file, err := os.Open(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	decoded, err := png.Decode(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Bounds().Dx() != 1 || decoded.Bounds().Dy() != 2 {
+		t.Fatalf("dimensions = %dx%d, want 1x2", decoded.Bounds().Dx(), decoded.Bounds().Dy())
+	}
+	if r, _, b, _ := decoded.At(0, 0).RGBA(); r != 0 || b == 0 {
+		t.Fatalf("top pixel = r:%d b:%d, want blue after flip+rotate", r, b)
+	}
+	if r, _, b, _ := decoded.At(0, 1).RGBA(); r == 0 || b != 0 {
+		t.Fatalf("bottom pixel = r:%d b:%d, want red after flip+rotate", r, b)
+	}
+}
+
 func TestVisualDistanceRejectsColorOnlyHashCollisions(t *testing.T) {
 	root := t.TempDir()
 	red := filepath.Join(root, "red.png")

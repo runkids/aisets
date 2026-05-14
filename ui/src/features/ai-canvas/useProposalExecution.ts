@@ -11,6 +11,19 @@ import {
 } from "./aiCanvasState";
 import { adjacentCardPosition, nowISO } from "./canvasUtils";
 
+function stringParam(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberParam(value: unknown, fallback: number) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
 export function useProposalExecution(opts: {
   cards: CanvasCard[];
   t: TFunction;
@@ -177,12 +190,29 @@ export function useProposalExecution(opts: {
       switch (proposal.tool) {
         case "compress_image":
         case "convert_image":
-        case "resize_image": {
+        case "resize_image":
+        case "mirror_image":
+        case "rotate_image": {
+          const isTransform =
+            proposal.tool === "mirror_image" ||
+            proposal.tool === "rotate_image";
           const result = await renderImageToolPreview({
             assetId,
-            outputFormat: (p.outputFormat as string) || "webp",
-            quality: (p.quality as number) || 82,
-            maxDimensionPx: (p.maxDimensionPx as number) || 1600,
+            operation: proposal.tool,
+            outputFormat: stringParam(
+              p.outputFormat,
+              isTransform ? "" : "webp",
+            ),
+            quality: numberParam(p.quality, 82),
+            maxDimensionPx: numberParam(p.maxDimensionPx, 1600),
+            flip:
+              proposal.tool === "mirror_image"
+                ? stringParam(p.flip, "horizontal")
+                : undefined,
+            rotateDegrees:
+              proposal.tool === "rotate_image"
+                ? numberParam(p.rotateDegrees ?? p.degrees, 90)
+                : undefined,
           });
           const sourceCard = findAssetCard(assetId);
           const position = sourceCard

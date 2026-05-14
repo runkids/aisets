@@ -150,6 +150,32 @@ fn resize_copies_image_when_it_already_fits() {
 }
 
 #[test]
+fn transform_mirrors_and_rotates_image() {
+    let temp = TempDir::new();
+    let input = temp.path("source.png");
+    let output = temp.path("output.png");
+    let mut img = RgbaImage::new(2, 1);
+    img.put_pixel(0, 0, Rgba([255, 0, 0, 255]));
+    img.put_pixel(1, 0, Rgba([0, 0, 255, 255]));
+    img.save(&input).expect("write source image");
+
+    assert_success(run(&[
+        "transform",
+        "--flip",
+        "horizontal",
+        "--rotate",
+        "90",
+        input.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let out = image::open(&output).expect("open output").to_rgba8();
+    assert_eq!(out.dimensions(), (1, 2));
+    assert_eq!(out.get_pixel(0, 0).0, [0, 0, 255, 255]);
+    assert_eq!(out.get_pixel(0, 1).0, [255, 0, 0, 255]);
+}
+
+#[test]
 fn thumbnail_preserves_aspect_ratio_within_requested_size() {
     let temp = TempDir::new();
     let input = temp.path("input.png");

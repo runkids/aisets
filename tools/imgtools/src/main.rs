@@ -4,6 +4,7 @@ mod exif;
 mod hash;
 mod probe;
 mod svg;
+mod transform;
 mod vlm_normalize;
 
 use clap::{Parser, Subcommand};
@@ -123,6 +124,19 @@ enum Command {
         #[arg(long)]
         output: Option<String>,
     },
+    /// Mirror and/or rotate an image
+    Transform {
+        /// Flip mode: none, horizontal, vertical, both
+        #[arg(long, default_value = "none")]
+        flip: String,
+        /// Clockwise rotation degrees: 0, 90, 180, 270
+        #[arg(long, default_value_t = 0)]
+        rotate: i32,
+        /// Input file path
+        input: String,
+        /// Output file path
+        output: String,
+    },
     /// Extract EXIF metadata (GPS, camera, date, orientation, DPI)
     Exif {
         /// Input file path
@@ -175,6 +189,12 @@ fn main() {
             output,
         } => vlm_normalize::run(&input, &output, &purpose, max_size, &background),
         Command::Composite { output } => composite::run(output.as_deref()),
+        Command::Transform {
+            flip,
+            rotate,
+            input,
+            output,
+        } => transform::run(&input, &output, &flip, rotate),
         Command::Exif { input } => exif::run(&input),
         Command::Version => {
             println!("aisets-imgtools {}", env!("CARGO_PKG_VERSION"));
