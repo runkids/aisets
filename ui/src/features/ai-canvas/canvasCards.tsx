@@ -1480,7 +1480,7 @@ export function AICursor({
       <MousePointer2
         size={22}
         strokeWidth={2.5}
-        className="fill-g-purple/60 text-g-purple/70 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-all duration-500"
+        className="fill-g-purple/60 text-white drop-shadow-md transition-all duration-500"
       />
     );
   }
