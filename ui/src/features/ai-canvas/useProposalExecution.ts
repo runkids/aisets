@@ -9,7 +9,7 @@ import {
   type ProposalCanvasCard,
   type ProposalStatus,
 } from "./aiCanvasState";
-import { nowISO } from "./canvasUtils";
+import { adjacentCardPosition, nowISO } from "./canvasUtils";
 
 export function useProposalExecution(opts: {
   cards: CanvasCard[];
@@ -81,6 +81,12 @@ export function useProposalExecution(opts: {
       if (c.asset.id === ref || c.id === ref) return c.asset;
     }
     return undefined;
+  }
+
+  function findAssetCard(ref: string) {
+    return cards.find(
+      (c) => c.kind === "asset" && (c.asset.id === ref || c.id === ref),
+    );
   }
 
   function perAssetText(
@@ -178,11 +184,15 @@ export function useProposalExecution(opts: {
             quality: (p.quality as number) || 82,
             maxDimensionPx: (p.maxDimensionPx as number) || 1600,
           });
+          const sourceCard = findAssetCard(assetId);
+          const position = sourceCard
+            ? adjacentCardPosition(sourceCard)
+            : { x: proposal.x, y: proposal.y + 88 };
           const variantCard: CanvasCard = {
             id: createCanvasCardId("variant"),
             kind: "variant",
-            x: proposal.x,
-            y: proposal.y + 200,
+            x: position.x,
+            y: position.y,
             createdAt: nowISO(),
             sourceAssetId: assetId,
             sourceName: proposal.description,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AssetCanvasCard, UploadCanvasCard } from "./aiCanvasState";
 import {
   DEFAULT_IMAGE_ASPECT_RATIO,
+  adjacentCardPosition,
   compactImageAspectRatio,
 } from "./canvasUtils";
 
@@ -58,6 +59,27 @@ function makeAssetCard(): AssetCanvasCard {
     },
   };
 }
+
+describe("adjacentCardPosition", () => {
+  it("places generated cards next to the anchor using measured width", () => {
+    expect(
+      adjacentCardPosition(
+        { id: "asset-1", x: 120, y: 80 },
+        { "asset-1": { width: 360 } },
+      ),
+    ).toEqual({ x: 504, y: 80 });
+  });
+
+  it("keeps stacked generated cards close to the anchor", () => {
+    expect(
+      adjacentCardPosition(
+        { id: "asset-1", x: 120, y: 80 },
+        { "asset-1": { width: 360 } },
+        { index: 2, verticalStep: 88 },
+      ),
+    ).toEqual({ x: 504, y: 256 });
+  });
+});
 
 describe("compactImageAspectRatio", () => {
   it("uses the uploaded image dimensions for compact upload cards", () => {

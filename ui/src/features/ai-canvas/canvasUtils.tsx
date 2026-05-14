@@ -193,6 +193,21 @@ export function nextCardPosition(
   return { x: 84 + jitterX, y: 72 + jitterY };
 }
 
+export function adjacentCardPosition(
+  anchor: { id: string; x: number; y: number },
+  metrics: Record<string, { width?: number }> = {},
+  options: { gap?: number; index?: number; verticalStep?: number } = {},
+) {
+  const gap = options.gap ?? 24;
+  const index = options.index ?? 0;
+  const verticalStep = options.verticalStep ?? 72;
+  const anchorWidth = metrics[anchor.id]?.width ?? CARD_WIDTH;
+  return {
+    x: Math.round(anchor.x + anchorWidth + gap),
+    y: Math.round(anchor.y + index * verticalStep),
+  };
+}
+
 export function selectedAssetIds(cards: AssetCanvasCard[]) {
   return cards.map((card) => card.asset.id);
 }

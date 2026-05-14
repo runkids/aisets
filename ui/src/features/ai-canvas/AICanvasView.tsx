@@ -23,6 +23,7 @@ import {
   imageMeta,
   AI_MENTION_COMMENT_RE,
   AI_MENTION_COMMENT_RE_G,
+  adjacentCardPosition,
   compactImageAspectRatio,
   isImageCard,
   nextCardPosition,
@@ -663,6 +664,16 @@ export function AICanvasView({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!commentMode) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape" || e.isComposing) return;
+      setCommentMode(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [commentMode]);
+
   const uploadRef = useRef<(files: File[]) => void>(handleUploadAndCreateCards);
   useEffect(() => {
     uploadRef.current = handleUploadAndCreateCards;
@@ -796,11 +807,13 @@ export function AICanvasView({
     const containerSize = rect
       ? { width: rect.width, height: rect.height }
       : undefined;
-    const position = nextCardPosition(cards.length, viewport, containerSize);
+    const position = assetCards[0]
+      ? adjacentCardPosition(assetCards[0], cardLayoutMetrics)
+      : nextCardPosition(cards.length, viewport, containerSize);
     const card: CanvasCard = {
       id: createCanvasCardId("ai"),
       kind: "assistant",
-      x: position.x + CARD_WIDTH + 36,
+      x: position.x,
       y: position.y,
       createdAt: nowISO(),
       prompt: promptText,
@@ -833,8 +846,7 @@ export function AICanvasView({
     const card: CommentCanvasCard = {
       id,
       kind: "comment",
-      x: anchorCard.x + CARD_WIDTH + 24,
-      y: anchorCard.y + 32,
+      ...adjacentCardPosition(anchorCard, cardLayoutMetrics),
       createdAt: nowISO(),
       anchorId: anchorCard.id,
       text: commentText,
@@ -856,21 +868,21 @@ export function AICanvasView({
   async function createImagePreview(
     assetCard: AssetCanvasCard,
     promptText: string,
+    outputFormat = DEFAULT_IMAGE_TOOL_SETTINGS.outputFormat,
   ) {
     setWorking("imagePreview");
     setError("");
     try {
       const preview = await renderImageToolPreview({
         assetId: assetCard.asset.id,
-        outputFormat: DEFAULT_IMAGE_TOOL_SETTINGS.outputFormat,
+        outputFormat,
         quality: DEFAULT_IMAGE_TOOL_SETTINGS.quality,
         maxDimensionPx: DEFAULT_IMAGE_TOOL_SETTINGS.maxDimensionPx,
       });
       const card: VariantCanvasCard = {
         id: createCanvasCardId("variant"),
         kind: "variant",
-        x: assetCard.x + CARD_WIDTH + 36,
-        y: assetCard.y,
+        ...adjacentCardPosition(assetCard, cardLayoutMetrics),
         createdAt: nowISO(),
         sourceAssetId: assetCard.asset.id,
         sourceName: fileName(assetCard.asset.repoPath),
@@ -910,8 +922,9 @@ export function AICanvasView({
       const card: OperationCanvasCard = {
         id: createCanvasCardId("op"),
         kind: "operation",
-        x: (first?.x ?? 120) + CARD_WIDTH + 36,
-        y: first?.y ?? 96,
+        ...(first
+          ? adjacentCardPosition(first, cardLayoutMetrics)
+          : { x: 120, y: 96 }),
         createdAt: nowISO(),
         prompt: promptText || t("aiCanvas.safeVariantPrompt"),
         token: result.token,

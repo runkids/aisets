@@ -90,6 +90,7 @@ type AICanvasStageProps = {
   onCreateImagePreview: (
     assetCard: AssetCanvasCard,
     promptText: string,
+    outputFormat?: string,
   ) => void | Promise<void>;
   onCreateOperationPreview: (
     assetCards: AssetCanvasCard[],
@@ -272,8 +273,8 @@ export function AICanvasStage({
                           ? () => onOpenAsset(card.asset.id)
                           : undefined
                       }
-                      onRenderPreview={() =>
-                        void onCreateImagePreview(card, "")
+                      onRenderPreview={(outputFormat) =>
+                        void onCreateImagePreview(card, "", outputFormat)
                       }
                       onOperationPreview={() =>
                         void onCreateOperationPreview(

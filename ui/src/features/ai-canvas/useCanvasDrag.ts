@@ -32,7 +32,7 @@ function cardTransform(
 ) {
   const stableScale =
     isScreenStableCard(card) && viewportScale > 0 ? 1 / viewportScale : 1;
-  return `translate(${x}px, ${y}px) scale(${stableScale})`;
+  return `translate3d(${x}px, ${y}px, 0) scale(${stableScale})`;
 }
 
 function dragZIndex(card: CanvasCard) {

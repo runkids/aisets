@@ -21,7 +21,13 @@ import {
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
-import { CARD_WIDTH, imageMeta, nextCardPosition, nowISO } from "./canvasUtils";
+import {
+  CARD_WIDTH,
+  adjacentCardPosition,
+  imageMeta,
+  nextCardPosition,
+  nowISO,
+} from "./canvasUtils";
 
 type AICursorState = {
   x: number;
@@ -528,6 +534,13 @@ export function useCanvasChat(opts: {
       };
     }
 
+    function cardForAssetRefs(refs: string[]) {
+      return canvasCards.find((card) => {
+        if (refs.includes(card.id)) return true;
+        return card.kind === "asset" && refs.includes(card.asset.id);
+      });
+    }
+
     function runAlignTool(result: unknown) {
       const ids = actionResultCardIds(result, canvasCards);
       if (ids.length < 2) return;
@@ -638,16 +651,24 @@ export function useCanvasChat(opts: {
           runCaptureTool(event.tool, event.params.transparent === true);
           return;
         }
-        const selectedCard = canvasCards.find(
-          (c) => c.id === canvasPrimarySelectedId,
-        );
-        const baseX = selectedCard ? selectedCard.x - CARD_WIDTH - 36 : 84;
-        const baseY = selectedCard ? selectedCard.y : 72;
+        const targetRefs = [
+          event.targetAssetId,
+          ...(event.targetAssetIds ?? []),
+        ].filter((id): id is string => typeof id === "string" && !!id);
+        const anchorCard =
+          cardForAssetRefs(targetRefs) ??
+          canvasCards.find((c) => c.id === canvasPrimarySelectedId);
+        const position = anchorCard
+          ? adjacentCardPosition(anchorCard, cardLayoutMetrics, {
+              index: newCards.length,
+              verticalStep: 88,
+            })
+          : { x: 84, y: 72 + newCards.length * 88 };
         const card: ProposalCanvasCard = {
           id: createCanvasCardId("proposal"),
           kind: "proposal",
-          x: baseX,
-          y: baseY + newCards.length * 220,
+          x: position.x,
+          y: position.y,
           createdAt: nowISO(),
           proposalId: event.id,
           tool: event.tool,
@@ -735,11 +756,17 @@ export function useCanvasChat(opts: {
         };
         if (r?.anchorCardId && r?.text) {
           const anchor = canvasCards.find((c) => c.id === r.anchorCardId);
+          const position = anchor
+            ? adjacentCardPosition(anchor, cardLayoutMetrics, {
+                index: newCards.length,
+                verticalStep: 88,
+              })
+            : { x: 84, y: 72 + newCards.length * 88 };
           const card: CommentCanvasCard = {
             id: createCanvasCardId("comment"),
             kind: "comment",
-            x: anchor ? anchor.x - CARD_WIDTH - 24 : 84,
-            y: anchor ? anchor.y + 100 + newCards.length * 160 : 72,
+            x: position.x,
+            y: position.y,
             createdAt: nowISO(),
             anchorId: r.anchorCardId,
             text: r.text,

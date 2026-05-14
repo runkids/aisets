@@ -1,6 +1,8 @@
 import {
   ArrowUp,
   Bot,
+  Check,
+  ChevronDown,
   Copy,
   ExternalLink,
   ImagePlus,
@@ -20,7 +22,6 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { createPortal } from "react-dom";
 import { basePath } from "@/api/client";
 import { Badge, IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -243,7 +244,7 @@ function useCommentOverlay(opts: {
       }
     : null;
 
-  const overlay = (
+  const overlay = opts.enabled ? (
     <>
       {drawRect && (
         <div
@@ -328,7 +329,7 @@ function useCommentOverlay(opts: {
         </div>
       )}
     </>
-  );
+  ) : null;
 
   return {
     containerRef,
@@ -368,12 +369,27 @@ function CommentRegionButtons({
 }
 
 const ctxMenuContentCls =
-  "z-[1300] min-w-[220px] max-w-[320px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-1.5 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]";
+  "z-[1300] min-w-[220px] max-w-[320px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.98)] p-1.5 shadow-g-md";
 const ctxMenuItemCls =
   "flex w-full min-h-8 cursor-pointer items-center gap-2 rounded-[10px] px-3 py-1.5 font-g text-g-ui text-white outline-none transition-colors duration-[120ms] ease-g hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-default";
 const ctxMenuSepCls = "mx-2 my-1 h-px bg-white/[0.08]";
 const ctxMenuLabelCls =
   "px-3 py-1.5 font-g text-g-caption text-white/50 select-text";
+const CANVAS_CONVERT_FORMATS = ["avif", "webp", "jpeg", "png"] as const;
+
+function normalizeImageFormat(format: string) {
+  const normalized = format.replace(/^\./, "").toLowerCase();
+  if (normalized === "jpg") return "jpeg";
+  return normalized || "image";
+}
+
+function autoConvertFormat(asset: AssetCanvasCard["asset"]) {
+  const source = normalizeImageFormat(asset.image.format || asset.ext);
+  if (source === "png" && asset.image.alpha) return "webp";
+  if (source === "avif") return "webp";
+  if (source === "gif") return "webp";
+  return "avif";
+}
 
 export type ImageCardContextMenuProps = {
   onAddComment?: () => void;
@@ -384,7 +400,7 @@ export type ImageCardContextMenuProps = {
 export type AssetContextMenuProps = ImageCardContextMenuProps & {
   card: AssetCanvasCard;
   onOpenAsset?: () => void;
-  onRenderPreview?: () => void;
+  onRenderPreview?: (outputFormat?: string) => void;
   onOperationPreview?: () => void;
   working?: boolean;
 };
@@ -402,6 +418,11 @@ export function AssetContextMenu({
   const { t } = useTranslation();
   const asset = card.asset;
   const tags = tagLabel(asset);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const sourceFormat = normalizeImageFormat(
+    asset.image.format || asset.ext,
+  ).toUpperCase();
+  const autoFormat = autoConvertFormat(asset).toUpperCase();
   return (
     <>
       <div className={ctxMenuLabelCls}>
@@ -434,15 +455,69 @@ export function AssetContextMenu({
       )}
       <div className={ctxMenuSepCls} />
       {onRenderPreview && (
-        <button
-          type="button"
-          className={ctxMenuItemCls}
-          disabled={working}
-          onClick={onRenderPreview}
-        >
-          <ImagePlus size={14} className="shrink-0 text-white/46" />
-          {t("aiCanvas.previewWebp")}
-        </button>
+        <div className="px-1 py-1">
+          <button
+            type="button"
+            className={ctxMenuItemCls}
+            disabled={working}
+            aria-expanded={convertOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              setConvertOpen((open) => !open);
+            }}
+          >
+            <ImagePlus size={14} className="shrink-0 text-white/46" />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="font-[590]">
+                {t("aiCanvas.convertHeader", { ext: sourceFormat })}
+              </span>
+              <span className="ml-1.5 font-g-mono text-white/54">
+                {autoFormat}
+              </span>
+            </span>
+            <ChevronDown
+              size={14}
+              className={cn(
+                "shrink-0 text-white/42 transition-transform duration-[120ms] ease-g",
+                convertOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {convertOpen && (
+            <div className="mt-1 border-t border-white/[0.08] pt-1">
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onRenderPreview(autoConvertFormat(asset))}
+              >
+                <span className="w-5 shrink-0" />
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="font-[590]">
+                    {t("aiCanvas.convertAuto")}
+                  </span>
+                  <span className="mx-1.5 text-white/28">·</span>
+                  <span className="text-white/54">{autoFormat}</span>
+                </span>
+                <Check size={14} className="shrink-0 text-white/78" />
+              </button>
+              {CANVAS_CONVERT_FORMATS.map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  className={ctxMenuItemCls}
+                  disabled={working}
+                  onClick={() => onRenderPreview(format)}
+                >
+                  <span className="w-5 shrink-0" />
+                  <span className="font-g-mono text-[15px] font-[590] uppercase tracking-[-0.02em]">
+                    {format}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       {onOperationPreview && (
         <button
@@ -655,32 +730,36 @@ export function CardShell({
     }
   }
 
-  function handleContextMenu(e: React.MouseEvent) {
+  function handleContextMenu(e: React.MouseEvent<HTMLElement>) {
     if (!chromeless || !contextMenu) return;
     e.preventDefault();
     dismissHint();
-    setCtxMenuPos({ x: e.clientX, y: e.clientY });
+    const rect = e.currentTarget.getBoundingClientRect();
+    const effectiveScale = Math.max(0.01, canvasScale * screenStableScale);
+    setCtxMenuPos({
+      x: (e.clientX - rect.left) / effectiveScale,
+      y: (e.clientY - rect.top) / effectiveScale,
+    });
   }
 
   const ctxMenuRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!ctxMenuPos) return;
-    function dismiss(e: Event) {
-      if (
-        ctxMenuRef.current &&
-        e.target instanceof Node &&
-        ctxMenuRef.current.contains(e.target)
-      )
-        return;
+    function dismiss(e: PointerEvent) {
+      const menu = ctxMenuRef.current;
+      if (menu && e.target instanceof Node && menu.contains(e.target)) return;
       setCtxMenuPos(null);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setCtxMenuPos(null);
     }
-    document.addEventListener("mousedown", dismiss);
-    document.addEventListener("keydown", onKey);
+    const frame = requestAnimationFrame(() => {
+      document.addEventListener("pointerdown", dismiss);
+      document.addEventListener("keydown", onKey);
+    });
     return () => {
-      document.removeEventListener("mousedown", dismiss);
+      cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("keydown", onKey);
     };
   }, [ctxMenuPos]);
@@ -690,7 +769,7 @@ export function CardShell({
     isNewCard &&
       "animate-[canvasCardIn_280ms_var(--g-ease-out)_both] motion-reduce:animate-none",
     floatingCardLayer(card, selected),
-    "[&:has([data-ai-canvas-comment-composer='true'])]:z-[1050]",
+    ctxMenuPos && "!z-[1300]",
     chromeless
       ? cn(
           "overflow-visible border-2 border-transparent shadow-none transition-[border-color,box-shadow,filter]",
@@ -714,12 +793,15 @@ export function CardShell({
       ref={(node) => onRegister(card.id, node)}
       style={{
         width: width ?? CARD_WIDTH,
-        transform: `translate(${position?.x ?? card.x}px, ${position?.y ?? card.y}px) scale(${screenStableScale})`,
+        transform: `translate3d(${position?.x ?? card.x}px, ${position?.y ?? card.y}px, 0) scale(${screenStableScale})`,
         transformOrigin: "left top",
       }}
       data-ai-canvas-card="true"
       data-selected={selected || undefined}
-      onPointerDown={(e) => onSelect(card.id, e.shiftKey)}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        onSelect(card.id, e.shiftKey);
+      }}
       onContextMenu={handleContextMenu}
     >
       {chromeless ? (
@@ -817,31 +899,27 @@ export function CardShell({
           onPointerCancel={handleResizeUp}
         />
       )}
+      {ctxMenuPos && contextMenu && (
+        <div
+          ref={ctxMenuRef}
+          className={ctxMenuContentCls}
+          style={{
+            position: "absolute",
+            left: ctxMenuPos.x,
+            top: ctxMenuPos.y,
+            transform: `scale(${1 / Math.max(0.01, canvasScale * screenStableScale)})`,
+            transformOrigin: "left top",
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => setCtxMenuPos(null)}
+        >
+          {contextMenu}
+        </div>
+      )}
     </section>
   );
 
-  return (
-    <>
-      {cardContent}
-      {ctxMenuPos &&
-        contextMenu &&
-        createPortal(
-          <div
-            ref={ctxMenuRef}
-            className={ctxMenuContentCls}
-            style={{
-              position: "fixed",
-              left: ctxMenuPos.x,
-              top: ctxMenuPos.y,
-            }}
-            onClick={() => setCtxMenuPos(null)}
-          >
-            {contextMenu}
-          </div>,
-          document.body,
-        )}
-    </>
-  );
+  return cardContent;
 }
 
 export function AssetCardBody({
