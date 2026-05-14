@@ -802,7 +802,7 @@ export function CardShell({
           )
         : cn(
             "overflow-hidden rounded-g-lg bg-g-surface/75 shadow-g-pop backdrop-blur-xl",
-            selected && "ring-2 ring-g-active-bg",
+            selected && "ring-1 ring-g-active-bg",
           ),
   );
 
