@@ -593,18 +593,355 @@ func canvasActionsOnlyFocus(actions []canvasAction) bool {
 	return true
 }
 
+func canvasTextOnlyResponseNeedsActionRepair(textBody string, nonFocusToolExecuted bool, loop int, maxLoops int) bool {
+	if loop >= maxLoops-1 || nonFocusToolExecuted || strings.TrimSpace(textBody) == "" {
+		return false
+	}
+	return canvasTextLooksLikeDeferredWork(textBody)
+}
+
+func canvasTextLooksLikeDeferredWork(text string) bool {
+	text = strings.TrimSpace(strings.ToLower(text))
+	if text == "" {
+		return false
+	}
+
+	futureMarkers := []string{
+		"i will", "i'll", "i can", "i would", "i'm going to", "let me", "next, i", "here is the plan", "suggested",
+		"我會", "我会", "我將", "我将", "我可以", "可以幫", "可以帮", "接下來", "接下来", "現在我將", "现在我将", "以下是", "建議", "建议",
+	}
+	hasFutureMarker := false
+	for _, marker := range futureMarkers {
+		if strings.Contains(text, marker) {
+			hasFutureMarker = true
+			break
+		}
+	}
+	if !hasFutureMarker {
+		return false
+	}
+
+	lineCount := 0
+	listLikeLines := 0
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lineCount++
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") || strings.HasPrefix(line, "• ") ||
+			(len(line) >= 2 && line[0] >= '1' && line[0] <= '9' && line[1] == '.') ||
+			(len(line) >= len("1、") && line[0] >= '1' && line[0] <= '9' && strings.HasPrefix(line[1:], "、")) {
+			listLikeLines++
+		}
+	}
+	if listLikeLines > 0 {
+		return true
+	}
+	return lineCount >= 3
+}
+
+func canvasActionRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`Your previous response described intended canvas work without producing an executable non-focus action.
+Do not continue explaining the plan. Convert the described work into the closest available canvas tool actions now.
+Use native tool calls if available; otherwise use action blocks.
+
+Required behavior:
+- Use canvas layout tools for visual board changes.
+- Use proposal tools for source-file or metadata changes.
+- Use capture tools for screenshot/export work.
+- If the work needs multiple steps, start with the first concrete tool action and continue after tool results.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+const (
+	canvasLoopReasonToolResults          = "tool_results"
+	canvasLoopReasonTruncatedAction      = "truncated_action"
+	canvasLoopReasonMissingCapture       = "missing_capture"
+	canvasLoopReasonTextOnlyDeferredWork = "text_only_deferred_work"
+	canvasLoopReasonFocusOnlyNeedsAnswer = "focus_only_needs_answer"
+	canvasLoopReasonBlockedComment       = "blocked_comment"
+)
+
+type canvasNextLoopInput struct {
+	Loop                      int
+	MaxLoops                  int
+	ToolResultCount           int
+	TruncatedAction           bool
+	MissingCapture            bool
+	TextOnlyDeferredWork      bool
+	FocusOnlyNeedsAnswer      bool
+	BlockedCommentNeedsAnswer bool
+}
+
+func canvasNextLoopReason(input canvasNextLoopInput) string {
+	if input.Loop >= input.MaxLoops-1 {
+		return ""
+	}
+	if input.TruncatedAction {
+		return canvasLoopReasonTruncatedAction
+	}
+	if input.MissingCapture {
+		return canvasLoopReasonMissingCapture
+	}
+	if input.TextOnlyDeferredWork {
+		return canvasLoopReasonTextOnlyDeferredWork
+	}
+	if input.FocusOnlyNeedsAnswer {
+		return canvasLoopReasonFocusOnlyNeedsAnswer
+	}
+	if input.BlockedCommentNeedsAnswer {
+		return canvasLoopReasonBlockedComment
+	}
+	if input.ToolResultCount > 0 {
+		return canvasLoopReasonToolResults
+	}
+	return ""
+}
+
+type canvasCompactToolResult struct {
+	Tool    string         `json:"tool"`
+	Summary map[string]any `json:"summary,omitempty"`
+}
+
+func compactCanvasToolResult(tool string, result any) canvasCompactToolResult {
+	summary, ok := compactCanvasValue("result", result).(map[string]any)
+	if !ok {
+		summary = map[string]any{"value": compactCanvasValue("value", result)}
+	}
+	return canvasCompactToolResult{Tool: tool, Summary: summary}
+}
+
+func compactCanvasValue(key string, value any) any {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case string:
+		return truncate(v, 300)
+	case bool, int, int64, float64:
+		return v
+	case []string:
+		return v
+	case []scanner.AssetItem:
+		return compactCanvasAssetItems(v)
+	case scanner.AssetItem:
+		return compactCanvasAssetItem(v)
+	case []any:
+		limit := min(len(v), 20)
+		out := make([]any, 0, limit)
+		for _, item := range v[:limit] {
+			out = append(out, compactCanvasValue(key, item))
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, item := range v {
+			if k == "items" {
+				out[k] = compactCanvasValue(k, item)
+				continue
+			}
+			out[k] = compactCanvasValue(k, item)
+		}
+		return out
+	default:
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		var decoded any
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			return truncate(string(raw), 300)
+		}
+		return compactCanvasValue(key, decoded)
+	}
+}
+
+func compactCanvasAssetItems(items []scanner.AssetItem) []map[string]any {
+	limit := min(len(items), 8)
+	out := make([]map[string]any, 0, limit)
+	for _, item := range items[:limit] {
+		out = append(out, compactCanvasAssetItem(item))
+	}
+	return out
+}
+
+func compactCanvasAssetItem(item scanner.AssetItem) map[string]any {
+	summary := map[string]any{
+		"assetId":     item.ID,
+		"repoPath":    item.RepoPath,
+		"projectName": item.ProjectName,
+		"ext":         item.Ext,
+		"bytes":       item.Bytes,
+		"width":       item.Image.Width,
+		"height":      item.Image.Height,
+		"usedByCount": len(item.UsedBy),
+	}
+	if item.AITag != nil {
+		summary["category"] = item.AITag.Category
+		if len(item.AITag.Tags) > 0 {
+			summary["tags"] = item.AITag.Tags
+		}
+		if item.AITag.Description != "" {
+			summary["description"] = truncate(item.AITag.Description, 180)
+		}
+	}
+	if item.OCR != nil && item.OCR.Text != "" {
+		summary["ocrText"] = truncate(item.OCR.Text, 180)
+	}
+	return summary
+}
+
+func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas canvasSnapshot, actions []canvasAction, toolResults []canvasCompactToolResult, previousAssistantText string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Original User Request\n%s\n\n", latestUserMessage)
+	fmt.Fprintf(&b, "## Loop Reason\n%s\n\n", reason)
+
+	if cards := compactCanvasRelevantCards(canvas, actions); len(cards) > 0 {
+		cardJSON, _ := json.Marshal(cards)
+		fmt.Fprintf(&b, "## Relevant Canvas Cards\n%s\n\n", string(cardJSON))
+	}
+	if previousAssistantText = strings.TrimSpace(previousAssistantText); previousAssistantText != "" {
+		fmt.Fprintf(&b, "## Previous Assistant Text\n%s\n\n", truncate(previousAssistantText, 1200))
+	}
+	if len(toolResults) > 0 {
+		resultJSON, _ := json.Marshal(toolResults)
+		fmt.Fprintf(&b, "## Compact Tool Results\n%s\n\n", string(resultJSON))
+	}
+
+	b.WriteString("## Required Follow-up\n")
+	b.WriteString(canvasFollowupInstruction(reason, latestUserMessage))
+	return b.String()
+}
+
+func canvasFollowupInstruction(reason string, latestUserMessage string) string {
+	switch reason {
+	case canvasLoopReasonTruncatedAction:
+		return "Your previous action block was truncated before the JSON finished. Reply with ONLY complete action blocks in ```action fences. Do not include explanatory prose. If arranging many cards, include all positions in one compact arrange_cards JSON object."
+	case canvasLoopReasonMissingCapture:
+		return canvasCaptureRepairPrompt(latestUserMessage)
+	case canvasLoopReasonTextOnlyDeferredWork:
+		return canvasActionRepairPrompt(latestUserMessage)
+	case canvasLoopReasonFocusOnlyNeedsAnswer:
+		return "Your previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
+	case canvasLoopReasonBlockedComment:
+		return "Your previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
+	case canvasLoopReasonToolResults:
+		return "Continue from the compact tool results above. Use the returned IDs exactly. If the user's request is fulfilled, give a short answer; otherwise call the next concrete tool."
+	default:
+		return "Continue the task from the context above."
+	}
+}
+
+func compactCanvasRelevantCards(canvas canvasSnapshot, actions []canvasAction) []map[string]any {
+	relevantIDs := map[string]bool{}
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			relevantIDs[id] = true
+		}
+	}
+	for _, id := range canvas.SelectedCardIDs {
+		add(id)
+	}
+	for _, act := range actions {
+		for _, id := range canvasActionCardIDs(act) {
+			add(id)
+		}
+		for _, key := range []string{"anchorCardId", "afterCardId", "commentCardId"} {
+			if id, ok := act.Params[key].(string); ok {
+				add(id)
+			}
+		}
+		if positions, ok := act.Params["positions"].([]any); ok {
+			for _, raw := range positions {
+				if pos, ok := raw.(map[string]any); ok {
+					if id, ok := pos["cardId"].(string); ok {
+						add(id)
+					}
+				}
+			}
+		}
+		for _, assetID := range canvasActionAssetIDs(act) {
+			for _, card := range canvas.Cards {
+				if card.Asset != nil && card.Asset.ID == assetID {
+					add(card.ID)
+				}
+			}
+		}
+	}
+	if len(relevantIDs) == 0 && len(canvas.Cards) <= 6 {
+		for _, card := range canvas.Cards {
+			add(card.ID)
+		}
+	}
+
+	out := []map[string]any{}
+	for _, card := range canvas.Cards {
+		if !relevantIDs[card.ID] {
+			continue
+		}
+		out = append(out, compactCanvasCard(card))
+	}
+	return out
+}
+
+func compactCanvasCard(card canvasCardSnapshot) map[string]any {
+	width := card.Width
+	if width <= 0 {
+		width = 320
+	}
+	height := card.Height
+	if height <= 0 {
+		height = 240
+	}
+	out := map[string]any{
+		"cardId": card.ID,
+		"kind":   card.Kind,
+		"x":      card.X,
+		"y":      card.Y,
+		"width":  width,
+		"height": height,
+		"layer":  card.LayerIndex,
+	}
+	if card.Asset != nil {
+		out["assetId"] = card.Asset.ID
+		out["repoPath"] = card.Asset.RepoPath
+		out["assetWidth"] = card.Asset.Width
+		out["assetHeight"] = card.Asset.Height
+	}
+	if card.Kind == "comment" {
+		out["anchorId"] = card.AnchorID
+		out["text"] = truncate(card.Text, 160)
+	}
+	if card.Kind == "proposal" {
+		out["tool"] = card.Tool
+		out["status"] = card.ProposalStatus
+		out["description"] = truncate(card.Description, 160)
+	}
+	if card.Kind == "upload" {
+		out["uploadToken"] = card.UploadToken
+		out["fileName"] = card.UploadFileName
+		out["uploadWidth"] = card.UploadWidth
+		out["uploadHeight"] = card.UploadHeight
+	}
+	return out
+}
+
 func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
 	if hangulTextRe.MatchString(latestUserMessage) {
-		return "Korean (한국어)"
+		return "Korean"
 	}
 	if kanaTextRe.MatchString(latestUserMessage) {
-		return "Japanese (日本語)"
+		return "Japanese"
 	}
 	if hanTextRe.MatchString(latestUserMessage) {
 		if strings.HasPrefix(locale, "zh-CN") {
-			return "Simplified Chinese (简体中文)"
+			return "Simplified Chinese"
 		}
-		return "Traditional Chinese (繁體中文)"
+		return "Traditional Chinese"
 	}
 	return ""
 }
@@ -862,7 +1199,9 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 	if isCanvasImageTransformTool(tool) {
 		return containsAnyText(latestUserMessage,
 			"mirror", "flip", "flipped", "rotate", "rotation", "turn",
-			"鏡像", "镜像", "翻轉", "翻转", "水平翻", "垂直翻", "左右翻", "上下翻", "旋轉", "旋转", "選轉", "选转",
+			"鏡像", "镜像", "鏡相", "镜相", "靚相", "靓相",
+			"反轉", "反转", "翻轉", "翻转", "水平翻", "垂直翻", "左右翻", "上下翻", "左右反", "上下反", "水平反", "垂直反",
+			"旋轉", "旋转", "選轉", "选转", "轉 90", "转 90",
 		)
 	}
 
@@ -1132,7 +1471,7 @@ Choose the correct capture tool yourself based on the request and canvas state:
 - capture_viewport: visible viewport
 - capture_canvas: entire canvas / full layout / exported canvas
 - capture_selected: selected cards only
-If the user asked for transparent/no-background/去背, set {"transparent": true}; otherwise false.
+If the user asked for transparent or no-background output, set {"transparent": true}; otherwise false.
 
 Latest user request: %q
 
@@ -1363,15 +1702,33 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	const canvasOutputTokenLimit = 900
+	promptKind := vlmPromptKindFull
+	loopReason := "initial"
+	var loopStats []vlmChatRoundStats
 	for loop := 0; loop < maxToolLoops; loop++ {
-		content, chatResp, err := s.chatVLMWithTools(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", canvasOutputTokenLimit, canvasLLMTools())
-		if err != nil {
+		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
+			Images:       images,
+			Backend:      backend,
+			ModelName:    modelName,
+			SystemPrompt: systemPrompt,
+			Prompt:       currentPrompt,
+			Purpose:      "canvas",
+			TimeoutSec:   canvasOutputTokenLimit,
+			Tools:        canvasLLMTools(),
+			Loop:         loop,
+			PromptKind:   promptKind,
+			LoopReason:   loopReason,
+		})
+		loopStats = append(loopStats, round.Stats)
+		if round.Err != nil {
 			sendNDJSON(w, map[string]any{
 				"type":  "error",
-				"error": map[string]string{"code": "canvas_chat_llm_failed", "message": err.Error()},
+				"error": map[string]string{"code": "canvas_chat_llm_failed", "message": round.Err.Error()},
 			})
 			return
 		}
+		content := round.Content
+		chatResp := round.Response
 		totalInputTokens += chatResp.InputTokens
 		totalOutputTokens += chatResp.OutputTokens
 
@@ -1391,7 +1748,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 		missingCapture := captureRequested && !captureSeen && !hasCaptureAction && loop < maxToolLoops-1
 
-		var toolResults []string
+		var compactToolResults []canvasCompactToolResult
 		captureExecutedThisLoop := false
 		nonFocusToolExecutedThisLoop := false
 		blockedCommentNeedsAnswer := false
@@ -1427,8 +1784,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					nonFocusToolExecutedThisLoop = true
 				}
 				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
-					resultJSON, _ := json.Marshal(result)
-					toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
+					compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
 				}
 			} else {
 				if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
@@ -1457,7 +1813,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(150 * time.Millisecond)
 		}
 
-		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop {
+		actionRequestNeedsTool := canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
+		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})
@@ -1470,26 +1827,24 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if captureExecutedThisLoop && !truncatedAction {
 			break
 		}
-		focusOnlyNeedsAnswer := canvasActionsOnlyFocus(actions) && textBody == "" && loop < maxToolLoops-1
-		if len(toolResults) == 0 && !missingCapture && !truncatedAction && !focusOnlyNeedsAnswer && !blockedCommentNeedsAnswer {
+		focusOnlyNeedsAnswer := canvasActionsOnlyFocus(actions) && textBody == "" && !actionRequestNeedsTool && loop < maxToolLoops-1
+		nextLoopReason := canvasNextLoopReason(canvasNextLoopInput{
+			Loop:                      loop,
+			MaxLoops:                  maxToolLoops,
+			ToolResultCount:           len(compactToolResults),
+			TruncatedAction:           truncatedAction,
+			MissingCapture:            missingCapture,
+			TextOnlyDeferredWork:      actionRequestNeedsTool,
+			FocusOnlyNeedsAnswer:      focusOnlyNeedsAnswer,
+			BlockedCommentNeedsAnswer: blockedCommentNeedsAnswer,
+		})
+		if nextLoopReason == "" {
 			break
 		}
 		images = nil
-		currentPrompt = currentPrompt + "\n\nassistant: " + content
-		if len(toolResults) > 0 {
-			currentPrompt += "\n\n## Tool Results\n" + strings.Join(toolResults, "\n\n")
-		}
-		if truncatedAction {
-			currentPrompt += "\n\n## Required Follow-up\nYour previous action block was truncated before the JSON finished. Reply with ONLY complete action blocks in ```action fences. Do not include explanatory prose. If arranging many cards, include all positions in one compact arrange_cards JSON object."
-		} else if missingCapture {
-			currentPrompt += "\n\n## Required Follow-up\n" + canvasCaptureRepairPrompt(latestUserMessage)
-		} else if focusOnlyNeedsAnswer {
-			currentPrompt += "\n\n## Required Follow-up\nYour previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
-		} else if blockedCommentNeedsAnswer {
-			currentPrompt += "\n\n## Required Follow-up\nYour previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
-		} else {
-			currentPrompt += "\n\nContinue acting on these results. Use the data above to fulfill the user's original request. Remember: EVERY response must include at least one action block."
-		}
+		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, content)
+		promptKind = vlmPromptKindFollowup
+		loopReason = nextLoopReason
 		sendNDJSON(w, map[string]any{"type": "thinking"})
 	}
 
@@ -1511,6 +1866,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		"durationMs":   durationMs,
 		"inputTokens":  totalInputTokens,
 		"outputTokens": totalOutputTokens,
+		"loopStats":    loopStats,
 	})
 }
 

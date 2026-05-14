@@ -27,7 +27,7 @@ func canvasToolRegistry() []canvasToolDef {
 		{
 			Name:        "search_assets",
 			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Returns full AssetItem objects that can be added directly to the canvas.",
-			Params:      `{"q": "string — search query (e.g. 'book', 'icon', '貓')", "limit": "int — max results, default 12"}`,
+			Params:      `{"q": "string — search query (e.g. 'book', 'icon', 'cat')", "limit": "int — max results, default 12"}`,
 			Cardinality: "multi",
 			Safe:        true,
 		},
@@ -146,21 +146,21 @@ func canvasToolRegistry() []canvasToolDef {
 		{
 			Name:        "capture_viewport",
 			Description: "Trigger the frontend screenshot control to capture the currently visible canvas viewport and show the normal screenshot preview.",
-			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Params:      `{"transparent": "boolean — true for transparent background"}`,
 			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "capture_canvas",
 			Description: "Trigger the frontend screenshot control to capture the entire canvas and show the normal screenshot preview.",
-			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Params:      `{"transparent": "boolean — true for transparent background"}`,
 			Cardinality: "multi",
 			Safe:        true,
 		},
 		{
 			Name:        "capture_selected",
 			Description: "Trigger the frontend screenshot control to capture the selected cards and show the normal screenshot preview.",
-			Params:      `{"transparent": "boolean — true for transparent background / 去背"}`,
+			Params:      `{"transparent": "boolean — true for transparent background"}`,
 			Cardinality: "multi",
 			Safe:        true,
 		},
@@ -215,14 +215,14 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "mirror_image",
-			Description: "Create a mirrored/flipped image variant using Rust imgtools. Use for horizontal or vertical mirror/flip requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Description: "Create a mirrored/flipped image variant using Rust imgtools. Use for clear mirror, flip, or reverse-image requests. This creates a confirmation proposal and does not directly edit the source file.",
 			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "flip": "horizontal|vertical|both, default horizontal", "outputFormat": "png|jpg|webp|avif optional"}`,
 			Cardinality: "multi",
 			Safe:        false,
 		},
 		{
 			Name:        "rotate_image",
-			Description: "Create a rotated image variant using Rust imgtools. Use for clockwise 90, 180, or 270 degree rotation requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Description: "Create a rotated image variant using Rust imgtools. Use for clear rotate, rotation, turn, clockwise, or 90/180/270 degree rotation requests. This creates a confirmation proposal and does not directly edit the source file.",
 			Params:      `{"assetIds": ["string"], "assetId": "string optional legacy single id", "degrees": "90|180|270, default 90", "outputFormat": "png|jpg|webp|avif optional"}`,
 			Cardinality: "multi",
 			Safe:        false,
@@ -367,12 +367,23 @@ func canvasProposalGuidance(options canvasChatOptions) string {
 	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
 }
 
+func canvasPromptLocaleDisplayName(locale string) string {
+	name := llm.LocaleDisplayName(locale)
+	if name == "" {
+		return ""
+	}
+	if before, _, ok := strings.Cut(name, " ("); ok {
+		return before
+	}
+	return name
+}
+
 func canvasSystemPrompt(locale string, options canvasChatOptions) string {
 	lang := "English"
 	if options.AutoLocale {
-		lang = llm.LocaleDisplayName(locale)
+		lang = canvasPromptLocaleDisplayName(locale)
 		if lang == "" && strings.HasPrefix(locale, "zh") {
-			lang = llm.LocaleDisplayName("zh-TW")
+			lang = canvasPromptLocaleDisplayName("zh-TW")
 		}
 		if lang == "" {
 			lang = "English"
@@ -429,26 +440,27 @@ CRITICAL RULES:
 %s
 
 ## IMPORTANT: search_assets searches the ENTIRE PROJECT CATALOG
-search_assets is NOT limited to what's on the canvas. It searches ALL assets in the project by filename, path, AI tags, description, and OCR text. When the user asks to "find", "list", "show", or "搜尋/找" assets, ALWAYS use search_assets first. Match the user's requested count: if they ask for one / single / 一張 / 一個, set limit: 1 and do not add multiple candidates. If the user mentions an exact filename or filename stem such as family_danran.png, search the exact stem first (family_danran) before broader visual terms; if that returns a result, use it and do NOT claim no match. Even if the canvas is empty, you can search the catalog. The results will be returned to you and you can then describe them.
+search_assets is NOT limited to what's on the canvas. It searches ALL assets in the project by filename, path, AI tags, description, and OCR text. When the user asks to find, list, or show assets, ALWAYS use search_assets first. Match the user's requested count: if they ask for one or a single item, set limit: 1 and do not add multiple candidates. If the user mentions an exact filename or filename stem such as family_danran.png, search the exact stem first (family_danran) before broader visual terms; if that returns a result, use it and do NOT claim no match. Even if the canvas is empty, you can search the catalog. The results will be returned to you and you can then describe them.
 
 get_asset_detail retrieves full metadata for a specific asset (project, local path, tags, description, OCR, references). Use it after search_assets to get details about specific items.
 
 ## Context-Aware Behavior
 - **When the user asks to select one or more cards:** Use select_cards with the exact card IDs. Single-card and multi-card selection are both supported.
 - **When the user asks to remove/delete extra cards from the canvas:** Use remove_cards. This only cleans the canvas and does not delete files. Do NOT use delete_asset unless the user explicitly asks to delete source files from the project.
-- **When the user asks to move a card in a direction** (right/left/up/down, 右邊/左邊/上方/下方) without a specific coordinate or distance: treat it as a nearby relative nudge, not a jump across the board. Move by about one card size plus a small gap. Keep the secondary axis close to the current position unless alignment, diagonal placement, or a nearby target card makes a small adjustment useful.
-- **When the user asks to copy/clone an image visually on the canvas** (e.g. "複製五隻小狗", "make five copies", "clone this image"): Use duplicate_cards with the image card ID and count equal to the number of new copies. Then use arrange_cards, align_cards, or distribute_cards with the returned new card IDs to create the requested feeling or layout. This is canvas-level duplication, not pixel editing.
+- **When the user asks to move a card in a direction** without a specific coordinate or distance: treat it as a nearby relative nudge, not a jump across the board. Move by about one card size plus a small gap. Keep the secondary axis close to the current position unless alignment, diagonal placement, or a nearby target card makes a small adjustment useful.
+- **When the user asks to arrange, lay out, compose, storyboard, or make selected images look like a scene:** operate on the canvas. Do not answer with only a written plan. Duplicate selected image cards if multiple beats or panels are needed, then use arrange_cards, resize_card, align_cards, or distribute_cards to create the layout. After duplicate_cards returns newCardIds, use those returned IDs in the follow-up arrange step.
+- **When the user asks to copy/clone an image visually on the canvas** (for example, "make five copies" or "clone this image"): Use duplicate_cards with the image card ID and count equal to the number of new copies. Then use arrange_cards, align_cards, or distribute_cards with the returned new card IDs to create the requested feeling or layout. This is canvas-level duplication, not pixel editing.
 - **When the user asks to find one asset/image:** Use search_assets with limit: 1. Do not dump all matches onto the canvas. If the request includes a filename, use the filename stem as the first query.
-- **When the user asks whether a target appears on the current canvas** (e.g. "畫布上有這隻狗嗎", "辨識畫布上有沒有", "match existing images on canvas"): inspect the canvas visually and compare against visible card IDs first. Do not ask the user to identify the target again. Use inspect_canvas if visual matching is needed; use focus_card/select_cards to point at matches. Use search_assets/find_similar_assets only for searching the project catalog, not as a substitute for checking visible canvas cards.
+- **When the user asks whether a target appears on the current canvas:** inspect the canvas visually and compare against visible card IDs first. Do not ask the user to identify the target again. Use inspect_canvas if visual matching is needed; use focus_card/select_cards to point at matches. Use search_assets/find_similar_assets only for searching the project catalog, not as a substitute for checking visible canvas cards.
 - **When the canvas is empty and the user asks to find/list assets:** Use search_assets with relevant keywords. You will receive the results. Then describe what you found.
-- **When creating comments/annotations:** Use create_comment ONLY when the user explicitly asks to annotate/註解/標記/圈出/highlight/comment/leave a note. Place comment cards away from image content. Do not cover or overlap the asset being discussed; keep roughly 80px+ distance from the image/card when possible. Use the region field to point to the relevant image area instead of placing the comment on top of it.
+- **When creating comments/annotations:** Use create_comment ONLY when the user explicitly asks to annotate, mark, circle, highlight, comment, or leave a note. Place comment cards away from image content. Do not cover or overlap the asset being discussed; keep roughly 80px+ distance from the image/card when possible. Use the region field to point to the relevant image area instead of placing the comment on top of it.
 - **When the user asks about a REGION (circled area, comment):** Focus on analyzing THAT specific region and answer in chat. Use create_comment only if the user asks you to add or update an annotation. Do NOT propose file-level operations unless explicitly asked.
 - **When arranging cards:** Use the current size=WIDTHxHEIGHT for every selected/visible card and place bounding boxes with clear whitespace. The canvas is large/unbounded, but only use far-away coordinates when the user asks for a broad layout or spread-out board. For ordinary move requests, stay near the current cluster. For 8+ cards, prefer a broad multi-row layout about 1600-2400px wide with 160px+ horizontal and 120px+ vertical gaps unless the user explicitly asks for a tight collage. Do not place large cards partly under smaller cards unless the user explicitly asks for overlap/collage. If the layout would improve with a focal image or smaller supporting images, use resize_card first/alongside arrange_cards; resize_card is visual only and safe. If you are unsure whether the layout visually overlaps or layers correctly, call inspect_canvas to see a hidden AI-only snapshot before finalizing.
 - **When the user asks to place an image on top / in front / above another image:** Use bring_cards_to_front for the card that should visually cover the others. Moving x/y is not enough to change stacking order. If the user says "put A in front of B" or "A above B", pass B as afterCardId so A is inserted directly above B instead of blindly moving A above every card.
-- **When the user asks to take a picture / screenshot / export the canvas / 拍照 / 截圖 / 匯出畫布:** After any arrange/resize/layer steps, call capture_viewport, capture_canvas, or capture_selected. If the user says 去背 or transparent, pass {"transparent": true}. This triggers the real frontend screenshot/export preview. Do not apologize or claim you cannot create an image file. Use inspect_canvas only for your own hidden visual check; it is not the user's final screenshot.
+- **When the user asks to take a picture, screenshot, or export the canvas:** After any arrange/resize/layer steps, call capture_viewport, capture_canvas, or capture_selected. If the user asks for a transparent or no-background export, pass {"transparent": true}. This triggers the real frontend screenshot/export preview. Do not apologize or claim you cannot create an image file. Use inspect_canvas only for your own hidden visual check; it is not the user's final screenshot.
 - **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For catalog/file tools, emit one action with assetIds so the UI can show a batch proposal and per-asset status.
 - **When the user explicitly asks for optimization/compression/format change:** Propose compress_image, resize_image, convert_image as appropriate.
-- **When the user explicitly asks to mirror/flip or rotate an image:** Propose mirror_image or rotate_image for the selected/mentioned catalog assets. Use flip=horizontal for left-right mirror unless the user asks for vertical/top-bottom. Use degrees=90 by default for rotate if the user does not specify a degree.
+- **When the user explicitly asks to mirror/flip/reverse or rotate an image:** Propose mirror_image or rotate_image for the selected/mentioned catalog assets. Use flip=horizontal by default for mirror/flip/reverse unless the user clearly asks for vertical or top-bottom flipping. Use degrees=90 by default for rotate_image if the user does not specify a degree.
 - **When the user explicitly asks to tag or write/save a description:** Propose update_tags or update_description for every selected asset card, not just the first one.
 - **When the user asks a general question about an asset:** Analyze and answer in chat. Use focus_card or get_asset_detail when useful. Do NOT create comments, file proposals, or metadata proposals unless the user explicitly asks for that action.
 - **When you spot visual issues** (edges, contrast, artifacts, wrong crop), describe them in chat. Only use create_comment to circle/mark the issue if the user explicitly asks for annotation. Regions use normalized 0-1 coordinates: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.

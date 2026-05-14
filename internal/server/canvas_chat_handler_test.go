@@ -1,13 +1,30 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"aisets/internal/llm"
+	"aisets/internal/scanner"
 )
+
+type roundStatsProvider struct {
+	fakeEmbedProvider
+}
+
+func (roundStatsProvider) Chat(context.Context, llm.ChatRequest) (llm.ChatResponse, error) {
+	return llm.ChatResponse{
+		Content:      "ok",
+		InputTokens:  3,
+		OutputTokens: 4,
+		DurationMs:   5,
+		ToolCalls:    []llm.ChatToolCall{{Name: "search_assets"}},
+	}, nil
+}
 
 func TestParseCanvasActions_PlainText(t *testing.T) {
 	text, actions := parseCanvasActions("This is a plain text response with no actions.")
@@ -145,15 +162,24 @@ func TestCanvasSystemPrompt_ImageOptimizationAdviceOffRestrictsProposals(t *test
 func TestCanvasSystemPrompt_AutoLocaleUsesBuiltInLanguages(t *testing.T) {
 	cases := map[string]string{
 		"en":    "Respond in English",
-		"zh-TW": "Respond in Traditional Chinese (繁體中文)",
-		"zh-CN": "Respond in Simplified Chinese (简体中文)",
-		"ja":    "Respond in Japanese (日本語)",
-		"ko":    "Respond in Korean (한국어)",
+		"zh-TW": "Respond in Traditional Chinese",
+		"zh-CN": "Respond in Simplified Chinese",
+		"ja":    "Respond in Japanese",
+		"ko":    "Respond in Korean",
 	}
 	for locale, want := range cases {
 		prompt := canvasSystemPrompt(locale, canvasChatOptions{AutoLocale: true})
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("%s prompt missing %q:\n%s", locale, want, prompt)
+		}
+	}
+}
+
+func TestCanvasSystemPrompt_EnglishInstructionsAvoidChineseAliases(t *testing.T) {
+	for _, locale := range []string{"en", "zh-TW", "zh-CN", "ja", "ko"} {
+		prompt := canvasSystemPrompt(locale, canvasChatOptions{AutoLocale: true})
+		if hanTextRe.MatchString(prompt) {
+			t.Fatalf("%s canvas system prompt should not contain Chinese aliases:\n%s", locale, prompt)
 		}
 	}
 }
@@ -268,6 +294,12 @@ func TestCanvasProposalAllowed_AllowsExplicitImageTransforms(t *testing.T) {
 	options := canvasChatOptions{ImageOptimizationAdvice: false}
 	if !canvasProposalAllowed("mirror_image", "幫這張圖做水平鏡像", options) {
 		t.Fatal("explicit mirror request should be allowed")
+	}
+	if !canvasProposalAllowed("mirror_image", "幫這張圖左右反轉", options) {
+		t.Fatal("explicit reverse request should be allowed")
+	}
+	if !canvasProposalAllowed("mirror_image", "幫這張圖靚相", options) {
+		t.Fatal("common mirror typo should be allowed")
 	}
 	if !canvasProposalAllowed("rotate_image", "把這張圖旋轉 90 度", options) {
 		t.Fatal("explicit rotate request should be allowed")
@@ -630,6 +662,180 @@ func TestCanvasActionsOnlyFocus(t *testing.T) {
 	}
 	if canvasActionsOnlyFocus([]canvasAction{{Tool: "focus_card"}, {Tool: "search_assets"}}) {
 		t.Fatal("mixed actions should not be focus-only")
+	}
+}
+
+func TestCanvasTextOnlyResponseNeedsActionRepair(t *testing.T) {
+	planText := `我已定位到 P1 和 P2 的角色圖像，現在我將為您規劃幾個分鏡劇情。以下是建議的戰鬥場景構思：
+
+分鏡 1：近身格鬥
+• P1 從左側突襲
+• P2 在右側防守並反擊`
+
+	if !canvasTextOnlyResponseNeedsActionRepair(planText, false, 0, 3) {
+		t.Fatal("deferred canvas work should request an action repair")
+	}
+	if canvasTextOnlyResponseNeedsActionRepair(planText, true, 0, 3) {
+		t.Fatal("executed non-focus tools should not request another action repair")
+	}
+	if canvasTextOnlyResponseNeedsActionRepair(planText, false, 2, 3) {
+		t.Fatal("last loop should not request another action repair")
+	}
+	if canvasTextOnlyResponseNeedsActionRepair("這張圖是 P1 角色站立姿勢。", false, 0, 3) {
+		t.Fatal("plain visual answer should not request an action repair")
+	}
+}
+
+func TestCanvasActionRepairPromptRequiresGenericToolActions(t *testing.T) {
+	prompt := canvasActionRepairPrompt("幫我安排幾個分鏡")
+	for _, want := range []string{"without producing an executable non-focus action", "Use canvas layout tools", "Reply with only tool calls or action blocks"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("repair prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestVLMChatRoundStats(t *testing.T) {
+	s := &Server{llmProvider: roundStatsProvider{}}
+	round := s.chatVLMRound(context.Background(), vlmChatRoundRequest{
+		ModelName:  "test-model",
+		Prompt:     "hello",
+		Purpose:    "canvas",
+		Loop:       1,
+		PromptKind: vlmPromptKindFollowup,
+		LoopReason: canvasLoopReasonToolResults,
+		Tools:      []llm.ChatTool{{Name: "search_assets"}},
+	})
+	if round.Err != nil {
+		t.Fatalf("chatVLMRound error: %v", round.Err)
+	}
+	if round.Content != "ok" {
+		t.Fatalf("content = %q", round.Content)
+	}
+	if round.Stats.Loop != 1 || round.Stats.PromptKind != vlmPromptKindFollowup || round.Stats.Reason != canvasLoopReasonToolResults {
+		t.Fatalf("stats identity = %#v", round.Stats)
+	}
+	if round.Stats.InputTokens != 3 || round.Stats.OutputTokens != 4 || round.Stats.DurationMs != 5 || round.Stats.ToolCallCount != 1 {
+		t.Fatalf("stats metrics = %#v", round.Stats)
+	}
+}
+
+func TestCanvasNextLoopReason(t *testing.T) {
+	cases := []struct {
+		name string
+		in   canvasNextLoopInput
+		want string
+	}{
+		{
+			name: "tool results",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, ToolResultCount: 1},
+			want: canvasLoopReasonToolResults,
+		},
+		{
+			name: "truncated priority",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, ToolResultCount: 1, TruncatedAction: true},
+			want: canvasLoopReasonTruncatedAction,
+		},
+		{
+			name: "missing capture",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, MissingCapture: true},
+			want: canvasLoopReasonMissingCapture,
+		},
+		{
+			name: "text only deferred work",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, TextOnlyDeferredWork: true},
+			want: canvasLoopReasonTextOnlyDeferredWork,
+		},
+		{
+			name: "focus only needs answer",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, FocusOnlyNeedsAnswer: true},
+			want: canvasLoopReasonFocusOnlyNeedsAnswer,
+		},
+		{
+			name: "blocked comment",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, BlockedCommentNeedsAnswer: true},
+			want: canvasLoopReasonBlockedComment,
+		},
+		{
+			name: "last loop stops",
+			in:   canvasNextLoopInput{Loop: 2, MaxLoops: 3, ToolResultCount: 1},
+			want: "",
+		},
+		{
+			name: "no reason stops",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3},
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canvasNextLoopReason(tc.in); got != tc.want {
+				t.Fatalf("canvasNextLoopReason() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuildCanvasFollowupPromptUsesCompactState(t *testing.T) {
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1"},
+		Cards: []canvasCardSnapshot{{
+			ID:     "card-1",
+			Kind:   "asset",
+			X:      10,
+			Y:      20,
+			Width:  180,
+			Height: 120,
+			Asset: &canvasAssetSnapshot{
+				ID:       "asset-1",
+				RepoPath: "sprites/p1.png",
+				Ext:      ".png",
+				Width:    64,
+				Height:   64,
+			},
+		}},
+	}
+	results := []canvasCompactToolResult{compactCanvasToolResult("duplicate_cards", map[string]any{
+		"cardIds":    []string{"card-1"},
+		"newCardIds": []string{"dup-1", "dup-2"},
+	})}
+	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "arrange these", canvas, nil, results, "I will arrange them.")
+	if strings.Contains(prompt, "## Canvas State") {
+		t.Fatalf("follow-up prompt should not include full canvas state:\n%s", prompt)
+	}
+	for _, want := range []string{"Original User Request", "arrange these", "card-1", "asset-1", "newCardIds", "dup-1", canvasLoopReasonToolResults} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("follow-up prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCompactCanvasToolResultSearchAssetsOmitsFullAssetItem(t *testing.T) {
+	compact := compactCanvasToolResult("search_assets", map[string]any{
+		"total": float64(1),
+		"items": []scanner.AssetItem{{
+			ID:          "asset-1",
+			RepoPath:    "icons/cat.png",
+			LocalPath:   "/private/project/icons/cat.png",
+			ContentHash: "hash-should-not-leak",
+			Ext:         ".png",
+			Bytes:       2048,
+		}},
+	})
+	raw, err := json.Marshal(compact)
+	if err != nil {
+		t.Fatalf("marshal compact result: %v", err)
+	}
+	body := string(raw)
+	for _, want := range []string{"asset-1", "icons/cat.png"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("compact result missing %q: %s", want, body)
+		}
+	}
+	for _, forbidden := range []string{"LocalPath", "localPath", "/private/project", "ContentHash", "contentHash", "hash-should-not-leak"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("compact result leaked %q: %s", forbidden, body)
+		}
 	}
 }
 

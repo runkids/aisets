@@ -126,59 +126,137 @@ type vlmImage struct {
 	Ext  string
 }
 
+const (
+	vlmPromptKindSingle   = "single"
+	vlmPromptKindFull     = "full"
+	vlmPromptKindFollowup = "followup"
+)
+
+type vlmChatRoundStats struct {
+	Loop          int    `json:"loop"`
+	PromptKind    string `json:"promptKind"`
+	Reason        string `json:"reason,omitempty"`
+	InputTokens   int64  `json:"inputTokens,omitempty"`
+	OutputTokens  int64  `json:"outputTokens,omitempty"`
+	DurationMs    int64  `json:"durationMs,omitempty"`
+	ToolCallCount int    `json:"toolCallCount"`
+}
+
+type vlmChatRoundRequest struct {
+	Images       []vlmImage
+	Backend      string
+	ModelName    string
+	SystemPrompt string
+	Prompt       string
+	Purpose      string
+	TimeoutSec   int
+	Tools        []llm.ChatTool
+	Loop         int
+	PromptKind   string
+	LoopReason   string
+}
+
+type vlmChatRoundResult struct {
+	Content  string
+	Response llm.ChatResponse
+	Stats    vlmChatRoundStats
+	Err      error
+}
+
 func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt, purpose string, timeoutSec int) (string, llm.ChatResponse, error) {
 	return s.chatVLMWithTools(ctx, images, backend, modelName, systemPrompt, prompt, purpose, timeoutSec, nil)
 }
 
 func (s *Server) chatVLMWithTools(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt, purpose string, timeoutSec int, tools []llm.ChatTool) (string, llm.ChatResponse, error) {
-	if id, ok := agent.AgentBackendID(backend); ok {
+	round := s.chatVLMRound(ctx, vlmChatRoundRequest{
+		Images:       images,
+		Backend:      backend,
+		ModelName:    modelName,
+		SystemPrompt: systemPrompt,
+		Prompt:       prompt,
+		Purpose:      purpose,
+		TimeoutSec:   timeoutSec,
+		Tools:        tools,
+		PromptKind:   vlmPromptKindSingle,
+	})
+	return round.Content, round.Response, round.Err
+}
+
+func (s *Server) chatVLMRound(ctx context.Context, req vlmChatRoundRequest) vlmChatRoundResult {
+	promptKind := req.PromptKind
+	if promptKind == "" {
+		promptKind = vlmPromptKindSingle
+	}
+	stats := vlmChatRoundStats{
+		Loop:       req.Loop,
+		PromptKind: promptKind,
+		Reason:     req.LoopReason,
+	}
+
+	if id, ok := agent.AgentBackendID(req.Backend); ok {
 		if provider, ok := s.agentProviders[id]; ok {
-			paths := make([]string, len(images))
-			for i, img := range images {
+			paths := make([]string, len(req.Images))
+			for i, img := range req.Images {
 				paths[i] = img.Path
 			}
-			cliModel := modelName
+			cliModel := req.ModelName
 			if cliModel == "default" {
 				cliModel = ""
 			}
 			var res agent.ChatResult
 			_ = provider.ChatBatch(ctx, []agent.ChatRequest{{
 				Model:        cliModel,
-				SystemPrompt: systemPrompt,
-				Prompt:       prompt,
+				SystemPrompt: req.SystemPrompt,
+				Prompt:       req.Prompt,
 				ImagePaths:   paths,
-				TimeoutSec:   timeoutSec,
+				TimeoutSec:   req.TimeoutSec,
 			}}, func(_ int, r agent.ChatResult) { res = r })
+			stats.InputTokens = res.InputTokens
+			stats.OutputTokens = res.OutputTokens
+			stats.DurationMs = res.DurationMs
 			if res.Err != nil {
-				return "", llm.ChatResponse{DurationMs: res.DurationMs}, res.Err
+				return vlmChatRoundResult{
+					Response: llm.ChatResponse{DurationMs: res.DurationMs},
+					Stats:    stats,
+					Err:      res.Err,
+				}
 			}
-			return res.Content, llm.ChatResponse{
+			resp := llm.ChatResponse{
 				Content:      res.Content,
 				InputTokens:  res.InputTokens,
 				OutputTokens: res.OutputTokens,
 				DurationMs:   res.DurationMs,
-			}, nil
+			}
+			return vlmChatRoundResult{
+				Content:  res.Content,
+				Response: resp,
+				Stats:    stats,
+			}
 		}
 	}
 
 	var dataURIs []string
-	for _, img := range images {
-		dataURI, err := prepareImageForVLM(img.Path, img.Ext, purpose)
+	for _, img := range req.Images {
+		dataURI, err := prepareImageForVLM(img.Path, img.Ext, req.Purpose)
 		if err != nil {
-			return "", llm.ChatResponse{}, err
+			return vlmChatRoundResult{Stats: stats, Err: err}
 		}
 		dataURIs = append(dataURIs, dataURI)
 	}
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
-		Model:      modelName,
-		Messages:   buildChatMessages(systemPrompt, prompt, dataURIs),
-		Tools:      tools,
-		TimeoutSec: timeoutSec,
+		Model:      req.ModelName,
+		Messages:   buildChatMessages(req.SystemPrompt, req.Prompt, dataURIs),
+		Tools:      req.Tools,
+		TimeoutSec: req.TimeoutSec,
 	})
+	stats.InputTokens = resp.InputTokens
+	stats.OutputTokens = resp.OutputTokens
+	stats.DurationMs = resp.DurationMs
+	stats.ToolCallCount = len(resp.ToolCalls)
 	if err != nil {
-		return "", resp, err
+		return vlmChatRoundResult{Response: resp, Stats: stats, Err: err}
 	}
-	return resp.Content, resp, nil
+	return vlmChatRoundResult{Content: resp.Content, Response: resp, Stats: stats}
 }
 
 type aiTagWorkResult struct {

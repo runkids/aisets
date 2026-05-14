@@ -32,10 +32,21 @@ export type CanvasChatEvent =
       durationMs: number;
       inputTokens?: number;
       outputTokens?: number;
+      loopStats?: CanvasChatLoopStat[];
     }
   | { type: "error"; error: { code: string; message: string } };
 
 type CanvasChatDone = Extract<CanvasChatEvent, { type: "done" }>;
+
+export type CanvasChatLoopStat = {
+  loop: number;
+  promptKind: string;
+  reason?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  durationMs?: number;
+  toolCallCount: number;
+};
 
 export type CanvasCardLayoutMetrics = Record<
   string,
