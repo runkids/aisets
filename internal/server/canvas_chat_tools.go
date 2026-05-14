@@ -170,33 +170,33 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "compress_image",
-			Description: "Compress/convert an asset to a smaller format (WebP, AVIF, PNG).",
+			Description: "Generate a compressed image variant (WebP, AVIF, PNG) without changing the source file.",
 			Cardinality: "multi",
-			Safe:        false,
+			Safe:        true,
 		},
 		{
 			Name:        "resize_image",
-			Description: "Resize an asset to fit within a max dimension.",
+			Description: "Generate a resized image variant that fits within a max dimension without changing the source file.",
 			Cardinality: "multi",
-			Safe:        false,
+			Safe:        true,
 		},
 		{
 			Name:        "convert_image",
-			Description: "Convert an asset to a different format without quality change.",
+			Description: "Generate a converted image variant in another format without changing the source file.",
 			Cardinality: "multi",
-			Safe:        false,
+			Safe:        true,
 		},
 		{
 			Name:        "mirror_image",
-			Description: "Create a mirrored/flipped image variant using Rust imgtools. Use for clear mirror, flip, or reverse-image requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Description: "Generate a mirrored/flipped image variant using Rust imgtools. Use for clear mirror, flip, or reverse-image requests. This preserves the source file.",
 			Cardinality: "multi",
-			Safe:        false,
+			Safe:        true,
 		},
 		{
 			Name:        "rotate_image",
-			Description: "Create a rotated image variant using Rust imgtools. Use for clear rotate, rotation, turn, clockwise, or 90/180/270 degree rotation requests. This creates a confirmation proposal and does not directly edit the source file.",
+			Description: "Generate a rotated image variant using Rust imgtools. Use for clear rotate, rotation, turn, clockwise, or 90/180/270 degree rotation requests. This preserves the source file.",
 			Cardinality: "multi",
-			Safe:        false,
+			Safe:        true,
 		},
 		{
 			Name:        "update_tags",
@@ -359,10 +359,10 @@ func canvasToolSafetyLabel(safe bool) string {
 
 func canvasProposalGuidance(options canvasChatOptions) string {
 	if options.ImageOptimizationAdvice {
-		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
+		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, call image variant tools such as compress_image, resize_image, or convert_image; they generate new preview images and preserve source files.\n- Keep metadata or file-writing proposals (update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
 	}
 
-	return "- Image optimization advice is OFF. Do NOT proactively create NEEDS_CONFIRMATION proposal cards for a general review. Use SAFE tools only unless the user's latest request explicitly asks for the exact file or metadata change.\n- Do not propose compress_image, resize_image, convert_image, mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
+	return "- Image optimization advice is OFF. Do NOT proactively call image variant tools or create NEEDS_CONFIRMATION proposal cards for a general review. Use image/file tools only when the user's latest request explicitly asks for that operation.\n- Do not call compress_image, resize_image, convert_image, mirror_image, rotate_image, update_tags, batch_update_tags, update_description, rename_asset, move_asset, copy_asset, delete_asset, favorite_asset, batch_favorite_assets, or export_asset just because an asset seems improvable."
 }
 
 func canvasPromptLocaleDisplayName(locale string) string {
@@ -541,9 +541,9 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When arranging cards:** Use the current size=WIDTHxHEIGHT for every selected/visible card and place bounding boxes with clear whitespace. The canvas is large/unbounded, but only use far-away coordinates when the user asks for a broad layout or spread-out board. For ordinary move requests, stay near the current cluster. For 8+ cards, prefer a broad multi-row layout about 1600-2400px wide with 160px+ horizontal and 120px+ vertical gaps unless the user explicitly asks for a tight collage. Do not place large cards partly under smaller cards unless the user explicitly asks for overlap/collage. If the layout would improve with a focal image or smaller supporting images, use resize_card first/alongside arrange_cards; resize_card is visual only and safe. If you are unsure whether the layout visually overlaps or layers correctly, call inspect_canvas to see a hidden AI-only snapshot before finalizing.
 - **When the user asks to place an image on top / in front / above another image:** Use bring_cards_to_front for the card that should visually cover the others. Moving x/y is not enough to change stacking order. If the user says "put A in front of B" or "A above B", pass B as afterCardId so A is inserted directly above B instead of blindly moving A above every card.
 - **When the user asks to take a picture, screenshot, or export the canvas:** After any arrange/resize/layer steps, call capture_viewport, capture_canvas, or capture_selected. If the user asks for a transparent or no-background export, pass {"transparent": true}. This triggers the real frontend screenshot/export preview. Do not apologize or claim you cannot create an image file. Use inspect_canvas only for your own hidden visual check; it is not the user's final screenshot.
-- **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For catalog/file tools, emit one action with assetIds so the UI can show a batch proposal and per-asset status.
-- **When the user explicitly asks for optimization/compression/format change:** Propose compress_image, resize_image, convert_image as appropriate.
-- **When the user explicitly asks to mirror/flip/reverse or rotate an image:** Propose mirror_image or rotate_image for the selected/mentioned catalog assets. Use flip=horizontal by default for mirror/flip/reverse unless the user clearly asks for vertical or top-bottom flipping. Use degrees=90 by default for rotate_image if the user does not specify a degree.
+- **When multiple asset cards are selected:** Treat the request as applying to ALL selected assets. Do not randomly choose one selected card. For catalog/image tools, emit one action with assetIds so the UI can show batch status.
+- **When the user explicitly asks for optimization/compression/format change:** Call compress_image, resize_image, or convert_image as appropriate. These generate new image variants and preserve source files.
+- **When the user explicitly asks to mirror/flip/reverse or rotate an image:** Call mirror_image or rotate_image for the selected/mentioned catalog assets. These generate new image variants and preserve source files. Use flip=horizontal by default for mirror/flip/reverse unless the user clearly asks for vertical or top-bottom flipping. Use degrees=90 by default for rotate_image if the user does not specify a degree.
 - **When the user explicitly asks to tag or write/save a description:** Propose update_tags or update_description for every selected asset card, not just the first one.
 - **When the user asks a general question about an asset:** Analyze and answer in chat. Use focus_card or get_asset_detail when useful. Do NOT create comments, file proposals, or metadata proposals unless the user explicitly asks for that action.
 - **When you spot visual issues** (edges, contrast, artifacts, wrong crop), describe them in chat. Only use create_comment to circle/mark the issue if the user explicitly asks for annotation. Regions use normalized 0-1 coordinates: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.

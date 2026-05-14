@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"aisets/internal/aitag"
 	"aisets/internal/llm"
 	"aisets/internal/scanner"
 )
@@ -108,13 +109,13 @@ func TestParseCanvasActions_MixedGoodBadBlocks(t *testing.T) {
 }
 
 func TestCanvasToolSafe(t *testing.T) {
-	safes := []string{"focus_card", "search_assets", "create_comment", "select_cards", "remove_cards", "move_card", "arrange_cards", "resize_card", "bring_cards_to_front", "inspect_canvas", "capture_viewport", "capture_canvas", "capture_selected"}
+	safes := []string{"focus_card", "search_assets", "create_comment", "select_cards", "remove_cards", "move_card", "arrange_cards", "resize_card", "bring_cards_to_front", "inspect_canvas", "capture_viewport", "capture_canvas", "capture_selected", "compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image"}
 	for _, name := range safes {
 		if !canvasToolSafe(name) {
 			t.Errorf("%s should be safe", name)
 		}
 	}
-	unsafes := []string{"compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image", "update_tags", "update_description", "update_ocr_text"}
+	unsafes := []string{"update_tags", "update_description", "update_ocr_text"}
 	for _, name := range unsafes {
 		if canvasToolSafe(name) {
 			t.Errorf("%s should NOT be safe", name)
@@ -140,8 +141,8 @@ func TestCanvasSystemPrompt_ImageOptimizationAdviceOffRestrictsProposals(t *test
 	prompt := canvasSystemPrompt("zh-TW", canvasChatOptions{ImageOptimizationAdvice: false})
 	for _, want := range []string{
 		"Image optimization advice is OFF",
-		"Do NOT proactively create NEEDS_CONFIRMATION proposal cards",
-		"Use SAFE tools only",
+		"Do NOT proactively call image variant tools",
+		"Use image/file tools only",
 		"latest request explicitly asks",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -197,7 +198,8 @@ func TestCanvasSystemPrompt_ImageOptimizationAdviceOnAllowsOptimizationProposals
 		"Image optimization advice is ON",
 		"proactively inspect selected or visible image assets",
 		"compress_image, resize_image, or convert_image",
-		"Keep non-optimization proposals",
+		"generate new preview images",
+		"metadata or file-writing proposals",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, prompt)
@@ -210,7 +212,7 @@ func TestBuildCanvasUserPrompt_ImageOptimizationAdviceOff(t *testing.T) {
 	if !strings.Contains(prompt, "Image optimization advice is OFF") {
 		t.Fatalf("prompt should include OFF state:\n%s", prompt)
 	}
-	if !strings.Contains(prompt, "Do not proactively propose compression, resizing, format conversion, mirroring, or rotation") {
+	if !strings.Contains(prompt, "Do not proactively call compression, resizing, format conversion, mirroring, or rotation") {
 		t.Fatalf("prompt should restrict proactive optimization:\n%s", prompt)
 	}
 }
@@ -247,12 +249,64 @@ func TestCanvasSearchQueryCandidates(t *testing.T) {
 	if len(got) < 2 || got[1] != "family_danran" {
 		t.Fatalf("stem-only candidates = %#v", got)
 	}
+
+	got = canvasSearchQueryCandidates("搜尋 cat 或貓相關素材，加入最相關的 2 張到畫布，排成一列。")
+	if !stringSliceContains(got, "cat") || !stringSliceContains(got, "貓") {
+		t.Fatalf("catalog search candidates should include requested query terms: %#v", got)
+	}
+}
+
+func TestCanvasRankCatalogSearchItemsPrefersExactMetadata(t *testing.T) {
+	items := []scanner.AssetItem{
+		{
+			ID:       "owl",
+			RepoPath: "bird_shima_fukurou.png",
+			AITag: &aitag.Result{
+				Tags:        []string{"貓頭鷹", "illustration"},
+				Description: "一隻貓頭鷹坐在樹枝上。",
+			},
+		},
+		{
+			ID:       "cat",
+			RepoPath: "monogatari_alice_cheshire_neko.png",
+			AITag: &aitag.Result{
+				Tags:        []string{"cat", "cheshire cat", "cartoon"},
+				TagsI18n:    map[string][]string{"zh-TW": []string{"貓", "柴郡貓", "卡通"}},
+				Description: "A cartoon cat.",
+			},
+		},
+		{
+			ID:       "catfish",
+			RepoPath: "fish_text_chinanago_nohi.png",
+			AITag: &aitag.Result{
+				Tags:        []string{"Catfish", "fish"},
+				TagsI18n:    map[string][]string{"zh-TW": []string{"鯰魚", "魚"}},
+				Description: "A catfish memorial day asset.",
+			},
+		},
+	}
+
+	if got := canvasRankCatalogSearchItems(items, "cat"); got[0].ID != "cat" {
+		t.Fatalf("cat search first result = %s, want cat; all=%#v", got[0].ID, got)
+	}
+	if got := canvasRankCatalogSearchItems(items, "貓"); got[0].ID != "cat" {
+		t.Fatalf("貓 search first result = %s, want cat; all=%#v", got[0].ID, got)
+	}
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCanvasProposalAllowed_BlocksUnsolicitedProposalsWhenAdviceOff(t *testing.T) {
 	latest := "幫我看看這張圖有什麼問題"
 	options := canvasChatOptions{ImageOptimizationAdvice: false}
-	for _, tool := range []string{"compress_image", "resize_image", "convert_image", "update_tags", "update_description"} {
+	for _, tool := range []string{"update_tags", "update_description"} {
 		if canvasProposalAllowed(tool, latest, options) {
 			t.Fatalf("%s should be blocked for a general request when advice is off", tool)
 		}
@@ -274,16 +328,10 @@ func TestCanvasProposalAllowed_AllowsExplicitMetadataRequests(t *testing.T) {
 
 func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testing.T) {
 	if !canvasProposalAllowed("compress_image", "幫我看看這張圖有沒有品質問題", canvasChatOptions{ImageOptimizationAdvice: true}) {
-		t.Fatal("optimization advice on should allow review-driven optimization proposals")
+		t.Fatal("optimization advice on should allow review-driven image variants")
 	}
 	if !canvasProposalAllowed("compress_image", "給我建議吧", canvasChatOptions{ImageOptimizationAdvice: true}) {
-		t.Fatal("optimization advice on should allow proactive optimization proposals for general advice")
-	}
-	if canvasProposalAllowed("compress_image", "這是啥", canvasChatOptions{ImageOptimizationAdvice: true}) {
-		t.Fatal("visual identification should not create optimization proposals")
-	}
-	if canvasProposalAllowed("compress_image", "他在做啥", canvasChatOptions{ImageOptimizationAdvice: true}) {
-		t.Fatal("activity identification should not create optimization proposals")
+		t.Fatal("optimization advice on should allow proactive optimization variants for general advice")
 	}
 	if !canvasProposalAllowed("compress_image", "幫我壓縮這張圖", canvasChatOptions{ImageOptimizationAdvice: false}) {
 		t.Fatal("explicit optimization request should be allowed even when advice is off")
@@ -303,9 +351,6 @@ func TestCanvasProposalAllowed_AllowsExplicitImageTransforms(t *testing.T) {
 	}
 	if !canvasProposalAllowed("rotate_image", "把這張圖旋轉 90 度", options) {
 		t.Fatal("explicit rotate request should be allowed")
-	}
-	if canvasProposalAllowed("rotate_image", "幫我看看這張圖", options) {
-		t.Fatal("plain review request should not create a rotate proposal")
 	}
 }
 
@@ -731,7 +776,7 @@ func TestCanvasActionRepairPromptRequiresGenericToolActions(t *testing.T) {
 
 func TestCanvasFocusOnlyRepairPromptRequiresActionForManipulation(t *testing.T) {
 	prompt := canvasFocusOnlyRepairPrompt("安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉")
-	for _, want := range []string{"requires canvas work", "Do NOT call focus_card again", "non-focus canvas tool action", "mirror_image/rotate_image", "no prose"} {
+	for _, want := range []string{"requires canvas work", "specific target/layout uncertainty", "Do not repeat the same focus_card", "concrete operation tools", "mirror_image/rotate_image", "no prose"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("focus-only repair prompt missing %q:\n%s", want, prompt)
 		}
@@ -1006,6 +1051,113 @@ func TestParseCanvasActions_LooseQuotedCallSyntax(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_BracketActionFormat(t *testing.T) {
+	input := `Before.
+[action: focus_card]
+description: Focus the existing goldfish card before moving it.
+impact: Moves the cursor to the fish asset on the canvas.
+cardId: asset-mp57knfh-w4tdk9
+
+[action: arrange_cards]
+description: Move both fish cards beside the current cluster without placing them far away.
+impact: Places book_zukan_fish.png and fish_kingyo2.png to the nearby right side for easier visual separation.
+cards:
+• cardId: asset-mp57knfi-s689c2
+  x: 1040
+  y: 1120
+• cardId: asset-mp57knfh-w4tdk9
+  x: 1040
+  y: 1260
+After.`
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "focus_card" {
+		t.Fatalf("first tool = %s", actions[0].Tool)
+	}
+	if actions[0].Description != "Focus the existing goldfish card before moving it." {
+		t.Fatalf("description = %q", actions[0].Description)
+	}
+	if actions[0].Params["cardId"] != "asset-mp57knfh-w4tdk9" {
+		t.Fatalf("focus params = %#v", actions[0].Params)
+	}
+	if actions[1].Tool != "arrange_cards" {
+		t.Fatalf("second tool = %s", actions[1].Tool)
+	}
+	positions, ok := actions[1].Params["positions"].([]any)
+	if !ok || len(positions) != 2 {
+		t.Fatalf("positions = %#v", actions[1].Params["positions"])
+	}
+	first, ok := positions[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first position = %#v", positions[0])
+	}
+	if first["cardId"] != "asset-mp57knfi-s689c2" || first["x"] != float64(1040) || first["y"] != float64(1120) {
+		t.Fatalf("first position = %#v", first)
+	}
+	if strings.Contains(text, "focus_card") || strings.Contains(text, "arrange_cards") || strings.Contains(text, "cardId") {
+		t.Fatalf("text leaked bracket action payload: %q", text)
+	}
+	if !strings.Contains(text, "Before.") || !strings.Contains(text, "After.") {
+		t.Fatalf("surrounding prose missing: %q", text)
+	}
+}
+
+func TestParseCanvasActions_BracketActionIgnoresUnknownHeaders(t *testing.T) {
+	input := "[note: focus_card]\ncardId: asset-1\n\n## action: not real\nplain"
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 0 {
+		t.Fatalf("expected no actions, got %#v", actions)
+	}
+	if !strings.Contains(text, "[note: focus_card]") || !strings.Contains(text, "plain") {
+		t.Fatalf("unexpected text = %q", text)
+	}
+}
+
+func TestParseCanvasActions_ActionHeaderMoveCardsAlias(t *testing.T) {
+	input := `Action: focus_card
+description: Focus the family human card before repositioning the human assets.
+impact: Cursor moves to family_danran.png.
+cardId: asset-mp57knfi-eooitm
+
+Action: move_cards
+description: Move all identified human cards farther away from the animal and fish cluster.
+impact: family_danran.png moves to x=120, y=1540; sleep_ofuton_dive_man.png moves to x=120, y=2050.
+cardIds: asset-mp57knfi-eooitm, asset-mp57knfi-t2kq3w`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected action text to be consumed, got %q", text)
+	}
+	if len(actions) != 2 {
+		t.Fatalf("expected 2 actions, got %#v", actions)
+	}
+	if actions[0].Tool != "focus_card" {
+		t.Fatalf("first tool = %s", actions[0].Tool)
+	}
+	if actions[1].Tool != "arrange_cards" {
+		t.Fatalf("move_cards should normalize to arrange_cards, got %s", actions[1].Tool)
+	}
+	positions, ok := actions[1].Params["positions"].([]any)
+	if !ok || len(positions) != 2 {
+		t.Fatalf("positions = %#v", actions[1].Params["positions"])
+	}
+	first, ok := positions[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first position = %#v", positions[0])
+	}
+	if first["cardId"] != "asset-mp57knfi-eooitm" || first["x"] != float64(120) || first["y"] != float64(1540) {
+		t.Fatalf("first position = %#v", first)
+	}
+	second, ok := positions[1].(map[string]any)
+	if !ok {
+		t.Fatalf("second position = %#v", positions[1])
+	}
+	if second["cardId"] != "asset-mp57knfi-t2kq3w" || second["x"] != float64(120) || second["y"] != float64(2050) {
+		t.Fatalf("second position = %#v", second)
+	}
+}
+
 func TestParseCanvasActions_PlainCallFormat(t *testing.T) {
 	input := "call: {\"tool\": \"create_comment\", \"params\": {\"anchorCardId\": \"asset-1\", \"text\": \"圈出紅色印章\", \"region\": {\"x\": 0.3, \"y\": 0.5, \"width\": 0.4, \"height\": 0.2}}, \"description\": \"註解印章\", \"impact\": \"標記圖片區域\"}\n已經註解。"
 	text, actions := parseCanvasActions(input)
@@ -1078,5 +1230,24 @@ func TestCanvasChatRequest_NoAttachmentTokens(t *testing.T) {
 	}
 	if len(req.AttachmentTokens) != 0 {
 		t.Fatalf("expected 0 tokens, got %d", len(req.AttachmentTokens))
+	}
+}
+
+func TestCanvasFallbackRequestedCount(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{in: "複製 5 張", want: 5},
+		{in: "复制四个", want: 4},
+		{in: "duplicate seven copies", want: 7},
+	}
+	for _, tc := range cases {
+		if got := canvasFallbackRequestedCount(tc.in); got != tc.want {
+			t.Fatalf("canvasFallbackRequestedCount(%q) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+	if got := canvasFallbackDuplicateCount("複製兩張", 2); got != 1 {
+		t.Fatalf("two requested for two targets should create one copy per target, got %d", got)
 	}
 }

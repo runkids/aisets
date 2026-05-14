@@ -111,16 +111,17 @@ func canvasSkillCatalog() []canvasSkillFamily {
 		},
 		{
 			ID:          canvasSkillFileProposals,
-			Description: "Confirmed file/image operation proposals such as compression, conversion, resize, mirror, rotate, rename, move, copy, delete, favorite, and export.",
+			Description: "Image variant tools plus confirmed file-writing proposals such as rename, move, copy, delete, and export.",
 			Triggers:    []string{"compress", "convert", "resize image", "mirror", "flip", "rotate", "rename", "move file", "copy file", "delete", "export asset"},
 			Tools: []string{
 				"focus_card", "compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image",
 				"rename_asset", "move_asset", "copy_asset", "delete_asset", "export_asset",
 			},
 			Rules: `## File Proposal Skill
+- Image variant tools (compress_image, resize_image, convert_image, mirror_image, rotate_image) execute directly and create new preview image cards; they do not change source files.
 - File-writing tools create NEEDS_CONFIRMATION proposal cards; they do not apply changes directly.
 - Only use these tools for explicit file/image operation requests.
-- For multiple selected assets, emit one proposal with assetIds so the UI can show per-asset status.
+- For multiple selected assets, emit one action with assetIds so the UI can show per-asset status.
 - For mirror/flip, default to horizontal unless the user clearly asks for vertical. For rotate, default to 90 degrees when unspecified.`,
 		},
 	}

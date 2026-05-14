@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,16 +37,22 @@ type canvasRegion struct {
 }
 
 type canvasAssetSnapshot struct {
-	ID          string   `json:"id"`
-	RepoPath    string   `json:"repoPath"`
-	Ext         string   `json:"ext"`
-	Width       int      `json:"width"`
-	Height      int      `json:"height"`
-	Bytes       int64    `json:"bytes"`
-	Tags        []string `json:"tags,omitempty"`
-	Description string   `json:"description,omitempty"`
-	OcrText     string   `json:"ocrText,omitempty"`
-	UsedByCount int      `json:"usedByCount"`
+	ID                    string              `json:"id"`
+	RepoPath              string              `json:"repoPath"`
+	Ext                   string              `json:"ext"`
+	Width                 int                 `json:"width"`
+	Height                int                 `json:"height"`
+	Bytes                 int64               `json:"bytes"`
+	Tags                  []string            `json:"tags,omitempty"`
+	Description           string              `json:"description,omitempty"`
+	OcrText               string              `json:"ocrText,omitempty"`
+	UsedByCount           int                 `json:"usedByCount"`
+	SearchCategory        string              `json:"searchCategory,omitempty"`
+	SearchTags            []string            `json:"searchTags,omitempty"`
+	SearchDescription     string              `json:"searchDescription,omitempty"`
+	SearchCategoryI18n    map[string]string   `json:"searchCategoryI18n,omitempty"`
+	SearchTagsI18n        map[string][]string `json:"searchTagsI18n,omitempty"`
+	SearchDescriptionI18n map[string]string   `json:"searchDescriptionI18n,omitempty"`
 }
 
 type canvasCardSnapshot struct {
@@ -114,6 +121,8 @@ type canvasAction struct {
 var actionBlockRe = regexp.MustCompile("(?s)```action\\s*\\n(.*?)\\n```")
 var jsonActionBlockRe = regexp.MustCompile("(?s)```json\\s*\\n(.*?)\\n```")
 var toolCallRe = regexp.MustCompile(`(?s)<\|?tool_call\|?>\s*(?:call\s*\(?\s*)?(\{.+\})\s*\)?\s*<\|?/?tool_call\|?>`)
+var fallbackActionHeaderRe = regexp.MustCompile(`(?mi)^\s*(?:\[action:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\]|action:\s*([A-Za-z_][A-Za-z0-9_]*)\s*)$`)
+var fallbackActionCoordinateRe = regexp.MustCompile(`(?i)\bx\s*=\s*(-?\d+(?:\.\d+)?)\s*,?\s*y\s*=\s*(-?\d+(?:\.\d+)?)`)
 
 var toolCallCleanRe = regexp.MustCompile(`(?s)<\|?/?tool_call\|?>`)
 var unquotedJSONKeyRe = regexp.MustCompile(`([\{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:`)
@@ -191,6 +200,271 @@ func parseCanvasActionJSON(raw string) []canvasAction {
 		return []canvasAction{act}
 	}
 	return nil
+}
+
+func findFallbackHeaderCanvasActionSpans(content string) []canvasActionSpan {
+	matches := fallbackActionHeaderRe.FindAllStringSubmatchIndex(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	var spans []canvasActionSpan
+	for i, loc := range matches {
+		tool := fallbackActionHeaderToolName(content, loc)
+		tool = canonicalFallbackCanvasToolName(tool)
+		if tool == "" || canvasToolCardinality(tool) == "" {
+			continue
+		}
+		bodyStart := loc[1]
+		bodyLimit := len(content)
+		if i+1 < len(matches) {
+			bodyLimit = matches[i+1][0]
+		}
+		bodyEnd, act, ok := parseBracketCanvasAction(content, bodyStart, bodyLimit, tool)
+		if !ok {
+			continue
+		}
+		spans = append(spans, canvasActionSpan{
+			start:   loc[0],
+			end:     bodyEnd,
+			actions: []canvasAction{act},
+		})
+	}
+	return spans
+}
+
+func fallbackActionHeaderToolName(content string, loc []int) string {
+	for i := 2; i+1 < len(loc); i += 2 {
+		if loc[i] >= 0 && loc[i+1] >= loc[i] {
+			return strings.TrimSpace(content[loc[i]:loc[i+1]])
+		}
+	}
+	return ""
+}
+
+func canonicalFallbackCanvasToolName(tool string) string {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
+	case "move_cards":
+		return "arrange_cards"
+	default:
+		return strings.TrimSpace(tool)
+	}
+}
+
+func parseBracketCanvasAction(content string, start, limit int, tool string) (int, canvasAction, bool) {
+	act := canvasAction{Tool: tool, Params: map[string]any{}}
+	listKey := ""
+	var listItems []map[string]any
+	var currentItem map[string]any
+	parseEnd := start
+	pos := start
+	for pos < limit {
+		lineStart := pos
+		lineEnd := pos
+		for lineEnd < limit && content[lineEnd] != '\n' && content[lineEnd] != '\r' {
+			lineEnd++
+		}
+		next := lineEnd
+		for next < limit && (content[next] == '\n' || content[next] == '\r') {
+			next++
+		}
+		line := content[lineStart:lineEnd]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			pos = next
+			continue
+		}
+
+		if key, value, ok := parseBracketCanvasActionBullet(trimmed); ok && listKey != "" {
+			currentItem = map[string]any{key: parseBracketCanvasScalar(value)}
+			listItems = append(listItems, currentItem)
+			parseEnd = next
+			pos = next
+			continue
+		}
+
+		if listKey != "" && currentItem != nil && bracketCanvasLineIsIndented(line) {
+			if key, value, ok := parseBracketCanvasActionPair(trimmed); ok {
+				currentItem[key] = parseBracketCanvasScalar(value)
+				parseEnd = next
+				pos = next
+				continue
+			}
+		}
+
+		if listKey != "" {
+			act.Params[listKey] = bracketCanvasActionListValue(listItems)
+			listKey = ""
+			listItems = nil
+			currentItem = nil
+		}
+
+		key, value, ok := parseBracketCanvasActionPair(trimmed)
+		if !ok {
+			break
+		}
+		switch key {
+		case "description":
+			act.Description = strings.TrimSpace(fmt.Sprint(parseBracketCanvasScalar(value)))
+		case "impact":
+			act.Impact = strings.TrimSpace(fmt.Sprint(parseBracketCanvasScalar(value)))
+		default:
+			if strings.TrimSpace(value) == "" {
+				listKey = key
+				listItems = []map[string]any{}
+				currentItem = nil
+			} else {
+				act.Params[key] = parseBracketCanvasScalar(value)
+			}
+		}
+		parseEnd = next
+		pos = next
+	}
+	if listKey != "" {
+		act.Params[listKey] = bracketCanvasActionListValue(listItems)
+	}
+	if parseEnd <= start {
+		return start, canvasAction{}, false
+	}
+	normalizeBracketCanvasActionParams(&act)
+	return parseEnd, act, true
+}
+
+func parseBracketCanvasActionBullet(trimmed string) (string, string, bool) {
+	for _, prefix := range []string{"•", "-", "*"} {
+		if strings.HasPrefix(trimmed, prefix) {
+			return parseBracketCanvasActionPair(strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)))
+		}
+	}
+	return "", "", false
+}
+
+func parseBracketCanvasActionPair(trimmed string) (string, string, bool) {
+	colon := strings.Index(trimmed, ":")
+	if colon <= 0 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(trimmed[:colon])
+	if key == "" {
+		return "", "", false
+	}
+	for i := 0; i < len(key); i++ {
+		ch := key[i]
+		if !isCanvasCallIdentChar(ch) {
+			return "", "", false
+		}
+	}
+	return key, strings.TrimSpace(trimmed[colon+1:]), true
+}
+
+func parseBracketCanvasScalar(value string) any {
+	value = strings.TrimSpace(value)
+	if len(value) >= 2 {
+		if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') || (value[0] == '`' && value[len(value)-1] == '`') {
+			return strings.TrimSpace(value[1 : len(value)-1])
+		}
+	}
+	switch strings.ToLower(value) {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+	if n, err := strconv.ParseFloat(value, 64); err == nil {
+		return n
+	}
+	return value
+}
+
+func splitBracketCanvasStringList(value any) []string {
+	switch v := value.(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			text := strings.TrimSpace(fmt.Sprint(item))
+			if text != "" {
+				out = append(out, text)
+			}
+		}
+		return out
+	case string:
+		parts := strings.Split(v, ",")
+		out := make([]string, 0, len(parts))
+		for _, part := range parts {
+			text := strings.TrimSpace(part)
+			if text != "" {
+				out = append(out, text)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func parseFallbackActionCoordinatePairs(text string) [][2]float64 {
+	matches := fallbackActionCoordinateRe.FindAllStringSubmatch(text, -1)
+	out := make([][2]float64, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		x, errX := strconv.ParseFloat(match[1], 64)
+		y, errY := strconv.ParseFloat(match[2], 64)
+		if errX != nil || errY != nil {
+			continue
+		}
+		out = append(out, [2]float64{x, y})
+	}
+	return out
+}
+
+func bracketCanvasLineIsIndented(line string) bool {
+	return len(line) > 0 && (line[0] == ' ' || line[0] == '\t')
+}
+
+func bracketCanvasActionListValue(items []map[string]any) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, item)
+	}
+	return out
+}
+
+func normalizeBracketCanvasActionParams(act *canvasAction) {
+	if act.Tool != "arrange_cards" {
+		return
+	}
+	if _, exists := act.Params["positions"]; exists {
+		return
+	}
+	if cards, exists := act.Params["cards"]; exists {
+		act.Params["positions"] = cards
+		delete(act.Params, "cards")
+		return
+	}
+	cardIDs := splitBracketCanvasStringList(act.Params["cardIds"])
+	if len(cardIDs) == 0 {
+		return
+	}
+	coords := parseFallbackActionCoordinatePairs(act.Impact)
+	if len(coords) == 0 {
+		coords = parseFallbackActionCoordinatePairs(act.Description)
+	}
+	if len(coords) != len(cardIDs) {
+		return
+	}
+	positions := make([]any, 0, len(cardIDs))
+	for i, cardID := range cardIDs {
+		positions = append(positions, map[string]any{
+			"cardId": cardID,
+			"x":      coords[i][0],
+			"y":      coords[i][1],
+		})
+	}
+	act.Params["positions"] = positions
+	delete(act.Params, "cardIds")
 }
 
 func findLooseQuotedCanvasCallSpans(content string) []canvasActionSpan {
@@ -502,8 +776,9 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	plainCallSpans := findPlainCanvasCallSpans(content)
 	looseQuotedCallSpans := findLooseQuotedCanvasCallSpans(content)
 	bareCallSpans := findBareCanvasCallSpans(content)
+	bracketActionSpans := findFallbackHeaderCanvasActionSpans(content)
 
-	if len(matches) == 0 && len(jsonMatches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 && len(bareCallSpans) == 0 {
+	if len(matches) == 0 && len(jsonMatches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 && len(bareCallSpans) == 0 && len(bracketActionSpans) == 0 {
 		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
 		return strings.TrimSpace(cleaned), nil
 	}
@@ -525,6 +800,7 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	spans = append(spans, plainCallSpans...)
 	spans = append(spans, looseQuotedCallSpans...)
 	spans = append(spans, bareCallSpans...)
+	spans = append(spans, bracketActionSpans...)
 	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
 
 	var textParts []string
@@ -595,6 +871,130 @@ func canvasActionsOnlyFocus(actions []canvasAction) bool {
 		}
 	}
 	return true
+}
+
+func canvasActionsOnlyPreparatory(actions []canvasAction) bool {
+	if len(actions) == 0 {
+		return false
+	}
+	for _, act := range actions {
+		if !canvasToolIsPreparatoryForCanvasWork(act.Tool) {
+			return false
+		}
+	}
+	return true
+}
+
+func canvasToolIsPreparatoryForCanvasWork(tool string) bool {
+	switch tool {
+	case "focus_card", "select_cards", "inspect_canvas":
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasToolIsConcreteCanvasWork(tool string) bool {
+	if canvasToolIsPreparatoryForCanvasWork(tool) {
+		return false
+	}
+	switch tool {
+	case "search_assets", "add_assets_to_canvas", "get_asset_detail", "extract_ocr_text",
+		"compare_assets", "find_similar_assets", "inspect_image_quality", "generate_alt_text",
+		"capture_viewport", "capture_canvas", "capture_selected":
+		return false
+	default:
+		return canvasToolCardinality(tool) != ""
+	}
+}
+
+func canvasActionStatusMessage(act canvasAction) string {
+	switch act.Tool {
+	case "focus_card":
+		if label := strings.TrimSpace(fmt.Sprint(act.Params["label"])); label != "" {
+			return "Confirming target: " + label
+		}
+		if cardID := strings.TrimSpace(fmt.Sprint(act.Params["cardId"])); cardID != "" {
+			return "Confirming target card: " + cardID
+		}
+		return "Confirming the target card."
+	case "select_cards":
+		return "Confirming the target selection before applying canvas changes."
+	case "inspect_canvas":
+		return "Inspecting the canvas before deciding the final placement."
+	case "resize_card":
+		return "Applying visual resize on the canvas."
+	case "move_card", "arrange_cards":
+		return "Applying the planned canvas placement."
+	case "align_cards", "distribute_cards", "bring_cards_to_front":
+		return "Applying the planned layout adjustment."
+	default:
+		if !canvasToolSafe(act.Tool) {
+			return "Preparing confirmation proposal: " + act.Tool
+		}
+		if canvasToolIsConcreteCanvasWork(act.Tool) {
+			return "Applying canvas operation: " + act.Tool
+		}
+		return ""
+	}
+}
+
+func canvasPlannedToolNames(latestUserMessage string) []string {
+	var names []string
+	add := func(name string) {
+		for _, existing := range names {
+			if existing == name {
+				return
+			}
+		}
+		names = append(names, name)
+	}
+	if containsAnyText(latestUserMessage, "放大", "縮小", "缩小", "resize", "bigger", "larger", "smaller") {
+		add("resize_card")
+	}
+	if containsAnyText(latestUserMessage, "移動", "移动", "放到", "移到", "move", "position") {
+		add("move_card")
+		add("arrange_cards")
+	}
+	if containsAnyText(latestUserMessage, "排列", "整理", "排版", "arrange", "layout") {
+		add("arrange_cards")
+	}
+	if containsAnyText(latestUserMessage, "對齊", "对齐", "align") {
+		add("align_cards")
+	}
+	if len(names) == 0 && canvasUserWantsCanvasAction(latestUserMessage) {
+		add("arrange_cards")
+	}
+	return names
+}
+
+func canvasFollowupStatusMessage(reason string, latestUserMessage string, preparatoryActionLoops int) string {
+	planned := canvasPlannedToolNames(latestUserMessage)
+	plannedText := strings.Join(planned, " / ")
+	switch reason {
+	case canvasLoopReasonFocusOnlyNeedsAnswer:
+		if plannedText != "" {
+			if preparatoryActionLoops > 1 {
+				return "Target checks are done; next I will move from confirmation to operation tools: " + plannedText + "."
+			}
+			return "Target confirmed; next I am preparing the operation tools: " + plannedText + "."
+		}
+		return "Target confirmed; deciding the next canvas operation."
+	case canvasLoopReasonToolResults:
+		if plannedText != "" {
+			return "Confirmation result received; continuing toward: " + plannedText + "."
+		}
+		return "Confirmation result received; deciding whether another canvas operation is needed."
+	case canvasLoopReasonTextOnlyDeferredWork:
+		if plannedText != "" {
+			return "Converting the described plan into executable tools: " + plannedText + "."
+		}
+		return "Converting the described plan into executable canvas tools."
+	case canvasLoopReasonCaptureOnlyWork:
+		return "Capture is complete; continuing with the requested canvas edit."
+	default:
+		return ""
+	}
 }
 
 func canvasTextOnlyResponseNeedsActionRepair(textBody string, nonFocusToolExecuted bool, loop int, maxLoops int) bool {
@@ -675,20 +1075,20 @@ func canvasUserWantsCanvasAction(latestUserMessage string) bool {
 		"安排", "排版", "分鏡", "分镜", "對戰", "对战", "戰鬥", "战斗", "操控",
 		"移動", "移动", "放到", "擺", "摆", "排列", "整理", "複製", "复制",
 		"鏡像", "镜像", "反轉", "反转", "翻轉", "翻转", "靚相",
-		"旋轉", "旋转", "轉", "转", "截圖", "截图", "匯出", "导出",
+		"旋轉", "旋转", "轉", "转", "放大", "縮小", "缩小", "截圖", "截图", "匯出", "导出",
 		"arrange", "layout", "storyboard", "battle", "fight", "move", "position",
-		"duplicate", "copy", "mirror", "flip", "rotate", "capture", "export",
+		"duplicate", "copy", "mirror", "flip", "rotate", "resize", "bigger", "larger", "smaller", "capture", "export",
 	)
 }
 
 func canvasFocusOnlyRepairPrompt(latestUserMessage string) string {
 	if canvasUserWantsCanvasAction(latestUserMessage) {
 		return fmt.Sprintf(`Your previous response only moved the cursor with focus_card, but the user's request requires canvas work.
-Do NOT call focus_card again and do not answer with prose.
-Use the closest executable non-focus canvas tool action now, such as arrange_cards, duplicate_cards, move_card, resize_card, capture_* tools, or proposal tools like mirror_image/rotate_image when source image changes are requested.
-If this is running inside Codex CLI and the user is asking for newly generated artwork, use its built-in imagegen capability now. Do not only promise to use imagegen later.
+	Every follow-up must either resolve a specific target/layout uncertainty or execute a concrete canvas operation.
+	Do not repeat the same focus_card for the same target. If target confirmation is still needed, use select_cards or inspect_canvas with a precise reason. If the target is clear, call concrete operation tools such as arrange_cards, duplicate_cards, move_card, resize_card, capture_* tools, or image variant tools like mirror_image/rotate_image when image generation is requested.
+	If this is running inside Codex CLI and the user is asking for newly generated artwork, use its built-in imagegen capability now. Do not only promise to use imagegen later.
 
-Latest user request: %q
+	Latest user request: %q
 
 Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 	}
@@ -698,7 +1098,7 @@ Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 func canvasCaptureOnlyRepairPrompt(latestUserMessage string) string {
 	return fmt.Sprintf(`Your previous response only captured the canvas, but the user's request requires canvas editing or multi-step composition work.
 Do NOT call capture_* again as the next action.
-Use the closest executable non-capture canvas tool action now, such as arrange_cards, duplicate_cards, move_card, resize_card, or proposal tools like mirror_image/rotate_image when source image changes are requested.
+Use the closest executable non-capture canvas tool action now, such as arrange_cards, duplicate_cards, move_card, resize_card, or image variant tools like mirror_image/rotate_image when image generation is requested.
 If this is running inside Codex CLI and the user is asking for newly generated artwork, use its built-in imagegen capability now. Do not only promise to use imagegen later.
 
 Latest user request: %q
@@ -1155,6 +1555,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 			if a.Description != "" {
 				fmt.Fprintf(&b, " desc=%q", truncate(a.Description, 200))
 			}
+			if searchText := canvasAssetSearchText(a); searchText != "" {
+				fmt.Fprintf(&b, " search=%q", truncate(searchText, 240))
+			}
 			if a.OcrText != "" {
 				fmt.Fprintf(&b, " ocr=%q", truncate(a.OcrText, 200))
 			}
@@ -1200,9 +1603,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 
 	b.WriteString("\n## Assistant Options\n")
 	if options.ImageOptimizationAdvice {
-		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n")
+		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, call image variant tools such as compress_image, resize_image, or convert_image; they generate new preview images and preserve source files.\n")
 	} else {
-		b.WriteString("- Image optimization advice is OFF. Do not proactively propose compression, resizing, format conversion, mirroring, or rotation unless the user's latest request explicitly asks for that image operation.\n")
+		b.WriteString("- Image optimization advice is OFF. Do not proactively call compression, resizing, format conversion, mirroring, or rotation tools unless the user's latest request explicitly asks for that image operation.\n")
 	}
 
 	b.WriteString("\n## Conversation\n")
@@ -1247,6 +1650,9 @@ func canvasSearchQueryCandidates(s string) []string {
 		}
 	}
 	for _, token := range assetStemTokenRe.FindAllString(s, -1) {
+		add(token)
+	}
+	for _, token := range canvasCatalogSearchQueryCandidates(s) {
 		add(token)
 	}
 	return out
@@ -1489,6 +1895,72 @@ func canvasActionCardIDs(act canvasAction) []string {
 	return ids
 }
 
+func canvasActionPositionCardIDs(act canvasAction) []string {
+	if act.Params == nil {
+		return nil
+	}
+	rawPositions, ok := act.Params["positions"]
+	if !ok {
+		return nil
+	}
+	addFromMap := func(out []string, item map[string]any) []string {
+		id := strings.TrimSpace(fmt.Sprint(item["cardId"]))
+		if id != "" {
+			out = append(out, id)
+		}
+		return out
+	}
+	var ids []string
+	switch positions := rawPositions.(type) {
+	case []any:
+		for _, raw := range positions {
+			if item, ok := raw.(map[string]any); ok {
+				ids = addFromMap(ids, item)
+			}
+		}
+	case []map[string]any:
+		for _, item := range positions {
+			ids = addFromMap(ids, item)
+		}
+	}
+	return ids
+}
+
+func canvasActionDedupeKey(act canvasAction) string {
+	ids := append([]string{}, canvasActionCardIDs(act)...)
+	ids = append(ids, canvasActionPositionCardIDs(act)...)
+	ids = append(ids, canvasActionAssetIDs(act)...)
+	if len(ids) == 0 {
+		return act.Tool
+	}
+	seen := map[string]bool{}
+	uniq := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		uniq = append(uniq, id)
+	}
+	sort.Strings(uniq)
+	return act.Tool + "|" + strings.Join(uniq, ",")
+}
+
+func filterCanvasFallbackActions(actions []canvasAction, executed map[string]bool) []canvasAction {
+	if len(actions) == 0 || len(executed) == 0 {
+		return actions
+	}
+	out := make([]canvasAction, 0, len(actions))
+	for _, act := range actions {
+		if executed[canvasActionDedupeKey(act)] {
+			continue
+		}
+		out = append(out, act)
+	}
+	return out
+}
+
 func canvasActionAssetIDs(act canvasAction) []string {
 	if act.Params == nil {
 		return nil
@@ -1709,6 +2181,10 @@ func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnaps
 			continue
 		}
 		targetAssetIDs := canvasActionAssetIDs(act)
+		if canvasToolPreservesExplicitAssetTargets(act.Tool) && len(targetAssetIDs) > 0 {
+			expanded = append(expanded, act)
+			continue
+		}
 		if !canvasToolCanUseSelectedAssetIDs(act.Tool) || toolCounts[act.Tool] != 1 || len(targetAssetIDs) > 1 || len(selectedAssetIDs) == 0 {
 			expanded = append(expanded, act)
 			continue
@@ -1732,6 +2208,331 @@ func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnaps
 		expanded = append(expanded, clone)
 	}
 	return expanded
+}
+
+func canvasToolPreservesExplicitAssetTargets(tool string) bool {
+	switch tool {
+	case "compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image":
+		return true
+	default:
+		return false
+	}
+}
+
+func refineCanvasImageVariantTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
+	fallbackByTool := map[string]canvasAction{}
+	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
+		if isCanvasImageTransformTool(act.Tool) && len(canvasActionAssetIDs(act)) > 0 {
+			fallbackByTool[act.Tool] = act
+		}
+	}
+	if len(fallbackByTool) == 0 {
+		return actions
+	}
+	refined := make([]canvasAction, 0, len(actions))
+	for _, act := range actions {
+		fallback, ok := fallbackByTool[act.Tool]
+		if !ok || !isCanvasImageTransformTool(act.Tool) {
+			refined = append(refined, act)
+			continue
+		}
+		targetIDs := canvasActionAssetIDs(fallback)
+		if len(targetIDs) == 0 {
+			refined = append(refined, act)
+			continue
+		}
+		clone := act
+		setCanvasActionAssetIDs(&clone, targetIDs)
+		if clone.Params == nil {
+			clone.Params = map[string]any{}
+		}
+		for _, key := range []string{"outputFormat", "flip"} {
+			if _, exists := clone.Params[key]; !exists {
+				if value, ok := fallback.Params[key]; ok {
+					clone.Params[key] = value
+				}
+			}
+		}
+		if act.Tool == "rotate_image" && !canvasTextHasExplicitRotationDegrees(latestUserMessage) {
+			if value, ok := fallback.Params["degrees"]; ok {
+				clone.Params["degrees"] = value
+			}
+		}
+		refined = append(refined, clone)
+	}
+	return refined
+}
+
+func refineCanvasLayoutActionTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
+	if canvasFallbackClauseTargetsSelection(latestUserMessage) {
+		return actions
+	}
+	fallbackByTool := map[string]canvasAction{}
+	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
+		switch act.Tool {
+		case "resize_card":
+			if cardID, _ := act.Params["cardId"].(string); strings.TrimSpace(cardID) != "" {
+				fallbackByTool[act.Tool] = act
+			}
+		case "duplicate_cards":
+			if len(canvasActionCardIDs(act)) > 0 {
+				fallbackByTool[act.Tool] = act
+			}
+		case "arrange_cards":
+			if len(canvasActionPositionCardIDs(act)) > 0 {
+				fallbackByTool[act.Tool] = act
+			}
+		}
+	}
+	if len(fallbackByTool) == 0 {
+		return actions
+	}
+	refined := make([]canvasAction, 0, len(actions))
+	for _, act := range actions {
+		switch act.Tool {
+		case "resize_card":
+			fallback, ok := fallbackByTool[act.Tool]
+			if !ok {
+				refined = append(refined, act)
+				continue
+			}
+			cardID, _ := fallback.Params["cardId"].(string)
+			cardID = strings.TrimSpace(cardID)
+			if cardID == "" {
+				refined = append(refined, act)
+				continue
+			}
+			clone := act
+			clone.Params = cloneCanvasActionParams(act.Params)
+			clone.Params["cardId"] = cardID
+			if width, ok := fallback.Params["width"]; ok {
+				clone.Params["width"] = width
+			}
+			refined = append(refined, clone)
+		case "duplicate_cards":
+			fallback, ok := fallbackByTool[act.Tool]
+			if !ok {
+				refined = append(refined, act)
+				continue
+			}
+			cardIDs := canvasActionCardIDs(fallback)
+			if len(cardIDs) == 0 {
+				refined = append(refined, act)
+				continue
+			}
+			clone := act
+			clone.Params = cloneCanvasActionParams(act.Params)
+			setCanvasActionCardIDs(&clone, cardIDs)
+			for _, key := range []string{"count", "layout", "label"} {
+				if value, ok := fallback.Params[key]; ok {
+					clone.Params[key] = value
+				}
+			}
+			refined = append(refined, clone)
+		case "arrange_cards":
+			fallback, ok := fallbackByTool[act.Tool]
+			if !ok {
+				refined = append(refined, act)
+				continue
+			}
+			positions := fallback.Params["positions"]
+			if len(canvasActionPositionCardIDs(fallback)) == 0 {
+				refined = append(refined, act)
+				continue
+			}
+			clone := act
+			clone.Params = cloneCanvasActionParams(act.Params)
+			clone.Params["positions"] = positions
+			refined = append(refined, clone)
+		default:
+			refined = append(refined, act)
+		}
+	}
+	return refined
+}
+
+func refineCanvasActionTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
+	actions = refineCanvasImageVariantTargets(actions, canvas, latestUserMessage)
+	actions = refineCanvasLayoutActionTargets(actions, canvas, latestUserMessage)
+	mentioned := canvasMentionedActionTargetCardIDs(latestUserMessage, canvas)
+	if !canvasFallbackClauseKeepsMultipleTargets(latestUserMessage) {
+		for id := range canvasFallbackLayoutTargetCardIDs(latestUserMessage, canvas) {
+			if mentioned == nil {
+				mentioned = map[string]bool{}
+			}
+			mentioned[id] = true
+		}
+	}
+	if len(mentioned) == 0 {
+		return actions
+	}
+	refined := make([]canvasAction, 0, len(actions))
+	for _, act := range actions {
+		switch act.Tool {
+		case "focus_card", "move_card", "resize_card":
+			cardID, _ := act.Params["cardId"].(string)
+			cardID = strings.TrimSpace(cardID)
+			if cardID != "" && !mentioned[cardID] {
+				continue
+			}
+		case "arrange_cards":
+			positions := filterCanvasActionPositionsByMentioned(act.Params["positions"], mentioned)
+			if len(positions) == 0 {
+				continue
+			}
+			clone := act
+			clone.Params = cloneCanvasActionParams(act.Params)
+			clone.Params["positions"] = positions
+			refined = append(refined, clone)
+			continue
+		case "duplicate_cards", "select_cards", "remove_cards", "align_cards", "distribute_cards", "bring_cards_to_front":
+			cardIDs := filterCanvasActionCardIDsByMentioned(canvasActionCardIDs(act), mentioned)
+			if len(cardIDs) == 0 {
+				continue
+			}
+			clone := act
+			setCanvasActionCardIDs(&clone, cardIDs)
+			refined = append(refined, clone)
+			continue
+		}
+		refined = append(refined, act)
+	}
+	return refined
+}
+
+func canvasFallbackLayoutTargetCardIDs(latestUserMessage string, canvas canvasSnapshot) map[string]bool {
+	if canvasFallbackClauseTargetsSelection(latestUserMessage) {
+		return nil
+	}
+	ids := map[string]bool{}
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			ids[id] = true
+		}
+	}
+	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
+		switch act.Tool {
+		case "focus_card", "move_card", "resize_card":
+			if id, _ := act.Params["cardId"].(string); id != "" {
+				add(id)
+			}
+		case "duplicate_cards", "select_cards", "remove_cards", "align_cards", "distribute_cards", "bring_cards_to_front":
+			for _, id := range canvasActionCardIDs(act) {
+				add(id)
+			}
+		case "arrange_cards":
+			for _, id := range canvasActionPositionCardIDs(act) {
+				add(id)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
+func canvasMentionedActionTargetCardIDs(text string, canvas canvasSnapshot) map[string]bool {
+	queryTerms := canvasFallbackQueryTerms(text)
+	if len(queryTerms) == 0 {
+		return nil
+	}
+	type cardMatch struct {
+		cardID  string
+		aliases []string
+	}
+	var matches []cardMatch
+	aliasCardCounts := map[string]int{}
+	for _, card := range canvas.Cards {
+		if !canvasCardCanBeVisuallyArranged(card) {
+			continue
+		}
+		score, aliases := canvasFallbackCardScore(card, queryTerms)
+		if score <= 0 || len(aliases) == 0 {
+			continue
+		}
+		matches = append(matches, cardMatch{cardID: card.ID, aliases: aliases})
+		seenAliases := map[string]bool{}
+		for _, alias := range aliases {
+			alias = strings.ToLower(strings.TrimSpace(alias))
+			if alias == "" || seenAliases[alias] {
+				continue
+			}
+			seenAliases[alias] = true
+			aliasCardCounts[alias]++
+		}
+	}
+	mentioned := map[string]bool{}
+	for _, match := range matches {
+		for _, alias := range match.aliases {
+			if aliasCardCounts[strings.ToLower(strings.TrimSpace(alias))] == 1 {
+				mentioned[match.cardID] = true
+				break
+			}
+		}
+	}
+	if len(mentioned) == 0 || len(mentioned) > max(8, len(canvas.Cards)/2) {
+		return nil
+	}
+	return mentioned
+}
+
+func cloneCanvasActionParams(params map[string]any) map[string]any {
+	next := make(map[string]any, len(params))
+	for key, value := range params {
+		next[key] = value
+	}
+	return next
+}
+
+func filterCanvasActionCardIDsByMentioned(cardIDs []string, mentioned map[string]bool) []string {
+	out := make([]string, 0, len(cardIDs))
+	seen := map[string]bool{}
+	for _, id := range cardIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || !mentioned[id] || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+func filterCanvasActionPositionsByMentioned(rawPositions any, mentioned map[string]bool) []any {
+	add := func(out []any, item map[string]any) []any {
+		cardID := strings.TrimSpace(fmt.Sprint(item["cardId"]))
+		if cardID == "" || !mentioned[cardID] {
+			return out
+		}
+		next := make(map[string]any, len(item))
+		for key, value := range item {
+			next[key] = value
+		}
+		return append(out, next)
+	}
+	var out []any
+	switch positions := rawPositions.(type) {
+	case []any:
+		for _, raw := range positions {
+			if item, ok := raw.(map[string]any); ok {
+				out = add(out, item)
+			}
+		}
+	case []map[string]any:
+		for _, item := range positions {
+			out = add(out, item)
+		}
+	}
+	return out
+}
+
+func canvasTextHasExplicitRotationDegrees(text string) bool {
+	return containsAnyText(text,
+		"90", "180", "270", "九十", "一百八十", "百八", "兩百七十", "两百七十",
+		"ninety", "one eighty", "one-eighty", "hundred eighty", "two seventy", "two-seventy",
+	)
 }
 
 func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
@@ -1875,6 +2676,37 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	loopReason := "initial"
 	var loopStats []vlmChatRoundStats
 	generatedImagePaths := map[string]bool{}
+	concreteCanvasActionSeen := false
+	searchCatalogActionSeen := false
+	preparatoryActionLoops := 0
+	executedCanvasActionKeys := map[string]bool{}
+	rememberExecutedCanvasAction := func(act canvasAction) {
+		if strings.TrimSpace(act.Tool) == "" {
+			return
+		}
+		executedCanvasActionKeys[canvasActionDedupeKey(act)] = true
+		if canvasToolIsCatalogSearchWork(act.Tool) {
+			searchCatalogActionSeen = true
+		}
+	}
+	confirmedFallbackCardIDSeen := map[string]bool{}
+	var confirmedFallbackCardIDs []string
+	rememberConfirmedFallbackCardID := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || confirmedFallbackCardIDSeen[id] {
+			return
+		}
+		confirmedFallbackCardIDSeen[id] = true
+		confirmedFallbackCardIDs = append(confirmedFallbackCardIDs, id)
+	}
+	rememberConfirmedFallbackAction := func(act canvasAction) {
+		switch act.Tool {
+		case "focus_card", "select_cards":
+			for _, id := range canvasActionCardIDs(act) {
+				rememberConfirmedFallbackCardID(id)
+			}
+		}
+	}
 	for loop := 0; loop < maxToolLoops; loop++ {
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
 			Images:           images,
@@ -1944,6 +2776,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		var invalidActionIssues []canvasActionValidationIssue
 		actions, invalidActionIssues = normalizeCanvasActions(actions, false)
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
+		actions = refineCanvasActionTargets(actions, req.Canvas, latestUserMessage)
+		actions = refineCanvasSearchActions(actions, latestUserMessage)
 		var postExpansionIssues []canvasActionValidationIssue
 		actions, postExpansionIssues = normalizeCanvasActions(actions, true)
 		invalidActionIssues = append(invalidActionIssues, postExpansionIssues...)
@@ -1973,6 +2807,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
 		}
 		for _, act := range actions {
+			rememberConfirmedFallbackAction(act)
+			if status := canvasActionStatusMessage(act); status != "" {
+				sendNDJSON(w, map[string]any{
+					"type":    "status",
+					"phase":   "confirming",
+					"content": status,
+				})
+			}
 			if act.Tool == "focus_card" {
 				executedActionCount++
 				safeActionCount++
@@ -1981,6 +2823,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"cardId": act.Params["cardId"],
 					"label":  act.Params["label"],
 				})
+				rememberExecutedCanvasAction(act)
 				time.Sleep(300 * time.Millisecond)
 				continue
 			}
@@ -2005,12 +2848,18 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"tool":   act.Tool,
 					"result": result,
 				})
+				rememberExecutedCanvasAction(act)
 				if canvasToolSuppressesSameTurnText(act.Tool) {
 					nonFocusToolExecutedThisLoop = true
 				}
+				if canvasToolIsConcreteCanvasWork(act.Tool) {
+					concreteCanvasActionSeen = true
+				}
 				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
 					nonCaptureToolExecutedThisLoop = true
-					compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
+					if !canvasToolIsConcreteCanvasWork(act.Tool) {
+						compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
+					}
 				}
 			} else {
 				if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
@@ -2033,10 +2882,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"targetAssetId":  targetAssetID,
 					"targetAssetIds": targetAssetIDs,
 				})
+				rememberExecutedCanvasAction(act)
 				executedActionCount++
 				proposalCount++
 				if canvasToolSuppressesSameTurnText(act.Tool) {
 					nonFocusToolExecutedThisLoop = true
+				}
+				if canvasToolIsConcreteCanvasWork(act.Tool) {
+					concreteCanvasActionSeen = true
 				}
 				nonCaptureToolExecutedThisLoop = true
 			}
@@ -2049,7 +2902,11 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		loopStats[statIndex].BlockedCommentCount = blockedCommentCount
 
 		actionRequestNeedsTool := canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
-		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool && !invalidActionNeedsRepair {
+		if canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen {
+			preparatoryActionLoops++
+		}
+		focusOnlyNeedsAnswer := (canvasActionsOnlyFocus(actions) || (canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen)) && !actionRequestNeedsTool && loop < maxToolLoops-1 && (textBody == "" || canvasUserWantsCanvasAction(latestUserMessage))
+		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool && !focusOnlyNeedsAnswer && !invalidActionNeedsRepair {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})
@@ -2063,7 +2920,6 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if captureExecutedThisLoop && !truncatedAction && !captureOnlyDeferredWork {
 			break
 		}
-		focusOnlyNeedsAnswer := canvasActionsOnlyFocus(actions) && textBody == "" && !actionRequestNeedsTool && loop < maxToolLoops-1
 		nextLoopReason := canvasNextLoopReason(canvasNextLoopInput{
 			Loop:                      loop,
 			MaxLoops:                  maxToolLoops,
@@ -2080,6 +2936,13 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if nextLoopReason == "" {
 			break
 		}
+		if status := canvasFollowupStatusMessage(nextLoopReason, latestUserMessage, preparatoryActionLoops); status != "" {
+			sendNDJSON(w, map[string]any{
+				"type":    "status",
+				"phase":   "planning",
+				"content": status,
+			})
+		}
 		if !canvasFollowupShouldRetainImages(nextLoopReason, latestUserMessage) {
 			images = nil
 		}
@@ -2095,6 +2958,95 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		promptKind = vlmPromptKindFollowup
 		loopReason = nextLoopReason
 		sendNDJSON(w, map[string]any{"type": "thinking"})
+	}
+
+	if !searchCatalogActionSeen {
+		if act, ok := fallbackCanvasCatalogSearchAction(latestUserMessage, selectedSkillIDs); ok {
+			fallbackSearchActions, _ := normalizeCanvasActions([]canvasAction{act}, true)
+			fallbackSearchActions = filterCanvasFallbackActions(fallbackSearchActions, executedCanvasActionKeys)
+			for _, searchAct := range fallbackSearchActions {
+				result := s.executeCanvasSafeAction(r, searchAct, settings, req.Canvas)
+				sendNDJSON(w, map[string]any{
+					"type":   "action_result",
+					"tool":   searchAct.Tool,
+					"result": result,
+				})
+				rememberExecutedCanvasAction(searchAct)
+				time.Sleep(150 * time.Millisecond)
+			}
+		}
+	}
+
+	if canvasUserWantsCanvasAction(latestUserMessage) {
+		fallbackActions := fallbackCanvasManipulationActions(latestUserMessage, req.Canvas, confirmedFallbackCardIDs)
+		fallbackActions, _ = normalizeCanvasActions(fallbackActions, true)
+		fallbackActions = refineCanvasActionTargets(fallbackActions, req.Canvas, latestUserMessage)
+		fallbackActions = filterCanvasFallbackActions(fallbackActions, executedCanvasActionKeys)
+		if len(fallbackActions) > 0 || preparatoryActionLoops > 0 || concreteCanvasActionSeen || len(confirmedFallbackCardIDs) > 0 {
+			if status := canvasFallbackManipulationStatus(fallbackActions); status != "" {
+				sendNDJSON(w, map[string]any{
+					"type":    "status",
+					"phase":   "operation",
+					"content": status,
+				})
+			}
+			for _, act := range fallbackActions {
+				if status := canvasActionStatusMessage(act); status != "" {
+					sendNDJSON(w, map[string]any{
+						"type":    "status",
+						"phase":   "operation",
+						"content": status,
+					})
+				}
+				if canvasToolSafe(act.Tool) {
+					result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
+					if act.Tool == "duplicate_cards" {
+						result = canvasFallbackAugmentDuplicateResult(result, latestUserMessage, req.Canvas)
+					}
+					sendNDJSON(w, map[string]any{
+						"type":   "action_result",
+						"tool":   act.Tool,
+						"result": result,
+					})
+					rememberExecutedCanvasAction(act)
+					if canvasToolIsConcreteCanvasWork(act.Tool) {
+						concreteCanvasActionSeen = true
+					}
+				} else {
+					if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
+						continue
+					}
+					proposalIndex++
+					targetAssetIDs := canvasActionAssetIDs(act)
+					var targetAssetID any
+					if len(targetAssetIDs) > 0 {
+						targetAssetID = targetAssetIDs[0]
+					}
+					sendNDJSON(w, map[string]any{
+						"type":           "proposal",
+						"id":             fmt.Sprintf("p%d", proposalIndex),
+						"tool":           act.Tool,
+						"params":         act.Params,
+						"description":    act.Description,
+						"impact":         act.Impact,
+						"targetAssetId":  targetAssetID,
+						"targetAssetIds": targetAssetIDs,
+					})
+					rememberExecutedCanvasAction(act)
+					if canvasToolIsConcreteCanvasWork(act.Tool) {
+						concreteCanvasActionSeen = true
+					}
+				}
+				time.Sleep(150 * time.Millisecond)
+			}
+			if !concreteCanvasActionSeen {
+				sendNDJSON(w, map[string]any{
+					"type":    "status",
+					"phase":   "blocked",
+					"content": "Target confirmation finished, but no safe concrete canvas operation could be inferred.",
+				})
+			}
+		}
 	}
 
 	if captureRequested && !captureSeen {
@@ -2269,6 +3221,13 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 				limit = 18
 			}
 		}
+		fetchLimit := limit
+		if strings.TrimSpace(q) != "" && fetchLimit < 18 {
+			fetchLimit = max(18, limit*4)
+			if fetchLimit > 18 {
+				fetchLimit = 18
+			}
+		}
 		scanID := s.latestScanID()
 		if scanID == 0 {
 			return map[string]any{"items": []any{}, "error": "no scan available"}
@@ -2279,7 +3238,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			query := config.CatalogItemQuery{
 				ScanID: scanID,
 				Query:  candidate,
-				Limit:  limit,
+				Limit:  fetchLimit,
 			}
 			page, err = s.store.CatalogItems(query)
 			if err != nil {
@@ -2293,6 +3252,10 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		items, err := s.enrichCanvasCatalogItems(r.Context(), scanID, page.Items, settings)
 		if err != nil {
 			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		items = canvasRankCatalogSearchItems(items, q)
+		if len(items) > limit {
+			items = items[:limit]
 		}
 		return map[string]any{"items": items, "total": page.Total, "q": q}
 	case "add_assets_to_canvas":
@@ -2308,6 +3271,18 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{"items": items, "count": len(items), "assetIds": assetIDs, "label": act.Params["label"]}
 	case "extract_ocr_text":
 		return s.executeCanvasOCRText(r, act, settings, canvas)
+	case "compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image":
+		return map[string]any{
+			"assetIds":       canvasActionAssetIDs(act),
+			"assetId":        act.Params["assetId"],
+			"operation":      act.Tool,
+			"outputFormat":   act.Params["outputFormat"],
+			"quality":        act.Params["quality"],
+			"maxDimensionPx": act.Params["maxDimensionPx"],
+			"flip":           act.Params["flip"],
+			"degrees":        act.Params["degrees"],
+			"label":          act.Params["label"],
+		}
 	case "create_comment":
 		return map[string]any{
 			"anchorCardId": act.Params["anchorCardId"],

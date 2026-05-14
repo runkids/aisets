@@ -96,6 +96,36 @@ func newCanvasToolUseHarness(t *testing.T, responses ...llm.ChatResponse) canvas
 	}); err != nil {
 		t.Fatal(err)
 	}
+	for _, result := range []aitag.Result{
+		{
+			ProjectID:     assetA.ProjectID,
+			RepoPath:      assetA.RepoPath,
+			ContentHash:   assetA.ContentHash,
+			HashAlgorithm: assetA.HashAlgorithm,
+			ProviderName:  providerName,
+			ModelName:     model,
+			Status:        aitag.StatusReady,
+			Category:      "icon",
+			Tags:          []string{"alpha"},
+			Description:   "First test asset",
+		},
+		{
+			ProjectID:     assetB.ProjectID,
+			RepoPath:      assetB.RepoPath,
+			ContentHash:   assetB.ContentHash,
+			HashAlgorithm: assetB.HashAlgorithm,
+			ProviderName:  providerName,
+			ModelName:     model,
+			Status:        aitag.StatusReady,
+			Category:      "photo",
+			Tags:          []string{"beta"},
+			Description:   "Second test asset",
+		},
+	} {
+		if err := store.UpsertAITagResult(result); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	s, err := New(Options{Store: store, Version: "test"})
 	if err != nil {
@@ -167,6 +197,154 @@ func canvasHarnessSnapshot(assetA, assetB string, selected ...string) canvasSnap
 				LayerIndex: 2,
 				AnchorID:   "card-a",
 				Text:       "Existing note",
+			},
+		},
+	}
+}
+
+func canvasHarnessTreeDonkeySnapshot(assetA, assetB string) canvasSnapshot {
+	return canvasSnapshot{
+		Viewport: canvasViewport{X: 0, Y: 0, Scale: 1},
+		Cards: []canvasCardSnapshot{
+			{
+				ID:         "card-family",
+				Kind:       "asset",
+				X:          80,
+				Y:          820,
+				Width:      300,
+				Height:     235,
+				LayerIndex: 0,
+				Asset: &canvasAssetSnapshot{
+					ID:          "asset-family",
+					RepoPath:    "family_danran.png",
+					Ext:         ".png",
+					Width:       500,
+					Height:      392,
+					Tags:        []string{"family", "group"},
+					Description: "Family group scene",
+				},
+			},
+			{
+				ID:         "card-tree",
+				Kind:       "asset",
+				X:          700,
+				Y:          960,
+				Width:      320,
+				Height:     320,
+				LayerIndex: 1,
+				Asset: &canvasAssetSnapshot{
+					ID:          assetA,
+					RepoPath:    "monogatari_suppai_budou.png",
+					Ext:         ".png",
+					Width:       180,
+					Height:      180,
+					Tags:        []string{"fox", "tree", "grapes", "cartoon"},
+					Description: "A cartoon fox sitting under a tree with grapes.",
+					SearchTagsI18n: map[string][]string{
+						"zh-TW": {"狐狸", "樹木", "葡萄", "卡通"},
+					},
+					SearchDescriptionI18n: map[string]string{
+						"zh-TW": "一隻卡通狐狸坐在葡萄樹下。",
+					},
+				},
+			},
+			{
+				ID:         "card-donkey",
+				Kind:       "asset",
+				X:          560,
+				Y:          1210,
+				Width:      320,
+				Height:     379,
+				LayerIndex: 2,
+				Asset: &canvasAssetSnapshot{
+					ID:          assetB,
+					RepoPath:    "animal_raba.png",
+					Ext:         ".png",
+					Width:       337,
+					Height:      400,
+					Tags:        []string{"驢", "donkey", "cartoon"},
+					Description: "一隻棕色的可愛卡通驢子。",
+				},
+			},
+			{
+				ID:         "card-fish-book",
+				Kind:       "asset",
+				X:          1040,
+				Y:          980,
+				Width:      300,
+				Height:     372,
+				LayerIndex: 3,
+				Asset: &canvasAssetSnapshot{
+					ID:          "asset-fish-book",
+					RepoPath:    "book_zukan_fish.png",
+					Ext:         ".png",
+					Width:       201,
+					Height:      250,
+					Tags:        []string{"魚", "兒童讀物", "圖鑑"},
+					Description: "一本介紹魚類的兒童圖鑑書。",
+				},
+			},
+		},
+	}
+}
+
+func canvasHarnessGenericRecoverySnapshot() canvasSnapshot {
+	return canvasSnapshot{
+		Viewport: canvasViewport{X: 0, Y: 0, Scale: 1},
+		Cards: []canvasCardSnapshot{
+			{
+				ID:         "card-primary",
+				Kind:       "asset",
+				X:          120,
+				Y:          160,
+				Width:      320,
+				Height:     240,
+				LayerIndex: 0,
+				Asset: &canvasAssetSnapshot{
+					ID:                "asset-primary",
+					RepoPath:          "primary-subject.png",
+					Ext:               ".png",
+					Width:             320,
+					Height:            240,
+					SearchTags:        []string{"primary-subject"},
+					SearchDescription: "Primary target asset for recovery tests.",
+				},
+			},
+			{
+				ID:         "card-secondary",
+				Kind:       "asset",
+				X:          520,
+				Y:          160,
+				Width:      320,
+				Height:     240,
+				LayerIndex: 1,
+				Asset: &canvasAssetSnapshot{
+					ID:                "asset-secondary",
+					RepoPath:          "secondary-subject.png",
+					Ext:               ".png",
+					Width:             320,
+					Height:            240,
+					SearchTags:        []string{"secondary-subject"},
+					SearchDescription: "Secondary target asset for recovery tests.",
+				},
+			},
+			{
+				ID:         "card-decoy",
+				Kind:       "asset",
+				X:          920,
+				Y:          160,
+				Width:      320,
+				Height:     240,
+				LayerIndex: 2,
+				Asset: &canvasAssetSnapshot{
+					ID:                "asset-decoy",
+					RepoPath:          "decoy-subject.png",
+					Ext:               ".png",
+					Width:             320,
+					Height:            240,
+					SearchTags:        []string{"decoy-subject"},
+					SearchDescription: "Decoy asset that must not be touched unless requested.",
+				},
 			},
 		},
 	}
@@ -245,6 +423,67 @@ func rejectCanvasHarnessEvent(t *testing.T, events []canvasHarnessEvent, eventTy
 	}
 }
 
+func canvasHarnessEventStringSlice(value any) []string {
+	switch v := value.(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if text, ok := item.(string); ok {
+				out = append(out, text)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func requireCanvasHarnessStatusContaining(t *testing.T, events []canvasHarnessEvent, text string) {
+	t.Helper()
+	for _, event := range events {
+		if event["type"] == "status" && strings.Contains(fmt.Sprint(event["content"]), text) {
+			return
+		}
+	}
+	t.Fatalf("missing status containing %q in %#v", text, events)
+}
+
+func requireCanvasActionTool(t *testing.T, actions []canvasAction, tool string) canvasAction {
+	t.Helper()
+	for _, action := range actions {
+		if action.Tool == tool {
+			return action
+		}
+	}
+	t.Fatalf("missing action tool=%s in %#v", tool, actions)
+	return canvasAction{}
+}
+
+func canvasHarnessRequestHasTool(req llm.ChatRequest, name string) bool {
+	for _, tool := range req.Tools {
+		if tool.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func requireCanvasHarnessRequestTool(t *testing.T, req llm.ChatRequest, name string) {
+	t.Helper()
+	if !canvasHarnessRequestHasTool(req, name) {
+		t.Fatalf("request missing tool %s in %#v", name, req.Tools)
+	}
+}
+
+func rejectCanvasHarnessRequestTool(t *testing.T, req llm.ChatRequest, name string) {
+	t.Helper()
+	if canvasHarnessRequestHasTool(req, name) {
+		t.Fatalf("request should not include tool %s in %#v", name, req.Tools)
+	}
+}
+
 func requireCanvasHarnessLoopStat(t *testing.T, events []canvasHarnessEvent, index int) map[string]any {
 	t.Helper()
 	done := requireCanvasHarnessEvent(t, events, "done", "")
@@ -278,6 +517,16 @@ func canvasHarnessToolCall(tool string, args map[string]any) llm.ChatResponse {
 			Name:      tool,
 			Arguments: args,
 		}},
+		InputTokens:  3,
+		OutputTokens: 4,
+		DurationMs:   5,
+	}
+}
+
+func canvasHarnessToolCalls(calls ...llm.ChatToolCall) llm.ChatResponse {
+	return llm.ChatResponse{
+		Content:      "native content should not be rendered after tool execution",
+		ToolCalls:    calls,
 		InputTokens:  3,
 		OutputTokens: 4,
 		DurationMs:   5,
@@ -546,6 +795,36 @@ func TestCanvasHarnessNativeToolCallsSuppressStaleText(t *testing.T) {
 	}
 }
 
+func TestCanvasHarnessFallbackCatalogSearchWhenModelDoesNotUseTool(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"搜尋 alpha 相關素材，加入 1 張到畫布，排成一列",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessText("ok"),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "search_assets")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("search result = %#v", event["result"])
+	}
+	items, ok := result["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("search items = %#v", result["items"])
+	}
+	item, ok := items[0].(map[string]any)
+	if !ok || item["id"] != bootstrap.assetA {
+		t.Fatalf("first search item = %#v, want assetA %s", items[0], bootstrap.assetA)
+	}
+	if result["q"] != "alpha" {
+		t.Fatalf("search q = %#v, want alpha", result["q"])
+	}
+	requests := provider.Requests()
+	if len(requests) != 1 {
+		t.Fatalf("fallback search should not require extra model loops, got %d", len(requests))
+	}
+}
+
 func TestCanvasHarnessNativeEmptyFallsBackToActionBlocks(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	events, provider := runCanvasToolUseHarness(
@@ -588,13 +867,38 @@ func TestCanvasHarnessNativeEmptyFallsBackToActionBlocks(t *testing.T) {
 	}
 }
 
+func TestCanvasHarnessEmptyLocalModelUsesDeterministicFallback(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方",
+		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
+		llm.ChatResponse{Content: "", InputTokens: 100, OutputTokens: 91, DurationMs: 5},
+		llm.ChatResponse{Content: "", InputTokens: 100, OutputTokens: 91, DurationMs: 5},
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
+	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	result, ok := duplicateEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
+	}
+	if got := canvasHarnessEventStringSlice(result["cardIds"]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+	if got := len(provider.Requests()); got != 2 {
+		t.Fatalf("requests = %d, want 2", got)
+	}
+}
+
 func TestCanvasHarnessFallbackActionFormats(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	cases := map[string]string{
-		"action fence": "```action\n{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140},\"description\":\"Move\",\"impact\":\"Moves card\"}\n```",
-		"json fence":   "```json\n[{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140}}]\n```",
-		"gemma":        "<|tool_call>call{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140}}<tool_call|>",
-		"plain call":   "call:move_card{cardId:<|\"|>card-a<|\"|>,x:120,y:140}",
+		"action fence":         "```action\n{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140},\"description\":\"Move\",\"impact\":\"Moves card\"}\n```",
+		"json fence":           "```json\n[{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140}}]\n```",
+		"gemma":                "<|tool_call>call{\"tool\":\"move_card\",\"params\":{\"cardId\":\"card-a\",\"x\":120,\"y\":140}}<tool_call|>",
+		"plain call":           "call:move_card{cardId:<|\"|>card-a<|\"|>,x:120,y:140}",
+		"codex bracket action": "[action: move_card]\ndescription: Move card.\nimpact: Moves the card on the canvas.\ncardId: card-a\nx: 120\ny: 140",
 	}
 	for name, content := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -613,6 +917,662 @@ func TestCanvasHarnessFallbackActionFormats(t *testing.T) {
 				t.Fatalf("fallbackActionCount = %v", got)
 			}
 		})
+	}
+}
+
+func TestCanvasHarnessFallbackBracketActionsExecuteMultipleTools(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"move these cards nearby",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessText(`[action: focus_card]
+description: Focus the first selected card.
+impact: Moves the cursor to the first card.
+cardId: card-a
+
+[action: arrange_cards]
+description: Move both cards into a nearby column.
+impact: Places both selected cards close together.
+cards:
+• cardId: card-a
+  x: 120
+  y: 140
+• cardId: card-b
+  x: 120
+  y: 280`),
+	)
+	requireCanvasHarnessEvent(t, events, "focus", "")
+	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	stat := requireCanvasHarnessLoopStat(t, events, 0)
+	if stat["toolUseSource"] != "fallback_parse" {
+		t.Fatalf("toolUseSource = %#v", stat["toolUseSource"])
+	}
+	if got := requireCanvasHarnessStatNumber(t, stat, "fallbackActionCount"); got != 2 {
+		t.Fatalf("fallbackActionCount = %v", got)
+	}
+}
+
+func TestCanvasHarnessFallbackActionHeaderMoveCardsAlias(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"move humans away",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessText(`Action: focus_card
+description: Focus the first card.
+impact: Cursor moves to the first card.
+cardId: card-a
+
+Action: move_cards
+description: Move all identified cards farther away.
+impact: card-a moves to x=120, y=1540; card-b moves to x=120, y=2050.
+cardIds: card-a, card-b`),
+	)
+	requireCanvasHarnessEvent(t, events, "focus", "")
+	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	stat := requireCanvasHarnessLoopStat(t, events, 0)
+	if stat["toolUseSource"] != "fallback_parse" {
+		t.Fatalf("toolUseSource = %#v", stat["toolUseSource"])
+	}
+	if got := requireCanvasHarnessStatNumber(t, stat, "fallbackActionCount"); got != 2 {
+		t.Fatalf("fallbackActionCount = %v", got)
+	}
+}
+
+func TestCanvasHarnessNativeFocusOnlyRepairsToNonFocusAction(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"move the tree card next to the cluster",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a", "label": "Tree card"}),
+		canvasHarnessToolCall("move_card", map[string]any{"cardId": "card-a", "x": "120", "y": "140"}),
+	)
+	requireCanvasHarnessEvent(t, events, "focus", "")
+	requireCanvasHarnessEvent(t, events, "status", "")
+	requireCanvasHarnessEvent(t, events, "action_result", "move_card")
+	requests := provider.Requests()
+	if len(requests) < 2 {
+		t.Fatalf("expected focus-only repair follow-up request, got %d", len(requests))
+	}
+	requireCanvasHarnessRequestTool(t, requests[1], "focus_card")
+	requireCanvasHarnessRequestTool(t, requests[1], "select_cards")
+	requireCanvasHarnessRequestTool(t, requests[1], "move_card")
+	requireCanvasHarnessRequestTool(t, requests[1], "resize_card")
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["toolUseSource"] != "native_tool_call" {
+		t.Fatalf("first toolUseSource = %#v", firstStat["toolUseSource"])
+	}
+	if firstStat["nextReason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if secondStat["reason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("second reason = %#v", secondStat["reason"])
+	}
+	if secondStat["toolUseSource"] != "native_tool_call" {
+		t.Fatalf("second toolUseSource = %#v", secondStat["toolUseSource"])
+	}
+}
+
+func TestCanvasHarnessNativePreparatoryActionsRepairUntilConcreteAction(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"resize the tree and move the donkey to empty space",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a", "label": "Tree card"}),
+		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-a"}, "label": "Tree card"}),
+		canvasHarnessToolCall("resize_card", map[string]any{"cardId": "card-a", "width": "420"}),
+	)
+	requireCanvasHarnessEvent(t, events, "focus", "")
+	requireCanvasHarnessEvent(t, events, "action_result", "select_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
+	status := requireCanvasHarnessEvent(t, events, "status", "")
+	if !strings.Contains(fmt.Sprint(status["content"]), "Confirming") {
+		t.Fatalf("status content = %#v", status["content"])
+	}
+	requests := provider.Requests()
+	if len(requests) < 3 {
+		t.Fatalf("expected repeated preparatory repair requests, got %d", len(requests))
+	}
+	requireCanvasHarnessRequestTool(t, requests[1], "focus_card")
+	requireCanvasHarnessRequestTool(t, requests[1], "select_cards")
+	requireCanvasHarnessRequestTool(t, requests[2], "focus_card")
+	requireCanvasHarnessRequestTool(t, requests[2], "select_cards")
+	requireCanvasHarnessRequestTool(t, requests[2], "resize_card")
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["nextReason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if secondStat["nextReason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("second nextReason = %#v", secondStat["nextReason"])
+	}
+	thirdStat := requireCanvasHarnessLoopStat(t, events, 2)
+	if thirdStat["reason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("third reason = %#v", thirdStat["reason"])
+	}
+}
+
+func TestCanvasHarnessPreparatoryLoopFallsBackToConcreteManipulation(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"把樹放大，然後樹下有一隻驢子也移到空的地方",
+		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
+		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-tree", "card-donkey"}, "label": "Tree and donkey group"}),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree and donkey group"}),
+	)
+	requireCanvasHarnessStatusContaining(t, events, "Confirmation complete")
+	resizeEvent := requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
+	resizeResult, ok := resizeEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("resize result = %#v", resizeEvent["result"])
+	}
+	if resizeResult["cardId"] != "card-tree" {
+		t.Fatalf("resize cardId = %#v", resizeResult["cardId"])
+	}
+	if width, ok := resizeResult["width"].(float64); !ok || width <= 320 {
+		t.Fatalf("resize width = %#v", resizeResult["width"])
+	}
+	arrangeEvent := requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	arrangeResult, ok := arrangeEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("arrange result = %#v", arrangeEvent["result"])
+	}
+	rawPositions, ok := arrangeResult["positions"].([]any)
+	if !ok || len(rawPositions) != 2 {
+		t.Fatalf("positions = %#v", arrangeResult["positions"])
+	}
+	gotIDs := make([]string, 0, len(rawPositions))
+	for _, raw := range rawPositions {
+		position, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("position = %#v", raw)
+		}
+		gotIDs = append(gotIDs, fmt.Sprint(position["cardId"]))
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"card-tree", "card-donkey"}) {
+		t.Fatalf("position card IDs = %#v", gotIDs)
+	}
+	requests := provider.Requests()
+	if len(requests) != 3 {
+		t.Fatalf("expected fallback after three preparatory requests, got %d requests", len(requests))
+	}
+}
+
+func TestCanvasHarnessFallbackUsesConfirmedTargetsAndExactMetadata(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方 旋轉封面是魚的書 把 family 鏡像處理",
+		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
+		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-tree", "card-donkey"}, "label": "Tree and donkey group"}),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree and donkey group"}),
+	)
+
+	resizeEvent := requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
+	resizeResult, ok := resizeEvent["result"].(map[string]any)
+	if !ok || resizeResult["cardId"] != "card-tree" {
+		t.Fatalf("resize result = %#v", resizeEvent["result"])
+	}
+
+	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+	duplicateResult, ok := duplicateEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
+	}
+	positions, ok := duplicateResult["positions"].([]any)
+	if !ok || len(positions) != 2 {
+		t.Fatalf("duplicate positions = %#v", duplicateResult["positions"])
+	}
+
+	rotateEvent := requireCanvasHarnessEvent(t, events, "action_result", "rotate_image")
+	rotateResult, ok := rotateEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("rotate result = %#v", rotateEvent["result"])
+	}
+	if got := canvasHarnessEventStringSlice(rotateResult["assetIds"]); !reflect.DeepEqual(got, []string{"asset-fish-book"}) {
+		t.Fatalf("rotate assetIds = %#v", got)
+	}
+	mirrorEvent := requireCanvasHarnessEvent(t, events, "action_result", "mirror_image")
+	mirrorResult, ok := mirrorEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("mirror result = %#v", mirrorEvent["result"])
+	}
+	if got := canvasHarnessEventStringSlice(mirrorResult["assetIds"]); !reflect.DeepEqual(got, []string{"asset-family"}) {
+		t.Fatalf("mirror assetIds = %#v", got)
+	}
+}
+
+func TestCanvasFallbackRelationClauseUsesMostRecentTarget(t *testing.T) {
+	actions := fallbackCanvasManipulationActions(
+		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方",
+		canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey"),
+		[]string{"card-tree"},
+	)
+	var duplicate canvasAction
+	for _, action := range actions {
+		if action.Tool == "duplicate_cards" {
+			duplicate = action
+			break
+		}
+	}
+	got := canvasActionCardIDs(duplicate)
+	if !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+}
+
+func TestCanvasFallbackDuplicateCopyPositionsIgnoreRemoteOutliers(t *testing.T) {
+	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
+	canvas.Cards = append(canvas.Cards, canvasCardSnapshot{
+		ID:     "card-remote",
+		Kind:   "asset",
+		X:      4900,
+		Y:      1040,
+		Width:  320,
+		Height: 320,
+		Asset: &canvasAssetSnapshot{
+			ID:          "asset-remote",
+			RepoPath:    "remote.png",
+			Description: "A remote outlier left from a previous operation.",
+		},
+	})
+
+	positions := canvasFallbackDuplicateCopyPositions(
+		"複製兩張也移到空的地方",
+		canvas,
+		[]string{"copy-a", "copy-b"},
+		[]string{"card-donkey"},
+	)
+
+	if got := canvasActionPositionCardIDs(canvasAction{Tool: "arrange_cards", Params: map[string]any{"positions": positions}}); !reflect.DeepEqual(got, []string{"copy-a", "copy-b"}) {
+		t.Fatalf("position cardIds = %#v", got)
+	}
+	for _, raw := range positions {
+		position, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("position = %#v", raw)
+		}
+		x, _ := position["x"].(float64)
+		if x >= 3000 {
+			t.Fatalf("copy position used remote outlier x=%v positions=%#v", x, positions)
+		}
+	}
+	firstPosition := positions[0].(map[string]any)
+	firstY, _ := firstPosition["y"].(float64)
+	if firstY <= 1210 {
+		t.Fatalf("first copy should be placed below the source card, y=%v positions=%#v", firstY, positions)
+	}
+}
+
+func TestCanvasFallbackExplicitTextOverridesConfirmedRemoteCopy(t *testing.T) {
+	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
+	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
+		source := *canvas.Cards[2].Asset
+		return canvasCardSnapshot{
+			ID:     id,
+			Kind:   "asset",
+			X:      x,
+			Y:      y,
+			Width:  320,
+			Height: 379,
+			Asset:  &source,
+		}
+	}
+	canvas.Cards = append(
+		canvas.Cards,
+		remoteDonkey("card-remote-donkey-a", 5360, 0),
+		remoteDonkey("card-remote-donkey-b", 5420, 360),
+	)
+
+	actions := fallbackCanvasManipulationActions(
+		"把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。",
+		canvas,
+		[]string{"card-remote-donkey-a"},
+	)
+
+	var resize, duplicate, arrange canvasAction
+	for _, action := range actions {
+		switch action.Tool {
+		case "resize_card":
+			resize = action
+		case "duplicate_cards":
+			duplicate = action
+		case "arrange_cards":
+			arrange = action
+		}
+	}
+	if got := strings.TrimSpace(fmt.Sprint(resize.Params["cardId"])); got != "card-tree" {
+		t.Fatalf("resize cardId = %q", got)
+	}
+	if got := canvasActionCardIDs(duplicate); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+	if got := canvasActionPositionCardIDs(arrange); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("arrange cardIds = %#v", got)
+	}
+}
+
+func TestRefineCanvasActionTargetsUsesTextOverSelectedRemoteCopies(t *testing.T) {
+	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
+	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
+		source := *canvas.Cards[2].Asset
+		return canvasCardSnapshot{
+			ID:     id,
+			Kind:   "asset",
+			X:      x,
+			Y:      y,
+			Width:  320,
+			Height: 379,
+			Asset:  &source,
+		}
+	}
+	canvas.Cards = append(
+		canvas.Cards,
+		remoteDonkey("card-remote-donkey-a", 5360, 0),
+		remoteDonkey("card-remote-donkey-b", 5420, 360),
+	)
+	canvas.SelectedCardIDs = []string{"card-remote-donkey-a", "card-remote-donkey-b"}
+	actions := []canvasAction{
+		{
+			Tool: "duplicate_cards",
+			Params: map[string]any{
+				"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"},
+				"count":   float64(2),
+			},
+		},
+		{
+			Tool: "arrange_cards",
+			Params: map[string]any{"positions": []any{
+				map[string]any{"cardId": "card-remote-donkey-a", "x": float64(5960), "y": float64(0)},
+				map[string]any{"cardId": "card-remote-donkey-b", "x": float64(6020), "y": float64(440)},
+			}},
+		},
+	}
+
+	refined := refineCanvasActionTargets(actions, canvas, "把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。")
+
+	if got := canvasActionCardIDs(refined[0]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+	if got := canvasActionPositionCardIDs(refined[1]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("arrange cardIds = %#v", got)
+	}
+}
+
+func TestCanvasHarnessRefinesNativeSelectedRemoteCopyActions(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	canvas := canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB)
+	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
+		source := *canvas.Cards[2].Asset
+		return canvasCardSnapshot{
+			ID:     id,
+			Kind:   "asset",
+			X:      x,
+			Y:      y,
+			Width:  320,
+			Height: 379,
+			Asset:  &source,
+		}
+	}
+	canvas.Cards = append(
+		canvas.Cards,
+		remoteDonkey("card-remote-donkey-a", 5360, 0),
+		remoteDonkey("card-remote-donkey-b", 5420, 360),
+	)
+	canvas.SelectedCardIDs = []string{"card-remote-donkey-a", "card-remote-donkey-b"}
+
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。",
+		canvas,
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-remote-donkey-a", "label": "Remote donkey"}),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-remote-donkey-a", "label": "Remote donkey"}),
+		canvasHarnessToolCalls(
+			llm.ChatToolCall{Name: "select_cards", Arguments: map[string]any{"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"}, "label": "Remote donkeys"}},
+			llm.ChatToolCall{Name: "duplicate_cards", Arguments: map[string]any{"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"}, "count": float64(2)}},
+			llm.ChatToolCall{Name: "move_card", Arguments: map[string]any{"cardId": "card-remote-donkey-a", "x": float64(50), "y": float64(50)}},
+		),
+	)
+
+	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+	result, ok := duplicateEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
+	}
+	if got := canvasHarnessEventStringSlice(result["cardIds"]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+}
+
+func TestRefineCanvasActionTargetsUsesFallbackLayoutTargets(t *testing.T) {
+	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
+	canvas.Cards = append(canvas.Cards, canvasCardSnapshot{
+		ID:         "card-cat",
+		Kind:       "asset",
+		X:          1320,
+		Y:          960,
+		Width:      320,
+		Height:     320,
+		LayerIndex: 4,
+		Asset: &canvasAssetSnapshot{
+			ID:                "asset-cat",
+			RepoPath:          "monogatari_alice_cheshire_neko.png",
+			Ext:               ".png",
+			Width:             400,
+			Height:            400,
+			SearchTags:        []string{"cat"},
+			SearchDescription: "A cat illustration that should not be touched.",
+		},
+	})
+	actions := []canvasAction{
+		{
+			Tool: "resize_card",
+			Params: map[string]any{
+				"cardId": "card-cat",
+				"width":  float64(640),
+			},
+		},
+		{
+			Tool: "duplicate_cards",
+			Params: map[string]any{
+				"cardIds": []any{"card-tree", "card-cat", "card-donkey"},
+				"count":   float64(2),
+			},
+		},
+		{
+			Tool: "arrange_cards",
+			Params: map[string]any{"positions": []any{
+				map[string]any{"cardId": "card-tree", "x": float64(1800), "y": float64(960)},
+				map[string]any{"cardId": "card-cat", "x": float64(1800), "y": float64(1320)},
+				map[string]any{"cardId": "card-donkey", "x": float64(1800), "y": float64(1680)},
+			}},
+		},
+	}
+
+	refined := refineCanvasActionTargets(actions, canvas, "把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方")
+
+	if got := strings.TrimSpace(fmt.Sprint(refined[0].Params["cardId"])); got != "card-tree" {
+		t.Fatalf("resize cardId = %q", got)
+	}
+	if got := canvasActionCardIDs(refined[1]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("duplicate cardIds = %#v", got)
+	}
+	if got := refined[1].Params["count"]; got != float64(2) {
+		t.Fatalf("duplicate count = %#v", got)
+	}
+	if got := canvasActionPositionCardIDs(refined[2]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
+		t.Fatalf("arrange cardIds = %#v", got)
+	}
+}
+
+func TestRefineCanvasImageVariantTargetsUsesClauseTargets(t *testing.T) {
+	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
+	actions := []canvasAction{
+		{
+			Tool: "rotate_image",
+			Params: map[string]any{
+				"assetIds": []any{"asset-tree", "asset-donkey", "asset-family", "asset-fish-book"},
+				"degrees":  float64(180),
+			},
+		},
+		{
+			Tool: "mirror_image",
+			Params: map[string]any{
+				"assetIds": []any{"asset-tree", "asset-donkey", "asset-family", "asset-fish-book"},
+				"flip":     "horizontal",
+			},
+		},
+	}
+
+	refined := refineCanvasImageVariantTargets(
+		actions,
+		canvas,
+		"旋轉封面是魚的書 把 family 鏡像處理",
+	)
+
+	if got := canvasActionAssetIDs(refined[0]); !reflect.DeepEqual(got, []string{"asset-fish-book"}) {
+		t.Fatalf("rotate assetIds = %#v", got)
+	}
+	if got := refined[0].Params["degrees"]; got != float64(90) {
+		t.Fatalf("rotate degrees = %#v", got)
+	}
+	if got := canvasActionAssetIDs(refined[1]); !reflect.DeepEqual(got, []string{"asset-family"}) {
+		t.Fatalf("mirror assetIds = %#v", got)
+	}
+}
+
+func TestRefineCanvasActionTargetsDropsUnmentionedArrangeCards(t *testing.T) {
+	canvas := canvasHarnessGenericRecoverySnapshot()
+	actions := []canvasAction{
+		{
+			Tool: "arrange_cards",
+			Params: map[string]any{"positions": []any{
+				map[string]any{"cardId": "card-primary", "x": float64(1200), "y": float64(960)},
+				map[string]any{"cardId": "card-secondary", "x": float64(1200), "y": float64(1320)},
+				map[string]any{"cardId": "card-decoy", "x": float64(1200), "y": float64(1680)},
+			}},
+		},
+	}
+
+	refined := refineCanvasActionTargets(actions, canvas, "resize primary-subject and move secondary-subject to empty space")
+
+	if len(refined) != 1 {
+		t.Fatalf("refined actions = %#v", refined)
+	}
+	got := canvasActionPositionCardIDs(refined[0])
+	if !reflect.DeepEqual(got, []string{"card-primary", "card-secondary"}) {
+		t.Fatalf("position card IDs = %#v", got)
+	}
+}
+
+func TestRefineCanvasActionTargetsDropsUnmentionedConfirmedFallbackTargets(t *testing.T) {
+	canvas := canvasHarnessGenericRecoverySnapshot()
+	actions := fallbackCanvasManipulationActions(
+		"primary-subject and secondary-subject. duplicate two copies to empty space",
+		canvas,
+		[]string{"card-primary", "card-secondary", "card-decoy"},
+	)
+	requireCanvasActionTool(t, actions, "duplicate_cards")
+
+	for _, action := range actions {
+		for _, id := range canvasActionCardIDs(action) {
+			if id == "card-decoy" {
+				t.Fatalf("decoy card leaked through %s params=%#v", action.Tool, action.Params)
+			}
+		}
+		for _, id := range canvasActionPositionCardIDs(action) {
+			if id == "card-decoy" {
+				t.Fatalf("decoy position leaked through %s params=%#v", action.Tool, action.Params)
+			}
+		}
+	}
+}
+
+func TestRefineCanvasActionTargetsKeepsAmbiguousLayoutActions(t *testing.T) {
+	canvas := canvasHarnessGenericRecoverySnapshot()
+	actions := []canvasAction{
+		{
+			Tool: "arrange_cards",
+			Params: map[string]any{"positions": []any{
+				map[string]any{"cardId": "card-primary", "x": float64(1200), "y": float64(960)},
+				map[string]any{"cardId": "card-secondary", "x": float64(1200), "y": float64(1320)},
+			}},
+		},
+	}
+
+	refined := refineCanvasActionTargets(actions, canvas, "move selected cards to empty space")
+
+	if len(refined) != 1 {
+		t.Fatalf("refined actions = %#v", refined)
+	}
+	got := canvasActionPositionCardIDs(refined[0])
+	if !reflect.DeepEqual(got, []string{"card-primary", "card-secondary"}) {
+		t.Fatalf("position card IDs = %#v", got)
+	}
+}
+
+func TestCanvasHarnessFallbackCompletesMissingToolsAfterPartialNativeActions(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方 旋轉封面是魚的書 把 family 鏡像處理",
+		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
+		canvasHarnessToolCalls(
+			llm.ChatToolCall{
+				Name: "select_cards",
+				Arguments: map[string]any{
+					"cardIds": []any{"card-tree", "card-donkey"},
+					"label":   "Tree and donkey group",
+				},
+			},
+			llm.ChatToolCall{
+				Name: "duplicate_cards",
+				Arguments: map[string]any{
+					"cardIds": []any{"card-tree", "card-donkey"},
+					"count":   float64(1),
+					"label":   "Duplicate confirmed group",
+				},
+			},
+			llm.ChatToolCall{
+				Name: "mirror_image",
+				Arguments: map[string]any{
+					"assetIds":     []any{"asset-family"},
+					"flip":         "horizontal",
+					"outputFormat": "png",
+				},
+			},
+		),
+	)
+
+	requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "mirror_image")
+	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
+	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "rotate_image")
+
+	duplicateCount := 0
+	mirrorCount := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "duplicate_cards" {
+			duplicateCount++
+		}
+		if event["type"] == "action_result" && event["tool"] == "mirror_image" {
+			mirrorCount++
+		}
+	}
+	if duplicateCount != 1 {
+		t.Fatalf("duplicate_cards event count = %d", duplicateCount)
+	}
+	if mirrorCount != 1 {
+		t.Fatalf("mirror_image action_result count = %d", mirrorCount)
 	}
 }
 
@@ -815,7 +1775,7 @@ func TestCanvasHarnessNormalizedArgsReachFrontendContract(t *testing.T) {
 	}
 }
 
-func TestCanvasHarnessNormalizesUnsafeProposalParams(t *testing.T) {
+func TestCanvasHarnessNormalizesImageVariantParams(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	events, _ := runCanvasToolUseHarness(
 		t,
@@ -827,15 +1787,18 @@ func TestCanvasHarnessNormalizesUnsafeProposalParams(t *testing.T) {
 			"output_format":  "png",
 		}),
 	)
-	proposal := requireCanvasHarnessEvent(t, events, "proposal", "rotate_image")
-	params, ok := proposal["params"].(map[string]any)
+	resultEvent := requireCanvasHarnessEvent(t, events, "action_result", "rotate_image")
+	params, ok := resultEvent["result"].(map[string]any)
 	if !ok {
-		t.Fatalf("params = %#v", proposal["params"])
+		t.Fatalf("result = %#v", resultEvent["result"])
 	}
-	if params["assetId"] != bootstrap.assetA || params["degrees"] != float64(90) || params["outputFormat"] != "png" {
-		t.Fatalf("normalized proposal params = %#v", params)
+	if got := canvasHarnessEventStringSlice(params["assetIds"]); !reflect.DeepEqual(got, []string{bootstrap.assetA}) {
+		t.Fatalf("normalized assetIds = %#v", got)
+	}
+	if params["degrees"] != float64(90) || params["outputFormat"] != "png" {
+		t.Fatalf("normalized image variant params = %#v", params)
 	}
 	if _, exists := params["rotate_degrees"]; exists {
-		t.Fatalf("raw alias leaked into proposal params: %#v", params)
+		t.Fatalf("raw alias leaked into action result params: %#v", params)
 	}
 }

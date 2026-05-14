@@ -198,6 +198,9 @@ type imageToolRenderPreviewResponse struct {
 	OutputBytes  int64  `json:"outputBytes"`
 	InputFormat  string `json:"inputFormat"`
 	OutputFormat string `json:"outputFormat"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	Alpha        bool   `json:"alpha"`
 }
 
 func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Request) {
@@ -250,7 +253,7 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		sourceDisplay = strings.TrimSuffix(item.RepoPath, item.Ext) + ".png"
 	}
 	if imageToolRenderPreviewIsTransform(body) {
-		s.handleImageToolTransformPreview(w, item, sourcePath, sourceBytes, sourceDisplay, needsPreConvert, body)
+		s.handleImageToolTransformPreview(w, item, sourcePath, sourceBytes, sourceDisplay, sourceMeta.Alpha, needsPreConvert, body)
 		return
 	}
 	settings, _ := s.store.Settings()
@@ -267,6 +270,7 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	outputMeta, _ := imageproc.Probe(candidate)
 	token := imageToolToken("render-preview:" + body.AssetID + ":" + body.OutputFormat)
 	downloadName := imageToolDownloadName(item.RepoPath, op.OutputFormat)
 	s.storeImageToolDownload(token, imageToolDownload{
@@ -288,6 +292,9 @@ func (s *Server) handleImageToolRenderPreview(w http.ResponseWriter, r *http.Req
 		OutputBytes:  op.EstimatedBytes,
 		InputFormat:  inputFormat,
 		OutputFormat: op.OutputFormat,
+		Width:        outputMeta.Width,
+		Height:       outputMeta.Height,
+		Alpha:        outputMeta.Alpha,
 	})
 }
 
@@ -300,13 +307,13 @@ func imageToolRenderPreviewIsTransform(body imageToolRenderPreviewRequest) bool 
 	}
 }
 
-func (s *Server) handleImageToolTransformPreview(w http.ResponseWriter, item scanner.AssetItem, sourcePath string, sourceBytes int64, sourceDisplay string, needsPreConvert bool, body imageToolRenderPreviewRequest) {
+func (s *Server) handleImageToolTransformPreview(w http.ResponseWriter, item scanner.AssetItem, sourcePath string, sourceBytes int64, sourceDisplay string, sourceAlpha bool, needsPreConvert bool, body imageToolRenderPreviewRequest) {
 	opts, err := imageToolTransformOptions(body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, apierr.New("image_transform_invalid", err.Error()))
 		return
 	}
-	outputFormat := imageToolTransformOutputFormat(body.OutputFormat, sourceDisplay)
+	outputFormat := imageToolTransformOutputFormat(body.OutputFormat, sourceDisplay, sourceAlpha)
 	tmp, err := os.CreateTemp("", "aisets-transform-*."+outputFormat)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -325,6 +332,7 @@ func (s *Server) handleImageToolTransformPreview(w http.ResponseWriter, item sca
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	outputMeta, _ := imageproc.Probe(targetPath)
 
 	token := imageToolToken(fmt.Sprintf("render-preview:%s:%s:%s:%d:%s", item.ID, body.Operation, opts.Flip, opts.RotateDegrees, outputFormat))
 	downloadName := imageToolTransformDownloadName(item.RepoPath, outputFormat, opts)
@@ -348,6 +356,9 @@ func (s *Server) handleImageToolTransformPreview(w http.ResponseWriter, item sca
 		OutputBytes:  info.Size(),
 		InputFormat:  inputFormat,
 		OutputFormat: outputFormat,
+		Width:        outputMeta.Width,
+		Height:       outputMeta.Height,
+		Alpha:        outputMeta.Alpha,
 	})
 }
 
@@ -379,10 +390,13 @@ func imageToolTransformOptions(body imageToolRenderPreviewRequest) (imageproc.Tr
 	return imageproc.TransformOptions{Flip: flip, RotateDegrees: degrees}, nil
 }
 
-func imageToolTransformOutputFormat(rawFormat, sourceDisplay string) string {
+func imageToolTransformOutputFormat(rawFormat, sourceDisplay string, sourceAlpha bool) string {
 	format := imageproc.NormalizeOptimizationFormat(rawFormat)
 	if format == "jpeg" {
 		format = "jpg"
+	}
+	if sourceAlpha && format == "jpg" {
+		format = "png"
 	}
 	switch format {
 	case "png", "jpg", "webp", "avif", "gif":

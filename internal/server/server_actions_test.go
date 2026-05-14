@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"image/color"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -558,7 +559,7 @@ func TestImageToolRenderPreviewTransform(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	project := filepath.Join(root, "project")
-	writePNG(t, filepath.Join(project, "img", "icon.png"))
+	writeSolidPNG(t, filepath.Join(project, "img", "icon.png"), color.NRGBA{R: 255, A: 128})
 
 	store, err := config.OpenStore()
 	if err != nil {
@@ -580,9 +581,9 @@ func TestImageToolRenderPreviewTransform(t *testing.T) {
 
 	payload, _ := json.Marshal(map[string]any{
 		"assetId":      items[0].ID,
-		"operation":    "rotate_image",
-		"degrees":      90,
-		"outputFormat": "png",
+		"operation":    "mirror_image",
+		"flip":         "horizontal",
+		"outputFormat": "jpg",
 	})
 	rec := httptest.NewRecorder()
 	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/render-preview", bytes.NewReader(payload)))
@@ -593,12 +594,18 @@ func TestImageToolRenderPreviewTransform(t *testing.T) {
 		Token        string `json:"token"`
 		OutputBytes  int64  `json:"outputBytes"`
 		OutputFormat string `json:"outputFormat"`
+		Width        int    `json:"width"`
+		Height       int    `json:"height"`
+		Alpha        bool   `json:"alpha"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &renderResp); err != nil {
 		t.Fatal(err)
 	}
 	if renderResp.Token == "" || renderResp.OutputBytes <= 0 || renderResp.OutputFormat != "png" {
 		t.Fatalf("render-preview transform body = %#v", renderResp)
+	}
+	if renderResp.Width != 8 || renderResp.Height != 8 || !renderResp.Alpha {
+		t.Fatalf("render-preview transform metadata = %#v, want 8x8 alpha PNG", renderResp)
 	}
 
 	rec = httptest.NewRecorder()
