@@ -21,6 +21,7 @@ import {
   CommentCardBody,
   OperationCardBody,
   ProposalCardBody,
+  SelectionContextMenu,
   UploadCardBody,
   UploadContextMenu,
   VariantCardBody,
@@ -71,7 +72,6 @@ type AICanvasStageProps = {
     x: number;
     y: number;
     label?: string;
-    emoji?: string;
     status: "thinking" | "acting" | "idle";
   };
   aiNickname?: string;
@@ -91,6 +91,7 @@ type AICanvasStageProps = {
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDeleteCard: (target: CanvasCard) => void;
+  onDeleteSelectedCards: (ids: string[]) => void;
   onDuplicateCard: (target: CanvasCard) => void;
   onRegisterCard: (cardId: string, node: HTMLElement | null) => void;
   onAddComment: (
@@ -136,6 +137,7 @@ export function AICanvasStage({
   onDragMove,
   onDragEnd,
   onDeleteCard,
+  onDeleteSelectedCards,
   onDuplicateCard,
   onRegisterCard,
   onAddComment,
@@ -144,10 +146,14 @@ export function AICanvasStage({
   const [deleteConfirmCard, setDeleteConfirmCard] = useState<CanvasCard | null>(
     null,
   );
+  const [deleteConfirmSelectedIds, setDeleteConfirmSelectedIds] = useState<
+    string[] | null
+  >(null);
   const latestHandlersRef = useRef({
     onAddComment,
     onCreateImagePreview,
     onDeleteCard,
+    onDeleteSelectedCards,
     onDragEnd,
     onDragMove,
     onDragStart,
@@ -160,6 +166,7 @@ export function AICanvasStage({
       onAddComment,
       onCreateImagePreview,
       onDeleteCard,
+      onDeleteSelectedCards,
       onDragEnd,
       onDragMove,
       onDragStart,
@@ -171,6 +178,7 @@ export function AICanvasStage({
     onAddComment,
     onCreateImagePreview,
     onDeleteCard,
+    onDeleteSelectedCards,
     onDragEnd,
     onDragMove,
     onDragStart,
@@ -247,7 +255,14 @@ export function AICanvasStage({
               : undefined
           }
           contextMenu={
-            card.kind === "asset" ? (
+            selectedCardIds.length > 1 && selectedCardIds.includes(card.id) ? (
+              <SelectionContextMenu
+                count={selectedCardIds.length}
+                onDelete={() =>
+                  setDeleteConfirmSelectedIds([...selectedCardIds])
+                }
+              />
+            ) : card.kind === "asset" ? (
               <AssetContextMenu
                 card={card}
                 onOpenAsset={
@@ -430,7 +445,6 @@ export function AICanvasStage({
             <AICursor
               position={{ x: aiCursor.x, y: aiCursor.y }}
               label={aiCursor.label}
-              emoji={aiCursor.emoji}
               status={aiCursor.status}
               nickname={aiNickname}
               greeting={aiGreeting}
@@ -457,6 +471,30 @@ export function AICanvasStage({
         title={t("aiCanvas.deleteCard")}
         message={t("aiCanvas.deleteConfirmMessage")}
         confirmText={t("aiCanvas.deleteCard")}
+        cancelText={t("common.cancel")}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirmSelectedIds}
+        onConfirm={() => {
+          if (deleteConfirmSelectedIds) {
+            latestHandlersRef.current.onDeleteSelectedCards(
+              deleteConfirmSelectedIds,
+            );
+          }
+          setDeleteConfirmSelectedIds(null);
+        }}
+        onCancel={() => setDeleteConfirmSelectedIds(null)}
+        title={t("aiCanvas.deleteSelected", {
+          count: deleteConfirmSelectedIds?.length ?? 0,
+        })}
+        message={t("aiCanvas.deleteSelectedConfirmMessage", {
+          count: deleteConfirmSelectedIds?.length ?? 0,
+        })}
+        confirmText={t("aiCanvas.deleteSelected", {
+          count: deleteConfirmSelectedIds?.length ?? 0,
+        })}
         cancelText={t("common.cancel")}
         variant="danger"
       />

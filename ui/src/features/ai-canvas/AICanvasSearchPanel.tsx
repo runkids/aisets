@@ -10,7 +10,6 @@ import { useEffect, useState, type RefObject } from "react";
 import type { TFunction } from "i18next";
 import {
   AssetThumbnail,
-  IconButton,
   TextInput,
   TextInputClearButton,
 } from "@/components/ui";
@@ -94,22 +93,22 @@ export function AICanvasSearchPanel({
 
   if (!open) {
     return (
-      <IconButton
+      <button
         data-ai-canvas-overlay="true"
-        size="md"
+        type="button"
         aria-label={t("aiCanvas.openSearch")}
-        className="pointer-events-auto absolute left-3 top-3 z-50 border border-g-line bg-g-surface shadow-g-pop animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] motion-reduce:animate-none"
+        className="pointer-events-auto absolute left-[130px] top-3 z-50 inline-flex h-[44px] w-[44px] items-center justify-center rounded-g-lg bg-g-surface/75 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus motion-reduce:animate-none"
         onClick={() => setOpen(true)}
       >
-        <Search />
-      </IconButton>
+        <Search size={20} className="text-g-ink-2" />
+      </button>
     );
   }
 
   return (
     <aside
       data-ai-canvas-overlay="true"
-      className="pointer-events-auto absolute left-3 top-3 z-50 flex w-[min(480px,calc(100%-24px))] origin-top-left flex-col gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none"
+      className="pointer-events-auto absolute left-[130px] top-3 z-50 flex w-[min(480px,calc(100%-142px))] origin-top-left flex-col gap-1 rounded-g-lg bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none"
     >
       <form
         className="flex items-center gap-1.5"
@@ -192,7 +191,13 @@ export function AICanvasSearchPanel({
               {query && (
                 <TextInputClearButton
                   label={t("toolbar.clearSearch")}
-                  onClick={() => setQuery("")}
+                  onClick={() => {
+                    setQuery("");
+                    setSearchResults([]);
+                    setSearchTotal(0);
+                    setSearchSelectedIds(new Set());
+                    setSearchActiveIndex(-1);
+                  }}
                   className="mr-0.5"
                 />
               )}
@@ -284,7 +289,30 @@ export function AICanvasSearchPanel({
       >
         <div className="overflow-hidden">
           <div className="flex items-center justify-between px-1.5 pb-0.5 text-g-chip font-[510] tracking-[0.02em] text-g-ink-4">
-            <span>{t("aiCanvas.searchResults", { count: searchTotal })}</span>
+            <span className="inline-flex items-center gap-2">
+              <span>{t("aiCanvas.searchResults", { count: searchTotal })}</span>
+              {searchSelectedIds.size < searchResults.length ? (
+                <button
+                  type="button"
+                  className="text-g-accent transition-colors duration-[100ms] ease-g hover:text-g-accent/80 focus-visible:outline-none focus-visible:shadow-g-focus"
+                  onClick={() =>
+                    setSearchSelectedIds(
+                      new Set(searchResults.map((a) => a.id)),
+                    )
+                  }
+                >
+                  {t("aiCanvas.selectAll")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-g-ink-3 transition-colors duration-[100ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+                  onClick={() => setSearchSelectedIds(new Set())}
+                >
+                  {t("aiCanvas.deselectAll")}
+                </button>
+              )}
+            </span>
             {searchSelectedIds.size > 0 ? (
               <button
                 type="button"

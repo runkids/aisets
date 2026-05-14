@@ -11,9 +11,6 @@ import {
   LoaderCircle,
   MessageCircle,
   MousePointer2,
-  Move,
-  Plus,
-  Search,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -592,6 +589,34 @@ export function UploadContextMenu({
       >
         <Trash2 size={14} className="shrink-0" />
         {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
+export function SelectionContextMenu({
+  count,
+  onDelete,
+}: {
+  count: number;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="font-[590] text-white">
+          {t("aiCanvas.selectedCount", { count })}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteSelected", { count })}
       </button>
     </>
   );
@@ -1377,42 +1402,9 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
   );
 }
 
-const CURSOR_EMOJI_MAP: Record<
-  string,
-  { icon: typeof Sparkles; anim: string }
-> = {
-  search: {
-    icon: Search,
-    anim: "animate-[cursorFloat_1.2s_ease-in-out_infinite]",
-  },
-  move: { icon: Move, anim: "animate-[cursorFloat_1s_ease-in-out_infinite]" },
-  create: { icon: Plus, anim: "animate-[cursorFloat_1s_ease-in-out_infinite]" },
-  remove: {
-    icon: Trash2,
-    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
-  },
-  comment: {
-    icon: MessageCircle,
-    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
-  },
-  select: {
-    icon: MousePointer2,
-    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
-  },
-  layer: {
-    icon: Layers3,
-    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
-  },
-  duplicate: {
-    icon: Copy,
-    anim: "animate-[cursorFloat_1s_ease-in-out_infinite]",
-  },
-};
-
 export function AICursor({
   position,
   label,
-  emoji,
   status,
   nickname,
   greeting,
@@ -1420,7 +1412,6 @@ export function AICursor({
 }: {
   position: { x: number; y: number };
   label?: string;
-  emoji?: string;
   status?: "thinking" | "acting" | "idle";
   nickname?: string;
   greeting?: string;
@@ -1436,8 +1427,6 @@ export function AICursor({
   }, [greeting]);
   const showGreeting = Boolean(greeting) && dismissedGreeting !== greeting;
   const showLabel = active || showGreeting;
-
-  const mapped = emoji ? CURSOR_EMOJI_MAP[emoji] : undefined;
 
   function renderIcon() {
     if (showGreeting) {
@@ -1460,19 +1449,6 @@ export function AICursor({
               style={{ animationDelay: `${i * 160}ms` }}
             />
           ))}
-        </div>
-      );
-    }
-    if (active && mapped) {
-      const Icon = mapped.icon;
-      return (
-        <div
-          className={cn(
-            "flex h-[22px] w-[22px] items-center justify-center rounded-full bg-g-purple/80 shadow-md",
-            mapped.anim,
-          )}
-        >
-          <Icon size={12} strokeWidth={2} className="text-white" />
         </div>
       );
     }

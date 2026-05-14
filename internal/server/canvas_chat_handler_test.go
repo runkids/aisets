@@ -389,6 +389,36 @@ func TestCanvasCaptureRequested(t *testing.T) {
 	}
 }
 
+func TestCanvasFollowupShouldRetainImages(t *testing.T) {
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonMissingCapture, "幫我排版後拍一張") {
+		t.Fatal("missing capture repair should retain images")
+	}
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonCaptureOnlyWork, "安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉") {
+		t.Fatal("capture-only manipulation repair should retain images")
+	}
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonFocusOnlyNeedsAnswer, "安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉") {
+		t.Fatal("focus-only manipulation repair should retain images")
+	}
+	for _, input := range []string{
+		"幫我看看這張圖有沒有品質問題",
+		"比較這兩張角色圖",
+		"analyze this image quality",
+	} {
+		if !canvasFollowupShouldRetainImages(canvasLoopReasonToolResults, input) {
+			t.Fatalf("expected visual request to retain images for %q", input)
+		}
+	}
+	for _, input := range []string{
+		"安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉",
+		"把這張圖旋轉 90 度",
+		"arrange these cards",
+	} {
+		if canvasFollowupShouldRetainImages(canvasLoopReasonToolResults, input) {
+			t.Fatalf("expected manipulation request to drop follow-up images for %q", input)
+		}
+	}
+}
+
 func TestFallbackCanvasCaptureAction(t *testing.T) {
 	action := fallbackCanvasCaptureAction("幫我排版後拍一張去背照", canvasSnapshot{})
 	if action.Tool != "capture_canvas" {
@@ -684,13 +714,47 @@ func TestCanvasTextOnlyResponseNeedsActionRepair(t *testing.T) {
 	if canvasTextOnlyResponseNeedsActionRepair("這張圖是 P1 角色站立姿勢。", false, 0, 3) {
 		t.Fatal("plain visual answer should not request an action repair")
 	}
+	imagegenText := "我會用 imagegen 技能處理這次「真的打起來」的需求，先把目前圈選的 P1/P2 動作視為角色一致性參考，再產出真正有互動的戰鬥構圖。"
+	if !canvasTextOnlyResponseNeedsActionRepair(imagegenText, false, 0, 3) {
+		t.Fatal("short imagegen promise should request an action repair")
+	}
 }
 
 func TestCanvasActionRepairPromptRequiresGenericToolActions(t *testing.T) {
 	prompt := canvasActionRepairPrompt("幫我安排幾個分鏡")
-	for _, want := range []string{"without producing an executable non-focus action", "Use canvas layout tools", "Reply with only tool calls or action blocks"} {
+	for _, want := range []string{"without producing an executable non-focus action", "Use canvas layout tools", "built-in imagegen capability", "Reply with only tool calls or action blocks"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("repair prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCanvasFocusOnlyRepairPromptRequiresActionForManipulation(t *testing.T) {
+	prompt := canvasFocusOnlyRepairPrompt("安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉")
+	for _, want := range []string{"requires canvas work", "Do NOT call focus_card again", "non-focus canvas tool action", "mirror_image/rotate_image", "no prose"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("focus-only repair prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "answer the user's latest question in prose") {
+		t.Fatalf("manipulation repair prompt should not switch to prose answer mode:\n%s", prompt)
+	}
+}
+
+func TestCanvasFocusOnlyRepairPromptAllowsProseForVisualQuestion(t *testing.T) {
+	prompt := canvasFocusOnlyRepairPrompt("這張圖是什麼？")
+	for _, want := range []string{"did not answer", "answer the user's latest question in prose"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("focus-only answer prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCanvasCaptureOnlyRepairPromptRequiresNonCaptureAction(t *testing.T) {
+	prompt := canvasCaptureOnlyRepairPrompt("安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉")
+	for _, want := range []string{"only captured the canvas", "Do NOT call capture_* again", "non-capture canvas tool action", "mirror_image/rotate_image", "no prose"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("capture-only repair prompt missing %q:\n%s", want, prompt)
 		}
 	}
 }
@@ -740,6 +804,11 @@ func TestCanvasNextLoopReason(t *testing.T) {
 			name: "missing capture",
 			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, MissingCapture: true},
 			want: canvasLoopReasonMissingCapture,
+		},
+		{
+			name: "capture only deferred work",
+			in:   canvasNextLoopInput{Loop: 0, MaxLoops: 3, CaptureOnlyDeferredWork: true},
+			want: canvasLoopReasonCaptureOnlyWork,
 		},
 		{
 			name: "text only deferred work",
@@ -807,6 +876,23 @@ func TestBuildCanvasFollowupPromptUsesCompactState(t *testing.T) {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("follow-up prompt missing %q:\n%s", want, prompt)
 		}
+	}
+}
+
+func TestCanvasGeneratedImagePathCandidates(t *testing.T) {
+	input := `Generated:
+![battle](/tmp/aisets battle.png)
+Saved file: /private/tmp/aisets-output.webp
+Existing asset path assets/sprite.png should be ignored.`
+	paths := canvasGeneratedImagePathCandidates(input)
+	if !reflect.DeepEqual(paths, []string{"/tmp/aisets battle.png", "/private/tmp/aisets-output.webp"}) {
+		t.Fatalf("paths = %#v", paths)
+	}
+
+	encoded := "file:///tmp/generated%20image.png"
+	paths = canvasGeneratedImagePathCandidates("Result: ![out](" + encoded + ")")
+	if !reflect.DeepEqual(paths, []string{"/tmp/generated image.png"}) {
+		t.Fatalf("encoded paths = %#v", paths)
 	}
 }
 
@@ -967,5 +1053,30 @@ func TestSplitParagraphs(t *testing.T) {
 	ps = splitParagraphs("")
 	if len(ps) != 0 {
 		t.Fatalf("empty string should give 0 paragraphs, got %d", len(ps))
+	}
+}
+
+func TestCanvasChatRequest_AttachmentTokens(t *testing.T) {
+	body := `{"messages":[],"canvas":{"cards":[]},"attachmentTokens":["tok1","tok2"]}`
+	var req canvasChatRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(req.AttachmentTokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d", len(req.AttachmentTokens))
+	}
+	if req.AttachmentTokens[0] != "tok1" || req.AttachmentTokens[1] != "tok2" {
+		t.Fatalf("unexpected tokens: %v", req.AttachmentTokens)
+	}
+}
+
+func TestCanvasChatRequest_NoAttachmentTokens(t *testing.T) {
+	body := `{"messages":[],"canvas":{"cards":[]}}`
+	var req canvasChatRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(req.AttachmentTokens) != 0 {
+		t.Fatalf("expected 0 tokens, got %d", len(req.AttachmentTokens))
 	}
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCaptureRequestFromFrames,
+  sessionThumbnailOutputScale,
   type CaptureFrame,
 } from "./useCanvasCapture";
 
@@ -52,5 +53,25 @@ describe("buildCaptureRequestFromFrames", () => {
         { assetId: "b", x: 274, y: 84, width: 100, height: 90 },
       ],
     });
+  });
+});
+
+describe("sessionThumbnailOutputScale", () => {
+  it("keeps session thumbnail encoding bounded for spread-out canvases", () => {
+    const scale = sessionThumbnailOutputScale({
+      x: 0,
+      y: 0,
+      width: 12000,
+      height: 8000,
+    });
+
+    expect(Math.ceil(12000 * scale)).toBeLessThanOrEqual(640);
+    expect(Math.ceil(8000 * scale)).toBeLessThanOrEqual(640);
+  });
+
+  it("does not upscale small session thumbnails beyond the default half scale", () => {
+    expect(
+      sessionThumbnailOutputScale({ x: 0, y: 0, width: 400, height: 320 }),
+    ).toBe(0.5);
   });
 });

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -95,11 +96,12 @@ type canvasChatOptions struct {
 }
 
 type canvasChatRequest struct {
-	Messages    []canvasChatMessage `json:"messages"`
-	Canvas      canvasSnapshot      `json:"canvas"`
-	Locale      string              `json:"locale"`
-	Options     canvasChatOptions   `json:"options"`
-	CanvasImage string              `json:"canvasImage,omitempty"`
+	Messages         []canvasChatMessage `json:"messages"`
+	Canvas           canvasSnapshot      `json:"canvas"`
+	Locale           string              `json:"locale"`
+	Options          canvasChatOptions   `json:"options"`
+	CanvasImage      string              `json:"canvasImage,omitempty"`
+	AttachmentTokens []string            `json:"attachmentTokens,omitempty"`
 }
 
 type canvasAction struct {
@@ -120,6 +122,8 @@ var kanaTextRe = regexp.MustCompile(`[ぁ-ゟ゠-ヿ]`)
 var hangulTextRe = regexp.MustCompile(`[가-힣]`)
 var filenameTokenRe = regexp.MustCompile(`(?i)([A-Za-z0-9][A-Za-z0-9_-]*)\.(png|jpe?g|webp|gif|svg|avif|heic)`)
 var assetStemTokenRe = regexp.MustCompile(`[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)+`)
+var markdownImagePathRe = regexp.MustCompile(`!\[[^\]]*\]\(([^)]+)\)`)
+var absoluteImagePathRe = regexp.MustCompile("(?i)(^|[\\s('\"`<])((?:file://)?/[^\\s'\"<>)]*\\.(?:png|jpe?g|webp|gif|svg|avif|heic|heif))")
 
 type canvasActionSpan struct {
 	start, end int
@@ -621,6 +625,14 @@ func canvasTextLooksLikeDeferredWork(text string) bool {
 		return false
 	}
 
+	if containsAnyText(text,
+		"imagegen", "image gen", "image generation", "generate image", "generated image",
+		"use the image", "use imagegen", "built-in", "skill", "tool",
+		"產出", "产出", "生成", "產生", "产生", "技能", "工具", "處理", "处理", "再產", "再产", "再做",
+	) {
+		return true
+	}
+
 	lineCount := 0
 	listLikeLines := 0
 	for _, line := range strings.Split(text, "\n") {
@@ -650,7 +662,44 @@ Required behavior:
 - Use canvas layout tools for visual board changes.
 - Use proposal tools for source-file or metadata changes.
 - Use capture tools for screenshot/export work.
+- If this is running inside Codex CLI and the work truly requires its built-in imagegen capability, use that capability now in this same response and return a concrete generated result. Do not merely say you will use imagegen later.
 - If the work needs multiple steps, start with the first concrete tool action and continue after tool results.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+func canvasUserWantsCanvasAction(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"安排", "排版", "分鏡", "分镜", "對戰", "对战", "戰鬥", "战斗", "操控",
+		"移動", "移动", "放到", "擺", "摆", "排列", "整理", "複製", "复制",
+		"鏡像", "镜像", "反轉", "反转", "翻轉", "翻转", "靚相",
+		"旋轉", "旋转", "轉", "转", "截圖", "截图", "匯出", "导出",
+		"arrange", "layout", "storyboard", "battle", "fight", "move", "position",
+		"duplicate", "copy", "mirror", "flip", "rotate", "capture", "export",
+	)
+}
+
+func canvasFocusOnlyRepairPrompt(latestUserMessage string) string {
+	if canvasUserWantsCanvasAction(latestUserMessage) {
+		return fmt.Sprintf(`Your previous response only moved the cursor with focus_card, but the user's request requires canvas work.
+Do NOT call focus_card again and do not answer with prose.
+Use the closest executable non-focus canvas tool action now, such as arrange_cards, duplicate_cards, move_card, resize_card, capture_* tools, or proposal tools like mirror_image/rotate_image when source image changes are requested.
+If this is running inside Codex CLI and the user is asking for newly generated artwork, use its built-in imagegen capability now. Do not only promise to use imagegen later.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+	}
+	return "Your previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
+}
+
+func canvasCaptureOnlyRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`Your previous response only captured the canvas, but the user's request requires canvas editing or multi-step composition work.
+Do NOT call capture_* again as the next action.
+Use the closest executable non-capture canvas tool action now, such as arrange_cards, duplicate_cards, move_card, resize_card, or proposal tools like mirror_image/rotate_image when source image changes are requested.
+If this is running inside Codex CLI and the user is asking for newly generated artwork, use its built-in imagegen capability now. Do not only promise to use imagegen later.
 
 Latest user request: %q
 
@@ -664,6 +713,7 @@ const (
 	canvasLoopReasonTextOnlyDeferredWork = "text_only_deferred_work"
 	canvasLoopReasonFocusOnlyNeedsAnswer = "focus_only_needs_answer"
 	canvasLoopReasonBlockedComment       = "blocked_comment"
+	canvasLoopReasonCaptureOnlyWork      = "capture_only_deferred_work"
 )
 
 type canvasNextLoopInput struct {
@@ -675,6 +725,7 @@ type canvasNextLoopInput struct {
 	TextOnlyDeferredWork      bool
 	FocusOnlyNeedsAnswer      bool
 	BlockedCommentNeedsAnswer bool
+	CaptureOnlyDeferredWork   bool
 }
 
 func canvasNextLoopReason(input canvasNextLoopInput) string {
@@ -686,6 +737,9 @@ func canvasNextLoopReason(input canvasNextLoopInput) string {
 	}
 	if input.MissingCapture {
 		return canvasLoopReasonMissingCapture
+	}
+	if input.CaptureOnlyDeferredWork {
+		return canvasLoopReasonCaptureOnlyWork
 	}
 	if input.TextOnlyDeferredWork {
 		return canvasLoopReasonTextOnlyDeferredWork
@@ -825,7 +879,9 @@ func canvasFollowupInstruction(reason string, latestUserMessage string) string {
 	case canvasLoopReasonTextOnlyDeferredWork:
 		return canvasActionRepairPrompt(latestUserMessage)
 	case canvasLoopReasonFocusOnlyNeedsAnswer:
-		return "Your previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
+		return canvasFocusOnlyRepairPrompt(latestUserMessage)
+	case canvasLoopReasonCaptureOnlyWork:
+		return canvasCaptureOnlyRepairPrompt(latestUserMessage)
 	case canvasLoopReasonBlockedComment:
 		return "Your previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
 	case canvasLoopReasonToolResults:
@@ -928,6 +984,64 @@ func compactCanvasCard(card canvasCardSnapshot) map[string]any {
 		out["uploadHeight"] = card.UploadHeight
 	}
 	return out
+}
+
+func canvasGeneratedImagePathCandidates(content string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		raw = strings.Trim(raw, "`\"'")
+		raw = strings.TrimPrefix(raw, "file://")
+		if raw == "" {
+			return
+		}
+		if decoded, err := url.PathUnescape(raw); err == nil {
+			raw = decoded
+		}
+		ext := strings.ToLower(filepath.Ext(raw))
+		switch ext {
+		case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".avif", ".heic", ".heif":
+		default:
+			return
+		}
+		if !filepath.IsAbs(raw) {
+			return
+		}
+		clean := filepath.Clean(raw)
+		if clean == "" || seen[clean] {
+			return
+		}
+		seen[clean] = true
+		out = append(out, clean)
+	}
+	for _, match := range markdownImagePathRe.FindAllStringSubmatch(content, -1) {
+		if len(match) >= 2 {
+			add(match[1])
+		}
+	}
+	for _, match := range absoluteImagePathRe.FindAllStringSubmatch(content, -1) {
+		if len(match) >= 3 {
+			add(match[2])
+		}
+	}
+	return out
+}
+
+func (s *Server) canvasGeneratedImagesFromContent(content string, seen map[string]bool) []canvasUploadResult {
+	var results []canvasUploadResult
+	for _, path := range canvasGeneratedImagePathCandidates(content) {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		result, err := s.processGeneratedCanvasImage(path)
+		if err != nil {
+			continue
+		}
+		results = append(results, result)
+	}
+	return results
 }
 
 func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
@@ -1447,6 +1561,23 @@ func canvasCaptureRequested(latestUserMessage string) bool {
 	)
 }
 
+func canvasFollowupShouldRetainImages(reason string, latestUserMessage string) bool {
+	if reason == canvasLoopReasonMissingCapture {
+		return true
+	}
+	if canvasUserWantsCanvasAction(latestUserMessage) && (reason == canvasLoopReasonFocusOnlyNeedsAnswer || reason == canvasLoopReasonTextOnlyDeferredWork || reason == canvasLoopReasonCaptureOnlyWork) {
+		return true
+	}
+	return containsAnyText(latestUserMessage,
+		"看圖", "看图", "看一下這張", "看一下这张", "看看這張", "看看这张",
+		"分析這張", "分析这张", "比較", "比较", "對比", "对比",
+		"辨識", "识别", "描述這張", "描述这张",
+		"畫面內容", "画面内容", "圖片內容", "图片内容", "影像內容", "图裡", "圖裡", "图中", "圖中",
+		"look at", "inspect", "compare", "analyze", "analyse", "describe",
+		"what is in", "what's in", "visual", "image quality", "quality issue",
+	)
+}
+
 func fallbackCanvasCaptureAction(latestUserMessage string, canvas canvasSnapshot) canvasAction {
 	tool := "capture_canvas"
 	if containsAnyText(latestUserMessage, "可見", "目前畫面", "viewport", "visible") {
@@ -1678,6 +1809,19 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 		images = append(images, vlmImage{Path: download.Path, Ext: filepath.Ext(download.Path)})
 	}
+	for _, token := range req.AttachmentTokens {
+		if len(images) >= 4 {
+			break
+		}
+		if token == "" {
+			continue
+		}
+		download, ok := s.peekImageToolDownload(token)
+		if !ok {
+			continue
+		}
+		images = append(images, vlmImage{Path: download.Path, Ext: filepath.Ext(download.Path)})
+	}
 
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -1705,6 +1849,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	promptKind := vlmPromptKindFull
 	loopReason := "initial"
 	var loopStats []vlmChatRoundStats
+	generatedImagePaths := map[string]bool{}
 	for loop := 0; loop < maxToolLoops; loop++ {
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
 			Images:       images,
@@ -1731,6 +1876,16 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		chatResp := round.Response
 		totalInputTokens += chatResp.InputTokens
 		totalOutputTokens += chatResp.OutputTokens
+		for _, image := range s.canvasGeneratedImagesFromContent(content, generatedImagePaths) {
+			sendNDJSON(w, map[string]any{
+				"type":             "generated_image",
+				"token":            image.Token,
+				"thumbnailDataUrl": image.ThumbnailDataURL,
+				"fileName":         image.FileName,
+				"width":            image.Width,
+				"height":           image.Height,
+			})
+		}
 
 		textBody, actions := parseCanvasActions(content)
 		if toolCallActions := canvasActionsFromToolCalls(chatResp.ToolCalls); len(toolCallActions) > 0 {
@@ -1750,6 +1905,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 		var compactToolResults []canvasCompactToolResult
 		captureExecutedThisLoop := false
+		nonCaptureToolExecutedThisLoop := false
 		nonFocusToolExecutedThisLoop := false
 		blockedCommentNeedsAnswer := false
 		for _, act := range actions {
@@ -1784,6 +1940,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					nonFocusToolExecutedThisLoop = true
 				}
 				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
+					nonCaptureToolExecutedThisLoop = true
 					compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
 				}
 			} else {
@@ -1809,6 +1966,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				if canvasToolSuppressesSameTurnText(act.Tool) {
 					nonFocusToolExecutedThisLoop = true
 				}
+				nonCaptureToolExecutedThisLoop = true
 			}
 			time.Sleep(150 * time.Millisecond)
 		}
@@ -1824,7 +1982,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if captureExecutedThisLoop && !truncatedAction {
+		captureOnlyDeferredWork := captureExecutedThisLoop && canvasUserWantsCanvasAction(latestUserMessage) && !nonCaptureToolExecutedThisLoop && loop < maxToolLoops-1
+		if captureExecutedThisLoop && !truncatedAction && !captureOnlyDeferredWork {
 			break
 		}
 		focusOnlyNeedsAnswer := canvasActionsOnlyFocus(actions) && textBody == "" && !actionRequestNeedsTool && loop < maxToolLoops-1
@@ -1837,11 +1996,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			TextOnlyDeferredWork:      actionRequestNeedsTool,
 			FocusOnlyNeedsAnswer:      focusOnlyNeedsAnswer,
 			BlockedCommentNeedsAnswer: blockedCommentNeedsAnswer,
+			CaptureOnlyDeferredWork:   captureOnlyDeferredWork,
 		})
 		if nextLoopReason == "" {
 			break
 		}
-		images = nil
+		if !canvasFollowupShouldRetainImages(nextLoopReason, latestUserMessage) {
+			images = nil
+		}
 		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, content)
 		promptKind = vlmPromptKindFollowup
 		loopReason = nextLoopReason

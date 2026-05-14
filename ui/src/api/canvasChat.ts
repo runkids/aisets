@@ -16,6 +16,14 @@ export type CanvasChatEvent =
       error?: string;
     }
   | {
+      type: "generated_image";
+      token: string;
+      thumbnailDataUrl: string;
+      fileName: string;
+      width: number;
+      height: number;
+    }
+  | {
       type: "proposal";
       id: string;
       tool: string;
@@ -151,6 +159,7 @@ export async function canvasChat(options: {
   locale: string;
   options?: CanvasChatOptions;
   canvasImage?: string;
+  attachmentTokens?: string[];
   onEvent?: (event: CanvasChatEvent) => void;
   signal?: AbortSignal;
 }): Promise<CanvasChatDone | null> {
@@ -160,6 +169,7 @@ export async function canvasChat(options: {
     locale: options.locale,
     options: options.options,
     canvasImage: options.canvasImage,
+    attachmentTokens: options.attachmentTokens,
   });
 
   const response = await fetch(`${basePath}/api/ai/canvas/chat`, {

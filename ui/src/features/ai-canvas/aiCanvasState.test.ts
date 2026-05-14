@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AssetItem } from "@/types";
 import {
   buildAssistantBullets,
+  cardIdsForBulkDeletion,
   cardIdsForDeletion,
   commentsForAssets,
   inferPromptIntent,
@@ -9,6 +10,7 @@ import {
   selectedAssetCards,
   type AssetCanvasCard,
   type CommentCanvasCard,
+  type UploadCanvasCard,
 } from "./aiCanvasState";
 
 function makeAsset(id: string): AssetItem {
@@ -86,6 +88,33 @@ describe("normalizeAICanvasSession", () => {
 
     expect(session.selectedCardIds).toEqual([asset.id]);
   });
+
+  it("preserves chat entries with only attachments", () => {
+    const session = normalizeAICanvasSession({
+      cards: [],
+      viewport: { x: 0, y: 0, scale: 1 },
+      chatHistory: [
+        { role: "user", content: "hello" },
+        {
+          role: "user",
+          content: "",
+          attachments: [
+            {
+              token: "abc",
+              thumbnailDataUrl: "data:image/png;base64,x",
+              fileName: "test.png",
+              width: 100,
+              height: 100,
+            },
+          ],
+        },
+        { role: "user", content: "" },
+      ],
+    });
+
+    expect(session.chatHistory).toHaveLength(2);
+    expect(session.chatHistory![1].attachments).toHaveLength(1);
+  });
 });
 
 describe("selectedAssetCards", () => {
@@ -142,6 +171,65 @@ describe("cardIdsForDeletion", () => {
     expect([...cardIdsForDeletion([asset, comment], comment.id)]).toEqual([
       comment.id,
     ]);
+  });
+
+  it("cascades comments when deleting an upload card", () => {
+    const upload: UploadCanvasCard = {
+      id: "upload-1",
+      kind: "upload",
+      x: 0,
+      y: 0,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      token: "tok-1",
+      thumbnailDataUrl: "",
+      fileName: "photo.png",
+      uploadWidth: 100,
+      uploadHeight: 100,
+    };
+    const comment: CommentCanvasCard = {
+      id: "comment-u1",
+      kind: "comment",
+      x: 10,
+      y: 10,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      anchorId: upload.id,
+      text: "Annotation",
+      region: { x: 0.1, y: 0.1, width: 0.3, height: 0.3 },
+    };
+    expect([...cardIdsForDeletion([upload, comment], upload.id)]).toEqual([
+      upload.id,
+      comment.id,
+    ]);
+  });
+});
+
+describe("cardIdsForBulkDeletion", () => {
+  it("collects cascade targets across multiple selected cards", () => {
+    const a1 = makeAssetCard("a1");
+    const a2 = makeAssetCard("a2");
+    const c1: CommentCanvasCard = {
+      id: "c1",
+      kind: "comment",
+      x: 0,
+      y: 0,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      anchorId: a1.id,
+      text: "Note",
+      region: { x: 0, y: 0, width: 0.5, height: 0.5 },
+    };
+    const c2: CommentCanvasCard = {
+      id: "c2",
+      kind: "comment",
+      x: 0,
+      y: 0,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      anchorId: a2.id,
+      text: "Note 2",
+      region: { x: 0, y: 0, width: 0.5, height: 0.5 },
+    };
+    const all = [a1, a2, c1, c2];
+    const result = cardIdsForBulkDeletion(all, [a1.id, a2.id]);
+    expect(result).toEqual(new Set([a1.id, a2.id, c1.id, c2.id]));
   });
 });
 

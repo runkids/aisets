@@ -38,6 +38,7 @@ import { useCanvasCapture } from "./useCanvasCapture";
 import {
   buildAssistantBullets,
   cardDisplayName,
+  cardIdsForBulkDeletion,
   cardIdsForDeletion,
   clampCanvasScale,
   DEFAULT_CANVAS_VIEWPORT,
@@ -51,8 +52,10 @@ import {
   type AICanvasSession,
   type AssetCanvasCard,
   type CanvasCard,
+  type ChatAttachment,
   type CommentCanvasCard,
   type ChatHistoryEntry,
+  type PendingAttachment,
   type ProposalCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
@@ -138,6 +141,9 @@ export function AICanvasView({
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [mentionedCardIds, setMentionedCardIds] = useState<string[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<
+    PendingAttachment[]
+  >([]);
   const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
@@ -535,6 +541,8 @@ export function AICanvasView({
     setWorking,
     setPrompt,
     setMentionedCardIds,
+    pendingAttachments,
+    setPendingAttachments,
   });
   const isWorking = working !== "idle";
   const composerToolsOpen = composerAdvancedOpen;
@@ -823,9 +831,9 @@ export function AICanvasView({
       document.removeEventListener("keydown", onKeyDown, { capture: true });
   }, []);
 
-  const uploadRef = useRef<(files: File[]) => void>(handleUploadAndCreateCards);
+  const uploadRef = useRef<(files: File[]) => void>(handleUploadToComposer);
   useEffect(() => {
-    uploadRef.current = handleUploadAndCreateCards;
+    uploadRef.current = handleUploadToComposer;
   });
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
@@ -859,6 +867,15 @@ export function AICanvasView({
       setSelectedCardIds((current) =>
         current.filter((id) => !removedIds.has(id)),
       );
+    },
+    [cards],
+  );
+
+  const deleteSelectedCards = useCallback(
+    (ids: string[]) => {
+      const removedIds = cardIdsForBulkDeletion(cards, ids);
+      setCards((current) => current.filter((c) => !removedIds.has(c.id)));
+      setSelectedCardIds([]);
     },
     [cards],
   );
@@ -906,7 +923,7 @@ export function AICanvasView({
         const result = await semanticSearch({
           q,
           includeItems: true,
-          limit: 18,
+          limit: 200,
         });
         const items = result.results
           .map((r) => r.item)
@@ -914,7 +931,7 @@ export function AICanvasView({
         setSearchResults(items);
         setSearchTotal(result.results.length);
       } else {
-        const page = await getCatalogItems({ scanId: scanId!, q, limit: 18 });
+        const page = await getCatalogItems({ scanId: scanId!, q, limit: 200 });
         setSearchResults(page.items);
         setSearchTotal(page.total);
       }
@@ -1314,27 +1331,20 @@ export function AICanvasView({
     appendPromptToken("@" + t("aiCanvas.selectedMention"));
   }
 
-  async function handleUploadAndCreateCards(files: File[]) {
+  async function handleUploadToComposer(files: File[]) {
     setWorking("ai");
     try {
       const results = await uploadCanvasImages(files);
-      const rect = rootRef.current?.getBoundingClientRect();
-      const containerSize = rect
-        ? { width: rect.width, height: rect.height }
-        : undefined;
-      const newCards: UploadCanvasCard[] = results.map((r, i) => ({
-        id: createCanvasCardId("upload"),
-        kind: "upload" as const,
-        ...nextCardPosition(cards.length + i, viewport, containerSize),
-        createdAt: nowISO(),
+      const attachments: PendingAttachment[] = results.map((r) => ({
+        id: createCanvasCardId("attach"),
         token: r.token,
         thumbnailDataUrl: r.thumbnailDataUrl,
         fileName: r.fileName,
-        uploadWidth: r.width,
-        uploadHeight: r.height,
+        width: r.width,
+        height: r.height,
       }));
-      setCards((prev) => [...prev, ...newCards]);
-      if (newCards.length > 0) setSelectedCardIds([newCards[0].id]);
+      setPendingAttachments((prev) => [...prev, ...attachments]);
+      setComposerCollapsed(false);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("aiCanvas.operationError"),
@@ -1344,6 +1354,29 @@ export function AICanvasView({
     }
   }
 
+  const handlePlaceOnCanvas = useCallback(
+    (att: ChatAttachment) => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      const containerSize = rect
+        ? { width: rect.width, height: rect.height }
+        : undefined;
+      const card: UploadCanvasCard = {
+        id: createCanvasCardId("upload"),
+        kind: "upload",
+        ...nextCardPosition(cards.length, viewport, containerSize),
+        createdAt: nowISO(),
+        token: att.token,
+        thumbnailDataUrl: att.thumbnailDataUrl,
+        fileName: att.fileName,
+        uploadWidth: att.width,
+        uploadHeight: att.height,
+      };
+      setCards((prev) => [...prev, card]);
+      setSelectedCardIds([card.id]);
+    },
+    [cards.length, viewport],
+  );
+
   function handleAttachImage() {
     const input = document.createElement("input");
     input.type = "file";
@@ -1351,7 +1384,7 @@ export function AICanvasView({
     input.multiple = true;
     input.onchange = () => {
       const files = Array.from(input.files ?? []);
-      if (files.length > 0) handleUploadAndCreateCards(files);
+      if (files.length > 0) handleUploadToComposer(files);
     };
     input.click();
   }
@@ -1400,6 +1433,7 @@ export function AICanvasView({
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onDeleteCard={deleteCard}
+        onDeleteSelectedCards={deleteSelectedCards}
         onDuplicateCard={duplicateCard}
         onRegisterCard={registerMeasuredCardElement}
         onAddComment={addComment}
@@ -1429,6 +1463,25 @@ export function AICanvasView({
         runSearch={runSearch}
         addAsset={addAsset}
       />
+
+      <a
+        href="https://github.com/runkids/aisets"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="pointer-events-auto absolute left-3 top-3 z-50 flex h-[44px] items-center gap-2.5 rounded-g-lg bg-g-surface/75 px-3 shadow-g-pop backdrop-blur-xl transition-opacity duration-[120ms] ease-g hover:opacity-70 focus-visible:outline-none focus-visible:shadow-g-focus"
+        aria-label="Aisets on GitHub"
+      >
+        <div className="grid size-g-btn-sm shrink-0 place-items-center overflow-hidden rounded-[7px] bg-black">
+          <img
+            className="block size-full"
+            src="../../public/brand/aisets-app-icon.avif"
+            alt=""
+          />
+        </div>
+        <span className="font-g-display text-[15px] font-[620] leading-g-btn-sm tracking-[-0.02em] text-g-ink">
+          Aisets
+        </span>
+      </a>
 
       <AICanvasToolbar
         t={t}
@@ -1561,6 +1614,9 @@ export function AICanvasView({
         onAiBackendChange={onAiBackendChange}
         groupedBackendOptions={groupedBackendOptions}
         clearChatHistory={clearChatHistory}
+        pendingAttachments={pendingAttachments}
+        setPendingAttachments={setPendingAttachments}
+        handlePlaceOnCanvas={handlePlaceOnCanvas}
       />
 
       {capturePreview && (

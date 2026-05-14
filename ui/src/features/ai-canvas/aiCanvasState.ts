@@ -111,10 +111,21 @@ export type ChatMentionPreview = {
   src?: string;
 };
 
+export type ChatAttachment = {
+  token: string;
+  thumbnailDataUrl: string;
+  fileName: string;
+  width: number;
+  height: number;
+};
+
+export type PendingAttachment = ChatAttachment & { id: string };
+
 export type ChatHistoryEntry = {
   role: string;
   content: string;
   mentions?: ChatMentionPreview[];
+  attachments?: ChatAttachment[];
 };
 
 export type AICanvasSession = {
@@ -399,7 +410,12 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
               ? sanitizeCanvasChatContent(entry.content)
               : entry.content,
         }))
-        .filter((entry) => entry.content || entry.mentions?.length)
+        .filter(
+          (entry) =>
+            entry.content ||
+            entry.mentions?.length ||
+            entry.attachments?.length,
+        )
         .slice(-10)
     : [];
 
@@ -486,14 +502,27 @@ export function commentsForAssets(cards: CanvasCard[], assetCardIds: string[]) {
 export function cardIdsForDeletion(cards: CanvasCard[], targetId: string) {
   const target = cards.find((card) => card.id === targetId);
   const ids = new Set<string>(target ? [target.id] : []);
-  if (target?.kind === "asset") {
-    cards.forEach((card) => {
+  if (target?.kind === "asset" || target?.kind === "upload") {
+    for (const card of cards) {
       if (card.kind === "comment" && card.anchorId === target.id) {
         ids.add(card.id);
       }
-    });
+    }
   }
   return ids;
+}
+
+export function cardIdsForBulkDeletion(
+  cards: CanvasCard[],
+  targetIds: string[],
+) {
+  const all = new Set<string>();
+  for (const id of targetIds) {
+    for (const rid of cardIdsForDeletion(cards, id)) {
+      all.add(rid);
+    }
+  }
+  return all;
 }
 
 export function cardDisplayName(card: CanvasCard) {

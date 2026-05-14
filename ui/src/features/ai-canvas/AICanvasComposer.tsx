@@ -6,6 +6,7 @@ import {
   ChevronDown,
   LoaderCircle,
   MessageCircle,
+  Layers,
   Paperclip,
   Plus,
   ScanText,
@@ -29,7 +30,9 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
+  type ChatAttachment,
   type ChatHistoryEntry,
+  type PendingAttachment,
   type ProposalCanvasCard,
 } from "./aiCanvasState";
 import {
@@ -104,6 +107,9 @@ type AICanvasComposerProps = {
   onAiBackendChange?: (value: string) => void;
   groupedBackendOptions: GroupedBackendOptions;
   clearChatHistory: () => void;
+  pendingAttachments: PendingAttachment[];
+  setPendingAttachments: StateSetter<PendingAttachment[]>;
+  handlePlaceOnCanvas: (att: ChatAttachment) => void;
 };
 
 export function AICanvasComposer({
@@ -153,6 +159,9 @@ export function AICanvasComposer({
   onAiBackendChange,
   groupedBackendOptions,
   clearChatHistory,
+  pendingAttachments,
+  setPendingAttachments,
+  handlePlaceOnCanvas,
 }: AICanvasComposerProps) {
   const composerDragRef = useRef<{ startY: number; startH: number } | null>(
     null,
@@ -334,9 +343,43 @@ export function AICanvasComposer({
                           ))}
                         </div>
                       )}
-                      <div className="whitespace-pre-wrap">
-                        {renderMarkdown(entry.content)}
-                      </div>
+                      {entry.attachments && entry.attachments.length > 0 && (
+                        <div className="mb-1.5 flex flex-wrap gap-2">
+                          {entry.attachments.map((att, attIdx) => (
+                            <div
+                              key={att.token || attIdx}
+                              className="rounded-[12px] border border-white/[0.08] bg-black/[0.16] p-1"
+                            >
+                              <img
+                                src={att.thumbnailDataUrl}
+                                alt={att.fileName}
+                                className="max-h-32 max-w-[200px] rounded-[10px] object-contain"
+                                draggable={false}
+                              />
+                              <div className="mt-1 flex items-center gap-1 px-0.5">
+                                <span className="min-w-0 flex-1 truncate text-[10px] text-white/50">
+                                  {att.fileName}
+                                </span>
+                                {isUser && (
+                                  <button
+                                    type="button"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-[510] text-white/60 transition-colors hover:bg-white/[0.1] hover:text-white"
+                                    onClick={() => handlePlaceOnCanvas(att)}
+                                  >
+                                    <Layers size={10} />
+                                    {t("aiCanvas.placeOnCanvas")}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {entry.content && (
+                        <div className="whitespace-pre-wrap">
+                          {renderMarkdown(entry.content)}
+                        </div>
+                      )}
                       {!isUser && (
                         <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
                           <CopyButton
@@ -526,6 +569,38 @@ export function AICanvasComposer({
                     }
                   >
                     <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {pendingAttachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2 px-1">
+              {pendingAttachments.map((att) => (
+                <span
+                  key={att.id}
+                  className="relative inline-flex flex-col items-center rounded-[14px] border border-white/[0.08] bg-white/[0.07] p-1"
+                >
+                  <img
+                    src={att.thumbnailDataUrl}
+                    alt={att.fileName}
+                    className="max-h-20 max-w-[120px] rounded-[10px] object-contain"
+                    draggable={false}
+                  />
+                  <span className="mt-0.5 max-w-[120px] truncate px-1 text-[10px] text-white/58">
+                    {att.fileName}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={t("aiCanvas.removeAttachment")}
+                    className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-white/[0.12] text-white/60 hover:bg-white/[0.2] hover:text-white"
+                    onClick={() =>
+                      setPendingAttachments((prev) =>
+                        prev.filter((a) => a.id !== att.id),
+                      )
+                    }
+                  >
+                    <X size={10} />
                   </button>
                 </span>
               ))}
@@ -906,7 +981,9 @@ export function AICanvasComposer({
               <button
                 type="button"
                 aria-label={t("aiCanvas.ask")}
-                disabled={prompt.trim() === ""}
+                disabled={
+                  prompt.trim() === "" && pendingAttachments.length === 0
+                }
                 className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.82] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                 onClick={() => void handleAsk()}
               >

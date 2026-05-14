@@ -75,6 +75,49 @@ func TestCanvasUploadPersistsAcrossServerInstances(t *testing.T) {
 	}
 }
 
+func TestProcessGeneratedCanvasImageRegistersUploadCardSource(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+
+	imagePath := filepath.Join(root, "codex-output.png")
+	writePNG(t, imagePath)
+
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := s.processGeneratedCanvasImage(imagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Token == "" || result.FileName != "codex-output.png" {
+		t.Fatalf("generated image result = %#v", result)
+	}
+	if result.Width != 8 || result.Height != 8 {
+		t.Fatalf("generated image size = %dx%d", result.Width, result.Height)
+	}
+	if result.ThumbnailDataURL == "" {
+		t.Fatal("generated image should include a thumbnail")
+	}
+	download, ok := s.peekImageToolDownload(result.Token)
+	if !ok {
+		t.Fatal("generated image should be registered as a download")
+	}
+	if !download.Persistent {
+		t.Fatal("generated image should persist as a canvas upload")
+	}
+	if download.Path == imagePath {
+		t.Fatal("generated image should be copied into canvas upload storage")
+	}
+}
+
 func newMultipartCanvasUploadRequest(t *testing.T, filename, path string) *http.Request {
 	t.Helper()
 	var body bytes.Buffer

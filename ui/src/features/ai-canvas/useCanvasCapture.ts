@@ -52,6 +52,7 @@ type RenderFrame = FrameGeometry & { img: HTMLImageElement };
 const CAPTURE_PADDING = 24;
 const IMAGE_FALLBACK_PADDING = 12;
 const AUTO_DISMISS_MS = 15000;
+const SESSION_THUMBNAIL_MAX_PX = 640;
 
 function px(value: string | undefined, fallback = 0) {
   const parsed = Number.parseFloat(value ?? "");
@@ -212,6 +213,15 @@ function captureCropForFrames(frames: FrameGeometry[]): CaptureCrop | null {
       return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     }, null) ?? null
   );
+}
+
+export function sessionThumbnailOutputScale(
+  crop: CaptureCrop,
+  maxDimension = SESSION_THUMBNAIL_MAX_PX,
+) {
+  const largestSide = Math.max(crop.width, crop.height);
+  if (largestSide <= 0) return 0.5;
+  return Math.min(0.5, maxDimension / largestSide);
 }
 
 function drawCanvasBackground(
@@ -473,7 +483,13 @@ export function useCanvasCapture(opts: CaptureOpts) {
     if (frames.length === 0) return undefined;
     const crop = captureCropForFrames(frames);
     if (!crop) return undefined;
-    return captureRenderedFrames(root, frames, crop, 0.5, false);
+    return captureRenderedFrames(
+      root,
+      frames,
+      crop,
+      sessionThumbnailOutputScale(crop),
+      false,
+    );
   }, [rootRef, cards, cardElementsRef, viewport]);
 
   return {

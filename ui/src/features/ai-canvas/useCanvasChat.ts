@@ -22,6 +22,7 @@ import {
   type ChatHistoryEntry,
   type ChatMentionPreview,
   type CommentCanvasCard,
+  type PendingAttachment,
   type ProposalCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
@@ -247,6 +248,8 @@ export function useCanvasChat(opts: {
   setWorking: Dispatch<SetStateAction<WorkingState>>;
   setPrompt: Dispatch<SetStateAction<string>>;
   setMentionedCardIds: Dispatch<SetStateAction<string[]>>;
+  pendingAttachments: PendingAttachment[];
+  setPendingAttachments: Dispatch<SetStateAction<PendingAttachment[]>>;
 }) {
   const {
     scanId,
@@ -276,6 +279,8 @@ export function useCanvasChat(opts: {
     setWorking,
     setPrompt,
     setMentionedCardIds,
+    pendingAttachments,
+    setPendingAttachments,
   } = opts;
 
   const abortRef = useRef<AbortController | null>(null);
@@ -297,7 +302,8 @@ export function useCanvasChat(opts: {
   }) {
     if (abortRef.current) return;
     const promptText = (overrides?.prompt ?? prompt).trim();
-    if (!promptText) return;
+    const sentAttachments = pendingAttachments;
+    if (!promptText && sentAttachments.length === 0) return;
     const canvasCards = overrides?.cards ?? cards;
     const canvasSelectedCardIds = (
       overrides?.selectedCardId ? [overrides.selectedCardId] : selectedCardIds
@@ -310,6 +316,7 @@ export function useCanvasChat(opts: {
     searchResultsRef.current = [];
     setPrompt("");
     setMentionedCardIds([]);
+    setPendingAttachments([]);
     setError("");
     setWorking("ai");
 
@@ -360,6 +367,7 @@ export function useCanvasChat(opts: {
         role: "user",
         content: promptText,
         mentions: chatMentions.length > 0 ? chatMentions : undefined,
+        attachments: sentAttachments.length > 0 ? sentAttachments : undefined,
       },
     ]);
 
@@ -511,6 +519,50 @@ export function useCanvasChat(opts: {
         if (tool === "capture_canvas") void captureCanvas(transparent);
         if (tool === "capture_selected") void captureSelected(transparent);
       }, delay);
+    }
+
+    function addGeneratedImageCard(
+      event: Extract<CanvasChatEvent, { type: "generated_image" }>,
+    ) {
+      if (!event.token || !event.thumbnailDataUrl) return;
+      const anchor =
+        canvasCards.find((card) => card.id === canvasPrimarySelectedId) ??
+        canvasCards.at(-1);
+      const rect = rootRef.current?.getBoundingClientRect();
+      const containerSize = rect
+        ? { width: rect.width, height: rect.height }
+        : undefined;
+      const position = anchor
+        ? adjacentCardPosition(anchor, cardLayoutMetrics, {
+            index: newCards.length,
+            verticalStep: 112,
+          })
+        : nextCardPosition(
+            canvasCards.length + newCards.length,
+            viewport,
+            containerSize,
+          );
+      const card: UploadCanvasCard = {
+        id: createCanvasCardId("upload"),
+        kind: "upload",
+        x: position.x,
+        y: position.y,
+        createdAt: nowISO(),
+        token: event.token,
+        thumbnailDataUrl: event.thumbnailDataUrl,
+        fileName: event.fileName,
+        uploadWidth: event.width,
+        uploadHeight: event.height,
+      };
+      newCards.push(card);
+      setCards((current) => [...current, card]);
+      setSelectedCardIds([card.id]);
+      setAiCursor({
+        ...focusCursorPosition(card, cardLayoutMetrics, viewport.scale),
+        label: event.fileName,
+        emoji: "image",
+        status: "acting",
+      });
     }
 
     function duplicateCardsFromResult(result: unknown) {
@@ -739,6 +791,9 @@ export function useCanvasChat(opts: {
         };
         newCards.push(card);
         setCards((current) => [...current, card]);
+      }
+      if (event.type === "generated_image") {
+        addGeneratedImageCard(event);
       }
       if (event.type === "action_result" && event.tool === "select_cards") {
         const result = event.result as { cardIds?: unknown; label?: string };
@@ -1034,6 +1089,10 @@ export function useCanvasChat(opts: {
         locale,
         options: { imageOptimizationAdvice },
         canvasImage,
+        attachmentTokens:
+          sentAttachments.length > 0
+            ? sentAttachments.map((a) => a.token)
+            : undefined,
         onEvent: handleEvent,
         signal: abort.signal,
       });

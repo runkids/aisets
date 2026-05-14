@@ -132,6 +132,8 @@
     "mentionCanvasImage": "캔버스 이미지 멘션",
     "noMentionImages": "캔버스에 아직 이미지가 없습니다.",
     "removeMention": "멘션 제거",
+    "removeAttachment": "첨부 제거",
+    "placeOnCanvas": "캔버스에 배치",
     "attachImage": "이미지 첨부",
     "extractText": "이미지 텍스트 추출",
     "extractTextDisabled": "먼저 catalog 이미지를 선택하거나 멘션하세요.",

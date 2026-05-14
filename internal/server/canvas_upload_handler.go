@@ -105,6 +105,69 @@ func (s *Server) processCanvasUpload(header *multipart.FileHeader) (canvasUpload
 	}, nil
 }
 
+func (s *Server) processGeneratedCanvasImage(sourcePath string) (canvasUploadResult, error) {
+	sourcePath = strings.TrimPrefix(strings.TrimSpace(sourcePath), "file://")
+	if sourcePath == "" {
+		return canvasUploadResult{}, os.ErrNotExist
+	}
+	sourcePath = filepath.Clean(sourcePath)
+	src, err := os.Open(sourcePath)
+	if err != nil {
+		return canvasUploadResult{}, err
+	}
+	defer src.Close()
+	info, err := src.Stat()
+	if err != nil {
+		return canvasUploadResult{}, err
+	}
+	if info.IsDir() {
+		return canvasUploadResult{}, os.ErrInvalid
+	}
+
+	name := filepath.Base(sourcePath)
+	ext := strings.ToLower(filepath.Ext(name))
+	if ext == "" {
+		ext = ".png"
+		name += ext
+	}
+	token := imageToolToken("canvas-generated:" + sourcePath)
+	dir := persistentCanvasUploadDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return canvasUploadResult{}, err
+	}
+	uploadPath := filepath.Join(dir, token+ext)
+	dst, err := os.OpenFile(uploadPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return canvasUploadResult{}, err
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		os.Remove(uploadPath)
+		return canvasUploadResult{}, err
+	}
+	if err := dst.Close(); err != nil {
+		os.Remove(uploadPath)
+		return canvasUploadResult{}, err
+	}
+
+	meta, _ := imageproc.Probe(uploadPath)
+	thumbnail := generatePreCheckThumbnail(uploadPath, "")
+	s.storeImageToolDownload(token, imageToolDownload{
+		Path:        uploadPath,
+		Name:        name,
+		ContentType: contentTypeForName(name),
+		Persistent:  true,
+		CreatedAt:   time.Now(),
+	})
+	return canvasUploadResult{
+		Token:            token,
+		ThumbnailDataURL: thumbnail,
+		FileName:         name,
+		Width:            meta.Width,
+		Height:           meta.Height,
+	}, nil
+}
+
 func persistentCanvasUploadDir() string {
 	return filepath.Join(config.DataDir(), "canvas-uploads")
 }

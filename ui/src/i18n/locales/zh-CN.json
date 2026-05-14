@@ -132,6 +132,8 @@
     "mentionCanvasImage": "提及画布图片",
     "noMentionImages": "画布上还没有图片。",
     "removeMention": "移除提及",
+    "removeAttachment": "移除附件",
+    "placeOnCanvas": "放到画布",
     "attachImage": "附加图片",
     "extractText": "提取图片文字",
     "extractTextDisabled": "请先选择或提及一张 catalog 图片。",

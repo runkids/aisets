@@ -132,6 +132,8 @@
     "mentionCanvasImage": "キャンバス画像をメンション",
     "noMentionImages": "キャンバス上に画像はまだありません。",
     "removeMention": "メンションを削除",
+    "removeAttachment": "添付を削除",
+    "placeOnCanvas": "キャンバスに配置",
     "attachImage": "画像を添付",
     "extractText": "画像テキストを抽出",
     "extractTextDisabled": "先に catalog 画像を選択またはメンションしてください。",
