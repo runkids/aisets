@@ -6,6 +6,7 @@ import type {
   AssetCanvasCard,
   CanvasCard,
   CommentCanvasCard,
+  UploadCanvasCard,
 } from "./aiCanvasState";
 
 export type CanvasSelection = {
@@ -16,6 +17,7 @@ export type CanvasSelection = {
 };
 
 export const CARD_WIDTH = 320;
+export const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
 const CANVAS_WHEEL_ZOOM_CURVE = 240;
 const CANVAS_WHEEL_ZOOM_MIN_FACTOR = 0.82;
 const CANVAS_WHEEL_ZOOM_MAX_FACTOR = 1.22;
@@ -195,6 +197,10 @@ export function selectedAssetIds(cards: AssetCanvasCard[]) {
   return cards.map((card) => card.asset.id);
 }
 
+export const AI_MENTION_TAG = "@aisets";
+export const AI_MENTION_COMMENT_RE = /(^|\s)@aisets(?=\s|$|[,.，。!?！？])/i;
+export const AI_MENTION_COMMENT_RE_G = /(^|\s)@aisets(?=\s|$|[,.，。!?！？])/gi;
+
 export function commentIds(cards: CommentCanvasCard[]) {
   return cards.map((card) => card.id);
 }
@@ -256,11 +262,27 @@ export function intersects(
   );
 }
 
+export function isImageCard(
+  card: CanvasCard,
+): card is AssetCanvasCard | UploadCanvasCard {
+  return card.kind === "asset" || card.kind === "upload";
+}
+
+export function compactImageAspectRatio(card: CanvasCard) {
+  if (card.kind !== "upload") return DEFAULT_IMAGE_ASPECT_RATIO;
+  if (card.uploadWidth <= 0 || card.uploadHeight <= 0) {
+    return DEFAULT_IMAGE_ASPECT_RATIO;
+  }
+  return card.uploadWidth / card.uploadHeight;
+}
+
 export function cardTone(card: CanvasCard) {
   if (card.kind === "asset") return "border-g-line";
-  if (card.kind === "comment") return "border-g-amber/50";
+  if (card.kind === "comment")
+    return card.isAi ? "border-g-purple/50" : "border-g-amber/50";
   if (card.kind === "assistant") return "border-g-line-strong";
   if (card.kind === "variant") return "border-g-blue/50";
+  if (card.kind === "upload") return "border-g-purple/50";
   return "border-g-green/50";
 }
 

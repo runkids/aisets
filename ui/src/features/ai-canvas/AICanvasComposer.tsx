@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   LoaderCircle,
+  MessageCircle,
   Paperclip,
   Plus,
   Square,
@@ -65,7 +66,9 @@ type AICanvasComposerProps = {
   imageOptimizationAdvice: boolean;
   setImageOptimizationAdvice: StateSetter<boolean>;
   mentionSelectedAsset: () => void;
-  noteUploadPending: () => void;
+  handleAttachImage: () => void;
+  commentMode: boolean;
+  setCommentMode: StateSetter<boolean>;
   addAssistantCard: (promptText: string, message?: string) => void;
   selectedProposal?: ProposalCanvasCard;
   pendingProposals: ProposalCanvasCard[];
@@ -106,7 +109,9 @@ export function AICanvasComposer({
   imageOptimizationAdvice,
   setImageOptimizationAdvice,
   mentionSelectedAsset,
-  noteUploadPending,
+  handleAttachImage,
+  commentMode,
+  setCommentMode,
   addAssistantCard,
   selectedProposal,
   pendingProposals,
@@ -359,7 +364,7 @@ export function AICanvasComposer({
                     variant="chip"
                     leadingIcon={<Paperclip />}
                     className={composerActionClass}
-                    onClick={noteUploadPending}
+                    onClick={handleAttachImage}
                   >
                     {t("aiCanvas.attachImage")}
                   </Button>
@@ -502,7 +507,7 @@ export function AICanvasComposer({
                   className="z-[80] min-w-[220px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
                 >
                   <DropdownMenuPrimitive.Item
-                    onSelect={noteUploadPending}
+                    onSelect={handleAttachImage}
                     className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
                   >
                     <Paperclip size={14} className="shrink-0 text-white/54" />
@@ -540,6 +545,25 @@ export function AICanvasComposer({
                 </DropdownMenuPrimitive.Content>
               </DropdownMenuPrimitive.Portal>
             </DropdownMenuPrimitive.Root>
+            <IconButton
+              size="sm"
+              aria-label={t("aiCanvas.attachImage")}
+              className={composerIconClass}
+              onClick={handleAttachImage}
+            >
+              <Paperclip />
+            </IconButton>
+            <IconButton
+              size="sm"
+              aria-label={t("aiCanvas.commentMode")}
+              className={cn(
+                composerIconClass,
+                commentMode && "!bg-white/[0.15] !text-white",
+              )}
+              onClick={() => setCommentMode((v) => !v)}
+            >
+              <MessageCircle />
+            </IconButton>
             <DropdownMenuPrimitive.Root>
               <DropdownMenuPrimitive.Trigger asChild>
                 <IconButton

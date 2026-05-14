@@ -40,7 +40,7 @@ function isScreenStableCard(card: CanvasCard) {
   );
 }
 
-function focusCursorPosition(
+export function focusCursorPosition(
   card: CanvasCard,
   metrics: CanvasCardLayoutMetrics,
   viewportScale: number,
@@ -48,11 +48,12 @@ function focusCursorPosition(
   const stableScale =
     isScreenStableCard(card) && viewportScale > 0 ? 1 / viewportScale : 1;
   const width = metrics[card.id]?.width ?? CARD_WIDTH * stableScale;
+  const height = metrics[card.id]?.height ?? 240 * stableScale;
   const pointerXOffset = viewportScale > 0 ? 6 / viewportScale : 6;
   const pointerYOffset = viewportScale > 0 ? 8 / viewportScale : 8;
   return {
     x: card.x + width / 2 - pointerXOffset,
-    y: card.y - pointerYOffset,
+    y: card.y + height / 2 - pointerYOffset,
   };
 }
 
@@ -487,6 +488,7 @@ export function useCanvasChat(opts: {
             anchorId: r.anchorCardId,
             text: r.text,
             region: r.region ?? { x: 0, y: 0, width: 1, height: 1 },
+            isAi: true,
           };
           newCards.push(card);
           setCards((current) => [...current, card]);

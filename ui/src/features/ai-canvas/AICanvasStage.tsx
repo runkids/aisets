@@ -13,10 +13,12 @@ import {
   CommentCardBody,
   OperationCardBody,
   ProposalCardBody,
+  UploadCardBody,
   VariantCardBody,
 } from "./canvasCards";
 import {
   CARD_WIDTH,
+  isImageCard,
   selectionBounds,
   type CanvasSelection,
 } from "./canvasUtils";
@@ -75,7 +77,7 @@ type AICanvasStageProps = {
   onDeleteCard: (target: CanvasCard) => void;
   onRegisterCard: (cardId: string, node: HTMLElement | null) => void;
   onAddComment: (
-    assetCard: AssetCanvasCard,
+    anchorCard: CanvasCard,
     text?: string,
     region?: { x: number; y: number; width: number; height: number },
   ) => void;
@@ -188,13 +190,13 @@ export function AICanvasStage({
             </svg>
           )}
           {cards.map((card) => {
-            if (hideCards && card.kind !== "asset") return null;
+            if (hideCards && !isImageCard(card)) return null;
             return (
               <CardShell
                 key={card.id}
                 card={card}
                 selected={selectedCardIds.includes(card.id)}
-                compact={compactCards && card.kind === "asset"}
+                compact={compactCards && isImageCard(card)}
                 width={cardWidths[card.id]}
                 canvasScale={viewport.scale}
                 onSelect={(id, shiftKey) => {
@@ -218,7 +220,7 @@ export function AICanvasStage({
                 onDragEnd={onDragEnd}
                 onDelete={onDeleteCard}
                 onResize={
-                  card.kind === "asset"
+                  isImageCard(card)
                     ? (id, w) => {
                         if (
                           selectedCardIds.length > 1 &&
@@ -231,11 +233,8 @@ export function AICanvasStage({
                             for (const peerId of selectedCardIds) {
                               if (peerId === id) continue;
                               next[peerId] = Math.max(
-                                200,
-                                Math.min(
-                                  800,
-                                  (prev[peerId] ?? CARD_WIDTH) * ratio,
-                                ),
+                                80,
+                                (prev[peerId] ?? CARD_WIDTH) * ratio,
                               );
                             }
                             return next;
@@ -285,6 +284,16 @@ export function AICanvasStage({
                   <ProposalCardBody card={card} />
                 ) : card.kind === "operation" ? (
                   <OperationCardBody card={card} />
+                ) : card.kind === "upload" ? (
+                  <UploadCardBody
+                    card={card}
+                    comments={commentsByAnchor.get(card.id) ?? []}
+                    compact={compactCards && card.kind === "upload"}
+                    commentEnabled={commentMode}
+                    canvasScale={viewport.scale}
+                    onSelectComment={(id) => setSelectedCardIds([id])}
+                    onCreateComment={onAddComment}
+                  />
                 ) : null}
               </CardShell>
             );

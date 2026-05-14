@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -62,6 +63,10 @@ type canvasCardSnapshot struct {
 	OutputBytes    int64                `json:"outputBytes,omitempty"`
 	InputFormat    string               `json:"inputFormat,omitempty"`
 	OutputFormat   string               `json:"outputFormat,omitempty"`
+	UploadToken    string               `json:"uploadToken,omitempty"`
+	UploadFileName string               `json:"uploadFileName,omitempty"`
+	UploadWidth    int                  `json:"uploadWidth,omitempty"`
+	UploadHeight   int                  `json:"uploadHeight,omitempty"`
 }
 
 type canvasViewport struct {
@@ -442,6 +447,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 		if card.Kind == "proposal" {
 			fmt.Fprintf(&b, " tool=%s status=%s", card.Tool, card.ProposalStatus)
 		}
+		if card.Kind == "upload" {
+			fmt.Fprintf(&b, " file=%s %dx%d", card.UploadFileName, card.UploadWidth, card.UploadHeight)
+		}
 		b.WriteByte('\n')
 	}
 
@@ -805,6 +813,29 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if len(images) >= 4 {
 			break
 		}
+	}
+	for _, card := range req.Canvas.Cards {
+		if len(images) >= 4 {
+			break
+		}
+		if card.Kind != "upload" || card.UploadToken == "" {
+			continue
+		}
+		selected := false
+		for _, sid := range req.Canvas.SelectedCardIDs {
+			if sid == card.ID {
+				selected = true
+				break
+			}
+		}
+		if !selected {
+			continue
+		}
+		download, ok := s.peekImageToolDownload(card.UploadToken)
+		if !ok {
+			continue
+		}
+		images = append(images, vlmImage{Path: download.Path, Ext: filepath.Ext(download.Path)})
 	}
 
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")

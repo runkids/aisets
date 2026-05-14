@@ -26,6 +26,7 @@ All stack-specific rules and conventions live in `.skillshare/extras/rules/` and
 | `react-ui-components.md` | UI primitives, layout patterns, settings, Rail, drawer, toast, icons, feature refactors |
 | `react-data-patterns.md` | Filtering, facets, virtual scroll, lazy load, React Query, portals, effect dependencies |
 | `react-streaming.md` | NDJSON streaming, background activities, navigation badges |
+| `react-canvas.md` | Canvas card integration checklist, type guards, comment overlay, upload cards, event handlers |
 | `go-conventions.md` | General Go, testing, file splitting, struct vs DB, derived fields |
 | `go-sqlite.md` | Read/write pools, batch TX, query optimization, SQL patterns |
 | `go-catalog-scan.md` | Scan intent, catalog enrichment, batch/detail parity |

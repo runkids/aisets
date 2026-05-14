@@ -120,6 +120,12 @@ export function serializeCanvasSnapshot(
         base.status = card.status;
         base.description = card.description;
       }
+      if (card.kind === "upload") {
+        base.uploadToken = card.token;
+        base.uploadFileName = card.fileName;
+        base.uploadWidth = card.uploadWidth;
+        base.uploadHeight = card.uploadHeight;
+      }
       return base;
     }),
   };
@@ -186,4 +192,31 @@ export async function canvasChat(options: {
     isDone: (event): event is CanvasChatDone => event.type === "done",
     fallbackDone: null,
   });
+}
+
+export type CanvasUploadResult = {
+  token: string;
+  thumbnailDataUrl: string;
+  fileName: string;
+  width: number;
+  height: number;
+};
+
+export async function uploadCanvasImages(
+  files: File[],
+): Promise<CanvasUploadResult[]> {
+  const form = new FormData();
+  for (const f of files) form.append("files", f, f.name);
+  const res = await fetch(`${basePath}/api/ai/canvas/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    throw new APIError(
+      "canvas_upload_failed",
+      `Upload failed: HTTP ${res.status}`,
+    );
+  }
+  const body = (await res.json()) as { results: CanvasUploadResult[] };
+  return body.results ?? [];
 }

@@ -6,7 +6,6 @@ import {
   Layers3,
   LoaderCircle,
   LocateFixed,
-  MessageCircle,
   Trash2,
   ZoomIn,
   ZoomOut,
@@ -23,8 +22,6 @@ type AICanvasToolbarProps = {
   viewportScale: number;
   zoomCanvasBy: (factor: number) => void;
   centerCanvasView: () => void;
-  commentMode: boolean;
-  setCommentMode: StateSetter<boolean>;
   isCapturing: boolean;
   captureTransparent: boolean;
   setCaptureTransparent: StateSetter<boolean>;
@@ -45,8 +42,6 @@ export function AICanvasToolbar({
   viewportScale,
   zoomCanvasBy,
   centerCanvasView,
-  commentMode,
-  setCommentMode,
   isCapturing,
   captureTransparent,
   setCaptureTransparent,
@@ -96,15 +91,6 @@ export function AICanvasToolbar({
         onClick={centerCanvasView}
       >
         <LocateFixed />
-      </IconButton>
-      <IconButton
-        size="sm"
-        aria-label={t("aiCanvas.commentMode")}
-        data-active={commentMode || undefined}
-        className={cn(commentMode && "bg-g-surface-3 text-g-ink")}
-        onClick={() => setCommentMode((v) => !v)}
-      >
-        <MessageCircle />
       </IconButton>
       <DropdownMenuPrimitive.Root>
         <DropdownMenuPrimitive.Trigger asChild>

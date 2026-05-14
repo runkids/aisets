@@ -33,6 +33,7 @@ export type CommentCanvasCard = CanvasCardBase & {
   anchorId: string;
   text: string;
   region: CanvasRegion;
+  isAi?: boolean;
 };
 
 export type AssistantCanvasCard = CanvasCardBase & {
@@ -64,6 +65,15 @@ export type OperationCanvasCard = CanvasCardBase & {
   assetIds: string[];
 };
 
+export type UploadCanvasCard = CanvasCardBase & {
+  kind: "upload";
+  token: string;
+  thumbnailDataUrl: string;
+  fileName: string;
+  uploadWidth: number;
+  uploadHeight: number;
+};
+
 export type ProposalStatus =
   | "pending"
   | "executing"
@@ -90,7 +100,8 @@ export type CanvasCard =
   | AssistantCanvasCard
   | VariantCanvasCard
   | OperationCanvasCard
-  | ProposalCanvasCard;
+  | ProposalCanvasCard
+  | UploadCanvasCard;
 
 export type ChatMentionPreview = {
   id: string;
@@ -219,6 +230,7 @@ function normalizeCard(value: unknown): CanvasCard | null {
         width: Number(region.width) || 0.34,
         height: Number(region.height) || 0.24,
       },
+      isAi: value.isAi === true ? true : undefined,
     };
   }
 
@@ -294,6 +306,24 @@ function normalizeCard(value: unknown): CanvasCard | null {
             (item): item is string => typeof item === "string",
           )
         : [],
+    };
+  }
+
+  if (kind === "upload" && typeof value.token === "string") {
+    return {
+      id,
+      kind,
+      x,
+      y,
+      createdAt,
+      token: value.token,
+      thumbnailDataUrl:
+        typeof value.thumbnailDataUrl === "string"
+          ? value.thumbnailDataUrl
+          : "",
+      fileName: typeof value.fileName === "string" ? value.fileName : "image",
+      uploadWidth: Number(value.uploadWidth) || 0,
+      uploadHeight: Number(value.uploadHeight) || 0,
     };
   }
 
@@ -480,6 +510,7 @@ export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "assistant") return card.prompt || "AI";
   if (card.kind === "variant") return card.sourceName;
   if (card.kind === "proposal") return card.description || card.tool;
+  if (card.kind === "upload") return card.fileName;
   return card.prompt || "Preview";
 }
 

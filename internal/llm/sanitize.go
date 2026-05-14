@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 )
@@ -32,21 +33,26 @@ func StripFences(s string) string {
 }
 
 func FixJSON(s string) string {
-	start := strings.Index(s, `{"`)
-	if start < 0 {
-		start = strings.Index(s, "{\n")
-		if start < 0 {
-			start = strings.Index(s, "{ ")
-			if start < 0 {
-				start = strings.Index(s, "{")
-			}
+	fallbackStart := -1
+	for i, c := range s {
+		if c != '{' {
+			continue
+		}
+		if fallbackStart < 0 {
+			fallbackStart = i
+		}
+		candidate := cleanJSONCandidate(extractBalancedJSON(s[i:]))
+		if json.Valid([]byte(candidate)) {
+			return candidate
 		}
 	}
-	if start < 0 {
+	if fallbackStart < 0 {
 		return s
 	}
-	s = s[start:]
-	s = extractBalancedJSON(s)
+	return cleanJSONCandidate(extractBalancedJSON(s[fallbackStart:]))
+}
+
+func cleanJSONCandidate(s string) string {
 	s = trailingCommaRe.ReplaceAllString(s, "$1")
 	s = missingCommaRe.ReplaceAllString(s, `$1,"`)
 	return s

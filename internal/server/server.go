@@ -205,6 +205,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/ai/embed/calibration/labels/{id}", s.handleEmbedCalibrationLabelDelete)
 	s.mux.HandleFunc("POST /api/ai/embed/calibration/analyze", s.handleEmbedCalibrationAnalyze)
 	s.mux.HandleFunc("POST /api/ai/canvas/chat", s.handleCanvasChat)
+	s.mux.HandleFunc("POST /api/ai/canvas/upload", s.handleCanvasUpload)
 	s.mux.HandleFunc("POST /api/canvas/capture", s.handleCanvasCapture)
 	s.mux.HandleFunc("POST /api/canvas/capture/save", s.handleCanvasCaptureSave)
 	s.mux.HandleFunc("GET /api/agent/status", s.handleAgentStatus)

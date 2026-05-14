@@ -50,6 +50,11 @@ func TestFixJSON(t *testing.T) {
 			`{"a":{"b":1},"c":[3]}`,
 		},
 		{
+			"pretty object with compact nested object",
+			"{\n\t\"category\": \"Photo\",\n\t\"quality\": {\"score\": 4}\n}",
+			"{\n\t\"category\": \"Photo\",\n\t\"quality\": {\"score\": 4}\n}",
+		},
+		{
 			"non-JSON brace before real JSON",
 			`{æ¯å‹•} {"tags":["icon"]}`,
 			`{"tags":["icon"]}`,

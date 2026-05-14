@@ -7,6 +7,7 @@ import {
   semanticSearch,
 } from "@/api";
 import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
+import { uploadCanvasImages } from "@/api/canvasChat";
 import {
   previewImageToolAssets,
   renderImageToolPreview,
@@ -20,6 +21,10 @@ import {
   DEFAULT_IMAGE_TOOL_SETTINGS,
   commentIds,
   imageMeta,
+  AI_MENTION_COMMENT_RE,
+  AI_MENTION_COMMENT_RE_G,
+  compactImageAspectRatio,
+  isImageCard,
   nextCardPosition,
   nowISO,
   selectedAssetIds,
@@ -44,6 +49,7 @@ import {
   type ChatHistoryEntry,
   type OperationCanvasCard,
   type ProposalCanvasCard,
+  type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
 import { useCanvasChat } from "./useCanvasChat";
@@ -124,7 +130,7 @@ export function AICanvasView({
       return true;
     }
   });
-  const [composerAdvancedOpen, setComposerAdvancedOpen] = useState(false);
+  const [composerAdvancedOpen] = useState(false);
   const [imageOptimizationAdvice, setImageOptimizationAdvice] = useState(() => {
     try {
       return (
@@ -293,8 +299,9 @@ export function AICanvasView({
         width: (cardWidths[card.id] ?? size?.width ?? CARD_WIDTH) * stableScale,
         height:
           (size?.height ??
-            (card.kind === "asset" && compactCards
-              ? (cardWidths[card.id] ?? CARD_WIDTH) * 0.75
+            (isImageCard(card) && compactCards
+              ? (cardWidths[card.id] ?? CARD_WIDTH) /
+                compactImageAspectRatio(card)
               : 240)) * stableScale,
         layerIndex,
       };
@@ -376,15 +383,13 @@ export function AICanvasView({
     return map;
   }, [cards]);
   const commentConnectors = useMemo(() => {
-    const assetCards = new Map(
-      cards
-        .filter((card): card is AssetCanvasCard => card.kind === "asset")
-        .map((card) => [card.id, card]),
+    const anchorCards = new Map(
+      cards.filter(isImageCard).map((card) => [card.id, card]),
     );
 
     return cards.flatMap((card) => {
       if (card.kind !== "comment") return [];
-      const anchor = assetCards.get(card.anchorId);
+      const anchor = anchorCards.get(card.anchorId);
       if (!anchor) return [];
       const anchorPosition =
         dragPreview?.cardId === anchor.id
@@ -643,6 +648,34 @@ export function AICanvasView({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const uploadRef = useRef<(files: File[]) => void>(handleUploadAndCreateCards);
+  useEffect(() => {
+    uploadRef.current = handleUploadAndCreateCards;
+  });
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of items) {
+        if (item.kind !== "file") continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+        if (
+          file.type.startsWith("image/") ||
+          file.name?.toLowerCase().endsWith(".svg")
+        ) {
+          files.push(file);
+        }
+      }
+      if (files.length === 0) return;
+      e.preventDefault();
+      uploadRef.current(files);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
   const deleteCard = useCallback(
     (target: CanvasCard) => {
       const removedIds = cardIdsForDeletion(cards, target.id);
@@ -741,15 +774,15 @@ export function AICanvasView({
   }
 
   function commentRequestsAi(text: string) {
-    return /(^|\s)@ai(?=\s|$|[,.，。!?！？])/i.test(text);
+    return AI_MENTION_COMMENT_RE.test(text);
   }
 
   function aiPromptFromComment(text: string) {
-    return text.replace(/(^|\s)@ai(?=\s|$|[,.，。!?！？])/gi, " ").trim();
+    return text.replace(AI_MENTION_COMMENT_RE_G, " ").trim();
   }
 
   function addComment(
-    assetCard: AssetCanvasCard,
+    anchorCard: CanvasCard,
     text = prompt.trim(),
     region?: { x: number; y: number; width: number; height: number },
   ) {
@@ -758,10 +791,10 @@ export function AICanvasView({
     const card: CommentCanvasCard = {
       id,
       kind: "comment",
-      x: assetCard.x + CARD_WIDTH + 24,
-      y: assetCard.y + 32,
+      x: anchorCard.x + CARD_WIDTH + 24,
+      y: anchorCard.y + 32,
       createdAt: nowISO(),
-      anchorId: assetCard.id,
+      anchorId: anchorCard.id,
       text: commentText,
       region: region ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
     };
@@ -947,9 +980,46 @@ export function AICanvasView({
     appendPromptToken("@" + t("aiCanvas.selectedMention"));
   }
 
-  function noteUploadPending() {
-    setError(t("aiCanvas.uploadPending"));
-    setComposerAdvancedOpen(true);
+  async function handleUploadAndCreateCards(files: File[]) {
+    setWorking("ai");
+    try {
+      const results = await uploadCanvasImages(files);
+      const rect = rootRef.current?.getBoundingClientRect();
+      const containerSize = rect
+        ? { width: rect.width, height: rect.height }
+        : undefined;
+      const newCards: UploadCanvasCard[] = results.map((r, i) => ({
+        id: createCanvasCardId("upload"),
+        kind: "upload" as const,
+        ...nextCardPosition(cards.length + i, viewport, containerSize),
+        createdAt: nowISO(),
+        token: r.token,
+        thumbnailDataUrl: r.thumbnailDataUrl,
+        fileName: r.fileName,
+        uploadWidth: r.width,
+        uploadHeight: r.height,
+      }));
+      setCards((prev) => [...prev, ...newCards]);
+      if (newCards.length > 0) setSelectedCardIds([newCards[0].id]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("aiCanvas.operationError"),
+      );
+    } finally {
+      setWorking("idle");
+    }
+  }
+
+  function handleAttachImage() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,.svg,.avif,.heic,.heif,.webp";
+    input.multiple = true;
+    input.onchange = () => {
+      const files = Array.from(input.files ?? []);
+      if (files.length > 0) handleUploadAndCreateCards(files);
+    };
+    input.click();
   }
 
   return (
@@ -1022,8 +1092,6 @@ export function AICanvasView({
         viewportScale={viewport.scale}
         zoomCanvasBy={zoomCanvasBy}
         centerCanvasView={centerCanvasView}
-        commentMode={commentMode}
-        setCommentMode={setCommentMode}
         isCapturing={isCapturing}
         captureTransparent={captureTransparent}
         setCaptureTransparent={setCaptureTransparent}
@@ -1066,7 +1134,9 @@ export function AICanvasView({
         imageOptimizationAdvice={imageOptimizationAdvice}
         setImageOptimizationAdvice={setImageOptimizationAdvice}
         mentionSelectedAsset={mentionSelectedAsset}
-        noteUploadPending={noteUploadPending}
+        handleAttachImage={handleAttachImage}
+        commentMode={commentMode}
+        setCommentMode={setCommentMode}
         addAssistantCard={addAssistantCard}
         selectedProposal={selectedProposal}
         pendingProposals={pendingProposals}
