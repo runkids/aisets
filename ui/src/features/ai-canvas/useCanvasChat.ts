@@ -23,7 +23,6 @@ import {
   type ChatMentionPreview,
   type CommentCanvasCard,
   type PendingAttachment,
-  type ProposalCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
@@ -34,6 +33,11 @@ import {
   nextCardPosition,
   nowISO,
 } from "./canvasUtils";
+import {
+  canvasActionResultCardIds,
+  canvasFocusCardFromEvent,
+  canvasProposalCardFromEvent,
+} from "./canvasChatEventContract";
 import type { WorkingState } from "./aiCanvasTypes";
 
 type AICursorState = {
@@ -106,16 +110,6 @@ function assetsFromActionResult(result: unknown): AssetItem[] {
   const items = (result as { items?: unknown }).items;
   if (!Array.isArray(items)) return [];
   return items.filter(isAssetItem);
-}
-
-function actionResultCardIds(result: unknown, cards: CanvasCard[]) {
-  if (!result || typeof result !== "object") return [];
-  const raw = (result as { cardIds?: unknown }).cardIds;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (id): id is string =>
-      typeof id === "string" && cards.some((card) => card.id === id),
-  );
 }
 
 type OCRTextActionItem = {
@@ -646,15 +640,8 @@ export function useCanvasChat(opts: {
       };
     }
 
-    function cardForAssetRefs(refs: string[]) {
-      return canvasCards.find((card) => {
-        if (refs.includes(card.id)) return true;
-        return card.kind === "asset" && refs.includes(card.asset.id);
-      });
-    }
-
     function runAlignTool(result: unknown) {
-      const ids = actionResultCardIds(result, canvasCards);
+      const ids = canvasActionResultCardIds(result, canvasCards);
       if (ids.length < 2) return;
       const axis = (result as { axis?: string }).axis;
       const boxes = ids
@@ -697,7 +684,7 @@ export function useCanvasChat(opts: {
     }
 
     function runDistributeTool(result: unknown) {
-      const ids = actionResultCardIds(result, canvasCards);
+      const ids = canvasActionResultCardIds(result, canvasCards);
       if (ids.length < 3) return;
       const direction = (result as { direction?: string }).direction;
       const rawGap = (result as { gap?: unknown }).gap;
@@ -737,7 +724,7 @@ export function useCanvasChat(opts: {
 
     function handleEvent(event: CanvasChatEvent) {
       if (event.type === "focus" && event.cardId) {
-        const target = canvasCards.find((c) => c.id === event.cardId);
+        const target = canvasFocusCardFromEvent(event, canvasCards);
         if (target) {
           setAiCursor({
             ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
@@ -765,34 +752,12 @@ export function useCanvasChat(opts: {
           runCaptureTool(event.tool, event.params.transparent === true);
           return;
         }
-        const targetRefs = [
-          event.targetAssetId,
-          ...(event.targetAssetIds ?? []),
-        ].filter((id): id is string => typeof id === "string" && !!id);
-        const anchorCard =
-          cardForAssetRefs(targetRefs) ??
-          canvasCards.find((c) => c.id === canvasPrimarySelectedId);
-        const position = anchorCard
-          ? adjacentCardPosition(anchorCard, cardLayoutMetrics, {
-              index: newCards.length,
-              verticalStep: 88,
-            })
-          : { x: 84, y: 72 + newCards.length * 88 };
-        const card: ProposalCanvasCard = {
-          id: createCanvasCardId("proposal"),
-          kind: "proposal",
-          x: position.x,
-          y: position.y,
-          createdAt: nowISO(),
-          proposalId: event.id,
-          tool: event.tool,
-          params: event.params,
-          description: event.description,
-          impact: event.impact,
-          status: "pending",
-          sourceAssetId: event.targetAssetId ?? event.targetAssetIds?.[0],
-          sourceAssetIds: event.targetAssetIds,
-        };
+        const card = canvasProposalCardFromEvent(event, {
+          cards: canvasCards,
+          selectedCardId: canvasPrimarySelectedId,
+          cardLayoutMetrics,
+          index: newCards.length,
+        });
         newCards.push(card);
         setCards((current) => [...current, card]);
       }

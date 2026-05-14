@@ -706,6 +706,16 @@ Latest user request: %q
 Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 }
 
+func canvasInvalidActionRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`Your previous canvas tool call had invalid arguments. The backend normalized common aliases and scalar values where possible, but one or more tool calls still missed required fields or used invalid enum/type values.
+Do not explain the mistake. Call the same intended canvas tool again with valid arguments that match the tool schema.
+Use native tool calls if available; otherwise use action blocks.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
 const (
 	canvasLoopReasonToolResults          = "tool_results"
 	canvasLoopReasonTruncatedAction      = "truncated_action"
@@ -714,6 +724,8 @@ const (
 	canvasLoopReasonFocusOnlyNeedsAnswer = "focus_only_needs_answer"
 	canvasLoopReasonBlockedComment       = "blocked_comment"
 	canvasLoopReasonCaptureOnlyWork      = "capture_only_deferred_work"
+	canvasLoopReasonInvalidAction        = "invalid_action"
+	canvasLoopReasonNativeEmptyFallback  = "native_empty_fallback"
 )
 
 type canvasNextLoopInput struct {
@@ -726,6 +738,7 @@ type canvasNextLoopInput struct {
 	FocusOnlyNeedsAnswer      bool
 	BlockedCommentNeedsAnswer bool
 	CaptureOnlyDeferredWork   bool
+	InvalidAction             bool
 }
 
 func canvasNextLoopReason(input canvasNextLoopInput) string {
@@ -734,6 +747,9 @@ func canvasNextLoopReason(input canvasNextLoopInput) string {
 	}
 	if input.TruncatedAction {
 		return canvasLoopReasonTruncatedAction
+	}
+	if input.InvalidAction {
+		return canvasLoopReasonInvalidAction
 	}
 	if input.MissingCapture {
 		return canvasLoopReasonMissingCapture
@@ -882,6 +898,8 @@ func canvasFollowupInstruction(reason string, latestUserMessage string) string {
 		return canvasFocusOnlyRepairPrompt(latestUserMessage)
 	case canvasLoopReasonCaptureOnlyWork:
 		return canvasCaptureOnlyRepairPrompt(latestUserMessage)
+	case canvasLoopReasonInvalidAction:
+		return canvasInvalidActionRepairPrompt(latestUserMessage)
 	case canvasLoopReasonBlockedComment:
 		return "Your previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
 	case canvasLoopReasonToolResults:
@@ -1746,7 +1764,15 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	req.Options.CanvasImageAttached = req.CanvasImage != ""
 	req.Options.AutoLocale = settings.LLMAutoLocale
 	req.Options.CanvasStrategy = s.canvasStrategyPrompt()
-	systemPrompt := canvasSystemPrompt(locale, req.Options)
+	latestUserMessage := latestCanvasUserMessage(req.Messages)
+	selectedSkillIDs := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
+		Message: latestUserMessage,
+		Canvas:  req.Canvas,
+		Options: req.Options,
+	})
+	canvasTools := canvasLLMToolsForSkills(selectedSkillIDs)
+	usingNativeTools := len(canvasTools) > 0
+	systemPrompt := canvasNativeSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options, locale)
 
 	var images []vlmImage
@@ -1838,7 +1864,6 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 	const maxToolLoops = 3
 	currentPrompt := userPrompt
-	latestUserMessage := latestCanvasUserMessage(req.Messages)
 	proposalIndex := 0
 	captureRequested := canvasCaptureRequested(latestUserMessage)
 	captureSeen := false
@@ -1852,19 +1877,21 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	generatedImagePaths := map[string]bool{}
 	for loop := 0; loop < maxToolLoops; loop++ {
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
-			Images:       images,
-			Backend:      backend,
-			ModelName:    modelName,
-			SystemPrompt: systemPrompt,
-			Prompt:       currentPrompt,
-			Purpose:      "canvas",
-			TimeoutSec:   canvasOutputTokenLimit,
-			Tools:        canvasLLMTools(),
-			Loop:         loop,
-			PromptKind:   promptKind,
-			LoopReason:   loopReason,
+			Images:           images,
+			Backend:          backend,
+			ModelName:        modelName,
+			SystemPrompt:     systemPrompt,
+			Prompt:           currentPrompt,
+			Purpose:          "canvas",
+			TimeoutSec:       canvasOutputTokenLimit,
+			Tools:            canvasTools,
+			SelectedSkillIDs: selectedSkillIDs,
+			Loop:             loop,
+			PromptKind:       promptKind,
+			LoopReason:       loopReason,
 		})
 		loopStats = append(loopStats, round.Stats)
+		statIndex := len(loopStats) - 1
 		if round.Err != nil {
 			sendNDJSON(w, map[string]any{
 				"type":  "error",
@@ -1876,6 +1903,18 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		chatResp := round.Response
 		totalInputTokens += chatResp.InputTokens
 		totalOutputTokens += chatResp.OutputTokens
+		if usingNativeTools && strings.TrimSpace(content) == "" && len(chatResp.ToolCalls) == 0 && loop < maxToolLoops-1 {
+			loopStats[statIndex].ToolUseSource = "native_empty"
+			loopStats[statIndex].NextReason = canvasLoopReasonNativeEmptyFallback
+			canvasTools = nil
+			usingNativeTools = false
+			systemPrompt = canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
+			currentPrompt = userPrompt
+			promptKind = vlmPromptKindFull
+			loopReason = canvasLoopReasonNativeEmptyFallback
+			sendNDJSON(w, map[string]any{"type": "thinking"})
+			continue
+		}
 		for _, image := range s.canvasGeneratedImagesFromContent(content, generatedImagePaths) {
 			sendNDJSON(w, map[string]any{
 				"type":             "generated_image",
@@ -1888,12 +1927,29 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		textBody, actions := parseCanvasActions(content)
-		if toolCallActions := canvasActionsFromToolCalls(chatResp.ToolCalls); len(toolCallActions) > 0 {
+		fallbackActionCount := len(actions)
+		toolCallActions := canvasActionsFromToolCalls(chatResp.ToolCalls)
+		toolUseSource := ""
+		if len(toolCallActions) > 0 {
 			actions = toolCallActions
 			textBody = strings.TrimSpace(content)
+			toolUseSource = "native_tool_call"
+		} else if fallbackActionCount > 0 {
+			toolUseSource = "fallback_parse"
 		}
+		loopStats[statIndex].ToolUseSource = toolUseSource
+		loopStats[statIndex].NativeToolCallCount = len(toolCallActions)
+		loopStats[statIndex].FallbackActionCount = fallbackActionCount
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
+		var invalidActionIssues []canvasActionValidationIssue
+		actions, invalidActionIssues = normalizeCanvasActions(actions, false)
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
+		var postExpansionIssues []canvasActionValidationIssue
+		actions, postExpansionIssues = normalizeCanvasActions(actions, true)
+		invalidActionIssues = append(invalidActionIssues, postExpansionIssues...)
+		invalidActionNeedsRepair := len(invalidActionIssues) > 0 && loop < maxToolLoops-1
+		loopStats[statIndex].ActionCount = len(actions)
+		loopStats[statIndex].InvalidActionCount = len(invalidActionIssues)
 		hasCaptureAction := false
 		for _, act := range actions {
 			if canvasToolIsCapture(act.Tool) {
@@ -1908,8 +1964,18 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		nonCaptureToolExecutedThisLoop := false
 		nonFocusToolExecutedThisLoop := false
 		blockedCommentNeedsAnswer := false
+		executedActionCount := 0
+		safeActionCount := 0
+		proposalCount := 0
+		blockedProposalCount := 0
+		blockedCommentCount := 0
+		for _, issue := range invalidActionIssues {
+			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
+		}
 		for _, act := range actions {
 			if act.Tool == "focus_card" {
+				executedActionCount++
+				safeActionCount++
 				sendNDJSON(w, map[string]any{
 					"type":   "focus",
 					"cardId": act.Params["cardId"],
@@ -1920,6 +1986,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 			if act.Tool == "create_comment" && !canvasUserAsksAnnotation(latestUserMessage) {
 				blockedCommentNeedsAnswer = true
+				blockedCommentCount++
 				continue
 			}
 			if canvasToolSafe(act.Tool) {
@@ -1931,6 +1998,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					captureExecutedThisLoop = true
 				}
 				result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
+				executedActionCount++
+				safeActionCount++
 				sendNDJSON(w, map[string]any{
 					"type":   "action_result",
 					"tool":   act.Tool,
@@ -1945,6 +2014,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
+					blockedProposalCount++
 					continue
 				}
 				proposalIndex++
@@ -1963,6 +2033,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"targetAssetId":  targetAssetID,
 					"targetAssetIds": targetAssetIDs,
 				})
+				executedActionCount++
+				proposalCount++
 				if canvasToolSuppressesSameTurnText(act.Tool) {
 					nonFocusToolExecutedThisLoop = true
 				}
@@ -1970,9 +2042,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 			time.Sleep(150 * time.Millisecond)
 		}
+		loopStats[statIndex].ExecutedActionCount = executedActionCount
+		loopStats[statIndex].SafeActionCount = safeActionCount
+		loopStats[statIndex].ProposalCount = proposalCount
+		loopStats[statIndex].BlockedProposalCount = blockedProposalCount
+		loopStats[statIndex].BlockedCommentCount = blockedCommentCount
 
 		actionRequestNeedsTool := canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
-		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool {
+		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool && !invalidActionNeedsRepair {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})
@@ -1997,12 +2074,22 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			FocusOnlyNeedsAnswer:      focusOnlyNeedsAnswer,
 			BlockedCommentNeedsAnswer: blockedCommentNeedsAnswer,
 			CaptureOnlyDeferredWork:   captureOnlyDeferredWork,
+			InvalidAction:             invalidActionNeedsRepair,
 		})
+		loopStats[statIndex].NextReason = nextLoopReason
 		if nextLoopReason == "" {
 			break
 		}
 		if !canvasFollowupShouldRetainImages(nextLoopReason, latestUserMessage) {
 			images = nil
+		}
+		selectedSkillIDs = expandCanvasSkillFamiliesForLoopReason(selectedSkillIDs, nextLoopReason, latestUserMessage, req.Options)
+		if usingNativeTools {
+			canvasTools = canvasLLMToolsForSkills(selectedSkillIDs)
+			systemPrompt = canvasNativeSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
+		} else {
+			canvasTools = nil
+			systemPrompt = canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 		}
 		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, content)
 		promptKind = vlmPromptKindFollowup

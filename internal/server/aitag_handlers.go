@@ -133,27 +133,45 @@ const (
 )
 
 type vlmChatRoundStats struct {
-	Loop          int    `json:"loop"`
-	PromptKind    string `json:"promptKind"`
-	Reason        string `json:"reason,omitempty"`
-	InputTokens   int64  `json:"inputTokens,omitempty"`
-	OutputTokens  int64  `json:"outputTokens,omitempty"`
-	DurationMs    int64  `json:"durationMs,omitempty"`
-	ToolCallCount int    `json:"toolCallCount"`
+	Loop                 int      `json:"loop"`
+	PromptKind           string   `json:"promptKind"`
+	Reason               string   `json:"reason,omitempty"`
+	NextReason           string   `json:"nextReason,omitempty"`
+	RepairLoop           bool     `json:"repairLoop,omitempty"`
+	SystemPromptBytes    int      `json:"systemPromptBytes,omitempty"`
+	UserPromptBytes      int      `json:"userPromptBytes,omitempty"`
+	ToolSchemaBytes      int      `json:"toolSchemaBytes,omitempty"`
+	SelectedSkillIDs     []string `json:"selectedSkillIds,omitempty"`
+	SelectedToolCount    int      `json:"selectedToolCount,omitempty"`
+	InputTokens          int64    `json:"inputTokens,omitempty"`
+	OutputTokens         int64    `json:"outputTokens,omitempty"`
+	DurationMs           int64    `json:"durationMs,omitempty"`
+	ToolCallCount        int      `json:"toolCallCount"`
+	ToolUseSource        string   `json:"toolUseSource,omitempty"`
+	NativeToolCallCount  int      `json:"nativeToolCallCount,omitempty"`
+	FallbackActionCount  int      `json:"fallbackActionCount,omitempty"`
+	ActionCount          int      `json:"actionCount,omitempty"`
+	InvalidActionCount   int      `json:"invalidActionCount,omitempty"`
+	ExecutedActionCount  int      `json:"executedActionCount,omitempty"`
+	SafeActionCount      int      `json:"safeActionCount,omitempty"`
+	ProposalCount        int      `json:"proposalCount,omitempty"`
+	BlockedProposalCount int      `json:"blockedProposalCount,omitempty"`
+	BlockedCommentCount  int      `json:"blockedCommentCount,omitempty"`
 }
 
 type vlmChatRoundRequest struct {
-	Images       []vlmImage
-	Backend      string
-	ModelName    string
-	SystemPrompt string
-	Prompt       string
-	Purpose      string
-	TimeoutSec   int
-	Tools        []llm.ChatTool
-	Loop         int
-	PromptKind   string
-	LoopReason   string
+	Images           []vlmImage
+	Backend          string
+	ModelName        string
+	SystemPrompt     string
+	Prompt           string
+	Purpose          string
+	TimeoutSec       int
+	Tools            []llm.ChatTool
+	SelectedSkillIDs []string
+	Loop             int
+	PromptKind       string
+	LoopReason       string
 }
 
 type vlmChatRoundResult struct {
@@ -188,9 +206,15 @@ func (s *Server) chatVLMRound(ctx context.Context, req vlmChatRoundRequest) vlmC
 		promptKind = vlmPromptKindSingle
 	}
 	stats := vlmChatRoundStats{
-		Loop:       req.Loop,
-		PromptKind: promptKind,
-		Reason:     req.LoopReason,
+		Loop:              req.Loop,
+		PromptKind:        promptKind,
+		Reason:            req.LoopReason,
+		RepairLoop:        req.Loop > 0 || (req.LoopReason != "" && req.LoopReason != "initial"),
+		SystemPromptBytes: len(req.SystemPrompt),
+		UserPromptBytes:   len(req.Prompt),
+		ToolSchemaBytes:   canvasToolSchemaBytes(req.Tools),
+		SelectedSkillIDs:  append([]string(nil), req.SelectedSkillIDs...),
+		SelectedToolCount: len(req.Tools),
 	}
 
 	if id, ok := agent.AgentBackendID(req.Backend); ok {

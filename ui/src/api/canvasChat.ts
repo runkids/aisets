@@ -50,10 +50,27 @@ export type CanvasChatLoopStat = {
   loop: number;
   promptKind: string;
   reason?: string;
+  nextReason?: string;
+  repairLoop?: boolean;
+  systemPromptBytes?: number;
+  userPromptBytes?: number;
+  toolSchemaBytes?: number;
+  selectedSkillIds?: string[];
+  selectedToolCount?: number;
   inputTokens?: number;
   outputTokens?: number;
   durationMs?: number;
   toolCallCount: number;
+  toolUseSource?: "native_tool_call" | "fallback_parse" | "native_empty";
+  nativeToolCallCount?: number;
+  fallbackActionCount?: number;
+  actionCount?: number;
+  invalidActionCount?: number;
+  executedActionCount?: number;
+  safeActionCount?: number;
+  proposalCount?: number;
+  blockedProposalCount?: number;
+  blockedCommentCount?: number;
 };
 
 export type CanvasCardLayoutMetrics = Record<
