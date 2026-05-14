@@ -64,6 +64,7 @@ export function useCanvasDrag(opts: {
   ) => void;
   handleDragMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleDragEnd: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  canvasInnerRef: React.RefObject<HTMLDivElement | null>;
   handleWheel: (e: ReactWheelEvent<HTMLDivElement>) => void;
   handleCanvasPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleCanvasPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -84,6 +85,8 @@ export function useCanvasDrag(opts: {
     useState<CanvasSelection | null>(null);
 
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
+  const canvasInnerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef(viewport);
   const canvasSelectionRef = useRef<CanvasSelection | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const dragRef = useRef<{
@@ -107,12 +110,32 @@ export function useCanvasDrag(opts: {
     }>;
   } | null>(null);
   const wheelFrameRef = useRef<number | null>(null);
+  const wheelCommitTimerRef = useRef<number | null>(null);
   const wheelPendingRef = useRef<{
     panX: number;
     panY: number;
     zoomFactor: number;
     point: { x: number; y: number } | null;
   }>({ panX: 0, panY: 0, zoomFactor: 1, point: null });
+
+  const applyViewportTransform = useCallback(
+    (next: { x: number; y: number; scale: number }) => {
+      const inner = canvasInnerRef.current;
+      if (!inner) return;
+      inner.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) scale(${next.scale})`;
+      inner.style.setProperty("--ai-canvas-scale", String(next.scale));
+      inner.style.setProperty(
+        "--ai-canvas-stable-scale",
+        String(next.scale > 0 ? 1 / next.scale : 1),
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    viewportRef.current = viewport;
+    applyViewportTransform(viewport);
+  }, [applyViewportTransform, viewport]);
 
   // --- gesture prevention effect ---
   useEffect(() => {
@@ -209,27 +232,47 @@ export function useCanvasDrag(opts: {
     dragFrameRef.current = window.requestAnimationFrame(renderDragFrame);
   }, [renderDragFrame]);
 
+  const scheduleWheelCommit = useCallback(() => {
+    if (wheelCommitTimerRef.current !== null) {
+      window.clearTimeout(wheelCommitTimerRef.current);
+    }
+    wheelCommitTimerRef.current = window.setTimeout(() => {
+      wheelCommitTimerRef.current = null;
+      const latest = viewportRef.current;
+      setViewport((current) =>
+        current.x === latest.x &&
+        current.y === latest.y &&
+        current.scale === latest.scale
+          ? current
+          : latest,
+      );
+    }, 80);
+  }, [setViewport]);
+
   const flushWheelFrame = useCallback(() => {
     wheelFrameRef.current = null;
     const pending = wheelPendingRef.current;
     wheelPendingRef.current = { panX: 0, panY: 0, zoomFactor: 1, point: null };
 
-    setViewport((current) => {
-      let next = current;
-      if (pending.point && pending.zoomFactor !== 1) {
-        const nextScale = clampCanvasScale(current.scale * pending.zoomFactor);
-        next = zoomViewportAtPoint(current, pending.point, nextScale);
-      }
-      if (pending.panX !== 0 || pending.panY !== 0) {
-        next = {
-          ...next,
-          x: next.x - pending.panX,
-          y: next.y - pending.panY,
-        };
-      }
-      return next;
-    });
-  }, [setViewport]);
+    const current = viewportRef.current;
+    let next = current;
+    if (pending.point && pending.zoomFactor !== 1) {
+      const nextScale = clampCanvasScale(current.scale * pending.zoomFactor);
+      next = zoomViewportAtPoint(current, pending.point, nextScale);
+    }
+    if (pending.panX !== 0 || pending.panY !== 0) {
+      next = {
+        ...next,
+        x: next.x - pending.panX,
+        y: next.y - pending.panY,
+      };
+    }
+    if (next !== current) {
+      viewportRef.current = next;
+      applyViewportTransform(next);
+      scheduleWheelCommit();
+    }
+  }, [applyViewportTransform, scheduleWheelCommit]);
 
   const scheduleWheelFrame = useCallback(() => {
     if (wheelFrameRef.current !== null) return;
@@ -273,6 +316,9 @@ export function useCanvasDrag(opts: {
       cancelActiveDrag();
       if (wheelFrameRef.current !== null) {
         window.cancelAnimationFrame(wheelFrameRef.current);
+      }
+      if (wheelCommitTimerRef.current !== null) {
+        window.clearTimeout(wheelCommitTimerRef.current);
       }
     };
   }, [setDragPreview]);
@@ -492,6 +538,7 @@ export function useCanvasDrag(opts: {
   return {
     canvasSelection,
     cardElementsRef,
+    canvasInnerRef,
     registerCardElement,
     handleDragStart,
     handleDragMove,

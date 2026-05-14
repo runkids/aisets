@@ -683,8 +683,11 @@ export function CardShell({
     x: number;
     y: number;
   } | null>(null);
-  const screenStableScale =
-    isScreenStableCard(card) && canvasScale > 0 ? 1 / canvasScale : 1;
+  const stableCard = isScreenStableCard(card);
+  const screenStableScale = stableCard && canvasScale > 0 ? 1 / canvasScale : 1;
+  const shellScale = stableCard
+    ? "var(--ai-canvas-stable-scale, 1)"
+    : String(screenStableScale);
   const chromeless = isImageCard(card);
   const imageLabel = chromeless
     ? card.kind === "asset"
@@ -780,7 +783,7 @@ export function CardShell({
       ref={(node) => onRegister(card.id, node)}
       style={{
         width: width ?? CARD_WIDTH,
-        transform: `translate3d(${position?.x ?? card.x}px, ${position?.y ?? card.y}px, 0) scale(${screenStableScale})`,
+        transform: `translate3d(${position?.x ?? card.x}px, ${position?.y ?? card.y}px, 0) scale(${shellScale})`,
         transformOrigin: "left top",
       }}
       data-ai-canvas-card="true"

@@ -1,7 +1,9 @@
 import {
   useState,
+  type CSSProperties,
   type Dispatch,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
   type SetStateAction,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -49,6 +51,7 @@ function isVisibleImageCard(card: CanvasCard) {
 type AICanvasStageProps = {
   t: TFunction;
   viewport: { x: number; y: number; scale: number };
+  canvasInnerRef: RefObject<HTMLDivElement | null>;
   cards: CanvasCard[];
   setCards: Dispatch<SetStateAction<CanvasCard[]>>;
   selectedCardIds: string[];
@@ -100,6 +103,7 @@ type AICanvasStageProps = {
 export function AICanvasStage({
   t,
   viewport,
+  canvasInnerRef,
   cards,
   setCards,
   selectedCardIds,
@@ -147,11 +151,18 @@ export function AICanvasStage({
         onWheel={onWheel}
       >
         <div
+          ref={canvasInnerRef}
           data-ai-canvas-inner="true"
-          className="absolute left-0 top-0 origin-top-left"
-          style={{
-            transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
-          }}
+          className="absolute left-0 top-0 origin-top-left will-change-transform"
+          style={
+            {
+              transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
+              "--ai-canvas-scale": String(viewport.scale),
+              "--ai-canvas-stable-scale": String(
+                viewport.scale > 0 ? 1 / viewport.scale : 1,
+              ),
+            } as CSSProperties
+          }
         >
           {commentConnectors.length > 0 && !hideNonImageCards && (
             <svg

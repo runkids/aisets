@@ -232,6 +232,7 @@ export function AICanvasView({
   const {
     canvasSelection,
     cardElementsRef,
+    canvasInnerRef,
     registerCardElement,
     handleDragStart,
     handleDragMove,
@@ -1102,6 +1103,7 @@ export function AICanvasView({
       <AICanvasStage
         t={t}
         viewport={viewport}
+        canvasInnerRef={canvasInnerRef}
         cards={cards}
         setCards={setCards}
         selectedCardIds={selectedCardIds}
