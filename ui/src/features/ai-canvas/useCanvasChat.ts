@@ -34,6 +34,7 @@ import {
   nextCardPosition,
   nowISO,
 } from "./canvasUtils";
+import type { WorkingState } from "./aiCanvasTypes";
 
 type AICursorState = {
   x: number;
@@ -42,8 +43,6 @@ type AICursorState = {
   emoji?: string;
   status: "thinking" | "acting" | "idle";
 };
-
-type WorkingState = "idle" | "search" | "ai" | "imagePreview" | "operation";
 
 function isScreenStableCard(card: CanvasCard) {
   return (
@@ -375,12 +374,17 @@ export function useCanvasChat(opts: {
     let suppressModelTextAfterOCR = false;
     const newCards: CanvasCard[] = [];
     const animationTimers: number[] = [];
+    let latestAnimationDueAt = 0;
     let animationEndMs = 0;
     let captureQueued = false;
 
     function queueTimer(fn: () => void, delay: number) {
       const timer = window.setTimeout(fn, delay);
       animationTimers.push(timer);
+      latestAnimationDueAt = Math.max(
+        latestAnimationDueAt,
+        window.performance.now() + delay,
+      );
       return timer;
     }
 
@@ -1154,13 +1158,19 @@ export function useCanvasChat(opts: {
         );
       }
     } finally {
-      setWorking("idle");
-      const settleDelay = animationTimers.length > 0 ? 900 : 0;
+      const settleDelay =
+        latestAnimationDueAt > 0
+          ? Math.max(900, latestAnimationDueAt - window.performance.now() + 180)
+          : 0;
+      if (settleDelay > 0) {
+        setWorking("aiApplying");
+      }
       window.setTimeout(() => {
+        setWorking("idle");
         setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
         setDragPreview(null);
+        abortRef.current = null;
       }, settleDelay);
-      abortRef.current = null;
     }
   }
 

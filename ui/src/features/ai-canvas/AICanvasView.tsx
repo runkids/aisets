@@ -554,14 +554,18 @@ export function AICanvasView({
   const composerStatusLabel = error
     ? t("aiCanvas.statusError")
     : isWorking
-      ? t("aiCanvas.statusProcessing")
+      ? working === "aiApplying"
+        ? t("aiCanvas.statusApplying")
+        : t("aiCanvas.statusProcessing")
       : latestChatContent
         ? t("aiCanvas.statusLatest")
         : t("aiCanvas.statusReady");
   const composerStatusText =
     error ||
     (isWorking
-      ? t("aiCanvas.statusProcessingDetail")
+      ? working === "aiApplying"
+        ? t("aiCanvas.statusApplyingDetail")
+        : t("aiCanvas.statusProcessingDetail")
       : latestChatContent
         ? t("aiCanvas.statusLatestDetail")
         : t("aiCanvas.statusReadyDetail"));

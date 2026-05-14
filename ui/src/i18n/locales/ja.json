@@ -270,7 +270,9 @@
     "unsavedChanges": "未保存の変更",
     "unsavedChangesConfirm": "破棄して読み込み",
     "unsavedChangesMessage": "未保存の変更があります。別のセッションを読み込むと現在の内容は破棄されます",
-    "viewMode": "表示モード"
+    "viewMode": "表示モード",
+    "statusApplying": "キャンバス操作を適用中",
+    "statusApplyingDetail": "画面上の変更を完了しています…"
   },
   "favorites": {
     "add": "お気に入りに追加",

@@ -271,7 +271,9 @@
     "newCanvas": "New canvas",
     "newCanvasMessage": "Start a fresh canvas. Your current session is still saved and can be loaded from the sessions list.",
     "newCanvasConfirm": "New canvas",
-    "greeting": "Welcome back!"
+    "greeting": "Welcome back!",
+    "statusApplying": "Applying canvas actions",
+    "statusApplyingDetail": "Finishing the visible canvas changes…"
   },
   "favorites": {
     "add": "Add to Favorites",

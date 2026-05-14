@@ -271,7 +271,9 @@
     "newCanvas": "新畫布",
     "newCanvasMessage": "開啟全新畫布，目前的工作階段仍已儲存，可從列表隨時載入",
     "newCanvasConfirm": "新畫布",
-    "greeting": "歡迎回來！"
+    "greeting": "歡迎回來！",
+    "statusApplying": "套用畫布動作中",
+    "statusApplyingDetail": "正在完成畫面上的操作…"
   },
   "favorites": {
     "add": "加入收藏",

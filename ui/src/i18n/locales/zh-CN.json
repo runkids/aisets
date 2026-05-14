@@ -270,7 +270,9 @@
     "unsavedChanges": "未保存的变更",
     "unsavedChangesConfirm": "放弃并加载",
     "unsavedChangesMessage": "您有未保存的变更，加载其他会话将会舍弃当前的内容",
-    "viewMode": "查看模式"
+    "viewMode": "查看模式",
+    "statusApplying": "正在套用画布动作",
+    "statusApplyingDetail": "正在完成画面上的操作…"
   },
   "favorites": {
     "add": "加入收藏",

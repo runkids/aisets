@@ -11,6 +11,7 @@ export type WorkingState =
   | "idle"
   | "search"
   | "ai"
+  | "aiApplying"
   | "imagePreview"
   | "operation";
 
