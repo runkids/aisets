@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AssetCanvasCard, CanvasCard } from "./aiCanvasState";
+import type {
+  AssetCanvasCard,
+  CanvasCard,
+  UploadCanvasCard,
+} from "./aiCanvasState";
 
 type CaptureOpts = {
   rootRef: React.RefObject<HTMLDivElement | null>;
@@ -15,13 +19,16 @@ export type CapturePreview = {
   url: string;
 };
 
-export type CaptureFrame = {
-  assetId: string;
+type FrameGeometry = {
   x: number;
   y: number;
   width: number;
   height: number;
   bounds: { x: number; y: number; width: number; height: number };
+};
+
+export type CaptureFrame = FrameGeometry & {
+  assetId: string;
 };
 
 type CaptureCrop = { x: number; y: number; width: number; height: number };
@@ -40,7 +47,7 @@ type CaptureRequest = {
   outputHeight?: number;
 };
 
-type RenderFrame = CaptureFrame & { img: HTMLImageElement };
+type RenderFrame = FrameGeometry & { img: HTMLImageElement };
 
 const CAPTURE_PADDING = 24;
 const IMAGE_FALLBACK_PADDING = 12;
@@ -81,7 +88,7 @@ function containRect(
   };
 }
 
-function assetRenderFrames(
+function imageRenderFrames(
   cards: CanvasCard[],
   ids: Set<string>,
   cardElements: Map<string, HTMLElement>,
@@ -90,11 +97,14 @@ function assetRenderFrames(
 ): RenderFrame[] {
   const rootRect = root.getBoundingClientRect();
   return cards
-    .filter((c): c is AssetCanvasCard => c.kind === "asset" && ids.has(c.id))
+    .filter(
+      (c): c is AssetCanvasCard | UploadCanvasCard =>
+        (c.kind === "asset" || c.kind === "upload") && ids.has(c.id),
+    )
     .flatMap((card) => {
       const cardEl = cardElements.get(card.id);
       const frameEl = cardEl?.querySelector<HTMLElement>(
-        "[data-ai-canvas-asset-frame='true']",
+        "[data-ai-canvas-image-frame='true'], [data-ai-canvas-asset-frame='true']",
       );
       const img = frameEl?.querySelector<HTMLImageElement>("img");
       if (!cardEl || !frameEl || !img) return [];
@@ -128,11 +138,11 @@ function assetRenderFrames(
       };
       const rect = containRect(contentBox, img.naturalWidth, img.naturalHeight);
 
-      return [{ assetId: card.asset.id, ...rect, bounds, img }];
+      return [{ ...rect, bounds, img }];
     });
 }
 
-function frameIntersectsCrop(frame: CaptureFrame, crop: CaptureCrop) {
+function frameIntersectsCrop(frame: FrameGeometry, crop: CaptureCrop) {
   return (
     frame.bounds.x < crop.x + crop.width &&
     frame.bounds.x + frame.bounds.width > crop.x &&
@@ -186,7 +196,7 @@ export function buildCaptureRequestFromFrames(
   };
 }
 
-function captureCropForFrames(frames: CaptureFrame[]): CaptureCrop | null {
+function captureCropForFrames(frames: FrameGeometry[]): CaptureCrop | null {
   return (
     frames.reduce<CaptureCrop | null>((acc, frame) => {
       const minX = acc ? Math.min(acc.x, frame.bounds.x) : frame.bounds.x;
@@ -359,7 +369,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
     ) => {
       const root = rootRef.current;
       if (!root) return;
-      const frames = assetRenderFrames(
+      const frames = imageRenderFrames(
         cards,
         ids,
         cardElementsRef.current,
@@ -436,7 +446,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
   const captureCanvasForAI = useCallback(async () => {
     const root = rootRef.current;
     if (!root) return undefined;
-    const frames = assetRenderFrames(
+    const frames = imageRenderFrames(
       cards,
       new Set(cards.map((c) => c.id)),
       cardElementsRef.current,

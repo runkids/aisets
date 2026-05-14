@@ -27,6 +27,7 @@ type imageToolDownload struct {
 	Name             string
 	ContentType      string
 	DeleteAfterServe bool
+	Persistent       bool
 	CreatedAt        time.Time
 }
 
@@ -471,6 +472,9 @@ func (s *Server) cleanupImageToolDownloads() {
 	defer s.mu.Unlock()
 	now := time.Now()
 	for token, download := range s.imageToolDownloads {
+		if download.Persistent {
+			continue
+		}
 		if now.Sub(download.CreatedAt) > imageToolDownloadTTL {
 			_ = os.Remove(download.Path)
 			delete(s.imageToolDownloads, token)
@@ -517,9 +521,18 @@ func (s *Server) zipImageToolResults(results []imageToolResult) string {
 
 func (s *Server) peekImageToolDownload(token string) (imageToolDownload, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	download, ok := s.imageToolDownloads[token]
-	return download, ok
+	s.mu.Unlock()
+	if ok {
+		return download, true
+	}
+	if restored, ok := restorePersistentCanvasUpload(token); ok {
+		s.mu.Lock()
+		s.imageToolDownloads[token] = restored
+		s.mu.Unlock()
+		return restored, true
+	}
+	return imageToolDownload{}, false
 }
 
 func optimizePreviewOps(preview actions.Preview) []optimize.Operation {

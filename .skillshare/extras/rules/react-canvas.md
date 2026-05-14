@@ -33,7 +33,7 @@
 ## Upload Cards
 
 - **Upload card images use the full-quality preview endpoint.** Display `/api/image-tools/preview/{token}` as the `<img>` src, with `thumbnailDataUrl` as the fallback `onerror` source. The thumbnail is a compressed base64 data URL (~80px) used only during token expiry or initial load — never as the primary display.
-- **Upload card tokens follow the imageToolDownloads pattern.** Backend `storeImageToolDownload` stores temp file metadata with a 1-hour TTL token. Frontend creates `UploadCanvasCard` with `{token, thumbnailDataUrl, fileName, uploadWidth, uploadHeight}`. Canvas chat resolves tokens via `peekImageToolDownload` to get the temp file path for VLM.
+- **Upload card tokens must be persistent and restorable.** Frontend creates `UploadCanvasCard` with `{token, thumbnailDataUrl, fileName, uploadWidth, uploadHeight}` and stores that token in canvas session state. Backend `storeImageToolDownload` must mark canvas uploads as persistent, store the file under `config.DataDir()` (not an in-memory-only temp path), and let `peekImageToolDownload` restore by token after a server restart. Otherwise later VLM/OCR requests fail even though the upload card is still visible.
 
 ## Event Handlers
 
@@ -44,3 +44,5 @@
 
 - **Safe vs confirmation tools.** Canvas tools in `canvasToolRegistry` are either `Safe: true` (executed immediately, result fed back to LLM) or `Safe: false` (creates a proposal card for user approval). Layout tools (`move_card`, `arrange_cards`) are safe; destructive tools or tools that modify assets require confirmation.
 - **AI-generated comments are distinguished by `isAi` flag.** When the AI creates a comment via `create_comment` tool, set `isAi: true` on the `CommentCanvasCard`. This drives the purple border tone (`border-g-purple/50`) to visually distinguish AI annotations from user annotations (`border-g-amber/50`).
+- **Terminal tool results suppress same-response prose.** Some safe tools are already the final user-facing answer surface, such as `extract_ocr_text`. After formatting those `action_result` events, ignore prose emitted in the same model response; otherwise stale model narration can be appended after real tool failures and mislead the user.
+- **OCR uses asset IDs for catalog cards and card IDs for uploads.** `extract_ocr_text` must accept `assetIds` for catalog assets and `cardIds` for upload cards. Keep composer target counts, mentionable cards, canvas prompt target summaries, tool schema, and backend resolver behavior aligned so uploaded images are not silently excluded from OCR.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"aisets/internal/apierr"
+	"aisets/internal/config"
 	"aisets/internal/imageproc"
 )
 
@@ -62,28 +63,36 @@ func (s *Server) processCanvasUpload(header *multipart.FileHeader) (canvasUpload
 	defer src.Close()
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	tmp, err := os.CreateTemp("", "aisets-canvas-upload-*"+ext)
+	if ext == "" {
+		ext = ".bin"
+	}
+	token := imageToolToken("canvas-upload:" + header.Filename)
+	dir := persistentCanvasUploadDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return canvasUploadResult{}, err
+	}
+	uploadPath := filepath.Join(dir, token+ext)
+	dst, err := os.OpenFile(uploadPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 	if err != nil {
 		return canvasUploadResult{}, err
 	}
-	tmpPath := tmp.Name()
 
-	if _, err := io.Copy(tmp, src); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		os.Remove(uploadPath)
 		return canvasUploadResult{}, err
 	}
-	tmp.Close()
+	dst.Close()
 
-	meta, _ := imageproc.Probe(tmpPath)
+	meta, _ := imageproc.Probe(uploadPath)
 
-	thumbnail := generatePreCheckThumbnail(tmpPath, "")
+	thumbnail := generatePreCheckThumbnail(uploadPath, "")
 
-	token := imageToolToken("canvas-upload:" + header.Filename)
 	s.storeImageToolDownload(token, imageToolDownload{
-		Path:        tmpPath,
+		Path:        uploadPath,
 		Name:        header.Filename,
 		ContentType: contentTypeForName(header.Filename),
+		Persistent:  true,
 		CreatedAt:   time.Now(),
 	})
 
@@ -94,4 +103,43 @@ func (s *Server) processCanvasUpload(header *multipart.FileHeader) (canvasUpload
 		Width:            meta.Width,
 		Height:           meta.Height,
 	}, nil
+}
+
+func persistentCanvasUploadDir() string {
+	return filepath.Join(config.DataDir(), "canvas-uploads")
+}
+
+func restorePersistentCanvasUpload(token string) (imageToolDownload, bool) {
+	if !isImageToolToken(token) {
+		return imageToolDownload{}, false
+	}
+	matches, err := filepath.Glob(filepath.Join(persistentCanvasUploadDir(), token+".*"))
+	if err != nil || len(matches) == 0 {
+		return imageToolDownload{}, false
+	}
+	path := matches[0]
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return imageToolDownload{}, false
+	}
+	name := filepath.Base(path)
+	return imageToolDownload{
+		Path:        path,
+		Name:        name,
+		ContentType: contentTypeForName(name),
+		Persistent:  true,
+		CreatedAt:   info.ModTime(),
+	}, true
+}
+
+func isImageToolToken(token string) bool {
+	if len(token) != 40 {
+		return false
+	}
+	for _, ch := range token {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) {
+			return false
+		}
+	}
+	return true
 }

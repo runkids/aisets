@@ -1670,17 +1670,17 @@ func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, setting
 			}
 			seenUploadCards[card.ID] = true
 			if card.UploadToken == "" {
-				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "upload token missing"})
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "upload token missing; re-upload this image to run OCR"})
 				continue
 			}
 			download, ok := s.peekImageToolDownload(card.UploadToken)
 			if !ok {
-				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "uploaded image is no longer available"})
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "uploaded image is no longer available; re-upload this image to run OCR"})
 				continue
 			}
 			info, err := os.Stat(download.Path)
 			if err != nil {
-				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: err.Error()})
+				results = append(results, itemResult{CardID: card.ID, FileName: card.UploadFileName, Source: "upload", Status: ocr.StatusFailed, ErrorMessage: "uploaded image file is missing; re-upload this image to run OCR"})
 				continue
 			}
 			ext := strings.ToLower(filepath.Ext(card.UploadFileName))
@@ -1725,7 +1725,17 @@ func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, setting
 		if err != nil {
 			return map[string]any{"items": []any{}, "error": err.Error()}
 		}
+		foundAssetIDs := make(map[string]bool, len(items))
 		for _, item := range items {
+			foundAssetIDs[item.ID] = true
+			if item.LocalPath == "" {
+				results = append(results, itemResult{AssetID: item.ID, RepoPath: item.RepoPath, CardID: assetCardIDs[item.ID], FileName: filepath.Base(item.RepoPath), Source: "catalog", Status: ocr.StatusFailed, ErrorMessage: "project asset has no local path; rescan the project"})
+				continue
+			}
+			if _, err := os.Stat(item.LocalPath); err != nil {
+				results = append(results, itemResult{AssetID: item.ID, RepoPath: item.RepoPath, CardID: assetCardIDs[item.ID], FileName: filepath.Base(item.RepoPath), Source: "catalog", Status: ocr.StatusFailed, ErrorMessage: "original project file is missing; rescan the project or remove this canvas card"})
+				continue
+			}
 			targets = append(targets, ocrTarget{
 				item:     item,
 				assetID:  item.ID,
@@ -1734,6 +1744,11 @@ func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, setting
 				fileName: filepath.Base(item.RepoPath),
 				source:   "catalog",
 			})
+		}
+		for _, assetID := range assetIDs {
+			if !foundAssetIDs[assetID] {
+				results = append(results, itemResult{AssetID: assetID, CardID: assetCardIDs[assetID], Source: "catalog", Status: ocr.StatusFailed, ErrorMessage: "catalog asset is no longer available; rescan the project or remove this canvas card"})
+			}
 		}
 	}
 
@@ -1797,7 +1812,7 @@ func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, setting
 		entry.Status = result.Status
 		entry.Text = result.Text
 		entry.Languages = result.Languages
-		entry.ErrorMessage = result.ErrorMessage
+		entry.ErrorMessage = canvasOCRDisplayError(result.ErrorMessage)
 		counts.Processed++
 		if result.Status == ocr.StatusReady {
 			counts.Ready++
@@ -1817,6 +1832,26 @@ func (s *Server) executeCanvasOCRText(r *http.Request, act canvasAction, setting
 		"saveToMetadata":          false,
 		"saveInstruction":         "Use update_ocr_text proposal to save OCR text into metadata.",
 	}
+}
+
+func canvasOCRDisplayError(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return ""
+	}
+	if idx := strings.Index(message, "{"); idx >= 0 {
+		var payload struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(message[idx:]), &payload); err == nil {
+			if text := strings.TrimSpace(payload.Error.Message); text != "" {
+				return text
+			}
+		}
+	}
+	return message
 }
 
 func (s *Server) latestScanID() int64 {

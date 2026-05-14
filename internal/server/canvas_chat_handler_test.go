@@ -466,6 +466,20 @@ func TestCanvasActionCardIDs_NormalizesLegacyAndBatchParams(t *testing.T) {
 	}
 }
 
+func TestCanvasOCRDisplayError_ExtractsProviderMessage(t *testing.T) {
+	raw := `openai-compat: chat: status 400: {
+    "error": {
+        "message": "Failed to load model \"qwen/qwen3.6-27b\". Error: Model loading was stopped due to insufficient system resources.",
+        "type": "invalid_request_error"
+    }
+}`
+	got := canvasOCRDisplayError(raw)
+	want := `Failed to load model "qwen/qwen3.6-27b". Error: Model loading was stopped due to insufficient system resources.`
+	if got != want {
+		t.Fatalf("display error = %q, want %q", got, want)
+	}
+}
+
 func TestCanvasToolsDeclareCardinality(t *testing.T) {
 	for _, tool := range canvasToolRegistry() {
 		if tool.Cardinality == "" {

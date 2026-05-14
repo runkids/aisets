@@ -401,7 +401,6 @@ export type AssetContextMenuProps = ImageCardContextMenuProps & {
   card: AssetCanvasCard;
   onOpenAsset?: () => void;
   onRenderPreview?: (outputFormat?: string) => void;
-  onOperationPreview?: () => void;
   working?: boolean;
 };
 
@@ -409,7 +408,6 @@ export function AssetContextMenu({
   card,
   onOpenAsset,
   onRenderPreview,
-  onOperationPreview,
   onAddComment,
   onDuplicate,
   onDelete,
@@ -518,17 +516,6 @@ export function AssetContextMenu({
             </div>
           )}
         </div>
-      )}
-      {onOperationPreview && (
-        <button
-          type="button"
-          className={ctxMenuItemCls}
-          disabled={working}
-          onClick={onOperationPreview}
-        >
-          <Layers3 size={14} className="shrink-0 text-white/46" />
-          {t("aiCanvas.safeVariant")}
-        </button>
       )}
       {onAddComment && (
         <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
@@ -961,6 +948,7 @@ export function AssetCardBody({
   return (
     <div
       ref={commentContainerRef}
+      data-ai-canvas-image-frame="true"
       data-ai-canvas-asset-frame="true"
       className="relative"
       style={{ aspectRatio: ar }}
@@ -1029,6 +1017,7 @@ export function AssistantCardBody({
 export function UploadCardBody({
   card,
   comments,
+  hideOverlays,
   commentEnabled,
   canvasScale = 1,
   onSelectComment,
@@ -1036,6 +1025,7 @@ export function UploadCardBody({
 }: {
   card: UploadCanvasCard;
   comments: CommentCanvasCard[];
+  hideOverlays?: boolean;
   commentEnabled?: boolean;
   canvasScale?: number;
   onSelectComment: (commentId: string) => void;
@@ -1051,7 +1041,7 @@ export function UploadCardBody({
     pointerProps: commentPointerProps,
     overlay: commentOverlay,
   } = useCommentOverlay({
-    enabled: !!commentEnabled,
+    enabled: !!commentEnabled && !hideOverlays,
     canvasScale,
     onSubmit: (text, region) => onCreateComment?.(card, text, region),
   });
@@ -1059,6 +1049,7 @@ export function UploadCardBody({
   return (
     <div
       ref={commentContainerRef}
+      data-ai-canvas-image-frame="true"
       className="relative"
       style={{ aspectRatio: compactImageAspectRatio(card) }}
       {...commentPointerProps}
@@ -1073,7 +1064,9 @@ export function UploadCardBody({
             (e.target as HTMLImageElement).src = card.thumbnailDataUrl;
         }}
       />
-      <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
+      {!hideOverlays && (
+        <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
+      )}
       {commentOverlay}
     </div>
   );

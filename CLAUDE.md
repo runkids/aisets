@@ -35,6 +35,13 @@ All stack-specific rules and conventions live in `.skillshare/extras/rules/` and
 | `rust-imgtools.md` | CLI integration tests, svg-to-png, Go wrapper, CI |
 | `commit-verification.md` | Devcontainer, UI/backend commit checklists, CI, air hot-reload |
 
+### 2.1 Captured AI Canvas conventions
+
+- **Canvas upload tokens must survive chat retries and server restarts.** Canvas cards persist upload tokens in session state, so uploaded images used by VLM/OCR must be stored as persistent downloads and restored through `peekImageToolDownload`; in-memory-only temp files make later OCR fail with stale token errors.
+- **Terminal canvas tool results must not be followed by model prose.** User-facing safe tools such as `extract_ocr_text` already produce the final answer surface. Suppress same-response LLM prose after these results, otherwise stale reasoning gets appended and can contradict the actual tool error.
+- **Canvas OCR targets are mixed identity types.** Catalog images use `assetIds`, while uploaded canvas images use `cardIds`; composer target counts, prompt target descriptions, tool schema, and backend resolvers must all support both or OCR silently ignores uploads.
+- **Normalize provider errors before presenting OCR results.** OpenAI-compatible backends may wrap useful failures inside JSON error bodies. Extract the provider `error.message` for per-image OCR output so the user sees the actionable cause instead of repeated raw transport payloads.
+
 ---
 
 ## 3. Quick links

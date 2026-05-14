@@ -8,10 +8,7 @@ import {
 } from "@/api";
 import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
 import { uploadCanvasImages } from "@/api/canvasChat";
-import {
-  previewImageToolAssets,
-  renderImageToolPreview,
-} from "@/api/imageTools";
+import { renderImageToolPreview } from "@/api/imageTools";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ConfirmDialog } from "@/components/ui";
 import type { AssetItem } from "@/types";
@@ -37,6 +34,7 @@ import {
   cardDisplayName,
   cardIdsForDeletion,
   clampCanvasScale,
+  DEFAULT_CANVAS_VIEWPORT,
   commentsForAssets,
   createCanvasCardId,
   emptyAICanvasSession,
@@ -48,7 +46,6 @@ import {
   type CanvasCard,
   type CommentCanvasCard,
   type ChatHistoryEntry,
-  type OperationCanvasCard,
   type ProposalCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
@@ -170,11 +167,10 @@ export function AICanvasView({
       status: "idle" as const,
     };
   });
-  const [viewMode, setViewMode] = useState<"normal" | "compact" | "hidden">(
-    initialSession.viewMode ?? "normal",
+  const [hideNonImageCards, setHideNonImageCards] = useState(
+    initialSession.viewMode === "hidden",
   );
-  const compactCards = viewMode === "compact" || viewMode === "hidden";
-  const hideCards = viewMode === "hidden";
+  const viewMode = hideNonImageCards ? "hidden" : "normal";
   const [cardWidths, setCardWidths] = useState<Record<string, number>>(
     initialSession.cardWidths ?? {},
   );
@@ -585,9 +581,9 @@ export function AICanvasView({
       viewport,
       chatHistory: chatHistory.slice(-10),
       cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
-      viewMode: viewMode !== "normal" ? viewMode : undefined,
+      viewMode: hideNonImageCards ? "hidden" : undefined,
     });
-  }, [cards, selectedCardIds, viewport, chatHistory, cardWidths, viewMode]);
+  }, [cards, selectedCardIds, viewport, chatHistory, cardWidths, hideNonImageCards]);
 
   useEffect(() => {
     try {
@@ -935,40 +931,6 @@ export function AICanvasView({
     }
   }
 
-  async function createOperationPreview(
-    assetCards: AssetCanvasCard[],
-    promptText: string,
-  ) {
-    setWorking("operation");
-    setError("");
-    try {
-      const result = await previewImageToolAssets({
-        assetIds: selectedAssetIds(assetCards),
-        settings: DEFAULT_IMAGE_TOOL_SETTINGS,
-      });
-      const first = assetCards[0];
-      const card: OperationCanvasCard = {
-        id: createCanvasCardId("op"),
-        kind: "operation",
-        ...(first
-          ? adjacentCardPosition(first, cardLayoutMetrics)
-          : { x: 120, y: 96 }),
-        createdAt: nowISO(),
-        prompt: promptText || t("aiCanvas.safeVariantPrompt"),
-        token: result.token,
-        preview: result.preview,
-        assetIds: selectedAssetIds(assetCards),
-      };
-      setCards((current) => [...current, card]);
-      setSelectedCardIds([card.id]);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("aiCanvas.operationError"),
-      );
-    } finally {
-      setWorking("idle");
-    }
-  }
 
   function clearCanvas() {
     setCards([]);
@@ -1146,8 +1108,7 @@ export function AICanvasView({
         setSelectedCardIds={setSelectedCardIds}
         cardWidths={cardWidths}
         setCardWidths={setCardWidths}
-        compactCards={compactCards}
-        hideCards={hideCards}
+        hideNonImageCards={hideNonImageCards}
         commentConnectors={commentConnectors}
         commentsByAnchor={commentsByAnchor}
         groupBounds={groupBounds}
@@ -1171,7 +1132,6 @@ export function AICanvasView({
         onRegisterCard={registerMeasuredCardElement}
         onAddComment={addComment}
         onCreateImagePreview={createImagePreview}
-        onCreateOperationPreview={createOperationPreview}
       />
 
       <AICanvasSearchPanel
@@ -1211,11 +1171,13 @@ export function AICanvasView({
         captureCanvas={captureCanvas}
         captureSelected={captureSelected}
         selectedCardCount={selectedCardIds.length}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
+        hideNonImageCards={hideNonImageCards}
+        setHideNonImageCards={setHideNonImageCards}
         setSelectedCardIds={setSelectedCardIds}
         cardsCount={cards.length}
         onClear={() => setClearConfirmOpen(true)}
+        debugOpen={debugOpen}
+        onToggleDebug={() => setDebugOpen((v) => !v)}
       />
 
       <ConfirmDialog
@@ -1300,7 +1262,23 @@ export function AICanvasView({
           chatHistory={chatHistory}
           working={working}
           aiCursor={aiCursor}
+          error={error}
+          viewMode={viewMode}
+          composerCollapsed={composerCollapsed}
+          commentMode={commentMode}
+          searchOpen={searchOpen}
+          searchMode={searchMode}
+          searchResultsCount={searchResults.length}
+          searchBusy={searchBusy}
+          searchError={searchError}
           onClose={() => setDebugOpen(false)}
+          onResetViewport={() => setViewport({ ...DEFAULT_CANVAS_VIEWPORT })}
+          onClearCards={() => {
+            setCards([]);
+            setSelectedCardIds([]);
+          }}
+          onSelectAll={() => setSelectedCardIds(cards.map((c) => c.id))}
+          onDeselectAll={() => setSelectedCardIds([])}
         />
       )}
     </div>

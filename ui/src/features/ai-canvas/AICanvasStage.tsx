@@ -42,6 +42,10 @@ type CommentConnector = {
   path: string;
 };
 
+function isVisibleImageCard(card: CanvasCard) {
+  return isImageCard(card) || card.kind === "variant";
+}
+
 type AICanvasStageProps = {
   t: TFunction;
   viewport: { x: number; y: number; scale: number };
@@ -51,8 +55,7 @@ type AICanvasStageProps = {
   setSelectedCardIds: Dispatch<SetStateAction<string[]>>;
   cardWidths: Record<string, number>;
   setCardWidths: Dispatch<SetStateAction<Record<string, number>>>;
-  compactCards: boolean;
-  hideCards: boolean;
+  hideNonImageCards: boolean;
   commentConnectors: CommentConnector[];
   commentsByAnchor: Map<string, CommentCanvasCard[]>;
   groupBounds: { x: number; y: number; w: number; h: number } | null;
@@ -92,10 +95,6 @@ type AICanvasStageProps = {
     promptText: string,
     outputFormat?: string,
   ) => void | Promise<void>;
-  onCreateOperationPreview: (
-    assetCards: AssetCanvasCard[],
-    promptText: string,
-  ) => void | Promise<void>;
 };
 
 export function AICanvasStage({
@@ -107,8 +106,7 @@ export function AICanvasStage({
   setSelectedCardIds,
   cardWidths,
   setCardWidths,
-  compactCards,
-  hideCards,
+  hideNonImageCards,
   commentConnectors,
   commentsByAnchor,
   groupBounds,
@@ -132,7 +130,6 @@ export function AICanvasStage({
   onRegisterCard,
   onAddComment,
   onCreateImagePreview,
-  onCreateOperationPreview,
 }: AICanvasStageProps) {
   const [deleteConfirmCard, setDeleteConfirmCard] = useState<CanvasCard | null>(
     null,
@@ -156,7 +153,7 @@ export function AICanvasStage({
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
           }}
         >
-          {commentConnectors.length > 0 && !hideCards && (
+          {commentConnectors.length > 0 && !hideNonImageCards && (
             <svg
               className="pointer-events-none absolute left-0 top-0 z-[36] overflow-visible"
               width="1"
@@ -203,13 +200,12 @@ export function AICanvasStage({
             </svg>
           )}
           {cards.map((card) => {
-            if (hideCards && !isImageCard(card)) return null;
+            if (hideNonImageCards && !isVisibleImageCard(card)) return null;
             return (
               <CardShell
                 key={card.id}
                 card={card}
                 selected={selectedCardIds.includes(card.id)}
-                compact={compactCards && !isImageCard(card)}
                 width={cardWidths[card.id]}
                 canvasScale={viewport.scale}
                 onSelect={(id, shiftKey) => {
@@ -276,12 +272,6 @@ export function AICanvasStage({
                       onRenderPreview={(outputFormat) =>
                         void onCreateImagePreview(card, "", outputFormat)
                       }
-                      onOperationPreview={() =>
-                        void onCreateOperationPreview(
-                          [card],
-                          t("aiCanvas.safeVariantPrompt"),
-                        )
-                      }
                       onAddComment={() => {
                         setSelectedCardIds([card.id]);
                         setCommentMode(true);
@@ -307,7 +297,7 @@ export function AICanvasStage({
                   <AssetCardBody
                     card={card}
                     comments={commentsByAnchor.get(card.id) ?? []}
-                    hideOverlays={hideCards}
+                    hideOverlays={hideNonImageCards}
                     commentEnabled={commentMode}
                     canvasScale={viewport.scale}
                     onSelectComment={(id) => setSelectedCardIds([id])}
@@ -327,6 +317,7 @@ export function AICanvasStage({
                   <UploadCardBody
                     card={card}
                     comments={commentsByAnchor.get(card.id) ?? []}
+                    hideOverlays={hideNonImageCards}
                     commentEnabled={commentMode}
                     canvasScale={viewport.scale}
                     onSelectComment={(id) => setSelectedCardIds([id])}
@@ -336,7 +327,7 @@ export function AICanvasStage({
               </CardShell>
             );
           })}
-          {groupBounds && !hideCards && (
+          {groupBounds && !hideNonImageCards && (
             <div
               className="pointer-events-none absolute z-[38] rounded-g-sm border-2 border-dashed border-[#0d99ff]"
               style={{
@@ -347,7 +338,7 @@ export function AICanvasStage({
               }}
             />
           )}
-          {!hideCards && (
+          {!hideNonImageCards && (
             <AICursor
               position={{ x: aiCursor.x, y: aiCursor.y }}
               label={aiCursor.label}

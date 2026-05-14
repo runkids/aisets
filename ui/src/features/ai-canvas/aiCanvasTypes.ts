@@ -14,8 +14,6 @@ export type WorkingState =
   | "imagePreview"
   | "operation";
 
-export type CanvasViewMode = "normal" | "compact" | "hidden";
-
 export type MentionableImageCard = {
   id: string;
   name: string;

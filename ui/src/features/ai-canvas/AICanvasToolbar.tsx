@@ -1,9 +1,9 @@
 import {
   ArrowLeft,
+  Bug,
   Camera,
   Eye,
   EyeOff,
-  Layers3,
   LoaderCircle,
   LocateFixed,
   Trash2,
@@ -13,8 +13,7 @@ import {
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import type { TFunction } from "i18next";
 import { Badge, Button, IconButton, Switch } from "@/components/ui";
-import { cn } from "@/lib/cn";
-import type { CanvasViewMode, StateSetter } from "./aiCanvasTypes";
+import type { StateSetter } from "./aiCanvasTypes";
 
 type AICanvasToolbarProps = {
   t: TFunction;
@@ -29,11 +28,13 @@ type AICanvasToolbarProps = {
   captureCanvas: (transparent: boolean) => void | Promise<void>;
   captureSelected: (transparent: boolean) => void | Promise<void>;
   selectedCardCount: number;
-  viewMode: CanvasViewMode;
-  setViewMode: StateSetter<CanvasViewMode>;
+  hideNonImageCards: boolean;
+  setHideNonImageCards: StateSetter<boolean>;
   setSelectedCardIds: StateSetter<string[]>;
   cardsCount: number;
   onClear: () => void;
+  debugOpen: boolean;
+  onToggleDebug: () => void;
 };
 
 export function AICanvasToolbar({
@@ -49,11 +50,13 @@ export function AICanvasToolbar({
   captureCanvas,
   captureSelected,
   selectedCardCount,
-  viewMode,
-  setViewMode,
+  hideNonImageCards,
+  setHideNonImageCards,
   setSelectedCardIds,
   cardsCount,
   onClear,
+  debugOpen,
+  onToggleDebug,
 }: AICanvasToolbarProps) {
   return (
     <div
@@ -156,23 +159,19 @@ export function AICanvasToolbar({
       </DropdownMenuPrimitive.Root>
       <IconButton
         size="sm"
-        aria-label={t("aiCanvas.viewMode")}
-        data-active={viewMode !== "normal" || undefined}
-        className={cn(viewMode !== "normal" && "bg-g-surface-3 text-g-ink")}
+        aria-label={
+          hideNonImageCards
+            ? t("aiCanvas.showAllElements")
+            : t("aiCanvas.hideNonImageElements")
+        }
+        data-active={hideNonImageCards || undefined}
+        className={hideNonImageCards ? "bg-g-surface-3 text-g-ink" : undefined}
         onClick={() => {
-          setViewMode((m) =>
-            m === "normal" ? "compact" : m === "compact" ? "hidden" : "normal",
-          );
+          setHideNonImageCards((hidden) => !hidden);
           setSelectedCardIds([]);
         }}
       >
-        {viewMode === "hidden" ? (
-          <EyeOff />
-        ) : viewMode === "compact" ? (
-          <Layers3 />
-        ) : (
-          <Eye />
-        )}
+        {hideNonImageCards ? <EyeOff /> : <Eye />}
       </IconButton>
       <IconButton
         size="sm"
@@ -181,6 +180,14 @@ export function AICanvasToolbar({
         onClick={onClear}
       >
         <Trash2 />
+      </IconButton>
+      <IconButton
+        size="sm"
+        aria-label="Debug"
+        onClick={onToggleDebug}
+        className={debugOpen ? "text-green-500" : undefined}
+      >
+        <Bug />
       </IconButton>
     </div>
   );

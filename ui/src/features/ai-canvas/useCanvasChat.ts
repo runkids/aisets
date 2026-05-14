@@ -346,6 +346,7 @@ export function useCanvasChat(opts: {
     ]);
 
     let assistantText = "";
+    let suppressModelTextAfterOCR = false;
     const newCards: CanvasCard[] = [];
     const animationTimers: number[] = [];
     let animationEndMs = 0;
@@ -641,6 +642,7 @@ export function useCanvasChat(opts: {
         setAiCursor((prev) => ({ ...prev, status: "thinking" }));
       }
       if (event.type === "text") {
+        if (suppressModelTextAfterOCR) return;
         const text = sanitizeCanvasChatContent(event.content);
         if (text) {
           assistantText += (assistantText ? "\n\n" : "") + text;
@@ -920,6 +922,7 @@ export function useCanvasChat(opts: {
         }
       }
       if (event.type === "action_result" && event.tool === "extract_ocr_text") {
+        suppressModelTextAfterOCR = true;
         const text = formatOCRActionText(event.result, t);
         if (text) {
           assistantText += (assistantText ? "\n\n" : "") + text;
