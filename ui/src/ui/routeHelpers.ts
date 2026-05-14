@@ -33,7 +33,7 @@ export const modes: Mode[] = [
 
 export function pathForMode(mode: Mode) {
   if (mode === "imageTools") return "/image-tools";
-  if (mode === "aiCanvas") return "/ai-canvas";
+  if (mode === "aiCanvas") return "/canvas";
   if (mode === "tags") return "/tags-categories";
   return `/${mode}`;
 }
@@ -41,7 +41,7 @@ export function pathForMode(mode: Mode) {
 export function modeForPath(pathname: string): Mode {
   const segment = pathname.replace(/^\/+|\/+$/g, "").split("/")[0];
   if (segment === "image-tools") return "imageTools";
-  if (segment === "ai-canvas") return "aiCanvas";
+  if (segment === "canvas") return "aiCanvas";
   if (segment === "tags-categories") return "tags";
   return modes.includes(segment as Mode) ? (segment as Mode) : "projects";
 }

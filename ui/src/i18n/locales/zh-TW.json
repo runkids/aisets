@@ -137,6 +137,7 @@
     "noMentionImages": "畫布上還沒有圖片。",
     "removeMention": "移除提及",
     "attachImage": "附加圖片",
+    "commentMode": "註解模式",
     "extractText": "擷取圖片文字",
     "extractTextDisabled": "請先選取或提及一張 catalog 圖片。",
     "extractTextPrompt": "使用 OCR 擷取選取或提及 catalog 圖片中的可見文字，並依檔名分段回覆。",
@@ -176,6 +177,22 @@
     "layerChanged": "調整圖層",
     "proposalTags": "標籤",
     "proposalDescription": "描述",
+    "proposalTool": {
+      "compress_image": "壓縮圖片",
+      "resize_image": "調整圖片尺寸",
+      "convert_image": "轉換圖片格式",
+      "update_tags": "更新標籤",
+      "batch_update_tags": "更新標籤",
+      "update_description": "更新描述",
+      "update_ocr_text": "更新 OCR 文字",
+      "rename_asset": "重新命名素材",
+      "move_asset": "移動素材",
+      "copy_asset": "複製素材",
+      "delete_asset": "刪除素材",
+      "favorite_asset": "收藏素材",
+      "batch_favorite_assets": "收藏素材",
+      "export_asset": "匯出素材"
+    },
     "targetKind": {
       "comment": "註解",
       "assistant": "AI 卡片",
@@ -243,7 +260,8 @@
     "currentSession": "目前",
     "newCanvas": "新畫布",
     "newCanvasMessage": "開啟全新畫布，目前的工作階段仍已儲存，可從列表隨時載入",
-    "newCanvasConfirm": "新畫布"
+    "newCanvasConfirm": "新畫布",
+    "greeting": "歡迎回來！"
   },
   "favorites": {
     "add": "加入收藏",

@@ -28,14 +28,28 @@ type ChatMessage struct {
 type ChatRequest struct {
 	Model      string        `json:"model"`
 	Messages   []ChatMessage `json:"messages"`
+	Tools      []ChatTool    `json:"tools,omitempty"`
 	TimeoutSec int           `json:"timeoutSec,omitempty"`
 }
 
+type ChatTool struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+type ChatToolCall struct {
+	ID        string         `json:"id,omitempty"`
+	Name      string         `json:"name"`
+	Arguments map[string]any `json:"arguments,omitempty"`
+}
+
 type ChatResponse struct {
-	Content      string `json:"content"`
-	DurationMs   int64  `json:"durationMs"`
-	InputTokens  int64  `json:"inputTokens"`
-	OutputTokens int64  `json:"outputTokens"`
+	Content      string         `json:"content"`
+	DurationMs   int64          `json:"durationMs"`
+	InputTokens  int64          `json:"inputTokens"`
+	OutputTokens int64          `json:"outputTokens"`
+	ToolCalls    []ChatToolCall `json:"toolCalls,omitempty"`
 }
 
 type EmbedRequest struct {

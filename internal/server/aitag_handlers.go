@@ -127,6 +127,10 @@ type vlmImage struct {
 }
 
 func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt, purpose string, timeoutSec int) (string, llm.ChatResponse, error) {
+	return s.chatVLMWithTools(ctx, images, backend, modelName, systemPrompt, prompt, purpose, timeoutSec, nil)
+}
+
+func (s *Server) chatVLMWithTools(ctx context.Context, images []vlmImage, backend, modelName, systemPrompt, prompt, purpose string, timeoutSec int, tools []llm.ChatTool) (string, llm.ChatResponse, error) {
 	if id, ok := agent.AgentBackendID(backend); ok {
 		if provider, ok := s.agentProviders[id]; ok {
 			paths := make([]string, len(images))
@@ -168,6 +172,7 @@ func (s *Server) chatVLM(ctx context.Context, images []vlmImage, backend, modelN
 	resp, err := s.llmProvider.Chat(ctx, llm.ChatRequest{
 		Model:      modelName,
 		Messages:   buildChatMessages(systemPrompt, prompt, dataURIs),
+		Tools:      tools,
 		TimeoutSec: timeoutSec,
 	})
 	if err != nil {

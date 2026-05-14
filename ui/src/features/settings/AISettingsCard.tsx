@@ -630,7 +630,7 @@ export function AISettingsCard({
               </span>
               <TextInput
                 value={draft.aiNickname ?? ""}
-                placeholder="AI"
+                placeholder="Aisets"
                 className="w-48"
                 onChange={(e) =>
                   onUpdateDraft((c) => ({

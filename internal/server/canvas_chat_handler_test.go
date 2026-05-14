@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"aisets/internal/llm"
 )
 
 func TestParseCanvasActions_PlainText(t *testing.T) {
@@ -103,6 +105,17 @@ func TestCanvasToolSafe(t *testing.T) {
 	}
 	if canvasToolSafe("nonexistent") {
 		t.Error("unknown tool should not be safe")
+	}
+}
+
+func TestCanvasToolSuppressesSameTurnText(t *testing.T) {
+	if canvasToolSuppressesSameTurnText("focus_card") {
+		t.Fatal("focus_card should allow the same-turn assistant text to render")
+	}
+	for _, tool := range []string{"search_assets", "extract_ocr_text", "compress_image"} {
+		if !canvasToolSuppressesSameTurnText(tool) {
+			t.Fatalf("%s should suppress same-turn assistant text", tool)
+		}
 	}
 }
 
@@ -225,8 +238,14 @@ func TestCanvasProposalAllowed_AllowsExplicitMetadataRequests(t *testing.T) {
 }
 
 func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testing.T) {
-	if !canvasProposalAllowed("compress_image", "幫我看看這張圖", canvasChatOptions{ImageOptimizationAdvice: true}) {
-		t.Fatal("optimization advice on should allow proactive optimization proposals")
+	if !canvasProposalAllowed("compress_image", "幫我看看這張圖有沒有品質問題", canvasChatOptions{ImageOptimizationAdvice: true}) {
+		t.Fatal("optimization advice on should allow review-driven optimization proposals")
+	}
+	if canvasProposalAllowed("compress_image", "這是啥", canvasChatOptions{ImageOptimizationAdvice: true}) {
+		t.Fatal("visual identification should not create optimization proposals")
+	}
+	if canvasProposalAllowed("compress_image", "他在做啥", canvasChatOptions{ImageOptimizationAdvice: true}) {
+		t.Fatal("activity identification should not create optimization proposals")
 	}
 	if !canvasProposalAllowed("compress_image", "幫我壓縮這張圖", canvasChatOptions{ImageOptimizationAdvice: false}) {
 		t.Fatal("explicit optimization request should be allowed even when advice is off")
@@ -517,6 +536,53 @@ func TestParseCanvasActions_ToolCallNoCall(t *testing.T) {
 	}
 }
 
+func TestParseCanvasActions_RawActionJSON(t *testing.T) {
+	input := `{"tool":"search_assets","params":{"q":"老人在刷牙的可愛插畫","limit":1},"description":"搜尋素材","impact":"找相關圖片"}`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected empty text, got %q", text)
+	}
+	if len(actions) != 1 || actions[0].Tool != "search_assets" {
+		t.Fatalf("actions = %#v", actions)
+	}
+	if actions[0].Params["q"] != "老人在刷牙的可愛插畫" {
+		t.Fatalf("unexpected params: %#v", actions[0].Params)
+	}
+}
+
+func TestCanvasActionsFromToolCalls(t *testing.T) {
+	actions := canvasActionsFromToolCalls([]llm.ChatToolCall{
+		{Name: "search_assets", Arguments: map[string]any{"q": "dog", "limit": float64(1)}},
+		{Name: "unknown_tool", Arguments: map[string]any{"q": "ignored"}},
+	})
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 valid action, got %#v", actions)
+	}
+	if actions[0].Tool != "search_assets" || actions[0].Params["q"] != "dog" {
+		t.Fatalf("unexpected action: %#v", actions[0])
+	}
+}
+
+func TestCanvasActionsFromToolCallsNestedActionEnvelope(t *testing.T) {
+	actions := canvasActionsFromToolCalls([]llm.ChatToolCall{{
+		Name: "focus_card",
+		Arguments: map[string]any{
+			"params":      map[string]any{"cardId": "asset-1", "label": "target"},
+			"description": "Focus target",
+			"impact":      "Moves cursor",
+		},
+	}})
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %#v", actions)
+	}
+	if actions[0].Params["cardId"] != "asset-1" {
+		t.Fatalf("params = %#v", actions[0].Params)
+	}
+	if actions[0].Description != "Focus target" || actions[0].Impact != "Moves cursor" {
+		t.Fatalf("metadata = %#v", actions[0])
+	}
+}
+
 func TestParseCanvasActions_JSONFenceArray(t *testing.T) {
 	input := "I will inspect the current canvas.\n```json\n[\n  {\"tool\":\"focus_card\",\"params\":{\"cardId\":\"copy-1\",\"label\":\"target\"}},\n  {\"tool\":\"find_similar_assets\",\"params\":{\"assetIds\":[\"386481964017\"],\"limit\":5}}\n]\n```"
 	text, actions := parseCanvasActions(input)
@@ -588,6 +654,23 @@ func TestParseCanvasActions_PlainCallFormat(t *testing.T) {
 	region, ok := actions[0].Params["region"].(map[string]any)
 	if !ok || region["x"] != 0.3 {
 		t.Fatalf("expected parsed region, got %#v", actions[0].Params["region"])
+	}
+}
+
+func TestParseCanvasActions_BareCallJSONFormat(t *testing.T) {
+	input := "call\n{\"tool\":\"search_assets\",\"params\":{\"q\":\"老人在刷牙的可愛插畫\",\"limit\":1},\"description\":\"搜尋素材\",\"impact\":\"找相關圖片\"}"
+	text, actions := parseCanvasActions(input)
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action from bare call JSON format, got %d; text=%q", len(actions), text)
+	}
+	if actions[0].Tool != "search_assets" {
+		t.Fatalf("expected search_assets, got %s", actions[0].Tool)
+	}
+	if text != "" {
+		t.Fatalf("text should not contain raw call payload: %q", text)
+	}
+	if actions[0].Params["q"] != "老人在刷牙的可愛插畫" {
+		t.Fatalf("unexpected params: %#v", actions[0].Params)
 	}
 }
 

@@ -139,7 +139,7 @@ export function AICanvasToolbar({
           {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
         </IconButton>
         {isDirty && !isSaving && (
-          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-g-accent" />
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400" />
         )}
       </div>
       {sessionName && (

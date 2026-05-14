@@ -323,6 +323,28 @@ func canvasToolsBlock() string {
 	return b.String()
 }
 
+func canvasLLMTools() []llm.ChatTool {
+	tools := make([]llm.ChatTool, 0, len(canvasToolRegistry()))
+	for _, t := range canvasToolRegistry() {
+		tools = append(tools, llm.ChatTool{
+			Name:        t.Name,
+			Description: fmt.Sprintf("%s Params: %s Cardinality: %s Safety: %s.", t.Description, t.Params, t.Cardinality, canvasToolSafetyLabel(t.Safe)),
+			Parameters: map[string]any{
+				"type":                 "object",
+				"additionalProperties": true,
+			},
+		})
+	}
+	return tools
+}
+
+func canvasToolSafetyLabel(safe bool) string {
+	if safe {
+		return "SAFE"
+	}
+	return "NEEDS_CONFIRMATION"
+}
+
 func canvasProposalGuidance(options canvasChatOptions) string {
 	if options.ImageOptimizationAdvice {
 		return "- Image optimization advice is ON. You may proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, create NEEDS_CONFIRMATION proposal cards with compress_image, resize_image, or convert_image. Do not apply changes directly.\n- Keep non-optimization proposals (update_tags, batch_update_tags, update_description, rename, move, delete, export, favorite, batch_favorite_assets) tied to the user's explicit request."
@@ -359,7 +381,7 @@ Card positions are top-left canvas coordinates. Use each card's size=WIDTHxHEIGH
 ## Available Tools
 %s
 ## Response Format
-Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVERY response MUST include at least one tool call. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action. For each tool call, emit:
+Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVERY response MUST include at least one tool call. Prefer native tool calls when the API exposes them; do not print tool JSON in normal assistant text when native tool calls are available. If native tool calls are unavailable, use exactly the action block format below. Do NOT use call, call:, <tool_call>, or bare JSON in assistant text. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action. For each fallback content tool call, emit:
 
 %saction
 {"tool": "tool_name", "params": {...}, "description": "what this does", "impact": "expected effect"}

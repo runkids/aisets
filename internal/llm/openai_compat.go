@@ -106,18 +106,38 @@ type openAIChatMessage struct {
 	Content interface{} `json:"content"`
 }
 
+type openAIChatTool struct {
+	Type     string             `json:"type"`
+	Function openAIChatFunction `json:"function"`
+}
+
+type openAIChatFunction struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
 // openAIChatRequest is the body sent to POST /v1/chat/completions.
 type openAIChatRequest struct {
 	Model    string              `json:"model"`
 	Messages []openAIChatMessage `json:"messages"`
 	Stream   bool                `json:"stream"`
+	Tools    []openAIChatTool    `json:"tools,omitempty"`
 }
 
 // openAIChatResponse is the shape returned by POST /v1/chat/completions.
 type openAIChatResponse struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string          `json:"name"`
+					Arguments json.RawMessage `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`
 	Usage struct {
@@ -156,34 +176,26 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 		Messages: msgs,
 		Stream:   false,
 	}
-	b, err := json.Marshal(body)
+	if len(req.Tools) > 0 {
+		body.Tools = make([]openAIChatTool, 0, len(req.Tools))
+		for _, tool := range req.Tools {
+			body.Tools = append(body.Tools, openAIChatTool{
+				Type: "function",
+				Function: openAIChatFunction{
+					Name:        tool.Name,
+					Description: tool.Description,
+					Parameters:  tool.Parameters,
+				},
+			})
+		}
+	}
+	raw, durationMs, err := p.postChat(ctx, body)
+	if err != nil && len(body.Tools) > 0 && isOpenAICompatToolUnsupported(err.Error()) {
+		body.Tools = nil
+		raw, durationMs, err = p.postChat(ctx, body)
+	}
 	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openai-compat: marshal chat request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint+"/chat/completions", bytes.NewReader(b))
-	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openai-compat: build chat request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	p.setAuth(httpReq)
-
-	start := time.Now()
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return ChatResponse{}, fmt.Errorf("openai-compat: chat: %w", err)
-	}
-	defer resp.Body.Close()
-	durationMs := time.Since(start).Milliseconds()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return ChatResponse{}, fmt.Errorf("openai-compat: chat: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var raw openAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return ChatResponse{}, fmt.Errorf("openai-compat: decode chat response: %w", err)
+		return ChatResponse{}, err
 	}
 	if len(raw.Choices) == 0 {
 		return ChatResponse{}, fmt.Errorf("openai-compat: chat: empty choices in response")
@@ -191,10 +203,88 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 
 	return ChatResponse{
 		Content:      raw.Choices[0].Message.Content,
+		ToolCalls:    openAIToolCalls(raw.Choices[0].Message.ToolCalls),
 		DurationMs:   durationMs,
 		InputTokens:  raw.Usage.PromptTokens,
 		OutputTokens: raw.Usage.CompletionTokens,
 	}, nil
+}
+
+func (p *OpenAICompatProvider) postChat(ctx context.Context, body openAIChatRequest) (openAIChatResponse, int64, error) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return openAIChatResponse{}, 0, fmt.Errorf("openai-compat: marshal chat request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint+"/chat/completions", bytes.NewReader(b))
+	if err != nil {
+		return openAIChatResponse{}, 0, fmt.Errorf("openai-compat: build chat request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	p.setAuth(httpReq)
+
+	start := time.Now()
+	resp, err := p.client.Do(httpReq)
+	if err != nil {
+		return openAIChatResponse{}, 0, fmt.Errorf("openai-compat: chat: %w", err)
+	}
+	defer resp.Body.Close()
+	durationMs := time.Since(start).Milliseconds()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return openAIChatResponse{}, durationMs, fmt.Errorf("openai-compat: chat: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var raw openAIChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return openAIChatResponse{}, durationMs, fmt.Errorf("openai-compat: decode chat response: %w", err)
+	}
+
+	return raw, durationMs, nil
+}
+
+func isOpenAICompatToolUnsupported(msg string) bool {
+	msg = strings.ToLower(msg)
+	return strings.Contains(msg, "tool") || strings.Contains(msg, "function")
+}
+
+func openAIToolCalls(raw []struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	} `json:"function"`
+}) []ChatToolCall {
+	var calls []ChatToolCall
+	for _, tc := range raw {
+		if tc.Function.Name == "" {
+			continue
+		}
+		args := parseOpenAIToolArguments(tc.Function.Arguments)
+		calls = append(calls, ChatToolCall{
+			ID:        tc.ID,
+			Name:      tc.Function.Name,
+			Arguments: args,
+		})
+	}
+	return calls
+}
+
+func parseOpenAIToolArguments(raw json.RawMessage) map[string]any {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var encoded string
+	if err := json.Unmarshal(raw, &encoded); err == nil {
+		raw = json.RawMessage(encoded)
+	}
+	var args map[string]any
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil
+	}
+	return args
 }
 
 // openAIEmbedRequest is the body sent to POST /v1/embeddings.

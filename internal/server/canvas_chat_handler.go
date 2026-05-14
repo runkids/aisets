@@ -321,6 +321,66 @@ func findPlainCanvasCallSpans(content string) []canvasActionSpan {
 	return spans
 }
 
+func findBareCanvasCallSpans(content string) []canvasActionSpan {
+	var spans []canvasActionSpan
+	searchStart := 0
+	for {
+		idx := strings.Index(content[searchStart:], "call")
+		if idx < 0 {
+			break
+		}
+		start := searchStart + idx
+		beforeOK := start == 0 || !isCanvasCallIdentChar(content[start-1])
+		after := start + len("call")
+		afterOK := after >= len(content) || !isCanvasCallIdentChar(content[after])
+		if !beforeOK || !afterOK || (after < len(content) && content[after] == ':') {
+			searchStart = start + len("call")
+			continue
+		}
+		jsonStart := after
+		for jsonStart < len(content) && strings.ContainsRune(" \n\r\t", rune(content[jsonStart])) {
+			jsonStart++
+		}
+		hasParen := jsonStart < len(content) && content[jsonStart] == '('
+		if hasParen {
+			jsonStart++
+			for jsonStart < len(content) && strings.ContainsRune(" \n\r\t", rune(content[jsonStart])) {
+				jsonStart++
+			}
+		}
+		if jsonStart >= len(content) || content[jsonStart] != '{' {
+			searchStart = start + len("call")
+			continue
+		}
+		jsonEnd := balancedJSONObjectEnd(content, jsonStart)
+		if jsonEnd < 0 {
+			searchStart = start + len("call")
+			continue
+		}
+		jsonBody := normalizeCanvasActionJSON(content[jsonStart:jsonEnd])
+		if len(parseCanvasActionJSON(jsonBody)) == 0 {
+			searchStart = start + len("call")
+			continue
+		}
+		end := jsonEnd
+		if hasParen {
+			for end < len(content) && strings.ContainsRune(" \n\r\t", rune(content[end])) {
+				end++
+			}
+			if end < len(content) && content[end] == ')' {
+				end++
+			}
+		}
+		spans = append(spans, canvasActionSpan{start: start, end: end, json: jsonBody})
+		searchStart = end
+	}
+	return spans
+}
+
+func isCanvasCallIdentChar(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
+}
+
 func canvasActionBlockLikelyTruncated(content string) bool {
 	idx := strings.LastIndex(content, "```action")
 	if idx < 0 {
@@ -331,13 +391,18 @@ func canvasActionBlockLikelyTruncated(content string) bool {
 }
 
 func parseCanvasActions(content string) (textBody string, actions []canvasAction) {
+	if parsed := parseCanvasActionJSON(content); len(parsed) > 0 {
+		return "", parsed
+	}
+
 	matches := actionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	jsonMatches := jsonActionBlockRe.FindAllStringSubmatchIndex(content, -1)
 	toolMatches := toolCallRe.FindAllStringSubmatchIndex(content, -1)
 	plainCallSpans := findPlainCanvasCallSpans(content)
 	looseQuotedCallSpans := findLooseQuotedCanvasCallSpans(content)
+	bareCallSpans := findBareCanvasCallSpans(content)
 
-	if len(matches) == 0 && len(jsonMatches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 {
+	if len(matches) == 0 && len(jsonMatches) == 0 && len(toolMatches) == 0 && len(plainCallSpans) == 0 && len(looseQuotedCallSpans) == 0 && len(bareCallSpans) == 0 {
 		cleaned := toolCallCleanRe.ReplaceAllString(content, "")
 		return strings.TrimSpace(cleaned), nil
 	}
@@ -358,11 +423,15 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	}
 	spans = append(spans, plainCallSpans...)
 	spans = append(spans, looseQuotedCallSpans...)
+	spans = append(spans, bareCallSpans...)
 	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
 
 	var textParts []string
 	prev := 0
 	for _, s := range spans {
+		if s.start < prev {
+			continue
+		}
 		if s.start > prev {
 			textParts = append(textParts, content[prev:s.start])
 		}
@@ -382,6 +451,37 @@ func parseCanvasActions(content string) (textBody string, actions []canvasAction
 	joined = toolCallCleanRe.ReplaceAllString(joined, "")
 	textBody = strings.TrimSpace(joined)
 	return textBody, actions
+}
+
+func canvasActionsFromToolCalls(calls []llm.ChatToolCall) []canvasAction {
+	var actions []canvasAction
+	for _, call := range calls {
+		if canvasToolCardinality(call.Name) == "" {
+			continue
+		}
+		params := call.Arguments
+		description := ""
+		impact := ""
+		if nested, ok := params["params"].(map[string]any); ok {
+			if rawDescription, ok := params["description"].(string); ok {
+				description = rawDescription
+			}
+			if rawImpact, ok := params["impact"].(string); ok {
+				impact = rawImpact
+			}
+			params = nested
+		}
+		if params == nil {
+			params = map[string]any{}
+		}
+		actions = append(actions, canvasAction{
+			Tool:        call.Name,
+			Params:      params,
+			Description: description,
+			Impact:      impact,
+		})
+	}
+	return actions
 }
 
 func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
@@ -599,11 +699,30 @@ func isCanvasOptimizationTool(tool string) bool {
 	}
 }
 
+func canvasToolSuppressesSameTurnText(tool string) bool {
+	return tool != "focus_card"
+}
+
+func canvasUserAsksVisualIdentification(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"what is this", "what's this", "what is it", "what's it", "what is this doing", "what are they doing", "identify this", "recognize this",
+		"這是什麼", "這是啥", "這是甚麼", "這啥", "這張是什麼", "這張是啥", "他在做什麼", "他在做啥", "在做什麼", "在做啥",
+		"这是什么", "这是啥", "这是甚么", "这啥", "这张是什么", "这张是啥", "他在做什么", "他在做啥", "在做什么", "在做啥",
+	)
+}
+
+func canvasUserAsksOptimizationReview(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"issue", "problem", "quality", "review", "audit", "delivery", "performance", "file size", "too large",
+		"問題", "品质", "品質", "檢查", "检查", "看看有沒有問題", "看看有没有问题", "載入", "加载", "速度", "太大", "檔案太大", "文件太大",
+	)
+}
+
 func canvasProposalAllowed(tool string, latestUserMessage string, options canvasChatOptions) bool {
 	if canvasToolSafe(tool) {
 		return true
 	}
-	if options.ImageOptimizationAdvice && isCanvasOptimizationTool(tool) {
+	if options.ImageOptimizationAdvice && isCanvasOptimizationTool(tool) && canvasUserAsksOptimizationReview(latestUserMessage) && !canvasUserAsksVisualIdentification(latestUserMessage) {
 		return true
 	}
 	if isCanvasOptimizationTool(tool) {
@@ -1110,7 +1229,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 	const canvasOutputTokenLimit = 900
 	for loop := 0; loop < maxToolLoops; loop++ {
-		content, chatResp, err := s.chatVLM(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", canvasOutputTokenLimit)
+		content, chatResp, err := s.chatVLMWithTools(r.Context(), images, backend, modelName, systemPrompt, currentPrompt, "canvas", canvasOutputTokenLimit, canvasLLMTools())
 		if err != nil {
 			sendNDJSON(w, map[string]any{
 				"type":  "error",
@@ -1122,6 +1241,10 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		totalOutputTokens += chatResp.OutputTokens
 
 		textBody, actions := parseCanvasActions(content)
+		if toolCallActions := canvasActionsFromToolCalls(chatResp.ToolCalls); len(toolCallActions) > 0 {
+			actions = toolCallActions
+			textBody = strings.TrimSpace(content)
+		}
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
 		hasCaptureAction := false
@@ -1135,7 +1258,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 
 		var toolResults []string
 		captureExecutedThisLoop := false
-		toolExecutedThisLoop := false
+		nonFocusToolExecutedThisLoop := false
 		for _, act := range actions {
 			if act.Tool == "focus_card" {
 				sendNDJSON(w, map[string]any{
@@ -1143,7 +1266,6 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"cardId": act.Params["cardId"],
 					"label":  act.Params["label"],
 				})
-				toolExecutedThisLoop = true
 				time.Sleep(300 * time.Millisecond)
 				continue
 			}
@@ -1161,7 +1283,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"tool":   act.Tool,
 					"result": result,
 				})
-				toolExecutedThisLoop = true
+				if canvasToolSuppressesSameTurnText(act.Tool) {
+					nonFocusToolExecutedThisLoop = true
+				}
 				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
 					resultJSON, _ := json.Marshal(result)
 					toolResults = append(toolResults, fmt.Sprintf("[Tool Result: %s]\n%s", act.Tool, string(resultJSON)))
@@ -1186,12 +1310,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"targetAssetId":  targetAssetID,
 					"targetAssetIds": targetAssetIDs,
 				})
-				toolExecutedThisLoop = true
+				if canvasToolSuppressesSameTurnText(act.Tool) {
+					nonFocusToolExecutedThisLoop = true
+				}
 			}
 			time.Sleep(150 * time.Millisecond)
 		}
 
-		if textBody != "" && !truncatedAction && !toolExecutedThisLoop {
+		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})

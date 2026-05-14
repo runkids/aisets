@@ -71,6 +71,7 @@ type AICanvasStageProps = {
     status: "thinking" | "acting" | "idle";
   };
   aiNickname?: string;
+  aiGreeting?: string;
   commentMode: boolean;
   setCommentMode: Dispatch<SetStateAction<boolean>>;
   isWorking: boolean;
@@ -118,6 +119,7 @@ export function AICanvasStage({
   dragPreview,
   aiCursor,
   aiNickname,
+  aiGreeting,
   commentMode,
   setCommentMode,
   isWorking,
@@ -355,6 +357,7 @@ export function AICanvasStage({
               label={aiCursor.label}
               status={aiCursor.status}
               nickname={aiNickname}
+              greeting={aiGreeting}
               canvasScale={viewport.scale}
             />
           )}

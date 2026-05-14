@@ -45,6 +45,7 @@ import {
   renderMarkdown,
   tagLabel,
 } from "./canvasUtils";
+import { proposalToolLabel } from "./proposalLabels";
 
 const CONTEXT_MENU_HINT_KEY = "aisets.canvas.contextMenuHintSeen";
 
@@ -1265,7 +1266,7 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
                     : "blue"
           }
         >
-          {card.tool.replaceAll("_", " ")}
+          {proposalToolLabel(t, card.tool)}
         </Badge>
         {targetAssetIds.length > 1 && (
           <Badge tone="blue">
@@ -1378,43 +1379,84 @@ export function AICursor({
   label,
   status,
   nickname,
+  greeting,
   canvasScale = 1,
 }: {
   position: { x: number; y: number };
   label?: string;
   status?: "thinking" | "acting" | "idle";
   nickname?: string;
+  greeting?: string;
   canvasScale?: number;
 }) {
   const active = status === "thinking" || status === "acting";
   const stableScale = canvasScale > 0 ? 1 / canvasScale : 1;
+  const [dismissedGreeting, setDismissedGreeting] = useState("");
+  useEffect(() => {
+    if (!greeting) return;
+    const timer = setTimeout(() => setDismissedGreeting(greeting), 3000);
+    return () => clearTimeout(timer);
+  }, [greeting]);
+  const showGreeting = Boolean(greeting) && dismissedGreeting !== greeting;
+  const showLabel = active || showGreeting;
   return (
     <div
-      className="pointer-events-none absolute z-[60] transition-[transform] duration-[620ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+      className="pointer-events-none absolute z-[1400] transition-[transform] duration-[620ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{
         transform: `translate(${position.x}px, ${position.y}px) scale(${stableScale})`,
         transformOrigin: "left top",
       }}
     >
-      <div className="flex flex-col items-start">
-        <MousePointer2
-          size={22}
-          strokeWidth={2.5}
-          className={cn(
-            "drop-shadow-md transition-all duration-500",
-            active
-              ? "fill-g-purple text-white"
-              : "fill-g-purple/60 text-white/70",
-            status === "thinking" && "animate-pulse",
-          )}
-        />
+      <div
+        className={cn(
+          "flex flex-col items-start",
+          showGreeting && "animate-[cursorBounce_600ms_ease-in-out]",
+        )}
+        style={
+          showGreeting
+            ? ({
+                "--bounce-1": "-12px",
+                "--bounce-2": "4px",
+                "--bounce-3": "-6px",
+                "--bounce-4": "2px",
+              } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {showGreeting ? (
+          <span
+            className="inline-block text-[22px] leading-none drop-shadow-md animate-[wave_800ms_ease-in-out_2]"
+            style={{ transformOrigin: "70% 70%" }}
+          >
+            👋
+          </span>
+        ) : status === "thinking" ? (
+          <span className="inline-block text-[18px] leading-none drop-shadow-md animate-[cursorFloat_1.2s_ease-in-out_infinite]">
+            🤔
+          </span>
+        ) : status === "acting" ? (
+          <span className="inline-block text-[18px] leading-none drop-shadow-md animate-[cursorWrite_600ms_ease-in-out_infinite]">
+            ✍️
+          </span>
+        ) : (
+          <MousePointer2
+            size={22}
+            strokeWidth={2.5}
+            className="drop-shadow-md transition-all duration-500 fill-g-purple/60 text-white/70"
+          />
+        )}
         <div
           className={cn(
-            "-mt-1 ml-3 flex items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-opacity duration-500",
-            active ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
+            "-mt-1 ml-3 flex items-center gap-1 whitespace-nowrap rounded-g-sm px-1.5 py-0.5 text-[10px] font-[590] tracking-g-ui text-white shadow-g-sm transition-all duration-500",
+            showLabel ? "bg-g-purple opacity-100" : "bg-g-purple/60 opacity-60",
           )}
         >
-          <span>{nickname || "AI"}</span>
+          <span>{nickname || "Aisets"}</span>
+          {showGreeting && !active && greeting && (
+            <span className="max-w-[360px] min-w-0 whitespace-nowrap opacity-80 animate-[fadeIn_400ms_var(--g-ease)]">
+              · {greeting}
+            </span>
+          )}
           {active && label && (
             <span className="max-w-[360px] min-w-0 whitespace-nowrap opacity-80">
               · {label}

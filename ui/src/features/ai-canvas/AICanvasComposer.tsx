@@ -15,7 +15,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { TFunction } from "i18next";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import {
@@ -32,7 +32,13 @@ import {
   type ChatHistoryEntry,
   type ProposalCanvasCard,
 } from "./aiCanvasState";
+import {
+  canvasUserPromptHistory,
+  navigateCanvasPromptHistory,
+  type CanvasPromptHistoryState,
+} from "./canvasPromptHistory";
 import { renderMarkdown } from "./canvasUtils";
+import { proposalToolLabel } from "./proposalLabels";
 import type {
   AIBackendOption,
   MentionableImageCard,
@@ -150,6 +156,15 @@ export function AICanvasComposer({
     null,
   );
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const promptHistoryNavigationRef = useRef<CanvasPromptHistoryState>({
+    index: null,
+    draft: "",
+  });
+  const userPromptHistory = useMemo(
+    () => canvasUserPromptHistory(chatHistory),
+    [chatHistory],
+  );
 
   const currentTargetPreview = currentTargets.find((target) => target.src);
   const currentTargetText =
@@ -171,6 +186,19 @@ export function AICanvasComposer({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [chatHistory.length, collapsed, height, isWorking, latestChatContent]);
+
+  useEffect(() => {
+    promptHistoryNavigationRef.current = { index: null, draft: "" };
+  }, [chatHistory.length]);
+
+  function movePromptCursorToEnd() {
+    window.requestAnimationFrame(() => {
+      const el = promptInputRef.current;
+      if (!el) return;
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    });
+  }
 
   return (
     <div
@@ -407,7 +435,7 @@ export function AICanvasComposer({
               {selectedProposal?.status === "pending" ? (
                 <>
                   <Badge tone="amber">
-                    {selectedProposal.tool.replaceAll("_", " ")}
+                    {proposalToolLabel(t, selectedProposal.tool)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">
                     {selectedProposal.description}
@@ -703,12 +731,60 @@ export function AICanvasComposer({
               </DropdownMenuPrimitive.Portal>
             </DropdownMenuPrimitive.Root>
             <textarea
+              ref={promptInputRef}
               value={prompt}
               placeholder={t("aiCanvas.composerPlaceholder")}
               className="max-h-20 min-h-5 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-5 text-white outline-none placeholder:text-white/35"
               rows={1}
-              onChange={(event) => setPrompt(event.target.value)}
+              onChange={(event) => {
+                promptHistoryNavigationRef.current = {
+                  index: null,
+                  draft: event.target.value,
+                };
+                setPrompt(event.target.value);
+              }}
               onKeyDown={(event) => {
+                if (
+                  (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+                  !event.shiftKey &&
+                  !event.altKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  const browsingHistory =
+                    promptHistoryNavigationRef.current.index !== null;
+                  const isMultiline = event.currentTarget.value.includes("\n");
+                  const caretAtStart =
+                    event.currentTarget.selectionStart === 0 &&
+                    event.currentTarget.selectionEnd === 0;
+                  const caretAtEnd =
+                    event.currentTarget.selectionStart ===
+                      event.currentTarget.value.length &&
+                    event.currentTarget.selectionEnd ===
+                      event.currentTarget.value.length;
+                  const shouldNavigateHistory =
+                    event.key === "ArrowUp"
+                      ? browsingHistory || !isMultiline || caretAtStart
+                      : browsingHistory && (!isMultiline || caretAtEnd);
+
+                  if (shouldNavigateHistory) {
+                    const next = navigateCanvasPromptHistory(
+                      userPromptHistory,
+                      event.key === "ArrowUp" ? "previous" : "next",
+                      promptHistoryNavigationRef.current,
+                      event.currentTarget.value,
+                    );
+                    if (next) {
+                      event.preventDefault();
+                      promptHistoryNavigationRef.current = next.state;
+                      setPrompt(next.prompt);
+                      movePromptCursorToEnd();
+                      return;
+                    }
+                  }
+                }
+
                 if (
                   event.key === "Enter" &&
                   !event.shiftKey &&

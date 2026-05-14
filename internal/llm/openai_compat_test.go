@@ -186,6 +186,108 @@ func TestOpenAICompatChatWithVision(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatChatWithTools(t *testing.T) {
+	var capturedBody map[string]interface{}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{
+			"choices":[{
+				"message":{
+					"content":"",
+					"tool_calls":[{
+						"id":"call-1",
+						"type":"function",
+						"function":{
+							"name":"search_assets",
+							"arguments":"{\"q\":\"dog\",\"limit\":1}"
+						}
+					}]
+				}
+			}],
+			"usage":{"prompt_tokens":12,"completion_tokens":4}
+		}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Model: "test-model",
+		Messages: []ChatMessage{
+			{Role: "user", Content: "find a dog"},
+		},
+		Tools: []ChatTool{{
+			Name:        "search_assets",
+			Description: "Search assets",
+			Parameters:  map[string]any{"type": "object"},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	tools, ok := capturedBody["tools"].([]interface{})
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools missing from request: %#v", capturedBody["tools"])
+	}
+	if len(resp.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %#v", resp.ToolCalls)
+	}
+	if resp.ToolCalls[0].Name != "search_assets" {
+		t.Fatalf("tool name = %q", resp.ToolCalls[0].Name)
+	}
+	if resp.ToolCalls[0].Arguments["q"] != "dog" {
+		t.Fatalf("arguments = %#v", resp.ToolCalls[0].Arguments)
+	}
+	if resp.InputTokens != 12 || resp.OutputTokens != 4 {
+		t.Fatalf("usage = %d/%d", resp.InputTokens, resp.OutputTokens)
+	}
+}
+
+func TestOpenAICompatChatWithToolsFallsBackWhenUnsupported(t *testing.T) {
+	attempts := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var capturedBody map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if _, hasTools := capturedBody["tools"]; hasTools {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"error":{"message":"tools are not supported"}}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"fallback"}}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Model:    "test-model",
+		Messages: []ChatMessage{{Role: "user", Content: "hi"}},
+		Tools:    []ChatTool{{Name: "search_assets"}},
+	})
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	if resp.Content != "fallback" {
+		t.Fatalf("content = %q", resp.Content)
+	}
+}
+
 func TestOpenAICompatEmbed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/embeddings" || r.Method != http.MethodPost {

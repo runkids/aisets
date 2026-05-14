@@ -137,6 +137,7 @@
     "noMentionImages": "No images on the canvas yet.",
     "removeMention": "Remove mention",
     "attachImage": "Attach image",
+    "commentMode": "Comment mode",
     "extractText": "Extract image text",
     "extractTextDisabled": "Select or mention a catalog image first.",
     "extractTextPrompt": "Extract visible text from the selected or mentioned catalog images with OCR. Return the result grouped by filename.",
@@ -176,6 +177,22 @@
     "layerChanged": "Changed layer",
     "proposalTags": "Tags",
     "proposalDescription": "Description",
+    "proposalTool": {
+      "compress_image": "Compress image",
+      "resize_image": "Resize image",
+      "convert_image": "Convert image",
+      "update_tags": "Update tags",
+      "batch_update_tags": "Update tags",
+      "update_description": "Update description",
+      "update_ocr_text": "Update OCR text",
+      "rename_asset": "Rename asset",
+      "move_asset": "Move asset",
+      "copy_asset": "Copy asset",
+      "delete_asset": "Delete asset",
+      "favorite_asset": "Favorite asset",
+      "batch_favorite_assets": "Favorite assets",
+      "export_asset": "Export asset"
+    },
     "targetKind": {
       "comment": "Comment",
       "assistant": "AI card",
@@ -243,7 +260,8 @@
     "currentSession": "Current",
     "newCanvas": "New canvas",
     "newCanvasMessage": "Start a fresh canvas. Your current session is still saved and can be loaded from the sessions list.",
-    "newCanvasConfirm": "New canvas"
+    "newCanvasConfirm": "New canvas",
+    "greeting": "Welcome back!"
   },
   "favorites": {
     "add": "Add to Favorites",
