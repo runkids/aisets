@@ -189,6 +189,15 @@ func TestBuildCanvasUserPrompt_ImageOptimizationAdviceOff(t *testing.T) {
 	}
 }
 
+func TestBuildCanvasUserPrompt_IncludesCanvasScale(t *testing.T) {
+	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "幫我移動這張到右邊"}}, canvasSnapshot{}, canvasChatOptions{}, "zh-TW")
+	for _, want := range []string{"100px is a small nudge", "200-350px is a nearby move", "600px+ is a large jump"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
 func TestBuildCanvasUserPrompt_UsesLatestUserLanguage(t *testing.T) {
 	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "再幫我找一張類似家庭照的 family_danran.png"}}, canvasSnapshot{}, canvasChatOptions{}, "en")
 	if !strings.Contains(prompt, "Respond in Traditional Chinese") {
@@ -240,6 +249,9 @@ func TestCanvasProposalAllowed_AllowsExplicitMetadataRequests(t *testing.T) {
 func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testing.T) {
 	if !canvasProposalAllowed("compress_image", "幫我看看這張圖有沒有品質問題", canvasChatOptions{ImageOptimizationAdvice: true}) {
 		t.Fatal("optimization advice on should allow review-driven optimization proposals")
+	}
+	if !canvasProposalAllowed("compress_image", "給我建議吧", canvasChatOptions{ImageOptimizationAdvice: true}) {
+		t.Fatal("optimization advice on should allow proactive optimization proposals for general advice")
 	}
 	if canvasProposalAllowed("compress_image", "這是啥", canvasChatOptions{ImageOptimizationAdvice: true}) {
 		t.Fatal("visual identification should not create optimization proposals")

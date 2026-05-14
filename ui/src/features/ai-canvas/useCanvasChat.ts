@@ -1,4 +1,9 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type {
+  Dispatch,
+  MutableRefObject,
+  RefObject,
+  SetStateAction,
+} from "react";
 import { useRef } from "react";
 import type { TFunction } from "i18next";
 import {
@@ -46,6 +51,16 @@ function isScreenStableCard(card: CanvasCard) {
     card.kind === "proposal" ||
     card.kind === "operation"
   );
+}
+
+function aiCardTransform(
+  card: CanvasCard,
+  x: number,
+  y: number,
+  scale: number,
+) {
+  const stableScale = isScreenStableCard(card) && scale > 0 ? 1 / scale : 1;
+  return `translate3d(${x}px, ${y}px, 0) scale(${stableScale})`;
 }
 
 export function focusCursorPosition(
@@ -219,6 +234,7 @@ export function useCanvasChat(opts: {
   imageOptimizationAdvice: boolean;
   t: TFunction;
   rootRef: RefObject<HTMLDivElement | null>;
+  cardElementsRef: MutableRefObject<Map<string, HTMLElement>>;
   setCards: Dispatch<SetStateAction<CanvasCard[]>>;
   setSelectedCardIds: Dispatch<SetStateAction<string[]>>;
   setChatHistory: Dispatch<SetStateAction<ChatHistoryEntry[]>>;
@@ -249,6 +265,7 @@ export function useCanvasChat(opts: {
     imageOptimizationAdvice,
     t,
     rootRef,
+    cardElementsRef,
     setCards,
     setSelectedCardIds,
     setChatHistory,
@@ -412,6 +429,19 @@ export function useCanvasChat(opts: {
       const stepMs = 34;
       animationEndMs = Math.max(animationEndMs, delay + (steps + 1) * stepMs);
       queueTimer(() => {
+        const element = cardElementsRef.current.get(cardId);
+        const previousWillChange = element?.style.willChange ?? "";
+        const previousZIndex = element?.style.zIndex ?? "";
+        if (element) {
+          element.style.willChange = "transform";
+          element.style.zIndex = "1300";
+          element.style.transform = aiCardTransform(
+            card,
+            from.x,
+            from.y,
+            viewport.scale,
+          );
+        }
         setAiCursor({
           x: from.x + cardWidth / 2,
           y: from.y + 18,
@@ -419,7 +449,7 @@ export function useCanvasChat(opts: {
           emoji: "move",
           status: "acting",
         });
-        setDragPreview({ cardId, x: from.x, y: from.y });
+        if (!element) setDragPreview({ cardId, x: from.x, y: from.y });
         for (let i = 1; i <= steps; i++) {
           queueTimer(() => {
             const progress = i / steps;
@@ -438,11 +468,30 @@ export function useCanvasChat(opts: {
               emoji: "move",
               status: "acting",
             });
-            setDragPreview({ cardId, x: next.x, y: next.y });
+            if (element) {
+              element.style.transform = aiCardTransform(
+                card,
+                next.x,
+                next.y,
+                viewport.scale,
+              );
+            } else {
+              setDragPreview({ cardId, x: next.x, y: next.y });
+            }
           }, i * stepMs);
         }
         queueTimer(
           () => {
+            if (element) {
+              element.style.transform = aiCardTransform(
+                card,
+                x,
+                y,
+                viewport.scale,
+              );
+              element.style.willChange = previousWillChange;
+              element.style.zIndex = previousZIndex;
+            }
             setCards((cur) =>
               cur.map((c) => (c.id === cardId ? { ...c, x, y } : c)),
             );

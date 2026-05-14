@@ -524,6 +524,7 @@ export function AICanvasView({
     imageOptimizationAdvice,
     t,
     rootRef,
+    cardElementsRef,
     setCards,
     setSelectedCardIds,
     setChatHistory,
@@ -1283,6 +1284,15 @@ export function AICanvasView({
     appendPromptToken(`@${target.name}`);
   }
 
+  function mentionAllImageCards() {
+    const ids = mentionableImageCards.map((card) => card.id);
+    setMentionedCardIds((current) => [
+      ...current,
+      ...ids.filter((id) => !current.includes(id)),
+    ]);
+    appendPromptToken("@all");
+  }
+
   function mentionSelectedAsset() {
     const targets = selectedAssets
       .map((asset) =>
@@ -1539,6 +1549,7 @@ export function AICanvasView({
         mentionableImageCards={mentionableImageCards}
         mentionedCardIds={mentionedCardIds}
         mentionImageCard={mentionImageCard}
+        mentionAllImageCards={mentionAllImageCards}
         prompt={prompt}
         setPrompt={setPrompt}
         handleAsk={handleAsk}

@@ -718,6 +718,8 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	}
 	b.WriteString("- The canvas is large/unbounded. You may use much wider coordinates than the current cluster; do NOT assume the visible whitespace is unavailable.\n")
 	b.WriteString("- Card positions are top-left canvas coordinates. Use each card's size when spacing items; do not assume all cards are 320px wide.\n")
+	b.WriteString("- Coordinate scale: 100px is a small nudge, 200-350px is a nearby move, 600px+ is a large jump. Directional requests like right/left/up/down usually mean a nearby relative move, not a jump across the board.\n")
+	b.WriteString("- To place one card beside another, use target.x + target.width + 80-160px for the next x coordinate. Keep y close unless the user asks for a diagonal or new row.\n")
 	b.WriteString("- Higher layer values render later/on top. arrange_cards and move_card only change x/y, not z-index, so avoid overlap instead of relying on stacking.\n")
 	b.WriteString("- resize_card changes only the visual displayed card width. Use it to make a hero image larger or supporting images smaller before arranging.\n")
 	b.WriteString("- For a spread-out layout, leave at least 160px horizontal and 120px vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
@@ -838,7 +840,7 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 	if canvasToolSafe(tool) {
 		return true
 	}
-	if options.ImageOptimizationAdvice && isCanvasOptimizationTool(tool) && canvasUserAsksOptimizationReview(latestUserMessage) && !canvasUserAsksVisualIdentification(latestUserMessage) {
+	if options.ImageOptimizationAdvice && isCanvasOptimizationTool(tool) && !canvasUserAsksVisualIdentification(latestUserMessage) {
 		return true
 	}
 	if isCanvasOptimizationTool(tool) {

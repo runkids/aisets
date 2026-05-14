@@ -1,4 +1,7 @@
 import {
+  useEffect,
+  useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type Dispatch,
@@ -141,6 +144,204 @@ export function AICanvasStage({
   const [deleteConfirmCard, setDeleteConfirmCard] = useState<CanvasCard | null>(
     null,
   );
+  const latestHandlersRef = useRef({
+    onAddComment,
+    onCreateImagePreview,
+    onDeleteCard,
+    onDragEnd,
+    onDragMove,
+    onDragStart,
+    onDuplicateCard,
+    onOpenAsset,
+    onRegisterCard,
+  });
+  useEffect(() => {
+    latestHandlersRef.current = {
+      onAddComment,
+      onCreateImagePreview,
+      onDeleteCard,
+      onDragEnd,
+      onDragMove,
+      onDragStart,
+      onDuplicateCard,
+      onOpenAsset,
+      onRegisterCard,
+    };
+  }, [
+    onAddComment,
+    onCreateImagePreview,
+    onDeleteCard,
+    onDragEnd,
+    onDragMove,
+    onDragStart,
+    onDuplicateCard,
+    onOpenAsset,
+    onRegisterCard,
+  ]);
+  const hasOpenAssetHandler = Boolean(onOpenAsset);
+
+  const renderedCards = useMemo(() => {
+    return cards.map((card) => {
+      if (hideNonImageCards && !isVisibleImageCard(card)) return null;
+      return (
+        <CardShell
+          key={card.id}
+          card={card}
+          selected={selectedCardIds.includes(card.id)}
+          width={cardWidths[card.id]}
+          canvasScale={viewport.scale}
+          onSelect={(id, shiftKey) => {
+            setSelectedCardIds((prev) =>
+              shiftKey
+                ? prev.includes(id)
+                  ? prev.filter((x) => x !== id)
+                  : [...prev, id]
+                : [id],
+            );
+            setCards((prev) => {
+              const idx = prev.findIndex((c) => c.id === id);
+              if (idx < 0 || idx === prev.length - 1) return prev;
+              const next = [...prev];
+              next.push(next.splice(idx, 1)[0]);
+              return next;
+            });
+          }}
+          onDragStart={(event, target) =>
+            latestHandlersRef.current.onDragStart(event, target)
+          }
+          onDragMove={(event) => latestHandlersRef.current.onDragMove(event)}
+          onDragEnd={(event) => latestHandlersRef.current.onDragEnd(event)}
+          onDelete={(target) => latestHandlersRef.current.onDeleteCard(target)}
+          onResize={
+            isImageCard(card)
+              ? (id, w) => {
+                  if (
+                    selectedCardIds.length > 1 &&
+                    selectedCardIds.includes(id)
+                  ) {
+                    const oldW = cardWidths[id] ?? CARD_WIDTH;
+                    const ratio = w / oldW;
+                    setCardWidths((prev) => {
+                      const next = { ...prev, [id]: w };
+                      for (const peerId of selectedCardIds) {
+                        if (peerId === id) continue;
+                        next[peerId] = Math.max(
+                          80,
+                          (prev[peerId] ?? CARD_WIDTH) * ratio,
+                        );
+                      }
+                      return next;
+                    });
+                  } else {
+                    setCardWidths((prev) => ({ ...prev, [id]: w }));
+                  }
+                }
+              : undefined
+          }
+          onRegister={(id, node) =>
+            latestHandlersRef.current.onRegisterCard(id, node)
+          }
+          position={
+            dragPreview?.cardId === card.id
+              ? { x: dragPreview.x, y: dragPreview.y }
+              : undefined
+          }
+          contextMenu={
+            card.kind === "asset" ? (
+              <AssetContextMenu
+                card={card}
+                onOpenAsset={
+                  hasOpenAssetHandler
+                    ? () =>
+                        latestHandlersRef.current.onOpenAsset?.(card.asset.id)
+                    : undefined
+                }
+                onRenderPreview={(outputFormat) =>
+                  void latestHandlersRef.current.onCreateImagePreview(
+                    card,
+                    "",
+                    outputFormat,
+                  )
+                }
+                onAddComment={() => {
+                  setSelectedCardIds([card.id]);
+                  setCommentMode(true);
+                }}
+                onDuplicate={() =>
+                  latestHandlersRef.current.onDuplicateCard(card)
+                }
+                onDelete={() => setDeleteConfirmCard(card)}
+                working={isWorking}
+              />
+            ) : card.kind === "upload" ? (
+              <UploadContextMenu
+                card={card}
+                onAddComment={() => {
+                  setSelectedCardIds([card.id]);
+                  setCommentMode(true);
+                }}
+                onDuplicate={() =>
+                  latestHandlersRef.current.onDuplicateCard(card)
+                }
+                onDelete={() => setDeleteConfirmCard(card)}
+              />
+            ) : undefined
+          }
+        >
+          {card.kind === "asset" ? (
+            <AssetCardBody
+              card={card}
+              comments={commentsByAnchor.get(card.id) ?? []}
+              hideOverlays={hideNonImageCards}
+              commentEnabled={commentMode}
+              canvasScale={viewport.scale}
+              onSelectComment={(id) => setSelectedCardIds([id])}
+              onCreateComment={(anchorCard, text, region) =>
+                latestHandlersRef.current.onAddComment(anchorCard, text, region)
+              }
+            />
+          ) : card.kind === "comment" ? (
+            <CommentCardBody card={card} />
+          ) : card.kind === "assistant" ? (
+            <AssistantCardBody card={card} />
+          ) : card.kind === "variant" ? (
+            <VariantCardBody card={card} />
+          ) : card.kind === "proposal" ? (
+            <ProposalCardBody card={card} />
+          ) : card.kind === "operation" ? (
+            <OperationCardBody card={card} />
+          ) : card.kind === "upload" ? (
+            <UploadCardBody
+              card={card}
+              comments={commentsByAnchor.get(card.id) ?? []}
+              hideOverlays={hideNonImageCards}
+              commentEnabled={commentMode}
+              canvasScale={viewport.scale}
+              onSelectComment={(id) => setSelectedCardIds([id])}
+              onCreateComment={(anchorCard, text, region) =>
+                latestHandlersRef.current.onAddComment(anchorCard, text, region)
+              }
+            />
+          ) : null}
+        </CardShell>
+      );
+    });
+  }, [
+    cardWidths,
+    cards,
+    commentsByAnchor,
+    commentMode,
+    dragPreview,
+    hideNonImageCards,
+    hasOpenAssetHandler,
+    isWorking,
+    selectedCardIds,
+    setCards,
+    setCardWidths,
+    setCommentMode,
+    setSelectedCardIds,
+    viewport.scale,
+  ]);
 
   return (
     <>
@@ -213,134 +414,7 @@ export function AICanvasStage({
               ))}
             </svg>
           )}
-          {cards.map((card) => {
-            if (hideNonImageCards && !isVisibleImageCard(card)) return null;
-            return (
-              <CardShell
-                key={card.id}
-                card={card}
-                selected={selectedCardIds.includes(card.id)}
-                width={cardWidths[card.id]}
-                canvasScale={viewport.scale}
-                onSelect={(id, shiftKey) => {
-                  setSelectedCardIds((prev) =>
-                    shiftKey
-                      ? prev.includes(id)
-                        ? prev.filter((x) => x !== id)
-                        : [...prev, id]
-                      : [id],
-                  );
-                  setCards((prev) => {
-                    const idx = prev.findIndex((c) => c.id === id);
-                    if (idx < 0 || idx === prev.length - 1) return prev;
-                    const next = [...prev];
-                    next.push(next.splice(idx, 1)[0]);
-                    return next;
-                  });
-                }}
-                onDragStart={onDragStart}
-                onDragMove={onDragMove}
-                onDragEnd={onDragEnd}
-                onDelete={onDeleteCard}
-                onResize={
-                  isImageCard(card)
-                    ? (id, w) => {
-                        if (
-                          selectedCardIds.length > 1 &&
-                          selectedCardIds.includes(id)
-                        ) {
-                          const oldW = cardWidths[id] ?? CARD_WIDTH;
-                          const ratio = w / oldW;
-                          setCardWidths((prev) => {
-                            const next = { ...prev, [id]: w };
-                            for (const peerId of selectedCardIds) {
-                              if (peerId === id) continue;
-                              next[peerId] = Math.max(
-                                80,
-                                (prev[peerId] ?? CARD_WIDTH) * ratio,
-                              );
-                            }
-                            return next;
-                          });
-                        } else {
-                          setCardWidths((prev) => ({ ...prev, [id]: w }));
-                        }
-                      }
-                    : undefined
-                }
-                onRegister={onRegisterCard}
-                position={
-                  dragPreview?.cardId === card.id
-                    ? { x: dragPreview.x, y: dragPreview.y }
-                    : undefined
-                }
-                contextMenu={
-                  card.kind === "asset" ? (
-                    <AssetContextMenu
-                      card={card}
-                      onOpenAsset={
-                        onOpenAsset
-                          ? () => onOpenAsset(card.asset.id)
-                          : undefined
-                      }
-                      onRenderPreview={(outputFormat) =>
-                        void onCreateImagePreview(card, "", outputFormat)
-                      }
-                      onAddComment={() => {
-                        setSelectedCardIds([card.id]);
-                        setCommentMode(true);
-                      }}
-                      onDuplicate={() => onDuplicateCard(card)}
-                      onDelete={() => setDeleteConfirmCard(card)}
-                      working={isWorking}
-                    />
-                  ) : card.kind === "upload" ? (
-                    <UploadContextMenu
-                      card={card}
-                      onAddComment={() => {
-                        setSelectedCardIds([card.id]);
-                        setCommentMode(true);
-                      }}
-                      onDuplicate={() => onDuplicateCard(card)}
-                      onDelete={() => setDeleteConfirmCard(card)}
-                    />
-                  ) : undefined
-                }
-              >
-                {card.kind === "asset" ? (
-                  <AssetCardBody
-                    card={card}
-                    comments={commentsByAnchor.get(card.id) ?? []}
-                    hideOverlays={hideNonImageCards}
-                    commentEnabled={commentMode}
-                    canvasScale={viewport.scale}
-                    onSelectComment={(id) => setSelectedCardIds([id])}
-                    onCreateComment={onAddComment}
-                  />
-                ) : card.kind === "comment" ? (
-                  <CommentCardBody card={card} />
-                ) : card.kind === "assistant" ? (
-                  <AssistantCardBody card={card} />
-                ) : card.kind === "variant" ? (
-                  <VariantCardBody card={card} />
-                ) : card.kind === "proposal" ? (
-                  <ProposalCardBody card={card} />
-                ) : card.kind === "operation" ? (
-                  <OperationCardBody card={card} />
-                ) : card.kind === "upload" ? (
-                  <UploadCardBody
-                    card={card}
-                    comments={commentsByAnchor.get(card.id) ?? []}
-                    hideOverlays={hideNonImageCards}
-                    commentEnabled={commentMode}
-                    canvasScale={viewport.scale}
-                    onSelectComment={(id) => setSelectedCardIds([id])}
-                    onCreateComment={onAddComment}
-                  />
-                ) : null}
-              </CardShell>
-            );
-          })}
+          {renderedCards}
           {groupBounds && !hideNonImageCards && (
             <div
               className="pointer-events-none absolute z-[38] rounded-g-sm border-2 border-dashed border-[#0d99ff]"

@@ -92,6 +92,7 @@ type AICanvasComposerProps = {
   mentionableImageCards: MentionableImageCard[];
   mentionedCardIds: string[];
   mentionImageCard: (cardId: string) => void;
+  mentionAllImageCards: () => void;
   prompt: string;
   setPrompt: StateSetter<string>;
   handleAsk: () => void | Promise<void>;
@@ -140,6 +141,7 @@ export function AICanvasComposer({
   mentionableImageCards,
   mentionedCardIds,
   mentionImageCard,
+  mentionAllImageCards,
   prompt,
   setPrompt,
   handleAsk,
@@ -697,35 +699,69 @@ export function AICanvasComposer({
                       {t("aiCanvas.noMentionImages")}
                     </div>
                   ) : (
-                    mentionableImageCards.map((card) => (
-                      <DropdownMenuPrimitive.Item
-                        key={card.id}
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          mentionImageCard(card.id);
-                        }}
-                        className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                    <>
+                      {mentionableImageCards.length > 1 && (
+                        <DropdownMenuPrimitive.Item
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            mentionAllImageCards();
+                          }}
+                          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                        >
+                          <span className="flex size-8 items-center justify-center rounded-[10px] border border-white/[0.1] bg-white/[0.06] text-g-caption text-white/60">
+                            {mentionableImageCards.length}
+                          </span>
+                          <span className="font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
+                            {t("common.all")}
+                          </span>
+                          {mentionableImageCards.every((c) =>
+                            mentionedCardIds.includes(c.id),
+                          ) && (
+                            <Check
+                              size={14}
+                              className="ml-auto shrink-0 text-white"
+                            />
+                          )}
+                        </DropdownMenuPrimitive.Item>
+                      )}
+                      <div
+                        className="max-h-[320px] overflow-y-auto"
+                        data-ai-canvas-scroll="true"
                       >
-                        <AssetThumbnail
-                          src={card.src}
-                          size="sm"
-                          className="size-8 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
-                          imageClassName="max-h-6 max-w-6"
-                          draggable={false}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
-                            {card.name}
-                          </span>
-                          <span className="block truncate text-g-chip text-white/42">
-                            {card.meta}
-                          </span>
-                        </span>
-                        {mentionedCardIds.includes(card.id) && (
-                          <Check size={14} className="shrink-0 text-white" />
-                        )}
-                      </DropdownMenuPrimitive.Item>
-                    ))
+                        {mentionableImageCards.map((card) => (
+                          <DropdownMenuPrimitive.Item
+                            key={card.id}
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              mentionImageCard(card.id);
+                            }}
+                            className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[12px] px-2 py-1.5 font-g text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
+                          >
+                            <AssetThumbnail
+                              src={card.src}
+                              size="sm"
+                              className="size-8 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                              imageClassName="max-h-6 max-w-6"
+                              draggable={false}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
+                                {card.name}
+                              </span>
+                              <span className="block truncate text-g-chip text-white/42">
+                                {card.meta}
+                              </span>
+                            </span>
+                            {mentionedCardIds.includes(card.id) && (
+                              <Check
+                                size={14}
+                                className="shrink-0 text-white"
+                              />
+                            )}
+                          </DropdownMenuPrimitive.Item>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </DropdownMenuPrimitive.Content>
               </DropdownMenuPrimitive.Portal>

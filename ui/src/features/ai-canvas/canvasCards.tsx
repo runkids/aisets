@@ -1452,11 +1452,11 @@ export function AICursor({
     }
     if (status === "thinking") {
       return (
-        <div className="flex h-7 w-7 items-center justify-center gap-[3px] rounded-full bg-g-purple/15">
+        <div className="flex h-[22px] w-[22px] items-center justify-center gap-[2.5px] rounded-full bg-g-purple/80 shadow-md">
           {[0, 1, 2].map((i) => (
             <span
               key={i}
-              className="block h-[5px] w-[5px] rounded-full bg-g-purple animate-[cursorDot_1.2s_ease-in-out_infinite]"
+              className="block h-1 w-1 rounded-full bg-white animate-[cursorDot_1.2s_ease-in-out_infinite]"
               style={{ animationDelay: `${i * 160}ms` }}
             />
           ))}
@@ -1468,11 +1468,11 @@ export function AICursor({
       return (
         <div
           className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-full bg-g-purple/15",
+            "flex h-[22px] w-[22px] items-center justify-center rounded-full bg-g-purple/80 shadow-md",
             mapped.anim,
           )}
         >
-          <Icon size={15} strokeWidth={1.8} className="text-g-purple" />
+          <Icon size={12} strokeWidth={2} className="text-white" />
         </div>
       );
     }
