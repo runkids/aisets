@@ -13,6 +13,7 @@ import {
   candidatePreviewMentionsFromSearchResult,
   focusCursorPosition,
   formatOCRActionText,
+  resizeCursorPosition,
   resolveCanvasActionCardId,
   searchResultCardPosition,
   searchResultNeedsUserConfirmation,
@@ -80,6 +81,21 @@ describe("focusCursorPosition", () => {
     expect(
       focusCursorPosition(card, { [card.id]: { width: 360, height: 420 } }, 1),
     ).toEqual({ x: 274, y: 402 });
+  });
+});
+
+describe("resizeCursorPosition", () => {
+  it("keeps the cursor tip on the bottom-right resize handle under viewport zoom", () => {
+    const card = makeUploadCard();
+
+    expect(
+      resizeCursorPosition(
+        card,
+        { [card.id]: { width: 300, height: 150 } },
+        2,
+        500,
+      ),
+    ).toEqual({ x: 597, y: 446 });
   });
 });
 

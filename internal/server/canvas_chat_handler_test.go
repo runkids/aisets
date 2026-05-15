@@ -1173,6 +1173,58 @@ func TestBuildCanvasFollowupPromptDuplicateWorkflowKeepsCleanupContext(t *testin
 	}
 }
 
+func TestApplyCanvasActionResultToSnapshotProjectsGeometryAndLayer(t *testing.T) {
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-a"},
+		Cards: []canvasCardSnapshot{
+			{
+				ID:     "card-a",
+				Kind:   "asset",
+				X:      10,
+				Y:      20,
+				Width:  220,
+				Height: 160,
+				Asset:  &canvasAssetSnapshot{ID: "asset-a", RepoPath: "img/a.png", Ext: ".png", Width: 8, Height: 8},
+			},
+			{
+				ID:     "card-b",
+				Kind:   "asset",
+				X:      280,
+				Y:      20,
+				Width:  220,
+				Height: 160,
+				Asset:  &canvasAssetSnapshot{ID: "asset-b", RepoPath: "img/b.png", Ext: ".png", Width: 8, Height: 8},
+			},
+		},
+	}
+	canvas = applyCanvasActionResultToSnapshot(canvas, "resize_card", map[string]any{
+		"cardId": "card-a",
+		"width":  float64(420),
+	})
+	canvas = applyCanvasActionResultToSnapshot(canvas, "move_card", map[string]any{
+		"cardId": "card-a",
+		"x":      float64(240),
+		"y":      float64(180),
+	})
+	canvas = applyCanvasActionResultToSnapshot(canvas, "bring_cards_to_front", map[string]any{
+		"cardIds": []string{"card-a"},
+	})
+
+	card := canvasCardByID(canvas, "card-a")
+	if card == nil {
+		t.Fatal("missing projected card")
+	}
+	if card.X != 240 || card.Y != 180 || card.Width != 420 || card.Height != 420 {
+		t.Fatalf("projected card = pos %.0f,%.0f size %.0fx%.0f", card.X, card.Y, card.Width, card.Height)
+	}
+	if got := canvas.Cards[len(canvas.Cards)-1].ID; got != "card-a" {
+		t.Fatalf("top card = %s, want card-a", got)
+	}
+	if card.LayerIndex != len(canvas.Cards)-1 {
+		t.Fatalf("layer = %d, want %d", card.LayerIndex, len(canvas.Cards)-1)
+	}
+}
+
 func TestCanvasGeneratedImagePathCandidates(t *testing.T) {
 	input := `Generated:
 ![battle](/tmp/aisets battle.png)

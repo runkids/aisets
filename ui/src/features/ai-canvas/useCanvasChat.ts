@@ -92,6 +92,27 @@ export function focusCursorPosition(
   };
 }
 
+export function resizeCursorPosition(
+  card: CanvasCard,
+  metrics: CanvasCardLayoutMetrics,
+  viewportScale: number,
+  width?: number,
+): Pick<AICursorState, "x" | "y"> {
+  const stableScale =
+    isScreenStableCard(card) && viewportScale > 0 ? 1 / viewportScale : 1;
+  const baseWidth = metrics[card.id]?.width ?? CARD_WIDTH * stableScale;
+  const baseHeight = metrics[card.id]?.height ?? 240 * stableScale;
+  const nextWidth = width ?? baseWidth;
+  const nextHeight =
+    baseWidth > 0 ? nextWidth * (baseHeight / baseWidth) : baseHeight;
+  const pointerXOffset = viewportScale > 0 ? 6 / viewportScale : 6;
+  const pointerYOffset = viewportScale > 0 ? 8 / viewportScale : 8;
+  return {
+    x: card.x + nextWidth - pointerXOffset,
+    y: card.y + nextHeight - pointerYOffset,
+  };
+}
+
 function isCaptureTool(tool: string) {
   return (
     tool === "capture_viewport" ||
@@ -945,8 +966,12 @@ export function useCanvasChat(opts: {
       trackProjectedAnimation(delay, (steps + 1) * stepMs);
       queueTimer(() => {
         setAnimationCursor({
-          x: card.x + fromWidth,
-          y: card.y + height,
+          ...resizeCursorPosition(
+            card,
+            { ...cardLayoutMetrics, [cardId]: { width: fromWidth, height } },
+            viewport.scale,
+            fromWidth,
+          ),
           label: t("aiCanvas.resizingCard"),
           emoji: "move",
           status: "acting",
@@ -961,8 +986,15 @@ export function useCanvasChat(opts: {
             const nextWidth = fromWidth + (toWidth - fromWidth) * eased;
             setCardWidths((current) => ({ ...current, [cardId]: nextWidth }));
             setAnimationCursor({
-              x: card.x + nextWidth,
-              y: card.y + height,
+              ...resizeCursorPosition(
+                card,
+                {
+                  ...cardLayoutMetrics,
+                  [cardId]: { width: fromWidth, height },
+                },
+                viewport.scale,
+                nextWidth,
+              ),
               label: t("aiCanvas.resizingCard"),
               emoji: "move",
               status: "acting",

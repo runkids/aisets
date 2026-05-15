@@ -2018,7 +2018,7 @@ func canvasFollowupInstruction(reason string, latestUserMessage string) string {
 	case canvasLoopReasonBlockedComment:
 		return "Your previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
 	case canvasLoopReasonToolResults:
-		return "Continue from the compact tool results above. Use the returned IDs exactly. Do not repeat completed tool calls. For duplicate workflows, arrange returned newCardIds but do not remove returned newCardIds as cleanup; remove_cards is only for pre-existing unrelated visible cards. For multi-step operation patterns, call the next distinct missing tool; if the user's request is fulfilled, give a short answer."
+		return "Continue from the compact tool results above. Use the returned IDs exactly. Do not repeat completed tool calls or repeat the same operation type unless the previous tool result was invalid. For duplicate workflows, arrange returned newCardIds but do not remove returned newCardIds as cleanup; remove_cards is only for pre-existing unrelated visible cards. For multi-step operation patterns, compare the Original User Request, Completed Canvas Tools, and Compact Tool Results, then call the next distinct missing tool from the English operation pattern. For the hero/main-image pattern, focus_card + resize_card + move_card/arrange_cards is incomplete until any requested layer/front/above/top placement has been completed with bring_cards_to_front. If the user's request is fulfilled, give a short answer."
 	default:
 		return "Continue the task from the context above."
 	}
@@ -3767,6 +3767,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	textAssetSearchSeen := false
 	ocrTextAnnotationRepairPending := false
 	var latestOCRAnnotationItems []canvasOCRAnnotationItem
+	projectedCanvas := req.Canvas
 	protectCleanupCardIDs := func(ids []string) {
 		for _, id := range ids {
 			id = strings.TrimSpace(id)
@@ -3876,14 +3877,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
-		actions = refineCanvasActionTargets(actions, req.Canvas, latestUserMessage)
+		actions = expandCanvasMultiSelectedActions(actions, projectedCanvas, latestUserMessage)
+		actions = refineCanvasActionTargets(actions, projectedCanvas, latestUserMessage)
 		actions = refineCanvasSearchActions(actions, latestUserMessage)
 		actions = filterCanvasIncidentalCatalogSearchActions(actions)
 		var postExpansionIssues []canvasActionValidationIssue
 		actions, postExpansionIssues = normalizeCanvasActions(actions, true)
 		var blockedUnverifiableTextActionCount int
-		actions, blockedUnverifiableTextActionCount = filterCanvasUnverifiableTextMentionActions(actions, req.Canvas)
+		actions, blockedUnverifiableTextActionCount = filterCanvasUnverifiableTextMentionActions(actions, projectedCanvas)
 		var missingVisualCueIssues []canvasActionValidationIssue
 		actions, missingVisualCueIssues = filterCanvasFallbackImageRegionActionsMissingVisualCue(actions, toolUseSource != "native_tool_call")
 		var blockedIncompleteTextActionCount int
@@ -3955,14 +3956,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				requestedRemoveIDs := canvasActionCardIDs(act)
 				act = filterCanvasRemoveActionProtectedCards(act, cleanupProtectedCardIDs)
 				if len(canvasActionCardIDs(act)) == 0 && len(requestedRemoveIDs) > 0 && executedCanvasTools["duplicate_cards"] {
-					setCanvasActionCardIDs(&act, canvasCleanupCandidateCardIDs(req.Canvas, cleanupProtectedCardIDs))
+					setCanvasActionCardIDs(&act, canvasCleanupCandidateCardIDs(projectedCanvas, cleanupProtectedCardIDs))
 				}
 				if len(canvasActionCardIDs(act)) == 0 {
 					continue
 				}
 			}
-			act = normalizeCanvasImageRegionAction(act, req.Canvas)
-			act = s.refineCanvasImageRegionAction(r.Context(), act, req.Canvas)
+			act = normalizeCanvasImageRegionAction(act, projectedCanvas)
+			act = s.refineCanvasImageRegionAction(r.Context(), act, projectedCanvas)
 			act = fillCanvasCopyAssetDestPathsFromOCR(act, latestOCRAnnotationItems)
 			act = sanitizeCanvasCopyAssetDestPathsFromOCR(act, latestOCRAnnotationItems)
 			act = normalizeCanvasCopyAssetDestPaths(act)
@@ -3977,7 +3978,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			if canvasActionAlreadyExecuted(act) {
 				continue
 			}
-			if key := canvasTextRegionActionDedupeKey(act, req.Canvas); key != "" {
+			if key := canvasTextRegionActionDedupeKey(act, projectedCanvas); key != "" {
 				if executedCanvasTextRegionKeys[key] {
 					continue
 				}
@@ -4014,7 +4015,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					executedCaptureTools[act.Tool] = true
 					captureExecutedThisLoop = true
 				}
-				result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
+				result := s.executeCanvasSafeAction(r, act, settings, projectedCanvas)
 				if act.Tool == "extract_ocr_text" && canvasOCRTextAnnotationWorkflowRequested(latestUserMessage, selectedSkillIDs, executedCanvasTools) {
 					markCanvasOCRResultAsIntermediate(result)
 					if items := canvasOCRAnnotationItems(result); len(items) > 0 {
@@ -4035,6 +4036,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"tool":   act.Tool,
 					"result": result,
 				})
+				projectedCanvas = applyCanvasActionResultToSnapshot(projectedCanvas, act.Tool, result)
 				if act.Tool == "add_assets_to_canvas" {
 					addedCatalogItemsForAnswer = appendCanvasAssetItemsUnique(addedCatalogItemsForAnswer, canvasAssetItemsFromActionResult(result))
 				}
@@ -4113,7 +4115,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		requiredNativeToolCallMissing := canvasRequiredNativeToolCallMissing(usingNativeTools, roundToolChoice, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
 		actionBlockTextNeedsRepair := canvasActionBlockTextNeedsActionRepair(usingNativeTools, loopReason, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
 		actionRequestNeedsTool := requiredNativeToolCallMissing || actionBlockTextNeedsRepair || canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
-		incompleteTextAnnotation := blockedUnverifiableTextActionCount > 0 || blockedIncompleteTextActionCount > 0 || blockedGenericTextRegionCount > 0 || canvasIncompleteTextAnnotationNeedsRepair(actions, req.Canvas, loop, maxToolLoops)
+		incompleteTextAnnotation := blockedUnverifiableTextActionCount > 0 || blockedIncompleteTextActionCount > 0 || blockedGenericTextRegionCount > 0 || canvasIncompleteTextAnnotationNeedsRepair(actions, projectedCanvas, loop, maxToolLoops)
 		if executedTextAnnotation {
 			textAnnotationRepairPending = false
 		}
@@ -4215,7 +4217,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			canvasTools = nil
 			systemPrompt = canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 		}
-		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, executedCanvasToolSequence, content)
+		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, projectedCanvas, actions, compactToolResults, executedCanvasToolSequence, content)
 		promptKind = vlmPromptKindFollowup
 		loopReason = nextLoopReason
 		sendNDJSON(w, map[string]any{"type": "thinking"})
@@ -4230,12 +4232,13 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				"content": status,
 			})
 		}
-		result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
+		result := s.executeCanvasSafeAction(r, act, settings, projectedCanvas)
 		sendNDJSON(w, map[string]any{
 			"type":   "action_result",
 			"tool":   act.Tool,
 			"result": result,
 		})
+		projectedCanvas = applyCanvasActionResultToSnapshot(projectedCanvas, act.Tool, result)
 		rememberExecutedCanvasAction(act)
 	}
 

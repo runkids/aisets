@@ -715,7 +715,11 @@ export function CardShell({
   onRegister: (id: string, node: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
-  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const resizeRef = useRef<{
+    startX: number;
+    startW: number;
+    scale: number;
+  } | null>(null);
   const [isNewCard] = useState(
     () => Date.now() - Date.parse(card.createdAt) < 1200,
   );
@@ -744,13 +748,19 @@ export function CardShell({
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
     e.stopPropagation();
     e.preventDefault();
-    resizeRef.current = { startX: e.clientX, startW: width ?? CARD_WIDTH };
+    const effectiveScale = Math.max(0.01, canvasScale * screenStableScale);
+    resizeRef.current = {
+      startX: e.clientX,
+      startW: width ?? CARD_WIDTH,
+      scale: effectiveScale,
+    };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handleResizeMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (!resizeRef.current || !onResize) return;
-    const delta = e.clientX - resizeRef.current.startX;
+    const delta =
+      (e.clientX - resizeRef.current.startX) / resizeRef.current.scale;
     const next = Math.max(80, resizeRef.current.startW + delta);
     onResize(card.id, next);
   }

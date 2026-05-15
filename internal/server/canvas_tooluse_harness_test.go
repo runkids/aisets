@@ -1946,6 +1946,12 @@ func TestCanvasHarnessNativeToolResultsCanFinishHeroLayerChain(t *testing.T) {
 	requireCanvasHarnessToolChoice(t, requests[1], "required")
 	requireCanvasHarnessToolChoice(t, requests[2], "")
 	requireCanvasHarnessToolChoice(t, requests[3], "")
+	if prompt := requests[2].Messages[len(requests[2].Messages)-1].Content; !strings.Contains(prompt, `"width":420`) || !strings.Contains(prompt, `"height":420`) {
+		t.Fatalf("resize follow-up prompt did not project updated size:\n%s", prompt)
+	}
+	if prompt := requests[3].Messages[len(requests[3].Messages)-1].Content; !strings.Contains(prompt, `"x":240`) || !strings.Contains(prompt, `"y":180`) || !strings.Contains(prompt, `"width":420`) || !strings.Contains(prompt, `"height":420`) {
+		t.Fatalf("move follow-up prompt did not project updated geometry:\n%s", prompt)
+	}
 	fourthStat := requireCanvasHarnessLoopStat(t, events, 3)
 	if fourthStat["reason"] != canvasLoopReasonToolResults {
 		t.Fatalf("fourth reason = %#v", fourthStat["reason"])
