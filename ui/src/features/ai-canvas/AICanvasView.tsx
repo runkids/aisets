@@ -59,6 +59,7 @@ import {
   type ChatAttachment,
   type CommentCanvasCard,
   type ChatHistoryEntry,
+  type ChatMentionPreview,
   type ChatRunUsage,
   type PendingAttachment,
   type ProposalCanvasCard,
@@ -1451,6 +1452,26 @@ export function AICanvasView({
     [cards.length, viewport],
   );
 
+  function handleAddSearchCandidate(mention: ChatMentionPreview) {
+    if (!mention.asset) return;
+    addAsset(mention.asset);
+  }
+
+  function handleDismissSearchCandidates(entryIndex: number) {
+    setChatHistory((current) =>
+      current.map((entry, index) => {
+        if (index !== entryIndex || !entry.mentions?.length) return entry;
+        const mentions = entry.mentions.filter(
+          (mention) => mention.kind !== "searchCandidate",
+        );
+        return {
+          ...entry,
+          mentions: mentions.length > 0 ? mentions : undefined,
+        };
+      }),
+    );
+  }
+
   function handleAttachImage() {
     const input = document.createElement("input");
     input.type = "file";
@@ -1695,6 +1716,8 @@ export function AICanvasView({
         pendingAttachments={pendingAttachments}
         setPendingAttachments={setPendingAttachments}
         handlePlaceOnCanvas={handlePlaceOnCanvas}
+        handleAddSearchCandidate={handleAddSearchCandidate}
+        handleDismissSearchCandidates={handleDismissSearchCandidates}
       />
 
       {capturePreview && (

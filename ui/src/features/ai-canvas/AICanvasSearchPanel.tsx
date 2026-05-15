@@ -1,12 +1,20 @@
 import {
   Check,
+  ChevronLeft,
+  ListChecks,
   LoaderCircle,
   Plus,
   Search,
+  SearchX,
   WandSparkles,
-  X,
 } from "lucide-react";
-import { useEffect, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { TFunction } from "i18next";
 import {
   AssetThumbnail,
@@ -82,6 +90,32 @@ export function AICanvasSearchPanel({
   addAsset,
 }: AICanvasSearchPanelProps) {
   const [phaseIdx, setPhaseIdx] = useState(0);
+  const [batchMode, setBatchMode] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const [everSearched, setEverSearched] = useState(false);
+  const [prevQuery, setPrevQuery] = useState(query);
+  const [prevSearchBusy, setPrevSearchBusy] = useState(searchBusy);
+  const [prevResults, setPrevResults] = useState(searchResults);
+
+  const isDraggingRef = useRef(false);
+  const pendingDragRef = useRef(false);
+  const dragStartIdx = useRef(-1);
+  const didDragRef = useRef(false);
+  const lastClickIdx = useRef(-1);
+
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setEverSearched(false);
+  }
+  if (searchBusy !== prevSearchBusy) {
+    setPrevSearchBusy(searchBusy);
+    if (searchBusy) setEverSearched(true);
+  }
+  if (searchResults !== prevResults) {
+    setPrevResults(searchResults);
+    if (addedIds.size > 0) setAddedIds(new Set());
+  }
 
   useEffect(() => {
     if (!searchBusy || searchMode !== "semantic") return;
@@ -90,6 +124,79 @@ export function AICanvasSearchPanel({
     }, 1200);
     return () => window.clearInterval(id);
   }, [searchBusy, searchMode]);
+
+  useEffect(() => {
+    const handleUp = () => {
+      pendingDragRef.current = false;
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+      dragStartIdx.current = -1;
+    };
+    document.addEventListener("pointerup", handleUp);
+    return () => document.removeEventListener("pointerup", handleUp);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setBatchMode(false);
+    setSearchSelectedIds(new Set());
+    setOpen(false);
+  }, [setSearchSelectedIds, setOpen]);
+
+  const handleItemClick = useCallback(
+    (asset: AssetItem, index: number, event: React.MouseEvent) => {
+      if (batchMode) {
+        if (didDragRef.current) {
+          didDragRef.current = false;
+          return;
+        }
+        if (event.shiftKey && lastClickIdx.current >= 0) {
+          const start = Math.min(lastClickIdx.current, index);
+          const end = Math.max(lastClickIdx.current, index);
+          setSearchSelectedIds((prev) => {
+            const next = new Set(prev);
+            for (let i = start; i <= end; i++) {
+              next.add(searchResults[i].id);
+            }
+            return next;
+          });
+        } else {
+          setSearchSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(asset.id)) next.delete(asset.id);
+            else next.add(asset.id);
+            return next;
+          });
+        }
+        lastClickIdx.current = index;
+      } else {
+        if (addedIds.has(asset.id)) return;
+        addAsset(asset);
+        setAddedIds((prev) => new Set(prev).add(asset.id));
+      }
+      setSearchActiveIndex(index);
+    },
+    [
+      batchMode,
+      addedIds,
+      searchResults,
+      addAsset,
+      setSearchSelectedIds,
+      setSearchActiveIndex,
+    ],
+  );
+
+  const handleBatchAdd = useCallback(() => {
+    const toAdd = searchResults.filter((a) => searchSelectedIds.has(a.id));
+    toAdd.forEach(addAsset);
+    setAddedIds((prev) => {
+      const next = new Set(prev);
+      toAdd.forEach((a) => next.add(a.id));
+      return next;
+    });
+    setSearchSelectedIds(new Set());
+  }, [searchResults, searchSelectedIds, addAsset, setSearchSelectedIds]);
 
   if (!open) {
     return (
@@ -104,6 +211,13 @@ export function AICanvasSearchPanel({
       </button>
     );
   }
+
+  const showEmptyState =
+    everSearched &&
+    !searchBusy &&
+    searchResults.length === 0 &&
+    !searchError &&
+    query.trim();
 
   return (
     <aside
@@ -162,25 +276,55 @@ export function AICanvasSearchPanel({
             }
             if (e.key === "ArrowDown" && searchResults.length > 0) {
               e.preventDefault();
-              setSearchActiveIndex((i) =>
-                Math.min(i + 1, searchResults.length - 1),
+              const next = Math.min(
+                searchActiveIndex + 1,
+                searchResults.length - 1,
               );
+              setSearchActiveIndex(next);
+              if (batchMode && e.shiftKey && searchResults[next]) {
+                setSearchSelectedIds((prev) =>
+                  new Set(prev).add(searchResults[next].id),
+                );
+              }
               return;
             }
             if (e.key === "ArrowUp" && searchResults.length > 0) {
               e.preventDefault();
-              setSearchActiveIndex((i) => Math.max(i - 1, -1));
+              const next = Math.max(searchActiveIndex - 1, 0);
+              setSearchActiveIndex(next);
+              if (batchMode && e.shiftKey && searchResults[next]) {
+                setSearchSelectedIds((prev) =>
+                  new Set(prev).add(searchResults[next].id),
+                );
+              }
               return;
             }
             if (e.key === "Enter") {
               e.stopPropagation();
               if (searchActiveIndex >= 0 && searchResults[searchActiveIndex]) {
                 e.preventDefault();
+                const asset = searchResults[searchActiveIndex];
+                if (batchMode) {
+                  setSearchSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(asset.id)) next.delete(asset.id);
+                    else next.add(asset.id);
+                    return next;
+                  });
+                } else if (!addedIds.has(asset.id)) {
+                  addAsset(asset);
+                  setAddedIds((prev) => new Set(prev).add(asset.id));
+                }
+              }
+            }
+            if (e.key === " " && batchMode && searchActiveIndex >= 0) {
+              e.preventDefault();
+              const asset = searchResults[searchActiveIndex];
+              if (asset) {
                 setSearchSelectedIds((prev) => {
                   const next = new Set(prev);
-                  const id = searchResults[searchActiveIndex].id;
-                  if (next.has(id)) next.delete(id);
-                  else next.add(id);
+                  if (next.has(asset.id)) next.delete(asset.id);
+                  else next.add(asset.id);
                   return next;
                 });
               }
@@ -257,25 +401,25 @@ export function AICanvasSearchPanel({
         <button
           type="button"
           aria-label={t("aiCanvas.closeSearch")}
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-g-sm text-g-ink-3 transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
-          onClick={() => {
-            if (searchResults.length > 0) {
-              setSearchResults([]);
-              setSearchTotal(0);
-              setSearchSelectedIds(new Set());
-              setQuery("");
-            } else {
-              setOpen(false);
-            }
-          }}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-g-sm text-g-ink-3 transition-[color,background] duration-[120ms] ease-g hover:bg-g-surface-3 hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+          onClick={handleClose}
         >
-          <X size={14} aria-hidden="true" />
+          <ChevronLeft size={14} aria-hidden="true" />
         </button>
       </form>
 
       {searchError && (
         <div className="mt-1 rounded-g-sm border border-g-red/40 bg-g-red-soft px-2 py-1.5 text-g-caption text-g-red">
           {searchError}
+        </div>
+      )}
+
+      {showEmptyState && (
+        <div className="flex flex-col items-center gap-1.5 py-5">
+          <SearchX size={18} className="text-g-ink-4" />
+          <span className="text-g-caption text-g-ink-3">
+            {t("aiCanvas.noSearchResults")}
+          </span>
         </div>
       )}
 
@@ -291,83 +435,139 @@ export function AICanvasSearchPanel({
           <div className="flex items-center justify-between px-1.5 pb-0.5 text-g-chip font-[510] tracking-[0.02em] text-g-ink-4">
             <span className="inline-flex items-center gap-2">
               <span>{t("aiCanvas.searchResults", { count: searchTotal })}</span>
-              {searchSelectedIds.size < searchResults.length ? (
+              {batchMode &&
+                (searchSelectedIds.size < searchResults.length ? (
+                  <button
+                    type="button"
+                    className="text-g-purple transition-colors duration-[100ms] ease-g hover:text-g-purple/80 focus-visible:outline-none focus-visible:shadow-g-focus"
+                    onClick={() =>
+                      setSearchSelectedIds(
+                        new Set(searchResults.map((a) => a.id)),
+                      )
+                    }
+                  >
+                    {t("aiCanvas.selectAll")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-g-ink-3 transition-colors duration-[100ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
+                    onClick={() => setSearchSelectedIds(new Set())}
+                  >
+                    {t("aiCanvas.deselectAll")}
+                  </button>
+                ))}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              {batchMode && searchSelectedIds.size > 0 && (
                 <button
                   type="button"
-                  className="text-g-accent transition-colors duration-[100ms] ease-g hover:text-g-accent/80 focus-visible:outline-none focus-visible:shadow-g-focus"
-                  onClick={() =>
-                    setSearchSelectedIds(
-                      new Set(searchResults.map((a) => a.id)),
-                    )
-                  }
+                  className="inline-flex items-center gap-1 rounded-g-pill bg-g-purple px-2 py-0.5 font-g text-[11px] font-[590] text-white transition-opacity duration-[100ms] ease-g hover:opacity-85 focus-visible:outline-none focus-visible:shadow-g-focus"
+                  onClick={handleBatchAdd}
                 >
-                  {t("aiCanvas.selectAll")}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="text-g-ink-3 transition-colors duration-[100ms] ease-g hover:text-g-ink focus-visible:outline-none focus-visible:shadow-g-focus"
-                  onClick={() => setSearchSelectedIds(new Set())}
-                >
-                  {t("aiCanvas.deselectAll")}
+                  <Plus size={11} />
+                  {t("imageTools.addSelected", {
+                    count: searchSelectedIds.size,
+                  })}
                 </button>
               )}
-            </span>
-            {searchSelectedIds.size > 0 ? (
+              {!batchMode && <span>{t("aiCanvas.addHint")}</span>}
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-g-pill bg-g-accent px-2 py-0.5 font-g text-[11px] font-[590] text-white transition-opacity duration-[100ms] ease-g hover:opacity-85 focus-visible:outline-none focus-visible:shadow-g-focus"
+                aria-label={t("aiCanvas.batchSelect")}
+                className={cn(
+                  "inline-flex size-[18px] items-center justify-center rounded-[4px] transition-colors duration-[120ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus",
+                  batchMode
+                    ? "bg-g-purple text-white"
+                    : "text-g-ink-4 hover:bg-g-surface-3 hover:text-g-ink-3",
+                )}
                 onClick={() => {
-                  searchResults
-                    .filter((a) => searchSelectedIds.has(a.id))
-                    .forEach(addAsset);
-                  setSearchResults([]);
-                  setSearchTotal(0);
-                  setSearchActiveIndex(-1);
-                  setSearchSelectedIds(new Set());
+                  const entering = !batchMode;
+                  setBatchMode(entering);
+                  if (!entering) {
+                    setSearchSelectedIds(new Set());
+                    lastClickIdx.current = -1;
+                  }
                 }}
               >
-                <Plus size={11} />
-                {t("imageTools.addSelected", {
-                  count: searchSelectedIds.size,
-                })}
+                <ListChecks size={11} />
               </button>
-            ) : (
-              <span>{t("aiCanvas.addHint")}</span>
-            )}
+            </span>
           </div>
           <div
             data-ai-canvas-scroll="true"
-            className="max-h-[320px] overflow-y-auto"
+            className={cn(
+              "max-h-[320px] overflow-y-auto",
+              isDragging && "select-none",
+            )}
           >
             {searchResults.map((asset, i) => {
               const selected = searchSelectedIds.has(asset.id);
+              const added = addedIds.has(asset.id);
+
               return (
                 <button
                   key={asset.id}
                   type="button"
                   data-active={searchActiveIndex === i || undefined}
                   className={cn(
-                    "group flex w-full items-center gap-2.5 px-1.5 py-1.5 text-left transition-colors duration-[100ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus data-[active]:bg-g-surface-2",
-                    selected && "bg-g-accent-soft",
+                    "group flex w-full items-center gap-2.5 py-1.5 text-left transition-colors duration-[100ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus data-[active]:bg-g-surface-2",
                     i === 0 && "rounded-t-g-sm",
                     i === searchResults.length - 1 && "rounded-b-g-sm",
                     i < searchResults.length - 1 && "border-b border-g-line/50",
+                    batchMode
+                      ? cn(
+                          "border-l-2 px-1.5 hover:bg-g-surface-2",
+                          selected
+                            ? "border-l-g-purple bg-g-purple-soft"
+                            : "border-l-transparent",
+                        )
+                      : cn(
+                          "px-1.5",
+                          added
+                            ? "cursor-default opacity-50"
+                            : "hover:bg-g-surface-2",
+                        ),
                   )}
-                  onMouseEnter={() => setSearchActiveIndex(i)}
-                  onClick={() => {
-                    setSearchSelectedIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(asset.id)) next.delete(asset.id);
-                      else next.add(asset.id);
-                      return next;
-                    });
+                  onClick={(e) => handleItemClick(asset, i, e)}
+                  onPointerDown={(e) => {
+                    if (!batchMode) return;
+                    e.preventDefault();
+                    pendingDragRef.current = true;
+                    dragStartIdx.current = i;
+                    didDragRef.current = false;
+                  }}
+                  onPointerEnter={() => {
+                    setSearchActiveIndex(i);
+                    if (!batchMode) return;
+                    if (pendingDragRef.current && i !== dragStartIdx.current) {
+                      pendingDragRef.current = false;
+                      isDraggingRef.current = true;
+                      setIsDragging(true);
+                      didDragRef.current = true;
+                      const start = Math.min(dragStartIdx.current, i);
+                      const end = Math.max(dragStartIdx.current, i);
+                      const ids = new Set<string>();
+                      for (let j = start; j <= end; j++) {
+                        ids.add(searchResults[j].id);
+                      }
+                      setSearchSelectedIds(ids);
+                    } else if (isDraggingRef.current) {
+                      didDragRef.current = true;
+                      const start = Math.min(dragStartIdx.current, i);
+                      const end = Math.max(dragStartIdx.current, i);
+                      const ids = new Set<string>();
+                      for (let j = start; j <= end; j++) {
+                        ids.add(searchResults[j].id);
+                      }
+                      setSearchSelectedIds(ids);
+                    }
                   }}
                 >
                   <AssetThumbnail
                     src={asset.thumbnailUrl || asset.url}
                     size="sm"
-                    className="size-8 rounded-g-sm"
+                    className="size-10 rounded-g-sm"
                     imageClassName="select-none"
                     draggable={false}
                   />
@@ -379,8 +579,21 @@ export function AICanvasSearchPanel({
                       {asset.projectName} · {imageMeta(asset)}
                     </span>
                   </span>
-                  {selected ? (
-                    <Check size={14} className="shrink-0 text-g-accent" />
+                  {batchMode ? (
+                    <span
+                      className={cn(
+                        "inline-flex size-[14px] shrink-0 items-center justify-center rounded-[3px] transition-colors duration-[100ms] ease-g",
+                        selected
+                          ? "bg-g-purple text-white"
+                          : "border border-g-line group-hover:border-g-ink-3",
+                      )}
+                    >
+                      {selected && (
+                        <Check size={10} strokeWidth={3} aria-hidden="true" />
+                      )}
+                    </span>
+                  ) : added ? (
+                    <Check size={14} className="shrink-0 text-g-purple" />
                   ) : (
                     <Plus
                       size={14}
