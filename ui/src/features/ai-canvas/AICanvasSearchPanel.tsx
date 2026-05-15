@@ -462,7 +462,7 @@ export function AICanvasSearchPanel({
               {batchMode && searchSelectedIds.size > 0 && (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-g-pill bg-g-purple px-2 py-0.5 font-g text-[11px] font-[590] text-white transition-opacity duration-[100ms] ease-g hover:opacity-85 focus-visible:outline-none focus-visible:shadow-g-focus"
+                  className="inline-flex items-center gap-1 rounded-g-pill bg-g-purple/12 px-2 py-0.5 font-g text-[11px] font-[590] text-g-purple transition-opacity duration-[100ms] ease-g hover:bg-g-purple/20 focus-visible:outline-none focus-visible:shadow-g-focus"
                   onClick={handleBatchAdd}
                 >
                   <Plus size={11} />
@@ -478,7 +478,7 @@ export function AICanvasSearchPanel({
                 className={cn(
                   "inline-flex size-[18px] items-center justify-center rounded-[4px] transition-colors duration-[120ms] ease-g focus-visible:outline-none focus-visible:shadow-g-focus",
                   batchMode
-                    ? "bg-g-purple text-white"
+                    ? "bg-g-purple/12 text-g-purple"
                     : "text-g-ink-4 hover:bg-g-surface-3 hover:text-g-ink-3",
                 )}
                 onClick={() => {
@@ -584,7 +584,7 @@ export function AICanvasSearchPanel({
                       className={cn(
                         "inline-flex size-[14px] shrink-0 items-center justify-center rounded-[3px] transition-colors duration-[100ms] ease-g",
                         selected
-                          ? "bg-g-purple text-white"
+                          ? "bg-g-purple/75 text-white"
                           : "border border-g-line group-hover:border-g-ink-3",
                       )}
                     >
