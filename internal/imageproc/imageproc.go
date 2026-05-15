@@ -26,7 +26,6 @@ import (
 	"aisets/internal/imgtools"
 	"github.com/corona10/goimagehash"
 	_ "github.com/gen2brain/avif"
-	"github.com/jdeng/goheif"
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 	minify "github.com/tdewolff/minify/v2"
@@ -850,22 +849,6 @@ func ImageToPNG(path string, svgMaxSize int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func decodeHEIC(path string) (image.Image, error) {
-	if data, err := heicToPNGSystem(path); err == nil {
-		return png.Decode(bytes.NewReader(data))
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	img, err := goheif.Decode(f)
-	if err != nil {
-		return nil, fmt.Errorf("decode HEIC %s: %w", filepath.Base(path), err)
-	}
-	return img, nil
-}
-
 func heicToPNGSystem(path string) ([]byte, error) {
 	tmp, err := os.CreateTemp("", "heicpng-*.png")
 	if err != nil {
@@ -885,21 +868,6 @@ func heicToPNGSystem(path string) ([]byte, error) {
 		}
 	}
 	return nil, fmt.Errorf("no system HEIC tool available")
-}
-
-func HeicToPNG(path string) ([]byte, error) {
-	if data, err := heicToPNGSystem(path); err == nil {
-		return data, nil
-	}
-	img, err := decodeHEIC(path)
-	if err != nil {
-		return nil, err
-	}
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, fmt.Errorf("encode png: %w", err)
-	}
-	return buf.Bytes(), nil
 }
 
 func svgToPNGViaImgtools(path string, maxSize int) ([]byte, error) {
