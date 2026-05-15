@@ -209,8 +209,8 @@ describe("canvas chat frontend event contract", () => {
     ).toMatchObject({
       id: "proposal-card-1",
       kind: "proposal",
-      x: 254,
-      y: 20,
+      x: 10,
+      y: 284,
       createdAt: "2026-05-14T00:00:01.000Z",
       proposalId: "proposal-1",
       tool: "rotate_image",

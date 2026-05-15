@@ -196,17 +196,62 @@ export function nextCardPosition(
 
 export function adjacentCardPosition(
   anchor: { id: string; x: number; y: number },
-  metrics: Record<string, { width?: number }> = {},
-  options: { gap?: number; index?: number; verticalStep?: number } = {},
+  metrics: Record<string, { width?: number; height?: number }> = {},
+  options: {
+    gap?: number;
+    index?: number;
+    verticalStep?: number;
+    allCards?: CanvasCard[];
+    newCardWidth?: number;
+    newCardHeight?: number;
+  } = {},
 ) {
   const gap = options.gap ?? 24;
   const index = options.index ?? 0;
   const verticalStep = options.verticalStep ?? 72;
-  const anchorWidth = metrics[anchor.id]?.width ?? CARD_WIDTH;
-  return {
-    x: Math.round(anchor.x + anchorWidth + gap),
-    y: Math.round(anchor.y + index * verticalStep),
+  const anchorW = metrics[anchor.id]?.width ?? CARD_WIDTH;
+  const anchorH = metrics[anchor.id]?.height ?? CARD_WIDTH * 0.75;
+  const offset = index * verticalStep;
+
+  const fallback = {
+    x: Math.round(anchor.x + anchorW + gap),
+    y: Math.round(anchor.y + offset),
   };
+
+  const others = options.allCards?.filter((c) => c.id !== anchor.id);
+  if (!others || others.length === 0) return fallback;
+
+  const nw = options.newCardWidth ?? CARD_WIDTH;
+  const nh = options.newCardHeight ?? 240;
+
+  function overlapsAny(cx: number, cy: number): boolean {
+    for (const card of others!) {
+      const cw = metrics[card.id]?.width ?? CARD_WIDTH;
+      const ch = metrics[card.id]?.height ?? 240;
+      if (
+        cx < card.x + cw &&
+        cx + nw > card.x &&
+        cy < card.y + ch &&
+        cy + nh > card.y
+      )
+        return true;
+    }
+    return false;
+  }
+
+  const candidates = [
+    { x: anchor.x, y: anchor.y + anchorH + gap + offset },
+    { x: anchor.x + anchorW + gap, y: anchor.y + offset },
+    { x: anchor.x - nw - gap, y: anchor.y + offset },
+    { x: anchor.x, y: anchor.y - nh - gap + offset },
+  ];
+
+  for (const pos of candidates) {
+    const cx = Math.round(pos.x);
+    const cy = Math.round(pos.y);
+    if (!overlapsAny(cx, cy)) return { x: cx, y: cy };
+  }
+  return fallback;
 }
 
 export function selectedAssetIds(cards: AssetCanvasCard[]) {

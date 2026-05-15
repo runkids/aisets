@@ -916,6 +916,7 @@ export function useCanvasChat(opts: {
         const position = adjacentCardPosition(sourceCard, cardLayoutMetrics, {
           index: newCards.length,
           verticalStep: 112,
+          allCards: [...canvasCards, ...newCards],
         });
         const card: VariantCanvasCard = {
           id: createCanvasCardId("variant"),
@@ -1133,6 +1134,7 @@ export function useCanvasChat(opts: {
         ? adjacentCardPosition(anchor, cardLayoutMetrics, {
             index: newCards.length,
             verticalStep: 112,
+            allCards: [...canvasCards, ...newCards],
           })
         : nextCardPosition(
             canvasCards.length + newCards.length,
@@ -1520,6 +1522,9 @@ export function useCanvasChat(opts: {
             ? adjacentCardPosition(anchor, cardLayoutMetrics, {
                 index: newCards.length,
                 verticalStep: 88,
+                allCards: [...canvasCards, ...newCards],
+                newCardWidth: 280,
+                newCardHeight: 100,
               })
             : { x: 84, y: 72 + newCards.length * 88 };
           const card: CommentCanvasCard = {

@@ -218,7 +218,7 @@ export function useProposalExecution(opts: {
           });
           const sourceCard = findAssetCard(assetId);
           const position = sourceCard
-            ? adjacentCardPosition(sourceCard)
+            ? adjacentCardPosition(sourceCard, {}, { allCards: cards })
             : { x: proposal.x, y: proposal.y + 88 };
           const sourceName =
             sourceCard?.kind === "asset"

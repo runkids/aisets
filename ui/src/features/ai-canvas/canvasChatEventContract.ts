@@ -66,6 +66,7 @@ export function canvasProposalCardFromEvent(
     ? adjacentCardPosition(anchorCard, options.cardLayoutMetrics, {
         index,
         verticalStep: 88,
+        allCards: options.cards,
       })
     : { x: 84, y: 72 + index * 88 };
 

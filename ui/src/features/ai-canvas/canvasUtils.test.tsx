@@ -116,6 +116,28 @@ describe("adjacentCardPosition", () => {
       ),
     ).toEqual({ x: 504, y: 256 });
   });
+
+  it("avoids overlapping cards by placing below when right side is blocked", () => {
+    const anchor: AssetCanvasCard = { ...makeAssetCard(), id: "a", x: 0, y: 0 };
+    const blocker: AssetCanvasCard = { ...makeAssetCard(), id: "b", x: 344, y: 0 };
+    const metrics = {
+      a: { width: 320, height: 240 },
+      b: { width: 320, height: 240 },
+    };
+    const pos = adjacentCardPosition(anchor, metrics, {
+      allCards: [anchor, blocker],
+    });
+    expect(pos.y).toBe(264);
+    expect(pos.x).toBe(0);
+  });
+
+  it("falls back to right side when no allCards provided", () => {
+    const pos = adjacentCardPosition(
+      { id: "a", x: 0, y: 0 },
+      { a: { width: 320 } },
+    );
+    expect(pos).toEqual({ x: 344, y: 0 });
+  });
 });
 
 describe("compactImageAspectRatio", () => {
