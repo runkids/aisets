@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { aisetsAppIconUrl } from "@/brandAssets";
 import type { SettingsInfo, VersionCheck } from "@/types";
 import { Badge, Button, Card, ConfirmDialog, Notice } from "@/components/ui";
 import { SectionHeading, sectionIcon } from "./index";
@@ -139,7 +140,7 @@ export function AboutSection({
               <div className="flex flex-wrap items-center gap-3">
                 <img
                   className="size-11 shrink-0 rounded-[10px] shadow-g-sm"
-                  src="../../public/brand/aisets-app-icon.avif"
+                  src={aisetsAppIconUrl}
                   alt=""
                 />
                 <div className="flex flex-wrap items-center gap-2">

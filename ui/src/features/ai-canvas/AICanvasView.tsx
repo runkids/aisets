@@ -10,6 +10,7 @@ import {
 import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
 import { uploadCanvasImages } from "@/api/canvasChat";
 import { renderImageToolPreview } from "@/api/imageTools";
+import { aisetsAppIconUrl } from "@/brandAssets";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ConfirmDialog, PromptDialog } from "@/components/ui";
 import { getCanvasSession, isCanvasSessionNotFound } from "@/api";
@@ -1583,11 +1584,7 @@ export function AICanvasView({
         aria-label="Aisets on GitHub"
       >
         <div className="grid size-g-btn-sm shrink-0 place-items-center overflow-hidden rounded-[7px] bg-black">
-          <img
-            className="block size-full"
-            src="../../public/brand/aisets-app-icon.avif"
-            alt=""
-          />
+          <img className="block size-full" src={aisetsAppIconUrl} alt="" />
         </div>
         <span className="font-g-display text-[15px] font-[620] leading-g-btn-sm tracking-[-0.02em] text-g-ink">
           Aisets

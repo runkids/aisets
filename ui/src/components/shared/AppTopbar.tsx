@@ -60,6 +60,7 @@ import { ActivityDropdown } from "./ActivityDropdown";
 import { Keycap, ScanProgressContent, TextInputButton, Tooltip } from "../ui";
 import { IconButton } from "../ui/Button";
 import { useVersionQuery } from "../../queries";
+import { aisetsAppIconUrl } from "@/brandAssets";
 
 function embedStageLabel(
   activity: EmbedActivityState,
@@ -333,11 +334,7 @@ export function AppTopbar({
             aria-label="Aisets on GitHub"
           >
             <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black shadow-g-sm">
-              <img
-                className="block size-full"
-                src="../../public/brand/aisets-app-icon.avif"
-                alt=""
-              />
+              <img className="block size-full" src={aisetsAppIconUrl} alt="" />
             </div>
             <div className="min-w-0 max-[960px]:hidden">
               <div className="truncate font-g-display text-[17px] font-[620] leading-[1.1] tracking-[-0.02em] text-g-ink">

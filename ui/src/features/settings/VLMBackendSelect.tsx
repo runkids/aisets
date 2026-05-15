@@ -78,8 +78,10 @@ export function VLMBackendSelect({
 
   const adapters =
     agentRuntime?.adapters?.filter((a) => a.id !== "local-llm") ?? [];
-  const localModels = models ?? [];
+  const localModels = Array.isArray(models) ? models : [];
   const isConnected = !!llmRuntime?.connected;
+  const hasLocalGroup = localModels.length > 0 || isConnected;
+  const hasAgentGroup = adapters.length > 0;
 
   function displayLabel(): string {
     switch (parsed.type) {
@@ -154,8 +156,14 @@ export function VLMBackendSelect({
               </DropdownMenuPrimitive.Item>
             )}
 
+            {!hasLocalGroup && !hasAgentGroup && (
+              <div className="max-w-[320px] px-2 py-2 font-g text-[11px] leading-snug text-g-ink-4">
+                {t("settings.vlmBackendNoBackends")}
+              </div>
+            )}
+
             {/* Local LLM models group */}
-            {(localModels.length > 0 || isConnected) && (
+            {hasLocalGroup && (
               <DropdownMenuPrimitive.Group>
                 {showInherit && (
                   <DropdownMenuPrimitive.Separator className="my-1.5 h-px bg-g-line" />
@@ -223,7 +231,7 @@ export function VLMBackendSelect({
             )}
 
             {/* Agent CLI group */}
-            {adapters.length > 0 && (
+            {hasAgentGroup && (
               <DropdownMenuPrimitive.Group>
                 <DropdownMenuPrimitive.Separator className="my-1.5 h-px bg-g-line" />
                 <DropdownMenuPrimitive.Label className="flex items-center gap-1.5 px-2 py-1.5 font-g text-[11px] font-[590] uppercase tracking-[0.08em] text-g-ink-4">

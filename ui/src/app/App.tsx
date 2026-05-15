@@ -201,29 +201,41 @@ function agentAdapterLabel(id: string) {
   }
 }
 
-function canvasBackendLabel(settings?: SettingsInfo) {
+function canvasBackendLabel(
+  settings?: SettingsInfo,
+  unavailableLabel = "AI not configured",
+) {
   if (!settings) return "";
   const backend =
     settings.vlmBackendCanvas || settings.vlmBackend || "local-llm";
+  const adapters = settings.agentRuntime?.adapters ?? [];
   if (backend.startsWith("agent:")) {
     const rest = backend.slice("agent:".length);
     const slash = rest.indexOf("/");
     const adapterId = slash >= 0 ? rest.slice(0, slash) : rest;
     const backendModel = slash >= 0 ? rest.slice(slash + 1) : "";
     const adapterName =
-      settings.agentRuntime.adapters.find((adapter) => adapter.id === adapterId)
-        ?.name ?? agentAdapterLabel(adapterId);
+      adapters.find((adapter) => adapter.id === adapterId)?.name ??
+      agentAdapterLabel(adapterId);
     const model = backendModel || settings.agentModel;
     return model ? `${adapterName} ${model}` : adapterName;
   }
   const localModel = backend.startsWith("local-llm/")
     ? backend.slice("local-llm/".length)
-    : settings.llmVisionModel || settings.llmRuntime.visionModel;
+    : settings.llmVisionModel || settings.llmRuntime?.visionModel || "";
   const provider = settings.llmProvider || "LLM";
+  if (!localModel && !settings.llmRuntime?.connected && !settings.llmEnabled) {
+    return unavailableLabel;
+  }
   return localModel ? `${provider} ${localModel}` : provider;
 }
 
-type CanvasBackendOption = { value: string; label: string; group: string };
+type CanvasBackendOption = {
+  value: string;
+  label: string;
+  group: string;
+  disabled?: boolean;
+};
 
 type CanvasBackendLabels = {
   canvas: string;
@@ -231,6 +243,9 @@ type CanvasBackendLabels = {
   llm: string;
   localLLM: string;
   agent: string;
+  unavailable: string;
+  configureLLM: string;
+  configureAgent: string;
 };
 
 function canvasBackendOptions(
@@ -239,7 +254,16 @@ function canvasBackendOptions(
 ): CanvasBackendOption[] {
   if (!settings) return [];
   const options: CanvasBackendOption[] = [];
-  const inherited = canvasBackendLabel({ ...settings, vlmBackendCanvas: "" });
+  const llmModels = Array.isArray(settings.llmRuntime?.models)
+    ? settings.llmRuntime.models
+    : [];
+  const adapters = (settings.agentRuntime?.adapters ?? []).filter(
+    (adapter) => adapter.id !== "local-llm",
+  );
+  const inherited = canvasBackendLabel(
+    { ...settings, vlmBackendCanvas: "" },
+    labels.unavailable,
+  );
   options.push({
     value: "",
     label: inherited
@@ -249,29 +273,47 @@ function canvasBackendOptions(
   });
 
   const localDefault =
-    settings.llmVisionModel || settings.llmRuntime.visionModel;
-  if (settings.llmRuntime.connected || localDefault) {
+    settings.llmVisionModel || settings.llmRuntime?.visionModel || "";
+  if (settings.llmRuntime?.connected || localDefault) {
     options.push({
       value: "local-llm",
       label: localDefault ? `${labels.llm} · ${localDefault}` : labels.localLLM,
       group: labels.llm,
     });
   }
-  for (const model of settings.llmRuntime.models) {
+  for (const model of llmModels) {
     options.push({
       value: `local-llm/${model.name}`,
       label: model.name,
       group: labels.llm,
     });
   }
+  if (
+    llmModels.length === 0 &&
+    !settings.llmRuntime?.connected &&
+    !localDefault
+  ) {
+    options.push({
+      value: "local-llm-unavailable",
+      label: labels.configureLLM,
+      group: labels.llm,
+      disabled: true,
+    });
+  }
 
-  for (const adapter of settings.agentRuntime.adapters.filter(
-    (adapter) => adapter.id !== "local-llm",
-  )) {
+  for (const adapter of adapters) {
     options.push({
       value: `agent:${adapter.id}`,
       label: adapter.name || agentAdapterLabel(adapter.id),
       group: labels.agent,
+    });
+  }
+  if (adapters.length === 0) {
+    options.push({
+      value: "agent-unavailable",
+      label: labels.configureAgent,
+      group: labels.agent,
+      disabled: true,
     });
   }
   return options;
@@ -1382,7 +1424,10 @@ export function App() {
               scanId={catalogSummary?.scanId}
               aiEnabled={settingsQuery.data?.settings.llmEnabled ?? false}
               aiNickname={settingsQuery.data?.settings.aiNickname || ""}
-              aiBackendLabel={canvasBackendLabel(settingsQuery.data?.settings)}
+              aiBackendLabel={canvasBackendLabel(
+                settingsQuery.data?.settings,
+                t("aiCanvas.backendUnavailable"),
+              )}
               aiBackendValue={
                 settingsQuery.data?.settings.vlmBackendCanvas ?? ""
               }
@@ -1394,6 +1439,9 @@ export function App() {
                   llm: t("aiCanvas.backendGroupLLM"),
                   localLLM: t("aiCanvas.backendLocalLLM"),
                   agent: t("aiCanvas.backendGroupAgent"),
+                  unavailable: t("aiCanvas.backendUnavailable"),
+                  configureLLM: t("aiCanvas.backendConfigureLLM"),
+                  configureAgent: t("aiCanvas.backendConfigureAgent"),
                 },
               )}
               aiBackendPending={updateSettingsMutation.isPending}
