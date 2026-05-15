@@ -1936,7 +1936,7 @@
     "installInstalled": "Aisets はすでにアプリとしてインストールされています",
     "installAccepted": "Aisets をインストールしました",
     "installDismissed": "インストールをキャンセルしました",
-    "installManualHint": "ブラウザメニューからこのサイトをインストールしてください。macOS Safari では「ファイル > Dockに追加」を選択します",
+    "installManualHint": "このブラウザではまだインストールプロンプトが表示されていません。再読み込みしてもう一度試すか、アドレスバーまたはブラウザメニューからインストールしてください。macOS Safari では「ファイル > Dockに追加」を選択します。",
     "save": "保存",
     "reset": "リセット",
     "resetSettings": "設定をリセット",

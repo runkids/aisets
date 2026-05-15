@@ -1309,7 +1309,7 @@
     "installInstalled": "Aisets is already installed as an app.",
     "installAccepted": "Aisets was installed.",
     "installDismissed": "Install was dismissed.",
-    "installManualHint": "Use the browser menu to install this site. On macOS Safari, choose File > Add to Dock.",
+    "installManualHint": "This browser has not exposed an install prompt yet. Refresh and try again, or install from the address bar or browser menu. On macOS Safari, choose File > Add to Dock.",
     "save": "Save",
     "reset": "Reset",
     "resetSettings": "Reset Settings",

@@ -1936,7 +1936,7 @@
     "installInstalled": "Aisets 已经以 App 形式安装",
     "installAccepted": "Aisets 已安装",
     "installDismissed": "已取消安装",
-    "installManualHint": "请使用浏览器菜单安装此网站macOS Safari 可选择“文件 > 添加到 Dock”",
+    "installManualHint": "此浏览器目前没有提供安装提示。请刷新后重试，或从地址栏／浏览器菜单安装；macOS Safari 可选择“文件 > 添加到 Dock”。",
     "save": "保存",
     "reset": "重置",
     "resetSettings": "重置设置",

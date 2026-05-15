@@ -2229,7 +2229,7 @@
     "installInstalled": "Aisets 已經以 App 形式安裝",
     "installAccepted": "Aisets 已安裝",
     "installDismissed": "已取消安裝",
-    "installManualHint": "請使用瀏覽器選單安裝此網站macOS Safari 可選擇「檔案 > 加入 Dock」",
+    "installManualHint": "此瀏覽器目前沒有提供安裝提示。請重新整理後再試，或從網址列／瀏覽器選單安裝；macOS Safari 可選擇「檔案 > 加入 Dock」。",
     "save": "儲存",
     "reset": "重設",
     "resetSettings": "重設設定",

@@ -253,6 +253,7 @@ func TestServerHelpersBasePathAndUIHandlers(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.html"), `<!doctype html><head></head><body>app</body>`)
 	mustWrite(t, filepath.Join(dir, "assets", "app.js"), `console.log("ok")`)
+	mustWrite(t, filepath.Join(dir, "site.webmanifest"), `{"name":"Aisets"}`)
 	spa := spaHandlerFromDisk(dir, "/studio")
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
@@ -265,6 +266,12 @@ func TestServerHelpersBasePathAndUIHandlers(t *testing.T) {
 	spa.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "console.log") {
 		t.Fatalf("spa asset = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/site.webmanifest", nil)
+	spa.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("content-type") != "application/manifest+json; charset=utf-8" {
+		t.Fatalf("spa manifest = %d content-type=%q", rec.Code, rec.Header().Get("content-type"))
 	}
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/missing-route", nil)

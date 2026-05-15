@@ -111,6 +111,9 @@ func spaHandlerFromDisk(dir, basePath string) http.Handler {
 		absTarget, _ := filepath.Abs(target)
 		if absTarget == absDir || strings.HasPrefix(absTarget, absDir+string(filepath.Separator)) {
 			if info, err := os.Stat(absTarget); err == nil && !info.IsDir() {
+				if filepath.Ext(absTarget) == ".webmanifest" {
+					w.Header().Set("content-type", "application/manifest+json; charset=utf-8")
+				}
 				fileServer.ServeHTTP(w, r)
 				return
 			}
