@@ -20,8 +20,10 @@ import {
   sanitizeCanvasChatContent,
   type AssetCanvasCard,
   type CanvasCard,
+  type ChatActivityEntry,
   type ChatHistoryEntry,
   type ChatMentionPreview,
+  type ChatRunUsage,
   type CommentCanvasCard,
   type CanvasRegion,
   type PendingAttachment,
@@ -52,6 +54,7 @@ type AICursorState = {
 
 const CAPTURE_QUEUE_GAP_MS = 1200;
 const TOOL_STATUS_CLEAR_DELAY_MS = 250;
+const CHAT_ACTIVITY_LIMIT = 24;
 
 function isScreenStableCard(card: CanvasCard) {
   return (
@@ -95,6 +98,52 @@ function isCaptureTool(tool: string) {
     tool === "capture_canvas" ||
     tool === "capture_selected"
   );
+}
+
+type CanvasChatDone = Extract<CanvasChatEvent, { type: "done" }>;
+
+export function canvasRunUsageFromDone(done: CanvasChatDone): ChatRunUsage {
+  const inputTokens =
+    typeof done.inputTokens === "number" && Number.isFinite(done.inputTokens)
+      ? done.inputTokens
+      : undefined;
+  const outputTokens =
+    typeof done.outputTokens === "number" && Number.isFinite(done.outputTokens)
+      ? done.outputTokens
+      : undefined;
+  const totalTokens =
+    inputTokens === undefined && outputTokens === undefined
+      ? undefined
+      : (inputTokens ?? 0) + (outputTokens ?? 0);
+  const seconds = done.durationMs > 0 ? done.durationMs / 1000 : 0;
+  const rateBase = outputTokens ?? totalTokens;
+  const loopStats = done.loopStats ?? [];
+  const sumLoopField = (
+    field: keyof NonNullable<CanvasChatDone["loopStats"]>[number],
+  ) =>
+    loopStats.reduce((sum, stat) => {
+      const value = stat[field];
+      return typeof value === "number" && Number.isFinite(value)
+        ? sum + value
+        : sum;
+    }, 0);
+
+  return {
+    providerName: done.providerName,
+    modelName: done.modelName,
+    durationMs: done.durationMs,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    tokensPerSecond:
+      rateBase !== undefined && seconds > 0
+        ? Math.round((rateBase / seconds) * 100) / 100
+        : undefined,
+    loopCount: loopStats.length || undefined,
+    toolCallCount: sumLoopField("toolCallCount") || undefined,
+    fallbackActionCount: sumLoopField("fallbackActionCount") || undefined,
+    invalidActionCount: sumLoopField("invalidActionCount") || undefined,
+  };
 }
 
 function isCanvasRegion(value: unknown): value is CanvasRegion {
@@ -469,6 +518,9 @@ export function useCanvasChat(opts: {
   setMentionedCardIds: Dispatch<SetStateAction<string[]>>;
   pendingAttachments: PendingAttachment[];
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachment[]>>;
+  onChatRunStart?: () => void;
+  setActiveChatActivity?: Dispatch<SetStateAction<ChatActivityEntry[]>>;
+  setActiveChatUsage?: Dispatch<SetStateAction<ChatRunUsage | undefined>>;
 }) {
   const {
     cards,
@@ -499,6 +551,9 @@ export function useCanvasChat(opts: {
     setMentionedCardIds,
     pendingAttachments,
     setPendingAttachments,
+    onChatRunStart,
+    setActiveChatActivity,
+    setActiveChatUsage,
   } = opts;
 
   const abortRef = useRef<AbortController | null>(null);
@@ -538,6 +593,7 @@ export function useCanvasChat(opts: {
     let canvasMentionedCardIds = mentionedCardIds.filter((id) =>
       canvasCards.some((card) => card.id === id),
     );
+    onChatRunStart?.();
     cancelToolStatusClear();
     setPrompt("");
     setMentionedCardIds([]);
@@ -645,6 +701,10 @@ export function useCanvasChat(opts: {
 
     let assistantText = "";
     let suppressModelTextAfterOCR = false;
+    let runUsage: ChatRunUsage | undefined;
+    let activitySequence = 0;
+    const activityStartedAt = window.performance.now();
+    const activityEntries: ChatActivityEntry[] = [];
     const newCards: CanvasCard[] = [];
     const animationTimers: number[] = [];
     const animationStartedAt = window.performance.now();
@@ -659,6 +719,50 @@ export function useCanvasChat(opts: {
       if (card.kind === "asset") {
         assetCardIds.set(card.asset.id, card.id);
       }
+    }
+
+    function syncActiveActivity() {
+      setActiveChatActivity?.(activityEntries.slice(-CHAT_ACTIVITY_LIMIT));
+    }
+
+    function pushChatActivity(
+      entry: Omit<ChatActivityEntry, "id" | "atMs"> & { atMs?: number },
+    ) {
+      const next: ChatActivityEntry = {
+        ...entry,
+        id: `activity-${activitySequence}`,
+        atMs:
+          entry.atMs ??
+          Math.max(0, Math.round(window.performance.now() - activityStartedAt)),
+      };
+      activitySequence += 1;
+      const last = activityEntries.at(-1);
+      if (
+        last &&
+        last.kind === next.kind &&
+        last.label === next.label &&
+        last.detail === next.detail
+      ) {
+        activityEntries[activityEntries.length - 1] = {
+          ...last,
+          atMs: next.atMs,
+        };
+      } else {
+        activityEntries.push(next);
+        if (activityEntries.length > CHAT_ACTIVITY_LIMIT) {
+          activityEntries.splice(
+            0,
+            activityEntries.length - CHAT_ACTIVITY_LIMIT,
+          );
+        }
+      }
+      syncActiveActivity();
+    }
+
+    function compactActivityDetail(value: string | undefined) {
+      if (!value) return undefined;
+      const trimmed = value.replace(/\s+/g, " ").trim();
+      return trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed;
     }
 
     function resolveCanvasCardId(rawId: string) {
@@ -1156,6 +1260,19 @@ export function useCanvasChat(opts: {
     }
 
     function handleEvent(event: CanvasChatEvent) {
+      if (event.type === "done") {
+        runUsage = canvasRunUsageFromDone(event);
+        setActiveChatUsage?.(runUsage);
+        pushChatActivity({
+          kind: "done",
+          label: t("aiCanvas.activityDone"),
+          detail: compactActivityDetail(
+            [event.providerName, event.modelName].filter(Boolean).join(" · "),
+          ),
+          tone: "success",
+        });
+        return;
+      }
       if (event.type === "focus" && event.cardId) {
         cancelToolStatusClear();
         const target = canvasFocusCardFromEvent(event, canvasCards);
@@ -1175,6 +1292,10 @@ export function useCanvasChat(opts: {
       if (event.type === "thinking") {
         cancelToolStatusClear();
         setAiCursor((prev) => ({ ...prev, status: "thinking" }));
+        pushChatActivity({
+          kind: "thinking",
+          label: t("aiCanvas.activityThinking"),
+        });
       }
       if (event.type === "status") {
         cancelToolStatusClear();
@@ -1184,6 +1305,11 @@ export function useCanvasChat(opts: {
           emoji: event.phase === "planning" ? "thinking" : "move",
           status: canvasStatusCursorStatus(event.phase),
         }));
+        pushChatActivity({
+          kind: "status",
+          label: canvasStatusCursorLabel(event.phase, t),
+          detail: compactActivityDetail(event.content),
+        });
       }
       if (event.type === "text") {
         if (suppressModelTextAfterOCR) return;
@@ -1193,6 +1319,11 @@ export function useCanvasChat(opts: {
         }
       }
       if (event.type === "proposal") {
+        pushChatActivity({
+          kind: "proposal",
+          label: t("aiCanvas.activityProposal"),
+          detail: compactActivityDetail(`${event.tool}: ${event.description}`),
+        });
         if (isCaptureTool(event.tool)) {
           runCaptureTool(event.tool, event.params.transparent === true);
           return;
@@ -1207,7 +1338,22 @@ export function useCanvasChat(opts: {
         setCards((current) => [...current, card]);
       }
       if (event.type === "generated_image") {
+        pushChatActivity({
+          kind: "image",
+          label: t("aiCanvas.activityGeneratedImage"),
+          detail: compactActivityDetail(event.fileName),
+        });
         addGeneratedImageCard(event);
+      }
+      if (event.type === "action_result") {
+        pushChatActivity({
+          kind: "tool",
+          label: event.error
+            ? t("aiCanvas.activityToolFailed")
+            : t("aiCanvas.activityToolCompleted"),
+          detail: compactActivityDetail(event.tool),
+          tone: event.error ? "danger" : "success",
+        });
       }
       if (event.type === "action_result" && event.tool === "select_cards") {
         const ids = canvasActionResultCardIds(event.result, canvasCards);
@@ -1506,7 +1652,7 @@ export function useCanvasChat(opts: {
     }
 
     try {
-      await canvasChat({
+      const done = await canvasChat({
         messages,
         canvas: snapshot,
         locale,
@@ -1519,16 +1665,26 @@ export function useCanvasChat(opts: {
         onEvent: handleEvent,
         signal: abort.signal,
       });
+      if (done && !runUsage) {
+        runUsage = canvasRunUsageFromDone(done);
+        setActiveChatUsage?.(runUsage);
+      }
 
       if (pendingVariantPreviews.length > 0) {
         await Promise.allSettled(pendingVariantPreviews);
       }
 
       assistantText = sanitizeCanvasChatContent(assistantText);
-      if (assistantText) {
+      const activity = activityEntries.slice(-CHAT_ACTIVITY_LIMIT);
+      if (assistantText || activity.length > 0 || runUsage) {
         setChatHistory((prev) => [
           ...prev.slice(-10),
-          { role: "assistant", content: assistantText },
+          {
+            role: "assistant",
+            content: assistantText,
+            activity: activity.length > 0 ? activity : undefined,
+            usage: runUsage,
+          },
         ]);
       }
     } catch (err) {

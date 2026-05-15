@@ -124,11 +124,36 @@ export type ChatAttachment = {
 
 export type PendingAttachment = ChatAttachment & { id: string };
 
+export type ChatActivityEntry = {
+  id: string;
+  kind: "thinking" | "status" | "tool" | "proposal" | "image" | "done";
+  label: string;
+  detail?: string;
+  atMs?: number;
+  tone?: "neutral" | "success" | "warning" | "danger";
+};
+
+export type ChatRunUsage = {
+  providerName?: string;
+  modelName?: string;
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  tokensPerSecond?: number;
+  loopCount?: number;
+  toolCallCount?: number;
+  fallbackActionCount?: number;
+  invalidActionCount?: number;
+};
+
 export type ChatHistoryEntry = {
   role: string;
   content: string;
   mentions?: ChatMentionPreview[];
   attachments?: ChatAttachment[];
+  activity?: ChatActivityEntry[];
+  usage?: ChatRunUsage;
 };
 
 export type AICanvasSession = {
@@ -406,6 +431,80 @@ function normalizeCard(value: unknown): CanvasCard | null {
   return null;
 }
 
+function safeChatString(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length > maxLength
+    ? `${trimmed.slice(0, maxLength)}…`
+    : trimmed;
+}
+
+function normalizeChatActivity(
+  value: unknown,
+): ChatActivityEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = value
+    .map((item): ChatActivityEntry | null => {
+      if (!isRecord(item)) return null;
+      const id = safeChatString(item.id, 80);
+      const label = safeChatString(item.label, 120);
+      if (!id || !label) return null;
+      const kind =
+        item.kind === "thinking" ||
+        item.kind === "status" ||
+        item.kind === "tool" ||
+        item.kind === "proposal" ||
+        item.kind === "image" ||
+        item.kind === "done"
+          ? item.kind
+          : "status";
+      const tone =
+        item.tone === "success" ||
+        item.tone === "warning" ||
+        item.tone === "danger" ||
+        item.tone === "neutral"
+          ? item.tone
+          : undefined;
+      const atMs = Number(item.atMs);
+      return {
+        id,
+        kind,
+        label,
+        detail: safeChatString(item.detail, 280),
+        atMs: Number.isFinite(atMs) && atMs >= 0 ? Math.round(atMs) : undefined,
+        tone,
+      };
+    })
+    .filter((entry): entry is ChatActivityEntry => Boolean(entry))
+    .slice(-24);
+  return entries.length > 0 ? entries : undefined;
+}
+
+function normalizeChatRunUsage(value: unknown): ChatRunUsage | undefined {
+  if (!isRecord(value)) return undefined;
+  const usage: ChatRunUsage = {};
+  type NumberKey = Exclude<keyof ChatRunUsage, "providerName" | "modelName">;
+  const setNumber = (key: NumberKey) => {
+    const n = Number(value[key]);
+    if (Number.isFinite(n) && n >= 0) usage[key] = Math.round(n * 100) / 100;
+  };
+  const providerName = safeChatString(value.providerName, 80);
+  const modelName = safeChatString(value.modelName, 120);
+  if (providerName) usage.providerName = providerName;
+  if (modelName) usage.modelName = modelName;
+  setNumber("durationMs");
+  setNumber("inputTokens");
+  setNumber("outputTokens");
+  setNumber("totalTokens");
+  setNumber("tokensPerSecond");
+  setNumber("loopCount");
+  setNumber("toolCallCount");
+  setNumber("fallbackActionCount");
+  setNumber("invalidActionCount");
+  return Object.keys(usage).length > 0 ? usage : undefined;
+}
+
 export function normalizeAICanvasSession(value: unknown): AICanvasSession {
   if (!isRecord(value)) return emptyAICanvasSession();
   const cards = Array.isArray(value.cards)
@@ -439,18 +538,26 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
             typeof e.role === "string" &&
             typeof e.content === "string",
         )
-        .map((entry) => ({
-          ...entry,
-          content:
-            entry.role === "assistant"
-              ? sanitizeCanvasChatContent(entry.content)
-              : entry.content,
-        }))
+        .map((entry) => {
+          const activity = normalizeChatActivity(entry.activity);
+          const usage = normalizeChatRunUsage(entry.usage);
+          return {
+            ...entry,
+            content:
+              entry.role === "assistant"
+                ? sanitizeCanvasChatContent(entry.content)
+                : entry.content,
+            activity,
+            usage,
+          };
+        })
         .filter(
           (entry) =>
             entry.content ||
             entry.mentions?.length ||
-            entry.attachments?.length,
+            entry.attachments?.length ||
+            entry.activity?.length ||
+            entry.usage,
         )
         .slice(-10)
     : [];

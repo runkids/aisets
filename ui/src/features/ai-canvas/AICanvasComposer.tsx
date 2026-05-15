@@ -31,10 +31,16 @@ import {
 import { cn } from "@/lib/cn";
 import {
   type ChatAttachment,
+  type ChatActivityEntry,
   type ChatHistoryEntry,
   type PendingAttachment,
   type ProposalCanvasCard,
+  type ChatRunUsage,
 } from "./aiCanvasState";
+import {
+  AICanvasActivityPanel,
+  AICanvasRunUsageChips,
+} from "./AICanvasActivityPanel";
 import {
   canvasUserPromptHistory,
   navigateCanvasPromptHistory,
@@ -70,6 +76,9 @@ type AICanvasComposerProps = {
   composerStatusLabel: string;
   composerStatusText: string;
   elapsedLabel?: string | null;
+  activeChatActivity?: ChatActivityEntry[];
+  activeChatUsage?: ChatRunUsage;
+  activeElapsedMs?: number;
   currentTargets?: MentionableImageCard[];
   latestChatContent: string;
   chatHistory: ChatHistoryEntry[];
@@ -123,6 +132,9 @@ export function AICanvasComposer({
   composerStatusLabel,
   composerStatusText,
   elapsedLabel,
+  activeChatActivity = [],
+  activeChatUsage,
+  activeElapsedMs,
   currentTargets = [],
   latestChatContent,
   chatHistory,
@@ -198,7 +210,14 @@ export function AICanvasComposer({
       el.scrollTop = el.scrollHeight;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [chatHistory.length, collapsed, height, isWorking, latestChatContent]);
+  }, [
+    activeChatActivity.length,
+    chatHistory.length,
+    collapsed,
+    height,
+    isWorking,
+    latestChatContent,
+  ]);
 
   useEffect(() => {
     promptHistoryNavigationRef.current = { index: null, draft: "" };
@@ -318,10 +337,10 @@ export function AICanvasComposer({
                     <article
                       key={i}
                       className={cn(
-                        "max-w-[min(610px,calc(100%-16px))] rounded-g-lg border px-3 py-2 text-g-body leading-[1.45] text-white/84",
+                        "w-[calc(100%-48px)] rounded-g-md border px-3 py-2 text-g-body leading-[1.45] text-white/84 max-[760px]:w-[calc(100%-20px)]",
                         isUser
-                          ? "self-end border-white/[0.1] bg-white/[0.12]"
-                          : "self-start border-white/[0.06] bg-white/[0.06]",
+                          ? "self-end rounded-br-g-sm border-white/[0.12] bg-white/[0.13]"
+                          : "self-start rounded-bl-g-sm border-white/[0.06] bg-white/[0.06]",
                       )}
                     >
                       {entry.mentions && entry.mentions.length > 0 && (
@@ -382,30 +401,58 @@ export function AICanvasComposer({
                           ))}
                         </div>
                       )}
+                      {!isUser && entry.activity?.length && (
+                        <AICanvasActivityPanel
+                          t={t}
+                          activity={entry.activity}
+                          usage={entry.usage}
+                          className={entry.content ? "mb-2" : undefined}
+                        />
+                      )}
                       {entry.content && (
                         <div className="whitespace-pre-wrap">
                           {renderMarkdown(entry.content)}
                         </div>
                       )}
-                      {!isUser && (
-                        <div className="mt-3 flex items-center gap-1 border-t border-white/[0.05] pt-2 text-white/38">
-                          <CopyButton
-                            value={entry.content}
-                            label={t("ai.copyResult")}
-                            className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
-                          />
+                      {(entry.content || (!isUser && entry.usage)) && (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/[0.05] pt-2 text-white/38">
+                          {entry.content && (
+                            <CopyButton
+                              value={entry.content}
+                              label={t("aiCanvas.copyMessage")}
+                              className="size-6 text-white/42 hover:bg-white/[0.08] hover:text-white"
+                            />
+                          )}
+                          {!isUser && entry.usage && (
+                            <AICanvasRunUsageChips
+                              t={t}
+                              usage={entry.usage}
+                              className="ml-auto justify-end"
+                            />
+                          )}
                         </div>
                       )}
                     </article>
                   );
                 })
               )}
-              {isWorking && (
+              {isWorking && activeChatActivity.length > 0 ? (
+                <div className="w-[calc(100%-48px)] self-start max-[760px]:w-[calc(100%-20px)]">
+                  <AICanvasActivityPanel
+                    t={t}
+                    activity={activeChatActivity}
+                    usage={activeChatUsage}
+                    elapsedMs={activeElapsedMs}
+                    live
+                    defaultOpen
+                  />
+                </div>
+              ) : isWorking ? (
                 <div className="flex items-center gap-2 self-start rounded-g-md border border-white/[0.06] bg-white/[0.07] px-3 py-2 text-g-caption text-white/56">
                   <LoaderCircle size={12} className="animate-spin" />
                   {t("aiCanvas.statusProcessingDetail")}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}

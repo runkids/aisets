@@ -117,6 +117,53 @@ describe("normalizeAICanvasSession", () => {
     expect(session.chatHistory).toHaveLength(2);
     expect(session.chatHistory![1].attachments).toHaveLength(1);
   });
+
+  it("preserves assistant activity-only entries and usage summaries", () => {
+    const session = normalizeAICanvasSession({
+      cards: [],
+      viewport: { x: 0, y: 0, scale: 1 },
+      chatHistory: [
+        {
+          role: "assistant",
+          content: "",
+          activity: [
+            {
+              id: "step-1",
+              kind: "tool",
+              label: "Tool completed",
+              detail: "create_comment",
+              atMs: 1200,
+              tone: "success",
+            },
+          ],
+          usage: {
+            providerName: "openai-compatible",
+            modelName: "qwen3-vl",
+            durationMs: 4321,
+            totalTokens: 120,
+            tokensPerSecond: 12.34,
+            toolCallCount: 1,
+          },
+        },
+      ],
+    });
+
+    expect(session.chatHistory).toHaveLength(1);
+    expect(session.chatHistory![0].activity?.[0]).toMatchObject({
+      kind: "tool",
+      label: "Tool completed",
+      detail: "create_comment",
+      atMs: 1200,
+    });
+    expect(session.chatHistory![0].usage).toMatchObject({
+      providerName: "openai-compatible",
+      modelName: "qwen3-vl",
+      durationMs: 4321,
+      totalTokens: 120,
+      tokensPerSecond: 12.34,
+      toolCallCount: 1,
+    });
+  });
 });
 
 describe("writeAICanvasSession", () => {

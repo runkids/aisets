@@ -134,7 +134,7 @@ export function AICanvasToolbar({
           size="sm"
           aria-label={t("aiCanvas.save")}
           onClick={onSave}
-          disabled={isSaving || cardsCount === 0}
+          disabled={isSaving}
         >
           {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
         </IconButton>

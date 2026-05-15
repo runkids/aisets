@@ -5,6 +5,7 @@ import {
   canvasActionResultCreatesAssetCards,
   canvasAnimationSettleDelay,
   canvasCaptureQueueDelay,
+  canvasRunUsageFromDone,
   clearCanvasToolStatusCursor,
   duplicateCardPositionsFromActionResult,
   canvasStatusCursorLabel,
@@ -237,6 +238,49 @@ describe("clearCanvasToolStatusCursor", () => {
         status: "acting",
       }),
     ).toEqual({ x: 12, y: 34, status: "idle" });
+  });
+});
+
+describe("canvasRunUsageFromDone", () => {
+  it("summarizes provider, tokens, rate, and tool loop stats", () => {
+    expect(
+      canvasRunUsageFromDone({
+        type: "done",
+        providerName: "openai-compatible",
+        modelName: "qwen3-vl",
+        durationMs: 10_000,
+        inputTokens: 300,
+        outputTokens: 120,
+        loopStats: [
+          {
+            loop: 1,
+            promptKind: "initial",
+            toolCallCount: 2,
+            fallbackActionCount: 1,
+            invalidActionCount: 0,
+          },
+          {
+            loop: 2,
+            promptKind: "repair",
+            toolCallCount: 1,
+            fallbackActionCount: 0,
+            invalidActionCount: 1,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      providerName: "openai-compatible",
+      modelName: "qwen3-vl",
+      durationMs: 10_000,
+      inputTokens: 300,
+      outputTokens: 120,
+      totalTokens: 420,
+      tokensPerSecond: 12,
+      loopCount: 2,
+      toolCallCount: 3,
+      fallbackActionCount: 1,
+      invalidActionCount: 1,
+    });
   });
 });
 

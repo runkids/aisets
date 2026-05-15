@@ -55,9 +55,11 @@ import {
   type AICanvasSession,
   type AssetCanvasCard,
   type CanvasCard,
+  type ChatActivityEntry,
   type ChatAttachment,
   type CommentCanvasCard,
   type ChatHistoryEntry,
+  type ChatRunUsage,
   type PendingAttachment,
   type ProposalCanvasCard,
   type UploadCanvasCard,
@@ -66,6 +68,7 @@ import {
 import { useCanvasChat } from "./useCanvasChat";
 import { useCanvasDrag } from "./useCanvasDrag";
 import { useProposalExecution } from "./useProposalExecution";
+import { formatCanvasRunDuration } from "./AICanvasActivityPanel";
 import { AICanvasComposer } from "./AICanvasComposer";
 import { AICanvasCapturePreview, AICanvasDebugPanel } from "./AICanvasOverlays";
 import { AICanvasSearchPanel } from "./AICanvasSearchPanel";
@@ -150,6 +153,16 @@ export function AICanvasView({
   const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
+  const [activeChatActivity, setActiveChatActivity] = useState<
+    ChatActivityEntry[]
+  >([]);
+  const [activeChatUsage, setActiveChatUsage] = useState<
+    ChatRunUsage | undefined
+  >(undefined);
+  const [activeChatRunStartedAt, setActiveChatRunStartedAt] = useState<
+    number | null
+  >(null);
+  const [activeChatElapsedMs, setActiveChatElapsedMs] = useState(0);
   const [composerCollapsed, setComposerCollapsed] = useState(() => {
     try {
       return sessionStorage.getItem("aisets.canvas.collapsed") === "true";
@@ -547,8 +560,26 @@ export function AICanvasView({
     setMentionedCardIds,
     pendingAttachments,
     setPendingAttachments,
+    onChatRunStart: () => {
+      setActiveChatActivity([]);
+      setActiveChatUsage(undefined);
+      setActiveChatRunStartedAt(Date.now());
+      setActiveChatElapsedMs(0);
+    },
+    setActiveChatActivity,
+    setActiveChatUsage,
   });
   const isWorking = working !== "idle";
+  useEffect(() => {
+    if (!isWorking || activeChatRunStartedAt === null) return undefined;
+    const update = () => {
+      setActiveChatElapsedMs(Date.now() - activeChatRunStartedAt);
+    };
+    update();
+    const timer = window.setInterval(update, 250);
+    return () => window.clearInterval(timer);
+  }, [activeChatRunStartedAt, isWorking]);
+
   const composerToolsOpen = composerAdvancedOpen;
   const assistantMessages = useMemo(
     () => chatHistory.filter((entry) => entry.role === "assistant"),
@@ -573,6 +604,12 @@ export function AICanvasView({
       : latestChatContent
         ? t("aiCanvas.statusLatestDetail")
         : t("aiCanvas.statusReadyDetail"));
+  const elapsedLabel =
+    isWorking && activeChatRunStartedAt !== null
+      ? t("aiCanvas.elapsed", {
+          time: formatCanvasRunDuration(activeChatElapsedMs),
+        })
+      : null;
   const groupedBackendOptions = useMemo(() => {
     const groups: Array<{ group: string; options: AIBackendOption[] }> = [];
     for (const option of aiBackendOptions) {
@@ -1196,12 +1233,10 @@ export function AICanvasView({
   }
 
   function handleSave() {
-    if (cards.length === 0) return;
     void doSave(currentSessionName ?? autoSessionName(), false);
   }
 
   function handleSaveAs() {
-    if (cards.length === 0) return;
     setSaveAsMode(true);
     setSaveNameDefault(autoSessionName());
     setSaveNameDialogOpen(true);
@@ -1610,6 +1645,10 @@ export function AICanvasView({
         isWorking={isWorking}
         composerStatusLabel={composerStatusLabel}
         composerStatusText={composerStatusText}
+        elapsedLabel={elapsedLabel}
+        activeChatActivity={activeChatActivity}
+        activeChatUsage={activeChatUsage}
+        activeElapsedMs={activeChatElapsedMs}
         currentTargets={currentTargets}
         latestChatContent={latestChatContent}
         chatHistory={chatHistory}
