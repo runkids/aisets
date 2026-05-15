@@ -25,6 +25,7 @@
 <p align="center">
   <a href="#install">Install</a> •
   <a href="#quick-start">Run UI</a> •
+  <a href="#ai-canvas-demo">AI Canvas Demo</a> •
   <a href="#why-aisets">Why Aisets</a> •
   <a href="#ai-that-actually-helps">AI</a> •
   <a href="#what-were-building-next">Roadmap</a>
@@ -32,6 +33,20 @@
 
 > [!IMPORTANT]
 > Aisets is in active development. Expect fast iteration and review the release notes before updating.
+
+## AI Canvas Demo
+
+AI Canvas lets agents work visually with image assets: stage references, move the camera, zoom into details, arrange cards, capture the result, and explain the composition.
+
+<p align="center">
+  <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4">
+    <img src=".github/assets/readme-ai-canvas-toy-shop-demo.gif" alt="AI Canvas staging cute image assets into a toy-shop composition with Codex CLI" width="960">
+  </a>
+</p>
+
+<p align="center">
+  <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4"><strong>Watch the AI Canvas toy-shop staging demo</strong></a>
+</p>
 
 ## Install
 
@@ -114,8 +129,8 @@ Supported AI paths include:
 | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-duplicates.png" alt="Aisets duplicate analysis comparing similar PNG and WebP assets" width="480"> | <img src=".github/assets/readme-optimize.png" alt="Aisets optimization view with critical size findings, format conversion, and resize recommendations" width="480"> |
 
-| Check one-off images before import                                                                                                              | Tune local AI and agent CLIs                                                                                                                                                  |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Check one-off images before import                                                                                                              | Tune local AI and agent CLIs                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-image-tools.png" alt="Aisets image tools view for checking images before adding them to a project" width="480"> | <img src=".github/assets/readme-ai-settings.png" alt="Aisets AI settings with local LLM, embedding model, agent CLI, tagging, OCR, and semantic indexing controls" width="480"> |
 
 ## What You Can Do With It

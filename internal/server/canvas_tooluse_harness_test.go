@@ -1470,7 +1470,7 @@ func TestCanvasHarnessPhotoStagingMovesFromInspectToLayoutBeforeCapture(t *testi
 			finalText += fmt.Sprint(event["content"])
 		}
 	}
-	if !strings.Contains(finalText, "擺拍理念") || !strings.Contains(finalText, "畢業") {
+	if !strings.Contains(finalText, "擺拍") || !strings.Contains(finalText, "截圖") {
 		t.Fatalf("missing localized staging rationale text: %q", finalText)
 	}
 	requests := bootstrap.provider.Requests()
@@ -1645,7 +1645,7 @@ func TestCanvasHarnessPhotoStagingDefersCaptureUntilAfterStaging(t *testing.T) {
 			finalText += fmt.Sprint(event["content"])
 		}
 	}
-	if !strings.Contains(finalText, "staging concept") || !strings.Contains(finalText, "birthday family portrait") {
+	if !strings.Contains(finalText, "擺拍") || !strings.Contains(finalText, "截圖") {
 		t.Fatalf("missing staging rationale text: %q", finalText)
 	}
 }
@@ -1765,7 +1765,7 @@ func TestCanvasHarnessPhotoStagingBlocksCaptureWhenSameLoopHasInvalidActions(t *
 	}
 }
 
-func TestCanvasHarnessPhotoStagingIgnoresLayoutAfterCapture(t *testing.T) {
+func TestCanvasHarnessPhotoStagingStopsAfterCapture(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	bootstrap.provider.responses = []llm.ChatResponse{
 		canvasHarnessToolCalls(
@@ -1816,11 +1816,8 @@ func TestCanvasHarnessPhotoStagingIgnoresLayoutAfterCapture(t *testing.T) {
 		t.Fatalf("missing final photo-staging rationale text: %#v", events)
 	}
 	requests := bootstrap.provider.Requests()
-	if len(requests) < 2 {
-		t.Fatalf("expected answer-only follow-up request after capture, got %d requests", len(requests))
-	}
-	if len(requests[1].Tools) != 0 {
-		t.Fatalf("post-capture follow-up exposed tools: %#v", requests[1].Tools)
+	if len(requests) != 1 {
+		t.Fatalf("photo staging should stop after capture instead of asking for more layout, requests = %d", len(requests))
 	}
 }
 

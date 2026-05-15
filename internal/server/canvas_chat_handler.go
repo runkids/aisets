@@ -1504,18 +1504,11 @@ Latest user request: %q
 Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 }
 
-func canvasPhotoStagingAnswerSystemPrompt(locale string) string {
-	lang := strings.TrimSpace(locale)
-	if lang == "" {
-		lang = "the user's language"
+func canvasPhotoStagingFallbackAnswerText(latestUserMessage string, locale string) string {
+	switch canvasLatestUserLanguage(latestUserMessage, locale) {
+	case "Traditional Chinese", "Simplified Chinese":
+		return "已完成擺拍與截圖。這次以使用者指定的風格作為方向，透過主視覺與輔助圖的大小差、前後層次、留白和視覺動線建立雜誌式構圖；旋轉或鏡像只作為少量點綴，避免為了使用工具而破壞畫面。"
 	}
-	return fmt.Sprintf(`You are completing a canvas photo-staging workflow after the layout and screenshot capture have already finished.
-Do not call tools, do not output JSON, and do not output action blocks.
-Reply only with concise natural-language staging concept and rationale in %s.
-Mention focal hierarchy, spacing, visual flow, editorial staging choices, and how the requested style direction influenced the composition.`, lang)
-}
-
-func canvasPhotoStagingFallbackAnswerText() string {
 	return "Completed the staged layout and screenshot. The composition uses focal hierarchy, spacing, layering, and deliberate scale or transform choices to support the requested style."
 }
 
@@ -4179,24 +4172,17 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for loop := 0; loop < maxToolLoops; loop++ {
-		photoStagingAnswerOnlyAfterCapture := photoStagingWorkflow && canvasPhotoStagingCaptureCompleted(executedCanvasToolSequence)
 		roundTools := canvasTools
 		roundToolChoice := ""
-		roundSystemPrompt := systemPrompt
 		if usingNativeTools {
 			roundTools = canvasNativeToolsForRound(canvasTools, loopReason)
 			roundToolChoice = canvasNativeToolChoice(roundTools, loopReason)
-		}
-		if photoStagingAnswerOnlyAfterCapture {
-			roundTools = nil
-			roundToolChoice = ""
-			roundSystemPrompt = canvasPhotoStagingAnswerSystemPrompt(locale)
 		}
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
 			Images:           images,
 			Backend:          backend,
 			ModelName:        modelName,
-			SystemPrompt:     roundSystemPrompt,
+			SystemPrompt:     systemPrompt,
 			Prompt:           currentPrompt,
 			Purpose:          "canvas",
 			TimeoutSec:       canvasOutputTokenLimit,
@@ -4255,28 +4241,13 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		} else if fallbackActionCount > 0 {
 			toolUseSource = "fallback_parse"
 		}
-		if photoStagingAnswerOnlyAfterCapture {
-			if strings.TrimSpace(textBody) == "" && len(actions) > 0 {
-				textBody = canvasPhotoStagingFallbackAnswerText()
-			}
-			actions = nil
-			toolCallActions = nil
-			fallbackActionCount = 0
-			toolUseSource = ""
-		}
 		loopStats[statIndex].ToolUseSource = toolUseSource
 		loopStats[statIndex].NativeToolCallCount = len(toolCallActions)
 		loopStats[statIndex].FallbackActionCount = fallbackActionCount
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
-		if photoStagingAnswerOnlyAfterCapture {
-			truncatedAction = false
-		}
 		var invalidActionIssues []canvasActionValidationIssue
 		actions, invalidActionIssues = normalizeCanvasActions(actions, false)
-		if photoStagingAnswerOnlyAfterCapture {
-			invalidActionIssues = nil
-		}
-		if !photoStagingAnswerOnlyAfterCapture && usingNativeTools && len(chatResp.ToolCalls) > 0 && len(toolCallActions) == 0 && strings.TrimSpace(content) == "" {
+		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(toolCallActions) == 0 && strings.TrimSpace(content) == "" {
 			for _, call := range chatResp.ToolCalls {
 				invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
 					Tool:   call.Name,
@@ -4301,7 +4272,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		actions = reorderCanvasPhotoStagingCaptureActions(actions, photoStagingWorkflow)
 		invalidActionIssues = append(invalidActionIssues, postExpansionIssues...)
 		invalidActionIssues = append(invalidActionIssues, missingVisualCueIssues...)
-		if !photoStagingAnswerOnlyAfterCapture && usingNativeTools && len(chatResp.ToolCalls) > 0 && len(actions) == 0 && strings.TrimSpace(content) == "" {
+		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(actions) == 0 && strings.TrimSpace(content) == "" {
 			invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
 				Tool:   "native_tool_call",
 				Reason: "native tool calls did not produce executable canvas actions: " + strings.Join(canvasActionToolNames(toolCallActions), ", "),
@@ -4650,6 +4621,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		captureResultNeedsFollowup := captureExecutedThisLoop && len(compactToolResults) > 0 && (!nonCaptureToolExecutedThisLoop || photoStagingWorkflow) && loop < maxToolLoops-1
 		captureOnlyDeferredWork := captureBeforeStagingWork && (!canvasPhotoStagingWorkCompleted(executedCanvasTools) ||
 			!canvasPhotoStagingAllVisibleImagesCovered(projectedCanvas, photoStagingCoveredCardIDs))
+		if photoStagingWorkflow && captureExecutedThisLoop && !truncatedAction {
+			break
+		}
 		if captureExecutedThisLoop && !truncatedAction && !captureResultNeedsFollowup {
 			break
 		}
@@ -4719,7 +4693,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !textEmitted && photoStagingWorkflow && canvasPhotoStagingCaptureCompleted(executedCanvasToolSequence) {
-		sendNDJSON(w, map[string]any{"type": "text", "content": canvasPhotoStagingFallbackAnswerText()})
+		sendNDJSON(w, map[string]any{"type": "text", "content": canvasPhotoStagingFallbackAnswerText(latestUserMessage, locale)})
 		textEmitted = true
 	}
 
