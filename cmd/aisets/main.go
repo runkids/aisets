@@ -32,6 +32,8 @@ func run(rawArgs []string) int {
 	switch args[0] {
 	case "ui":
 		err = cmdUI(args[1:], jsonOut)
+	case "__restart-ui":
+		err = cmdUIRestart(args[1:])
 	case "version":
 		err = cmdVersion(args[1:], jsonOut)
 	case "projects":

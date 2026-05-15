@@ -16,9 +16,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"aisets/internal/apierr"
 	"aisets/internal/config"
+	versionpkg "aisets/internal/version"
 )
 
 func resolvedTempDir(t *testing.T) string {
@@ -29,6 +31,81 @@ func resolvedTempDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return resolved
+}
+
+func TestUpdateAPIErrorUsesActionableCodes(t *testing.T) {
+	status, body := updateAPIError(versionpkg.ElevatedPermissionError{Path: "/usr/local/bin/aisets"})
+	if status != http.StatusForbidden || body.Code != "update_elevated_permission_required" || body.Params["path"] != "/usr/local/bin/aisets" {
+		t.Fatalf("elevated update error = status %d body %#v", status, body)
+	}
+
+	status, body = updateAPIError(errors.New("download update: 404 Not Found"))
+	if status != http.StatusInternalServerError || body.Code != "update_failed" || body.Params["message"] != "download update: 404 Not Found" {
+		t.Fatalf("generic update error = status %d body %#v", status, body)
+	}
+}
+
+func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
+	s, err := New(Options{Addr: "127.0.0.1:3003", BasePath: "/studio", Store: nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := s.uiRestartHelperArgs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	for _, want := range []string{"__restart-ui", "--host 127.0.0.1", "--port 3003", "--base-path /studio", "--clear-cache", "--no-open"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("restart args %q missing %q", joined, want)
+		}
+	}
+}
+
+func TestRestartEndpointStartsHelperBeforeExit(t *testing.T) {
+	s, err := New(Options{Addr: "127.0.0.1:3003", BasePath: "/studio", Store: nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStart := startUIRestartHelper
+	oldExit := processExit
+	started := make(chan []string, 1)
+	exited := make(chan int, 1)
+	startUIRestartHelper = func(args []string) error {
+		started <- args
+		return nil
+	}
+	processExit = func(code int) { exited <- code }
+	t.Cleanup(func() {
+		startUIRestartHelper = oldStart
+		processExit = oldExit
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/restart", strings.NewReader(`{}`))
+	req.RemoteAddr = "127.0.0.1:43210"
+	req.Host = "127.0.0.1:3003"
+	req.Header.Set("Origin", "http://127.0.0.1:3003")
+	s.handleRestart(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"restarting":true`) {
+		t.Fatalf("restart response = %d %s", rec.Code, rec.Body.String())
+	}
+	select {
+	case args := <-started:
+		if !strings.Contains(strings.Join(args, " "), "--base-path /studio") {
+			t.Fatalf("restart args = %#v", args)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("restart helper was not started")
+	}
+	select {
+	case code := <-exited:
+		if code != 0 {
+			t.Fatalf("exit code = %d", code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("server did not schedule exit")
+	}
 }
 
 func TestAPIVersionAndUpdateDevMode(t *testing.T) {

@@ -19,6 +19,7 @@ import {
   useRenameProjectMutation,
   useRenameWorkspaceMutation,
   useResetDatabaseMutation,
+  useRestartAppMutation,
   useSettingsQuery,
   useSwitchWorkspaceMutation,
   useUpdateAppMutation,
@@ -134,6 +135,7 @@ export function SettingsView({
   const clearEmbeddingsMutation = useClearEmbeddingsMutation();
   const importMutation = useImportSettingsMutation();
   const installOCRMutation = useInstallOCRMutation();
+  const restartAppMutation = useRestartAppMutation();
   const removeProjectMutation = useRemoveProjectMutation();
   const removeOCRMutation = useRemoveOCRMutation();
   const removeWorkspaceMutation = useRemoveWorkspaceMutation();
@@ -188,6 +190,7 @@ export function SettingsView({
     resetMutation.isPending ||
     switchWorkspaceMutation.isPending ||
     updateAppMutation.isPending ||
+    restartAppMutation.isPending ||
     updateMutation.isPending;
   const settingsActionDisabled =
     settingsQuery.isLoading || working || ocrWorking;
@@ -426,6 +429,18 @@ export function SettingsView({
     } catch (error) {
       toast.error(errorMessage(error), {
         title: t("settings.updateFailed"),
+      });
+    }
+  }
+
+  async function onRestartApp() {
+    try {
+      await restartAppMutation.mutateAsync();
+      toast.info(t("settings.updateRestarting"));
+      void reloadWhenServerReady();
+    } catch (error) {
+      toast.error(errorMessage(error), {
+        title: t("settings.updateRestartFailed"),
       });
     }
   }
@@ -760,6 +775,8 @@ export function SettingsView({
       {updatedApp && (
         <UpdateRestartModal
           update={updatedApp}
+          restartPending={restartAppMutation.isPending}
+          onRestart={() => void onRestartApp()}
           onClose={() => setUpdatedApp(null)}
         />
       )}
@@ -769,9 +786,13 @@ export function SettingsView({
 
 function UpdateRestartModal({
   update,
+  restartPending,
+  onRestart,
   onClose,
 }: {
   update: UpdateAppResult;
+  restartPending: boolean;
+  onRestart: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -787,9 +808,16 @@ function UpdateRestartModal({
       onClose={onClose}
       size="md"
       footer={
-        <Button variant="primary" onClick={onClose}>
-          {t("common.close")}
-        </Button>
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            {t("common.close")}
+          </Button>
+          <Button variant="primary" onClick={onRestart} disabled={restartPending}>
+            {restartPending
+              ? t("settings.updateRestarting")
+              : t("settings.updateRestartAction")}
+          </Button>
+        </>
       }
     >
       <div className="flex flex-col gap-4 text-g-body text-g-ink-2">
@@ -830,6 +858,24 @@ function RestartCommandBlock({
       </pre>
     </section>
   );
+}
+
+async function reloadWhenServerReady() {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, 800));
+    try {
+      const response = await fetch(`${window.__BASE_PATH__ ?? ""}/api/health`, {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        window.location.reload();
+        return;
+      }
+    } catch {
+      /* server is restarting */
+    }
+  }
 }
 
 function currentUIPort() {

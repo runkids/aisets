@@ -11,6 +11,7 @@ import {
   renameProject,
   renameWorkspace,
   resetDatabase,
+  restartApp,
   switchWorkspace,
   updateApp,
   updateSettings,
@@ -46,6 +47,10 @@ export function useUpdateAppMutation() {
       await client.invalidateQueries({ queryKey: versionQueryKey });
     },
   });
+}
+
+export function useRestartAppMutation() {
+  return useMutation({ mutationFn: restartApp });
 }
 
 export function useAddProjectMutation() {

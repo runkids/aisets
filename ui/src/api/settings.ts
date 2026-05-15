@@ -36,6 +36,13 @@ export function updateApp() {
   });
 }
 
+export function restartApp() {
+  return request<{ ok: boolean; restarting: boolean }>("/api/restart", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export function exportSettings() {
   return request<ExportData>("/api/settings/export");
 }

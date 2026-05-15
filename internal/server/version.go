@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
+	"aisets/internal/apierr"
 	versionpkg "aisets/internal/version"
 )
 
@@ -36,8 +38,25 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Force:          body.Force,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+		status, updateErr := updateAPIError(err)
+		writeJSON(w, status, map[string]any{"error": updateErr})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "update": result})
+}
+
+func updateAPIError(err error) (int, apierr.Error) {
+	var elevated versionpkg.ElevatedPermissionError
+	if errors.As(err, &elevated) {
+		return http.StatusForbidden, apierr.WithParams(
+			"update_elevated_permission_required",
+			err.Error(),
+			map[string]any{"path": elevated.Path},
+		)
+	}
+	return http.StatusInternalServerError, apierr.WithParams(
+		"update_failed",
+		err.Error(),
+		map[string]any{"message": err.Error()},
+	)
 }

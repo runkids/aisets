@@ -128,6 +128,21 @@ func cmdUIOnce(args []string, _ bool) error {
 	return srv.StartWithContext(context.Background())
 }
 
+func cmdUIRestart(args []string) error {
+	opts, err := parseUIOptions(args)
+	if err != nil {
+		return err
+	}
+	if len(opts.projects) > 0 {
+		return fmt.Errorf("__restart-ui does not accept project paths")
+	}
+	opts = resolveRememberedUIOptions(opts)
+	if !waitForUIServerDown(opts, 10*time.Second) {
+		return fmt.Errorf("UI server did not stop before restart: %s", uiURL(opts))
+	}
+	return startUIInBackground(opts, false)
+}
+
 func cmdUIStop(args []string, jsonOut bool) error {
 	opts, err := parseUIOptions(args)
 	if err != nil {
