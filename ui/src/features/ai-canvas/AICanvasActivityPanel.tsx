@@ -11,8 +11,10 @@ import {
   ListChecks,
   Wrench,
 } from "lucide-react";
+import { Tooltip } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { ChatActivityEntry, ChatRunUsage } from "./aiCanvasState";
+import { formatCanvasRunDuration } from "./canvasRunFormat";
 
 type AICanvasActivityPanelProps = {
   t: TFunction;
@@ -23,14 +25,6 @@ type AICanvasActivityPanelProps = {
   defaultOpen?: boolean;
   className?: string;
 };
-
-export function formatCanvasRunDuration(ms: number | null | undefined) {
-  const safeMs = Number.isFinite(ms) && ms && ms > 0 ? ms : 0;
-  if (safeMs < 60_000) return `${(safeMs / 1000).toFixed(2)}s`;
-  const minutes = Math.floor(safeMs / 60_000);
-  const seconds = ((safeMs % 60_000) / 1000).toFixed(2).padStart(5, "0");
-  return `${minutes}:${seconds}`;
-}
 
 function formatTokenCount(value: number | undefined) {
   if (!Number.isFinite(value)) return "";
@@ -67,43 +61,49 @@ export function AICanvasRunUsageChips({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] leading-none text-white/48",
+        "flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-[10px] leading-none text-white/48",
         className,
       )}
     >
       {provider && (
-        <span className="inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
-          <Cpu size={11} />
-          <span className="min-w-0 truncate">{provider}</span>
-        </span>
+        <Tooltip
+          label={provider}
+          placement="top"
+          contentClassName="max-w-[360px] break-all"
+        >
+          <span className="inline-flex h-6 min-w-0 max-w-[min(260px,100%)] shrink items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
+            <Cpu size={11} className="shrink-0" />
+            <span className="min-w-0 truncate">{provider}</span>
+          </span>
+        </Tooltip>
       )}
       {Number.isFinite(usage?.durationMs) && (
-        <span className="inline-flex h-6 items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
-          <Clock3 size={11} />
+        <span className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
+          <Clock3 size={11} className="shrink-0" />
           {t("aiCanvas.activityDuration", {
             time: formatCanvasRunDuration(usage?.durationMs),
           })}
         </span>
       )}
       {Number.isFinite(totalTokens) && (
-        <span className="inline-flex h-6 items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
-          <Hash size={11} />
+        <span className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
+          <Hash size={11} className="shrink-0" />
           {t("aiCanvas.activityTokens", {
             count: formatTokenCount(totalTokens),
           })}
         </span>
       )}
       {Number.isFinite(usage?.tokensPerSecond) && (
-        <span className="inline-flex h-6 items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
-          <Gauge size={11} />
+        <span className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
+          <Gauge size={11} className="shrink-0" />
           {t("aiCanvas.activityTokensPerSecond", {
             rate: usage?.tokensPerSecond?.toFixed(2),
           })}
         </span>
       )}
       {(toolCount > 0 || loopCount > 0) && (
-        <span className="inline-flex h-6 items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
-          <ListChecks size={11} />
+        <span className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.04] px-2">
+          <ListChecks size={11} className="shrink-0" />
           {t("aiCanvas.activityLoopsAndTools", {
             loops: loopCount,
             tools: toolCount,

@@ -68,7 +68,7 @@ import {
 import { useCanvasChat } from "./useCanvasChat";
 import { useCanvasDrag } from "./useCanvasDrag";
 import { useProposalExecution } from "./useProposalExecution";
-import { formatCanvasRunDuration } from "./AICanvasActivityPanel";
+import { formatCanvasRunDuration } from "./canvasRunFormat";
 import { AICanvasComposer } from "./AICanvasComposer";
 import { AICanvasCapturePreview, AICanvasDebugPanel } from "./AICanvasOverlays";
 import { AICanvasSearchPanel } from "./AICanvasSearchPanel";

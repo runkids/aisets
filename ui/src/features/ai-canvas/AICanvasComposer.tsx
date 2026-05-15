@@ -337,10 +337,10 @@ export function AICanvasComposer({
                     <article
                       key={i}
                       className={cn(
-                        "w-[calc(100%-48px)] rounded-g-md border px-3 py-2 text-g-body leading-[1.45] text-white/84 max-[760px]:w-[calc(100%-20px)]",
+                        "rounded-g-md border px-3 py-2 text-g-body leading-[1.45] text-white/84",
                         isUser
-                          ? "self-end rounded-br-g-sm border-white/[0.12] bg-white/[0.13]"
-                          : "self-start rounded-bl-g-sm border-white/[0.06] bg-white/[0.06]",
+                          ? "w-fit max-w-[min(760px,calc(100%-48px))] self-end rounded-br-g-sm border-white/[0.12] bg-white/[0.13] max-[760px]:max-w-[calc(100%-20px)]"
+                          : "w-[calc(100%-48px)] self-start rounded-bl-g-sm border-white/[0.06] bg-white/[0.06] max-[760px]:w-[calc(100%-20px)]",
                       )}
                     >
                       {entry.mentions && entry.mentions.length > 0 && (
@@ -415,7 +415,7 @@ export function AICanvasComposer({
                         </div>
                       )}
                       {(entry.content || (!isUser && entry.usage)) && (
-                        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/[0.05] pt-2 text-white/38">
+                        <div className="mt-3 flex flex-nowrap items-center gap-1.5 overflow-hidden border-t border-white/[0.05] pt-2 text-white/38">
                           {entry.content && (
                             <CopyButton
                               value={entry.content}
@@ -427,7 +427,7 @@ export function AICanvasComposer({
                             <AICanvasRunUsageChips
                               t={t}
                               usage={entry.usage}
-                              className="ml-auto justify-end"
+                              className="ml-auto flex-1 justify-end"
                             />
                           )}
                         </div>
