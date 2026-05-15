@@ -1483,6 +1483,7 @@ func TestCanvasHarnessPhotoStagingMovesFromInspectToLayoutBeforeCapture(t *testi
 		"requested style direction",
 		"rigid equal-size grid",
 		"mirror_image or rotate_image",
+		"any integer-degree angle",
 		"bring_cards_to_front",
 		"z-index",
 	} {
@@ -1549,7 +1550,8 @@ func TestCanvasPhotoStagingPromptStaysCompactForLocalLLM(t *testing.T) {
 		t.Fatalf("photo staging follow-up prompt should use compact card JSON:\n%s", followup)
 	}
 	if !strings.Contains(followup, "Aesthetic staging matters more than demonstrating every available tool") ||
-		!strings.Contains(followup, "Use mirror_image or rotate_image only for a small number of deliberate PNG variants") {
+		!strings.Contains(followup, "Use mirror_image or rotate_image only for a small number of deliberate PNG variants") ||
+		!strings.Contains(followup, "any integer-degree angle") {
 		t.Fatalf("photo staging follow-up prompt missing creative transform guidance:\n%s", followup)
 	}
 }

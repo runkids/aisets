@@ -107,7 +107,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 			fmt.Fprintf(&b, "Photo staging target image cards (%d): %s\n", len(ids), strings.Join(ids, ", "))
 			b.WriteString("For photo staging, all visible image cards above are in scope unless the user explicitly narrows the request. Any arrange_cards, align_cards, distribute_cards, or selected staging plan must include every listed image card before capture.\n")
 			b.WriteString("Act as a professional photographer and art director, not a grid-layout assistant. Preserve the requested style direction across every loop.\n")
-			b.WriteString("Use resize_card and arrange_cards to create the actual composition. Use bring_cards_to_front for z-index/front layering when it improves depth. Use mirror_image or rotate_image only for a small number of images when a transformed PNG variant improves the story or composition; do not use transforms merely to show capability. Avoid a rigid equal-size grid unless the user asks for one.\n\n")
+			b.WriteString("Use resize_card and arrange_cards to create the actual composition. Use bring_cards_to_front for z-index/front layering when it improves depth. Use mirror_image or rotate_image only for a small number of images when a transformed PNG variant improves the story or composition; rotate_image supports any integer-degree angle, so prefer subtle deliberate angles over arbitrary 90-degree turns unless 90 degrees is requested or clearly useful; do not use transforms merely to show capability. Avoid a rigid equal-size grid unless the user asks for one.\n\n")
 		}
 	}
 
@@ -223,7 +223,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 
 	b.WriteString("\n## Assistant Options\n")
 	if options.PhotoStagingWorkflow {
-		b.WriteString("- Photo staging is ON. Image optimization advice is still separate. mirror_image and rotate_image are optional art-direction tools for a small number of images when a transformed PNG variant improves the staged composition, direction, or cover-like rhythm; do not use them merely to show capability.\n")
+		b.WriteString("- Photo staging is ON. Image optimization advice is still separate. mirror_image and rotate_image are optional art-direction tools for a small number of images when a transformed PNG variant improves the staged composition, direction, or cover-like rhythm; rotate_image supports any integer-degree angle; do not use them merely to show capability.\n")
 	} else if options.ImageOptimizationAdvice {
 		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, call image variant tools such as compress_image, resize_image, or convert_image; they generate new preview images and preserve source files.\n")
 	} else {

@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  AssetCanvasCard,
-  CanvasCard,
-  UploadCanvasCard,
-} from "./aiCanvasState";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CanvasCard } from "./aiCanvasState";
+import { isImageCard } from "./canvasUtils";
 
 type CaptureOpts = {
   rootRef: React.RefObject<HTMLDivElement | null>;
@@ -53,6 +50,14 @@ const CAPTURE_PADDING = 24;
 const IMAGE_FALLBACK_PADDING = 12;
 const AUTO_DISMISS_MS = 15000;
 const SESSION_THUMBNAIL_MAX_PX = 640;
+const RENDER_FRAME_RETRY_COUNT = 8;
+const IMAGE_READY_TIMEOUT_MS = 2000;
+
+type CaptureState = Pick<CaptureOpts, "cards" | "selectedCardIds" | "viewport">;
+
+export function captureImageCards(cards: CanvasCard[], ids: Set<string>) {
+  return cards.filter((card) => isImageCard(card) && ids.has(card.id));
+}
 
 export async function capturePreviewSignature(blob: Blob) {
   const data = new Uint8Array(await blob.arrayBuffer());
@@ -62,6 +67,14 @@ export async function capturePreviewSignature(blob: Blob) {
     hash = Math.imul(hash, 0x01000193);
   }
   return `${blob.type}:${blob.size}:${(hash >>> 0).toString(16)}`;
+}
+
+export function shouldSkipDuplicatePreview(
+  previousSignature: string | null,
+  activePreviewUrl: string | null,
+  nextSignature: string,
+) {
+  return previousSignature === nextSignature && activePreviewUrl !== null;
 }
 
 function px(value: string | undefined, fallback = 0) {
@@ -107,50 +120,118 @@ function imageRenderFrames(
   viewport: { x: number; y: number; scale: number },
 ): RenderFrame[] {
   const rootRect = root.getBoundingClientRect();
-  return cards
-    .filter(
-      (c): c is AssetCanvasCard | UploadCanvasCard =>
-        (c.kind === "asset" || c.kind === "upload") && ids.has(c.id),
-    )
-    .flatMap((card) => {
-      const cardEl = cardElements.get(card.id);
-      const frameEl = cardEl?.querySelector<HTMLElement>(
-        "[data-ai-canvas-image-frame='true'], [data-ai-canvas-asset-frame='true']",
-      );
-      const img = frameEl?.querySelector<HTMLImageElement>("img");
-      if (!cardEl || !frameEl || !img) return [];
+  return captureImageCards(cards, ids).flatMap((card) => {
+    const cardEl = cardElements.get(card.id);
+    const frameEl = cardEl?.querySelector<HTMLElement>(
+      "[data-ai-canvas-image-frame='true'], [data-ai-canvas-asset-frame='true']",
+    );
+    const img = frameEl?.querySelector<HTMLImageElement>("img");
+    if (!cardEl || !frameEl || !img) return [];
 
-      const frame = screenRectToWorld(
-        frameEl.getBoundingClientRect(),
-        rootRect,
-        viewport,
-      );
-      const bounds = screenRectToWorld(
-        cardEl.getBoundingClientRect(),
-        rootRect,
-        viewport,
-      );
-      const styles = window.getComputedStyle(img);
-      const contentBox = {
-        x: frame.x + px(styles.paddingLeft, IMAGE_FALLBACK_PADDING),
-        y: frame.y + px(styles.paddingTop, IMAGE_FALLBACK_PADDING),
-        width: Math.max(
-          1,
-          frame.width -
-            px(styles.paddingLeft, IMAGE_FALLBACK_PADDING) -
-            px(styles.paddingRight, IMAGE_FALLBACK_PADDING),
-        ),
-        height: Math.max(
-          1,
-          frame.height -
-            px(styles.paddingTop, IMAGE_FALLBACK_PADDING) -
-            px(styles.paddingBottom, IMAGE_FALLBACK_PADDING),
-        ),
-      };
-      const rect = containRect(contentBox, img.naturalWidth, img.naturalHeight);
+    const frame = screenRectToWorld(
+      frameEl.getBoundingClientRect(),
+      rootRect,
+      viewport,
+    );
+    const bounds = screenRectToWorld(
+      cardEl.getBoundingClientRect(),
+      rootRect,
+      viewport,
+    );
+    const styles = window.getComputedStyle(img);
+    const contentBox = {
+      x: frame.x + px(styles.paddingLeft, IMAGE_FALLBACK_PADDING),
+      y: frame.y + px(styles.paddingTop, IMAGE_FALLBACK_PADDING),
+      width: Math.max(
+        1,
+        frame.width -
+          px(styles.paddingLeft, IMAGE_FALLBACK_PADDING) -
+          px(styles.paddingRight, IMAGE_FALLBACK_PADDING),
+      ),
+      height: Math.max(
+        1,
+        frame.height -
+          px(styles.paddingTop, IMAGE_FALLBACK_PADDING) -
+          px(styles.paddingBottom, IMAGE_FALLBACK_PADDING),
+      ),
+    };
+    const rect = containRect(contentBox, img.naturalWidth, img.naturalHeight);
 
-      return [{ ...rect, bounds, img }];
+    return [{ ...rect, bounds, img }];
+  });
+}
+
+function nextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
     });
+  });
+}
+
+function imageElementReady(img: HTMLImageElement) {
+  return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+}
+
+async function waitForImageReady(img: HTMLImageElement) {
+  if (imageElementReady(img)) {
+    await img.decode?.().catch(() => undefined);
+    return imageElementReady(img);
+  }
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      img.removeEventListener("load", finish);
+      img.removeEventListener("error", finish);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, IMAGE_READY_TIMEOUT_MS);
+    img.addEventListener("load", finish, { once: true });
+    img.addEventListener("error", finish, { once: true });
+  });
+
+  if (imageElementReady(img)) {
+    await img.decode?.().catch(() => undefined);
+  }
+  return imageElementReady(img);
+}
+
+async function waitForRenderableFrames(
+  cards: CanvasCard[],
+  ids: Set<string>,
+  cardElements: Map<string, HTMLElement>,
+  root: HTMLElement,
+  viewport: { x: number; y: number; scale: number },
+  crop?: CaptureCrop,
+) {
+  const expectedImageCount = captureImageCards(cards, ids).length;
+  let frames = imageRenderFrames(cards, ids, cardElements, root, viewport);
+
+  for (let attempt = 0; attempt < RENDER_FRAME_RETRY_COUNT; attempt += 1) {
+    const visibleFrames = crop
+      ? frames.filter((frame) => frameIntersectsCrop(frame, crop))
+      : frames;
+    if (
+      frames.length >= expectedImageCount &&
+      visibleFrames.every((frame) => imageElementReady(frame.img))
+    ) {
+      return frames;
+    }
+
+    if (visibleFrames.length > 0) {
+      await Promise.all(
+        visibleFrames.map((frame) => waitForImageReady(frame.img)),
+      );
+    }
+    await nextPaint();
+    frames = imageRenderFrames(cards, ids, cardElements, root, viewport);
+  }
+
+  return frames;
 }
 
 function frameIntersectsCrop(frame: FrameGeometry, crop: CaptureCrop) {
@@ -308,6 +389,7 @@ async function captureRenderedFrames(
 
   for (const frame of frames) {
     if (!frameIntersectsCrop(frame, crop)) continue;
+    if (!(await waitForImageReady(frame.img))) continue;
     ctx.drawImage(
       frame.img,
       (frame.x - crop.x) * outputScale,
@@ -366,6 +448,15 @@ export function useCanvasCapture(opts: CaptureOpts) {
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const prevUrlRef = useRef<string | null>(null);
   const prevSignatureRef = useRef<string | null>(null);
+  const latestStateRef = useRef<CaptureState>({
+    cards,
+    selectedCardIds,
+    viewport,
+  });
+
+  useLayoutEffect(() => {
+    latestStateRef.current = { cards, selectedCardIds, viewport };
+  }, [cards, selectedCardIds, viewport]);
 
   useEffect(() => {
     return () => {
@@ -376,7 +467,15 @@ export function useCanvasCapture(opts: CaptureOpts) {
 
   const showPreview = useCallback(async (blob: Blob) => {
     const signature = await capturePreviewSignature(blob);
-    if (prevSignatureRef.current === signature) return;
+    if (
+      shouldSkipDuplicatePreview(
+        prevSignatureRef.current,
+        prevUrlRef.current,
+        signature,
+      )
+    ) {
+      return;
+    }
     if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
     const url = URL.createObjectURL(blob);
     prevUrlRef.current = url;
@@ -408,12 +507,14 @@ export function useCanvasCapture(opts: CaptureOpts) {
     ) => {
       const root = rootRef.current;
       if (!root) return;
-      const frames = imageRenderFrames(
-        cards,
+      const state = latestStateRef.current;
+      const frames = await waitForRenderableFrames(
+        state.cards,
         ids,
         cardElementsRef.current,
         root,
-        viewport,
+        state.viewport,
+        crop,
       );
       if (frames.length === 0) return;
       const captureCrop = crop ?? captureCropForFrames(frames);
@@ -433,64 +534,68 @@ export function useCanvasCapture(opts: CaptureOpts) {
         setIsCapturing(false);
       }
     },
-    [rootRef, cards, cardElementsRef, viewport, showPreview],
+    [rootRef, cardElementsRef, showPreview],
   );
 
   const captureViewport = useCallback(
     async (transparent = false) => {
       const root = rootRef.current;
       if (!root) return;
-      const worldMinX = -viewport.x / viewport.scale;
-      const worldMinY = -viewport.y / viewport.scale;
+      const state = latestStateRef.current;
+      const worldMinX = -state.viewport.x / state.viewport.scale;
+      const worldMinY = -state.viewport.y / state.viewport.scale;
       return captureWithIds(
-        new Set(cards.map((c) => c.id)),
+        new Set(state.cards.map((c) => c.id)),
         {
           x: worldMinX,
           y: worldMinY,
-          width: root.clientWidth / viewport.scale,
-          height: root.clientHeight / viewport.scale,
+          width: root.clientWidth / state.viewport.scale,
+          height: root.clientHeight / state.viewport.scale,
         },
-        viewport.scale,
+        state.viewport.scale,
         transparent,
       );
     },
-    [rootRef, cards, viewport, captureWithIds],
+    [rootRef, captureWithIds],
   );
 
   const captureCanvas = useCallback(
     async (transparent = false) => {
+      const state = latestStateRef.current;
       return captureWithIds(
-        new Set(cards.map((c) => c.id)),
+        new Set(state.cards.map((c) => c.id)),
         undefined,
         1,
         transparent,
       );
     },
-    [cards, captureWithIds],
+    [captureWithIds],
   );
 
   const captureSelected = useCallback(
     async (transparent = false) => {
-      if (selectedCardIds.length === 0) return;
+      const state = latestStateRef.current;
+      if (state.selectedCardIds.length === 0) return;
       return captureWithIds(
-        new Set(selectedCardIds),
+        new Set(state.selectedCardIds),
         undefined,
         1,
         transparent,
       );
     },
-    [selectedCardIds, captureWithIds],
+    [captureWithIds],
   );
 
   const captureCanvasForAI = useCallback(async () => {
     const root = rootRef.current;
     if (!root) return undefined;
-    const frames = imageRenderFrames(
-      cards,
-      new Set(cards.map((c) => c.id)),
+    const state = latestStateRef.current;
+    const frames = await waitForRenderableFrames(
+      state.cards,
+      new Set(state.cards.map((c) => c.id)),
       cardElementsRef.current,
       root,
-      viewport,
+      state.viewport,
     );
     if (frames.length === 0) return undefined;
     const crop = captureCropForFrames(frames);
@@ -508,17 +613,18 @@ export function useCanvasCapture(opts: CaptureOpts) {
       },
     );
     return blobToDataURL(blob);
-  }, [rootRef, cards, cardElementsRef, viewport]);
+  }, [rootRef, cardElementsRef]);
 
   const captureCanvasBlob = useCallback(async (): Promise<Blob | undefined> => {
     const root = rootRef.current;
     if (!root) return undefined;
-    const frames = imageRenderFrames(
-      cards,
-      new Set(cards.map((c) => c.id)),
+    const state = latestStateRef.current;
+    const frames = await waitForRenderableFrames(
+      state.cards,
+      new Set(state.cards.map((c) => c.id)),
       cardElementsRef.current,
       root,
-      viewport,
+      state.viewport,
     );
     if (frames.length === 0) return undefined;
     const crop = captureCropForFrames(frames);
@@ -530,7 +636,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
       sessionThumbnailOutputScale(crop),
       false,
     );
-  }, [rootRef, cards, cardElementsRef, viewport]);
+  }, [rootRef, cardElementsRef]);
 
   return {
     captureViewport,

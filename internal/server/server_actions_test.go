@@ -613,6 +613,24 @@ func TestImageToolRenderPreviewTransform(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("transform preview serve = %d %s", rec.Code, rec.Body.String())
 	}
+
+	payload, _ = json.Marshal(map[string]any{
+		"assetId":      items[0].ID,
+		"operation":    "rotate_image",
+		"degrees":      17,
+		"outputFormat": "png",
+	})
+	rec = httptest.NewRecorder()
+	s.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/image-tools/assets/render-preview", bytes.NewReader(payload)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("render-preview arbitrary rotation = %d %s", rec.Code, rec.Body.String())
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &renderResp); err != nil {
+		t.Fatal(err)
+	}
+	if renderResp.Width <= 8 || renderResp.Height <= 8 {
+		t.Fatalf("render-preview arbitrary rotation metadata = %#v, want expanded canvas", renderResp)
+	}
 }
 
 func TestImageToolMetadata(t *testing.T) {

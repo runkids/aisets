@@ -7,6 +7,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -45,11 +46,6 @@ func normalizeTransformOptions(opts TransformOptions) (TransformOptions, error) 
 	}
 
 	rotation := ((opts.RotateDegrees % 360) + 360) % 360
-	switch rotation {
-	case 0, 90, 180, 270:
-	default:
-		return TransformOptions{}, fmt.Errorf("rotation must be one of 0, 90, 180, 270 degrees")
-	}
 
 	return TransformOptions{Flip: flip, RotateDegrees: rotation}, nil
 }
@@ -87,6 +83,9 @@ func transformGoFallback(inputPath, outputPath string, opts TransformOptions) er
 		out = rotate180NRGBA(out)
 	case 270:
 		out = rotate270NRGBA(out)
+	case 0:
+	default:
+		out = rotateArbitraryNRGBA(out, opts.RotateDegrees)
 	}
 
 	return writeTransformedImage(outputPath, out)
@@ -154,6 +153,51 @@ func rotate270NRGBA(src *image.NRGBA) *image.NRGBA {
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			dst.SetNRGBA(y, w-1-x, src.NRGBAAt(x, y))
+		}
+	}
+	return dst
+}
+
+func rotateArbitraryNRGBA(src *image.NRGBA, degrees int) *image.NRGBA {
+	bounds := src.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+	radians := float64(degrees) * math.Pi / 180
+	cos, sin := math.Cos(radians), math.Sin(radians)
+	halfW, halfH := float64(w)/2, float64(h)/2
+	corners := [][2]float64{
+		{-halfW, -halfH},
+		{halfW, -halfH},
+		{-halfW, halfH},
+		{halfW, halfH},
+	}
+	minX, maxX := math.Inf(1), math.Inf(-1)
+	minY, maxY := math.Inf(1), math.Inf(-1)
+	for _, corner := range corners {
+		x := corner[0]*cos + corner[1]*sin
+		y := -corner[0]*sin + corner[1]*cos
+		minX = math.Min(minX, x)
+		maxX = math.Max(maxX, x)
+		minY = math.Min(minY, y)
+		maxY = math.Max(maxY, y)
+	}
+	outW := int(math.Ceil(maxX - minX))
+	outH := int(math.Ceil(maxY - minY))
+	if outW <= 0 || outH <= 0 {
+		return src
+	}
+	dst := image.NewNRGBA(image.Rect(0, 0, outW, outH))
+	for y := 0; y < outH; y++ {
+		for x := 0; x < outW; x++ {
+			tx := float64(x) + 0.5 + minX
+			ty := float64(y) + 0.5 + minY
+			srcX := tx*cos - ty*sin + halfW
+			srcY := tx*sin + ty*cos + halfH
+			sx := int(math.Floor(srcX))
+			sy := int(math.Floor(srcY))
+			if sx < 0 || sx >= w || sy < 0 || sy >= h {
+				continue
+			}
+			dst.SetNRGBA(x, y, src.NRGBAAt(sx, sy))
 		}
 	}
 	return dst

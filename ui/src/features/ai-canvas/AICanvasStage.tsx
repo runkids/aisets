@@ -51,7 +51,7 @@ type CommentConnector = {
 };
 
 function isVisibleImageCard(card: CanvasCard) {
-  return isImageCard(card) || card.kind === "variant";
+  return isImageCard(card);
 }
 
 type AICanvasStageProps = {

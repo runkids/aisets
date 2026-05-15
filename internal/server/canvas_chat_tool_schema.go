@@ -211,7 +211,7 @@ func canvasToolParameters(name string) map[string]any {
 		}))
 	case "rotate_image":
 		return canvasObjectSchema([]string{"assetIds", "degrees"}, canvasAssetTargetProperties(map[string]any{
-			"degrees":      canvasIntegerEnumSchema("Clockwise rotation degrees.", 90, 180, 270),
+			"degrees":      canvasIntegerSchema("Clockwise rotation degrees. Use any integer angle from 0 to 359; default to 90 only when the user does not specify an angle."),
 			"outputFormat": canvasStringEnumSchema("Optional output image format.", "png", "jpg", "webp", "avif"),
 		}))
 	case "update_tags":

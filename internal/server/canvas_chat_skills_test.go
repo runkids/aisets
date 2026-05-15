@@ -92,7 +92,7 @@ func TestCanvasPhotoStagingSkillGatesLayoutAndCaptureTools(t *testing.T) {
 		"native": canvasNativeSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, skills),
 		"action": canvasSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, skills),
 	} {
-		for _, want := range []string{"Professional photo staging", "professional photographer", "mirror_image", "rotate_image", "bring_cards_to_front", "capture_canvas"} {
+		for _, want := range []string{"Professional photo staging", "professional photographer", "mirror_image", "rotate_image", "any integer-degree angle", "bring_cards_to_front", "capture_canvas"} {
 			if !strings.Contains(prompt, want) {
 				t.Fatalf("%s photo staging prompt missing %q:\n%s", name, want, prompt)
 			}
@@ -113,6 +113,7 @@ func TestCanvasNativePhotoStagingSystemPromptIsCompact(t *testing.T) {
 		"resize_card",
 		"mirror_image",
 		"rotate_image",
+		"any integer-degree angle",
 		"bring_cards_to_front",
 		"z-index",
 		"capture_canvas",
@@ -146,6 +147,7 @@ func TestCanvasActionPhotoStagingSystemPromptIsCompact(t *testing.T) {
 		"resize_card",
 		"mirror_image",
 		"rotate_image",
+		"any integer-degree angle",
 		"bring_cards_to_front",
 		"z-index",
 		"capture_canvas",

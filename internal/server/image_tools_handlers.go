@@ -379,11 +379,6 @@ func imageToolTransformOptions(body imageToolRenderPreviewRequest) (imageproc.Tr
 		flip = "none"
 	}
 	degrees = ((degrees % 360) + 360) % 360
-	switch degrees {
-	case 0, 90, 180, 270:
-	default:
-		return imageproc.TransformOptions{}, fmt.Errorf("rotation must be one of 0, 90, 180, 270 degrees")
-	}
 	if flip == "none" && degrees == 0 {
 		return imageproc.TransformOptions{}, fmt.Errorf("no image transform requested")
 	}

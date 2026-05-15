@@ -9,6 +9,7 @@ import {
   inferPromptIntent,
   normalizeAICanvasSession,
   selectedAssetCards,
+  shouldScheduleAICanvasAutoSave,
   writeAICanvasSession,
   type AssetCanvasCard,
   type CommentCanvasCard,
@@ -56,6 +57,54 @@ function makeAsset(id: string): AssetItem {
     },
   };
 }
+
+describe("shouldScheduleAICanvasAutoSave", () => {
+  it("does not schedule while a drag is active", () => {
+    expect(
+      shouldScheduleAICanvasAutoSave({
+        isDirty: true,
+        cardsLength: 1,
+        isSaving: false,
+        isDragging: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("schedules only for dirty non-empty idle sessions", () => {
+    expect(
+      shouldScheduleAICanvasAutoSave({
+        isDirty: true,
+        cardsLength: 1,
+        isSaving: false,
+        isDragging: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldScheduleAICanvasAutoSave({
+        isDirty: false,
+        cardsLength: 1,
+        isSaving: false,
+        isDragging: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldScheduleAICanvasAutoSave({
+        isDirty: true,
+        cardsLength: 0,
+        isSaving: false,
+        isDragging: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldScheduleAICanvasAutoSave({
+        isDirty: true,
+        cardsLength: 1,
+        isSaving: true,
+        isDragging: false,
+      }),
+    ).toBe(false);
+  });
+});
 
 function makeAssetCard(id: string): AssetCanvasCard {
   return {

@@ -7,6 +7,7 @@ import type {
   CanvasCard,
   CommentCanvasCard,
   UploadCanvasCard,
+  VariantCanvasCard,
 } from "./aiCanvasState";
 
 export type CanvasSelection = {
@@ -324,8 +325,10 @@ export function intersects(
 
 export function isImageCard(
   card: CanvasCard,
-): card is AssetCanvasCard | UploadCanvasCard {
-  return card.kind === "asset" || card.kind === "upload";
+): card is AssetCanvasCard | UploadCanvasCard | VariantCanvasCard {
+  return (
+    card.kind === "asset" || card.kind === "upload" || card.kind === "variant"
+  );
 }
 
 export function compactImageAspectRatio(card: CanvasCard) {

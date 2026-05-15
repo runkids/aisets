@@ -176,6 +176,20 @@ export type AICanvasPromptIntent =
   | "imageEdit"
   | "describe";
 
+export function shouldScheduleAICanvasAutoSave(opts: {
+  isDirty: boolean;
+  cardsLength: number;
+  isSaving: boolean;
+  isDragging: boolean;
+}) {
+  return (
+    opts.isDirty &&
+    opts.cardsLength > 0 &&
+    !opts.isSaving &&
+    !opts.isDragging
+  );
+}
+
 export function sanitizeCanvasChatContent(content: string) {
   return content
     .replace(

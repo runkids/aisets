@@ -52,6 +52,7 @@ import {
   normalizeAICanvasSession,
   readAICanvasSession,
   selectedAssetCards,
+  shouldScheduleAICanvasAutoSave,
   writeAICanvasSession,
   type AICanvasSession,
   type AssetCanvasCard,
@@ -299,6 +300,8 @@ export function AICanvasView({
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerEnd,
+    isDragging,
+    isDraggingRef,
   } = useCanvasDrag({
     rootRef,
     viewport,
@@ -1265,10 +1268,19 @@ export function AICanvasView({
     undefined,
   );
   useEffect(() => {
-    if (!isDirty || cards.length === 0 || isSaving) return;
+    if (
+      !shouldScheduleAICanvasAutoSave({
+        isDirty,
+        cardsLength: cards.length,
+        isSaving,
+        isDragging: isDragging || isDraggingRef.current,
+      })
+    ) {
+      return;
+    }
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      if (cards.length === 0) return;
+      if (cards.length === 0 || isDraggingRef.current) return;
       void doSave(currentSessionName ?? autoSessionName(), false, true);
     }, 3000);
     return () => clearTimeout(autoSaveTimerRef.current);

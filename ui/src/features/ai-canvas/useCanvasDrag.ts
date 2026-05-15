@@ -69,6 +69,8 @@ export function useCanvasDrag(opts: {
   handleCanvasPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleCanvasPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleCanvasPointerEnd: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  isDragging: boolean;
+  isDraggingRef: React.MutableRefObject<boolean>;
 } {
   const {
     rootRef,
@@ -83,6 +85,8 @@ export function useCanvasDrag(opts: {
 
   const [canvasSelection, setCanvasSelection] =
     useState<CanvasSelection | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
 
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
   const canvasInnerRef = useRef<HTMLDivElement | null>(null);
@@ -299,6 +303,8 @@ export function useCanvasDrag(opts: {
       }
       if (drag.previewsConnectors) setDragPreview(null);
       dragRef.current = null;
+      isDraggingRef.current = false;
+      setIsDragging(false);
     }
 
     function cancelOnVisibilityChange() {
@@ -370,6 +376,8 @@ export function useCanvasDrag(opts: {
         }
       }
     }
+    isDraggingRef.current = true;
+    setIsDragging(true);
     dragRef.current = {
       cardId: card.id,
       card,
@@ -445,6 +453,8 @@ export function useCanvasDrag(opts: {
     );
     if (drag.previewsConnectors) setDragPreview(null);
     dragRef.current = null;
+    isDraggingRef.current = false;
+    setIsDragging(false);
   }
 
   // --- wheel handler ---
@@ -547,5 +557,7 @@ export function useCanvasDrag(opts: {
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerEnd,
+    isDragging,
+    isDraggingRef,
   };
 }

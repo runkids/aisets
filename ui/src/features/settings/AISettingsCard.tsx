@@ -155,10 +155,10 @@ export function AISettingsCard({
     >
       <div className="flex items-center gap-3 border-b border-g-line px-6 py-2.5 md:px-8">
         <AiChipIcon size={15} className="shrink-0 text-g-ink-3" />
-        <span className="font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
+        <span className="shrink-0 font-g text-g-ui font-[590] uppercase tracking-[0.06em] text-g-ink-3">
           {t("settings.section.ai")}
         </span>
-        <div className="ml-auto">
+        <div className="ml-auto overflow-x-auto">
           <Tabs
             value={aiTab}
             items={[

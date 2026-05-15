@@ -158,6 +158,31 @@ func TestTransformImageMirrorAndRotate(t *testing.T) {
 	}
 }
 
+func TestTransformImageArbitraryRotation(t *testing.T) {
+	root := t.TempDir()
+	input := filepath.Join(root, "input.png")
+	output := filepath.Join(root, "output.png")
+
+	writePNG(t, input, solidImage(10, 6, color.NRGBA{R: 255, A: 255}))
+
+	if err := TransformImage(input, output, TransformOptions{RotateDegrees: 17}); err != nil {
+		t.Fatal(err)
+	}
+
+	file, err := os.Open(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	decoded, err := png.Decode(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Bounds().Dx() <= 10 || decoded.Bounds().Dy() <= 6 {
+		t.Fatalf("dimensions = %dx%d, want expanded canvas for arbitrary rotation", decoded.Bounds().Dx(), decoded.Bounds().Dy())
+	}
+}
+
 func TestVisualDistanceRejectsColorOnlyHashCollisions(t *testing.T) {
 	root := t.TempDir()
 	red := filepath.Join(root, "red.png")

@@ -271,7 +271,7 @@ func canvasPhotoStagingCreativeContract() string {
 		"Do not default to a rigid equal-size grid, perfectly even rows, or purely mechanical distribution unless the user explicitly asks for a grid.",
 		"Aesthetic staging matters more than demonstrating every available tool.",
 		"Use resizing, placement, and z-index to create depth and story: one or more hero images can be larger, supporting images can be grouped by theme, and small props can form foreground/background accents.",
-		"Use resize_card for displayed card scale and arrange_cards for the actual composition. Use mirror_image or rotate_image only for a small number of deliberate PNG variants when a transformed image improves the staged composition, direction, or cover-like rhythm. Do not rotate, mirror, duplicate, or transform images merely because the tools are available.",
+		"Use resize_card for displayed card scale and arrange_cards for the actual composition. Use mirror_image or rotate_image only for a small number of deliberate PNG variants when a transformed image improves the staged composition, direction, or cover-like rhythm. rotate_image supports any integer-degree angle, so prefer subtle deliberate angles over arbitrary 90-degree turns unless 90 degrees is requested or clearly useful. Do not rotate, mirror, duplicate, or transform images merely because the tools are available.",
 		"Use bring_cards_to_front to control foreground/hero layers intentionally. Do not rely on accidental overlap or insertion order for important objects.",
 		"Capture only after real layout work covers all visible image cards and the staged layout expresses the requested style, not merely after all cards have non-overlapping positions.",
 	}, " ")

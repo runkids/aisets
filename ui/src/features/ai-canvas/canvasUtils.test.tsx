@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { AssetCanvasCard, UploadCanvasCard } from "./aiCanvasState";
+import type {
+  AssetCanvasCard,
+  UploadCanvasCard,
+  VariantCanvasCard,
+} from "./aiCanvasState";
 import {
   DEFAULT_IMAGE_ASPECT_RATIO,
   adjacentCardPosition,
   commentRegionDisplayOptions,
   compactImageAspectRatio,
   imageFrameSize,
+  isImageCard,
   normalizeCommentRegion,
 } from "./canvasUtils";
 
@@ -63,6 +68,35 @@ function makeAssetCard(): AssetCanvasCard {
   };
 }
 
+function makeVariantCard(): VariantCanvasCard {
+  return {
+    id: "variant-1",
+    kind: "variant",
+    x: 0,
+    y: 0,
+    createdAt: new Date(0).toISOString(),
+    sourceAssetId: "asset-1",
+    sourceName: "rotated.png",
+    previewUrl: "/variant.png",
+    token: "variant-token",
+    inputBytes: 100,
+    outputBytes: 90,
+    inputFormat: "png",
+    outputFormat: "png",
+    width: 240,
+    height: 320,
+    alpha: true,
+  };
+}
+
+describe("isImageCard", () => {
+  it("treats generated variant cards as renderable image cards", () => {
+    expect(isImageCard(makeAssetCard())).toBe(true);
+    expect(isImageCard(makeUploadCard(320, 240))).toBe(true);
+    expect(isImageCard(makeVariantCard())).toBe(true);
+  });
+});
+
 describe("adjacentCardPosition", () => {
   it("places generated cards next to the anchor using measured width", () => {
     expect(
@@ -101,6 +135,10 @@ describe("compactImageAspectRatio", () => {
     expect(compactImageAspectRatio(makeAssetCard())).toBe(
       DEFAULT_IMAGE_ASPECT_RATIO,
     );
+  });
+
+  it("uses generated variant dimensions for rotated image cards", () => {
+    expect(compactImageAspectRatio(makeVariantCard())).toBeCloseTo(240 / 320);
   });
 });
 

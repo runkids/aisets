@@ -720,7 +720,7 @@ function floatingCardLayer(card: CanvasCard, selected: boolean) {
 }
 
 function isChromelessImageCard(card: CanvasCard) {
-  return isImageCard(card) || card.kind === "variant";
+  return isImageCard(card);
 }
 
 export function CardShell({
