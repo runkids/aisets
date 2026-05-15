@@ -9,7 +9,7 @@ clap = { version = "4", features = ["derive"] }
 image = { version = "0.25", features = ["gif", "jpeg", "png", "webp", "avif"] }
 webp = "0.3"
 libwebp-sys = "0.9"
-ravif = "0.13"
+ravif = { version = "0.13", default-features = false, features = ["threading"] }
 rgb = "0.8"
 resvg = "0.44"
 tiny-skia = "0.11"
