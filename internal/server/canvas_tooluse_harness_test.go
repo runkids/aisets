@@ -1091,7 +1091,7 @@ func TestCanvasSearchAssetsFallsBackToSemanticSearch(t *testing.T) {
 	}
 	result := bootstrap.server.executeCanvasSafeAction(
 		httptest.NewRequest(http.MethodPost, "/api/ai/canvas/chat", nil),
-		canvasAction{Tool: "search_assets", Params: map[string]any{"q": "logo", "limit": float64(1)}},
+		canvasAction{Tool: "search_assets", Params: map[string]any{"q": "semantic visual query", "limit": float64(1)}},
 		settings,
 		canvasSnapshot{},
 	).(map[string]any)
@@ -1104,6 +1104,60 @@ func TestCanvasSearchAssetsFallsBackToSemanticSearch(t *testing.T) {
 	}
 	if result["matchType"] != "semantic" {
 		t.Fatalf("matchType = %#v, want semantic", result["matchType"])
+	}
+}
+
+func TestExpandCanvasCatalogSearchCandidatesAddsLogoSynonyms(t *testing.T) {
+	got := expandCanvasCatalogSearchCandidates([]string{"logo"})
+	wantOrder := []string{"logo", "mark", "symbol", "icon", "badge", "emblem", "brand", "favicon"}
+	if len(got) < len(wantOrder) {
+		t.Fatalf("expanded candidates = %#v, want at least %#v", got, wantOrder)
+	}
+	for i, want := range wantOrder {
+		if got[i] != want {
+			t.Fatalf("expanded candidates = %#v, want %q at index %d", got, want, i)
+		}
+	}
+}
+
+func TestCanvasSearchAssetsShowsLogoCandidatesForConfirmation(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writePNG(t, filepath.Join(bootstrap.root, "img", "app_icon.png"))
+	iconAsset := serverScanAsset(bootstrap.root, "img/app_icon.png", 5000, "hash-icon", 0)
+	if _, err := bootstrap.server.store.RecordScan(scanner.Catalog{
+		GeneratedAt: "2026-05-14T01:00:00Z",
+		Projects:    []scanner.Project{{ID: "p", Name: "fixture", Path: bootstrap.root}},
+		Items:       []scanner.AssetItem{iconAsset},
+		Stats:       scanner.CatalogStats{TotalFiles: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := bootstrap.server.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := bootstrap.server.executeCanvasSafeAction(
+		httptest.NewRequest(http.MethodPost, "/api/ai/canvas/chat", nil),
+		canvasAction{Tool: "search_assets", Params: map[string]any{"q": "logo", "limit": float64(3)}},
+		settings,
+		canvasSnapshot{},
+	).(map[string]any)
+	if needs, _ := result["needsUserConfirmation"].(bool); !needs {
+		t.Fatalf("needsUserConfirmation = %#v, want true; result=%#v", result["needsUserConfirmation"], result)
+	}
+	items, ok := result["items"].([]scanner.AssetItem)
+	if !ok || len(items) != 0 {
+		t.Fatalf("items = %#v, want no auto-add items", result["items"])
+	}
+	candidates, ok := result["candidatePreviews"].([]scanner.AssetItem)
+	if !ok || len(candidates) != 1 {
+		t.Fatalf("candidatePreviews = %#v, want 1 candidate", result["candidatePreviews"])
+	}
+	if candidates[0].ID != iconAsset.ID {
+		t.Fatalf("candidate asset = %q, want %q", candidates[0].ID, iconAsset.ID)
+	}
+	if result["matchType"] != "catalog_candidate" {
+		t.Fatalf("matchType = %#v, want catalog_candidate", result["matchType"])
 	}
 }
 

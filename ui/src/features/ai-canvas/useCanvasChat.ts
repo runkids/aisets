@@ -179,6 +179,32 @@ function assetsFromActionResult(result: unknown): AssetItem[] {
   return items.filter(isAssetItem);
 }
 
+export function searchResultNeedsUserConfirmation(result: unknown) {
+  return (
+    Boolean(result) &&
+    typeof result === "object" &&
+    (result as { needsUserConfirmation?: unknown }).needsUserConfirmation ===
+      true
+  );
+}
+
+export function candidatePreviewMentionsFromSearchResult(
+  result: unknown,
+): ChatMentionPreview[] {
+  if (!searchResultNeedsUserConfirmation(result)) return [];
+  const candidates = (result as { candidatePreviews?: unknown })
+    .candidatePreviews;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.filter(isAssetItem).map((asset) => ({
+    id: asset.id,
+    name: fileName(asset.repoPath),
+    meta: imageMeta(asset),
+    src: asset.thumbnailUrl || asset.url,
+    kind: "searchCandidate",
+    asset,
+  }));
+}
+
 type OCRTextActionItem = {
   assetId?: string;
   cardId?: string;
@@ -701,6 +727,8 @@ export function useCanvasChat(opts: {
 
     let assistantText = "";
     let suppressModelTextAfterOCR = false;
+    let searchConfirmationNeeded = false;
+    const assistantMentionById = new Map<string, ChatMentionPreview>();
     let runUsage: ChatRunUsage | undefined;
     let activitySequence = 0;
     const activityStartedAt = window.performance.now();
@@ -1355,6 +1383,16 @@ export function useCanvasChat(opts: {
           tone: event.error ? "danger" : "success",
         });
       }
+      if (event.type === "action_result" && event.tool === "search_assets") {
+        if (searchResultNeedsUserConfirmation(event.result)) {
+          searchConfirmationNeeded = true;
+          for (const mention of candidatePreviewMentionsFromSearchResult(
+            event.result,
+          )) {
+            assistantMentionById.set(mention.id, mention);
+          }
+        }
+      }
       if (event.type === "action_result" && event.tool === "select_cards") {
         const ids = canvasActionResultCardIds(event.result, canvasCards);
         if (ids.length > 0) {
@@ -1675,13 +1713,29 @@ export function useCanvasChat(opts: {
       }
 
       assistantText = sanitizeCanvasChatContent(assistantText);
+      const assistantMentions = Array.from(assistantMentionById.values());
+      if (searchConfirmationNeeded) {
+        const notice = t("aiCanvas.searchNeedsConfirmation", {
+          count: assistantMentions.length,
+        });
+        assistantText = sanitizeCanvasChatContent(
+          assistantText ? `${notice}\n\n${assistantText}` : notice,
+        );
+      }
       const activity = activityEntries.slice(-CHAT_ACTIVITY_LIMIT);
-      if (assistantText || activity.length > 0 || runUsage) {
+      if (
+        assistantText ||
+        assistantMentions.length > 0 ||
+        activity.length > 0 ||
+        runUsage
+      ) {
         setChatHistory((prev) => [
           ...prev.slice(-10),
           {
             role: "assistant",
             content: assistantText,
+            mentions:
+              assistantMentions.length > 0 ? assistantMentions : undefined,
             activity: activity.length > 0 ? activity : undefined,
             usage: runUsage,
           },

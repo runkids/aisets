@@ -33,6 +33,7 @@ import {
   type ChatAttachment,
   type ChatActivityEntry,
   type ChatHistoryEntry,
+  type ChatMentionPreview,
   type PendingAttachment,
   type ProposalCanvasCard,
   type ChatRunUsage,
@@ -120,6 +121,8 @@ type AICanvasComposerProps = {
   pendingAttachments: PendingAttachment[];
   setPendingAttachments: StateSetter<PendingAttachment[]>;
   handlePlaceOnCanvas: (att: ChatAttachment) => void;
+  handleAddSearchCandidate: (mention: ChatMentionPreview) => void;
+  handleDismissSearchCandidates: (entryIndex: number) => void;
 };
 
 export function AICanvasComposer({
@@ -176,6 +179,8 @@ export function AICanvasComposer({
   pendingAttachments,
   setPendingAttachments,
   handlePlaceOnCanvas,
+  handleAddSearchCandidate,
+  handleDismissSearchCandidates,
 }: AICanvasComposerProps) {
   const composerDragRef = useRef<{ startY: number; startH: number } | null>(
     null,
@@ -333,6 +338,14 @@ export function AICanvasComposer({
               ) : (
                 chatHistory.map((entry, i) => {
                   const isUser = entry.role === "user";
+                  const candidateMentions = isUser
+                    ? []
+                    : (entry.mentions ?? []).filter(
+                        (mention) => mention.kind === "searchCandidate",
+                      );
+                  const regularMentions = (entry.mentions ?? []).filter(
+                    (mention) => mention.kind !== "searchCandidate",
+                  );
                   return (
                     <article
                       key={i}
@@ -343,9 +356,64 @@ export function AICanvasComposer({
                           : "w-[calc(100%-48px)] self-start rounded-bl-g-sm border-white/[0.06] bg-white/[0.06] max-[760px]:w-[calc(100%-20px)]",
                       )}
                     >
-                      {entry.mentions && entry.mentions.length > 0 && (
+                      {candidateMentions.length > 0 && (
+                        <div className="mb-2">
+                          <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] overflow-hidden rounded-[16px] border border-white/[0.08]">
+                            {candidateMentions.map((mention, ci) => (
+                              <div
+                                key={mention.id}
+                                className={cn(
+                                  "min-w-0 bg-black/[0.16] p-2",
+                                  ci > 0 && "border-l border-white/[0.08]",
+                                )}
+                              >
+                                <AssetThumbnail
+                                  src={mention.src}
+                                  alt={mention.name}
+                                  size="fill"
+                                  className="mb-2 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
+                                  imageClassName="max-h-[82%] max-w-[82%]"
+                                  draggable={false}
+                                />
+                                <div className="min-w-0 pb-2">
+                                  <div className="truncate font-g-mono text-g-caption font-[510] tracking-g-mono text-white/86">
+                                    {mention.name}
+                                  </div>
+                                  <div className="truncate text-g-chip text-white/42">
+                                    {mention.meta}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  leadingIcon={<Check />}
+                                  className="w-full border-white/80 bg-white text-black [&:hover:not(:disabled)]:bg-white/90 [&:hover:not(:disabled)]:text-black"
+                                  disabled={!mention.asset}
+                                  onClick={() =>
+                                    handleAddSearchCandidate(mention)
+                                  }
+                                >
+                                  {t("aiCanvas.searchCandidateAdd")}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              leadingIcon={<X />}
+                              className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
+                              onClick={() => handleDismissSearchCandidates(i)}
+                            >
+                              {t("aiCanvas.searchCandidateReject")}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {regularMentions.length > 0 && (
                         <div className="mb-1.5 flex flex-wrap gap-1.5">
-                          {entry.mentions.map((mention) => (
+                          {regularMentions.map((mention) => (
                             <span
                               key={mention.id}
                               className="inline-flex max-w-[190px] items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-black/[0.16] py-0.5 pl-0.5 pr-1.5"

@@ -112,6 +112,8 @@ export type ChatMentionPreview = {
   name: string;
   meta: string;
   src?: string;
+  kind?: "searchCandidate";
+  asset?: AssetItem;
 };
 
 export type ChatAttachment = {

@@ -1011,7 +1011,7 @@ export function AICanvasView({
     }
   }
 
-  function addAsset(asset: AssetItem) {
+  function addAsset(asset: AssetItem, options?: { select?: boolean }) {
     const id = createCanvasCardId("asset");
     const rect = rootRef.current?.getBoundingClientRect();
     const containerSize = rect
@@ -1027,7 +1027,9 @@ export function AICanvasView({
       asset,
     };
     setCards((current) => [...current, card]);
-    setSelectedCardIds([id]);
+    if (options?.select !== false) {
+      setSelectedCardIds([id]);
+    }
   }
 
   function addAssistantCard(promptText: string, message?: string) {
@@ -1454,7 +1456,7 @@ export function AICanvasView({
 
   function handleAddSearchCandidate(mention: ChatMentionPreview) {
     if (!mention.asset) return;
-    addAsset(mention.asset);
+    addAsset(mention.asset, { select: false });
   }
 
   function handleDismissSearchCandidates(entryIndex: number) {

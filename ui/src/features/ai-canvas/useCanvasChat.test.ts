@@ -10,10 +10,12 @@ import {
   duplicateCardPositionsFromActionResult,
   canvasStatusCursorLabel,
   canvasStatusCursorStatus,
+  candidatePreviewMentionsFromSearchResult,
   focusCursorPosition,
   formatOCRActionText,
   resolveCanvasActionCardId,
   searchResultCardPosition,
+  searchResultNeedsUserConfirmation,
   uploadCardsFromAttachments,
 } from "./useCanvasChat";
 
@@ -290,6 +292,38 @@ describe("canvasActionResultCreatesAssetCards", () => {
     expect(canvasActionResultCreatesAssetCards("add_assets_to_canvas")).toBe(
       true,
     );
+  });
+});
+
+describe("candidatePreviewMentionsFromSearchResult", () => {
+  it("turns uncertain search candidates into assistant chat previews", () => {
+    const asset = makeAssetCard("candidate", 0, 0).asset;
+    const result = {
+      needsUserConfirmation: true,
+      candidatePreviews: [asset],
+    };
+
+    expect(searchResultNeedsUserConfirmation(result)).toBe(true);
+    expect(candidatePreviewMentionsFromSearchResult(result)).toEqual([
+      {
+        id: asset.id,
+        name: "candidate.png",
+        meta: "320x240 · 100 B",
+        src: "/api/thumbs/candidate",
+        kind: "searchCandidate",
+        asset,
+      },
+    ]);
+  });
+
+  it("does not expose normal search results as confirmation previews", () => {
+    const asset = makeAssetCard("candidate", 0, 0).asset;
+
+    expect(
+      candidatePreviewMentionsFromSearchResult({
+        items: [asset],
+      }),
+    ).toEqual([]);
   });
 });
 

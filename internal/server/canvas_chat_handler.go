@@ -1955,8 +1955,24 @@ func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas c
 	}
 
 	b.WriteString("## Required Follow-up\n")
+	if canvasToolResultsNeedUserConfirmation(toolResults) {
+		b.WriteString("The latest search result is marked needsUserConfirmation=true. Do not call add_assets_to_canvas, arrange_cards, or any other canvas mutation. Answer in chat that no suitable direct match was found, mention that candidate previews are shown for review, and ask the user to confirm which candidate should be added.")
+		return b.String()
+	}
 	b.WriteString(canvasFollowupInstruction(reason, latestUserMessage))
 	return b.String()
+}
+
+func canvasToolResultsNeedUserConfirmation(results []canvasCompactToolResult) bool {
+	for _, result := range results {
+		if result.Tool != "search_assets" {
+			continue
+		}
+		if needs, _ := result.Summary["needsUserConfirmation"].(bool); needs {
+			return true
+		}
+	}
+	return false
 }
 
 func canvasTextAnnotationTargets(canvas canvasSnapshot) []map[string]any {
@@ -4540,20 +4556,60 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		if hasText && canvasSearchTextQueryIsGeneric(q) {
 			candidates = []string{""}
 		}
-		for _, candidate := range candidates {
-			query := config.CatalogItemQuery{
-				ScanID:      scanID,
-				Query:       candidate,
-				AIOcrStatus: canvasSearchOCRStatus(hasText),
-				Limit:       fetchLimit,
+		searchCatalog := func(candidates []string) (config.CatalogItemsPage, string, error) {
+			var result config.CatalogItemsPage
+			var matchedQ string
+			for _, candidate := range candidates {
+				query := config.CatalogItemQuery{
+					ScanID:      scanID,
+					Query:       candidate,
+					AIOcrStatus: canvasSearchOCRStatus(hasText),
+					Limit:       fetchLimit,
+				}
+				result, err = s.store.CatalogItems(query)
+				if err != nil {
+					return result, matchedQ, err
+				}
+				if result.Total > 0 {
+					matchedQ = candidate
+					break
+				}
 			}
-			page, err = s.store.CatalogItems(query)
+			return result, matchedQ, nil
+		}
+		page, matchedQ, err := searchCatalog(candidates)
+		if err != nil {
+			return map[string]any{"items": []any{}, "error": err.Error()}
+		}
+		if matchedQ != "" {
+			q = matchedQ
+		}
+		if page.Total == 0 && strings.TrimSpace(q) != "" && !hasText {
+			candidatePage, candidateQ, err := searchCatalog(canvasAdditionalCatalogSearchCandidates(candidates))
 			if err != nil {
 				return map[string]any{"items": []any{}, "error": err.Error()}
 			}
-			if page.Total > 0 {
-				q = candidate
-				break
+			if candidatePage.Total > 0 {
+				candidateItems, err := s.enrichCanvasCatalogItems(r.Context(), scanID, candidatePage.Items, settings)
+				if err != nil {
+					return map[string]any{"items": []any{}, "error": err.Error()}
+				}
+				candidateItems = canvasRankCatalogSearchItems(candidateItems, candidateQ)
+				if len(candidateItems) > limit {
+					candidateItems = candidateItems[:limit]
+				}
+				return map[string]any{
+					"items":                 []scanner.AssetItem{},
+					"candidatePreviews":     candidateItems,
+					"candidateCount":        len(candidateItems),
+					"candidateQ":            candidateQ,
+					"total":                 0,
+					"q":                     q,
+					"matchType":             "catalog_candidate",
+					"hasText":               hasText,
+					"needsUserConfirmation": true,
+					"reason":                "No direct catalog match was found. Expanded matches are shown only for user confirmation.",
+				}
 			}
 		}
 		items, err := s.enrichCanvasCatalogItems(r.Context(), scanID, page.Items, settings)
@@ -4567,6 +4623,22 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		matchType := "catalog"
 		if len(items) == 0 && strings.TrimSpace(q) != "" {
 			if semanticItems, ok := s.canvasSemanticCatalogSearch(r.Context(), scanID, q, limit, settings); ok {
+				if canvasSemanticSearchNeedsUserConfirmation(q, semanticItems) {
+					if len(semanticItems) > limit {
+						semanticItems = semanticItems[:limit]
+					}
+					return map[string]any{
+						"items":                 []scanner.AssetItem{},
+						"candidatePreviews":     semanticItems,
+						"candidateCount":        len(semanticItems),
+						"total":                 0,
+						"q":                     q,
+						"matchType":             "semantic_candidate",
+						"hasText":               hasText,
+						"needsUserConfirmation": true,
+						"reason":                "Semantic matches had no direct metadata overlap with the query. They are shown only for user confirmation.",
+					}
+				}
 				items = semanticItems
 				if hasText {
 					items = canvasFilterCatalogItemsWithOCRText(items)

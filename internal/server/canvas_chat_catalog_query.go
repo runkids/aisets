@@ -13,10 +13,15 @@ import (
 const canvasCatalogMaxRequestedCount = 18
 
 var (
-	canvasCatalogSearchTerms = []string{"search", "find", "show", "list", "catalog"}
-	canvasCatalogAddTerms    = []string{"add", "include", "put", "place", "import"}
-	canvasCatalogLayoutTerms = []string{"row", "line", "grid"}
-	canvasCatalogStopTerms   = canvasBuildCatalogStopTerms()
+	canvasCatalogSearchTerms    = []string{"search", "find", "show", "list", "catalog"}
+	canvasCatalogAddTerms       = []string{"add", "include", "put", "place", "import"}
+	canvasCatalogLayoutTerms    = []string{"row", "line", "grid"}
+	canvasCatalogStopTerms      = canvasBuildCatalogStopTerms()
+	canvasCatalogTermExpansions = map[string][]string{
+		"logo":     {"mark", "symbol", "icon", "badge", "emblem", "brand", "favicon"},
+		"logos":    {"logo", "mark", "symbol", "icon", "badge", "emblem", "brand", "favicon"},
+		"logotype": {"logo", "mark", "symbol", "icon", "badge", "emblem", "brand", "favicon"},
+	}
 
 	canvasRequestedArabicCountRe = regexp.MustCompile(`(?i)(\d+)\s*(copies|copy|cards|items)?`)
 	canvasEnglishCounts          = map[string]int{"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9}
@@ -142,6 +147,56 @@ func canvasCatalogSearchQueryCandidates(text string) []string {
 		add(token)
 	}
 	return out
+}
+
+func expandCanvasCatalogSearchCandidates(candidates []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(candidates))
+	add := func(value string) {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	for _, candidate := range candidates {
+		add(candidate)
+		for _, token := range canvasCatalogSearchQueryCandidates(candidate) {
+			for _, expanded := range canvasCatalogTermExpansions[token] {
+				add(expanded)
+			}
+		}
+	}
+	return out
+}
+
+func canvasAdditionalCatalogSearchCandidates(candidates []string) []string {
+	base := map[string]bool{}
+	for _, candidate := range candidates {
+		base[strings.ToLower(strings.TrimSpace(candidate))] = true
+	}
+	var out []string
+	for _, candidate := range expandCanvasCatalogSearchCandidates(candidates) {
+		if base[candidate] {
+			continue
+		}
+		out = append(out, candidate)
+	}
+	return out
+}
+
+func canvasSemanticSearchNeedsUserConfirmation(query string, items []scanner.AssetItem) bool {
+	queryTerms := canvasCatalogSearchQueryCandidates(query)
+	if len(queryTerms) == 0 || len(queryTerms) > 2 || len(items) == 0 {
+		return false
+	}
+	for _, item := range items {
+		if canvasCatalogSearchItemScore(item, queryTerms) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func canvasCatalogSearchTextTokens(text string) []string {
