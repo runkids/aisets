@@ -39,17 +39,3 @@ release:
     name: aisets
   extra_files:
     - glob: ./aisets-ui-dist.tar.gz
-
-brews:
-  - name: aisets
-    repository:
-      owner: runkids
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/runkids/aisets
-    description: Local-first asset ops
-    license: MIT
-    dependencies:
-      - name: tesseract
-    test: |
-      system "#{bin}/aisets", "version"
