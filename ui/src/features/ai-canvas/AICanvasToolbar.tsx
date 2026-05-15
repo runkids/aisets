@@ -34,7 +34,7 @@ type AICanvasToolbarProps = {
   hideNonImageCards: boolean;
   setHideNonImageCards: StateSetter<boolean>;
   setSelectedCardIds: StateSetter<string[]>;
-  cardsCount: number;
+  canClear: boolean;
   onClear: () => void;
   debugOpen: boolean;
   onToggleDebug: () => void;
@@ -63,7 +63,7 @@ export function AICanvasToolbar({
   hideNonImageCards,
   setHideNonImageCards,
   setSelectedCardIds,
-  cardsCount,
+  canClear,
   onClear,
   debugOpen,
   onToggleDebug,
@@ -229,7 +229,7 @@ export function AICanvasToolbar({
       <IconButton
         size="sm"
         aria-label={t("aiCanvas.clear")}
-        disabled={cardsCount === 0}
+        disabled={!canClear}
         onClick={onClear}
       >
         <Trash2 />

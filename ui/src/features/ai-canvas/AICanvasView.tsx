@@ -581,6 +581,11 @@ export function AICanvasView({
   }, [activeChatRunStartedAt, isWorking]);
 
   const composerToolsOpen = composerAdvancedOpen;
+  const canClearCanvas =
+    cards.length > 0 ||
+    chatHistory.length > 0 ||
+    Boolean(currentSessionId) ||
+    isDirty;
   const assistantMessages = useMemo(
     () => chatHistory.filter((entry) => entry.role === "assistant"),
     [chatHistory],
@@ -1568,14 +1573,14 @@ export function AICanvasView({
         hideNonImageCards={hideNonImageCards}
         setHideNonImageCards={setHideNonImageCards}
         setSelectedCardIds={setSelectedCardIds}
-        cardsCount={cards.length}
+        canClear={canClearCanvas}
         onClear={() => setClearConfirmOpen(true)}
         debugOpen={debugOpen}
         onToggleDebug={() => setDebugOpen((v) => !v)}
         onSave={handleSave}
         onOpenSessions={() => setSessionsDialogOpen(true)}
         onNewCanvas={() => {
-          if (isDirty || cards.length > 0) {
+          if (canClearCanvas) {
             setNewCanvasConfirmOpen(true);
           }
         }}
