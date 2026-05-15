@@ -138,13 +138,24 @@ export function useImportSettingsMutation() {
   });
 }
 
+const CATALOG_AFFECTING_KEYS: (keyof SettingsUpdate)[] = [
+  "optimizationThresholds",
+  "optimizationStrategies",
+  "excludePatterns",
+  "excludePatternsByIntent",
+  "lintRules",
+  "activeWorkspaceId",
+];
+
 export function useUpdateSettingsMutation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (data: SettingsUpdate) => updateSettings(data),
-    onSuccess: async () => {
+    onSuccess: async (_result, variables) => {
       await client.invalidateQueries({ queryKey: settingsQueryKey });
-      await client.invalidateQueries({ queryKey: catalogQueryKey });
+      if (CATALOG_AFFECTING_KEYS.some((key) => key in variables)) {
+        await client.invalidateQueries({ queryKey: catalogQueryKey });
+      }
     },
   });
 }
