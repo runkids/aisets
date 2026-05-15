@@ -22,6 +22,8 @@ const githubAPIURL = "https://api.github.com/repos/" + repo + "/releases/latest"
 
 var httpClient = http.DefaultClient
 
+var writePrivilegeRequired = binaryWriteRequiresPrivilege
+
 type CheckResult struct {
 	CurrentVersion  string `json:"currentVersion"`
 	LatestVersion   string `json:"latestVersion,omitempty"`
@@ -48,6 +50,14 @@ type UpgradeResult struct {
 
 type latestReleaseResponse struct {
 	TagName string `json:"tag_name"`
+}
+
+type ElevatedPermissionError struct {
+	Path string
+}
+
+func (e ElevatedPermissionError) Error() string {
+	return fmt.Sprintf("elevated permissions are required to update %s", e.Path)
 }
 
 func Check(ctx context.Context, currentVersion string) (CheckResult, error) {
@@ -105,6 +115,9 @@ func Upgrade(ctx context.Context, opts UpgradeOptions) (UpgradeResult, error) {
 		if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
 			execPath = resolved
 		}
+	}
+	if runtime.GOOS != "windows" && writePrivilegeRequired(execPath) {
+		return UpgradeResult{CurrentVersion: currentVersion, LatestVersion: latest, Message: "Elevated permissions required"}, ElevatedPermissionError{Path: execPath}
 	}
 	if err := downloadAndReplaceBinary(ctx, latest, execPath); err != nil {
 		return UpgradeResult{CurrentVersion: currentVersion, LatestVersion: latest, Message: "Update failed"}, err
@@ -255,6 +268,17 @@ func downloadAndReplaceBinary(ctx context.Context, ver, destPath string) error {
 	if err := os.Chmod(tmpBinary, mode); err != nil {
 		return err
 	}
+	return replaceBinary(destPath, tmpBinary)
+}
+
+func replaceBinary(destPath, tmpBinary string) error {
+	if runtime.GOOS != "windows" {
+		if err := os.Rename(tmpBinary, destPath); err != nil {
+			return fmt.Errorf("replace binary: %w", err)
+		}
+		return nil
+	}
+
 	backup := destPath + ".old"
 	_ = os.Remove(backup)
 	if err := os.Rename(destPath, backup); err != nil {
@@ -266,6 +290,18 @@ func downloadAndReplaceBinary(ctx context.Context, ver, destPath string) error {
 	}
 	_ = os.Remove(backup)
 	return nil
+}
+
+func binaryWriteRequiresPrivilege(destPath string) bool {
+	dir := filepath.Dir(destPath)
+	file, err := os.CreateTemp(dir, ".aisets-update-check-*")
+	if err != nil {
+		return os.IsPermission(err)
+	}
+	name := file.Name()
+	_ = file.Close()
+	_ = os.Remove(name)
+	return false
 }
 
 func fetchChecksumForAsset(ctx context.Context, ver, assetName string) (string, error) {

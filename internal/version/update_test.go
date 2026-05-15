@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -84,6 +85,32 @@ func TestUpgradeDevMode(t *testing.T) {
 	}
 	if !result.DevMode || !result.Updated || result.LatestVersion != "0.1.1-dev" {
 		t.Fatalf("Upgrade(dev) = %#v", result)
+	}
+}
+
+func TestUpgradeRequiresElevatedPermissionsBeforeDownload(t *testing.T) {
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.String() != githubAPIURL {
+			t.Fatalf("unexpected URL after permission check: %s", r.URL.String())
+		}
+		return jsonResponse(http.StatusOK, `{"tag_name":"v1.0.1"}`), nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	oldWritePrivilegeRequired := writePrivilegeRequired
+	writePrivilegeRequired = func(_ string) bool { return true }
+	t.Cleanup(func() { writePrivilegeRequired = oldWritePrivilegeRequired })
+
+	execPath := filepath.Join(t.TempDir(), executableName())
+	if err := os.WriteFile(execPath, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Upgrade(t.Context(), UpgradeOptions{CurrentVersion: "1.0.0", ExecPath: execPath})
+	var permissionErr ElevatedPermissionError
+	if !errors.As(err, &permissionErr) || permissionErr.Path != execPath {
+		t.Fatalf("err = %T %[1]v, want ElevatedPermissionError for %s", err, execPath)
 	}
 }
 

@@ -588,14 +588,22 @@ func ensureUIAvailable() (string, error) {
 }
 
 func withUISpinner(message string, fn func() error) error {
+	return withStatusSpinner(message, "UI assets ready.", "UI asset download failed.", fn)
+}
+
+func withStatusSpinner(message, successMessage, failureMessage string, fn func() error) error {
 	if !isTerminal(os.Stderr) {
 		fmt.Fprintf(os.Stderr, "%s...\n", message)
 		err := fn()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "UI asset download failed.")
+			if failureMessage != "" {
+				fmt.Fprintln(os.Stderr, failureMessage)
+			}
 			return err
 		}
-		fmt.Fprintln(os.Stderr, "UI assets ready.")
+		if successMessage != "" {
+			fmt.Fprintln(os.Stderr, successMessage)
+		}
 		return nil
 	}
 
@@ -622,10 +630,14 @@ func withUISpinner(message string, fn func() error) error {
 	<-stopped
 	clearUISpinnerLine()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "✕ UI asset download failed.\n")
+		if failureMessage != "" {
+			fmt.Fprintf(os.Stderr, "✕ %s\n", failureMessage)
+		}
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "⋮ UI assets ready.\n")
+	if successMessage != "" {
+		fmt.Fprintf(os.Stderr, "⋮ %s\n", successMessage)
+	}
 	return nil
 }
 

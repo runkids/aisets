@@ -86,6 +86,18 @@ Update anytime:
 aisets update
 ```
 
+Uninstall the CLI:
+
+```bash
+# Remove the installed binary
+sudo rm -f /usr/local/bin/aisets
+
+# Optional: remove local data and cache
+rm -rf ~/.local/share/aisets ~/.cache/aisets
+```
+
+If you installed to a custom `INSTALL_DIR`, remove `aisets` from that directory instead of `/usr/local/bin`.
+
 ## Why Aisets
 
 Image debt sneaks into every codebase: duplicate icons, mystery screenshots, forgotten marketing exports, giant PNGs, unused files, broken naming, GPS metadata, and assets no one wants to touch because cleanup feels risky.

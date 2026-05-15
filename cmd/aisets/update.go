@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"aisets/internal/apierr"
 	versionpkg "aisets/internal/version"
@@ -21,12 +23,28 @@ func cmdUpdate(args []string, jsonOut bool) error {
 	if fs.NArg() != 0 {
 		return apierr.WithParams("update_unexpected_args", "update does not accept positional arguments", map[string]any{"args": fs.Args()})
 	}
-	result, err := versionpkg.Upgrade(context.Background(), versionpkg.UpgradeOptions{
-		CurrentVersion: version,
-		DryRun:         *dryRun,
-		Force:          *force,
-	})
+	var result versionpkg.UpgradeResult
+	upgrade := func() error {
+		var err error
+		result, err = versionpkg.Upgrade(context.Background(), versionpkg.UpgradeOptions{
+			CurrentVersion: version,
+			DryRun:         *dryRun,
+			Force:          *force,
+		})
+		return err
+	}
+	var err error
+	if jsonOut {
+		err = upgrade()
+	} else {
+		err = withStatusSpinner("Updating Aisets", "", "Aisets update failed.", upgrade)
+	}
 	if err != nil {
+		var permissionErr versionpkg.ElevatedPermissionError
+		if !jsonOut && errors.As(err, &permissionErr) {
+			fmt.Fprintf(os.Stderr, "Aisets update needs elevated permissions to write to %s\n", filepath.Dir(permissionErr.Path))
+			return reexecUpdateWithPrivileges(permissionErr.Path)
+		}
 		return err
 	}
 	if jsonOut {
