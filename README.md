@@ -6,7 +6,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://github.com/runkids/aisets/releases"><img src="https://img.shields.io/github/v/release/runkids/aisets" alt="Release"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue" alt="Platform">
-  <a href="https://goreportcard.com/report/github.com/runkids/aisets"><img src="https://goreportcard.com/badge/github.com/runkids/aisets" alt="Go Report Card"></a>
   <a href="https://deepwiki.com/runkids/aisets"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
@@ -15,8 +14,8 @@
 </p>
 
 <p align="center">
-  <strong>Local-first asset hygiene for multi-project workspaces.</strong><br>
-  Scan, deduplicate, lint, optimize, AI-tag & clean up image assets — all from a single CLI binary with a localhost UI.
+  <strong>AI-powered asset intelligence for codebases.</strong><br>
+  Audit image assets across projects: find duplicates, unused files, oversized images, OCR text, AI tags, and safe next actions — locally and visually.
 </p>
 
 <p align="center">
@@ -24,30 +23,82 @@
 </p>
 
 <p align="center">
-  <a href="#installation">Install</a> •
-  <a href="#product-tour">Product Tour</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#features">Features</a> •
-  <a href="#commands">Commands</a> •
-  <a href="#development">Development</a>
+  <a href="#install">Install</a> •
+  <a href="#quick-start">Run UI</a> •
+  <a href="#why-aisets">Why Aisets</a> •
+  <a href="#ai-that-actually-helps">AI</a> •
+  <a href="#what-were-building-next">Roadmap</a>
 </p>
 
 > [!IMPORTANT]
-> This project is in active development. Expect breaking changes with new releases.
-> Please review the [release changelog](https://github.com/runkids/aisets/releases) before updating.
+> Aisets is in active development. Expect fast iteration and review the release notes before updating.
+
+## Install
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/runkids/aisets/main/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | iex
+```
+
+## Quick Start
+
+```bash
+# Open the dashboard for a project
+aisets ui /path/to/your/project
+```
+
+The dashboard opens locally in your browser. Use `--app` if you prefer a desktop-style window.
+
+You can also scan from the CLI:
+
+```bash
+aisets scan /path/to/your/project --json
+```
+
+Update anytime:
+
+```bash
+aisets update
+```
 
 ## Why Aisets
 
-Every codebase accumulates image debt: duplicates nobody notices, 4 MB PNGs that should be AVIF, unused assets that survive every refactor, inconsistent naming that breaks imports. Manual cleanup doesn't scale.
+Image debt sneaks into every codebase: duplicate icons, mystery screenshots, forgotten marketing exports, giant PNGs, unused files, broken naming, GPS metadata, and assets no one wants to touch because cleanup feels risky.
 
-Aisets fixes this:
+Aisets turns that pile into a visual, AI-assisted workflow:
 
-- **One scan, full picture** — duplicates, near-duplicates, unused files, lint issues, optimization opportunities, all in one pass
-- **AI-powered tagging & OCR** — auto-categorize assets, extract image text, translate tags, and build semantic search indexes
-- **Custom asset workflows** — save reusable filters for large images, cleanup candidates, OCR text, AI categories, tags, duplicates, and more
-- **Safe actions** — rename, merge duplicates, delete unused files with preview/apply workflow. Nothing changes until you confirm
-- **Multi-project aware** — manage assets across repos with project-type-aware analysis (code project, asset pack, library, mixed)
-- **Local & private** — single Go binary, SQLite database, no cloud, no telemetry. Your assets never leave your machine
+- **See the whole mess at once** — browse every image with size, format, dimensions, duplicates, usage, optimization hints, OCR, tags, and project context.
+- **Search by meaning, not filenames** — find “login screen”, “invoice screenshot”, “food photo”, or text inside images even when file names are useless.
+- **Let AI label the boring stuff** — generate categories, tags, descriptions, OCR text, translations, and semantic search data.
+- **Clean safely** — preview renames, duplicate merges, and unused-file deletion before anything changes.
+- **Fix asset bloat before users feel it** — spot giant images, missing responsive variants, lazy-loading issues, and format-conversion wins.
+- **Work across multiple repos** — great for design systems, app suites, asset packs, marketing sites, and long-lived projects.
+- **Stay local-first** — run the dashboard on your machine and choose when AI uses local models or external tools.
+
+If you have ever asked “can we delete this image?” and nobody knew the answer, Aisets is for you.
+
+## AI That Actually Helps
+
+Aisets is not just another file browser with an AI badge. AI is used where it makes asset maintenance faster:
+
+- **AI tagging** — categories, descriptive tags, scene hints, face/language signals, and translated labels.
+- **AI OCR** — extract text from screenshots, memes, product shots, documents, and mixed-language images.
+- **Semantic search** — search assets by intent, visual meaning, tags, descriptions, and OCR text.
+- **AI cleanup planning** — use agent CLIs to help turn scan findings into practical cleanup plans.
+- **Content-aware workflows** — build filters around AI category, OCR content, tags, duplicate status, and optimization potential.
+
+Supported AI paths include:
+
+- **Local AI** — connect local / OpenAI-compatible runtimes such as Ollama or LM Studio for private workflows.
+- **Agent CLIs** — integrate with coding agents including **Codex CLI** and **Pi**, plus Claude Code, Cursor Agent, Gemini CLI, and Copilot CLI.
+- **Your choice** — keep everything local, use agent tools already installed on your machine, or connect compatible providers when you want them.
 
 ## Product Tour
 
@@ -63,290 +114,60 @@ Aisets fixes this:
 | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-duplicates.png" alt="Aisets duplicate analysis comparing similar PNG and WebP assets" width="480"> | <img src=".github/assets/readme-optimize.png" alt="Aisets optimization view with critical size findings, format conversion, and resize recommendations" width="480"> |
 
-| Check one-off images before import                                                                                                              | Tune AI, OCR, embeddings, and agent CLIs                                                                                                                                        |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Check one-off images before import                                                                                                              | Tune local AI and agent CLIs                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-image-tools.png" alt="Aisets image tools view for checking images before adding them to a project" width="480"> | <img src=".github/assets/readme-ai-settings.png" alt="Aisets AI settings with local LLM, embedding model, agent CLI, tagging, OCR, and semantic indexing controls" width="480"> |
 
-## Installation
+## What You Can Do With It
 
-macOS / Linux:
+### Find duplicates before they become permanent
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/runkids/aisets/main/install.sh | sh
-```
+- Detect exact duplicate files across projects.
+- Compare visually similar images side by side.
+- Pick what to keep, preview the merge, and update references safely.
 
-Windows PowerShell:
+### Delete with confidence
 
-```powershell
-iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | iex
-```
+- Find assets that code no longer references.
+- Separate code projects from asset packs and libraries so “unused” does not become reckless.
+- Preview every destructive action before applying it.
 
-Update to the latest version anytime:
+### Make images smaller without guessing
 
-```bash
-aisets update
-```
+- Estimate savings before converting anything.
+- Find oversized rasters, heavy GIFs, large inline imports, missing dimensions, and lazy-loading issues.
+- Generate practical optimization scripts when you are ready.
 
-## Quick Start
+### Turn image chaos into searchable knowledge
 
-```bash
-# Add a project and open the UI
-aisets ui /path/to/your/project
+- OCR screenshots and design exports.
+- Tag images automatically with AI.
+- Save filters for cleanup candidates, huge files, OCR matches, AI categories, duplicated assets, and review queues.
 
-# Or scan from the CLI
-aisets scan /path/to/your/project --json
-```
+### Check files before adding them
 
-The UI opens at `http://127.0.0.1:5174`. Use `--app` to launch a desktop-style window (Chrome/Edge/Brave).
+- Drop in new images before import.
+- Catch duplicates, naming issues, and optimization opportunities early.
+- Avoid adding asset debt in the first place.
 
-## Features
+## What We're Building Next
 
-### AI Asset Browser
+Aisets already has scanning, AI metadata, OCR, embeddings, semantic search, safe actions, Image Tools, and an AI Canvas foundation. The next work is about turning those pieces into a more trustworthy AI asset workflow:
 
-Browse assets with the metadata that usually lives in separate tools:
+- **AI operation safety contract** — every AI-originated file or metadata change should be typed, validated by the backend, previewable, and auditable.
+- **Embedding index health** — semantic search should clearly show whether text/image vectors are ready, stale, missing, or generated by a different provider/model.
+- **Assistant asset operations** — natural-language requests should return grounded asset cards, comparison previews, cleanup plans, and safe operation cards instead of text-only answers.
+- **AI Canvas hardening** — keep the visual workspace focused on asset work: arrange images, inspect context, create variants, annotate regions, and review operations before applying anything.
+- **Agent cleanup plans** — use Codex CLI, Pi, and other agent CLIs to generate structured cleanup plans with preview commands, blockers, verification checks, and Aisets-side validation.
 
-- AI categories, tags, descriptions, scene signals, and translated labels
-- OCR status and searchable image text from VLM or local OCR
-- EXIF metadata, GPS privacy signals, image dimensions, file size, format, alpha, and animation
-- Project, extension, status, category, custom filter, and optimization facets
-- Virtualized grids and lists for large asset catalogs
+## Safety First
 
-### Semantic Search & Custom Filters
+Aisets is designed for repos you care about:
 
-Use `⌘ P` to jump across pages, assets, saved filters, and semantic results. Aisets can search by natural language over category, tags, descriptions, and OCR text.
-
-Custom Filters turn asset metadata into reusable workflows:
-
-| Workflow                    | Example rules                                               |
-| --------------------------- | ----------------------------------------------------------- |
-| **Huge optimizable assets** | size >= 1 MB + optimizable                                  |
-| **Images with OCR text**    | OCR ready + OCR text matches                                |
-| **AI category review**      | category contains Social Issues, Food, UI, Screenshot, etc. |
-| **Cleanup candidates**      | duplicate OR near-duplicate OR optimizable                  |
-
-### Scan & Detect
-
-| Feature              | Description                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------ |
-| **Exact duplicates** | BLAKE3 content hashing identifies 100% identical files across projects               |
-| **Near-duplicates**  | Perceptual hashing (dHash) finds visually similar images, including flipped variants |
-| **Unused assets**    | Reference tracking across JS/TS/CSS/HTML to find assets no code imports              |
-| **Image metadata**   | Dimensions, format, alpha channel, animation, EXIF data extraction                   |
-| **Scan diff**        | Compare two scans to see what changed over time                                      |
-| **Scan profiles**    | Fast (metadata + duplicates) or Full (+ references, near-duplicates, optimization)   |
-
-### Lint
-
-9 built-in rules catch common asset issues in your codebase:
-
-| Rule                   | Severity | What it catches                                            |
-| ---------------------- | -------- | ---------------------------------------------------------- |
-| `large-inline-import`  | Critical | `?raw` / `?inline` imports over 10 KB bloating your bundle |
-| `missing-lazy-loading` | Warning  | Large `<img>` without `loading="lazy"` or `fetchpriority`  |
-| `missing-dimensions`   | Warning  | `<img>` without width/height causing CLS                   |
-| `bg-content-image`     | Warning  | Large raster in CSS `background-image` (can't lazy-load)   |
-| `no-responsive-image`  | Info     | Raster images over 100 KB without `srcset`                 |
-| `svg-as-img`           | Info     | SVG via `<img>` tag (no CSS/animation control)             |
-| `img-as-background`    | Info     | Large decorative `<img alt="">` better as CSS background   |
-| `duplicate-asset`      | Warning  | Identical files that should be consolidated                |
-| `exif-gps-privacy`     | Advisory | Images that still contain GPS metadata                     |
-
-### Optimize
-
-Estimate savings and generate conversion scripts:
-
-- **Format conversion** — PNG → AVIF/WebP, JPEG → AVIF, GIF recompress
-- **SVG minification** — via svgo or built-in
-- **Resize oversized rasters** — configurable max dimensions
-- **7 built-in strategies** — fully customizable thresholds, quality, speed
-- **Script generation** — export a bash script using ffmpeg, cwebp, avifenc, gifsicle, or built-in imgtools
-- **Preview before apply** — see estimated savings before any file changes
-
-### AI Tagging & OCR
-
-Auto-categorize images and extract text using vision language models:
-
-- **AI Tags** — category, descriptive tags, scene type, face detection, language detection, location estimation
-- **AI OCR** — extract text from images via VLM, with 20+ language support
-- **Local Tesseract OCR** — offline text extraction for bulk processing
-- **Multi-provider** — Ollama, OpenAI-compatible APIs, or agent CLIs (Claude, Codex, Gemini, Cursor, Copilot & more)
-- **Semantic search** — build embeddings over tags, descriptions, categories, and OCR text
-- **i18n tags** — AI-generated tags are translated across all 5 supported languages
-- **Content-hash dedup** — identical images share AI results, no redundant API calls
-
-### Actions
-
-Safe file operations with preview/apply workflow:
-
-| Action               | What it does                                            |
-| -------------------- | ------------------------------------------------------- |
-| **Rename**           | Move/rename an asset and update all code references     |
-| **Merge duplicates** | Keep one copy, redirect all references, delete the rest |
-| **Delete unused**    | Remove confirmed unused assets (code-project only)      |
-
-Every action generates a preview first. Apply revalidates source files and rejects stale previews.
-
-### Pre-Check
-
-Verify files before adding them to your project:
-
-- Detect exact and near-duplicate matches against the existing catalog
-- Flag naming issues (spaces, uppercase, special characters)
-- Suggest optimizations before the file lands in your repo
-
-### Project Types
-
-Choose a project type to control how Aisets interprets usage and safety:
-
-| Type             | Unused detection             | Delete-unused          | Lint     |
-| ---------------- | ---------------------------- | ---------------------- | -------- |
-| **Code project** | Full reference tracking      | Enabled (with preview) | Full     |
-| **Asset pack**   | N/A (assets used externally) | Disabled               | Skipped  |
-| **Library**      | "Possibly unused" only       | Disabled               | Advisory |
-| **Mixed**        | "Possibly unused" only       | Conditional            | Advisory |
-
-## Commands
-
-```
-aisets ui [paths...] [--port PORT] [--app]     Open the UI (background daemon)
-aisets ui once [paths...]                       Foreground server (Docker/CI)
-aisets ui stop [--port PORT]                    Stop background server
-aisets scan [paths...] [--json]                 Scan projects
-aisets scans list [--json]                      List scan history
-aisets scans diff --base ID --target ID         Compare two scans
-aisets pre-check [files...] [--json]            Check files before adding
-aisets optimize estimate [ids...] [--json]      Estimate optimization savings
-aisets optimize script [ids...] [--json]        Generate optimization script
-aisets actions rename preview ...               Preview a rename
-aisets actions merge-duplicates preview ...      Preview a duplicate merge
-aisets actions delete-unused preview ...         Preview unused deletion
-aisets actions apply --preview file.json        Apply a previewed action
-aisets projects [add|remove|rename|list]        Manage projects
-aisets settings [get|export|import|reset-*]     Manage settings
-aisets update [--dry-run] [--force]             Self-update to latest release
-aisets version [--json]                         Show version
-```
-
-All commands support `--json` for AI agent and automation integration.
-
-## Architecture
-
-```
-┌────────────────────────────────────────────────────────┐
-│                     CLI (Go)                           │
-│  cmd/aisets — UI server, scan, actions, pre-check      │
-├────────────────────────────────────────────────────────┤
-│                  Internal Packages                     │
-│  scanner · lint · optimize · actions · agent · ocr     │
-│  imageproc · precheck · version · uidist · config      │
-├──────────────┬─────────────────────────────────────────┤
-│ imgtools     │            SQLite (WAL)                 │
-│ (Rust)       │  Catalogs, scans, AI results, settings  │
-│ resvg, image │  Read pool (4) + Write pool (1)         │
-└──────────────┴─────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│                    UI (React + TypeScript)              │
-│  Vite · Tailwind · CVA · @tanstack/react-virtual       │
-│  Browse · Duplicates · Lint · Optimize · Tags · Scans  │
-│  NDJSON streaming · Virtual scrolling · Dark/Light     │
-└────────────────────────────────────────────────────────┘
-```
-
-- **Go backend** — single binary, embedded or downloaded UI, NDJSON streaming for real-time scan progress
-- **Rust imgtools** — image probing, hashing, format conversion, SVG rasterization (resvg). Falls back to Go when unavailable
-- **SQLite WAL** — concurrent reads during writes, separated read/write pools
-- **React UI** — virtual scrolling for 10k+ assets, faceted filtering, keyboard-driven command palette
-
-## Development
-
-```bash
-# Build the CLI
-go build -o bin/aisets ./cmd/aisets
-./bin/aisets ui /path/to/project --no-open
-
-# UI development (Vite + HMR)
-cd ui && pnpm install && pnpm run dev
-```
-
-The Go server runs on `127.0.0.1:19520` by default. Vite proxies `/api` to it.
-
-### Sharing & Remote Access
-
-Share the dashboard over the network or internet. Pick the method that fits your setup:
-
-**Quick tunnel** — no config, public URL in seconds:
-
-```bash
-aisets ui --host 0.0.0.0 --no-open
-
-# ngrok
-ngrok http 19520
-
-# Cloudflare (no account needed for temporary tunnels)
-cloudflared tunnel --url http://localhost:19520
-```
-
-**Cloudflare with custom domain** — persistent tunnel:
-
-```bash
-cloudflared tunnel create aisets
-cloudflared tunnel route dns aisets assets.example.com
-cloudflared tunnel run --url http://localhost:19520 aisets
-```
-
-**Reverse proxy (sub-path)** — host alongside other services on the same domain:
-
-```bash
-aisets ui --base-path /aisets --host 0.0.0.0 --no-open
-# or: AISETS_UI_BASE_PATH=/aisets aisets ui --host 0.0.0.0 --no-open
-```
-
-```nginx
-# Nginx
-location /aisets/ {
-    proxy_pass http://127.0.0.1:19520;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-}
-```
-
-```
-# Caddy
-handle_path /aisets/* {
-    reverse_proxy 127.0.0.1:19520
-}
-```
-
-> **Note:** The dashboard reads files from the host filesystem. Anyone with the URL can browse scanned project assets.
-
-### Devcontainer
-
-```bash
-make devc        # Start devcontainer and enter shell
-ui /workspace    # Start Go API (Air hot reload) + Vite UI
-```
-
-Open `http://127.0.0.1:5174` from the host browser.
-
-### Rust imgtools
-
-```bash
-cd tools/imgtools
-cargo build --release
-```
-
-### Running Tests
-
-```bash
-go test ./...                              # Go tests
-pnpm --dir ui test                         # UI tests
-cargo test --manifest-path tools/imgtools/Cargo.toml  # Rust tests
-```
-
-## Safety
-
-File-changing operations use a preview/apply model. Apply revalidates source files before writing and rejects stale previews. CLI accepts preview JSON from a file or stdin via `--preview -`.
+- File-changing actions use **preview → confirm → apply**.
+- Apply rechecks files before writing, so stale previews are rejected.
+- Project type controls how aggressive unused detection should be.
+- Local-first workflows keep your assets on your machine unless you choose an external AI provider or agent.
 
 ## License
 

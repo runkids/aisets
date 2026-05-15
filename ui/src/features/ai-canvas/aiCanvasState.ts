@@ -146,6 +146,7 @@ export type ChatRunUsage = {
   loopCount?: number;
   toolCallCount?: number;
   fallbackActionCount?: number;
+  executedActionCount?: number;
   invalidActionCount?: number;
 };
 
@@ -503,6 +504,7 @@ function normalizeChatRunUsage(value: unknown): ChatRunUsage | undefined {
   setNumber("loopCount");
   setNumber("toolCallCount");
   setNumber("fallbackActionCount");
+  setNumber("executedActionCount");
   setNumber("invalidActionCount");
   return Object.keys(usage).length > 0 ? usage : undefined;
 }
@@ -666,7 +668,11 @@ export function commentsForAssets(cards: CanvasCard[], assetCardIds: string[]) {
 export function cardIdsForDeletion(cards: CanvasCard[], targetId: string) {
   const target = cards.find((card) => card.id === targetId);
   const ids = new Set<string>(target ? [target.id] : []);
-  if (target?.kind === "asset" || target?.kind === "upload") {
+  if (
+    target?.kind === "asset" ||
+    target?.kind === "upload" ||
+    target?.kind === "variant"
+  ) {
     for (const card of cards) {
       if (card.kind === "comment" && card.anchorId === target.id) {
         ids.add(card.id);

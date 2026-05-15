@@ -8,6 +8,7 @@ const (
 	canvasSkillOCR               = "ocr"
 	canvasSkillComments          = "comments"
 	canvasSkillCapture           = "capture"
+	canvasSkillPhotoStaging      = "photo-staging"
 	canvasSkillQuality           = "quality"
 	canvasSkillMetadataProposals = "metadata-proposals"
 	canvasSkillFileProposals     = "file-proposals"
@@ -97,6 +98,23 @@ func canvasSkillCatalog() []canvasSkillFamily {
 - inspect_canvas is only for hidden AI visual checking; it is not the user's final screenshot.`,
 		},
 		{
+			ID:          canvasSkillPhotoStaging,
+			Description: "Professional photo staging, art direction, visual composition, and screenshot capture for all visible canvas images.",
+			Triggers:    []string{"photo shoot", "photoshoot", "photographer", "photo staging", "stage photos", "art direct", "beautify", "make beautiful", "portfolio shot", "hero shot", "editorial composition"},
+			Tools: []string{
+				"focus_card", "select_cards", "inspect_canvas", "resize_card", "arrange_cards",
+				"align_cards", "distribute_cards", "bring_cards_to_front", "mirror_image", "rotate_image",
+				"capture_viewport", "capture_canvas",
+			},
+			Rules: `## Photo Staging Skill
+- Act like a professional photographer and art director for the canvas.
+- Use all visible image cards unless the user narrows the target set. Do not stage only the first selected card when the request says all images or the canvas.
+- Create a finished composition, not a written plan: inspect the current board when useful, resize hero/supporting images, arrange with clear whitespace, align/distribute when it improves polish, use z-index/front layering for foreground heroes, and avoid accidental overlaps.
+- Prefer a balanced editorial/product-shot layout with one focal area, supporting clusters, staggered rhythm, and negative space unless the user asks for a grid, row, collage, or storyboard.
+- Use resize_card and arrange_cards for the actual composition, bring_cards_to_front for visual layering, and mirror_image or rotate_image only for a small number of deliberate PNG variants when a transformed image improves the composition direction or cover-like rhythm. Do not rotate, mirror, duplicate, or transform images merely to show tool capability.
+- After the staging layout is complete, call capture_canvas for the full staged board or capture_viewport when the user explicitly asks for the current viewport. The final screenshot/export preview is part of the task.`,
+		},
+		{
 			ID:          canvasSkillQuality,
 			Description: "Asset comparison, similarity, quality inspection, alt text, and general visual questions.",
 			Triggers:    []string{"compare", "similar", "duplicate", "quality", "alt text", "describe", "what is this", "issue"},
@@ -144,6 +162,24 @@ func canvasAllSkillIDs() []string {
 	return ids
 }
 
+func normalizeCanvasSelectedSkillIDs(ids []string) []string {
+	allowed := map[string]bool{}
+	for _, skill := range canvasSkillCatalog() {
+		allowed[skill.ID] = true
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if !allowed[id] || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
 func canvasDefaultSkillIDs() []string {
 	return []string{
 		canvasSkillLayout,
@@ -159,7 +195,7 @@ func classifyCanvasSkillFamilies(input canvasSkillClassifyInput) []string {
 	var ids []string
 	for _, skill := range canvasSkillCatalog() {
 		for _, trigger := range skill.Triggers {
-			if strings.Contains(message, strings.ToLower(trigger)) {
+			if canvasSkillTriggerMatches(message, trigger) {
 				ids = append(ids, skill.ID)
 				break
 			}
@@ -172,6 +208,29 @@ func classifyCanvasSkillFamilies(input canvasSkillClassifyInput) []string {
 		return canvasDefaultSkillIDs()
 	}
 	return ids
+}
+
+func canvasSkillTriggerMatches(message string, trigger string) bool {
+	trigger = strings.ToLower(strings.TrimSpace(trigger))
+	if trigger == "" {
+		return false
+	}
+	if strings.ContainsFunc(trigger, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	}) {
+		return strings.Contains(message, trigger)
+	}
+	if len(trigger) <= 3 {
+		for _, token := range strings.FieldsFunc(message, func(r rune) bool {
+			return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+		}) {
+			if token == trigger || token == trigger+"s" {
+				return true
+			}
+		}
+		return false
+	}
+	return strings.Contains(message, trigger)
 }
 
 func canvasSelectedFormatProposalRequested(message string, canvas canvasSnapshot) bool {

@@ -31,6 +31,12 @@ function formatTokenCount(value: number | undefined) {
   return new Intl.NumberFormat("en-US").format(Math.round(value ?? 0));
 }
 
+export function canvasRunToolCount(usage?: ChatRunUsage) {
+  const executed = usage?.executedActionCount;
+  if (Number.isFinite(executed)) return Math.round(executed ?? 0);
+  return (usage?.toolCallCount ?? 0) + (usage?.fallbackActionCount ?? 0);
+}
+
 export function AICanvasRunUsageChips({
   t,
   usage,
@@ -46,7 +52,7 @@ export function AICanvasRunUsageChips({
   const totalTokens =
     usage?.totalTokens ??
     ((usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0) || undefined);
-  const toolCount = usage?.toolCallCount ?? 0;
+  const toolCount = canvasRunToolCount(usage);
   const loopCount = usage?.loopCount ?? 0;
   const hasUsage =
     Boolean(provider) ||

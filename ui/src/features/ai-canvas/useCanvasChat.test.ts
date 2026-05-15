@@ -275,6 +275,7 @@ describe("canvasRunUsageFromDone", () => {
             promptKind: "initial",
             toolCallCount: 2,
             fallbackActionCount: 1,
+            executedActionCount: 3,
             invalidActionCount: 0,
           },
           {
@@ -282,6 +283,7 @@ describe("canvasRunUsageFromDone", () => {
             promptKind: "repair",
             toolCallCount: 1,
             fallbackActionCount: 0,
+            executedActionCount: 1,
             invalidActionCount: 1,
           },
         ],
@@ -297,6 +299,7 @@ describe("canvasRunUsageFromDone", () => {
       loopCount: 2,
       toolCallCount: 3,
       fallbackActionCount: 1,
+      executedActionCount: 4,
       invalidActionCount: 1,
     });
   });

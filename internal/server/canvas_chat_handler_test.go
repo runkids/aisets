@@ -1126,7 +1126,7 @@ func TestBuildCanvasFollowupPromptUsesCompactState(t *testing.T) {
 		"cardIds":    []string{"card-1"},
 		"newCardIds": []string{"dup-1", "dup-2"},
 	})}
-	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "arrange these", canvas, nil, results, []string{"duplicate_cards"}, "I will arrange them.")
+	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "arrange these", canvas, nil, results, []string{"duplicate_cards"}, "I will arrange them.", false)
 	if strings.Contains(prompt, "## Canvas State") {
 		t.Fatalf("follow-up prompt should not include full canvas state:\n%s", prompt)
 	}
@@ -1165,7 +1165,7 @@ func TestBuildCanvasFollowupPromptDuplicateWorkflowKeepsCleanupContext(t *testin
 		"cardIds":    []string{"card-1"},
 		"newCardIds": []string{"dup-1", "dup-2"},
 	})}
-	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "duplicate selected images and remove unrelated candidates", canvas, nil, results, []string{"duplicate_cards"}, "")
+	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "duplicate selected images and remove unrelated candidates", canvas, nil, results, []string{"duplicate_cards"}, "", false)
 	for _, want := range []string{"card-decoy", "unrelated_candidate.png", "do not remove returned newCardIds", "pre-existing unrelated visible cards"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("duplicate follow-up prompt missing %q:\n%s", want, prompt)

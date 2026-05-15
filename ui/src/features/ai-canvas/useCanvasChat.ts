@@ -163,6 +163,7 @@ export function canvasRunUsageFromDone(done: CanvasChatDone): ChatRunUsage {
     loopCount: loopStats.length || undefined,
     toolCallCount: sumLoopField("toolCallCount") || undefined,
     fallbackActionCount: sumLoopField("fallbackActionCount") || undefined,
+    executedActionCount: sumLoopField("executedActionCount") || undefined,
     invalidActionCount: sumLoopField("invalidActionCount") || undefined,
   };
 }
@@ -546,6 +547,7 @@ export function useCanvasChat(opts: {
   locale: string;
   chatHistory: ChatHistoryEntry[];
   prompt: string;
+  preparedSkillIds?: string[];
   mentionedCardIds: string[];
   imageOptimizationAdvice: boolean;
   t: TFunction;
@@ -562,6 +564,7 @@ export function useCanvasChat(opts: {
   setError: Dispatch<SetStateAction<string>>;
   setWorking: Dispatch<SetStateAction<WorkingState>>;
   setPrompt: Dispatch<SetStateAction<string>>;
+  setPreparedSkillIds?: Dispatch<SetStateAction<string[]>>;
   setMentionedCardIds: Dispatch<SetStateAction<string[]>>;
   pendingAttachments: PendingAttachment[];
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachment[]>>;
@@ -581,6 +584,7 @@ export function useCanvasChat(opts: {
     locale,
     chatHistory,
     prompt,
+    preparedSkillIds = [],
     mentionedCardIds,
     imageOptimizationAdvice,
     t,
@@ -595,6 +599,7 @@ export function useCanvasChat(opts: {
     setError,
     setWorking,
     setPrompt,
+    setPreparedSkillIds,
     setMentionedCardIds,
     pendingAttachments,
     setPendingAttachments,
@@ -628,9 +633,13 @@ export function useCanvasChat(opts: {
     prompt?: string;
     selectedCardId?: string;
     cards?: CanvasCard[];
+    selectedSkillIds?: string[];
   }) {
     if (abortRef.current) return;
     const promptText = (overrides?.prompt ?? prompt).trim();
+    const sentSelectedSkillIds = overrides
+      ? (overrides.selectedSkillIds ?? [])
+      : preparedSkillIds;
     const sentAttachments = pendingAttachments;
     if (!promptText && sentAttachments.length === 0) return;
     let canvasCards = overrides?.cards ?? cards;
@@ -643,6 +652,7 @@ export function useCanvasChat(opts: {
     onChatRunStart?.();
     cancelToolStatusClear();
     setPrompt("");
+    setPreparedSkillIds?.([]);
     setMentionedCardIds([]);
     setPendingAttachments([]);
     setError("");
@@ -1727,6 +1737,8 @@ export function useCanvasChat(opts: {
         canvas: snapshot,
         locale,
         options: { imageOptimizationAdvice },
+        selectedSkillIds:
+          sentSelectedSkillIds.length > 0 ? sentSelectedSkillIds : undefined,
         canvasImage,
         attachmentTokens:
           sentAttachments.length > 0

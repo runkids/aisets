@@ -37,6 +37,7 @@ All stack-specific rules and conventions live in `.skillshare/extras/rules/` and
 
 ### 2.1 Verification conventions
 
+- **Apply local agent workflow before AI harness edits.** Before changing AI Canvas, prompt, harness, or tool-execution code, read the repo instructions (`AGENTS.md`, this file, and relevant rule files), detect the active stack from manifests/configs, and use the documented devcontainer/Docker commands for verification. Keep the change surgical, define the expected tool sequence and UI/data result before testing, and commit only scoped English messages after the relevant checks pass.
 - **Devcontainer Go tests must use an executable temp directory.** The devcontainer mounts `/tmp` as tmpfs and it can behave like a noexec temp target for Go test binaries. When `go test` fails with `fork/exec /tmp/go-build... permission denied`, rerun inside the container with `GOTMPDIR=/workspace/tmp/go-tmp` and `GOCACHE=/workspace/tmp/go-cache` after creating those directories, instead of treating it as a code failure.
 
 ### 2.2 Captured AI Canvas conventions

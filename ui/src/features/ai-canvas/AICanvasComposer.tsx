@@ -1,6 +1,7 @@
 import {
   ArrowUp,
   AtSign,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -92,6 +93,7 @@ type AICanvasComposerProps = {
   mentionSelectedAsset: () => void;
   handleAttachImage: () => void;
   handleExtractText: () => void | Promise<void>;
+  handlePreparePhotoStaging: () => void;
   extractTextTargetCount: number;
   extractTextDisabled: boolean;
   commentMode: boolean;
@@ -150,6 +152,7 @@ export function AICanvasComposer({
   mentionSelectedAsset,
   handleAttachImage,
   handleExtractText,
+  handlePreparePhotoStaging,
   extractTextTargetCount,
   extractTextDisabled,
   commentMode,
@@ -780,6 +783,35 @@ export function AICanvasComposer({
                     {extractTextTargetCount > 0 && (
                       <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-g-mono text-[10px] text-white/50">
                         {extractTextTargetCount}
+                      </span>
+                    )}
+                  </DropdownMenuPrimitive.Item>
+                  <DropdownMenuPrimitive.Item
+                    disabled={mentionableImageCards.length === 0 || isWorking}
+                    title={
+                      mentionableImageCards.length === 0
+                        ? t("aiCanvas.photoStageDisabled")
+                        : undefined
+                    }
+                    onSelect={(event) => {
+                      if (mentionableImageCards.length === 0 || isWorking) {
+                        event.preventDefault();
+                        return;
+                      }
+                      handlePreparePhotoStaging();
+                      window.requestAnimationFrame(() => {
+                        promptInputRef.current?.focus();
+                      });
+                    }}
+                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
+                  >
+                    <Camera size={14} className="shrink-0 text-white/54" />
+                    <span className="min-w-0 flex-1">
+                      {t("aiCanvas.photoStage")}
+                    </span>
+                    {mentionableImageCards.length > 0 && (
+                      <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-g-mono text-[10px] text-white/50">
+                        {mentionableImageCards.length}
                       </span>
                     )}
                   </DropdownMenuPrimitive.Item>

@@ -205,12 +205,12 @@ func canvasToolParameters(name string) map[string]any {
 			"outputFormat": canvasStringEnumSchema("Output image format.", "webp", "avif", "png", "jpg"),
 		}))
 	case "mirror_image":
-		return canvasObjectSchema(nil, canvasAssetTargetProperties(map[string]any{
+		return canvasObjectSchema([]string{"assetIds"}, canvasAssetTargetProperties(map[string]any{
 			"flip":         canvasStringEnumSchema("Flip direction.", "horizontal", "vertical", "both"),
 			"outputFormat": canvasStringEnumSchema("Optional output image format.", "png", "jpg", "webp", "avif"),
 		}))
 	case "rotate_image":
-		return canvasObjectSchema(nil, canvasAssetTargetProperties(map[string]any{
+		return canvasObjectSchema([]string{"assetIds", "degrees"}, canvasAssetTargetProperties(map[string]any{
 			"degrees":      canvasIntegerEnumSchema("Clockwise rotation degrees.", 90, 180, 270),
 			"outputFormat": canvasStringEnumSchema("Optional output image format.", "png", "jpg", "webp", "avif"),
 		}))

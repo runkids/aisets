@@ -605,6 +605,51 @@ export function UploadContextMenu({
   );
 }
 
+export type VariantContextMenuProps = ImageCardContextMenuProps & {
+  card: VariantCanvasCard;
+};
+
+export function VariantContextMenu({
+  card,
+  onAddComment,
+  onDuplicate,
+  onDelete,
+}: VariantContextMenuProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">{card.sourceName}</div>
+        <div className="mt-0.5 truncate text-[11px] text-white/36">
+          {t("aiCanvas.cardKind.variant")}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      {onAddComment && (
+        <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
+          <MessageCircle size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.comment")}
+        </button>
+      )}
+      {onDuplicate && (
+        <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
+          <Copy size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.duplicateImage")}
+        </button>
+      )}
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
 export function SelectionContextMenu({
   count,
   onDelete,

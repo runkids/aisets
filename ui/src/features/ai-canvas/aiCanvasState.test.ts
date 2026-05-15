@@ -13,6 +13,7 @@ import {
   type AssetCanvasCard,
   type CommentCanvasCard,
   type UploadCanvasCard,
+  type VariantCanvasCard,
 } from "./aiCanvasState";
 
 function makeAsset(id: string): AssetItem {
@@ -64,6 +65,26 @@ function makeAssetCard(id: string): AssetCanvasCard {
     y: 20,
     createdAt: "2026-05-13T00:00:00.000Z",
     asset: makeAsset(id),
+  };
+}
+
+function makeVariantCard(id: string): VariantCanvasCard {
+  return {
+    id: `variant-${id}`,
+    kind: "variant",
+    x: 10,
+    y: 20,
+    createdAt: "2026-05-13T00:00:00.000Z",
+    sourceAssetId: `asset-${id}`,
+    sourceName: `${id}.png`,
+    previewUrl: `/assets/${id}-variant.png`,
+    token: `token-${id}`,
+    inputBytes: 1200,
+    outputBytes: 1200,
+    inputFormat: "png",
+    outputFormat: "png",
+    width: 100,
+    height: 100,
   };
 }
 
@@ -143,6 +164,7 @@ describe("normalizeAICanvasSession", () => {
             totalTokens: 120,
             tokensPerSecond: 12.34,
             toolCallCount: 1,
+            executedActionCount: 1,
           },
         },
       ],
@@ -162,6 +184,7 @@ describe("normalizeAICanvasSession", () => {
       totalTokens: 120,
       tokensPerSecond: 12.34,
       toolCallCount: 1,
+      executedActionCount: 1,
     });
   });
 });
@@ -307,6 +330,24 @@ describe("cardIdsForDeletion", () => {
     };
     expect([...cardIdsForDeletion([upload, comment], upload.id)]).toEqual([
       upload.id,
+      comment.id,
+    ]);
+  });
+
+  it("cascades comments when deleting a variant card", () => {
+    const variant = makeVariantCard("rotated");
+    const comment: CommentCanvasCard = {
+      id: "comment-v1",
+      kind: "comment",
+      x: 10,
+      y: 10,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      anchorId: variant.id,
+      text: "Variant annotation",
+      region: { x: 0.1, y: 0.1, width: 0.3, height: 0.3 },
+    };
+    expect([...cardIdsForDeletion([variant, comment], variant.id)]).toEqual([
+      variant.id,
       comment.id,
     ]);
   });

@@ -25,6 +25,7 @@ import {
   UploadCardBody,
   UploadContextMenu,
   VariantCardBody,
+  VariantContextMenu,
 } from "./canvasCards";
 import {
   CARD_WIDTH,
@@ -291,6 +292,18 @@ export function AICanvasStage({
               />
             ) : card.kind === "upload" ? (
               <UploadContextMenu
+                card={card}
+                onAddComment={() => {
+                  setSelectedCardIds([card.id]);
+                  setCommentMode(true);
+                }}
+                onDuplicate={() =>
+                  latestHandlersRef.current.onDuplicateCard(card)
+                }
+                onDelete={() => setDeleteConfirmCard(card)}
+              />
+            ) : card.kind === "variant" ? (
+              <VariantContextMenu
                 card={card}
                 onAddComment={() => {
                   setSelectedCardIds([card.id]);

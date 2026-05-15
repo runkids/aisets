@@ -112,6 +112,7 @@ type canvasChatOptions struct {
 	CanvasImageAttached     bool   `json:"-"`
 	AutoLocale              bool   `json:"-"`
 	CanvasStrategy          string `json:"-"`
+	PhotoStagingWorkflow    bool   `json:"-"`
 }
 
 type canvasChatRequest struct {
@@ -119,6 +120,7 @@ type canvasChatRequest struct {
 	Canvas           canvasSnapshot      `json:"canvas"`
 	Locale           string              `json:"locale"`
 	Options          canvasChatOptions   `json:"options"`
+	SelectedSkillIDs []string            `json:"selectedSkillIds,omitempty"`
 	CanvasImage      string              `json:"canvasImage,omitempty"`
 	AttachmentTokens []string            `json:"attachmentTokens,omitempty"`
 }
@@ -1141,7 +1143,7 @@ func canvasFollowupStatusMessage(reason string, latestUserMessage string, prepar
 		}
 		return "Converting the described plan into executable canvas tools."
 	case canvasLoopReasonCaptureOnlyWork:
-		return "Capture is complete; continuing with the requested canvas edit."
+		return "Capture was deferred until staging is complete; continuing with layout tools first."
 	case canvasLoopReasonOCRTextExtraction:
 		return "Text-bearing assets are on the canvas; extracting OCR before creating annotations."
 	case canvasLoopReasonOCRTextAnnotation:
@@ -1500,6 +1502,21 @@ Use native tool calls if available; otherwise use action blocks.
 Latest user request: %q
 
 Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+func canvasPhotoStagingAnswerSystemPrompt(locale string) string {
+	lang := strings.TrimSpace(locale)
+	if lang == "" {
+		lang = "the user's language"
+	}
+	return fmt.Sprintf(`You are completing a canvas photo-staging workflow after the layout and screenshot capture have already finished.
+Do not call tools, do not output JSON, and do not output action blocks.
+Reply only with concise natural-language staging concept and rationale in %s.
+Mention focal hierarchy, spacing, visual flow, editorial staging choices, and how the requested style direction influenced the composition.`, lang)
+}
+
+func canvasPhotoStagingFallbackAnswerText() string {
+	return "Completed the staged layout and screenshot. The composition uses focal hierarchy, spacing, layering, and deliberate scale or transform choices to support the requested style."
 }
 
 const (
@@ -1923,7 +1940,7 @@ func canvasCreatedCommentsAnswerText(texts []string, locale string) string {
 	return fmt.Sprintf("Added %d comments.", count)
 }
 
-func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas canvasSnapshot, actions []canvasAction, toolResults []canvasCompactToolResult, completedTools []string, previousAssistantText string) string {
+func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas canvasSnapshot, actions []canvasAction, toolResults []canvasCompactToolResult, completedTools []string, previousAssistantText string, photoStagingWorkflow bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Original User Request\n%s\n\n", latestUserMessage)
 	fmt.Fprintf(&b, "## Loop Reason\n%s\n\n", reason)
@@ -1932,9 +1949,17 @@ func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas c
 	if canvasCompletedToolsContain(completedTools, "duplicate_cards") {
 		cards = compactCanvasCards(canvas.Cards, 12)
 	}
+	if photoStagingWorkflow {
+		cards = compactCanvasPhotoStagingCards(canvasVisibleImageCards(canvas, 40), 40)
+	}
 	if len(cards) > 0 {
 		cardJSON, _ := json.Marshal(cards)
 		fmt.Fprintf(&b, "## Relevant Canvas Cards\n%s\n\n", string(cardJSON))
+	}
+	if photoStagingWorkflow {
+		if ids := canvasVisibleImageCardIDs(canvas); len(ids) > 0 {
+			fmt.Fprintf(&b, "## Photo Staging Target Image Cards\n%s\n\n", strings.Join(ids, ", "))
+		}
 	}
 	if len(completedTools) > 0 {
 		completedJSON, _ := json.Marshal(completedTools)
@@ -1953,14 +1978,37 @@ func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas c
 			fmt.Fprintf(&b, "## Missing OCR Text Annotation Targets\n%s\n\n", string(targetJSON))
 		}
 	}
+	if photoStagingWorkflow && !(reason == canvasLoopReasonToolResults && canvasPhotoStagingCaptureCompleted(completedTools)) {
+		b.WriteString("## Photo Staging Creative Contract\n")
+		b.WriteString(canvasPhotoStagingCreativeContract())
+		b.WriteString("\n\n")
+	}
 
 	b.WriteString("## Required Follow-up\n")
 	if canvasToolResultsNeedUserConfirmation(toolResults) {
 		b.WriteString("The latest search result is marked needsUserConfirmation=true. Do not call add_assets_to_canvas, arrange_cards, or any other canvas mutation. Answer in chat that no suitable direct match was found, mention that candidate previews are shown for review, and ask the user to confirm which candidate should be added.")
 		return b.String()
 	}
+	if reason == canvasLoopReasonToolResults && photoStagingWorkflow && canvasPhotoStagingCaptureCompleted(completedTools) {
+		b.WriteString("The photo staging layout and screenshot capture are complete. Do not call more tools. Reply in the user's language with a concise staging concept and rationale. Mention the focal hierarchy, spacing, visual flow, editorial staging choices, and how any requested style direction influenced the composition.")
+		return b.String()
+	}
 	b.WriteString(canvasFollowupInstruction(reason, latestUserMessage))
 	return b.String()
+}
+
+func canvasPhotoStagingCreativeContract() string {
+	return strings.Join([]string{
+		"You are acting as a professional photographer and art director, not a grid-layout assistant.",
+		"Preserve the user's requested style direction from the Original User Request across every loop.",
+		"Create an editorial composition with a clear hero/focal hierarchy, supporting clusters, intentional negative space, staggered rhythm, and readable visual flow.",
+		"Do not default to a rigid equal-size grid, perfectly even rows, or purely mechanical distribution unless the user explicitly asks for a grid.",
+		"Aesthetic staging matters more than demonstrating every available tool.",
+		"Use resizing, placement, and z-index to create depth and story: one or more hero images can be larger, supporting images can be grouped by theme, and small props can form foreground/background accents.",
+		"Use resize_card for displayed card scale and arrange_cards for the actual composition. Use mirror_image or rotate_image only for a small number of deliberate PNG variants when a transformed image improves the staged composition, direction, or cover-like rhythm. Do not rotate, mirror, duplicate, or transform images merely because the tools are available.",
+		"Use bring_cards_to_front to control foreground/hero layers intentionally. Do not rely on accidental overlap or insertion order for important objects.",
+		"Capture only after real layout work covers all visible image cards and the staged layout expresses the requested style, not merely after all cards have non-overlapping positions.",
+	}, " ")
 }
 
 func canvasToolResultsNeedUserConfirmation(results []canvasCompactToolResult) bool {
@@ -2122,6 +2170,36 @@ func canvasPromptRelevantCards(canvas canvasSnapshot, latestUserMessage string, 
 	return out
 }
 
+func canvasVisibleImageCardIDs(canvas canvasSnapshot) []string {
+	cards := canvasVisibleImageCards(canvas, 0)
+	ids := make([]string, 0, len(cards))
+	for _, card := range cards {
+		if card.ID != "" {
+			ids = append(ids, card.ID)
+		}
+	}
+	return ids
+}
+
+func canvasVisibleImageCards(canvas canvasSnapshot, limit int) []canvasCardSnapshot {
+	cards := make([]canvasCardSnapshot, 0, len(canvas.Cards))
+	seen := map[string]bool{}
+	for _, card := range canvas.Cards {
+		if card.ID == "" || seen[card.ID] {
+			continue
+		}
+		switch card.Kind {
+		case "asset", "upload", "variant":
+			seen[card.ID] = true
+			cards = append(cards, card)
+			if limit > 0 && len(cards) >= limit {
+				return cards
+			}
+		}
+	}
+	return cards
+}
+
 func compactCanvasCards(cards []canvasCardSnapshot, limit int) []map[string]any {
 	if limit <= 0 || limit > len(cards) {
 		limit = len(cards)
@@ -2129,6 +2207,107 @@ func compactCanvasCards(cards []canvasCardSnapshot, limit int) []map[string]any 
 	out := make([]map[string]any, 0, limit)
 	for _, card := range cards[:limit] {
 		out = append(out, compactCanvasCard(card))
+	}
+	return out
+}
+
+func compactCanvasPhotoStagingCards(cards []canvasCardSnapshot, limit int) []map[string]any {
+	if limit <= 0 || limit > len(cards) {
+		limit = len(cards)
+	}
+	out := make([]map[string]any, 0, limit)
+	for _, card := range cards[:limit] {
+		out = append(out, compactCanvasPhotoStagingCard(card))
+	}
+	return out
+}
+
+func compactCanvasPhotoStagingCard(card canvasCardSnapshot) map[string]any {
+	width := card.Width
+	if width <= 0 {
+		width = 320
+	}
+	height := card.Height
+	if height <= 0 {
+		height = 240
+	}
+	out := map[string]any{
+		"cardId": card.ID,
+		"kind":   card.Kind,
+		"x":      card.X,
+		"y":      card.Y,
+		"width":  width,
+		"height": height,
+		"layer":  card.LayerIndex,
+	}
+	if card.Asset != nil {
+		asset := card.Asset
+		imageFormat := asset.ImageFormat
+		if imageFormat == "" {
+			imageFormat = strings.TrimPrefix(strings.ToLower(asset.Ext), ".")
+		}
+		out["assetId"] = asset.ID
+		out["fileName"] = truncate(canvasAssetFileName(asset.FileName, asset.RepoPath), 80)
+		if imageFormat != "" {
+			out["format"] = imageFormat
+		}
+		if tags := compactCanvasStringList(firstNonEmptyStringList(asset.SearchTags, asset.Tags), 4); len(tags) > 0 {
+			out["tags"] = tags
+		}
+		if desc := firstNonEmptyString(asset.SearchDescription, asset.Description); desc != "" {
+			out["desc"] = truncate(desc, 60)
+		}
+		if len(asset.SearchLanguages) > 0 {
+			out["languages"] = compactCanvasStringList(asset.SearchLanguages, 3)
+		}
+		if asset.OcrText != "" {
+			out["ocr"] = truncate(asset.OcrText, 60)
+		}
+	}
+	if card.Kind == "variant" {
+		out["sourceAssetId"] = card.SourceAssetID
+		out["sourceName"] = card.SourceName
+		out["inputFormat"] = card.InputFormat
+		out["outputFormat"] = card.OutputFormat
+	}
+	if card.Kind == "upload" {
+		out["uploadToken"] = card.UploadToken
+		out["fileName"] = card.UploadFileName
+		out["uploadWidth"] = card.UploadWidth
+		out["uploadHeight"] = card.UploadHeight
+	}
+	return out
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyStringList(values ...[]string) []string {
+	for _, value := range values {
+		if len(value) > 0 {
+			return value
+		}
+	}
+	return nil
+}
+
+func compactCanvasStringList(values []string, limit int) []string {
+	if limit <= 0 || limit > len(values) {
+		limit = len(values)
+	}
+	out := make([]string, 0, limit)
+	for _, value := range values[:limit] {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
 	}
 	return out
 }
@@ -2254,6 +2433,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	var b strings.Builder
 	latestUserMessage := latestCanvasUserMessage(messages)
 	promptCards := canvasPromptRelevantCards(canvas, latestUserMessage, 10)
+	if options.PhotoStagingWorkflow {
+		promptCards = canvasVisibleImageCards(canvas, 40)
+	}
 
 	b.WriteString("## Canvas State\n")
 	selectedVisualCount := 0
@@ -2311,6 +2493,14 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	}
 	fmt.Fprintf(&b, "Total cards: %d\n", len(canvas.Cards))
 	fmt.Fprintf(&b, "Viewport: pan=(%.0f,%.0f) scale=%.2f\n\n", canvas.Viewport.X, canvas.Viewport.Y, canvas.Viewport.Scale)
+	if options.PhotoStagingWorkflow {
+		if ids := canvasVisibleImageCardIDs(canvas); len(ids) > 0 {
+			fmt.Fprintf(&b, "Photo staging target image cards (%d): %s\n", len(ids), strings.Join(ids, ", "))
+			b.WriteString("For photo staging, all visible image cards above are in scope unless the user explicitly narrows the request. Any arrange_cards, align_cards, distribute_cards, or selected staging plan must include every listed image card before capture.\n")
+			b.WriteString("Act as a professional photographer and art director, not a grid-layout assistant. Preserve the requested style direction across every loop.\n")
+			b.WriteString("Use resize_card and arrange_cards to create the actual composition. Use bring_cards_to_front for z-index/front layering when it improves depth. Use mirror_image or rotate_image only for a small number of images when a transformed PNG variant improves the story or composition; do not use transforms merely to show capability. Avoid a rigid equal-size grid unless the user asks for one.\n\n")
+		}
+	}
 
 	hasBounds := false
 	var minX, minY, maxX, maxY float64
@@ -2342,61 +2532,70 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 		}
 	}
 
-	for _, card := range promptCards {
-		fmt.Fprintf(&b, "- [%s] id=%s pos=(%.0f,%.0f)", card.Kind, card.ID, card.X, card.Y)
-		if card.Width > 0 && card.Height > 0 {
-			fmt.Fprintf(&b, " size=%.0fx%.0f", card.Width, card.Height)
-		} else if card.Width > 0 {
-			fmt.Fprintf(&b, " width=%.0f", card.Width)
-		}
-		fmt.Fprintf(&b, " layer=%d", card.LayerIndex)
-		if card.Asset != nil {
-			a := card.Asset
-			fmt.Fprintf(&b, " path=%s ext=%s %dx%d %dB", a.RepoPath, a.Ext, a.Width, a.Height, a.Bytes)
-			if len(a.Tags) > 0 {
-				fmt.Fprintf(&b, " tags=[%s]", strings.Join(a.Tags, ","))
-			}
-			if a.Description != "" {
-				fmt.Fprintf(&b, " desc=%q", truncate(a.Description, 200))
-			}
-			if searchText := canvasAssetSearchText(a); searchText != "" {
-				fmt.Fprintf(&b, " search=%q", truncate(searchText, 240))
-			}
-			if a.OcrText != "" {
-				fmt.Fprintf(&b, " ocr=%q", truncate(a.OcrText, 200))
-			}
-			fmt.Fprintf(&b, " usedBy=%d", a.UsedByCount)
-		}
-		if card.Kind == "comment" {
-			fmt.Fprintf(&b, " anchor=%s text=%q", card.AnchorID, truncate(card.Text, 200))
-			if card.Region != nil {
-				fmt.Fprintf(&b, " region=(%.2f,%.2f,%.2f,%.2f)", card.Region.X, card.Region.Y, card.Region.Width, card.Region.Height)
-			}
-		}
-		if card.Kind == "variant" {
-			fmt.Fprintf(&b, " sourceAssetId=%s sourceName=%s %s→%s %dB→%dB", card.SourceAssetID, card.SourceName, card.InputFormat, card.OutputFormat, card.InputBytes, card.OutputBytes)
-		}
-		if card.Kind == "proposal" {
-			fmt.Fprintf(&b, " tool=%s status=%s", card.Tool, card.ProposalStatus)
-		}
-		if card.Kind == "upload" {
-			fmt.Fprintf(&b, " file=%s %dx%d", card.UploadFileName, card.UploadWidth, card.UploadHeight)
-		}
-		b.WriteByte('\n')
-	}
-	if omitted := len(canvas.Cards) - len(promptCards); omitted > 0 {
-		fmt.Fprintf(&b, "- %d less relevant cards omitted from this prompt to keep the model context short.\n", omitted)
-	}
 	if len(promptCards) > 0 {
-		cardJSON, _ := json.Marshal(compactCanvasCards(promptCards, len(promptCards)))
-		fmt.Fprintf(&b, "\n## AI-Readable Canvas Cards JSON\n%s\n", string(cardJSON))
+		if options.PhotoStagingWorkflow {
+			cardJSON, _ := json.Marshal(compactCanvasPhotoStagingCards(promptCards, len(promptCards)))
+			fmt.Fprintf(&b, "## Photo Staging Cards JSON\n%s\n", string(cardJSON))
+		} else {
+			for _, card := range promptCards {
+				fmt.Fprintf(&b, "- [%s] id=%s pos=(%.0f,%.0f)", card.Kind, card.ID, card.X, card.Y)
+				if card.Width > 0 && card.Height > 0 {
+					fmt.Fprintf(&b, " size=%.0fx%.0f", card.Width, card.Height)
+				} else if card.Width > 0 {
+					fmt.Fprintf(&b, " width=%.0f", card.Width)
+				}
+				fmt.Fprintf(&b, " layer=%d", card.LayerIndex)
+				if card.Asset != nil {
+					a := card.Asset
+					fmt.Fprintf(&b, " path=%s ext=%s %dx%d %dB", a.RepoPath, a.Ext, a.Width, a.Height, a.Bytes)
+					if len(a.Tags) > 0 {
+						fmt.Fprintf(&b, " tags=[%s]", strings.Join(a.Tags, ","))
+					}
+					if a.Description != "" {
+						fmt.Fprintf(&b, " desc=%q", truncate(a.Description, 200))
+					}
+					if searchText := canvasAssetSearchText(a); searchText != "" {
+						fmt.Fprintf(&b, " search=%q", truncate(searchText, 240))
+					}
+					if a.OcrText != "" {
+						fmt.Fprintf(&b, " ocr=%q", truncate(a.OcrText, 200))
+					}
+					fmt.Fprintf(&b, " usedBy=%d", a.UsedByCount)
+				}
+				if card.Kind == "comment" {
+					fmt.Fprintf(&b, " anchor=%s text=%q", card.AnchorID, truncate(card.Text, 200))
+					if card.Region != nil {
+						fmt.Fprintf(&b, " region=(%.2f,%.2f,%.2f,%.2f)", card.Region.X, card.Region.Y, card.Region.Width, card.Region.Height)
+					}
+				}
+				if card.Kind == "variant" {
+					fmt.Fprintf(&b, " sourceAssetId=%s sourceName=%s %s→%s %dB→%dB", card.SourceAssetID, card.SourceName, card.InputFormat, card.OutputFormat, card.InputBytes, card.OutputBytes)
+				}
+				if card.Kind == "proposal" {
+					fmt.Fprintf(&b, " tool=%s status=%s", card.Tool, card.ProposalStatus)
+				}
+				if card.Kind == "upload" {
+					fmt.Fprintf(&b, " file=%s %dx%d", card.UploadFileName, card.UploadWidth, card.UploadHeight)
+				}
+				b.WriteByte('\n')
+			}
+			if omitted := len(canvas.Cards) - len(promptCards); omitted > 0 {
+				fmt.Fprintf(&b, "- %d less relevant cards omitted from this prompt to keep the model context short.\n", omitted)
+			}
+			cardJSON, _ := json.Marshal(compactCanvasCards(promptCards, len(promptCards)))
+			fmt.Fprintf(&b, "\n## AI-Readable Canvas Cards JSON\n%s\n", string(cardJSON))
+		}
 	}
 
 	b.WriteString("\n## Layout Facts\n")
 	if options.CanvasImageAttached {
 		b.WriteString("- A hidden AI-only screenshot of the current canvas is attached. Use it to judge visual overlap, spacing, scale, and composition before arranging cards.\n")
 	}
-	b.WriteString("- Asset JSON includes visual.url and visual.thumbnailUrl references for the actual image; use those references or the attached canvas screenshot when visual details matter.\n")
+	if options.PhotoStagingWorkflow {
+		b.WriteString("- Photo staging card JSON is compact for local LLMs; use card IDs, dimensions, layer, filenames, tags, OCR text, and the attached screenshot for visual details.\n")
+	} else {
+		b.WriteString("- Asset JSON includes visual.url and visual.thumbnailUrl references for the actual image; use those references or the attached canvas screenshot when visual details matter.\n")
+	}
 	if hasBounds {
 		fmt.Fprintf(&b, "- Current card cluster bounds: x=%.0f y=%.0f width=%.0f height=%.0f.\n", minX, minY, maxX-minX, maxY-minY)
 	}
@@ -2404,7 +2603,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	b.WriteString("- Card positions are top-left canvas coordinates. Use each card's size when spacing items; do not assume all cards are 320px wide.\n")
 	b.WriteString("- Coordinate scale: 100px is a small nudge, 200-350px is a nearby move, 600px+ is a large jump. Directional requests like right/left/up/down usually mean a nearby relative move, not a jump across the board.\n")
 	b.WriteString("- To place one card beside another, use target.x + target.width + 80-160px for the next x coordinate. Keep y close unless the user asks for a diagonal or new row.\n")
-	b.WriteString("- Higher layer values render later/on top. arrange_cards and move_card only change x/y, not z-index, so avoid overlap instead of relying on stacking.\n")
+	b.WriteString("- Higher layer values render later/on top. arrange_cards and move_card only change x/y; use bring_cards_to_front when z-index/front layering matters.\n")
 	b.WriteString("- resize_card changes only the visual displayed card width. Use it to make a hero image larger or supporting images smaller before arranging.\n")
 	b.WriteString("- For a spread-out layout, leave at least 160px horizontal and 120px vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
 	b.WriteString("- For 8+ cards, spread them across a broad board (roughly 1600-2400px wide, multiple rows/columns). Avoid piling every card near the center or around one hero image.\n")
@@ -2414,7 +2613,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	}
 
 	b.WriteString("\n## Assistant Options\n")
-	if options.ImageOptimizationAdvice {
+	if options.PhotoStagingWorkflow {
+		b.WriteString("- Photo staging is ON. Image optimization advice is still separate. mirror_image and rotate_image are optional art-direction tools for a small number of images when a transformed PNG variant improves the staged composition, direction, or cover-like rhythm; do not use them merely to show capability.\n")
+	} else if options.ImageOptimizationAdvice {
 		b.WriteString("- Image optimization advice is ON. Proactively inspect selected or visible image assets for web delivery opportunities using format, dimensions, byte size, transparency/animation hints, and visual content. When useful, call image variant tools such as compress_image, resize_image, or convert_image; they generate new preview images and preserve source files.\n")
 	} else {
 		b.WriteString("- Image optimization advice is OFF. Do not proactively call compression, resizing, format conversion, mirroring, or rotation tools unless the user's latest request explicitly asks for that image operation.\n")
@@ -2561,6 +2762,7 @@ func canvasNativeInitialToolNames() map[string]bool {
 		"move_card":             true,
 		"arrange_cards":         true,
 		"bring_cards_to_front":  true,
+		"inspect_canvas":        true,
 		"duplicate_cards":       true,
 		"remove_cards":          true,
 		"extract_ocr_text":      true,
@@ -2568,6 +2770,7 @@ func canvasNativeInitialToolNames() map[string]bool {
 		"update_comment":        true,
 		"delete_comment":        true,
 		"capture_viewport":      true,
+		"capture_canvas":        true,
 		"capture_selected":      true,
 		"compare_assets":        true,
 		"find_similar_assets":   true,
@@ -3392,6 +3595,178 @@ func canvasToolIsCapture(tool string) bool {
 	}
 }
 
+func canvasPhotoStagingWorkflowRequested(latestUserMessage string, explicitSelectedSkillIDs []string, selectedSkillIDs []string) bool {
+	if canvasStringListContains(explicitSelectedSkillIDs, canvasSkillPhotoStaging) {
+		return true
+	}
+	if !canvasStringListContains(selectedSkillIDs, canvasSkillPhotoStaging) {
+		return false
+	}
+	return containsAnyText(latestUserMessage,
+		"professional photographer",
+		"art director",
+		"photo shoot",
+		"photoshoot",
+		"photo staging",
+		"stage photos",
+		"stage all visible image cards",
+		"staged canvas screenshot",
+		"beautify",
+		"make beautiful",
+		"portfolio shot",
+		"hero shot",
+		"editorial composition",
+	)
+}
+
+func canvasPhotoStagingWorkTool(tool string) bool {
+	switch tool {
+	case "resize_card", "move_card", "arrange_cards", "align_cards", "distribute_cards", "bring_cards_to_front", "mirror_image", "rotate_image":
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasPhotoStagingLayoutTool(tool string) bool {
+	switch tool {
+	case "resize_card", "move_card", "arrange_cards", "align_cards", "distribute_cards":
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasPhotoStagingWorkCompleted(executed map[string]bool) bool {
+	for _, tool := range []string{"resize_card", "move_card", "arrange_cards", "align_cards", "distribute_cards"} {
+		if executed[tool] {
+			return true
+		}
+	}
+	return false
+}
+
+func canvasPhotoStagingActionCardIDs(act canvasAction) []string {
+	addUnique := func(ids []string, value string) []string {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return ids
+		}
+		for _, id := range ids {
+			if id == value {
+				return ids
+			}
+		}
+		return append(ids, value)
+	}
+	switch act.Tool {
+	case "resize_card", "move_card":
+		var ids []string
+		return addUnique(ids, fmt.Sprint(act.Params["cardId"]))
+	case "arrange_cards":
+		positions, ok := act.Params["positions"].([]any)
+		if !ok {
+			return nil
+		}
+		ids := make([]string, 0, len(positions))
+		for _, raw := range positions {
+			pos, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			ids = addUnique(ids, fmt.Sprint(pos["cardId"]))
+		}
+		return ids
+	case "align_cards", "distribute_cards", "bring_cards_to_front":
+		return canvasActionCardIDs(act)
+	default:
+		return nil
+	}
+}
+
+func canvasPhotoStagingMissingTargetIDs(act canvasAction, canvas canvasSnapshot) []string {
+	switch act.Tool {
+	case "arrange_cards", "align_cards", "distribute_cards":
+	default:
+		return nil
+	}
+	required := canvasVisibleImageCardIDs(canvas)
+	if len(required) == 0 {
+		return nil
+	}
+	covered := map[string]bool{}
+	for _, id := range canvasPhotoStagingActionCardIDs(act) {
+		covered[id] = true
+	}
+	var missing []string
+	for _, id := range required {
+		if !covered[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
+
+func canvasPhotoStagingAllVisibleImagesCovered(canvas canvasSnapshot, covered map[string]bool) bool {
+	required := canvasVisibleImageCardIDs(canvas)
+	if len(required) == 0 {
+		return true
+	}
+	for _, id := range required {
+		if !covered[id] {
+			return false
+		}
+	}
+	return true
+}
+
+func canvasPhotoStagingMissingCoveredIDs(canvas canvasSnapshot, covered map[string]bool) []string {
+	var missing []string
+	for _, id := range canvasVisibleImageCardIDs(canvas) {
+		if !covered[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
+
+func canvasPhotoStagingMissingReason(missing []string) string {
+	if len(missing) == 0 {
+		return "photo staging must include every visible image card before capture"
+	}
+	limit := min(len(missing), 12)
+	suffix := ""
+	if len(missing) > limit {
+		suffix = fmt.Sprintf(" (+%d more)", len(missing)-limit)
+	}
+	return fmt.Sprintf("photo staging must include every visible image card before capture; missing cardIds: %s%s", strings.Join(missing[:limit], ", "), suffix)
+}
+
+func reorderCanvasPhotoStagingCaptureActions(actions []canvasAction, enabled bool) []canvasAction {
+	if !enabled || len(actions) < 2 {
+		return actions
+	}
+	nonCapture := make([]canvasAction, 0, len(actions))
+	capture := make([]canvasAction, 0, len(actions))
+	for _, act := range actions {
+		if canvasToolIsCapture(act.Tool) {
+			capture = append(capture, act)
+		} else {
+			nonCapture = append(nonCapture, act)
+		}
+	}
+	if len(capture) == 0 || len(nonCapture) == 0 {
+		return actions
+	}
+	return append(nonCapture, capture...)
+}
+
+func canvasPhotoStagingCaptureCompleted(completedTools []string) bool {
+	return canvasStringListContains(completedTools, "capture_canvas") ||
+		canvasStringListContains(completedTools, "capture_viewport") ||
+		canvasStringListContains(completedTools, "capture_selected")
+}
+
 func canvasCaptureRequested(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
 		"capture", "screenshot", "photo", "picture", "export", "download",
@@ -3613,16 +3988,25 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	req.Options.AutoLocale = settings.LLMAutoLocale
 	req.Options.CanvasStrategy = s.canvasStrategyPrompt()
 	latestUserMessage := latestCanvasUserMessage(req.Messages)
-	selectedSkillIDs := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
-		Message: latestUserMessage,
-		Canvas:  req.Canvas,
-		Options: req.Options,
-	})
-	if canvasLatestUserLanguage(latestUserMessage, locale) != "" {
-		selectedSkillIDs = canvasAllSkillIDs()
+	explicitSelectedSkillIDs := normalizeCanvasSelectedSkillIDs(req.SelectedSkillIDs)
+	selectedSkillIDs := explicitSelectedSkillIDs
+	if len(selectedSkillIDs) == 0 {
+		selectedSkillIDs = classifyCanvasSkillFamilies(canvasSkillClassifyInput{
+			Message: latestUserMessage,
+			Canvas:  req.Canvas,
+			Options: req.Options,
+		})
+		if canvasLatestUserLanguage(latestUserMessage, locale) != "" {
+			selectedSkillIDs = canvasAllSkillIDs()
+		}
 	}
+	photoStagingWorkflow := canvasPhotoStagingWorkflowRequested(latestUserMessage, explicitSelectedSkillIDs, selectedSkillIDs)
+	req.Options.PhotoStagingWorkflow = photoStagingWorkflow
 	canvasTools := canvasLLMToolsForSkills(selectedSkillIDs)
 	usingNativeTools := canvasNativeToolsEnabled(backend, canvasTools)
+	if photoStagingWorkflow && backend == agent.BackendLocalLLM {
+		usingNativeTools = false
+	}
 	systemPrompt := canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 	if usingNativeTools {
 		canvasTools = canvasNativeLLMToolsForSkills(selectedSkillIDs)
@@ -3743,8 +4127,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	const maxToolLoops = 5
 	currentPrompt := userPrompt
 	proposalIndex := 0
-	captureRequested := canvasCaptureRequested(latestUserMessage)
+	captureRequested := canvasCaptureRequested(latestUserMessage) || photoStagingWorkflow
 	executedCaptureTools := map[string]bool{}
+	photoStagingCoveredCardIDs := map[string]bool{}
 	var totalInputTokens, totalOutputTokens int64
 	start := time.Now()
 
@@ -3794,17 +4179,24 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for loop := 0; loop < maxToolLoops; loop++ {
+		photoStagingAnswerOnlyAfterCapture := photoStagingWorkflow && canvasPhotoStagingCaptureCompleted(executedCanvasToolSequence)
 		roundTools := canvasTools
 		roundToolChoice := ""
+		roundSystemPrompt := systemPrompt
 		if usingNativeTools {
 			roundTools = canvasNativeToolsForRound(canvasTools, loopReason)
 			roundToolChoice = canvasNativeToolChoice(roundTools, loopReason)
+		}
+		if photoStagingAnswerOnlyAfterCapture {
+			roundTools = nil
+			roundToolChoice = ""
+			roundSystemPrompt = canvasPhotoStagingAnswerSystemPrompt(locale)
 		}
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
 			Images:           images,
 			Backend:          backend,
 			ModelName:        modelName,
-			SystemPrompt:     systemPrompt,
+			SystemPrompt:     roundSystemPrompt,
 			Prompt:           currentPrompt,
 			Purpose:          "canvas",
 			TimeoutSec:       canvasOutputTokenLimit,
@@ -3863,13 +4255,28 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		} else if fallbackActionCount > 0 {
 			toolUseSource = "fallback_parse"
 		}
+		if photoStagingAnswerOnlyAfterCapture {
+			if strings.TrimSpace(textBody) == "" && len(actions) > 0 {
+				textBody = canvasPhotoStagingFallbackAnswerText()
+			}
+			actions = nil
+			toolCallActions = nil
+			fallbackActionCount = 0
+			toolUseSource = ""
+		}
 		loopStats[statIndex].ToolUseSource = toolUseSource
 		loopStats[statIndex].NativeToolCallCount = len(toolCallActions)
 		loopStats[statIndex].FallbackActionCount = fallbackActionCount
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
+		if photoStagingAnswerOnlyAfterCapture {
+			truncatedAction = false
+		}
 		var invalidActionIssues []canvasActionValidationIssue
 		actions, invalidActionIssues = normalizeCanvasActions(actions, false)
-		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(toolCallActions) == 0 && strings.TrimSpace(content) == "" {
+		if photoStagingAnswerOnlyAfterCapture {
+			invalidActionIssues = nil
+		}
+		if !photoStagingAnswerOnlyAfterCapture && usingNativeTools && len(chatResp.ToolCalls) > 0 && len(toolCallActions) == 0 && strings.TrimSpace(content) == "" {
 			for _, call := range chatResp.ToolCalls {
 				invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
 					Tool:   call.Name,
@@ -3891,9 +4298,10 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		actions, blockedIncompleteTextActionCount = filterCanvasIncompleteTextAnnotationActions(actions, loopReason, textAnnotationRepairPending)
 		var blockedOCRTextAnnotationActionCount int
 		actions, blockedOCRTextAnnotationActionCount = filterCanvasOCRTextAnnotationActions(actions, loopReason)
+		actions = reorderCanvasPhotoStagingCaptureActions(actions, photoStagingWorkflow)
 		invalidActionIssues = append(invalidActionIssues, postExpansionIssues...)
 		invalidActionIssues = append(invalidActionIssues, missingVisualCueIssues...)
-		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(actions) == 0 && strings.TrimSpace(content) == "" {
+		if !photoStagingAnswerOnlyAfterCapture && usingNativeTools && len(chatResp.ToolCalls) > 0 && len(actions) == 0 && strings.TrimSpace(content) == "" {
 			invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
 				Tool:   "native_tool_call",
 				Reason: "native tool calls did not produce executable canvas actions: " + strings.Join(canvasActionToolNames(toolCallActions), ", "),
@@ -3910,7 +4318,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		missingCapture := captureRequested && len(executedCaptureTools) == 0 && !hasCaptureAction && loop < maxToolLoops-1
+		missingCapture := false
 
 		var compactToolResults []canvasCompactToolResult
 		captureExecutedThisLoop := false
@@ -3927,6 +4335,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		ocrTextAnnotationNeededThisLoop := false
 		blockedGenericTextRegionCount := 0
 		var executedCommentResults []canvasCompactToolResult
+		captureBeforeStagingWork := false
+		photoStagingCoverageRepairPending := false
+		photoStagingDeferredWorkForInvalidLoop := false
 		for _, issue := range invalidActionIssues {
 			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
 		}
@@ -3983,6 +4394,49 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				executedCanvasTextRegionKeys[key] = true
+			}
+			if photoStagingWorkflow && len(invalidActionIssues) > 0 && (canvasPhotoStagingWorkTool(act.Tool) || canvasToolIsCapture(act.Tool)) {
+				if !photoStagingDeferredWorkForInvalidLoop {
+					photoStagingDeferredWorkForInvalidLoop = true
+					issue := canvasActionValidationIssue{
+						Tool:   act.Tool,
+						Reason: "photo staging deferred layout and capture because this loop contains invalid tool calls; repair invalid arguments and return one clean final layout before capture",
+					}
+					invalidActionIssues = append(invalidActionIssues, issue)
+					compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
+				}
+				continue
+			}
+			if photoStagingWorkflow && canvasPhotoStagingWorkTool(act.Tool) {
+				if missing := canvasPhotoStagingMissingTargetIDs(act, projectedCanvas); len(missing) > 0 {
+					photoStagingCoverageRepairPending = true
+					issue := canvasActionValidationIssue{
+						Tool:   act.Tool,
+						Reason: canvasPhotoStagingMissingReason(missing),
+					}
+					invalidActionIssues = append(invalidActionIssues, issue)
+					compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
+					continue
+				}
+			}
+			if photoStagingWorkflow && canvasToolIsCapture(act.Tool) {
+				reason := ""
+				if len(invalidActionIssues) > 0 || photoStagingCoverageRepairPending {
+					reason = "photo staging capture is deferred because earlier staging tool calls in this loop are invalid or incomplete; repair the invalid arguments and finish the layout before capture"
+				} else if !canvasPhotoStagingWorkCompleted(executedCanvasTools) ||
+					!canvasPhotoStagingAllVisibleImagesCovered(projectedCanvas, photoStagingCoveredCardIDs) {
+					reason = canvasPhotoStagingMissingReason(canvasPhotoStagingMissingCoveredIDs(projectedCanvas, photoStagingCoveredCardIDs))
+				}
+				if reason != "" {
+					captureBeforeStagingWork = true
+					issue := canvasActionValidationIssue{
+						Tool:   act.Tool,
+						Reason: reason,
+					}
+					invalidActionIssues = append(invalidActionIssues, issue)
+					compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
+					continue
+				}
 			}
 			if status := canvasActionStatusMessage(act); status != "" {
 				sendNDJSON(w, map[string]any{
@@ -4064,6 +4518,11 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				if canvasToolIsConcreteCanvasWork(act.Tool) {
 					concreteCanvasActionSeen = true
 				}
+				if canvasPhotoStagingLayoutTool(act.Tool) {
+					for _, id := range canvasPhotoStagingActionCardIDs(act) {
+						photoStagingCoveredCardIDs[id] = true
+					}
+				}
 				if act.Tool != "extract_ocr_text" {
 					if !canvasToolIsCapture(act.Tool) {
 						nonCaptureToolExecutedThisLoop = true
@@ -4102,6 +4561,11 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				if canvasToolIsConcreteCanvasWork(act.Tool) {
 					concreteCanvasActionSeen = true
 				}
+				if canvasPhotoStagingLayoutTool(act.Tool) {
+					for _, id := range canvasPhotoStagingActionCardIDs(act) {
+						photoStagingCoveredCardIDs[id] = true
+					}
+				}
 				nonCaptureToolExecutedThisLoop = true
 			}
 			time.Sleep(150 * time.Millisecond)
@@ -4111,6 +4575,8 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		loopStats[statIndex].ProposalCount = proposalCount
 		loopStats[statIndex].BlockedProposalCount = blockedProposalCount
 		loopStats[statIndex].BlockedCommentCount = blockedCommentCount
+		loopStats[statIndex].InvalidActionCount = len(invalidActionIssues)
+		loopStats[statIndex].InvalidActionIssues = invalidActionIssues
 
 		requiredNativeToolCallMissing := canvasRequiredNativeToolCallMissing(usingNativeTools, roundToolChoice, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
 		actionBlockTextNeedsRepair := canvasActionBlockTextNeedsActionRepair(usingNativeTools, loopReason, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
@@ -4146,13 +4612,17 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if ocrTextAnnotation {
 			ocrTextAnnotationRepairPending = true
 		}
+		if photoStagingCoverageRepairPending && loop < maxToolLoops-1 {
+			invalidActionNeedsRepair = true
+		}
 		if incompleteTextAnnotation {
 			compactToolResults = append(compactToolResults, executedCommentResults...)
 		}
-		if canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen {
+		if (canvasUserWantsCanvasAction(latestUserMessage) || photoStagingWorkflow) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen {
 			preparatoryActionLoops++
 		}
-		focusOnlyNeedsAnswer := (canvasActionsOnlyFocus(actions) || (canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen)) && !actionRequestNeedsTool && loop < maxToolLoops-1 && (textBody == "" || canvasUserWantsCanvasAction(latestUserMessage))
+		photoStagingNeedsLayout := photoStagingWorkflow && canvasActionsOnlyPreparatory(actions) && !canvasPhotoStagingWorkCompleted(executedCanvasTools)
+		focusOnlyNeedsAnswer := (canvasActionsOnlyFocus(actions) || (canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen) || photoStagingNeedsLayout) && !actionRequestNeedsTool && loop < maxToolLoops-1 && (textBody == "" || canvasUserWantsCanvasAction(latestUserMessage) || photoStagingWorkflow)
 		if incompleteTextAnnotation {
 			invalidActionNeedsRepair = false
 			focusOnlyNeedsAnswer = false
@@ -4172,8 +4642,14 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		captureResultNeedsFollowup := captureExecutedThisLoop && len(compactToolResults) > 0 && !nonCaptureToolExecutedThisLoop && loop < maxToolLoops-1
-		captureOnlyDeferredWork := false
+		missingCapture = captureRequested && len(executedCaptureTools) == 0 && !hasCaptureAction && loop < maxToolLoops-1
+		if photoStagingWorkflow && (!canvasPhotoStagingWorkCompleted(executedCanvasTools) ||
+			!canvasPhotoStagingAllVisibleImagesCovered(projectedCanvas, photoStagingCoveredCardIDs)) {
+			missingCapture = false
+		}
+		captureResultNeedsFollowup := captureExecutedThisLoop && len(compactToolResults) > 0 && (!nonCaptureToolExecutedThisLoop || photoStagingWorkflow) && loop < maxToolLoops-1
+		captureOnlyDeferredWork := captureBeforeStagingWork && (!canvasPhotoStagingWorkCompleted(executedCanvasTools) ||
+			!canvasPhotoStagingAllVisibleImagesCovered(projectedCanvas, photoStagingCoveredCardIDs))
 		if captureExecutedThisLoop && !truncatedAction && !captureResultNeedsFollowup {
 			break
 		}
@@ -4217,7 +4693,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			canvasTools = nil
 			systemPrompt = canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 		}
-		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, projectedCanvas, actions, compactToolResults, executedCanvasToolSequence, content)
+		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, projectedCanvas, actions, compactToolResults, executedCanvasToolSequence, content, photoStagingWorkflow)
 		promptKind = vlmPromptKindFollowup
 		loopReason = nextLoopReason
 		sendNDJSON(w, map[string]any{"type": "thinking"})
@@ -4240,6 +4716,11 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		})
 		projectedCanvas = applyCanvasActionResultToSnapshot(projectedCanvas, act.Tool, result)
 		rememberExecutedCanvasAction(act)
+	}
+
+	if !textEmitted && photoStagingWorkflow && canvasPhotoStagingCaptureCompleted(executedCanvasToolSequence) {
+		sendNDJSON(w, map[string]any{"type": "text", "content": canvasPhotoStagingFallbackAnswerText()})
+		textEmitted = true
 	}
 
 	if !textEmitted && !textAnnotationRepairPending && !ocrTextAnnotationRepairPending {

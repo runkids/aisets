@@ -147,6 +147,7 @@ export function AICanvasView({
   );
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [preparedSkillIds, setPreparedSkillIds] = useState<string[]>([]);
   const [mentionedCardIds, setMentionedCardIds] = useState<string[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<
     PendingAttachment[]
@@ -544,6 +545,7 @@ export function AICanvasView({
     locale: i18n.language,
     chatHistory,
     prompt,
+    preparedSkillIds,
     mentionedCardIds,
     imageOptimizationAdvice,
     t,
@@ -558,6 +560,7 @@ export function AICanvasView({
     setError,
     setWorking,
     setPrompt,
+    setPreparedSkillIds,
     setMentionedCardIds,
     pendingAttachments,
     setPendingAttachments,
@@ -1494,6 +1497,17 @@ export function AICanvasView({
     void handleAsk({ prompt: t("aiCanvas.extractTextPrompt") });
   }
 
+  function handlePreparePhotoStaging() {
+    const defaultPrompt = t("aiCanvas.photoStagePrompt");
+    const styleLabel = t("aiCanvas.photoStageStyleLabel");
+    const template = `${defaultPrompt}\n${styleLabel}: `;
+    setPrompt((current) => {
+      const text = current.trim();
+      return text ? `${text}\n\n${template}` : template;
+    });
+    setPreparedSkillIds(["photo-staging"]);
+  }
+
   return (
     <div
       ref={rootRef}
@@ -1689,6 +1703,7 @@ export function AICanvasView({
         mentionSelectedAsset={mentionSelectedAsset}
         handleAttachImage={handleAttachImage}
         handleExtractText={handleExtractText}
+        handlePreparePhotoStaging={handlePreparePhotoStaging}
         extractTextTargetCount={extractTextTargetCount}
         extractTextDisabled={extractTextTargetCount === 0}
         commentMode={commentMode}

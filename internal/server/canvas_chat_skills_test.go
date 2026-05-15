@@ -43,6 +43,7 @@ func TestClassifyCanvasSkillFamilies(t *testing.T) {
 		{name: "ocr", message: "read the visible text with OCR", want: []string{canvasSkillOCR}},
 		{name: "comments", message: "annotate and circle this area", want: []string{canvasSkillComments}},
 		{name: "comment typo", message: "Copy this image and find the peachs and then add commends", want: []string{canvasSkillComments, canvasSkillLayout}},
+		{name: "photo staging", message: "act like a professional photographer and stage these photos beautifully", want: []string{canvasSkillPhotoStaging}, reject: []string{canvasSkillFileProposals, canvasSkillMetadataProposals}},
 		{name: "quality", message: "what is this image and any quality issue?", want: []string{canvasSkillQuality}, reject: []string{canvasSkillFileProposals}},
 		{name: "metadata", message: "save these tags and description", want: []string{canvasSkillMetadataProposals}},
 		{name: "file proposal", message: "rotate this asset and convert it to webp", want: []string{canvasSkillFileProposals}},
@@ -67,6 +68,114 @@ func TestClassifyCanvasSkillFamilies(t *testing.T) {
 				t.Fatalf("skill count = %d, skills=%v", len(got), got)
 			}
 		})
+	}
+}
+
+func TestCanvasPhotoStagingSkillGatesLayoutAndCaptureTools(t *testing.T) {
+	skills := []string{canvasSkillPhotoStaging}
+	tools := canvasLLMToolsForSkills(skills)
+	var names []string
+	for _, tool := range tools {
+		names = append(names, tool.Name)
+	}
+	for _, want := range []string{"inspect_canvas", "resize_card", "arrange_cards", "bring_cards_to_front", "mirror_image", "rotate_image", "capture_canvas", "capture_viewport"} {
+		if !canvasStringSliceContains(names, want) {
+			t.Fatalf("photo staging tool subset = %v, missing %s", names, want)
+		}
+	}
+	for _, reject := range []string{"search_assets", "create_comment", "rename_asset"} {
+		if canvasStringSliceContains(names, reject) {
+			t.Fatalf("photo staging tool subset = %v, should not include %s", names, reject)
+		}
+	}
+	for name, prompt := range map[string]string{
+		"native": canvasNativeSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, skills),
+		"action": canvasSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, skills),
+	} {
+		for _, want := range []string{"Professional photo staging", "professional photographer", "mirror_image", "rotate_image", "bring_cards_to_front", "capture_canvas"} {
+			if !strings.Contains(prompt, want) {
+				t.Fatalf("%s photo staging prompt missing %q:\n%s", name, want, prompt)
+			}
+		}
+	}
+}
+
+func TestCanvasNativePhotoStagingSystemPromptIsCompact(t *testing.T) {
+	prompt := canvasNativeSystemPromptForSkills("en", canvasChatOptions{
+		AutoLocale:           true,
+		PhotoStagingWorkflow: true,
+	}, []string{canvasSkillPhotoStaging})
+	if len(prompt) > 2200 {
+		t.Fatalf("native photo staging prompt too large for local LLMs: len=%d\n%s", len(prompt), prompt)
+	}
+	for _, want := range []string{
+		"professional photographer and art director",
+		"resize_card",
+		"mirror_image",
+		"rotate_image",
+		"bring_cards_to_front",
+		"z-index",
+		"capture_canvas",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("native photo staging compact prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	for _, forbidden := range []string{
+		"Search and add N relevant assets",
+		"Annotation/comment",
+		"Similarity, quality",
+		"Proposal Discipline",
+	} {
+		if strings.Contains(prompt, forbidden) {
+			t.Fatalf("native photo staging compact prompt should omit unrelated generic guidance %q:\n%s", forbidden, prompt)
+		}
+	}
+}
+
+func TestCanvasActionPhotoStagingSystemPromptIsCompact(t *testing.T) {
+	prompt := canvasSystemPromptForSkills("en", canvasChatOptions{
+		AutoLocale:           true,
+		PhotoStagingWorkflow: true,
+	}, []string{canvasSkillPhotoStaging})
+	if len(prompt) > 2600 {
+		t.Fatalf("action photo staging prompt too large for local LLMs: len=%d\n%s", len(prompt), prompt)
+	}
+	for _, want := range []string{
+		"bracket action blocks",
+		"resize_card",
+		"mirror_image",
+		"rotate_image",
+		"bring_cards_to_front",
+		"z-index",
+		"capture_canvas",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("action photo staging compact prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	for _, forbidden := range []string{
+		"Search and add N relevant assets",
+		"Annotation/comment",
+		"Similarity, quality",
+		"Example 1",
+	} {
+		if strings.Contains(prompt, forbidden) {
+			t.Fatalf("action photo staging compact prompt should omit unrelated generic guidance %q:\n%s", forbidden, prompt)
+		}
+	}
+}
+
+func TestNormalizeCanvasSelectedSkillIDs(t *testing.T) {
+	got := normalizeCanvasSelectedSkillIDs([]string{
+		" " + canvasSkillPhotoStaging + " ",
+		"unknown",
+		canvasSkillPhotoStaging,
+		canvasSkillCapture,
+	})
+	want := []string{canvasSkillPhotoStaging, canvasSkillCapture}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("selected skill IDs = %#v, want %#v", got, want)
 	}
 }
 

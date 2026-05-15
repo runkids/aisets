@@ -195,6 +195,7 @@ export async function canvasChat(options: {
   canvas: CanvasSnapshotPayload;
   locale: string;
   options?: CanvasChatOptions;
+  selectedSkillIds?: string[];
   canvasImage?: string;
   attachmentTokens?: string[];
   onEvent?: (event: CanvasChatEvent) => void;
@@ -205,6 +206,7 @@ export async function canvasChat(options: {
     canvas: options.canvas,
     locale: options.locale,
     options: options.options,
+    selectedSkillIds: options.selectedSkillIds,
     canvasImage: options.canvasImage,
     attachmentTokens: options.attachmentTokens,
   });
