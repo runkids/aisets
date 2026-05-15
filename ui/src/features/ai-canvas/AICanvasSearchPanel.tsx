@@ -97,7 +97,7 @@ export function AICanvasSearchPanel({
         data-ai-canvas-overlay="true"
         type="button"
         aria-label={t("aiCanvas.openSearch")}
-        className="pointer-events-auto absolute left-[130px] top-3 z-50 inline-flex h-[44px] w-[44px] items-center justify-center rounded-g-lg border border-transparent bg-g-surface/75 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80 [[data-theme='dark']_&]:hover:bg-g-surface-3"
+        className="pointer-events-auto absolute left-[130px] top-3 z-50 inline-flex h-[40px] w-[40px] items-center justify-center rounded-g-lg border border-transparent bg-g-surface/75 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_160ms_var(--g-ease-out)_both] transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 focus-visible:outline-none focus-visible:shadow-g-focus motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80 [[data-theme='dark']_&]:hover:bg-g-surface-3"
         onClick={() => setOpen(true)}
       >
         <Search size={20} className="text-g-ink-2" />
@@ -108,7 +108,7 @@ export function AICanvasSearchPanel({
   return (
     <aside
       data-ai-canvas-overlay="true"
-      className="pointer-events-auto absolute left-[130px] top-3 z-50 flex w-[min(480px,calc(100%-142px))] origin-top-left flex-col gap-1 rounded-g-lg border border-transparent bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
+      className="pointer-events-auto absolute left-[130px] top-3 z-50 flex w-[min(480px,calc(100%-142px))] origin-top-left flex-col rounded-g-lg border border-transparent bg-g-surface/75 p-1.5 shadow-g-pop backdrop-blur-xl animate-[canvasSearchIn_200ms_var(--g-ease-out)_both] motion-reduce:animate-none [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
     >
       <form
         className="flex items-center gap-1.5"
@@ -274,17 +274,17 @@ export function AICanvasSearchPanel({
       </form>
 
       {searchError && (
-        <div className="rounded-g-sm border border-g-red/40 bg-g-red-soft px-2 py-1.5 text-g-caption text-g-red">
+        <div className="mt-1 rounded-g-sm border border-g-red/40 bg-g-red-soft px-2 py-1.5 text-g-caption text-g-red">
           {searchError}
         </div>
       )}
 
       <div
         className={cn(
-          "grid transition-[grid-template-rows,opacity] duration-200 ease-g-out motion-reduce:transition-none",
+          "grid transition-[grid-template-rows,opacity,margin] duration-200 ease-g-out motion-reduce:transition-none",
           searchResults.length > 0
-            ? "grid-rows-[1fr] opacity-100"
-            : "grid-rows-[0fr] opacity-0",
+            ? "mt-1 grid-rows-[1fr] opacity-100"
+            : "mt-0 grid-rows-[0fr] opacity-0",
         )}
       >
         <div className="overflow-hidden">

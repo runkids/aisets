@@ -1542,7 +1542,7 @@ export function AICanvasView({
         href="https://github.com/runkids/aisets"
         target="_blank"
         rel="noopener noreferrer"
-        className="pointer-events-auto absolute left-3 top-3 z-50 flex h-[44px] items-center gap-2.5 rounded-g-lg border border-transparent bg-g-surface/75 px-3 shadow-g-pop backdrop-blur-xl transition-opacity duration-[120ms] ease-g hover:opacity-70 focus-visible:outline-none focus-visible:shadow-g-focus [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
+        className="pointer-events-auto absolute left-3 top-3 z-50 flex h-[40px] items-center gap-2.5 rounded-g-lg border border-transparent bg-g-surface/75 px-3 shadow-g-pop backdrop-blur-xl transition-opacity duration-[120ms] ease-g hover:opacity-70 focus-visible:outline-none focus-visible:shadow-g-focus [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80"
         aria-label="Aisets on GitHub"
       >
         <div className="grid size-g-btn-sm shrink-0 place-items-center overflow-hidden rounded-[7px] bg-black">
