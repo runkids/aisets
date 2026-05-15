@@ -226,6 +226,14 @@ function serializeCards(
     if (c.kind === "asset") {
       base.assetId = c.asset.id;
       base.repoPath = c.asset.repoPath;
+      base.fileName = c.asset.repoPath.split("/").pop() ?? c.asset.repoPath;
+      base.thumbnailUrl = c.asset.thumbnailUrl;
+      base.url = c.asset.url;
+      base.image = {
+        width: c.asset.image.width,
+        height: c.asset.image.height,
+        format: c.asset.image.format,
+      };
     }
     if (c.kind === "proposal") {
       base.tool = c.tool;
@@ -268,11 +276,36 @@ function serializeCardFull(card: CanvasCard): Record<string, unknown> {
   switch (card.kind) {
     case "asset":
       base.assetId = card.asset.id;
+      base.fileName = card.asset.repoPath.split("/").pop() ?? card.asset.id;
       base.repoPath = card.asset.repoPath;
+      base.projectName = card.asset.projectName;
       base.ext = card.asset.ext;
-      base.bytes = card.asset.bytes;
-      base.width = card.asset.image.width;
-      base.height = card.asset.image.height;
+      base.image = {
+        format: card.asset.image.format,
+        width: card.asset.image.width,
+        height: card.asset.image.height,
+        animated: card.asset.image.animated,
+        alpha: card.asset.image.alpha,
+        pages: card.asset.image.pages,
+        bytes: card.asset.bytes,
+      };
+      base.visual = {
+        url: card.asset.url,
+        thumbnailUrl: card.asset.thumbnailUrl,
+      };
+      base.aiTag = {
+        category: card.asset.aiTag?.category,
+        tags: card.asset.aiTag?.tags,
+        description: card.asset.aiTag?.description,
+        languages: card.asset.aiTag?.languages,
+      };
+      if (card.asset.ocr?.text) {
+        base.ocr = {
+          text: card.asset.ocr.text,
+          languages: card.asset.ocr.languages,
+        };
+      }
+      base.usedByCount = card.asset.usedBy.length;
       break;
     case "comment":
       base.anchorId = card.anchorId;

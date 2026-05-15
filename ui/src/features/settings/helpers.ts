@@ -49,7 +49,7 @@ export function defaultClauseValue(
   if (field === "project") return "Project";
   if (field === "bytes") return "0";
   if (field === "status") return "unused";
-  if (field === "ocrText" && operator === "regex") return "SALE|活動";
+  if (field === "ocrText" && operator === "regex") return "SALE|EVENT";
   if (field === "ocrText") return "SALE";
   if (field === "ocrLanguage" && operator === "oneOf") return "eng,chi_tra";
   if (field === "ocrLanguage") return "eng";

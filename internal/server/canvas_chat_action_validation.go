@@ -143,6 +143,12 @@ func normalizeCanvasValueForSchema(value any, schema map[string]any, path string
 				for _, item := range stringsSchema {
 					rawItems = append(rawItems, item)
 				}
+			} else if text, ok := value.(string); ok && canvasArrayItemsAreStrings(itemsSchema) {
+				parts := canvasSplitStringArrayParam(text)
+				rawItems = make([]any, 0, len(parts))
+				for _, part := range parts {
+					rawItems = append(rawItems, part)
+				}
 			} else {
 				rawItems = []any{value}
 			}
@@ -189,6 +195,28 @@ func normalizeCanvasValueForSchema(value any, schema map[string]any, path string
 	default:
 		return value, nil
 	}
+}
+
+func canvasArrayItemsAreStrings(schema map[string]any) bool {
+	kind, _ := schema["type"].(string)
+	return kind == "string"
+}
+
+func canvasSplitStringArrayParam(text string) []string {
+	fields := strings.FieldsFunc(text, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r'
+	})
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		field = strings.TrimSpace(field)
+		if field != "" {
+			out = append(out, field)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func canvasSchemaRequired(schema map[string]any) []string {

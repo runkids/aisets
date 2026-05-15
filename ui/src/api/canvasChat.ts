@@ -89,6 +89,10 @@ type CanvasChatOptions = {
   imageOptimizationAdvice?: boolean;
 };
 
+function baseName(path: string) {
+  return path.split("/").pop() || path;
+}
+
 export function serializeCanvasSnapshot(
   cards: CanvasCard[],
   selectedCardId: string | string[] | undefined,
@@ -127,11 +131,19 @@ export function serializeCanvasSnapshot(
         const isSelected = selectedSet.has(card.id);
         base.asset = {
           id: a.id,
+          fileName: baseName(a.repoPath),
           repoPath: a.repoPath,
+          projectName: a.projectName,
           ext: a.ext,
           width: a.image.width,
           height: a.image.height,
+          imageFormat: a.image.format,
+          animated: a.image.animated,
+          alpha: a.image.alpha,
+          pages: a.image.pages,
           bytes: a.bytes,
+          url: a.url,
+          thumbnailUrl: a.thumbnailUrl,
           usedByCount: a.usedBy?.length ?? 0,
           searchCategory: a.aiTag?.category,
           searchTags: a.aiTag?.tags,
@@ -139,6 +151,7 @@ export function serializeCanvasSnapshot(
           searchCategoryI18n: a.aiTag?.categoryI18n,
           searchTagsI18n: a.aiTag?.tagsI18n,
           searchDescriptionI18n: a.aiTag?.descriptionI18n,
+          searchLanguages: a.aiTag?.languages,
           ...(isSelected && {
             tags: a.aiTag?.tags,
             description: a.aiTag?.description,

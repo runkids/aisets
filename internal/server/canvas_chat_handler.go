@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -22,6 +24,7 @@ import (
 	"aisets/internal/llm"
 	"aisets/internal/ocr"
 	"aisets/internal/scanner"
+	"aisets/internal/semantic"
 )
 
 type canvasChatMessage struct {
@@ -38,11 +41,19 @@ type canvasRegion struct {
 
 type canvasAssetSnapshot struct {
 	ID                    string              `json:"id"`
+	FileName              string              `json:"fileName,omitempty"`
+	ProjectName           string              `json:"projectName,omitempty"`
 	RepoPath              string              `json:"repoPath"`
 	Ext                   string              `json:"ext"`
 	Width                 int                 `json:"width"`
 	Height                int                 `json:"height"`
+	ImageFormat           string              `json:"imageFormat,omitempty"`
+	Animated              bool                `json:"animated,omitempty"`
+	Alpha                 bool                `json:"alpha,omitempty"`
+	Pages                 int                 `json:"pages,omitempty"`
 	Bytes                 int64               `json:"bytes"`
+	URL                   string              `json:"url,omitempty"`
+	ThumbnailURL          string              `json:"thumbnailUrl,omitempty"`
 	Tags                  []string            `json:"tags,omitempty"`
 	Description           string              `json:"description,omitempty"`
 	OcrText               string              `json:"ocrText,omitempty"`
@@ -50,6 +61,7 @@ type canvasAssetSnapshot struct {
 	SearchCategory        string              `json:"searchCategory,omitempty"`
 	SearchTags            []string            `json:"searchTags,omitempty"`
 	SearchDescription     string              `json:"searchDescription,omitempty"`
+	SearchLanguages       []string            `json:"searchLanguages,omitempty"`
 	SearchCategoryI18n    map[string]string   `json:"searchCategoryI18n,omitempty"`
 	SearchTagsI18n        map[string][]string `json:"searchTagsI18n,omitempty"`
 	SearchDescriptionI18n map[string]string   `json:"searchDescriptionI18n,omitempty"`
@@ -362,6 +374,12 @@ func parseBracketCanvasScalar(value string) any {
 		if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') || (value[0] == '`' && value[len(value)-1] == '`') {
 			return strings.TrimSpace(value[1 : len(value)-1])
 		}
+		if value[0] == '{' || value[0] == '[' {
+			var decoded any
+			if err := json.Unmarshal([]byte(normalizeCanvasActionJSON(value)), &decoded); err == nil {
+				return decoded
+			}
+		}
 	}
 	switch strings.ToLower(value) {
 	case "true":
@@ -433,6 +451,8 @@ func bracketCanvasActionListValue(items []map[string]any) []any {
 }
 
 func normalizeBracketCanvasActionParams(act *canvasAction) {
+	normalizeBracketCanvasRegionParams(act)
+	normalizeBracketCanvasVisualCueParams(act)
 	if act.Tool != "arrange_cards" {
 		return
 	}
@@ -465,6 +485,85 @@ func normalizeBracketCanvasActionParams(act *canvasAction) {
 	}
 	act.Params["positions"] = positions
 	delete(act.Params, "cardIds")
+}
+
+func normalizeBracketCanvasRegionParams(act *canvasAction) {
+	if act.Params == nil || !canvasToolHasImageRegion(act.Tool) {
+		return
+	}
+	if raw, ok := act.Params["region"].(string); ok {
+		var decoded map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &decoded); err == nil {
+			act.Params["region"] = decoded
+		}
+	}
+	if _, exists := act.Params["region"]; exists {
+		return
+	}
+	x, okX := canvasBracketNumberParam(act.Params["regionX"])
+	y, okY := canvasBracketNumberParam(act.Params["regionY"])
+	width, okWidth := canvasBracketNumberParam(act.Params["regionWidth"])
+	height, okHeight := canvasBracketNumberParam(act.Params["regionHeight"])
+	if !okX || !okY || !okWidth || !okHeight {
+		return
+	}
+	act.Params["region"] = map[string]any{
+		"x":      x,
+		"y":      y,
+		"width":  width,
+		"height": height,
+	}
+	delete(act.Params, "regionX")
+	delete(act.Params, "regionY")
+	delete(act.Params, "regionWidth")
+	delete(act.Params, "regionHeight")
+}
+
+func normalizeBracketCanvasVisualCueParams(act *canvasAction) {
+	if act.Params == nil || !canvasToolHasImageRegion(act.Tool) {
+		return
+	}
+	if raw, ok := act.Params["visualCue"].(string); ok {
+		var decoded map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &decoded); err == nil {
+			act.Params["visualCue"] = decoded
+		}
+	}
+	if _, exists := act.Params["visualCue"]; exists {
+		return
+	}
+	targetDescription := strings.TrimSpace(fmt.Sprint(act.Params["visualCueTargetDescription"]))
+	colorHex := strings.TrimSpace(fmt.Sprint(act.Params["visualCueColorHex"]))
+	if targetDescription == "" && colorHex == "" {
+		return
+	}
+	visualCue := map[string]any{}
+	if targetDescription != "" {
+		visualCue["targetDescription"] = targetDescription
+	}
+	if colorHex != "" {
+		visualCue["colorHex"] = colorHex
+	}
+	act.Params["visualCue"] = visualCue
+	delete(act.Params, "visualCueTargetDescription")
+	delete(act.Params, "visualCueColorHex")
+}
+
+func canvasBracketNumberParam(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case json.Number:
+		n, err := v.Float64()
+		return n, err == nil
+	case string:
+		n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func findLooseQuotedCanvasCallSpans(content string) []canvasActionSpan {
@@ -873,6 +972,16 @@ func canvasActionsOnlyFocus(actions []canvasAction) bool {
 	return true
 }
 
+func canvasActionToolNames(actions []canvasAction) []string {
+	names := make([]string, 0, len(actions))
+	for _, action := range actions {
+		if action.Tool != "" {
+			names = append(names, action.Tool)
+		}
+	}
+	return names
+}
+
 func canvasActionsOnlyPreparatory(actions []canvasAction) bool {
 	if len(actions) == 0 {
 		return false
@@ -908,12 +1017,30 @@ func canvasToolIsConcreteCanvasWork(tool string) bool {
 	}
 }
 
+func filterCanvasIncidentalCatalogSearchActions(actions []canvasAction) []canvasAction {
+	hasImageOperation := false
+	for _, act := range actions {
+		if isCanvasOptimizationTool(act.Tool) || isCanvasImageTransformTool(act.Tool) {
+			hasImageOperation = true
+			break
+		}
+	}
+	if !hasImageOperation {
+		return actions
+	}
+	out := actions[:0]
+	for _, act := range actions {
+		if act.Tool == "search_assets" {
+			continue
+		}
+		out = append(out, act)
+	}
+	return out
+}
+
 func canvasActionStatusMessage(act canvasAction) string {
 	switch act.Tool {
 	case "focus_card":
-		if label := strings.TrimSpace(fmt.Sprint(act.Params["label"])); label != "" {
-			return "Confirming target: " + label
-		}
 		if cardID := strings.TrimSpace(fmt.Sprint(act.Params["cardId"])); cardID != "" {
 			return "Confirming target card: " + cardID
 		}
@@ -939,6 +1066,29 @@ func canvasActionStatusMessage(act canvasAction) string {
 	}
 }
 
+func canvasActionStreamParams(params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(params))
+	for key, value := range params {
+		if key == "label" {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func canvasToolDescription(tool string) string {
+	for _, def := range canvasToolRegistry() {
+		if def.Name == tool {
+			return def.Description
+		}
+	}
+	return "Canvas operation"
+}
+
 func canvasPlannedToolNames(latestUserMessage string) []string {
 	var names []string
 	add := func(name string) {
@@ -949,17 +1099,17 @@ func canvasPlannedToolNames(latestUserMessage string) []string {
 		}
 		names = append(names, name)
 	}
-	if containsAnyText(latestUserMessage, "放大", "縮小", "缩小", "resize", "bigger", "larger", "smaller") {
+	if canvasMessageWantsVisualResize(latestUserMessage) {
 		add("resize_card")
 	}
-	if containsAnyText(latestUserMessage, "移動", "移动", "放到", "移到", "move", "position") {
+	if canvasMessageWantsVisualMove(latestUserMessage) {
 		add("move_card")
 		add("arrange_cards")
 	}
-	if containsAnyText(latestUserMessage, "排列", "整理", "排版", "arrange", "layout") {
+	if containsAnyText(latestUserMessage, "arrange", "layout") {
 		add("arrange_cards")
 	}
-	if containsAnyText(latestUserMessage, "對齊", "对齐", "align") {
+	if containsAnyText(latestUserMessage, "align") {
 		add("align_cards")
 	}
 	if len(names) == 0 && canvasUserWantsCanvasAction(latestUserMessage) {
@@ -992,6 +1142,10 @@ func canvasFollowupStatusMessage(reason string, latestUserMessage string, prepar
 		return "Converting the described plan into executable canvas tools."
 	case canvasLoopReasonCaptureOnlyWork:
 		return "Capture is complete; continuing with the requested canvas edit."
+	case canvasLoopReasonOCRTextExtraction:
+		return "Text-bearing assets are on the canvas; extracting OCR before creating annotations."
+	case canvasLoopReasonOCRTextAnnotation:
+		return "OCR text is ready; creating the requested text annotations."
 	default:
 		return ""
 	}
@@ -1004,6 +1158,199 @@ func canvasTextOnlyResponseNeedsActionRepair(textBody string, nonFocusToolExecut
 	return canvasTextLooksLikeDeferredWork(textBody)
 }
 
+func canvasActionBlockTextNeedsActionRepair(usingNativeTools bool, loopReason string, textBody string, actionCount int, nonFocusToolExecuted bool, loop int, maxLoops int) bool {
+	if usingNativeTools || loop >= maxLoops-1 || nonFocusToolExecuted || actionCount > 0 || strings.TrimSpace(textBody) == "" {
+		return false
+	}
+	switch loopReason {
+	case "initial", canvasLoopReasonTextOnlyDeferredWork, canvasLoopReasonTruncatedAction, canvasLoopReasonMissingCapture, canvasLoopReasonCaptureOnlyWork, canvasLoopReasonInvalidAction, canvasLoopReasonNativeEmptyFallback, canvasLoopReasonOCRTextExtraction, canvasLoopReasonOCRTextAnnotation:
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasRequiredNativeToolCallMissing(usingNativeTools bool, toolChoice string, textBody string, actionCount int, nonFocusToolExecuted bool, loop int, maxLoops int) bool {
+	if loop >= maxLoops-1 || nonFocusToolExecuted || actionCount > 0 {
+		return false
+	}
+	return usingNativeTools && toolChoice == "required" && strings.TrimSpace(textBody) != ""
+}
+
+func canvasActionMentionsAssetOCR(act canvasAction, canvas canvasSnapshot) bool {
+	if act.Tool != "create_comment" && act.Tool != "update_comment" {
+		return false
+	}
+	text := strings.TrimSpace(fmt.Sprint(act.Params["text"]))
+	if text == "" {
+		return false
+	}
+	anchor := canvasImageRegionAnchorCard(act, canvas)
+	if anchor == nil || anchor.Asset == nil {
+		return false
+	}
+	ocrText := strings.TrimSpace(anchor.Asset.OcrText)
+	return ocrText != "" && strings.Contains(text, ocrText)
+}
+
+func canvasActionTargetsTextRegion(act canvasAction) bool {
+	if act.Tool != "create_comment" && act.Tool != "update_comment" {
+		return false
+	}
+	cue, ok := canvasRegionVisualCueFromParams(act.Params)
+	if !ok {
+		return false
+	}
+	return cue.HasColor && canvasVisualCueLooksLikeText(cue)
+}
+
+func canvasActionHasVerifiableNonTextCue(act canvasAction) bool {
+	if act.Tool != "create_comment" && act.Tool != "update_comment" {
+		return false
+	}
+	cue, ok := canvasRegionVisualCueFromParams(act.Params)
+	return ok && cue.HasColor && !canvasVisualCueLooksLikeText(cue)
+}
+
+func canvasActionHasRefinableVisualCue(act canvasAction) bool {
+	cue, ok := canvasRegionVisualCueFromParams(act.Params)
+	return ok && strings.TrimSpace(cue.TargetDescription) != "" && cue.HasColor
+}
+
+func canvasActionHasImageRegion(act canvasAction) bool {
+	if !canvasToolHasImageRegion(act.Tool) || act.Params == nil {
+		return false
+	}
+	_, ok := canvasRegionFromValue(act.Params["region"])
+	return ok
+}
+
+func canvasActionHasGenericPlaceholderRegion(act canvasAction) bool {
+	if !canvasToolHasImageRegion(act.Tool) || act.Params == nil {
+		return false
+	}
+	region, ok := canvasRegionFromValue(act.Params["region"])
+	return ok && canvasRegionLooksGenericPlaceholder(region)
+}
+
+func canvasRegionLooksGenericPlaceholder(region canvasRegion) bool {
+	return math.Abs(region.X-0.1) <= 0.015 &&
+		math.Abs(region.Y-0.2) <= 0.015 &&
+		math.Abs(region.Width-0.2) <= 0.015 &&
+		math.Abs(region.Height-0.1) <= 0.015
+}
+
+func canvasTextRegionActionDedupeKey(act canvasAction, canvas canvasSnapshot) string {
+	if act.Tool != "create_comment" || !canvasActionTargetsTextRegion(act) {
+		return ""
+	}
+	region, ok := canvasRegionFromValue(act.Params["region"])
+	if !ok {
+		return ""
+	}
+	anchor := canvasImageRegionAnchorCard(act, canvas)
+	if anchor == nil || anchor.ID == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		"%s:%s:%.3f:%.3f:%.3f:%.3f",
+		act.Tool,
+		anchor.ID,
+		region.X,
+		region.Y,
+		region.Width,
+		region.Height,
+	)
+}
+
+func canvasIncompleteTextAnnotationNeedsRepair(actions []canvasAction, canvas canvasSnapshot, loop int, maxLoops int) bool {
+	if loop >= maxLoops-1 {
+		return false
+	}
+	mentionsOCR := false
+	hasTextRegion := false
+	for _, act := range actions {
+		if canvasActionTargetsTextRegion(act) {
+			hasTextRegion = true
+		}
+		if canvasActionMentionsAssetOCR(act, canvas) {
+			mentionsOCR = true
+		}
+	}
+	return mentionsOCR && !hasTextRegion
+}
+
+func filterCanvasUnverifiableTextMentionActions(actions []canvasAction, canvas canvasSnapshot) ([]canvasAction, int) {
+	filtered := make([]canvasAction, 0, len(actions))
+	blocked := 0
+	for _, act := range actions {
+		if canvasActionMentionsAssetOCR(act, canvas) && !canvasActionTargetsTextRegion(act) && !canvasActionHasVerifiableNonTextCue(act) {
+			blocked++
+			continue
+		}
+		filtered = append(filtered, act)
+	}
+	return filtered, blocked
+}
+
+func filterCanvasFallbackImageRegionActionsMissingVisualCue(actions []canvasAction, requireVisualCue bool) ([]canvasAction, []canvasActionValidationIssue) {
+	if !requireVisualCue {
+		return actions, nil
+	}
+	filtered := make([]canvasAction, 0, len(actions))
+	var issues []canvasActionValidationIssue
+	for _, act := range actions {
+		if canvasActionHasImageRegion(act) && !canvasActionHasRefinableVisualCue(act) {
+			issues = append(issues, canvasActionValidationIssue{
+				Tool:   act.Tool,
+				Reason: "fallback image-region actions must include visualCue.targetDescription and visualCue.colorHex so the marker can be refined against the original image pixels",
+			})
+			continue
+		}
+		filtered = append(filtered, act)
+	}
+	return filtered, issues
+}
+
+func filterCanvasIncompleteTextAnnotationActions(actions []canvasAction, loopReason string, repairPending bool) ([]canvasAction, int) {
+	if loopReason != canvasLoopReasonIncompleteTextAnnotation && !repairPending {
+		return actions, 0
+	}
+	filtered := make([]canvasAction, 0, len(actions))
+	blocked := 0
+	for _, act := range actions {
+		if act.Tool == "create_comment" && canvasActionTargetsTextRegion(act) {
+			filtered = append(filtered, act)
+			continue
+		}
+		blocked++
+	}
+	return filtered, blocked
+}
+
+func filterCanvasOCRTextAnnotationActions(actions []canvasAction, loopReason string) ([]canvasAction, int) {
+	if loopReason != canvasLoopReasonOCRTextAnnotation {
+		return actions, 0
+	}
+	filtered := make([]canvasAction, 0, len(actions))
+	blocked := 0
+	for _, act := range actions {
+		switch act.Tool {
+		case "create_comment":
+			if canvasActionHasImageRegion(act) && canvasActionTargetsTextRegion(act) {
+				filtered = append(filtered, act)
+				continue
+			}
+			blocked++
+		case "remove_cards", "arrange_cards", "copy_asset":
+			filtered = append(filtered, act)
+		default:
+			blocked++
+		}
+	}
+	return filtered, blocked
+}
+
 func canvasTextLooksLikeDeferredWork(text string) bool {
 	text = strings.TrimSpace(strings.ToLower(text))
 	if text == "" {
@@ -1012,7 +1359,6 @@ func canvasTextLooksLikeDeferredWork(text string) bool {
 
 	futureMarkers := []string{
 		"i will", "i'll", "i can", "i would", "i'm going to", "let me", "next, i", "here is the plan", "suggested",
-		"我會", "我会", "我將", "我将", "我可以", "可以幫", "可以帮", "接下來", "接下来", "現在我將", "现在我将", "以下是", "建議", "建议",
 	}
 	hasFutureMarker := false
 	for _, marker := range futureMarkers {
@@ -1028,7 +1374,6 @@ func canvasTextLooksLikeDeferredWork(text string) bool {
 	if containsAnyText(text,
 		"imagegen", "image gen", "image generation", "generate image", "generated image",
 		"use the image", "use imagegen", "built-in", "skill", "tool",
-		"產出", "产出", "生成", "產生", "产生", "技能", "工具", "處理", "处理", "再產", "再产", "再做",
 	) {
 		return true
 	}
@@ -1043,7 +1388,7 @@ func canvasTextLooksLikeDeferredWork(text string) bool {
 		lineCount++
 		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") || strings.HasPrefix(line, "• ") ||
 			(len(line) >= 2 && line[0] >= '1' && line[0] <= '9' && line[1] == '.') ||
-			(len(line) >= len("1、") && line[0] >= '1' && line[0] <= '9' && strings.HasPrefix(line[1:], "、")) {
+			(len(line) >= 2 && line[0] >= '1' && line[0] <= '9' && line[1] == ')') {
 			listLikeLines++
 		}
 	}
@@ -1060,10 +1405,53 @@ Use native tool calls if available; otherwise use action blocks.
 
 Required behavior:
 - Use canvas layout tools for visual board changes.
+- Use create_comment with region for annotation, circle, mark, highlight, or object-location requests; put the location answer in the comment text.
 - Use proposal tools for source-file or metadata changes.
 - Use capture tools for screenshot/export work.
 - If this is running inside Codex CLI and the work truly requires its built-in imagegen capability, use that capability now in this same response and return a concrete generated result. Do not merely say you will use imagegen later.
 - If the work needs multiple steps, start with the first concrete tool action and continue after tool results.
+- For CLI/text transport, output bracket action blocks like [action: create_comment] with param lines. Do not output only "done", "already", or a natural-language completion claim.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+func canvasIncompleteTextAnnotationRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`A previous comment mentioned OCR/text content from the asset, but no separate region-bearing text annotation was produced.
+Add one create_comment for each missing OCR text target listed above. Do not repeat existing non-text comments.
+For text, box the actual visible characters themselves, not the banner, sign, label, or container.
+Required params: anchorCardId, text, region, visualCue.targetDescription, visualCue.colorHex.
+Use a text visual cue such as targetDescription: "white text characters" and the text pixel color.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+func canvasOCRTextAnnotationRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`The previous tool results contain OCR items for text-bearing candidates on the canvas.
+Complete the visual text-annotation workflow now:
+- Allowed tools in this round are create_comment, remove_cards, arrange_cards, and copy_asset only.
+- Do not call search_assets, add_assets_to_canvas, extract_ocr_text, focus_card, inspect_canvas, or any prose-only response; those cannot complete this repair round.
+- For each extract_ocr_text item with status "ready" and non-empty text, call create_comment on that same card or asset. Put the OCR text in the comment text.
+- For each extract_ocr_text item with no readable text, call remove_cards for that card or asset because the user asked to show text-bearing images.
+- If cards are removed, call arrange_cards for the remaining text-bearing cards so the layout stays even.
+- Use the returned cardId when present. If only assetId is present for a newly added card, use that assetId as anchorCardId/cardId; the frontend resolves it to the created canvas card.
+- For text, box the visible text area. If the exact character box is uncertain from metadata alone, box the visible text-bearing label/sign/image region rather than inventing unrelated coordinates.
+- Include visualCue.targetDescription in English and visualCue.colorHex for text pixels when calling create_comment.
+- If the original request also asks to copy files using the OCR text as filenames, call copy_asset in this same response after the comments. Use perAssetDestPaths with one assetId and OCR-derived destPath per source asset. This must create a proposal, not directly write files.
+
+Latest user request: %q
+
+Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
+}
+
+func canvasOCRTextExtractionRepairPrompt(latestUserMessage string) string {
+	return fmt.Sprintf(`The previous tool results show a text-bearing catalog search and assets were added to the canvas, but the OCR text needed for annotations has not been extracted yet.
+Call extract_ocr_text for the added assetIds or cardIds from the compact tool results.
+Required params: assetIds or cardIds, mode: "vlm", saveToMetadata: false.
+Do not call selection, layout, focus, or prose-only tools in this repair round.
 
 Latest user request: %q
 
@@ -1072,13 +1460,11 @@ Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 
 func canvasUserWantsCanvasAction(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
-		"安排", "排版", "分鏡", "分镜", "對戰", "对战", "戰鬥", "战斗", "操控",
-		"移動", "移动", "放到", "擺", "摆", "排列", "整理", "複製", "复制",
-		"鏡像", "镜像", "反轉", "反转", "翻轉", "翻转", "靚相",
-		"旋轉", "旋转", "轉", "转", "放大", "縮小", "缩小", "截圖", "截图", "匯出", "导出",
 		"arrange", "layout", "storyboard", "battle", "fight", "move", "position",
 		"duplicate", "copy", "mirror", "flip", "rotate", "resize", "bigger", "larger", "smaller", "capture", "export",
-	)
+	) || canvasMessageWantsVisualResize(latestUserMessage) ||
+		canvasMessageWantsVisualMove(latestUserMessage) ||
+		canvasMessageWantsVisualDuplicate(latestUserMessage)
 }
 
 func canvasFocusOnlyRepairPrompt(latestUserMessage string) string {
@@ -1092,7 +1478,7 @@ func canvasFocusOnlyRepairPrompt(latestUserMessage string) string {
 
 Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 	}
-	return "Your previous response only moved the cursor with focus_card and did not answer the user's request. Do NOT call focus_card again. Now answer the user's latest question in prose, or use a non-focus tool if more data is required."
+	return "Your previous response only moved the cursor with focus_card and did not answer or complete the user's request. Do NOT call focus_card again. If the original request asks for an edit, layout change, or file operation in any language, call the concrete non-focus tool now. If it is a visual question, answer the user's latest question in prose, or use a non-focus inspection/detail tool if more data is required."
 }
 
 func canvasCaptureOnlyRepairPrompt(latestUserMessage string) string {
@@ -1117,15 +1503,18 @@ Reply with only tool calls or action blocks and no prose.`, latestUserMessage)
 }
 
 const (
-	canvasLoopReasonToolResults          = "tool_results"
-	canvasLoopReasonTruncatedAction      = "truncated_action"
-	canvasLoopReasonMissingCapture       = "missing_capture"
-	canvasLoopReasonTextOnlyDeferredWork = "text_only_deferred_work"
-	canvasLoopReasonFocusOnlyNeedsAnswer = "focus_only_needs_answer"
-	canvasLoopReasonBlockedComment       = "blocked_comment"
-	canvasLoopReasonCaptureOnlyWork      = "capture_only_deferred_work"
-	canvasLoopReasonInvalidAction        = "invalid_action"
-	canvasLoopReasonNativeEmptyFallback  = "native_empty_fallback"
+	canvasLoopReasonToolResults              = "tool_results"
+	canvasLoopReasonTruncatedAction          = "truncated_action"
+	canvasLoopReasonMissingCapture           = "missing_capture"
+	canvasLoopReasonTextOnlyDeferredWork     = "text_only_deferred_work"
+	canvasLoopReasonFocusOnlyNeedsAnswer     = "focus_only_needs_answer"
+	canvasLoopReasonBlockedComment           = "blocked_comment"
+	canvasLoopReasonCaptureOnlyWork          = "capture_only_deferred_work"
+	canvasLoopReasonInvalidAction            = "invalid_action"
+	canvasLoopReasonNativeEmptyFallback      = "native_empty_fallback"
+	canvasLoopReasonIncompleteTextAnnotation = "incomplete_text_annotation"
+	canvasLoopReasonOCRTextExtraction        = "ocr_text_extraction"
+	canvasLoopReasonOCRTextAnnotation        = "ocr_text_annotation"
 )
 
 type canvasNextLoopInput struct {
@@ -1139,6 +1528,9 @@ type canvasNextLoopInput struct {
 	BlockedCommentNeedsAnswer bool
 	CaptureOnlyDeferredWork   bool
 	InvalidAction             bool
+	IncompleteTextAnnotation  bool
+	OCRTextExtraction         bool
+	OCRTextAnnotation         bool
 }
 
 func canvasNextLoopReason(input canvasNextLoopInput) string {
@@ -1150,6 +1542,15 @@ func canvasNextLoopReason(input canvasNextLoopInput) string {
 	}
 	if input.InvalidAction {
 		return canvasLoopReasonInvalidAction
+	}
+	if input.IncompleteTextAnnotation {
+		return canvasLoopReasonIncompleteTextAnnotation
+	}
+	if input.OCRTextExtraction {
+		return canvasLoopReasonOCRTextExtraction
+	}
+	if input.OCRTextAnnotation {
+		return canvasLoopReasonOCRTextAnnotation
 	}
 	if input.MissingCapture {
 		return canvasLoopReasonMissingCapture
@@ -1241,21 +1642,41 @@ func compactCanvasAssetItems(items []scanner.AssetItem) []map[string]any {
 func compactCanvasAssetItem(item scanner.AssetItem) map[string]any {
 	summary := map[string]any{
 		"assetId":     item.ID,
+		"fileName":    canvasAssetFileName("", item.RepoPath),
 		"repoPath":    item.RepoPath,
 		"projectName": item.ProjectName,
 		"ext":         item.Ext,
-		"bytes":       item.Bytes,
-		"width":       item.Image.Width,
-		"height":      item.Image.Height,
 		"usedByCount": len(item.UsedBy),
+		"image": map[string]any{
+			"format":   item.Image.Format,
+			"width":    item.Image.Width,
+			"height":   item.Image.Height,
+			"animated": item.Image.Animated,
+			"alpha":    item.Image.Alpha,
+			"pages":    item.Image.Pages,
+			"bytes":    item.Bytes,
+		},
+		"visual": map[string]any{
+			"url":          item.URL,
+			"thumbnailUrl": item.ThumbnailURL,
+		},
 	}
 	if item.AITag != nil {
-		summary["category"] = item.AITag.Category
+		ai := map[string]any{}
+		if item.AITag.Category != "" {
+			ai["category"] = item.AITag.Category
+		}
 		if len(item.AITag.Tags) > 0 {
-			summary["tags"] = item.AITag.Tags
+			ai["tags"] = item.AITag.Tags
 		}
 		if item.AITag.Description != "" {
-			summary["description"] = truncate(item.AITag.Description, 180)
+			ai["description"] = truncate(item.AITag.Description, 180)
+		}
+		if len(item.AITag.Languages) > 0 {
+			ai["languages"] = item.AITag.Languages
+		}
+		if len(ai) > 0 {
+			summary["ai"] = ai
 		}
 	}
 	if item.OCR != nil && item.OCR.Text != "" {
@@ -1264,14 +1685,260 @@ func compactCanvasAssetItem(item scanner.AssetItem) map[string]any {
 	return summary
 }
 
-func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas canvasSnapshot, actions []canvasAction, toolResults []canvasCompactToolResult, previousAssistantText string) string {
+type canvasOCRAnnotationItem struct {
+	AssetID      string `json:"assetId"`
+	RepoPath     string `json:"repoPath"`
+	CardID       string `json:"cardId"`
+	FileName     string `json:"fileName"`
+	Status       string `json:"status"`
+	Text         string `json:"text"`
+	ErrorMessage string `json:"errorMessage"`
+}
+
+func canvasOCRAnnotationItems(result any) []canvasOCRAnnotationItem {
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return nil
+	}
+	var decoded struct {
+		Items []canvasOCRAnnotationItem `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil
+	}
+	return decoded.Items
+}
+
+func canvasOCRTextAnnotationWorkflowRequested(latestUserMessage string, selectedSkillIDs []string, executed map[string]bool) bool {
+	if !executed["add_assets_to_canvas"] {
+		return false
+	}
+	if canvasUserAsksAnnotation(latestUserMessage) {
+		return true
+	}
+	return canvasStringListContains(selectedSkillIDs, canvasSkillComments) && canvasStringListContains(selectedSkillIDs, canvasSkillOCR)
+}
+
+func markCanvasOCRResultAsIntermediate(result any) {
+	if values, ok := result.(map[string]any); ok {
+		values["displayToUser"] = false
+		values["useForFollowup"] = "text_annotation"
+	}
+}
+
+func canvasAssetFileName(fileName string, repoPath string) string {
+	fileName = strings.TrimSpace(fileName)
+	if fileName != "" {
+		return fileName
+	}
+	if repoPath == "" {
+		return ""
+	}
+	return filepath.Base(repoPath)
+}
+
+func compactCanvasAssetSnapshot(asset *canvasAssetSnapshot) map[string]any {
+	if asset == nil {
+		return nil
+	}
+	imageFormat := asset.ImageFormat
+	if imageFormat == "" {
+		imageFormat = strings.TrimPrefix(strings.ToLower(asset.Ext), ".")
+	}
+	summary := map[string]any{
+		"assetId":     asset.ID,
+		"fileName":    canvasAssetFileName(asset.FileName, asset.RepoPath),
+		"repoPath":    asset.RepoPath,
+		"projectName": asset.ProjectName,
+		"ext":         asset.Ext,
+		"usedByCount": asset.UsedByCount,
+		"image": map[string]any{
+			"format":   imageFormat,
+			"width":    asset.Width,
+			"height":   asset.Height,
+			"animated": asset.Animated,
+			"alpha":    asset.Alpha,
+			"pages":    asset.Pages,
+			"bytes":    asset.Bytes,
+		},
+		"visual": map[string]any{
+			"url":          asset.URL,
+			"thumbnailUrl": asset.ThumbnailURL,
+		},
+	}
+	ai := map[string]any{}
+	if asset.SearchCategory != "" {
+		ai["category"] = asset.SearchCategory
+	}
+	if len(asset.SearchTags) > 0 {
+		ai["tags"] = asset.SearchTags
+	} else if len(asset.Tags) > 0 {
+		ai["tags"] = asset.Tags
+	}
+	if asset.SearchDescription != "" {
+		ai["description"] = truncate(asset.SearchDescription, 180)
+	} else if asset.Description != "" {
+		ai["description"] = truncate(asset.Description, 180)
+	}
+	if len(asset.SearchLanguages) > 0 {
+		ai["languages"] = asset.SearchLanguages
+	}
+	if len(ai) > 0 {
+		summary["ai"] = ai
+	}
+	if asset.OcrText != "" {
+		summary["ocrText"] = truncate(asset.OcrText, 180)
+	}
+	return summary
+}
+
+func canvasAssetItemsFromActionResult(result any) []scanner.AssetItem {
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		return nil
+	}
+	switch items := resultMap["items"].(type) {
+	case []scanner.AssetItem:
+		return items
+	case []any:
+		out := make([]scanner.AssetItem, 0, len(items))
+		for _, item := range items {
+			if asset, ok := item.(scanner.AssetItem); ok {
+				out = append(out, asset)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func appendCanvasAssetItemsUnique(current []scanner.AssetItem, next []scanner.AssetItem) []scanner.AssetItem {
+	if len(next) == 0 {
+		return current
+	}
+	seen := map[string]bool{}
+	for _, item := range current {
+		if item.ID != "" {
+			seen[item.ID] = true
+		}
+	}
+	for _, item := range next {
+		if item.ID != "" && seen[item.ID] {
+			continue
+		}
+		current = append(current, item)
+		if item.ID != "" {
+			seen[item.ID] = true
+		}
+	}
+	return current
+}
+
+func canvasLocaleFallbacks(locale string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	add(locale)
+	switch strings.ToLower(locale) {
+	case "zh-tw":
+		add("zh-Hant")
+		add("zh-traditional")
+	case "zh-cn":
+		add("zh-Hans")
+		add("zh-simplified")
+	}
+	add("en")
+	return out
+}
+
+func canvasAssetItemDescription(item scanner.AssetItem, locale string) string {
+	if item.AITag == nil {
+		return ""
+	}
+	locale = strings.TrimSpace(locale)
+	for _, candidate := range canvasLocaleFallbacks(locale) {
+		if strings.EqualFold(candidate, "en") {
+			continue
+		}
+		if desc := strings.TrimSpace(item.AITag.DescriptionI18n[candidate]); desc != "" {
+			return desc
+		}
+	}
+	if desc := strings.TrimSpace(item.AITag.Description); desc != "" && !strings.EqualFold(locale, "en") {
+		return desc
+	}
+	if desc := strings.TrimSpace(item.AITag.DescriptionI18n["en"]); desc != "" {
+		return desc
+	}
+	if desc := strings.TrimSpace(item.AITag.Description); desc != "" {
+		return desc
+	}
+	if len(item.AITag.Tags) > 0 {
+		return strings.Join(item.AITag.Tags, ", ")
+	}
+	return ""
+}
+
+func canvasCatalogItemsDescriptionText(items []scanner.AssetItem, locale string) string {
+	var b strings.Builder
+	for _, item := range items {
+		desc := canvasAssetItemDescription(item, locale)
+		if desc == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		fmt.Fprintf(&b, "- %s: %s", canvasAssetFileName("", item.RepoPath), desc)
+	}
+	return b.String()
+}
+
+func canvasAddedAssetsAnswerText(items []scanner.AssetItem, locale string) string {
+	return canvasCatalogItemsDescriptionText(items, locale)
+}
+
+func canvasCreatedCommentsAnswerText(texts []string, locale string) string {
+	count := 0
+	for _, text := range texts {
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		count++
+	}
+	if count == 0 {
+		return ""
+	}
+	if count == 1 {
+		return "Added 1 comment."
+	}
+	return fmt.Sprintf("Added %d comments.", count)
+}
+
+func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas canvasSnapshot, actions []canvasAction, toolResults []canvasCompactToolResult, completedTools []string, previousAssistantText string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Original User Request\n%s\n\n", latestUserMessage)
 	fmt.Fprintf(&b, "## Loop Reason\n%s\n\n", reason)
 
-	if cards := compactCanvasRelevantCards(canvas, actions); len(cards) > 0 {
+	cards := compactCanvasRelevantCards(canvas, actions)
+	if canvasCompletedToolsContain(completedTools, "duplicate_cards") {
+		cards = compactCanvasCards(canvas.Cards, 12)
+	}
+	if len(cards) > 0 {
 		cardJSON, _ := json.Marshal(cards)
 		fmt.Fprintf(&b, "## Relevant Canvas Cards\n%s\n\n", string(cardJSON))
+	}
+	if len(completedTools) > 0 {
+		completedJSON, _ := json.Marshal(completedTools)
+		fmt.Fprintf(&b, "## Completed Canvas Tools\n%s\n\n", string(completedJSON))
 	}
 	if previousAssistantText = strings.TrimSpace(previousAssistantText); previousAssistantText != "" {
 		fmt.Fprintf(&b, "## Previous Assistant Text\n%s\n\n", truncate(previousAssistantText, 1200))
@@ -1280,10 +1947,36 @@ func buildCanvasFollowupPrompt(reason string, latestUserMessage string, canvas c
 		resultJSON, _ := json.Marshal(toolResults)
 		fmt.Fprintf(&b, "## Compact Tool Results\n%s\n\n", string(resultJSON))
 	}
+	if reason == canvasLoopReasonIncompleteTextAnnotation {
+		if targets := canvasTextAnnotationTargets(canvas); len(targets) > 0 {
+			targetJSON, _ := json.Marshal(targets)
+			fmt.Fprintf(&b, "## Missing OCR Text Annotation Targets\n%s\n\n", string(targetJSON))
+		}
+	}
 
 	b.WriteString("## Required Follow-up\n")
 	b.WriteString(canvasFollowupInstruction(reason, latestUserMessage))
 	return b.String()
+}
+
+func canvasTextAnnotationTargets(canvas canvasSnapshot) []map[string]any {
+	var targets []map[string]any
+	for _, card := range canvas.Cards {
+		if card.Kind != "asset" || card.Asset == nil {
+			continue
+		}
+		ocrText := strings.TrimSpace(card.Asset.OcrText)
+		if ocrText == "" {
+			continue
+		}
+		targets = append(targets, map[string]any{
+			"anchorCardId": card.ID,
+			"assetId":      card.Asset.ID,
+			"fileName":     card.Asset.FileName,
+			"ocrText":      ocrText,
+		})
+	}
+	return targets
 }
 
 func canvasFollowupInstruction(reason string, latestUserMessage string) string {
@@ -1300,10 +1993,16 @@ func canvasFollowupInstruction(reason string, latestUserMessage string) string {
 		return canvasCaptureOnlyRepairPrompt(latestUserMessage)
 	case canvasLoopReasonInvalidAction:
 		return canvasInvalidActionRepairPrompt(latestUserMessage)
+	case canvasLoopReasonIncompleteTextAnnotation:
+		return canvasIncompleteTextAnnotationRepairPrompt(latestUserMessage)
+	case canvasLoopReasonOCRTextExtraction:
+		return canvasOCRTextExtractionRepairPrompt(latestUserMessage)
+	case canvasLoopReasonOCRTextAnnotation:
+		return canvasOCRTextAnnotationRepairPrompt(latestUserMessage)
 	case canvasLoopReasonBlockedComment:
 		return "Your previous response tried to create a comment, but the user did not ask for an annotation. Do NOT call create_comment. Answer the user's latest question in chat prose, and only mention uncertainty or next steps if needed."
 	case canvasLoopReasonToolResults:
-		return "Continue from the compact tool results above. Use the returned IDs exactly. If the user's request is fulfilled, give a short answer; otherwise call the next concrete tool."
+		return "Continue from the compact tool results above. Use the returned IDs exactly. Do not repeat completed tool calls. For duplicate workflows, arrange returned newCardIds but do not remove returned newCardIds as cleanup; remove_cards is only for pre-existing unrelated visible cards. For multi-step operation patterns, call the next distinct missing tool; if the user's request is fulfilled, give a short answer."
 	default:
 		return "Continue the task from the context above."
 	}
@@ -1362,6 +2061,62 @@ func compactCanvasRelevantCards(canvas canvasSnapshot, actions []canvasAction) [
 	return out
 }
 
+func canvasCompletedToolsContain(tools []string, want string) bool {
+	for _, tool := range tools {
+		if tool == want {
+			return true
+		}
+	}
+	return false
+}
+
+func canvasPromptRelevantCards(canvas canvasSnapshot, latestUserMessage string, limit int) []canvasCardSnapshot {
+	if limit <= 0 || len(canvas.Cards) <= limit {
+		return canvas.Cards
+	}
+	selected := map[string]bool{}
+	for _, id := range canvas.SelectedCardIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			selected[id] = true
+		}
+	}
+	mentioned := canvasMentionedCardIDsForPrompt(latestUserMessage, canvas)
+	out := make([]canvasCardSnapshot, 0, limit)
+	seen := map[string]bool{}
+	add := func(card canvasCardSnapshot) {
+		if card.ID == "" || seen[card.ID] || len(out) >= limit {
+			return
+		}
+		seen[card.ID] = true
+		out = append(out, card)
+	}
+	for _, card := range canvas.Cards {
+		if selected[card.ID] {
+			add(card)
+		}
+	}
+	for _, card := range canvas.Cards {
+		if mentioned[card.ID] {
+			add(card)
+		}
+	}
+	for _, card := range canvas.Cards {
+		add(card)
+	}
+	return out
+}
+
+func compactCanvasCards(cards []canvasCardSnapshot, limit int) []map[string]any {
+	if limit <= 0 || limit > len(cards) {
+		limit = len(cards)
+	}
+	out := make([]map[string]any, 0, limit)
+	for _, card := range cards[:limit] {
+		out = append(out, compactCanvasCard(card))
+	}
+	return out
+}
+
 func compactCanvasCard(card canvasCardSnapshot) map[string]any {
 	width := card.Width
 	if width <= 0 {
@@ -1385,6 +2140,7 @@ func compactCanvasCard(card canvasCardSnapshot) map[string]any {
 		out["repoPath"] = card.Asset.RepoPath
 		out["assetWidth"] = card.Asset.Width
 		out["assetHeight"] = card.Asset.Height
+		out["asset"] = compactCanvasAssetSnapshot(card.Asset)
 	}
 	if card.Kind == "comment" {
 		out["anchorId"] = card.AnchorID
@@ -1480,8 +2236,11 @@ func canvasLatestUserLanguage(latestUserMessage string, locale string) string {
 
 func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, options canvasChatOptions, locale string) string {
 	var b strings.Builder
+	latestUserMessage := latestCanvasUserMessage(messages)
+	promptCards := canvasPromptRelevantCards(canvas, latestUserMessage, 10)
 
 	b.WriteString("## Canvas State\n")
+	selectedVisualCount := 0
 	if len(canvas.SelectedCardIDs) > 0 {
 		fmt.Fprintf(&b, "Selected cards: %s\n", strings.Join(canvas.SelectedCardIDs, ", "))
 		var selectedAssets []string
@@ -1490,19 +2249,48 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 		for _, id := range canvas.SelectedCardIDs {
 			selected[id] = true
 		}
+		visualSelected := cloneStringBoolMap(selected)
+		var selectedCommentAnchors []string
 		for _, card := range canvas.Cards {
-			if selected[card.ID] && card.Asset != nil {
+			if selected[card.ID] && card.Kind == "comment" && strings.TrimSpace(card.AnchorID) != "" {
+				visualSelected[card.AnchorID] = true
+				selectedCommentAnchors = append(selectedCommentAnchors, fmt.Sprintf("comment=%s anchor=%s", card.ID, card.AnchorID))
+			}
+		}
+		for _, card := range canvas.Cards {
+			if visualSelected[card.ID] && card.Asset != nil {
 				selectedAssets = append(selectedAssets, fmt.Sprintf("card=%s assetId=%s path=%s", card.ID, card.Asset.ID, card.Asset.RepoPath))
 			}
-			if selected[card.ID] && card.Kind == "upload" && card.UploadToken != "" {
+			if visualSelected[card.ID] && card.Kind == "upload" && card.UploadToken != "" {
 				selectedUploads = append(selectedUploads, fmt.Sprintf("card=%s file=%s %dx%d", card.ID, card.UploadFileName, card.UploadWidth, card.UploadHeight))
 			}
+		}
+		selectedVisualCount = len(selectedAssets) + len(selectedUploads)
+		if len(selectedCommentAnchors) > 0 {
+			fmt.Fprintf(&b, "Selected comment anchors:\n- %s\n", strings.Join(selectedCommentAnchors, "\n- "))
 		}
 		if len(selectedAssets) > 0 {
 			fmt.Fprintf(&b, "Selected asset targets (%d):\n- %s\n", len(selectedAssets), strings.Join(selectedAssets, "\n- "))
 		}
 		if len(selectedUploads) > 0 {
 			fmt.Fprintf(&b, "Selected upload targets (%d):\n- %s\n", len(selectedUploads), strings.Join(selectedUploads, "\n- "))
+		}
+		if options.CanvasImageAttached || len(selectedAssets) > 0 || len(selectedUploads) > 0 {
+			b.WriteString("Attached visual inputs:\n")
+			if len(selectedAssets) > 0 || len(selectedUploads) > 0 {
+				if selectedVisualCount == 1 {
+					b.WriteString("- Image 1 is a selected card image with a coordinate grid overlay. Image 2 is the plain selected card image. Use the grid image to estimate create_comment.region or update_comment.region, then verify against the plain image. Localize the target against the anchored card image/original selected image, not the full canvas screenshot. Return a normalized top-left bounding box around the visible target itself. If the target sits on a host object, box only the requested target, not the host or surrounding context. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. For text, box the actual characters only, not the whole sign, banner, label, or container.\n")
+				} else {
+					b.WriteString("- Images 1..N are selected card image originals in selected-card order. For create_comment.region or update_comment.region, localize the target against the anchored card image/original selected image, not the full canvas screenshot. Return a normalized top-left bounding box around the visible target itself. If the target sits on a host object, box only the requested target, not the host or surrounding context. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. For text, box the actual characters only, not the whole sign, banner, label, or container.\n")
+				}
+			}
+			if options.CanvasImageAttached {
+				if len(selectedAssets) > 0 || len(selectedUploads) > 0 {
+					b.WriteString("- The final attached image is the canvas viewport screenshot. Use it only for layout, card positions, and visual context.\n")
+				} else {
+					b.WriteString("- Image 1 is the canvas viewport screenshot. Use it for layout, card positions, and visual context.\n")
+				}
+			}
 		}
 	}
 	fmt.Fprintf(&b, "Total cards: %d\n", len(canvas.Cards))
@@ -1538,7 +2326,7 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 		}
 	}
 
-	for _, card := range canvas.Cards {
+	for _, card := range promptCards {
 		fmt.Fprintf(&b, "- [%s] id=%s pos=(%.0f,%.0f)", card.Kind, card.ID, card.X, card.Y)
 		if card.Width > 0 && card.Height > 0 {
 			fmt.Fprintf(&b, " size=%.0fx%.0f", card.Width, card.Height)
@@ -1580,11 +2368,19 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 		}
 		b.WriteByte('\n')
 	}
+	if omitted := len(canvas.Cards) - len(promptCards); omitted > 0 {
+		fmt.Fprintf(&b, "- %d less relevant cards omitted from this prompt to keep the model context short.\n", omitted)
+	}
+	if len(promptCards) > 0 {
+		cardJSON, _ := json.Marshal(compactCanvasCards(promptCards, len(promptCards)))
+		fmt.Fprintf(&b, "\n## AI-Readable Canvas Cards JSON\n%s\n", string(cardJSON))
+	}
 
 	b.WriteString("\n## Layout Facts\n")
 	if options.CanvasImageAttached {
 		b.WriteString("- A hidden AI-only screenshot of the current canvas is attached. Use it to judge visual overlap, spacing, scale, and composition before arranging cards.\n")
 	}
+	b.WriteString("- Asset JSON includes visual.url and visual.thumbnailUrl references for the actual image; use those references or the attached canvas screenshot when visual details matter.\n")
 	if hasBounds {
 		fmt.Fprintf(&b, "- Current card cluster bounds: x=%.0f y=%.0f width=%.0f height=%.0f.\n", minX, minY, maxX-minX, maxY-minY)
 	}
@@ -1597,8 +2393,8 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	b.WriteString("- For a spread-out layout, leave at least 160px horizontal and 120px vertical whitespace between card bounding boxes unless the user asks for a collage.\n")
 	b.WriteString("- For 8+ cards, spread them across a broad board (roughly 1600-2400px wide, multiple rows/columns). Avoid piling every card near the center or around one hero image.\n")
 
-	if lang := canvasLatestUserLanguage(latestCanvasUserMessage(messages), locale); lang != "" {
-		fmt.Fprintf(&b, "\n## Response Language Override\n- The latest user message is written in %s. Respond in %s for natural-language text and tool labels/descriptions/impacts unless the user explicitly requests another language.\n", lang, lang)
+	if lang := canvasLatestUserLanguage(latestUserMessage, locale); lang != "" {
+		fmt.Fprintf(&b, "\n## Response Language Override\n- The latest user message is written in %s. Use %s only for natural-language assistant text. Keep tool labels, descriptions, impacts, status codes, action metadata, and internal reasoning in English.\n", lang, lang)
 	}
 
 	b.WriteString("\n## Assistant Options\n")
@@ -1630,6 +2426,155 @@ func latestCanvasUserMessage(messages []canvasChatMessage) string {
 		}
 	}
 	return ""
+}
+
+func canvasNativeToolsEnabled(backend string, tools []llm.ChatTool) bool {
+	if len(tools) == 0 {
+		return false
+	}
+	if _, ok := agent.AgentBackendID(backend); ok {
+		return false
+	}
+	return true
+}
+
+func canvasNativeToolChoice(tools []llm.ChatTool, loopReason string) string {
+	if len(tools) == 0 {
+		return ""
+	}
+	switch loopReason {
+	case "initial",
+		canvasLoopReasonTruncatedAction,
+		canvasLoopReasonMissingCapture,
+		canvasLoopReasonTextOnlyDeferredWork,
+		canvasLoopReasonFocusOnlyNeedsAnswer,
+		canvasLoopReasonCaptureOnlyWork,
+		canvasLoopReasonInvalidAction,
+		canvasLoopReasonIncompleteTextAnnotation,
+		canvasLoopReasonOCRTextExtraction,
+		canvasLoopReasonOCRTextAnnotation:
+		return "required"
+	default:
+		return ""
+	}
+}
+
+func canvasNativeToolsForRound(tools []llm.ChatTool, loopReason string) []llm.ChatTool {
+	if loopReason == canvasLoopReasonOCRTextExtraction {
+		if filtered := filterCanvasNativeToolsByName(tools, map[string]bool{"extract_ocr_text": true}); len(filtered) > 0 {
+			return filtered
+		}
+	}
+	if loopReason == canvasLoopReasonOCRTextAnnotation {
+		if filtered := filterCanvasNativeToolsByName(tools, map[string]bool{
+			"create_comment": true,
+			"remove_cards":   true,
+			"arrange_cards":  true,
+			"copy_asset":     true,
+		}); len(filtered) > 0 {
+			return requireCanvasNativeToolParams(filtered, "create_comment", "anchorCardId", "text", "region", "visualCue")
+		}
+	}
+	if loopReason == canvasLoopReasonIncompleteTextAnnotation {
+		if filtered := filterCanvasNativeToolsByName(tools, map[string]bool{"create_comment": true}); len(filtered) > 0 {
+			return filtered
+		}
+	}
+	if loopReason != canvasLoopReasonFocusOnlyNeedsAnswer {
+		if loopReason == "initial" {
+			if initialTools := filterCanvasNativeToolsByName(tools, canvasNativeInitialToolNames()); len(initialTools) > 0 {
+				return initialTools
+			}
+		}
+		return tools
+	}
+	filtered := make([]llm.ChatTool, 0, len(tools))
+	for _, tool := range tools {
+		if canvasToolIsConcreteCanvasWork(tool.Name) {
+			filtered = append(filtered, tool)
+		}
+	}
+	if len(filtered) == 0 {
+		return tools
+	}
+	return filtered
+}
+
+func requireCanvasNativeToolParams(tools []llm.ChatTool, toolName string, required ...string) []llm.ChatTool {
+	out := make([]llm.ChatTool, 0, len(tools))
+	for _, tool := range tools {
+		if tool.Name != toolName || len(tool.Parameters) == 0 {
+			out = append(out, tool)
+			continue
+		}
+		params := make(map[string]any, len(tool.Parameters)+1)
+		for key, value := range tool.Parameters {
+			params[key] = value
+		}
+		seen := map[string]bool{}
+		nextRequired := make([]string, 0, len(required))
+		for _, key := range canvasSchemaRequired(params) {
+			if !seen[key] {
+				seen[key] = true
+				nextRequired = append(nextRequired, key)
+			}
+		}
+		for _, key := range required {
+			if !seen[key] {
+				seen[key] = true
+				nextRequired = append(nextRequired, key)
+			}
+		}
+		params["required"] = nextRequired
+		tool.Parameters = params
+		out = append(out, tool)
+	}
+	return out
+}
+
+func canvasNativeInitialToolNames() map[string]bool {
+	return map[string]bool{
+		"focus_card":            true,
+		"search_assets":         true,
+		"add_assets_to_canvas":  true,
+		"get_asset_detail":      true,
+		"select_cards":          true,
+		"distribute_cards":      true,
+		"align_cards":           true,
+		"resize_card":           true,
+		"move_card":             true,
+		"arrange_cards":         true,
+		"bring_cards_to_front":  true,
+		"duplicate_cards":       true,
+		"remove_cards":          true,
+		"extract_ocr_text":      true,
+		"create_comment":        true,
+		"update_comment":        true,
+		"delete_comment":        true,
+		"capture_viewport":      true,
+		"capture_selected":      true,
+		"compare_assets":        true,
+		"find_similar_assets":   true,
+		"inspect_image_quality": true,
+		"generate_alt_text":     true,
+		"rotate_image":          true,
+		"mirror_image":          true,
+		"rename_asset":          true,
+		"copy_asset":            true,
+	}
+}
+
+func filterCanvasNativeToolsByName(tools []llm.ChatTool, allowed map[string]bool) []llm.ChatTool {
+	if len(allowed) == 0 {
+		return tools
+	}
+	out := make([]llm.ChatTool, 0, len(tools))
+	for _, tool := range tools {
+		if allowed[tool.Name] {
+			out = append(out, tool)
+		}
+	}
+	return out
 }
 
 func canvasSearchQueryCandidates(s string) []string {
@@ -1698,29 +2643,48 @@ func canvasToolSuppressesSameTurnText(tool string) bool {
 	return tool != "focus_card"
 }
 
+func canvasToolCompletesKnownChain(tool string, executed map[string]bool) bool {
+	switch tool {
+	case "align_cards":
+		return true
+	case "bring_cards_to_front":
+		return executed["resize_card"] || executed["move_card"] || executed["arrange_cards"]
+	case "remove_cards":
+		return executed["duplicate_cards"] || executed["search_assets"]
+	case "create_comment", "update_comment":
+		return true
+	case "capture_selected":
+		return executed["capture_viewport"] || executed["capture_canvas"]
+	case "generate_alt_text":
+		return executed["compare_assets"] || executed["find_similar_assets"] || executed["inspect_image_quality"]
+	default:
+		return false
+	}
+}
+
 func canvasUserAsksVisualIdentification(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
 		"what is this", "what's this", "what is it", "what's it", "what is this doing", "what are they doing", "identify this", "recognize this",
-		"這是什麼", "這是啥", "這是甚麼", "這啥", "這張是什麼", "這張是啥", "他在做什麼", "他在做啥", "在做什麼", "在做啥",
-		"这是什么", "这是啥", "这是甚么", "这啥", "这张是什么", "这张是啥", "他在做什么", "他在做啥", "在做什么", "在做啥",
 	)
 }
 
 func canvasUserAsksOptimizationReview(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
 		"issue", "problem", "quality", "review", "audit", "delivery", "performance", "file size", "too large",
-		"問題", "品质", "品質", "檢查", "检查", "看看有沒有問題", "看看有没有问题", "載入", "加载", "速度", "太大", "檔案太大", "文件太大",
 	)
 }
 
 func canvasUserAsksAnnotation(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
-		"annotate", "annotation", "comment", "add a note", "leave a note", "mark", "mark up", "circle", "highlight", "pin",
-		"註解", "注解", "留言", "加註", "加注", "標註", "标注", "標記", "标记", "圈出", "圈起來", "圈起来", "指出來", "指出来", "高亮",
+		"annotate", "annotation", "comment", "comments", "commend", "commends", "add a note", "leave a note", "mark", "mark up", "circle", "highlight", "point to", "pin",
 	)
 }
 
-func canvasProposalAllowed(tool string, latestUserMessage string, options canvasChatOptions) bool {
+func canvasFallbackCommentAllowed(latestUserMessage string, selectedSkillIDs []string) bool {
+	return canvasUserAsksAnnotation(latestUserMessage) || canvasStringListContains(selectedSkillIDs, canvasSkillComments)
+}
+
+func canvasProposalAllowed(tool string, latestUserMessage string, options canvasChatOptions, nativeToolCall bool) bool {
 	if canvasToolSafe(tool) {
 		return true
 	}
@@ -1730,46 +2694,271 @@ func canvasProposalAllowed(tool string, latestUserMessage string, options canvas
 	if isCanvasOptimizationTool(tool) {
 		return containsAnyText(latestUserMessage,
 			"optimize", "optimization", "compress", "resize", "convert", "webp", "avif",
-			"優化", "最佳化", "壓縮", "縮小", "調整尺寸", "轉檔", "轉成",
-			"转换", "压缩", "优化",
 		)
 	}
 	if isCanvasImageTransformTool(tool) {
 		return containsAnyText(latestUserMessage,
 			"mirror", "flip", "flipped", "rotate", "rotation", "turn",
-			"鏡像", "镜像", "鏡相", "镜相", "靚相", "靓相",
-			"反轉", "反转", "翻轉", "翻转", "水平翻", "垂直翻", "左右翻", "上下翻", "左右反", "上下反", "水平反", "垂直反",
-			"旋轉", "旋转", "選轉", "选转", "轉 90", "转 90",
 		)
 	}
 
 	mutationIntent := containsAnyText(latestUserMessage,
 		"add", "update", "set", "save", "write", "apply", "change", "edit", "create", "generate",
-		"新增", "加入", "加上", "更新", "設定", "設成", "儲存", "寫入", "補充", "產生", "套用", "修改",
-		"添加", "设置", "保存", "写入", "补充", "生成", "应用", "修改",
 	)
 
 	switch tool {
 	case "update_tags", "batch_update_tags":
-		return mutationIntent && containsAnyText(latestUserMessage, "tag", "tags", "標籤", "标签")
+		return mutationIntent && containsAnyText(latestUserMessage, "tag", "tags")
 	case "update_description":
-		return mutationIntent && containsAnyText(latestUserMessage, "description", "describe", "caption", "描述", "說明", "说明")
+		return mutationIntent && containsAnyText(latestUserMessage, "description", "describe", "caption")
 	case "update_ocr_text":
-		return mutationIntent && containsAnyText(latestUserMessage, "ocr", "text", "文字", "文本")
+		return mutationIntent && containsAnyText(latestUserMessage, "ocr", "text")
 	case "rename_asset":
-		return containsAnyText(latestUserMessage, "rename", "重新命名", "改名", "重命名")
+		return containsAnyText(latestUserMessage, "rename")
 	case "move_asset":
-		return containsAnyText(latestUserMessage, "move", "搬移", "移動", "移动")
+		return containsAnyText(latestUserMessage, "move")
 	case "copy_asset":
-		return containsAnyText(latestUserMessage, "copy", "duplicate", "複製", "复制")
+		return containsAnyText(latestUserMessage, "copy", "duplicate")
 	case "delete_asset":
-		return containsAnyText(latestUserMessage, "delete", "remove", "刪除", "删除", "移除")
+		return containsAnyText(latestUserMessage, "delete", "remove")
 	case "favorite_asset", "batch_favorite_assets":
-		return containsAnyText(latestUserMessage, "favorite", "favourite", "收藏")
+		return containsAnyText(latestUserMessage, "favorite", "favourite")
 	case "export_asset":
-		return containsAnyText(latestUserMessage, "export", "download", "匯出", "导出", "下載", "下载")
+		return containsAnyText(latestUserMessage, "export", "download")
 	default:
 		return false
+	}
+}
+
+func canvasProposalAllowedForAction(act canvasAction, latestUserMessage string, options canvasChatOptions, nativeToolCall bool) bool {
+	if act.Tool == "copy_asset" && canvasCopyAssetProposalHasDestination(act) {
+		return true
+	}
+	return canvasProposalAllowed(act.Tool, latestUserMessage, options, nativeToolCall)
+}
+
+func canvasCopyAssetProposalHasDestination(act canvasAction) bool {
+	if act.Params == nil {
+		return false
+	}
+	if text, ok := act.Params["destPath"].(string); ok && strings.TrimSpace(text) != "" {
+		return len(canvasActionAssetIDs(act)) > 0
+	}
+	rows, ok := act.Params["perAssetDestPaths"].([]any)
+	if !ok {
+		return false
+	}
+	for _, row := range rows {
+		values, ok := row.(map[string]any)
+		if !ok {
+			return false
+		}
+		assetID, _ := values["assetId"].(string)
+		destPath, _ := values["destPath"].(string)
+		if strings.TrimSpace(assetID) == "" || strings.TrimSpace(destPath) == "" {
+			return false
+		}
+	}
+	return len(rows) > 0
+}
+
+func fillCanvasCopyAssetDestPathsFromOCR(act canvasAction, items []canvasOCRAnnotationItem) canvasAction {
+	if act.Tool != "copy_asset" || act.Params == nil || len(items) == 0 || canvasCopyAssetProposalHasDestination(act) {
+		return act
+	}
+	assetIDs := canvasActionAssetIDs(act)
+	if len(assetIDs) == 0 {
+		return act
+	}
+	byAssetID := map[string]canvasOCRAnnotationItem{}
+	for _, item := range items {
+		assetID := strings.TrimSpace(item.AssetID)
+		if assetID != "" {
+			byAssetID[assetID] = item
+		}
+	}
+	destDir, _ := act.Params["destDir"].(string)
+	destDir = strings.Trim(strings.TrimSpace(destDir), "/")
+	rows := make([]any, 0, len(assetIDs))
+	for _, assetID := range assetIDs {
+		item, ok := byAssetID[assetID]
+		if !ok || strings.TrimSpace(item.Text) == "" {
+			continue
+		}
+		fileName := canvasTextDerivedCopyFileName(item.Text, item.FileName)
+		destPath := fileName
+		if destDir != "" {
+			destPath = path.Join(destDir, fileName)
+		}
+		rows = append(rows, map[string]any{
+			"assetId":  assetID,
+			"destPath": destPath,
+		})
+	}
+	if len(rows) == 0 {
+		return act
+	}
+	next := act
+	next.Params = cloneCanvasActionParams(act.Params)
+	next.Params["perAssetDestPaths"] = rows
+	return next
+}
+
+func sanitizeCanvasCopyAssetDestPathsFromOCR(act canvasAction, items []canvasOCRAnnotationItem) canvasAction {
+	if act.Tool != "copy_asset" || act.Params == nil || len(items) == 0 {
+		return act
+	}
+	rows, ok := act.Params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) == 0 {
+		return act
+	}
+	byAssetID := map[string]canvasOCRAnnotationItem{}
+	for _, item := range items {
+		assetID := strings.TrimSpace(item.AssetID)
+		if assetID != "" {
+			byAssetID[assetID] = item
+		}
+	}
+	nextRows := make([]any, 0, len(rows))
+	changed := false
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			nextRows = append(nextRows, raw)
+			continue
+		}
+		nextRow := make(map[string]any, len(row))
+		for key, value := range row {
+			nextRow[key] = value
+		}
+		assetID, _ := row["assetId"].(string)
+		destPath, _ := row["destPath"].(string)
+		item, found := byAssetID[strings.TrimSpace(assetID)]
+		if found && canvasCopyDestPathStem(destPath) == strings.TrimSpace(item.Text) {
+			safeFileName := canvasTextDerivedCopyFileName(item.Text, item.FileName)
+			if safeFileName != destPath {
+				nextRow["destPath"] = safeFileName
+				changed = true
+			}
+		}
+		nextRows = append(nextRows, nextRow)
+	}
+	if !changed {
+		return act
+	}
+	next := act
+	next.Params = cloneCanvasActionParams(act.Params)
+	next.Params["perAssetDestPaths"] = nextRows
+	return next
+}
+
+func canvasCopyDestPathStem(destPath string) string {
+	destPath = strings.TrimSpace(destPath)
+	ext := filepath.Ext(destPath)
+	if ext == "" {
+		return destPath
+	}
+	return strings.TrimSuffix(destPath, ext)
+}
+
+func normalizeCanvasCopyAssetDestPaths(act canvasAction) canvasAction {
+	if act.Tool != "copy_asset" || act.Params == nil {
+		return act
+	}
+	rows, ok := act.Params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) == 0 {
+		return act
+	}
+	used := map[string]bool{}
+	nextRows := make([]any, 0, len(rows))
+	changed := false
+	var rowAssetIDs []string
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			nextRows = append(nextRows, raw)
+			continue
+		}
+		assetID, _ := row["assetId"].(string)
+		assetID = strings.TrimSpace(assetID)
+		if assetID != "" {
+			rowAssetIDs = append(rowAssetIDs, assetID)
+		}
+		destPath, _ := row["destPath"].(string)
+		destPath = strings.TrimSpace(destPath)
+		uniqueDestPath := uniqueCanvasCopyDestPath(destPath, used)
+		if uniqueDestPath != destPath {
+			changed = true
+		}
+		nextRow := make(map[string]any, len(row))
+		for key, value := range row {
+			nextRow[key] = value
+		}
+		nextRow["destPath"] = uniqueDestPath
+		nextRows = append(nextRows, nextRow)
+	}
+	if len(canvasActionAssetIDs(act)) == 0 && len(rowAssetIDs) > 0 {
+		changed = true
+	}
+	if !changed {
+		return act
+	}
+	next := act
+	next.Params = cloneCanvasActionParams(act.Params)
+	next.Params["perAssetDestPaths"] = nextRows
+	if len(canvasActionAssetIDs(next)) == 0 && len(rowAssetIDs) > 0 {
+		setCanvasActionAssetIDs(&next, rowAssetIDs)
+	}
+	return next
+}
+
+func canvasTextDerivedCopyFileName(text string, fallbackFileName string) string {
+	ext := strings.TrimSpace(filepath.Ext(fallbackFileName))
+	if ext == "" {
+		ext = ".png"
+	}
+	base := strings.TrimSpace(text)
+	var b strings.Builder
+	for _, r := range base {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+			b.WriteRune('_')
+		default:
+			if r < 32 {
+				b.WriteRune('_')
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	name := strings.Trim(strings.TrimSpace(b.String()), ". ")
+	if name == "" {
+		name = strings.TrimSuffix(filepath.Base(fallbackFileName), filepath.Ext(fallbackFileName))
+	}
+	if name == "" {
+		name = "asset"
+	}
+	name = truncate(name, 120)
+	if filepath.Ext(name) != "" {
+		return name
+	}
+	return name + ext
+}
+
+func uniqueCanvasCopyDestPath(destPath string, used map[string]bool) string {
+	if destPath == "" {
+		return destPath
+	}
+	candidate := destPath
+	for index := 1; ; index++ {
+		key := strings.ToLower(candidate)
+		if !used[key] {
+			used[key] = true
+			return candidate
+		}
+		ext := filepath.Ext(destPath)
+		stem := strings.TrimSuffix(destPath, ext)
+		candidate = fmt.Sprintf("%s-%d%s", stem, index+1, ext)
 	}
 }
 
@@ -1794,21 +2983,36 @@ func selectedCanvasAssetIDs(canvas canvasSnapshot) []string {
 }
 
 func selectedCanvasImageCardIDs(canvas canvasSnapshot) []string {
-	selected := make(map[string]bool, len(canvas.SelectedCardIDs))
-	for _, id := range canvas.SelectedCardIDs {
-		selected[id] = true
+	byID := map[string]canvasCardSnapshot{}
+	for _, card := range canvas.Cards {
+		byID[card.ID] = card
 	}
 	var ids []string
 	seen := map[string]bool{}
-	for _, card := range canvas.Cards {
-		if !selected[card.ID] || seen[card.ID] {
-			continue
+	add := func(id string) {
+		if id = strings.TrimSpace(id); id == "" || seen[id] {
+			return
+		}
+		card, ok := byID[id]
+		if !ok {
+			return
 		}
 		if card.Kind != "asset" && card.Kind != "upload" && card.Kind != "variant" {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	for _, id := range canvas.SelectedCardIDs {
+		card, ok := byID[id]
+		if !ok {
 			continue
 		}
-		seen[card.ID] = true
-		ids = append(ids, card.ID)
+		if card.Kind == "comment" {
+			add(card.AnchorID)
+			continue
+		}
+		add(card.ID)
 	}
 	return ids
 }
@@ -1877,6 +3081,171 @@ func setCanvasActionCardIDs(act *canvasAction, ids []string) {
 	}
 }
 
+func filterCanvasRemoveActionProtectedCards(act canvasAction, protected map[string]bool) canvasAction {
+	if act.Tool != "remove_cards" || len(protected) == 0 {
+		return act
+	}
+	var filtered []string
+	for _, id := range canvasActionCardIDs(act) {
+		if protected[id] {
+			continue
+		}
+		filtered = append(filtered, id)
+	}
+	setCanvasActionCardIDs(&act, filtered)
+	return act
+}
+
+func canvasCleanupCandidateCardIDs(canvas canvasSnapshot, protected map[string]bool) []string {
+	var ids []string
+	for _, card := range canvas.Cards {
+		if protected[card.ID] {
+			continue
+		}
+		if card.Kind != "asset" && card.Kind != "upload" && card.Kind != "variant" {
+			continue
+		}
+		ids = append(ids, card.ID)
+	}
+	return ids
+}
+
+func normalizeCanvasImageRegionAction(act canvasAction, canvas canvasSnapshot) canvasAction {
+	if !canvasToolHasImageRegion(act.Tool) || act.Params == nil {
+		return act
+	}
+	rawRegion, ok := act.Params["region"]
+	if !ok {
+		return act
+	}
+	region, ok := canvasRegionFromValue(rawRegion)
+	if !ok {
+		return act
+	}
+	anchor := canvasImageRegionAnchorCard(act, canvas)
+	if anchor != nil && canvasRegionLooksPixelBased(region) {
+		width, height := canvasCardImageDisplaySize(*anchor)
+		if width > 0 && height > 0 {
+			region.X /= width
+			region.Width /= width
+			region.Y /= height
+			region.Height /= height
+		}
+	}
+	region = clampCanvasRegion(region)
+	next := act
+	next.Params = cloneCanvasActionParams(act.Params)
+	next.Params["region"] = map[string]any{
+		"x":      region.X,
+		"y":      region.Y,
+		"width":  region.Width,
+		"height": region.Height,
+	}
+	return next
+}
+
+func canvasToolHasImageRegion(tool string) bool {
+	switch tool {
+	case "create_comment", "update_comment":
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasImageRegionAnchorCard(act canvasAction, canvas canvasSnapshot) *canvasCardSnapshot {
+	if act.Params == nil {
+		return nil
+	}
+	switch act.Tool {
+	case "create_comment":
+		anchorID, _ := act.Params["anchorCardId"].(string)
+		return canvasCardByID(canvas, anchorID)
+	case "update_comment":
+		commentID, _ := act.Params["commentCardId"].(string)
+		comment := canvasCardByID(canvas, commentID)
+		if comment == nil || comment.AnchorID == "" {
+			return nil
+		}
+		return canvasCardByID(canvas, comment.AnchorID)
+	default:
+		return nil
+	}
+}
+
+func canvasCardByID(canvas canvasSnapshot, id string) *canvasCardSnapshot {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	for i := range canvas.Cards {
+		if canvas.Cards[i].ID == id {
+			return &canvas.Cards[i]
+		}
+	}
+	return nil
+}
+
+func canvasRegionFromValue(value any) (canvasRegion, bool) {
+	raw, ok := value.(map[string]any)
+	if !ok {
+		return canvasRegion{}, false
+	}
+	number := func(key string) (float64, bool) {
+		switch v := raw[key].(type) {
+		case float64:
+			return v, true
+		case int:
+			return float64(v), true
+		case json.Number:
+			n, err := v.Float64()
+			return n, err == nil
+		case string:
+			n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			return n, err == nil
+		default:
+			return 0, false
+		}
+	}
+	x, okX := number("x")
+	y, okY := number("y")
+	width, okWidth := number("width")
+	height, okHeight := number("height")
+	if !okX || !okY || !okWidth || !okHeight {
+		return canvasRegion{}, false
+	}
+	return canvasRegion{X: x, Y: y, Width: width, Height: height}, true
+}
+
+func canvasRegionLooksPixelBased(region canvasRegion) bool {
+	return region.X > 1 || region.Y > 1 || region.Width > 1 || region.Height > 1
+}
+
+func clampCanvasRegion(region canvasRegion) canvasRegion {
+	region.Width = min(max(region.Width, 0.02), 1)
+	region.Height = min(max(region.Height, 0.02), 1)
+	region.X = min(max(region.X, 0), 1-region.Width)
+	region.Y = min(max(region.Y, 0), 1-region.Height)
+	return region
+}
+
+func canvasCardImageDisplaySize(card canvasCardSnapshot) (float64, float64) {
+	width := card.Width
+	if width <= 0 {
+		width = 320
+	}
+	if card.Height > 0 {
+		return width, card.Height
+	}
+	if card.Asset != nil && card.Asset.Width > 0 && card.Asset.Height > 0 {
+		return width, width * float64(card.Asset.Height) / float64(card.Asset.Width)
+	}
+	if card.UploadWidth > 0 && card.UploadHeight > 0 {
+		return width, width * float64(card.UploadHeight) / float64(card.UploadWidth)
+	}
+	return width, 240
+}
+
 func canvasActionCardIDs(act canvasAction) []string {
 	if act.Params == nil {
 		return nil
@@ -1924,41 +3293,6 @@ func canvasActionPositionCardIDs(act canvasAction) []string {
 		}
 	}
 	return ids
-}
-
-func canvasActionDedupeKey(act canvasAction) string {
-	ids := append([]string{}, canvasActionCardIDs(act)...)
-	ids = append(ids, canvasActionPositionCardIDs(act)...)
-	ids = append(ids, canvasActionAssetIDs(act)...)
-	if len(ids) == 0 {
-		return act.Tool
-	}
-	seen := map[string]bool{}
-	uniq := make([]string, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" || seen[id] {
-			continue
-		}
-		seen[id] = true
-		uniq = append(uniq, id)
-	}
-	sort.Strings(uniq)
-	return act.Tool + "|" + strings.Join(uniq, ",")
-}
-
-func filterCanvasFallbackActions(actions []canvasAction, executed map[string]bool) []canvasAction {
-	if len(actions) == 0 || len(executed) == 0 {
-		return actions
-	}
-	out := make([]canvasAction, 0, len(actions))
-	for _, act := range actions {
-		if executed[canvasActionDedupeKey(act)] {
-			continue
-		}
-		out = append(out, act)
-	}
-	return out
 }
 
 func canvasActionAssetIDs(act canvasAction) []string {
@@ -2044,9 +3378,6 @@ func canvasToolIsCapture(tool string) bool {
 
 func canvasCaptureRequested(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
-		"拍照", "拍一張", "拍一张", "拍張", "拍张",
-		"截圖", "截图", "擷取", "截取",
-		"匯出畫布", "导出画布", "輸出畫布", "输出画布", "匯出", "导出", "輸出", "输出", "下載", "下载",
 		"capture", "screenshot", "photo", "picture", "export", "download",
 	)
 }
@@ -2055,34 +3386,25 @@ func canvasFollowupShouldRetainImages(reason string, latestUserMessage string) b
 	if reason == canvasLoopReasonMissingCapture {
 		return true
 	}
+	if reason == canvasLoopReasonFocusOnlyNeedsAnswer {
+		return true
+	}
+	if reason == canvasLoopReasonIncompleteTextAnnotation {
+		return true
+	}
+	if reason == canvasLoopReasonOCRTextExtraction {
+		return true
+	}
+	if reason == canvasLoopReasonOCRTextAnnotation {
+		return true
+	}
 	if canvasUserWantsCanvasAction(latestUserMessage) && (reason == canvasLoopReasonFocusOnlyNeedsAnswer || reason == canvasLoopReasonTextOnlyDeferredWork || reason == canvasLoopReasonCaptureOnlyWork) {
 		return true
 	}
 	return containsAnyText(latestUserMessage,
-		"看圖", "看图", "看一下這張", "看一下这张", "看看這張", "看看这张",
-		"分析這張", "分析这张", "比較", "比较", "對比", "对比",
-		"辨識", "识别", "描述這張", "描述这张",
-		"畫面內容", "画面内容", "圖片內容", "图片内容", "影像內容", "图裡", "圖裡", "图中", "圖中",
 		"look at", "inspect", "compare", "analyze", "analyse", "describe",
 		"what is in", "what's in", "visual", "image quality", "quality issue",
 	)
-}
-
-func fallbackCanvasCaptureAction(latestUserMessage string, canvas canvasSnapshot) canvasAction {
-	tool := "capture_canvas"
-	if containsAnyText(latestUserMessage, "可見", "目前畫面", "viewport", "visible") {
-		tool = "capture_viewport"
-	}
-	if containsAnyText(latestUserMessage, "選取", "選中", "selected", "selection") && len(canvas.SelectedCardIDs) > 0 {
-		tool = "capture_selected"
-	}
-	transparent := containsAnyText(latestUserMessage, "去背", "透明", "transparent", "no background", "without background")
-	return canvasAction{
-		Tool:        tool,
-		Params:      map[string]any{"transparent": transparent},
-		Description: "Capture the canvas",
-		Impact:      "Shows the screenshot preview",
-	}
 }
 
 func canvasCaptureRepairPrompt(latestUserMessage string) string {
@@ -2140,8 +3462,6 @@ func canvasImageTempFile(dataURI string) (string, func(), error) {
 func canvasUserLimitsToSingleAsset(latestUserMessage string) bool {
 	return containsAnyText(latestUserMessage,
 		"only this", "only first", "first image", "single image",
-		"只處理第一", "只处理第一", "只要第一", "只看第一", "第一張", "第一张",
-		"只處理這張", "只处理这张", "只看這張", "只看这张", "這張", "这张",
 	)
 }
 
@@ -2219,263 +3539,16 @@ func canvasToolPreservesExplicitAssetTargets(tool string) bool {
 	}
 }
 
-func refineCanvasImageVariantTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
-	fallbackByTool := map[string]canvasAction{}
-	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
-		if isCanvasImageTransformTool(act.Tool) && len(canvasActionAssetIDs(act)) > 0 {
-			fallbackByTool[act.Tool] = act
-		}
-	}
-	if len(fallbackByTool) == 0 {
-		return actions
-	}
-	refined := make([]canvasAction, 0, len(actions))
-	for _, act := range actions {
-		fallback, ok := fallbackByTool[act.Tool]
-		if !ok || !isCanvasImageTransformTool(act.Tool) {
-			refined = append(refined, act)
-			continue
-		}
-		targetIDs := canvasActionAssetIDs(fallback)
-		if len(targetIDs) == 0 {
-			refined = append(refined, act)
-			continue
-		}
-		clone := act
-		setCanvasActionAssetIDs(&clone, targetIDs)
-		if clone.Params == nil {
-			clone.Params = map[string]any{}
-		}
-		for _, key := range []string{"outputFormat", "flip"} {
-			if _, exists := clone.Params[key]; !exists {
-				if value, ok := fallback.Params[key]; ok {
-					clone.Params[key] = value
-				}
-			}
-		}
-		if act.Tool == "rotate_image" && !canvasTextHasExplicitRotationDegrees(latestUserMessage) {
-			if value, ok := fallback.Params["degrees"]; ok {
-				clone.Params["degrees"] = value
-			}
-		}
-		refined = append(refined, clone)
-	}
-	return refined
-}
-
-func refineCanvasLayoutActionTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
-	if canvasFallbackClauseTargetsSelection(latestUserMessage) {
-		return actions
-	}
-	fallbackByTool := map[string]canvasAction{}
-	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
-		switch act.Tool {
-		case "resize_card":
-			if cardID, _ := act.Params["cardId"].(string); strings.TrimSpace(cardID) != "" {
-				fallbackByTool[act.Tool] = act
-			}
-		case "duplicate_cards":
-			if len(canvasActionCardIDs(act)) > 0 {
-				fallbackByTool[act.Tool] = act
-			}
-		case "arrange_cards":
-			if len(canvasActionPositionCardIDs(act)) > 0 {
-				fallbackByTool[act.Tool] = act
-			}
-		}
-	}
-	if len(fallbackByTool) == 0 {
-		return actions
-	}
-	refined := make([]canvasAction, 0, len(actions))
-	for _, act := range actions {
-		switch act.Tool {
-		case "resize_card":
-			fallback, ok := fallbackByTool[act.Tool]
-			if !ok {
-				refined = append(refined, act)
-				continue
-			}
-			cardID, _ := fallback.Params["cardId"].(string)
-			cardID = strings.TrimSpace(cardID)
-			if cardID == "" {
-				refined = append(refined, act)
-				continue
-			}
-			clone := act
-			clone.Params = cloneCanvasActionParams(act.Params)
-			clone.Params["cardId"] = cardID
-			if width, ok := fallback.Params["width"]; ok {
-				clone.Params["width"] = width
-			}
-			refined = append(refined, clone)
-		case "duplicate_cards":
-			fallback, ok := fallbackByTool[act.Tool]
-			if !ok {
-				refined = append(refined, act)
-				continue
-			}
-			cardIDs := canvasActionCardIDs(fallback)
-			if len(cardIDs) == 0 {
-				refined = append(refined, act)
-				continue
-			}
-			clone := act
-			clone.Params = cloneCanvasActionParams(act.Params)
-			setCanvasActionCardIDs(&clone, cardIDs)
-			for _, key := range []string{"count", "layout", "label"} {
-				if value, ok := fallback.Params[key]; ok {
-					clone.Params[key] = value
-				}
-			}
-			refined = append(refined, clone)
-		case "arrange_cards":
-			fallback, ok := fallbackByTool[act.Tool]
-			if !ok {
-				refined = append(refined, act)
-				continue
-			}
-			positions := fallback.Params["positions"]
-			if len(canvasActionPositionCardIDs(fallback)) == 0 {
-				refined = append(refined, act)
-				continue
-			}
-			clone := act
-			clone.Params = cloneCanvasActionParams(act.Params)
-			clone.Params["positions"] = positions
-			refined = append(refined, clone)
-		default:
-			refined = append(refined, act)
-		}
-	}
-	return refined
-}
-
 func refineCanvasActionTargets(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
-	actions = refineCanvasImageVariantTargets(actions, canvas, latestUserMessage)
-	actions = refineCanvasLayoutActionTargets(actions, canvas, latestUserMessage)
-	mentioned := canvasMentionedActionTargetCardIDs(latestUserMessage, canvas)
-	if !canvasFallbackClauseKeepsMultipleTargets(latestUserMessage) {
-		for id := range canvasFallbackLayoutTargetCardIDs(latestUserMessage, canvas) {
-			if mentioned == nil {
-				mentioned = map[string]bool{}
-			}
-			mentioned[id] = true
-		}
-	}
-	if len(mentioned) == 0 {
-		return actions
-	}
-	refined := make([]canvasAction, 0, len(actions))
-	for _, act := range actions {
-		switch act.Tool {
-		case "focus_card", "move_card", "resize_card":
-			cardID, _ := act.Params["cardId"].(string)
-			cardID = strings.TrimSpace(cardID)
-			if cardID != "" && !mentioned[cardID] {
-				continue
-			}
-		case "arrange_cards":
-			positions := filterCanvasActionPositionsByMentioned(act.Params["positions"], mentioned)
-			if len(positions) == 0 {
-				continue
-			}
-			clone := act
-			clone.Params = cloneCanvasActionParams(act.Params)
-			clone.Params["positions"] = positions
-			refined = append(refined, clone)
-			continue
-		case "duplicate_cards", "select_cards", "remove_cards", "align_cards", "distribute_cards", "bring_cards_to_front":
-			cardIDs := filterCanvasActionCardIDsByMentioned(canvasActionCardIDs(act), mentioned)
-			if len(cardIDs) == 0 {
-				continue
-			}
-			clone := act
-			setCanvasActionCardIDs(&clone, cardIDs)
-			refined = append(refined, clone)
-			continue
-		}
-		refined = append(refined, act)
-	}
-	return refined
+	return actions
 }
 
-func canvasFallbackLayoutTargetCardIDs(latestUserMessage string, canvas canvasSnapshot) map[string]bool {
-	if canvasFallbackClauseTargetsSelection(latestUserMessage) {
-		return nil
+func cloneStringBoolMap(values map[string]bool) map[string]bool {
+	next := make(map[string]bool, len(values))
+	for key, value := range values {
+		next[key] = value
 	}
-	ids := map[string]bool{}
-	add := func(id string) {
-		id = strings.TrimSpace(id)
-		if id != "" {
-			ids[id] = true
-		}
-	}
-	for _, act := range fallbackCanvasManipulationActions(latestUserMessage, canvas, nil) {
-		switch act.Tool {
-		case "focus_card", "move_card", "resize_card":
-			if id, _ := act.Params["cardId"].(string); id != "" {
-				add(id)
-			}
-		case "duplicate_cards", "select_cards", "remove_cards", "align_cards", "distribute_cards", "bring_cards_to_front":
-			for _, id := range canvasActionCardIDs(act) {
-				add(id)
-			}
-		case "arrange_cards":
-			for _, id := range canvasActionPositionCardIDs(act) {
-				add(id)
-			}
-		}
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	return ids
-}
-
-func canvasMentionedActionTargetCardIDs(text string, canvas canvasSnapshot) map[string]bool {
-	queryTerms := canvasFallbackQueryTerms(text)
-	if len(queryTerms) == 0 {
-		return nil
-	}
-	type cardMatch struct {
-		cardID  string
-		aliases []string
-	}
-	var matches []cardMatch
-	aliasCardCounts := map[string]int{}
-	for _, card := range canvas.Cards {
-		if !canvasCardCanBeVisuallyArranged(card) {
-			continue
-		}
-		score, aliases := canvasFallbackCardScore(card, queryTerms)
-		if score <= 0 || len(aliases) == 0 {
-			continue
-		}
-		matches = append(matches, cardMatch{cardID: card.ID, aliases: aliases})
-		seenAliases := map[string]bool{}
-		for _, alias := range aliases {
-			alias = strings.ToLower(strings.TrimSpace(alias))
-			if alias == "" || seenAliases[alias] {
-				continue
-			}
-			seenAliases[alias] = true
-			aliasCardCounts[alias]++
-		}
-	}
-	mentioned := map[string]bool{}
-	for _, match := range matches {
-		for _, alias := range match.aliases {
-			if aliasCardCounts[strings.ToLower(strings.TrimSpace(alias))] == 1 {
-				mentioned[match.cardID] = true
-				break
-			}
-		}
-	}
-	if len(mentioned) == 0 || len(mentioned) > max(8, len(canvas.Cards)/2) {
-		return nil
-	}
-	return mentioned
+	return next
 }
 
 func cloneCanvasActionParams(params map[string]any) map[string]any {
@@ -2486,51 +3559,9 @@ func cloneCanvasActionParams(params map[string]any) map[string]any {
 	return next
 }
 
-func filterCanvasActionCardIDsByMentioned(cardIDs []string, mentioned map[string]bool) []string {
-	out := make([]string, 0, len(cardIDs))
-	seen := map[string]bool{}
-	for _, id := range cardIDs {
-		id = strings.TrimSpace(id)
-		if id == "" || !mentioned[id] || seen[id] {
-			continue
-		}
-		seen[id] = true
-		out = append(out, id)
-	}
-	return out
-}
-
-func filterCanvasActionPositionsByMentioned(rawPositions any, mentioned map[string]bool) []any {
-	add := func(out []any, item map[string]any) []any {
-		cardID := strings.TrimSpace(fmt.Sprint(item["cardId"]))
-		if cardID == "" || !mentioned[cardID] {
-			return out
-		}
-		next := make(map[string]any, len(item))
-		for key, value := range item {
-			next[key] = value
-		}
-		return append(out, next)
-	}
-	var out []any
-	switch positions := rawPositions.(type) {
-	case []any:
-		for _, raw := range positions {
-			if item, ok := raw.(map[string]any); ok {
-				out = add(out, item)
-			}
-		}
-	case []map[string]any:
-		for _, item := range positions {
-			out = add(out, item)
-		}
-	}
-	return out
-}
-
 func canvasTextHasExplicitRotationDegrees(text string) bool {
 	return containsAnyText(text,
-		"90", "180", "270", "九十", "一百八十", "百八", "兩百七十", "两百七十",
+		"90", "180", "270",
 		"ninety", "one eighty", "one-eighty", "hundred eighty", "two seventy", "two-seventy",
 	)
 }
@@ -2571,12 +3602,22 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		Canvas:  req.Canvas,
 		Options: req.Options,
 	})
+	if canvasLatestUserLanguage(latestUserMessage, locale) != "" {
+		selectedSkillIDs = canvasAllSkillIDs()
+	}
 	canvasTools := canvasLLMToolsForSkills(selectedSkillIDs)
-	usingNativeTools := len(canvasTools) > 0
-	systemPrompt := canvasNativeSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
+	usingNativeTools := canvasNativeToolsEnabled(backend, canvasTools)
+	systemPrompt := canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
+	if usingNativeTools {
+		canvasTools = canvasNativeLLMToolsForSkills(selectedSkillIDs)
+		systemPrompt = canvasNativeSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
+	} else {
+		canvasTools = nil
+	}
 	userPrompt := buildCanvasUserPrompt(req.Messages, req.Canvas, req.Options, locale)
 
 	var images []vlmImage
+	var canvasImage *vlmImage
 	if req.CanvasImage != "" {
 		path, cleanup, err := canvasImageTempFile(req.CanvasImage)
 		if err != nil {
@@ -2584,7 +3625,13 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer cleanup()
-		images = append(images, vlmImage{Path: path, Ext: ".png"})
+		canvasImage = &vlmImage{Path: path, Ext: ".png"}
+	}
+	imageLimit := 4
+	useSelectedCoordinateGrid := len(selectedCanvasImageCardIDs(req.Canvas)) == 1
+	selectedImageLimit := imageLimit
+	if canvasImage != nil {
+		selectedImageLimit--
 	}
 	for _, card := range req.Canvas.Cards {
 		if card.Asset == nil {
@@ -2608,13 +3655,19 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil || item.LocalPath == "" {
 			continue
 		}
+		if useSelectedCoordinateGrid && len(images) == 0 && len(images) < selectedImageLimit {
+			if path, cleanup, err := canvasCoordinateGridImage(item.LocalPath); err == nil {
+				defer cleanup()
+				images = append(images, vlmImage{Path: path, Ext: ".png"})
+			}
+		}
 		images = append(images, vlmImage{Path: item.LocalPath, Ext: item.Ext})
-		if len(images) >= 4 {
+		if len(images) >= selectedImageLimit {
 			break
 		}
 	}
 	for _, card := range req.Canvas.Cards {
-		if len(images) >= 4 {
+		if len(images) >= selectedImageLimit {
 			break
 		}
 		if card.Kind != "upload" || card.UploadToken == "" {
@@ -2634,10 +3687,19 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			continue
 		}
+		if useSelectedCoordinateGrid && len(images) == 0 && len(images) < selectedImageLimit {
+			if path, cleanup, err := canvasCoordinateGridImage(download.Path); err == nil {
+				defer cleanup()
+				images = append(images, vlmImage{Path: path, Ext: ".png"})
+			}
+		}
 		images = append(images, vlmImage{Path: download.Path, Ext: filepath.Ext(download.Path)})
 	}
+	if canvasImage != nil && len(images) < imageLimit {
+		images = append(images, *canvasImage)
+	}
 	for _, token := range req.AttachmentTokens {
-		if len(images) >= 4 {
+		if len(images) >= imageLimit {
 			break
 		}
 		if token == "" {
@@ -2657,17 +3719,16 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		sendNDJSON(w, map[string]any{
 			"type":   "focus",
 			"cardId": req.Canvas.SelectedCardIDs[0],
-			"label":  "Examining...",
 		})
 		time.Sleep(800 * time.Millisecond)
 	}
 	sendNDJSON(w, map[string]any{"type": "thinking"})
 
-	const maxToolLoops = 3
+	const maxToolLoops = 5
 	currentPrompt := userPrompt
 	proposalIndex := 0
 	captureRequested := canvasCaptureRequested(latestUserMessage)
-	captureSeen := false
+	executedCaptureTools := map[string]bool{}
 	var totalInputTokens, totalOutputTokens int64
 	start := time.Now()
 
@@ -2677,37 +3738,51 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 	var loopStats []vlmChatRoundStats
 	generatedImagePaths := map[string]bool{}
 	concreteCanvasActionSeen := false
-	searchCatalogActionSeen := false
 	preparatoryActionLoops := 0
+	textEmitted := false
+	var addedCatalogItemsForAnswer []scanner.AssetItem
+	var createdCommentTexts []string
+	executedCanvasTools := map[string]bool{}
 	executedCanvasActionKeys := map[string]bool{}
+	executedCanvasTextRegionKeys := map[string]bool{}
+	cleanupProtectedCardIDs := map[string]bool{}
+	var executedCanvasToolSequence []string
+	textAnnotationRepairPending := false
+	textAssetSearchSeen := false
+	ocrTextAnnotationRepairPending := false
+	var latestOCRAnnotationItems []canvasOCRAnnotationItem
+	protectCleanupCardIDs := func(ids []string) {
+		for _, id := range ids {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				cleanupProtectedCardIDs[id] = true
+			}
+		}
+	}
+	canvasActionAlreadyExecuted := func(act canvasAction) bool {
+		key := canvasActionExecutionKey(act)
+		if key == "" {
+			return false
+		}
+		return executedCanvasActionKeys[key]
+	}
 	rememberExecutedCanvasAction := func(act canvasAction) {
 		if strings.TrimSpace(act.Tool) == "" {
 			return
 		}
-		executedCanvasActionKeys[canvasActionDedupeKey(act)] = true
-		if canvasToolIsCatalogSearchWork(act.Tool) {
-			searchCatalogActionSeen = true
-		}
-	}
-	confirmedFallbackCardIDSeen := map[string]bool{}
-	var confirmedFallbackCardIDs []string
-	rememberConfirmedFallbackCardID := func(id string) {
-		id = strings.TrimSpace(id)
-		if id == "" || confirmedFallbackCardIDSeen[id] {
-			return
-		}
-		confirmedFallbackCardIDSeen[id] = true
-		confirmedFallbackCardIDs = append(confirmedFallbackCardIDs, id)
-	}
-	rememberConfirmedFallbackAction := func(act canvasAction) {
-		switch act.Tool {
-		case "focus_card", "select_cards":
-			for _, id := range canvasActionCardIDs(act) {
-				rememberConfirmedFallbackCardID(id)
-			}
+		executedCanvasTools[act.Tool] = true
+		executedCanvasToolSequence = append(executedCanvasToolSequence, act.Tool)
+		if key := canvasActionExecutionKey(act); key != "" {
+			executedCanvasActionKeys[key] = true
 		}
 	}
 	for loop := 0; loop < maxToolLoops; loop++ {
+		roundTools := canvasTools
+		roundToolChoice := ""
+		if usingNativeTools {
+			roundTools = canvasNativeToolsForRound(canvasTools, loopReason)
+			roundToolChoice = canvasNativeToolChoice(roundTools, loopReason)
+		}
 		round := s.chatVLMRound(r.Context(), vlmChatRoundRequest{
 			Images:           images,
 			Backend:          backend,
@@ -2716,7 +3791,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			Prompt:           currentPrompt,
 			Purpose:          "canvas",
 			TimeoutSec:       canvasOutputTokenLimit,
-			Tools:            canvasTools,
+			Tools:            roundTools,
+			ToolChoice:       roundToolChoice,
+			ImageDetail:      "high",
 			SelectedSkillIDs: selectedSkillIDs,
 			Loop:             loop,
 			PromptKind:       promptKind,
@@ -2764,7 +3841,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		toolUseSource := ""
 		if len(toolCallActions) > 0 {
 			actions = toolCallActions
-			textBody = strings.TrimSpace(content)
+			textBody = ""
 			toolUseSource = "native_tool_call"
 		} else if fallbackActionCount > 0 {
 			toolUseSource = "fallback_parse"
@@ -2775,15 +3852,40 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		truncatedAction := canvasActionBlockLikelyTruncated(content) && loop < maxToolLoops-1
 		var invalidActionIssues []canvasActionValidationIssue
 		actions, invalidActionIssues = normalizeCanvasActions(actions, false)
+		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(toolCallActions) == 0 && strings.TrimSpace(content) == "" {
+			for _, call := range chatResp.ToolCalls {
+				invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
+					Tool:   call.Name,
+					Reason: "unknown or unsupported native tool call",
+				})
+			}
+		}
 		actions = expandCanvasMultiSelectedActions(actions, req.Canvas, latestUserMessage)
 		actions = refineCanvasActionTargets(actions, req.Canvas, latestUserMessage)
 		actions = refineCanvasSearchActions(actions, latestUserMessage)
+		actions = filterCanvasIncidentalCatalogSearchActions(actions)
 		var postExpansionIssues []canvasActionValidationIssue
 		actions, postExpansionIssues = normalizeCanvasActions(actions, true)
+		var blockedUnverifiableTextActionCount int
+		actions, blockedUnverifiableTextActionCount = filterCanvasUnverifiableTextMentionActions(actions, req.Canvas)
+		var missingVisualCueIssues []canvasActionValidationIssue
+		actions, missingVisualCueIssues = filterCanvasFallbackImageRegionActionsMissingVisualCue(actions, toolUseSource != "native_tool_call")
+		var blockedIncompleteTextActionCount int
+		actions, blockedIncompleteTextActionCount = filterCanvasIncompleteTextAnnotationActions(actions, loopReason, textAnnotationRepairPending)
+		var blockedOCRTextAnnotationActionCount int
+		actions, blockedOCRTextAnnotationActionCount = filterCanvasOCRTextAnnotationActions(actions, loopReason)
 		invalidActionIssues = append(invalidActionIssues, postExpansionIssues...)
+		invalidActionIssues = append(invalidActionIssues, missingVisualCueIssues...)
+		if usingNativeTools && len(chatResp.ToolCalls) > 0 && len(actions) == 0 && strings.TrimSpace(content) == "" {
+			invalidActionIssues = append(invalidActionIssues, canvasActionValidationIssue{
+				Tool:   "native_tool_call",
+				Reason: "native tool calls did not produce executable canvas actions: " + strings.Join(canvasActionToolNames(toolCallActions), ", "),
+			})
+		}
 		invalidActionNeedsRepair := len(invalidActionIssues) > 0 && loop < maxToolLoops-1
 		loopStats[statIndex].ActionCount = len(actions)
 		loopStats[statIndex].InvalidActionCount = len(invalidActionIssues)
+		loopStats[statIndex].InvalidActionIssues = invalidActionIssues
 		hasCaptureAction := false
 		for _, act := range actions {
 			if canvasToolIsCapture(act.Tool) {
@@ -2791,7 +3893,7 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		missingCapture := captureRequested && !captureSeen && !hasCaptureAction && loop < maxToolLoops-1
+		missingCapture := captureRequested && len(executedCaptureTools) == 0 && !hasCaptureAction && loop < maxToolLoops-1
 
 		var compactToolResults []canvasCompactToolResult
 		captureExecutedThisLoop := false
@@ -2803,11 +3905,68 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		proposalCount := 0
 		blockedProposalCount := 0
 		blockedCommentCount := 0
+		executedTextAnnotation := false
+		ocrTextExtractionNeededThisLoop := false
+		ocrTextAnnotationNeededThisLoop := false
+		blockedGenericTextRegionCount := 0
+		var executedCommentResults []canvasCompactToolResult
 		for _, issue := range invalidActionIssues {
 			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", issue))
 		}
+		for i := 0; i < blockedUnverifiableTextActionCount; i++ {
+			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", canvasActionValidationIssue{
+				Tool:   "create_comment",
+				Reason: "comment mentioned OCR/text content but did not include a verifiable visualCue for either the non-text target or the text characters",
+			}))
+		}
+		for i := 0; i < blockedIncompleteTextActionCount; i++ {
+			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", canvasActionValidationIssue{
+				Tool:   "create_comment",
+				Reason: "text annotation repair requires a create_comment whose visualCue.targetDescription identifies text, letters, words, glyphs, or characters and whose visualCue.colorHex provides the text pixel color",
+			}))
+		}
+		for i := 0; i < blockedOCRTextAnnotationActionCount; i++ {
+			compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", canvasActionValidationIssue{
+				Tool:   "create_comment",
+				Reason: "OCR text annotation repair requires create_comment with a text visualCue, remove_cards for non-text results, arrange_cards for layout, or copy_asset with perAssetDestPaths when the original request asks for text-derived filenames",
+			}))
+		}
 		for _, act := range actions {
-			rememberConfirmedFallbackAction(act)
+			if act.Tool == "search_assets" && canvasSearchActionRequestsOCRText(act) {
+				textAssetSearchSeen = true
+			}
+			if act.Tool == "remove_cards" {
+				requestedRemoveIDs := canvasActionCardIDs(act)
+				act = filterCanvasRemoveActionProtectedCards(act, cleanupProtectedCardIDs)
+				if len(canvasActionCardIDs(act)) == 0 && len(requestedRemoveIDs) > 0 && executedCanvasTools["duplicate_cards"] {
+					setCanvasActionCardIDs(&act, canvasCleanupCandidateCardIDs(req.Canvas, cleanupProtectedCardIDs))
+				}
+				if len(canvasActionCardIDs(act)) == 0 {
+					continue
+				}
+			}
+			act = normalizeCanvasImageRegionAction(act, req.Canvas)
+			act = s.refineCanvasImageRegionAction(r.Context(), act, req.Canvas)
+			act = fillCanvasCopyAssetDestPathsFromOCR(act, latestOCRAnnotationItems)
+			act = sanitizeCanvasCopyAssetDestPathsFromOCR(act, latestOCRAnnotationItems)
+			act = normalizeCanvasCopyAssetDestPaths(act)
+			if loopReason == canvasLoopReasonOCRTextAnnotation && act.Tool == "create_comment" && canvasActionTargetsTextRegion(act) && canvasActionHasGenericPlaceholderRegion(act) {
+				blockedGenericTextRegionCount++
+				compactToolResults = append(compactToolResults, compactCanvasToolResult("invalid_action", canvasActionValidationIssue{
+					Tool:   "create_comment",
+					Reason: "OCR text annotation still used a generic placeholder region after image refinement; provide a specific box around the visible text pixels",
+				}))
+				continue
+			}
+			if canvasActionAlreadyExecuted(act) {
+				continue
+			}
+			if key := canvasTextRegionActionDedupeKey(act, req.Canvas); key != "" {
+				if executedCanvasTextRegionKeys[key] {
+					continue
+				}
+				executedCanvasTextRegionKeys[key] = true
+			}
 			if status := canvasActionStatusMessage(act); status != "" {
 				sendNDJSON(w, map[string]any{
 					"type":    "status",
@@ -2821,26 +3980,38 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				sendNDJSON(w, map[string]any{
 					"type":   "focus",
 					"cardId": act.Params["cardId"],
-					"label":  act.Params["label"],
 				})
 				rememberExecutedCanvasAction(act)
 				time.Sleep(300 * time.Millisecond)
 				continue
 			}
-			if act.Tool == "create_comment" && !canvasUserAsksAnnotation(latestUserMessage) {
+			if act.Tool == "create_comment" && toolUseSource != "native_tool_call" && !canvasFallbackCommentAllowed(latestUserMessage, selectedSkillIDs) {
 				blockedCommentNeedsAnswer = true
 				blockedCommentCount++
 				continue
 			}
 			if canvasToolSafe(act.Tool) {
 				if canvasToolIsCapture(act.Tool) {
-					if captureSeen {
+					if executedCaptureTools[act.Tool] {
 						continue
 					}
-					captureSeen = true
+					executedCaptureTools[act.Tool] = true
 					captureExecutedThisLoop = true
 				}
 				result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
+				if act.Tool == "extract_ocr_text" && canvasOCRTextAnnotationWorkflowRequested(latestUserMessage, selectedSkillIDs, executedCanvasTools) {
+					markCanvasOCRResultAsIntermediate(result)
+					if items := canvasOCRAnnotationItems(result); len(items) > 0 {
+						latestOCRAnnotationItems = items
+						if !executedCanvasTools["create_comment"] {
+							ocrTextAnnotationNeededThisLoop = true
+						}
+					}
+					if len(latestOCRAnnotationItems) > 0 && !executedCanvasTools["create_comment"] {
+						ocrTextAnnotationNeededThisLoop = true
+					}
+					compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
+				}
 				executedActionCount++
 				safeActionCount++
 				sendNDJSON(w, map[string]any{
@@ -2848,6 +4019,26 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"tool":   act.Tool,
 					"result": result,
 				})
+				if act.Tool == "add_assets_to_canvas" {
+					addedCatalogItemsForAnswer = appendCanvasAssetItemsUnique(addedCatalogItemsForAnswer, canvasAssetItemsFromActionResult(result))
+				}
+				if act.Tool == "duplicate_cards" {
+					if values, ok := result.(map[string]any); ok {
+						protectCleanupCardIDs(canvasParamStringSlice(values["cardIds"]))
+						protectCleanupCardIDs(canvasParamStringSlice(values["newCardIds"]))
+					}
+				}
+				if act.Tool == "create_comment" {
+					if values, ok := result.(map[string]any); ok {
+						if text, ok := values["text"].(string); ok && strings.TrimSpace(text) != "" {
+							createdCommentTexts = append(createdCommentTexts, strings.TrimSpace(text))
+						}
+					}
+					if canvasActionTargetsTextRegion(act) {
+						executedTextAnnotation = true
+					}
+					executedCommentResults = append(executedCommentResults, compactCanvasToolResult(act.Tool, result))
+				}
 				rememberExecutedCanvasAction(act)
 				if canvasToolSuppressesSameTurnText(act.Tool) {
 					nonFocusToolExecutedThisLoop = true
@@ -2855,14 +4046,16 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 				if canvasToolIsConcreteCanvasWork(act.Tool) {
 					concreteCanvasActionSeen = true
 				}
-				if !canvasToolIsCapture(act.Tool) && act.Tool != "extract_ocr_text" {
-					nonCaptureToolExecutedThisLoop = true
-					if !canvasToolIsConcreteCanvasWork(act.Tool) {
+				if act.Tool != "extract_ocr_text" {
+					if !canvasToolIsCapture(act.Tool) {
+						nonCaptureToolExecutedThisLoop = true
+					}
+					if !canvasToolCompletesKnownChain(act.Tool, executedCanvasTools) {
 						compactToolResults = append(compactToolResults, compactCanvasToolResult(act.Tool, result))
 					}
 				}
 			} else {
-				if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
+				if !canvasProposalAllowedForAction(act, latestUserMessage, req.Options, toolUseSource == "native_tool_call") {
 					blockedProposalCount++
 					continue
 				}
@@ -2876,9 +4069,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 					"type":           "proposal",
 					"id":             fmt.Sprintf("p%d", proposalIndex),
 					"tool":           act.Tool,
-					"params":         act.Params,
-					"description":    act.Description,
-					"impact":         act.Impact,
+					"params":         canvasActionStreamParams(act.Params),
+					"description":    canvasToolDescription(act.Tool),
+					"impact":         "Requires confirmation before applying.",
 					"targetAssetId":  targetAssetID,
 					"targetAssetIds": targetAssetIDs,
 				})
@@ -2901,23 +4094,72 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		loopStats[statIndex].BlockedProposalCount = blockedProposalCount
 		loopStats[statIndex].BlockedCommentCount = blockedCommentCount
 
-		actionRequestNeedsTool := canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
+		requiredNativeToolCallMissing := canvasRequiredNativeToolCallMissing(usingNativeTools, roundToolChoice, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
+		actionBlockTextNeedsRepair := canvasActionBlockTextNeedsActionRepair(usingNativeTools, loopReason, textBody, len(actions), nonFocusToolExecutedThisLoop, loop, maxToolLoops)
+		actionRequestNeedsTool := requiredNativeToolCallMissing || actionBlockTextNeedsRepair || canvasTextOnlyResponseNeedsActionRepair(textBody, nonFocusToolExecutedThisLoop, loop, maxToolLoops)
+		incompleteTextAnnotation := blockedUnverifiableTextActionCount > 0 || blockedIncompleteTextActionCount > 0 || blockedGenericTextRegionCount > 0 || canvasIncompleteTextAnnotationNeedsRepair(actions, req.Canvas, loop, maxToolLoops)
+		if executedTextAnnotation {
+			textAnnotationRepairPending = false
+		}
+		if textAnnotationRepairPending && !executedTextAnnotation {
+			incompleteTextAnnotation = true
+		}
+		if incompleteTextAnnotation {
+			textAnnotationRepairPending = true
+		}
+		if textAssetSearchSeen &&
+			executedCanvasTools["add_assets_to_canvas"] &&
+			!executedCanvasTools["extract_ocr_text"] &&
+			!executedCanvasTools["create_comment"] &&
+			canvasStringListContains(selectedSkillIDs, canvasSkillComments) &&
+			loop < maxToolLoops-1 {
+			ocrTextExtractionNeededThisLoop = true
+		}
+		ocrTextAnnotation := ocrTextAnnotationNeededThisLoop
+		if blockedOCRTextAnnotationActionCount > 0 {
+			ocrTextAnnotation = true
+		}
+		if executedTextAnnotation {
+			ocrTextAnnotationRepairPending = false
+		}
+		if ocrTextAnnotationRepairPending && !executedTextAnnotation {
+			ocrTextAnnotation = true
+		}
+		if ocrTextAnnotation {
+			ocrTextAnnotationRepairPending = true
+		}
+		if incompleteTextAnnotation {
+			compactToolResults = append(compactToolResults, executedCommentResults...)
+		}
 		if canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen {
 			preparatoryActionLoops++
 		}
 		focusOnlyNeedsAnswer := (canvasActionsOnlyFocus(actions) || (canvasUserWantsCanvasAction(latestUserMessage) && canvasActionsOnlyPreparatory(actions) && !concreteCanvasActionSeen)) && !actionRequestNeedsTool && loop < maxToolLoops-1 && (textBody == "" || canvasUserWantsCanvasAction(latestUserMessage))
-		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool && !focusOnlyNeedsAnswer && !invalidActionNeedsRepair {
+		if incompleteTextAnnotation {
+			invalidActionNeedsRepair = false
+			focusOnlyNeedsAnswer = false
+		}
+		if ocrTextAnnotation {
+			invalidActionNeedsRepair = false
+			focusOnlyNeedsAnswer = false
+		}
+		if textBody != "" && !truncatedAction && !nonFocusToolExecutedThisLoop && !actionRequestNeedsTool && !focusOnlyNeedsAnswer && !invalidActionNeedsRepair && !incompleteTextAnnotation && !textAnnotationRepairPending && !ocrTextAnnotation && !ocrTextAnnotationRepairPending && len(addedCatalogItemsForAnswer) == 0 {
 			paragraphs := splitParagraphs(textBody)
 			for _, p := range paragraphs {
 				sendNDJSON(w, map[string]any{"type": "text", "content": p})
+				textEmitted = true
 				if len(paragraphs) > 1 {
 					time.Sleep(50 * time.Millisecond)
 				}
 			}
 		}
 
-		captureOnlyDeferredWork := captureExecutedThisLoop && canvasUserWantsCanvasAction(latestUserMessage) && !nonCaptureToolExecutedThisLoop && loop < maxToolLoops-1
-		if captureExecutedThisLoop && !truncatedAction && !captureOnlyDeferredWork {
+		captureResultNeedsFollowup := captureExecutedThisLoop && len(compactToolResults) > 0 && !nonCaptureToolExecutedThisLoop && loop < maxToolLoops-1
+		captureOnlyDeferredWork := false
+		if captureExecutedThisLoop && !truncatedAction && !captureResultNeedsFollowup {
+			break
+		}
+		if proposalCount > 0 && !truncatedAction {
 			break
 		}
 		nextLoopReason := canvasNextLoopReason(canvasNextLoopInput{
@@ -2931,6 +4173,9 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 			BlockedCommentNeedsAnswer: blockedCommentNeedsAnswer,
 			CaptureOnlyDeferredWork:   captureOnlyDeferredWork,
 			InvalidAction:             invalidActionNeedsRepair,
+			IncompleteTextAnnotation:  incompleteTextAnnotation,
+			OCRTextExtraction:         ocrTextExtractionNeededThisLoop,
+			OCRTextAnnotation:         ocrTextAnnotation,
 		})
 		loopStats[statIndex].NextReason = nextLoopReason
 		if nextLoopReason == "" {
@@ -2948,115 +4193,48 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		}
 		selectedSkillIDs = expandCanvasSkillFamiliesForLoopReason(selectedSkillIDs, nextLoopReason, latestUserMessage, req.Options)
 		if usingNativeTools {
-			canvasTools = canvasLLMToolsForSkills(selectedSkillIDs)
+			canvasTools = canvasNativeLLMToolsForSkills(selectedSkillIDs)
 			systemPrompt = canvasNativeSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 		} else {
 			canvasTools = nil
 			systemPrompt = canvasSystemPromptForSkills(locale, req.Options, selectedSkillIDs)
 		}
-		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, content)
+		currentPrompt = buildCanvasFollowupPrompt(nextLoopReason, latestUserMessage, req.Canvas, actions, compactToolResults, executedCanvasToolSequence, content)
 		promptKind = vlmPromptKindFollowup
 		loopReason = nextLoopReason
 		sendNDJSON(w, map[string]any{"type": "thinking"})
 	}
 
-	if !searchCatalogActionSeen {
-		if act, ok := fallbackCanvasCatalogSearchAction(latestUserMessage, selectedSkillIDs); ok {
-			fallbackSearchActions, _ := normalizeCanvasActions([]canvasAction{act}, true)
-			fallbackSearchActions = filterCanvasFallbackActions(fallbackSearchActions, executedCanvasActionKeys)
-			for _, searchAct := range fallbackSearchActions {
-				result := s.executeCanvasSafeAction(r, searchAct, settings, req.Canvas)
-				sendNDJSON(w, map[string]any{
-					"type":   "action_result",
-					"tool":   searchAct.Tool,
-					"result": result,
-				})
-				rememberExecutedCanvasAction(searchAct)
-				time.Sleep(150 * time.Millisecond)
-			}
+	if !executedCanvasTools["arrange_cards"] && len(addedCatalogItemsForAnswer) > 1 {
+		act := canvasArrangeAddedCatalogItemsAction(addedCatalogItemsForAnswer)
+		if status := canvasActionStatusMessage(act); status != "" {
+			sendNDJSON(w, map[string]any{
+				"type":    "status",
+				"phase":   "operation",
+				"content": status,
+			})
 		}
-	}
-
-	if canvasUserWantsCanvasAction(latestUserMessage) {
-		fallbackActions := fallbackCanvasManipulationActions(latestUserMessage, req.Canvas, confirmedFallbackCardIDs)
-		fallbackActions, _ = normalizeCanvasActions(fallbackActions, true)
-		fallbackActions = refineCanvasActionTargets(fallbackActions, req.Canvas, latestUserMessage)
-		fallbackActions = filterCanvasFallbackActions(fallbackActions, executedCanvasActionKeys)
-		if len(fallbackActions) > 0 || preparatoryActionLoops > 0 || concreteCanvasActionSeen || len(confirmedFallbackCardIDs) > 0 {
-			if status := canvasFallbackManipulationStatus(fallbackActions); status != "" {
-				sendNDJSON(w, map[string]any{
-					"type":    "status",
-					"phase":   "operation",
-					"content": status,
-				})
-			}
-			for _, act := range fallbackActions {
-				if status := canvasActionStatusMessage(act); status != "" {
-					sendNDJSON(w, map[string]any{
-						"type":    "status",
-						"phase":   "operation",
-						"content": status,
-					})
-				}
-				if canvasToolSafe(act.Tool) {
-					result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
-					if act.Tool == "duplicate_cards" {
-						result = canvasFallbackAugmentDuplicateResult(result, latestUserMessage, req.Canvas)
-					}
-					sendNDJSON(w, map[string]any{
-						"type":   "action_result",
-						"tool":   act.Tool,
-						"result": result,
-					})
-					rememberExecutedCanvasAction(act)
-					if canvasToolIsConcreteCanvasWork(act.Tool) {
-						concreteCanvasActionSeen = true
-					}
-				} else {
-					if !canvasProposalAllowed(act.Tool, latestUserMessage, req.Options) {
-						continue
-					}
-					proposalIndex++
-					targetAssetIDs := canvasActionAssetIDs(act)
-					var targetAssetID any
-					if len(targetAssetIDs) > 0 {
-						targetAssetID = targetAssetIDs[0]
-					}
-					sendNDJSON(w, map[string]any{
-						"type":           "proposal",
-						"id":             fmt.Sprintf("p%d", proposalIndex),
-						"tool":           act.Tool,
-						"params":         act.Params,
-						"description":    act.Description,
-						"impact":         act.Impact,
-						"targetAssetId":  targetAssetID,
-						"targetAssetIds": targetAssetIDs,
-					})
-					rememberExecutedCanvasAction(act)
-					if canvasToolIsConcreteCanvasWork(act.Tool) {
-						concreteCanvasActionSeen = true
-					}
-				}
-				time.Sleep(150 * time.Millisecond)
-			}
-			if !concreteCanvasActionSeen {
-				sendNDJSON(w, map[string]any{
-					"type":    "status",
-					"phase":   "blocked",
-					"content": "Target confirmation finished, but no safe concrete canvas operation could be inferred.",
-				})
-			}
-		}
-	}
-
-	if captureRequested && !captureSeen {
-		act := fallbackCanvasCaptureAction(latestUserMessage, req.Canvas)
 		result := s.executeCanvasSafeAction(r, act, settings, req.Canvas)
 		sendNDJSON(w, map[string]any{
 			"type":   "action_result",
 			"tool":   act.Tool,
 			"result": result,
 		})
+		rememberExecutedCanvasAction(act)
+	}
+
+	if !textEmitted && !textAnnotationRepairPending && !ocrTextAnnotationRepairPending {
+		if answer := canvasCreatedCommentsAnswerText(createdCommentTexts, locale); answer != "" {
+			sendNDJSON(w, map[string]any{"type": "text", "content": answer})
+			textEmitted = true
+		}
+	}
+
+	if !textEmitted {
+		if answer := canvasAddedAssetsAnswerText(addedCatalogItemsForAnswer, locale); answer != "" {
+			sendNDJSON(w, map[string]any{"type": "text", "content": answer})
+			textEmitted = true
+		}
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -3069,6 +4247,48 @@ func (s *Server) handleCanvasChat(w http.ResponseWriter, r *http.Request) {
 		"outputTokens": totalOutputTokens,
 		"loopStats":    loopStats,
 	})
+}
+
+func canvasArrangeAddedCatalogItemsAction(items []scanner.AssetItem) canvasAction {
+	const (
+		cols   = 4
+		startX = 100
+		startY = 100
+		gapX   = 380
+		gapY   = 340
+	)
+	positions := make([]any, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		if item.ID == "" || seen[item.ID] {
+			continue
+		}
+		seen[item.ID] = true
+		index := len(positions)
+		positions = append(positions, map[string]any{
+			"cardId": item.ID,
+			"x":      float64(startX + (index%cols)*gapX),
+			"y":      float64(startY + (index/cols)*gapY),
+		})
+	}
+	return canvasAction{
+		Tool:        "arrange_cards",
+		Params:      map[string]any{"positions": positions},
+		Description: "Arrange newly added catalog assets",
+		Impact:      "Places newly added cards into a scannable layout on the canvas",
+	}
+}
+
+func canvasActionExecutionKey(act canvasAction) string {
+	tool := strings.TrimSpace(act.Tool)
+	if tool == "" {
+		return ""
+	}
+	params, err := json.Marshal(canvasActionStreamParams(act.Params))
+	if err != nil {
+		return tool
+	}
+	return tool + ":" + string(params)
 }
 
 func splitParagraphs(text string) []string {
@@ -3113,6 +4333,88 @@ func (s *Server) fetchCanvasCatalogItemsByIDs(ctx context.Context, scanID int64,
 		return nil, err
 	}
 	return s.enrichCanvasCatalogItems(ctx, scanID, items, settings)
+}
+
+func (s *Server) canvasSemanticCatalogSearch(ctx context.Context, scanID int64, q string, limit int, settings config.AppSettings) ([]scanner.AssetItem, bool) {
+	if s.llmProvider == nil || strings.TrimSpace(settings.LLMEmbedModel) == "" {
+		return nil, false
+	}
+	if limit <= 0 {
+		limit = 12
+	}
+	query := semantic.Query{
+		Text:       q,
+		Type:       "hybrid",
+		Limit:      limit,
+		ProjectIDs: s.store.ActiveProjectIDs(),
+	}
+	if len(query.ProjectIDs) == 0 {
+		query.ProjectIDs = nil
+	}
+	response, err := semantic.Search(ctx, s.store, s.llmProvider, settings, query)
+	if err != nil || len(response.Results) == 0 {
+		return nil, false
+	}
+	ids := make([]string, 0, len(response.Results))
+	for _, result := range response.Results {
+		if strings.TrimSpace(result.AssetID) != "" {
+			ids = append(ids, result.AssetID)
+		}
+	}
+	items, err := s.fetchCanvasCatalogItemsByIDs(ctx, scanID, ids, settings)
+	if err != nil || len(items) == 0 {
+		return nil, false
+	}
+	byID := make(map[string]scanner.AssetItem, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+	}
+	ordered := make([]scanner.AssetItem, 0, len(ids))
+	for _, id := range ids {
+		if item, ok := byID[id]; ok {
+			ordered = append(ordered, item)
+		}
+	}
+	if len(ordered) == 0 {
+		return nil, false
+	}
+	return ordered, true
+}
+
+func canvasSearchOCRStatus(hasText bool) string {
+	if hasText {
+		return "ocrTextReady"
+	}
+	return ""
+}
+
+func canvasSearchTextQueryIsGeneric(q string) bool {
+	q = strings.ToLower(strings.TrimSpace(q))
+	if q == "" {
+		return true
+	}
+	q = strings.ReplaceAll(q, "-", " ")
+	q = strings.ReplaceAll(q, "_", " ")
+	q = strings.Join(strings.Fields(q), " ")
+	switch q {
+	case "text", "visible text", "readable text", "ocr", "ocr text", "has text", "with text":
+		return true
+	default:
+		return false
+	}
+}
+
+func canvasFilterCatalogItemsWithOCRText(items []scanner.AssetItem) []scanner.AssetItem {
+	if len(items) == 0 {
+		return items
+	}
+	out := items[:0]
+	for _, item := range items {
+		if item.OCR != nil && strings.TrimSpace(item.OCR.Text) != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func canvasAssetSummary(item scanner.AssetItem) map[string]any {
@@ -3172,7 +4474,6 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 	case "focus_card":
 		return map[string]any{
 			"cardId": act.Params["cardId"],
-			"label":  act.Params["label"],
 		}
 	case "get_asset_detail":
 		assetID, _ := act.Params["assetId"].(string)
@@ -3214,6 +4515,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return detail
 	case "search_assets":
 		q, _ := act.Params["q"].(string)
+		hasText, _ := act.Params["hasText"].(bool)
 		limit := 12
 		if l, ok := act.Params["limit"].(float64); ok && l > 0 {
 			limit = int(l)
@@ -3234,11 +4536,16 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		}
 		var page config.CatalogItemsPage
 		var err error
-		for _, candidate := range canvasSearchQueryCandidates(q) {
+		candidates := canvasSearchQueryCandidates(q)
+		if hasText && canvasSearchTextQueryIsGeneric(q) {
+			candidates = []string{""}
+		}
+		for _, candidate := range candidates {
 			query := config.CatalogItemQuery{
-				ScanID: scanID,
-				Query:  candidate,
-				Limit:  fetchLimit,
+				ScanID:      scanID,
+				Query:       candidate,
+				AIOcrStatus: canvasSearchOCRStatus(hasText),
+				Limit:       fetchLimit,
 			}
 			page, err = s.store.CatalogItems(query)
 			if err != nil {
@@ -3253,11 +4560,24 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		if err != nil {
 			return map[string]any{"items": []any{}, "error": err.Error()}
 		}
+		if hasText {
+			items = canvasFilterCatalogItemsWithOCRText(items)
+		}
 		items = canvasRankCatalogSearchItems(items, q)
+		matchType := "catalog"
+		if len(items) == 0 && strings.TrimSpace(q) != "" {
+			if semanticItems, ok := s.canvasSemanticCatalogSearch(r.Context(), scanID, q, limit, settings); ok {
+				items = semanticItems
+				if hasText {
+					items = canvasFilterCatalogItemsWithOCRText(items)
+				}
+				matchType = "semantic"
+			}
+		}
 		if len(items) > limit {
 			items = items[:limit]
 		}
-		return map[string]any{"items": items, "total": page.Total, "q": q}
+		return map[string]any{"items": items, "total": len(items), "q": q, "matchType": matchType, "hasText": hasText}
 	case "add_assets_to_canvas":
 		assetIDs := canvasActionAssetIDs(act)
 		scanID := s.latestScanID()
@@ -3268,7 +4588,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		if err != nil {
 			return map[string]any{"items": []any{}, "error": err.Error()}
 		}
-		return map[string]any{"items": items, "count": len(items), "assetIds": assetIDs, "label": act.Params["label"]}
+		return map[string]any{"items": items, "count": len(items), "assetIds": assetIDs}
 	case "extract_ocr_text":
 		return s.executeCanvasOCRText(r, act, settings, canvas)
 	case "compress_image", "resize_image", "convert_image", "mirror_image", "rotate_image":
@@ -3281,7 +4601,6 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			"maxDimensionPx": act.Params["maxDimensionPx"],
 			"flip":           act.Params["flip"],
 			"degrees":        act.Params["degrees"],
-			"label":          act.Params["label"],
 		}
 	case "create_comment":
 		return map[string]any{
@@ -3293,6 +4612,7 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"commentCardId": act.Params["commentCardId"],
 			"text":          act.Params["text"],
+			"region":        act.Params["region"],
 		}
 	case "delete_comment":
 		return map[string]any{
@@ -3301,12 +4621,10 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 	case "select_cards":
 		return map[string]any{
 			"cardIds": act.Params["cardIds"],
-			"label":   act.Params["label"],
 		}
 	case "remove_cards":
 		return map[string]any{
 			"cardIds": act.Params["cardIds"],
-			"label":   act.Params["label"],
 		}
 	case "duplicate_cards":
 		sourceCardIDs := canvasActionCardIDs(act)
@@ -3339,7 +4657,6 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			"copies":     copies,
 			"newCardIds": cardIDs,
 			"layout":     act.Params["layout"],
-			"label":      act.Params["label"],
 		}
 	case "move_card":
 		return map[string]any{
@@ -3355,14 +4672,12 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"cardIds": act.Params["cardIds"],
 			"axis":    act.Params["axis"],
-			"label":   act.Params["label"],
 		}
 	case "distribute_cards":
 		return map[string]any{
 			"cardIds":   act.Params["cardIds"],
 			"direction": act.Params["direction"],
 			"gap":       act.Params["gap"],
-			"label":     act.Params["label"],
 		}
 	case "resize_card":
 		return map[string]any{
@@ -3373,7 +4688,6 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"cardIds":     act.Params["cardIds"],
 			"afterCardId": act.Params["afterCardId"],
-			"label":       act.Params["label"],
 		}
 	case "inspect_canvas":
 		return map[string]any{

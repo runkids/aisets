@@ -52,6 +52,18 @@ function makeAsset(id: string, repoPath: string): AssetItem {
     similar: [],
     preferredDuplicatePath: null,
     optimizationRecommendations: [],
+    ocr: {
+      status: "ready",
+      text: "BOOK",
+      languages: ["eng"],
+    },
+    aiTag: {
+      status: "ready",
+      category: "illustration",
+      tags: ["book-cover", "lion"],
+      description: "Book cover with a lion illustration.",
+      languages: ["eng"],
+    },
   };
 }
 
@@ -74,6 +86,43 @@ function makeAssetCard(
 describe("canvas chat frontend event contract", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("serializes asset image references and visual metadata for AI context", () => {
+    const [card] = [makeAssetCard("card-a", "asset-a", 10, 20)];
+
+    const snapshot = serializeCanvasSnapshot([card], ["card-a"], {
+      x: 0,
+      y: 0,
+      scale: 1,
+    });
+    const payload = snapshot.cards[0].asset as Record<string, unknown>;
+
+    expect(payload).toMatchObject({
+      id: "asset-a",
+      fileName: "asset-a.png",
+      repoPath: "asset-a.png",
+      projectName: "Project",
+      imageFormat: "png",
+      width: 320,
+      height: 240,
+      url: "/api/assets/asset-a",
+      thumbnailUrl: "/api/assets/asset-a/thumb",
+      searchDescription: "Book cover with a lion illustration.",
+      searchLanguages: ["eng"],
+      ocrText: "BOOK",
+    });
+  });
+
+  it("resolves streamed asset ids to canvas card ids", () => {
+    const cards = [makeAssetCard("card-a", "asset-a", 10, 20)];
+
+    expect(
+      canvasActionResultCardIds({ cardIds: ["asset-a", "missing"] }, cards),
+    ).toEqual(["card-a"]);
+    expect(
+      canvasFocusCardFromEvent({ type: "focus", cardId: "asset-a" }, cards)?.id,
+    ).toBe("card-a");
   });
 
   it("maps streamed focus, action_result, and proposal events to canvas state inputs", async () => {
@@ -166,6 +215,8 @@ describe("canvas chat frontend event contract", () => {
       proposalId: "proposal-1",
       tool: "rotate_image",
       params: { assetId: "asset-a", degrees: 90 },
+      description: "",
+      impact: "",
       status: "pending",
       sourceAssetId: "asset-a",
       sourceAssetIds: ["asset-a"],

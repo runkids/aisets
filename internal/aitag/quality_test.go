@@ -42,9 +42,9 @@ func TestIsResultUsable(t *testing.T) {
 			name: "template text",
 			in: Result{
 				Status:      StatusReady,
-				Category:    "類別",
-				Tags:        []string{"關鍵字1"},
-				Description: "陳述",
+				Category:    "category",
+				Tags:        []string{"keyword"},
+				Description: "description",
 			},
 			want: false,
 		},

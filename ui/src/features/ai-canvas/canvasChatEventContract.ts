@@ -19,10 +19,13 @@ export function canvasActionResultCardIds(
   if (!result || typeof result !== "object") return [];
   const raw = (result as { cardIds?: unknown }).cardIds;
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (id): id is string =>
-      typeof id === "string" && cards.some((card) => card.id === id),
-  );
+  const ids: string[] = [];
+  for (const id of raw) {
+    if (typeof id !== "string") continue;
+    const card = canvasCardForRefs(cards, [id]);
+    if (card && !ids.includes(card.id)) ids.push(card.id);
+  }
+  return ids;
 }
 
 export function canvasFocusCardFromEvent(
@@ -30,7 +33,7 @@ export function canvasFocusCardFromEvent(
   cards: CanvasCard[],
 ) {
   if (!event.cardId) return undefined;
-  return cards.find((card) => card.id === event.cardId);
+  return canvasCardForRefs(cards, [event.cardId]);
 }
 
 function canvasCardForRefs(cards: CanvasCard[], refs: string[]) {
@@ -75,8 +78,8 @@ export function canvasProposalCardFromEvent(
     proposalId: event.id,
     tool: event.tool,
     params: event.params,
-    description: event.description,
-    impact: event.impact,
+    description: "",
+    impact: "",
     status: "pending",
     sourceAssetId: event.targetAssetId ?? event.targetAssetIds?.[0],
     sourceAssetIds: event.targetAssetIds,

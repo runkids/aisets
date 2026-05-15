@@ -14,8 +14,7 @@ func usableText(value string) bool {
 		return false
 	}
 	switch strings.ToLower(v) {
-	case "...", "tag", "tags", "keyword", "keywords", "category", "description",
-		"關鍵字", "關鍵字1", "關鍵字2", "類別", "陳述":
+	case "...", "tag", "tags", "keyword", "keywords", "category", "description":
 		return false
 	default:
 		return true

@@ -1,8 +1,6 @@
 package server
 
-import (
-	"strings"
-)
+import "strings"
 
 const (
 	canvasSkillLayout            = "layout"
@@ -34,7 +32,7 @@ func canvasSkillCatalog() []canvasSkillFamily {
 		{
 			ID:          canvasSkillLayout,
 			Description: "Canvas card focus, selection, movement, arrangement, visual sizing, grouping, and layer order.",
-			Triggers:    []string{"move", "arrange", "layout", "select", "remove", "duplicate", "clone", "align", "distribute", "resize card", "front", "storyboard", "compose"},
+			Triggers:    []string{"move", "arrange", "layout", "select", "remove", "duplicate", "copy", "clone", "align", "distribute", "resize card", "front", "storyboard", "compose"},
 			Tools: []string{
 				"focus_card", "select_cards", "remove_cards", "duplicate_cards", "move_card", "arrange_cards",
 				"align_cards", "distribute_cards", "resize_card", "bring_cards_to_front", "inspect_canvas",
@@ -55,6 +53,7 @@ func canvasSkillCatalog() []canvasSkillFamily {
 			Rules: `## Search Skill
 - search_assets searches the ENTIRE PROJECT CATALOG, not just the current canvas.
 - When the user asks to find, list, or show assets, use search_assets first. If they ask for one item, set limit: 1.
+- When the user asks for assets that contain visible text, call search_assets with {"q":"","hasText":true}.
 - If the request includes a filename or filename stem, search that exact stem before broader visual terms.
 - Use get_asset_detail after search_assets when full metadata is needed. Use add_assets_to_canvas only after concrete catalog results should become cards.`,
 		},
@@ -71,10 +70,18 @@ func canvasSkillCatalog() []canvasSkillFamily {
 		{
 			ID:          canvasSkillComments,
 			Description: "Create, update, or delete canvas comment cards and annotations.",
-			Triggers:    []string{"comment", "annotate", "mark", "circle", "highlight", "note"},
+			Triggers:    []string{"comment", "comments", "commend", "commends", "annotate", "mark", "circle", "highlight", "point to", "note"},
 			Tools:       []string{"focus_card", "create_comment", "update_comment", "delete_comment"},
 			Rules: `## Comment Skill
-- Use create_comment only when the user explicitly asks to annotate, mark, circle, highlight, comment, or leave a note.
+- Use create_comment only when the user explicitly asks to annotate, mark, circle, highlight, point to, comment, or leave a note.
+- If the user asks where something is and also asks to circle/mark/highlight it, answer by creating a comment whose text states the answer and whose region tightly encloses that object/area.
+- create_comment.region is relative to the anchored card image. x/y are the top-left corner of the target box, not the center point; y increases downward.
+- If the requested target sits on another object, the region must enclose the target itself, not the host object or nearby context.
+- If multiple distinct objects/areas must be circled, call create_comment once per target/region instead of making one oversized combined region.
+- For small objects or text, include create_comment.visualCue or update_comment.visualCue with an English targetDescription and colorHex for the target pixels, so the tool can refine the marker against the original image.
+- If an existing comment circle/region is wrong and the user asks to correct it, call update_comment with commentCardId and a replacement region. Do not create another comment unless the user asks for a new annotation.
+- update_comment.region is relative to the existing comment anchor image and uses the same top-left normalized bounding-box format as create_comment.region.
+- create_comment.region is the visible marker. Do not say you cannot directly circle, draw, or annotate; use create_comment instead.
 - Place comment cards away from image content; use region to point to the relevant area instead of covering the asset.
 - If the user asks about an existing region or comment, answer in chat unless they ask you to add or update an annotation.`,
 		},
@@ -122,6 +129,7 @@ func canvasSkillCatalog() []canvasSkillFamily {
 - File-writing tools create NEEDS_CONFIRMATION proposal cards; they do not apply changes directly.
 - Only use these tools for explicit file/image operation requests.
 - For multiple selected assets, emit one action with assetIds so the UI can show per-asset status.
+- For copy_asset with a different filename per source asset, use perAssetDestPaths with one destPath per asset.
 - For mirror/flip, default to horizontal unless the user clearly asks for vertical. For rotate, default to 90 degrees when unspecified.`,
 		},
 	}
@@ -136,60 +144,58 @@ func canvasAllSkillIDs() []string {
 	return ids
 }
 
+func canvasDefaultSkillIDs() []string {
+	return []string{
+		canvasSkillLayout,
+		canvasSkillSearch,
+	}
+}
+
 func classifyCanvasSkillFamilies(input canvasSkillClassifyInput) []string {
-	msg := strings.ToLower(input.Message)
-	var selected []string
-	add := func(id string) {
-		if id == "" {
-			return
-		}
-		for _, existing := range selected {
-			if existing == id {
-				return
+	message := strings.ToLower(strings.TrimSpace(input.Message))
+	if message == "" {
+		return canvasDefaultSkillIDs()
+	}
+	var ids []string
+	for _, skill := range canvasSkillCatalog() {
+		for _, trigger := range skill.Triggers {
+			if strings.Contains(message, strings.ToLower(trigger)) {
+				ids = append(ids, skill.ID)
+				break
 			}
 		}
-		selected = append(selected, id)
 	}
+	if canvasSelectedFormatProposalRequested(message, input.Canvas) && !canvasStringListContains(ids, canvasSkillFileProposals) {
+		ids = append(ids, canvasSkillFileProposals)
+	}
+	if len(ids) == 0 {
+		return canvasDefaultSkillIDs()
+	}
+	return ids
+}
 
-	if containsAnyText(msg, "search", "find", "show", "list", "catalog", "filename", "asset named", "找", "搜尋", "搜索", "列出", "顯示", "檔名", "素材") {
-		add(canvasSkillSearch)
+func canvasSelectedFormatProposalRequested(message string, canvas canvasSnapshot) bool {
+	if len(canvas.SelectedCardIDs) == 0 || canvasMessageLooksLikeCatalogLookup(message) {
+		return false
 	}
-	if containsAnyText(msg, "ocr", "read text", "extract text", "visible text", "文字", "讀", "辨識", "提取", "擷取文字") {
-		add(canvasSkillOCR)
-	}
-	if containsAnyText(msg, "comment", "annotate", "annotation", "mark", "circle", "highlight", "note", "註解", "標記", "圈", "高亮", "留言", "備註") {
-		add(canvasSkillComments)
-	}
-	if containsAnyText(msg, "capture", "screenshot", "export canvas", "take a picture", "transparent", "截圖", "匯出畫布", "輸出畫布", "拍照", "透明") {
-		add(canvasSkillCapture)
-	}
-	if containsAnyText(msg, "move", "arrange", "layout", "select", "remove", "duplicate", "clone", "align", "distribute", "resize card", "storyboard", "compose", "front", "behind", "right", "left", "up", "down", "分鏡", "安排", "排列", "移動", "選取", "移除", "複製", "對齊", "分散", "放大", "縮小", "前面", "後面", "右邊", "左邊", "上面", "下面") {
-		add(canvasSkillLayout)
-	}
-	if containsAnyText(msg, "compare", "similar", "duplicate", "quality", "alt text", "describe", "what is", "what's", "issue", "problem", "比較", "相似", "重複", "品質", "畫質", "替代文字", "描述", "是什麼", "問題") {
-		add(canvasSkillQuality)
-	}
-	if containsAnyText(msg, "tag", "tags", "description", "save ocr", "favorite", "metadata", "標籤", "描述", "說明", "儲存 ocr", "保存 ocr", "收藏", "中繼資料", "元資料") {
-		add(canvasSkillMetadataProposals)
-	}
-	if containsAnyText(msg, "compress", "resize", "convert", "mirror", "flip", "rotate", "rename", "move file", "copy file", "copy asset", "delete file", "delete asset", "export asset", "optimize", "壓縮", "調整尺寸", "轉檔", "轉成", "鏡像", "翻轉", "旋轉", "重新命名", "刪除檔案", "刪檔", "匯出素材", "最佳化") {
-		add(canvasSkillFileProposals)
-	}
-	if input.Options.ImageOptimizationAdvice && canvasUserAsksOptimizationReview(input.Message) {
-		add(canvasSkillFileProposals)
-	}
-
-	if len(selected) == 0 {
-		if len(input.Canvas.Cards) == 0 {
-			add(canvasSkillSearch)
-		} else {
-			add(canvasSkillQuality)
+	for _, token := range strings.FieldsFunc(message, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	}) {
+		switch token {
+		case "webp", "avif":
+			return true
 		}
 	}
-	if len(selected) > 3 {
-		selected = selected[:3]
+	return false
+}
+
+func canvasMessageLooksLikeCatalogLookup(message string) bool {
+	for _, term := range []string{"search", "find", "show", "list", "catalog", "filename", "add assets"} {
+		if strings.Contains(message, term) {
+			return true
+		}
 	}
-	return selected
+	return false
 }
 
 func expandCanvasSkillFamiliesForLoopReason(skillIDs []string, reason string, latestUserMessage string, options canvasChatOptions) []string {
@@ -202,16 +208,15 @@ func expandCanvasSkillFamiliesForLoopReason(skillIDs []string, reason string, la
 	switch reason {
 	case canvasLoopReasonMissingCapture:
 		add(canvasSkillCapture)
-	case canvasLoopReasonTextOnlyDeferredWork, canvasLoopReasonFocusOnlyNeedsAnswer, canvasLoopReasonCaptureOnlyWork:
-		if canvasUserWantsCanvasAction(latestUserMessage) {
-			add(canvasSkillLayout)
-		}
-		if containsAnyText(latestUserMessage,
-			"compress", "resize", "convert", "mirror", "flip", "rotate", "optimize",
-			"壓縮", "調整尺寸", "轉檔", "轉成", "鏡像", "翻轉", "旋轉", "最佳化",
-		) {
-			add(canvasSkillFileProposals)
-		}
+	case canvasLoopReasonIncompleteTextAnnotation:
+		add(canvasSkillComments)
+	case canvasLoopReasonOCRTextExtraction:
+		add(canvasSkillOCR)
+	case canvasLoopReasonFocusOnlyNeedsAnswer, canvasLoopReasonCaptureOnlyWork:
+		add(canvasSkillLayout)
+	case canvasLoopReasonTextOnlyDeferredWork:
+		add(canvasSkillLayout)
+		add(canvasSkillFileProposals)
 	}
 	if options.ImageOptimizationAdvice && canvasUserAsksOptimizationReview(latestUserMessage) {
 		add(canvasSkillFileProposals)

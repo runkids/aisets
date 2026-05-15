@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import { previewImageUrl } from "@/api";
 import { request } from "@/api/client";
 import { renderImageToolPreview } from "@/api/imageTools";
+import { fileName } from "@/ui";
 import {
   createCanvasCardId,
   type CanvasCard,
@@ -10,6 +11,7 @@ import {
   type ProposalStatus,
 } from "./aiCanvasState";
 import { adjacentCardPosition, nowISO } from "./canvasUtils";
+import { proposalToolLabel } from "./proposalLabels";
 
 function stringParam(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value : fallback;
@@ -218,6 +220,10 @@ export function useProposalExecution(opts: {
           const position = sourceCard
             ? adjacentCardPosition(sourceCard)
             : { x: proposal.x, y: proposal.y + 88 };
+          const sourceName =
+            sourceCard?.kind === "asset"
+              ? fileName(sourceCard.asset.repoPath)
+              : proposalToolLabel(t, proposal.tool);
           const variantCard: CanvasCard = {
             id: createCanvasCardId("variant"),
             kind: "variant",
@@ -225,7 +231,7 @@ export function useProposalExecution(opts: {
             y: position.y,
             createdAt: nowISO(),
             sourceAssetId: assetId,
-            sourceName: proposal.description,
+            sourceName,
             previewUrl: previewImageUrl(result.token),
             token: result.token,
             inputBytes: result.inputBytes,
@@ -385,7 +391,14 @@ export function useProposalExecution(opts: {
           if (!asset) throw new Error("Asset not found on canvas");
           const destDir = (p.destDir as string) || "";
           const fname = asset.repoPath.split("/").pop() || "";
+          const perAssetDestPath = perAssetText(
+            p,
+            assetId,
+            "destPath",
+            "perAssetDestPaths",
+          );
           const destPath =
+            perAssetDestPath ||
             (p.destPath as string) ||
             (destDir ? destDir.replace(/\/$/, "") + "/" + fname : "");
           await request("/api/actions/batch/copy", {

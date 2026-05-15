@@ -6,17 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
+	"aisets/internal/agent"
 	"aisets/internal/aitag"
 	"aisets/internal/config"
 	"aisets/internal/llm"
+	"aisets/internal/ocr"
 	"aisets/internal/scanner"
 )
 
@@ -56,6 +62,39 @@ type canvasToolUseHarness struct {
 }
 
 type canvasHarnessEvent map[string]any
+
+type canvasHarnessAgentProvider struct {
+	mu       sync.Mutex
+	result   agent.ChatResult
+	results  []agent.ChatResult
+	index    int
+	requests []agent.ChatRequest
+}
+
+func (p *canvasHarnessAgentProvider) ChatBatch(_ context.Context, reqs []agent.ChatRequest, onResult func(int, agent.ChatResult)) error {
+	p.mu.Lock()
+	p.requests = append(p.requests, reqs...)
+	result := p.result
+	if len(p.results) > 0 {
+		result = p.results[min(p.index, len(p.results)-1)]
+		p.index++
+	}
+	p.mu.Unlock()
+	for i := range reqs {
+		onResult(i, result)
+	}
+	return nil
+}
+
+func (p *canvasHarnessAgentProvider) Requests() []agent.ChatRequest {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]agent.ChatRequest, len(p.requests))
+	copy(out, p.requests)
+	return out
+}
+
+func (p *canvasHarnessAgentProvider) Close() error { return nil }
 
 func newCanvasToolUseHarness(t *testing.T, responses ...llm.ChatResponse) canvasToolUseHarness {
 	t.Helper()
@@ -353,6 +392,12 @@ func canvasHarnessGenericRecoverySnapshot() canvasSnapshot {
 func runCanvasToolUseHarness(t *testing.T, message string, snapshot canvasSnapshot, responses ...llm.ChatResponse) ([]canvasHarnessEvent, *canvasToolUseScriptedProvider) {
 	t.Helper()
 	h := newCanvasToolUseHarness(t, responses...)
+	events := runCanvasToolUseHarnessWithHarness(t, h, message, snapshot)
+	return events, h.provider
+}
+
+func runCanvasToolUseHarnessWithHarness(t *testing.T, h canvasToolUseHarness, message string, snapshot canvasSnapshot) []canvasHarnessEvent {
+	t.Helper()
 	if len(snapshot.Cards) == 0 {
 		snapshot = canvasHarnessSnapshot(h.assetA, h.assetB)
 	}
@@ -370,7 +415,35 @@ func runCanvasToolUseHarness(t *testing.T, message string, snapshot canvasSnapsh
 	if rec.Code != http.StatusOK {
 		t.Fatalf("canvas chat = %d %s", rec.Code, rec.Body.String())
 	}
-	return decodeCanvasHarnessEvents(t, rec.Body.String()), h.provider
+	return decodeCanvasHarnessEvents(t, rec.Body.String())
+}
+
+func seedCanvasHarnessVLMOCR(t *testing.T, h canvasToolUseHarness, texts map[string]string) {
+	t.Helper()
+	scanID := h.server.latestScanID()
+	if scanID == 0 {
+		t.Fatal("missing scan")
+	}
+	for assetID, text := range texts {
+		item, err := h.server.store.CatalogItem(scanID, assetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.server.store.UpsertOCRResult(ocr.Result{
+			ProjectID:     item.ProjectID,
+			RepoPath:      item.RepoPath,
+			ContentHash:   item.ContentHash,
+			HashAlgorithm: item.HashAlgorithm,
+			EngineName:    "vlm",
+			EngineVersion: "ollama/fixture-vlm",
+			SettingsHash:  vlmOCRSettingsHash("fixture-vlm"),
+			Status:        ocr.StatusReady,
+			Text:          text,
+			Languages:     []string{"en"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func decodeCanvasHarnessEvents(t *testing.T, body string) []canvasHarnessEvent {
@@ -414,6 +487,21 @@ func requireCanvasHarnessEvent(t *testing.T, events []canvasHarnessEvent, eventT
 		t.Fatalf("missing event type=%s tool=%s in %#v", eventType, tool, events)
 	}
 	return event
+}
+
+func requireCanvasHarnessToolEventOrder(t *testing.T, events []canvasHarnessEvent, tools ...string) {
+	t.Helper()
+	index := 0
+	for _, event := range events {
+		if event["type"] != "action_result" || event["tool"] != tools[index] {
+			continue
+		}
+		index++
+		if index == len(tools) {
+			return
+		}
+	}
+	t.Fatalf("missing ordered action_result tools %v in %#v", tools, events)
 }
 
 func rejectCanvasHarnessEvent(t *testing.T, events []canvasHarnessEvent, eventType, tool string) {
@@ -484,6 +572,40 @@ func rejectCanvasHarnessRequestTool(t *testing.T, req llm.ChatRequest, name stri
 	}
 }
 
+func requireCanvasHarnessRequestTools(t *testing.T, req llm.ChatRequest, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		requireCanvasHarnessRequestTool(t, req, name)
+	}
+}
+
+func requireCanvasHarnessToolRequiredParams(t *testing.T, req llm.ChatRequest, name string, params ...string) {
+	t.Helper()
+	for _, tool := range req.Tools {
+		if tool.Name != name {
+			continue
+		}
+		required := map[string]bool{}
+		for _, key := range canvasSchemaRequired(tool.Parameters) {
+			required[key] = true
+		}
+		for _, param := range params {
+			if !required[param] {
+				t.Fatalf("tool %s required params = %#v, missing %s", name, required, param)
+			}
+		}
+		return
+	}
+	t.Fatalf("request missing tool %s in %#v", name, req.Tools)
+}
+
+func requireCanvasHarnessToolChoice(t *testing.T, req llm.ChatRequest, want string) {
+	t.Helper()
+	if req.ToolChoice != want {
+		t.Fatalf("tool choice = %q, want %q", req.ToolChoice, want)
+	}
+}
+
 func requireCanvasHarnessLoopStat(t *testing.T, events []canvasHarnessEvent, index int) map[string]any {
 	t.Helper()
 	done := requireCanvasHarnessEvent(t, events, "done", "")
@@ -537,6 +659,139 @@ func canvasHarnessText(content string) llm.ChatResponse {
 	return llm.ChatResponse{Content: content, InputTokens: 1, OutputTokens: 1, DurationMs: 1}
 }
 
+func writeCanvasRegionFixturePNG(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	img := image.NewNRGBA(image.Rect(0, 0, 100, 100))
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 100; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 0})
+		}
+	}
+	for y := 12; y < 38; y++ {
+		for x := 38; x < 58; x++ {
+			img.Set(x, y, color.NRGBA{R: 20, G: 25, B: 32, A: 255})
+		}
+	}
+	for y := 12; y < 38; y++ {
+		for x := 50; x < 66; x++ {
+			img.Set(x, y, color.NRGBA{R: 242, G: 106, B: 160, A: 255})
+		}
+	}
+	for y := 21; y < 28; y++ {
+		for x := 32; x < 39; x++ {
+			img.Set(x, y, color.NRGBA{R: 242, G: 106, B: 160, A: 255})
+		}
+	}
+	if err := png.Encode(file, img); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCanvasTextRegionFixturePNG(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	img := image.NewNRGBA(image.Rect(0, 0, 120, 120))
+	for y := 0; y < 120; y++ {
+		for x := 0; x < 120; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 0})
+		}
+	}
+	// Non-text white headband near the wrong model-provided region.
+	for y := 42; y < 57; y++ {
+		for x := 32; x < 68; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	// Three white glyph-like components on a sign far from the wrong region.
+	for y := 16; y < 30; y++ {
+		for x := 82; x < 96; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	for y := 42; y < 62; y++ {
+		for x := 80; x < 100; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	for y := 76; y < 84; y++ {
+		for x := 82; x < 99; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	if err := png.Encode(file, img); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCanvasRedTextWithWhiteDistractorPNG(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	img := image.NewNRGBA(image.Rect(0, 0, 120, 120))
+	for y := 0; y < 120; y++ {
+		for x := 0; x < 120; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 0})
+		}
+	}
+	// Wrong-color distractor that should not win when the model guesses white text.
+	for y := 58; y < 75; y++ {
+		for x := 34; x < 48; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	for y := 58; y < 75; y++ {
+		for x := 54; x < 68; x++ {
+			img.Set(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	// Tall spine-like decoration must not be mistaken for the title text.
+	for _, top := range []int{12, 25, 38, 51, 64, 77, 90} {
+		for y := top; y < top+5; y++ {
+			for x := 5; x < 11; x++ {
+				img.Set(x, y, color.NRGBA{R: 214, G: 38, B: 34, A: 255})
+			}
+		}
+	}
+	// Same-color non-text artwork below the title must not be merged into the text box.
+	for y := 64; y < 94; y++ {
+		for x := 50; x < 78; x++ {
+			img.Set(x, y, color.NRGBA{R: 214, G: 38, B: 34, A: 255})
+		}
+	}
+	// Red glyph-like title components near the top of the image.
+	for _, left := range []int{24, 39, 54, 69} {
+		for y := 16; y < 39; y++ {
+			for x := left; x < left+11; x++ {
+				img.Set(x, y, color.NRGBA{R: 214, G: 38, B: 34, A: 255})
+			}
+		}
+	}
+	if err := png.Encode(file, img); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func canvasHarnessDefaultArgs(tool, assetA, assetB string) map[string]any {
 	switch tool {
 	case "focus_card":
@@ -552,7 +807,7 @@ func canvasHarnessDefaultArgs(tool, assetA, assetB string) map[string]any {
 	case "create_comment":
 		return map[string]any{"anchorCardId": "card-a", "text": "Mark this region", "region": map[string]any{"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}}
 	case "update_comment":
-		return map[string]any{"commentCardId": "comment-a", "text": "Updated note"}
+		return map[string]any{"commentCardId": "comment-a", "text": "Updated note", "region": map[string]any{"x": 0.2, "y": 0.3, "width": 0.4, "height": 0.2}}
 	case "delete_comment":
 		return map[string]any{"commentCardId": "comment-a"}
 	case "select_cards", "remove_cards":
@@ -770,6 +1025,7 @@ func TestCanvasHarnessNativeToolCallsSuppressStaleText(t *testing.T) {
 	if len(requests) == 0 {
 		t.Fatal("provider received no requests")
 	}
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
 	wantToolCount := len(canvasLLMToolsForSkills([]string{canvasSkillSearch}))
 	if len(requests[0].Tools) != wantToolCount {
 		t.Fatalf("request did not include gated native canvas tools: got %d want %d", len(requests[0].Tools), wantToolCount)
@@ -795,33 +1051,990 @@ func TestCanvasHarnessNativeToolCallsSuppressStaleText(t *testing.T) {
 	}
 }
 
-func TestCanvasHarnessFallbackCatalogSearchWhenModelDoesNotUseTool(t *testing.T) {
+func TestCanvasSearchAssetsFallsBackToSemanticSearch(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	embedModel := "fixture-embed"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{LLMEmbedModel: &embedModel}); err != nil {
+		t.Fatal(err)
+	}
+	scanID := bootstrap.server.latestScanID()
+	for _, entry := range []struct {
+		id     string
+		vector []float32
+	}{
+		{id: bootstrap.assetA, vector: []float32{1, 0}},
+		{id: bootstrap.assetB, vector: []float32{0, 1}},
+	} {
+		item, err := bootstrap.server.store.CatalogItem(scanID, entry.id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = bootstrap.server.store.UpsertEmbedding(config.EmbeddingResult{
+			AssetID:       item.ID,
+			ProjectID:     item.ProjectID,
+			RepoPath:      item.RepoPath,
+			ContentHash:   item.ContentHash,
+			HashAlgorithm: item.HashAlgorithm,
+			EmbedType:     "text",
+			ProviderName:  "ollama",
+			ModelName:     embedModel,
+			Dimensions:    2,
+			Status:        "ready",
+		}, entry.vector)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	settings, err := bootstrap.server.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := bootstrap.server.executeCanvasSafeAction(
+		httptest.NewRequest(http.MethodPost, "/api/ai/canvas/chat", nil),
+		canvasAction{Tool: "search_assets", Params: map[string]any{"q": "logo", "limit": float64(1)}},
+		settings,
+		canvasSnapshot{},
+	).(map[string]any)
+	items, ok := result["items"].([]scanner.AssetItem)
+	if !ok || len(items) != 1 {
+		t.Fatalf("items = %#v", result["items"])
+	}
+	if items[0].ID != bootstrap.assetA {
+		t.Fatalf("semantic result asset = %q, want %q", items[0].ID, bootstrap.assetA)
+	}
+	if result["matchType"] != "semantic" {
+		t.Fatalf("matchType = %#v, want semantic", result["matchType"])
+	}
+}
+
+func TestCanvasSearchAssetsCanListTextBearingImages(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+		bootstrap.assetB: "",
+	})
+	settings, err := bootstrap.server.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := bootstrap.server.executeCanvasSafeAction(
+		httptest.NewRequest(http.MethodPost, "/api/ai/canvas/chat", nil),
+		canvasAction{Tool: "search_assets", Params: map[string]any{"q": "text", "limit": float64(12), "hasText": true}},
+		settings,
+		canvasSnapshot{},
+	).(map[string]any)
+	items, ok := result["items"].([]scanner.AssetItem)
+	if !ok || len(items) != 1 {
+		t.Fatalf("items = %#v", result["items"])
+	}
+	if items[0].ID != bootstrap.assetA {
+		t.Fatalf("text-bearing asset = %q, want %q", items[0].ID, bootstrap.assetA)
+	}
+	if items[0].OCR == nil || items[0].OCR.Text != "SALE" {
+		t.Fatalf("OCR text missing from result: %#v", items[0].OCR)
+	}
+	if result["hasText"] != true {
+		t.Fatalf("hasText = %#v, want true", result["hasText"])
+	}
+}
+
+func TestCanvasHarnessNormalizesGenericTextSearchToOCRFilter(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+		bootstrap.assetB: "",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "text", "limit": float64(12)}),
+		canvasHarnessText("Done."),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show assets that contain visible text.",
+		canvasSnapshot{},
+	)
+	searchEvent := requireCanvasHarnessEvent(t, events, "action_result", "search_assets")
+	searchResult, ok := searchEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("search result = %#v", searchEvent["result"])
+	}
+	if searchResult["hasText"] != true {
+		t.Fatalf("generic text search should be normalized to hasText=true: %#v", searchResult["hasText"])
+	}
+	items, ok := searchResult["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("generic text search should exclude empty OCR, items = %#v", searchResult["items"])
+	}
+}
+
+func TestCanvasHarnessNonEnglishValidationMatrixGetsRequiredNativeTools(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		tools []string
+	}{
+		{
+			name:  "search add row",
+			input: "幫我搜尋 logo 相關素材，加入最相關的 3 張到畫布，排成一列。",
+			tools: []string{"search_assets", "add_assets_to_canvas", "arrange_cards"},
+		},
+		{
+			name:  "detail before add",
+			input: "找出一張尺寸最大的 banner 圖，先看詳細資料，再加到畫布旁邊。",
+			tools: []string{"search_assets", "get_asset_detail", "add_assets_to_canvas"},
+		},
+		{
+			name:  "selected layout",
+			input: "把目前選取的所有卡片平均水平排列，並讓上緣對齊。",
+			tools: []string{"select_cards", "distribute_cards", "align_cards"},
+		},
+		{
+			name:  "hero layer",
+			input: "把主圖放大，移到中間，然後放到其他圖的最上層。",
+			tools: []string{"focus_card", "resize_card", "move_card", "arrange_cards", "bring_cards_to_front"},
+		},
+		{
+			name:  "duplicate cleanup",
+			input: "把目前選取的圖各複製兩張，放到空白區；如果多出不相關的候選圖就移除。",
+			tools: []string{"duplicate_cards", "arrange_cards", "remove_cards"},
+		},
+		{
+			name:  "ocr",
+			input: "讀出目前選取圖片裡的文字，只回答文字，不要寫回 metadata。",
+			tools: []string{"extract_ocr_text"},
+		},
+		{
+			name:  "annotation",
+			input: "幫我在這張圖需要注意的地方留一個註解，標出可讀性問題。",
+			tools: []string{"focus_card", "create_comment"},
+		},
+		{
+			name:  "capture",
+			input: "幫我截目前 viewport；再截目前選取的圖片區域，背景透明。",
+			tools: []string{"capture_viewport", "capture_selected"},
+		},
+		{
+			name:  "quality alt text",
+			input: "比較這兩張圖是否相似，檢查品質問題，最後替第一張產生 alt text。",
+			tools: []string{"compare_assets", "find_similar_assets", "inspect_image_quality", "generate_alt_text"},
+		},
+		{
+			name:  "variant and proposal",
+			input: "把封面是書的那張旋轉 90 度，family 做水平鏡像，另外把 family 檔名改短一點。",
+			tools: []string{"rotate_image", "mirror_image", "rename_asset"},
+		},
+		{
+			name:  "advanced text assets annotate and copy",
+			input: "請幫我把所有有文字的圖展示出來，且要平均擺放在畫布上，並用註解把文字的地方圈起來說明他寫了什麼，然後最後把這些檔案複製一份後用文字內容作為檔名",
+			tools: []string{"search_assets", "add_assets_to_canvas", "arrange_cards", "create_comment", "copy_asset"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bootstrap := newCanvasToolUseHarness(t)
+			_, provider := runCanvasToolUseHarness(
+				t,
+				tc.input,
+				canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a", "card-b"),
+				canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+			)
+			requests := provider.Requests()
+			if len(requests) == 0 {
+				t.Fatal("provider received no requests")
+			}
+			requireCanvasHarnessToolChoice(t, requests[0], "required")
+			requireCanvasHarnessRequestTools(t, requests[0], tc.tools...)
+		})
+	}
+}
+
+func TestCanvasHarnessAdvancedTextAssetsAnnotateAndCopyProposal(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+		bootstrap.assetB: "LOGO",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "", "limit": float64(18), "hasText": true}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA, bootstrap.assetB}}),
+		canvasHarnessToolCall("arrange_cards", map[string]any{"positions": []any{
+			map[string]any{"cardId": bootstrap.assetA, "x": float64(120), "y": float64(160)},
+			map[string]any{"cardId": bootstrap.assetB, "x": float64(460), "y": float64(160)},
+		}}),
+		canvasHarnessToolCalls(
+			llm.ChatToolCall{
+				Name: "create_comment",
+				Arguments: map[string]any{
+					"anchorCardId": bootstrap.assetA,
+					"text":         "Text reads: SALE",
+					"region":       map[string]any{"x": 0.2, "y": 0.2, "width": 0.5, "height": 0.25},
+				},
+			},
+			llm.ChatToolCall{
+				Name: "create_comment",
+				Arguments: map[string]any{
+					"anchorCardId": bootstrap.assetB,
+					"text":         "Text reads: LOGO",
+					"region":       map[string]any{"x": 0.25, "y": 0.25, "width": 0.45, "height": 0.25},
+				},
+			},
+			llm.ChatToolCall{
+				Name: "copy_asset",
+				Arguments: map[string]any{
+					"assetIds": []any{bootstrap.assetA, bootstrap.assetB},
+					"perAssetDestPaths": []any{
+						map[string]any{"assetId": bootstrap.assetA, "destPath": "exports/SALE.png"},
+						map[string]any{"assetId": bootstrap.assetB, "destPath": "exports/LOGO.png"},
+					},
+				},
+			},
+		),
+		canvasHarnessToolCall("duplicate_cards", map[string]any{"cardIds": []any{"card-a"}, "count": float64(1)}),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"請幫我把所有有文字的圖展示出來，且要平均擺放在畫布上，並用註解把文字的地方圈起來說明他寫了什麼，然後最後把這些檔案複製一份後用文字內容作為檔名",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "arrange_cards", "create_comment", "create_comment")
+
+	searchEvent := requireCanvasHarnessEvent(t, events, "action_result", "search_assets")
+	searchResult, ok := searchEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("search result = %#v", searchEvent["result"])
+	}
+	items, ok := searchResult["items"].([]any)
+	if !ok || len(items) != 2 {
+		t.Fatalf("search items = %#v", searchResult["items"])
+	}
+
+	proposal := requireCanvasHarnessEvent(t, events, "proposal", "copy_asset")
+	targetIDs := canvasHarnessEventStringSlice(proposal["targetAssetIds"])
+	if !reflect.DeepEqual(targetIDs, []string{bootstrap.assetA, bootstrap.assetB}) {
+		t.Fatalf("copy proposal targetAssetIds = %#v", targetIDs)
+	}
+	params, ok := proposal["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("proposal params = %#v", proposal["params"])
+	}
+	rows, ok := params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("perAssetDestPaths = %#v", params["perAssetDestPaths"])
+	}
+	rejectCanvasHarnessEvent(t, events, "action_result", "copy_asset")
+}
+
+func TestCanvasHarnessOCRAnnotationRoundAllowsCopyProposal(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "text", "limit": float64(12)}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA}}),
+		canvasHarnessToolCall("extract_ocr_text", map[string]any{"assetIds": []any{bootstrap.assetA}, "mode": "vlm", "saveToMetadata": false}),
+		canvasHarnessToolCalls(
+			llm.ChatToolCall{
+				Name: "create_comment",
+				Arguments: map[string]any{
+					"anchorCardId": bootstrap.assetA,
+					"text":         "SALE",
+					"region":       map[string]any{"x": 0.2, "y": 0.2, "width": 0.5, "height": 0.25},
+					"visualCue": map[string]any{
+						"targetDescription": "text characters",
+						"colorHex":          "#ffffff",
+					},
+				},
+			},
+			llm.ChatToolCall{
+				Name: "copy_asset",
+				Arguments: map[string]any{
+					"assetIds": []any{bootstrap.assetA},
+					"perAssetDestPaths": []any{
+						map[string]any{"assetId": bootstrap.assetA, "destPath": "exports/SALE.png"},
+					},
+				},
+			},
+		),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, annotate the text area with what it says, then copy each file using the text content as the filename.",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "extract_ocr_text", "create_comment")
+	proposal := requireCanvasHarnessEvent(t, events, "proposal", "copy_asset")
+	targetIDs := canvasHarnessEventStringSlice(proposal["targetAssetIds"])
+	if !reflect.DeepEqual(targetIDs, []string{bootstrap.assetA}) {
+		t.Fatalf("copy proposal targetAssetIds = %#v", targetIDs)
+	}
+	rejectCanvasHarnessEvent(t, events, "action_result", "copy_asset")
+	rejectCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+}
+
+func TestCanvasHarnessRepairsOCRTextWorkflowIntoComments(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+		bootstrap.assetB: "",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "", "limit": float64(18), "hasText": true}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA}}),
+		canvasHarnessToolCall("extract_ocr_text", map[string]any{"assetIds": []any{bootstrap.assetA}, "mode": "vlm", "saveToMetadata": false}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "Text reads: SALE",
+			"region":       map[string]any{"x": 0.2, "y": 0.2, "width": 0.5, "height": 0.25},
+			"visualCue": map[string]any{
+				"targetDescription": "white text characters",
+				"colorHex":          "#ffffff",
+			},
+		}),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly on the canvas, and annotate the text area with what it says.",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "extract_ocr_text", "create_comment")
+
+	searchEvent := requireCanvasHarnessEvent(t, events, "action_result", "search_assets")
+	searchResult, ok := searchEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("search result = %#v", searchEvent["result"])
+	}
+	items, ok := searchResult["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("text search should exclude empty OCR before limit, items = %#v", searchResult["items"])
+	}
+
+	ocrEvent := requireCanvasHarnessEvent(t, events, "action_result", "extract_ocr_text")
+	ocrResult, ok := ocrEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("OCR result = %#v", ocrEvent["result"])
+	}
+	if ocrResult["displayToUser"] != false {
+		t.Fatalf("OCR intermediate result should be hidden from final chat: %#v", ocrResult)
+	}
+	addStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if addStat["nextReason"] != canvasLoopReasonOCRTextExtraction {
+		t.Fatalf("post-add loop nextReason = %#v", addStat["nextReason"])
+	}
+	stat := requireCanvasHarnessLoopStat(t, events, 2)
+	if stat["nextReason"] != canvasLoopReasonOCRTextAnnotation {
+		t.Fatalf("OCR loop nextReason = %#v", stat["nextReason"])
+	}
+	requests := bootstrap.provider.Requests()
+	if len(requests) < 4 {
+		t.Fatalf("provider requests = %d, want OCR annotation repair request", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[2], "required")
+	requireCanvasHarnessRequestTools(t, requests[2], "extract_ocr_text")
+	requireCanvasHarnessToolChoice(t, requests[3], "required")
+	requireCanvasHarnessRequestTools(t, requests[3], "create_comment", "remove_cards", "arrange_cards")
+	requireCanvasHarnessToolRequiredParams(t, requests[3], "create_comment", "anchorCardId", "text", "region", "visualCue")
+}
+
+func TestCanvasHarnessRejectsOCRTextCommentWithoutRegion(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "text", "limit": float64(12)}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA}}),
+		canvasHarnessToolCall("extract_ocr_text", map[string]any{"assetIds": []any{bootstrap.assetA}, "mode": "vlm", "saveToMetadata": false}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "Text reads: SALE",
+		}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "Text reads: SALE",
+			"region":       map[string]any{"x": 0.2, "y": 0.2, "width": 0.5, "height": 0.25},
+			"visualCue": map[string]any{
+				"targetDescription": "white text characters",
+				"colorHex":          "#ffffff",
+			},
+		}),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly on the canvas, and annotate the text area with what it says.",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "extract_ocr_text", "create_comment")
+	commentEvents := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "create_comment" {
+			commentEvents++
+			result, _ := event["result"].(map[string]any)
+			if result["region"] == nil {
+				t.Fatalf("region-less OCR text comment should not execute: %#v", result)
+			}
+		}
+	}
+	if commentEvents != 1 {
+		t.Fatalf("executed create_comment count = %d, want 1", commentEvents)
+	}
+	stat := requireCanvasHarnessLoopStat(t, events, 3)
+	if stat["nextReason"] != canvasLoopReasonOCRTextAnnotation {
+		t.Fatalf("region-less OCR text comment nextReason = %#v", stat["nextReason"])
+	}
+}
+
+func TestCanvasHarnessRefinesOCRTextCommentFromGenericPlaceholder(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writeCanvasRedTextWithWhiteDistractorPNG(t, filepath.Join(bootstrap.root, "img", "a.png"))
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "text", "limit": float64(12)}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA}}),
+		canvasHarnessToolCall("extract_ocr_text", map[string]any{"assetIds": []any{bootstrap.assetA}, "mode": "vlm", "saveToMetadata": false}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "SALE",
+			"region":       map[string]any{"x": 0.1, "y": 0.2, "width": 0.2, "height": 0.1},
+			"visualCue": map[string]any{
+				"targetDescription": "white text characters",
+				"colorHex":          "#ffffff",
+			},
+		}),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly on the canvas, and annotate the text area with what it says.",
+		canvasSnapshot{},
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("comment result = %#v", event["result"])
+	}
+	rawRegion, ok := result["region"].(map[string]any)
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	region, ok := canvasRegionFromValue(rawRegion)
+	if !ok {
+		t.Fatalf("region parse failed: %#v", rawRegion)
+	}
+	if canvasRegionLooksGenericPlaceholder(region) || region.Y > 0.25 || region.Width < 0.35 {
+		t.Fatalf("generic OCR text placeholder was not refined to the red title: %#v", rawRegion)
+	}
+}
+
+func TestCanvasHarnessRejectsGenericOCRTextPlaceholderAfterFailedRefinement(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+	})
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "text", "limit": float64(12)}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA}}),
+		canvasHarnessToolCall("extract_ocr_text", map[string]any{"assetIds": []any{bootstrap.assetA}, "mode": "vlm", "saveToMetadata": false}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "SALE",
+			"region":       map[string]any{"x": 0.1, "y": 0.2, "width": 0.2, "height": 0.1},
+			"visualCue": map[string]any{
+				"targetDescription": "white text characters",
+				"colorHex":          "#ffffff",
+			},
+		}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "SALE",
+			"region":       map[string]any{"x": 0.3, "y": 0.15, "width": 0.35, "height": 0.18},
+			"visualCue": map[string]any{
+				"targetDescription": "text characters",
+				"colorHex":          "#d62622",
+			},
+		}),
+	}
+
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly on the canvas, and annotate the text area with what it says.",
+		canvasSnapshot{},
+	)
+	commentEvents := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "create_comment" {
+			commentEvents++
+			result, _ := event["result"].(map[string]any)
+			region, _ := canvasRegionFromValue(result["region"])
+			if canvasRegionLooksGenericPlaceholder(region) {
+				t.Fatalf("generic OCR text placeholder should not execute: %#v", result)
+			}
+		}
+	}
+	if commentEvents != 1 {
+		t.Fatalf("executed create_comment count = %d, want 1", commentEvents)
+	}
+	stat := requireCanvasHarnessLoopStat(t, events, 3)
+	if stat["nextReason"] != canvasLoopReasonIncompleteTextAnnotation {
+		t.Fatalf("generic placeholder nextReason = %#v", stat["nextReason"])
+	}
+}
+
+func TestCanvasHarnessNativeToolResultsCanContinueLayoutChain(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	events, provider := runCanvasToolUseHarness(
 		t,
-		"搜尋 alpha 相關素材，加入 1 張到畫布，排成一列",
-		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
-		canvasHarnessText("ok"),
+		"把目前選取的所有卡片平均水平排列，並讓上緣對齊。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a", "card-b"),
+		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-a", "card-b"}}),
+		canvasHarnessToolCall("distribute_cards", map[string]any{"cardIds": []any{"card-a", "card-b"}, "direction": "horizontal", "gap": float64(80)}),
+		canvasHarnessToolCall("align_cards", map[string]any{"cardIds": []any{"card-a", "card-b"}, "axis": "top"}),
+		canvasHarnessText("Done."),
 	)
-	event := requireCanvasHarnessEvent(t, events, "action_result", "search_assets")
-	result, ok := event["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("search result = %#v", event["result"])
+	requireCanvasHarnessToolEventOrder(t, events, "select_cards", "distribute_cards", "align_cards")
+
+	requests := provider.Requests()
+	if len(requests) < 3 {
+		t.Fatalf("expected native tool-result follow-up loop, got %d requests", len(requests))
 	}
-	items, ok := result["items"].([]any)
-	if !ok || len(items) != 1 {
-		t.Fatalf("search items = %#v", result["items"])
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
+	requireCanvasHarnessToolChoice(t, requests[1], "")
+	requireCanvasHarnessToolChoice(t, requests[2], "")
+	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if secondStat["reason"] != canvasLoopReasonToolResults {
+		t.Fatalf("second reason = %#v", secondStat["reason"])
 	}
-	item, ok := items[0].(map[string]any)
-	if !ok || item["id"] != bootstrap.assetA {
-		t.Fatalf("first search item = %#v, want assetA %s", items[0], bootstrap.assetA)
+	thirdStat := requireCanvasHarnessLoopStat(t, events, 2)
+	if thirdStat["reason"] != canvasLoopReasonToolResults {
+		t.Fatalf("third reason = %#v", thirdStat["reason"])
 	}
-	if result["q"] != "alpha" {
-		t.Fatalf("search q = %#v, want alpha", result["q"])
+}
+
+func TestCanvasHarnessRepairsRequiredNativeTextOnlyAnnotation(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Where is the peach in this image? Circle it.",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessText("The peach is on the headband, but I cannot directly circle it here."),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband.",
+			"region":       map[string]any{"x": 0.4, "y": 0.22, "width": 0.2, "height": 0.12},
+		}),
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	textEvent := requireCanvasHarnessEvent(t, events, "text", "")
+	if !strings.Contains(fmt.Sprint(textEvent["content"]), "Added 1 comment.") {
+		t.Fatalf("terminal comment answer missing: %#v", textEvent)
 	}
 	requests := provider.Requests()
-	if len(requests) != 1 {
-		t.Fatalf("fallback search should not require extra model loops, got %d", len(requests))
+	if len(requests) < 2 {
+		t.Fatalf("expected repair round, got %d requests", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if secondStat["reason"] != canvasLoopReasonTextOnlyDeferredWork {
+		t.Fatalf("repair reason = %#v", secondStat["reason"])
+	}
+}
+
+func TestCanvasHarnessRepairsIncompleteTextAnnotationMentionedByComment(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Asset.OcrText = "日本一"
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Circle the peach and the visible text, then explain both in comments.",
+		snapshot,
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband. The visible text reads 日本一.",
+			"region":       map[string]any{"x": 0.29, "y": 0.19, "width": 0.11, "height": 0.08},
+			"visualCue":    map[string]any{"targetDescription": "small pink peach icon", "colorHex": "#f26aa0"},
+		}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband. The visible text reads 日本一.",
+			"region":       map[string]any{"x": 0.29, "y": 0.19, "width": 0.11, "height": 0.08},
+			"visualCue":    map[string]any{"targetDescription": "small pink peach icon", "colorHex": "#f26aa0"},
+		}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The banner text reads 日本一.",
+			"region":       map[string]any{"x": 0.64, "y": 0.1, "width": 0.2, "height": 0.36},
+			"visualCue":    map[string]any{"targetDescription": "white text glyphs", "colorHex": "#ffffff"},
+		}),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "create_comment", "create_comment")
+	requests := provider.Requests()
+	if len(requests) < 2 {
+		t.Fatalf("expected incomplete text annotation repair, got %d requests", len(requests))
+	}
+	commentResults := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "create_comment" {
+			commentResults++
+		}
+	}
+	if commentResults != 2 {
+		t.Fatalf("expected repeated non-text comment to be blocked, got %d create_comment results in %#v", commentResults, events)
+	}
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["nextReason"] != canvasLoopReasonIncompleteTextAnnotation {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	if !strings.Contains(requests[1].Messages[len(requests[1].Messages)-1].Content, "actual visible characters") {
+		t.Fatalf("repair prompt should demand a separate text region:\n%s", requests[1].Messages[len(requests[1].Messages)-1].Content)
+	}
+}
+
+func TestCanvasHarnessBlocksUnverifiableOCRMentionBeforeRepair(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Asset.OcrText = "日本一"
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Circle the peach and the visible text, then explain both in comments.",
+		snapshot,
+		canvasHarnessToolCalls(
+			llm.ChatToolCall{
+				Name: "create_comment",
+				Arguments: map[string]any{
+					"anchorCardId": "card-a",
+					"text":         "The peach is on the headband. The visible text reads 日本一.",
+					"region":       map[string]any{"x": 0.29, "y": 0.19, "width": 0.11, "height": 0.08},
+					"visualCue":    map[string]any{"targetDescription": "small pink peach icon", "colorHex": "#f26aa0"},
+				},
+			},
+			llm.ChatToolCall{
+				Name: "create_comment",
+				Arguments: map[string]any{
+					"anchorCardId": "card-a",
+					"text":         "The picture has a peach on the left side and the text reads 日本一.",
+					"region":       map[string]any{"x": 0.1, "y": 0.2, "width": 0.15, "height": 0.1},
+				},
+			},
+		),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The banner text reads 日本一.",
+			"region":       map[string]any{"x": 0.64, "y": 0.1, "width": 0.2, "height": 0.36},
+			"visualCue":    map[string]any{"targetDescription": "white text glyphs", "colorHex": "#ffffff"},
+		}),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "create_comment", "create_comment")
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["nextReason"] != canvasLoopReasonIncompleteTextAnnotation {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	commentResults := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "create_comment" {
+			commentResults++
+			result := event["result"].(map[string]any)
+			if strings.Contains(fmt.Sprint(result["text"]), "left side") {
+				t.Fatalf("unverifiable OCR mention should be blocked before UI execution: %#v", result)
+			}
+		}
+	}
+	if commentResults != 2 {
+		t.Fatalf("expected only verified peach plus repaired text comments, got %d in %#v", commentResults, events)
+	}
+	requests := provider.Requests()
+	if len(requests) < 2 {
+		t.Fatalf("expected repair request after blocking unverifiable text mention, got %d", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+}
+
+func TestCanvasHarnessKeepsIncompleteTextAnnotationRepairSticky(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Asset.OcrText = "日本一"
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Circle the peach and the visible text, then explain both in comments.",
+		snapshot,
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband. The visible text reads 日本一.",
+			"region":       map[string]any{"x": 0.29, "y": 0.19, "width": 0.11, "height": 0.08},
+			"visualCue":    map[string]any{"targetDescription": "small pink peach icon", "colorHex": "#f26aa0"},
+		}),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The picture has a peach on the left side and the text reads 日本一.",
+			"region":       map[string]any{"x": 0.2, "y": 0.3, "width": 0.15, "height": 0.15},
+		}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The banner text reads 日本一.",
+			"region":       map[string]any{"x": 0.64, "y": 0.1, "width": 0.2, "height": 0.36},
+			"visualCue":    map[string]any{"targetDescription": "white text glyphs", "colorHex": "#ffffff"},
+		}),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "create_comment", "create_comment")
+	for _, index := range []int{1, 2, 3} {
+		stat := requireCanvasHarnessLoopStat(t, events, index)
+		if stat["nextReason"] != canvasLoopReasonIncompleteTextAnnotation {
+			t.Fatalf("loop %d nextReason = %#v, want sticky incomplete text repair", index, stat["nextReason"])
+		}
+	}
+	commentResults := 0
+	for _, event := range events {
+		if event["type"] != "action_result" || event["tool"] != "create_comment" {
+			continue
+		}
+		commentResults++
+		result := event["result"].(map[string]any)
+		if strings.Contains(fmt.Sprint(result["text"]), "left side") {
+			t.Fatalf("sticky repair should block wrong non-text OCR comment: %#v", result)
+		}
+	}
+	if commentResults != 2 {
+		t.Fatalf("expected verified peach plus repaired text comments, got %d in %#v", commentResults, events)
+	}
+	requests := provider.Requests()
+	if len(requests) != 5 {
+		t.Fatalf("requests = %d, want 5", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	requireCanvasHarnessToolChoice(t, requests[2], "required")
+	requireCanvasHarnessToolChoice(t, requests[3], "required")
+	requireCanvasHarnessToolChoice(t, requests[4], "required")
+	for _, index := range []int{2, 3, 4} {
+		requireCanvasHarnessRequestTool(t, requests[index], "create_comment")
+		rejectCanvasHarnessRequestTool(t, requests[index], "focus_card")
+		rejectCanvasHarnessRequestTool(t, requests[index], "select_cards")
+		rejectCanvasHarnessRequestTool(t, requests[index], "inspect_canvas")
+		if len(requests[index].Tools) != 1 {
+			t.Fatalf("request %d repair tools = %d, want only create_comment: %#v", index, len(requests[index].Tools), requests[index].Tools)
+		}
+	}
+}
+
+func TestCanvasHarnessDoesNotFinishWithProseWhileTextAnnotationPending(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Asset.OcrText = "日本一"
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Circle the peach and the visible text, then explain both in comments.",
+		snapshot,
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband. The visible text reads 日本一.",
+			"region":       map[string]any{"x": 0.29, "y": 0.19, "width": 0.11, "height": 0.08},
+			"visualCue":    map[string]any{"targetDescription": "small pink peach icon", "colorHex": "#f26aa0"},
+		}),
+		canvasHarnessText("The visible text reads 日本一 on the banner."),
+		canvasHarnessText("The visible text reads 日本一 on the banner."),
+		canvasHarnessText("The visible text reads 日本一 on the banner."),
+		canvasHarnessText("The visible text reads 日本一 on the banner."),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "create_comment")
+	rejectCanvasHarnessEvent(t, events, "text", "")
+
+	requests := provider.Requests()
+	if len(requests) != 5 {
+		t.Fatalf("requests = %d, want 5", len(requests))
+	}
+	for _, index := range []int{1, 2, 3, 4} {
+		stat := requireCanvasHarnessLoopStat(t, events, index)
+		if stat["reason"] != canvasLoopReasonIncompleteTextAnnotation {
+			t.Fatalf("loop %d reason = %#v, want sticky incomplete text repair", index, stat["reason"])
+		}
+		requireCanvasHarnessToolChoice(t, requests[index], "required")
+		requireCanvasHarnessRequestTool(t, requests[index], "create_comment")
+		rejectCanvasHarnessRequestTool(t, requests[index], "focus_card")
+	}
+}
+
+func TestCanvasHarnessNativeToolResultsCanFinishHeroLayerChain(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"把主圖放大，移到中間，然後放到其他圖的最上層。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+		canvasHarnessToolCall("resize_card", map[string]any{"cardId": "card-a", "width": float64(420)}),
+		canvasHarnessToolCall("move_card", map[string]any{"cardId": "card-a", "x": float64(240), "y": float64(180)}),
+		canvasHarnessToolCall("bring_cards_to_front", map[string]any{"cardIds": []any{"card-a"}}),
+		canvasHarnessText("Done."),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "resize_card", "move_card", "bring_cards_to_front")
+
+	requests := provider.Requests()
+	if len(requests) < 4 {
+		t.Fatalf("expected native hero-layer follow-up loop, got %d requests", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	requireCanvasHarnessToolChoice(t, requests[2], "")
+	requireCanvasHarnessToolChoice(t, requests[3], "")
+	fourthStat := requireCanvasHarnessLoopStat(t, events, 3)
+	if fourthStat["reason"] != canvasLoopReasonToolResults {
+		t.Fatalf("fourth reason = %#v", fourthStat["reason"])
+	}
+}
+
+func TestCanvasHarnessNativeToolResultsCanContinueCaptureChain(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"幫我截目前 viewport；再截目前選取的圖片區域，背景透明。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessToolCall("capture_viewport", map[string]any{"transparent": false}),
+		canvasHarnessToolCall("capture_selected", map[string]any{"transparent": true}),
+		canvasHarnessText("Done."),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "capture_viewport", "capture_selected")
+
+	requests := provider.Requests()
+	if len(requests) != 2 {
+		t.Fatalf("expected capture chain to stop after selected capture, got %d requests", len(requests))
+	}
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
+	requireCanvasHarnessToolChoice(t, requests[1], "")
+	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
+	if secondStat["reason"] != canvasLoopReasonToolResults {
+		t.Fatalf("second reason = %#v", secondStat["reason"])
+	}
+}
+
+func TestCanvasHarnessDuplicateCleanupProtectsSelectedOriginals(t *testing.T) {
+	snapshot := canvasHarnessGenericRecoverySnapshot()
+	snapshot.SelectedCardIDs = []string{"card-primary", "card-secondary"}
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把目前選取的圖各複製兩張，放到空白區；如果多出不相關的候選圖就移除。",
+		snapshot,
+		canvasHarnessToolCall("duplicate_cards", map[string]any{
+			"cardIds": []any{"card-primary", "card-secondary"},
+			"count":   float64(2),
+			"layout":  "grid",
+		}),
+		canvasHarnessToolCall("arrange_cards", map[string]any{"positions": []any{
+			map[string]any{"cardId": "dup-1", "x": float64(120), "y": float64(420)},
+			map[string]any{"cardId": "dup-2", "x": float64(480), "y": float64(420)},
+		}}),
+		canvasHarnessToolCall("remove_cards", map[string]any{
+			"cardIds": []any{"card-decoy", "card-primary", "card-secondary"},
+		}),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "remove_cards")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("remove result = %#v", event["result"])
+	}
+	got := canvasHarnessEventStringSlice(result["cardIds"])
+	if !reflect.DeepEqual(got, []string{"card-decoy"}) {
+		t.Fatalf("remove_cards cardIds = %#v, want card-decoy only", got)
+	}
+}
+
+func TestCanvasHarnessDuplicateCleanupRecoversCandidateWhenModelTargetsOriginals(t *testing.T) {
+	snapshot := canvasHarnessGenericRecoverySnapshot()
+	snapshot.SelectedCardIDs = []string{"card-primary", "card-secondary"}
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把目前選取的圖各複製兩張，放到空白區；如果多出不相關的候選圖就移除。",
+		snapshot,
+		canvasHarnessToolCall("duplicate_cards", map[string]any{
+			"cardIds": []any{"card-primary", "card-secondary"},
+			"count":   float64(2),
+			"layout":  "grid",
+		}),
+		canvasHarnessToolCall("remove_cards", map[string]any{
+			"cardIds": []any{"card-primary", "card-secondary"},
+		}),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "remove_cards")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("remove result = %#v", event["result"])
+	}
+	got := canvasHarnessEventStringSlice(result["cardIds"])
+	if !reflect.DeepEqual(got, []string{"card-decoy"}) {
+		t.Fatalf("remove_cards cardIds = %#v, want recovered decoy candidate", got)
+	}
+}
+
+func TestCanvasHarnessStreamDoesNotEchoLocalizedActionMetadata(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"move selected cards",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a", "label": "狐狸和葡萄的卡片"}),
+		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-a", "card-b"}, "label": "需要移動的卡片"}),
+		canvasHarnessToolCall("duplicate_cards", map[string]any{"cardIds": []any{"card-a"}, "count": float64(2), "label": "複製驢子圖片兩張"}),
+	)
+	requireCanvasHarnessEvent(t, events, "focus", "")
+	requireCanvasHarnessEvent(t, events, "action_result", "select_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+
+	data, err := json.Marshal(events)
+	if err != nil {
+		t.Fatalf("marshal events: %v", err)
+	}
+	for _, forbidden := range []string{"狐狸", "需要移動", "複製驢子"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("localized action metadata leaked into stream: %s in %s", forbidden, data)
+		}
+	}
+}
+
+func TestCanvasHarnessArrangesMultipleAddedCatalogItems(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"search cat related assets, add the most relevant 2 cards to the canvas, then arrange them in a row",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
+		canvasHarnessToolCall("search_assets", map[string]any{"q": "img", "limit": float64(2)}),
+		canvasHarnessToolCall("add_assets_to_canvas", map[string]any{"assetIds": []any{bootstrap.assetA, bootstrap.assetB}}),
+		canvasHarnessText("Added the two catalog assets."),
+	)
+
+	arrangeEvent := requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
+	result, ok := arrangeEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("arrange result = %#v", arrangeEvent["result"])
+	}
+	rawPositions, ok := result["positions"].([]any)
+	if !ok || len(rawPositions) != 2 {
+		t.Fatalf("positions = %#v", result["positions"])
+	}
+	gotIDs := make([]string, 0, len(rawPositions))
+	for _, raw := range rawPositions {
+		position, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("position = %#v", raw)
+		}
+		gotIDs = append(gotIDs, fmt.Sprint(position["cardId"]))
+	}
+	if !reflect.DeepEqual(gotIDs, []string{bootstrap.assetA, bootstrap.assetB}) {
+		t.Fatalf("position card IDs = %#v", gotIDs)
 	}
 }
 
@@ -842,12 +2055,14 @@ func TestCanvasHarnessNativeEmptyFallsBackToActionBlocks(t *testing.T) {
 	if len(requests[0].Tools) == 0 {
 		t.Fatal("first request should include native tools")
 	}
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
 	if strings.Contains(requests[0].Messages[0].Content, "## Available Tools") {
 		t.Fatalf("native request duplicated text tool block:\n%s", requests[0].Messages[0].Content)
 	}
 	if len(requests[1].Tools) != 0 {
 		t.Fatalf("fallback request should omit native tools, got %d", len(requests[1].Tools))
 	}
+	requireCanvasHarnessToolChoice(t, requests[1], "")
 	if !strings.Contains(requests[1].Messages[0].Content, "## Available Tools") {
 		t.Fatalf("fallback request missing text tool block:\n%s", requests[1].Messages[0].Content)
 	}
@@ -864,30 +2079,6 @@ func TestCanvasHarnessNativeEmptyFallsBackToActionBlocks(t *testing.T) {
 	}
 	if got := requireCanvasHarnessStatNumber(t, secondStat, "fallbackActionCount"); got != 1 {
 		t.Fatalf("fallbackActionCount = %v", got)
-	}
-}
-
-func TestCanvasHarnessEmptyLocalModelUsesDeterministicFallback(t *testing.T) {
-	bootstrap := newCanvasToolUseHarness(t)
-	events, provider := runCanvasToolUseHarness(
-		t,
-		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方",
-		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
-		llm.ChatResponse{Content: "", InputTokens: 100, OutputTokens: 91, DurationMs: 5},
-		llm.ChatResponse{Content: "", InputTokens: 100, OutputTokens: 91, DurationMs: 5},
-	)
-	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
-	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
-	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
-	result, ok := duplicateEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
-	}
-	if got := canvasHarnessEventStringSlice(result["cardIds"]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-	if got := len(provider.Requests()); got != 2 {
-		t.Fatalf("requests = %d, want 2", got)
 	}
 }
 
@@ -996,8 +2187,11 @@ func TestCanvasHarnessNativeFocusOnlyRepairsToNonFocusAction(t *testing.T) {
 	if len(requests) < 2 {
 		t.Fatalf("expected focus-only repair follow-up request, got %d", len(requests))
 	}
-	requireCanvasHarnessRequestTool(t, requests[1], "focus_card")
-	requireCanvasHarnessRequestTool(t, requests[1], "select_cards")
+	requireCanvasHarnessToolChoice(t, requests[0], "required")
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	rejectCanvasHarnessRequestTool(t, requests[1], "focus_card")
+	rejectCanvasHarnessRequestTool(t, requests[1], "select_cards")
+	rejectCanvasHarnessRequestTool(t, requests[1], "inspect_canvas")
 	requireCanvasHarnessRequestTool(t, requests[1], "move_card")
 	requireCanvasHarnessRequestTool(t, requests[1], "resize_card")
 	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
@@ -1023,475 +2217,29 @@ func TestCanvasHarnessNativePreparatoryActionsRepairUntilConcreteAction(t *testi
 		"resize the tree and move the donkey to empty space",
 		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
 		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a", "label": "Tree card"}),
-		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-a"}, "label": "Tree card"}),
 		canvasHarnessToolCall("resize_card", map[string]any{"cardId": "card-a", "width": "420"}),
 	)
 	requireCanvasHarnessEvent(t, events, "focus", "")
-	requireCanvasHarnessEvent(t, events, "action_result", "select_cards")
 	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
 	status := requireCanvasHarnessEvent(t, events, "status", "")
 	if !strings.Contains(fmt.Sprint(status["content"]), "Confirming") {
 		t.Fatalf("status content = %#v", status["content"])
 	}
 	requests := provider.Requests()
-	if len(requests) < 3 {
-		t.Fatalf("expected repeated preparatory repair requests, got %d", len(requests))
+	if len(requests) < 2 {
+		t.Fatalf("expected preparatory repair request, got %d", len(requests))
 	}
-	requireCanvasHarnessRequestTool(t, requests[1], "focus_card")
-	requireCanvasHarnessRequestTool(t, requests[1], "select_cards")
-	requireCanvasHarnessRequestTool(t, requests[2], "focus_card")
-	requireCanvasHarnessRequestTool(t, requests[2], "select_cards")
-	requireCanvasHarnessRequestTool(t, requests[2], "resize_card")
+	requireCanvasHarnessToolChoice(t, requests[1], "required")
+	rejectCanvasHarnessRequestTool(t, requests[1], "focus_card")
+	rejectCanvasHarnessRequestTool(t, requests[1], "select_cards")
+	requireCanvasHarnessRequestTool(t, requests[1], "resize_card")
 	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
 	if firstStat["nextReason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
 		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
 	}
 	secondStat := requireCanvasHarnessLoopStat(t, events, 1)
-	if secondStat["nextReason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
-		t.Fatalf("second nextReason = %#v", secondStat["nextReason"])
-	}
-	thirdStat := requireCanvasHarnessLoopStat(t, events, 2)
-	if thirdStat["reason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
-		t.Fatalf("third reason = %#v", thirdStat["reason"])
-	}
-}
-
-func TestCanvasHarnessPreparatoryLoopFallsBackToConcreteManipulation(t *testing.T) {
-	bootstrap := newCanvasToolUseHarness(t)
-	events, provider := runCanvasToolUseHarness(
-		t,
-		"把樹放大，然後樹下有一隻驢子也移到空的地方",
-		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
-		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-tree", "card-donkey"}, "label": "Tree and donkey group"}),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree and donkey group"}),
-	)
-	requireCanvasHarnessStatusContaining(t, events, "Confirmation complete")
-	resizeEvent := requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
-	resizeResult, ok := resizeEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("resize result = %#v", resizeEvent["result"])
-	}
-	if resizeResult["cardId"] != "card-tree" {
-		t.Fatalf("resize cardId = %#v", resizeResult["cardId"])
-	}
-	if width, ok := resizeResult["width"].(float64); !ok || width <= 320 {
-		t.Fatalf("resize width = %#v", resizeResult["width"])
-	}
-	arrangeEvent := requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
-	arrangeResult, ok := arrangeEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("arrange result = %#v", arrangeEvent["result"])
-	}
-	rawPositions, ok := arrangeResult["positions"].([]any)
-	if !ok || len(rawPositions) != 2 {
-		t.Fatalf("positions = %#v", arrangeResult["positions"])
-	}
-	gotIDs := make([]string, 0, len(rawPositions))
-	for _, raw := range rawPositions {
-		position, ok := raw.(map[string]any)
-		if !ok {
-			t.Fatalf("position = %#v", raw)
-		}
-		gotIDs = append(gotIDs, fmt.Sprint(position["cardId"]))
-	}
-	if !reflect.DeepEqual(gotIDs, []string{"card-tree", "card-donkey"}) {
-		t.Fatalf("position card IDs = %#v", gotIDs)
-	}
-	requests := provider.Requests()
-	if len(requests) != 3 {
-		t.Fatalf("expected fallback after three preparatory requests, got %d requests", len(requests))
-	}
-}
-
-func TestCanvasHarnessFallbackUsesConfirmedTargetsAndExactMetadata(t *testing.T) {
-	bootstrap := newCanvasToolUseHarness(t)
-	events, _ := runCanvasToolUseHarness(
-		t,
-		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方 旋轉封面是魚的書 把 family 鏡像處理",
-		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
-		canvasHarnessToolCall("select_cards", map[string]any{"cardIds": []any{"card-tree", "card-donkey"}, "label": "Tree and donkey group"}),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree and donkey group"}),
-	)
-
-	resizeEvent := requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
-	resizeResult, ok := resizeEvent["result"].(map[string]any)
-	if !ok || resizeResult["cardId"] != "card-tree" {
-		t.Fatalf("resize result = %#v", resizeEvent["result"])
-	}
-
-	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
-	duplicateResult, ok := duplicateEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
-	}
-	positions, ok := duplicateResult["positions"].([]any)
-	if !ok || len(positions) != 2 {
-		t.Fatalf("duplicate positions = %#v", duplicateResult["positions"])
-	}
-
-	rotateEvent := requireCanvasHarnessEvent(t, events, "action_result", "rotate_image")
-	rotateResult, ok := rotateEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("rotate result = %#v", rotateEvent["result"])
-	}
-	if got := canvasHarnessEventStringSlice(rotateResult["assetIds"]); !reflect.DeepEqual(got, []string{"asset-fish-book"}) {
-		t.Fatalf("rotate assetIds = %#v", got)
-	}
-	mirrorEvent := requireCanvasHarnessEvent(t, events, "action_result", "mirror_image")
-	mirrorResult, ok := mirrorEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("mirror result = %#v", mirrorEvent["result"])
-	}
-	if got := canvasHarnessEventStringSlice(mirrorResult["assetIds"]); !reflect.DeepEqual(got, []string{"asset-family"}) {
-		t.Fatalf("mirror assetIds = %#v", got)
-	}
-}
-
-func TestCanvasFallbackRelationClauseUsesMostRecentTarget(t *testing.T) {
-	actions := fallbackCanvasManipulationActions(
-		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方",
-		canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey"),
-		[]string{"card-tree"},
-	)
-	var duplicate canvasAction
-	for _, action := range actions {
-		if action.Tool == "duplicate_cards" {
-			duplicate = action
-			break
-		}
-	}
-	got := canvasActionCardIDs(duplicate)
-	if !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-}
-
-func TestCanvasFallbackDuplicateCopyPositionsIgnoreRemoteOutliers(t *testing.T) {
-	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
-	canvas.Cards = append(canvas.Cards, canvasCardSnapshot{
-		ID:     "card-remote",
-		Kind:   "asset",
-		X:      4900,
-		Y:      1040,
-		Width:  320,
-		Height: 320,
-		Asset: &canvasAssetSnapshot{
-			ID:          "asset-remote",
-			RepoPath:    "remote.png",
-			Description: "A remote outlier left from a previous operation.",
-		},
-	})
-
-	positions := canvasFallbackDuplicateCopyPositions(
-		"複製兩張也移到空的地方",
-		canvas,
-		[]string{"copy-a", "copy-b"},
-		[]string{"card-donkey"},
-	)
-
-	if got := canvasActionPositionCardIDs(canvasAction{Tool: "arrange_cards", Params: map[string]any{"positions": positions}}); !reflect.DeepEqual(got, []string{"copy-a", "copy-b"}) {
-		t.Fatalf("position cardIds = %#v", got)
-	}
-	for _, raw := range positions {
-		position, ok := raw.(map[string]any)
-		if !ok {
-			t.Fatalf("position = %#v", raw)
-		}
-		x, _ := position["x"].(float64)
-		if x >= 3000 {
-			t.Fatalf("copy position used remote outlier x=%v positions=%#v", x, positions)
-		}
-	}
-	firstPosition := positions[0].(map[string]any)
-	firstY, _ := firstPosition["y"].(float64)
-	if firstY <= 1210 {
-		t.Fatalf("first copy should be placed below the source card, y=%v positions=%#v", firstY, positions)
-	}
-}
-
-func TestCanvasFallbackExplicitTextOverridesConfirmedRemoteCopy(t *testing.T) {
-	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
-	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
-		source := *canvas.Cards[2].Asset
-		return canvasCardSnapshot{
-			ID:     id,
-			Kind:   "asset",
-			X:      x,
-			Y:      y,
-			Width:  320,
-			Height: 379,
-			Asset:  &source,
-		}
-	}
-	canvas.Cards = append(
-		canvas.Cards,
-		remoteDonkey("card-remote-donkey-a", 5360, 0),
-		remoteDonkey("card-remote-donkey-b", 5420, 360),
-	)
-
-	actions := fallbackCanvasManipulationActions(
-		"把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。",
-		canvas,
-		[]string{"card-remote-donkey-a"},
-	)
-
-	var resize, duplicate, arrange canvasAction
-	for _, action := range actions {
-		switch action.Tool {
-		case "resize_card":
-			resize = action
-		case "duplicate_cards":
-			duplicate = action
-		case "arrange_cards":
-			arrange = action
-		}
-	}
-	if got := strings.TrimSpace(fmt.Sprint(resize.Params["cardId"])); got != "card-tree" {
-		t.Fatalf("resize cardId = %q", got)
-	}
-	if got := canvasActionCardIDs(duplicate); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-	if got := canvasActionPositionCardIDs(arrange); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("arrange cardIds = %#v", got)
-	}
-}
-
-func TestRefineCanvasActionTargetsUsesTextOverSelectedRemoteCopies(t *testing.T) {
-	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
-	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
-		source := *canvas.Cards[2].Asset
-		return canvasCardSnapshot{
-			ID:     id,
-			Kind:   "asset",
-			X:      x,
-			Y:      y,
-			Width:  320,
-			Height: 379,
-			Asset:  &source,
-		}
-	}
-	canvas.Cards = append(
-		canvas.Cards,
-		remoteDonkey("card-remote-donkey-a", 5360, 0),
-		remoteDonkey("card-remote-donkey-b", 5420, 360),
-	)
-	canvas.SelectedCardIDs = []string{"card-remote-donkey-a", "card-remote-donkey-b"}
-	actions := []canvasAction{
-		{
-			Tool: "duplicate_cards",
-			Params: map[string]any{
-				"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"},
-				"count":   float64(2),
-			},
-		},
-		{
-			Tool: "arrange_cards",
-			Params: map[string]any{"positions": []any{
-				map[string]any{"cardId": "card-remote-donkey-a", "x": float64(5960), "y": float64(0)},
-				map[string]any{"cardId": "card-remote-donkey-b", "x": float64(6020), "y": float64(440)},
-			}},
-		},
-	}
-
-	refined := refineCanvasActionTargets(actions, canvas, "把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。")
-
-	if got := canvasActionCardIDs(refined[0]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-	if got := canvasActionPositionCardIDs(refined[1]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("arrange cardIds = %#v", got)
-	}
-}
-
-func TestCanvasHarnessRefinesNativeSelectedRemoteCopyActions(t *testing.T) {
-	bootstrap := newCanvasToolUseHarness(t)
-	canvas := canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB)
-	remoteDonkey := func(id string, x float64, y float64) canvasCardSnapshot {
-		source := *canvas.Cards[2].Asset
-		return canvasCardSnapshot{
-			ID:     id,
-			Kind:   "asset",
-			X:      x,
-			Y:      y,
-			Width:  320,
-			Height: 379,
-			Asset:  &source,
-		}
-	}
-	canvas.Cards = append(
-		canvas.Cards,
-		remoteDonkey("card-remote-donkey-a", 5360, 0),
-		remoteDonkey("card-remote-donkey-b", 5420, 360),
-	)
-	canvas.SelectedCardIDs = []string{"card-remote-donkey-a", "card-remote-donkey-b"}
-
-	events, _ := runCanvasToolUseHarness(
-		t,
-		"把樹放大，樹下那隻驢子複製兩張，三張一起移到空的地方。",
-		canvas,
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-remote-donkey-a", "label": "Remote donkey"}),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-remote-donkey-a", "label": "Remote donkey"}),
-		canvasHarnessToolCalls(
-			llm.ChatToolCall{Name: "select_cards", Arguments: map[string]any{"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"}, "label": "Remote donkeys"}},
-			llm.ChatToolCall{Name: "duplicate_cards", Arguments: map[string]any{"cardIds": []any{"card-remote-donkey-a", "card-remote-donkey-b"}, "count": float64(2)}},
-			llm.ChatToolCall{Name: "move_card", Arguments: map[string]any{"cardId": "card-remote-donkey-a", "x": float64(50), "y": float64(50)}},
-		),
-	)
-
-	duplicateEvent := requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
-	result, ok := duplicateEvent["result"].(map[string]any)
-	if !ok {
-		t.Fatalf("duplicate result = %#v", duplicateEvent["result"])
-	}
-	if got := canvasHarnessEventStringSlice(result["cardIds"]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-}
-
-func TestRefineCanvasActionTargetsUsesFallbackLayoutTargets(t *testing.T) {
-	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
-	canvas.Cards = append(canvas.Cards, canvasCardSnapshot{
-		ID:         "card-cat",
-		Kind:       "asset",
-		X:          1320,
-		Y:          960,
-		Width:      320,
-		Height:     320,
-		LayerIndex: 4,
-		Asset: &canvasAssetSnapshot{
-			ID:                "asset-cat",
-			RepoPath:          "monogatari_alice_cheshire_neko.png",
-			Ext:               ".png",
-			Width:             400,
-			Height:            400,
-			SearchTags:        []string{"cat"},
-			SearchDescription: "A cat illustration that should not be touched.",
-		},
-	})
-	actions := []canvasAction{
-		{
-			Tool: "resize_card",
-			Params: map[string]any{
-				"cardId": "card-cat",
-				"width":  float64(640),
-			},
-		},
-		{
-			Tool: "duplicate_cards",
-			Params: map[string]any{
-				"cardIds": []any{"card-tree", "card-cat", "card-donkey"},
-				"count":   float64(2),
-			},
-		},
-		{
-			Tool: "arrange_cards",
-			Params: map[string]any{"positions": []any{
-				map[string]any{"cardId": "card-tree", "x": float64(1800), "y": float64(960)},
-				map[string]any{"cardId": "card-cat", "x": float64(1800), "y": float64(1320)},
-				map[string]any{"cardId": "card-donkey", "x": float64(1800), "y": float64(1680)},
-			}},
-		},
-	}
-
-	refined := refineCanvasActionTargets(actions, canvas, "把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方")
-
-	if got := strings.TrimSpace(fmt.Sprint(refined[0].Params["cardId"])); got != "card-tree" {
-		t.Fatalf("resize cardId = %q", got)
-	}
-	if got := canvasActionCardIDs(refined[1]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("duplicate cardIds = %#v", got)
-	}
-	if got := refined[1].Params["count"]; got != float64(2) {
-		t.Fatalf("duplicate count = %#v", got)
-	}
-	if got := canvasActionPositionCardIDs(refined[2]); !reflect.DeepEqual(got, []string{"card-donkey"}) {
-		t.Fatalf("arrange cardIds = %#v", got)
-	}
-}
-
-func TestRefineCanvasImageVariantTargetsUsesClauseTargets(t *testing.T) {
-	canvas := canvasHarnessTreeDonkeySnapshot("asset-tree", "asset-donkey")
-	actions := []canvasAction{
-		{
-			Tool: "rotate_image",
-			Params: map[string]any{
-				"assetIds": []any{"asset-tree", "asset-donkey", "asset-family", "asset-fish-book"},
-				"degrees":  float64(180),
-			},
-		},
-		{
-			Tool: "mirror_image",
-			Params: map[string]any{
-				"assetIds": []any{"asset-tree", "asset-donkey", "asset-family", "asset-fish-book"},
-				"flip":     "horizontal",
-			},
-		},
-	}
-
-	refined := refineCanvasImageVariantTargets(
-		actions,
-		canvas,
-		"旋轉封面是魚的書 把 family 鏡像處理",
-	)
-
-	if got := canvasActionAssetIDs(refined[0]); !reflect.DeepEqual(got, []string{"asset-fish-book"}) {
-		t.Fatalf("rotate assetIds = %#v", got)
-	}
-	if got := refined[0].Params["degrees"]; got != float64(90) {
-		t.Fatalf("rotate degrees = %#v", got)
-	}
-	if got := canvasActionAssetIDs(refined[1]); !reflect.DeepEqual(got, []string{"asset-family"}) {
-		t.Fatalf("mirror assetIds = %#v", got)
-	}
-}
-
-func TestRefineCanvasActionTargetsDropsUnmentionedArrangeCards(t *testing.T) {
-	canvas := canvasHarnessGenericRecoverySnapshot()
-	actions := []canvasAction{
-		{
-			Tool: "arrange_cards",
-			Params: map[string]any{"positions": []any{
-				map[string]any{"cardId": "card-primary", "x": float64(1200), "y": float64(960)},
-				map[string]any{"cardId": "card-secondary", "x": float64(1200), "y": float64(1320)},
-				map[string]any{"cardId": "card-decoy", "x": float64(1200), "y": float64(1680)},
-			}},
-		},
-	}
-
-	refined := refineCanvasActionTargets(actions, canvas, "resize primary-subject and move secondary-subject to empty space")
-
-	if len(refined) != 1 {
-		t.Fatalf("refined actions = %#v", refined)
-	}
-	got := canvasActionPositionCardIDs(refined[0])
-	if !reflect.DeepEqual(got, []string{"card-primary", "card-secondary"}) {
-		t.Fatalf("position card IDs = %#v", got)
-	}
-}
-
-func TestRefineCanvasActionTargetsDropsUnmentionedConfirmedFallbackTargets(t *testing.T) {
-	canvas := canvasHarnessGenericRecoverySnapshot()
-	actions := fallbackCanvasManipulationActions(
-		"primary-subject and secondary-subject. duplicate two copies to empty space",
-		canvas,
-		[]string{"card-primary", "card-secondary", "card-decoy"},
-	)
-	requireCanvasActionTool(t, actions, "duplicate_cards")
-
-	for _, action := range actions {
-		for _, id := range canvasActionCardIDs(action) {
-			if id == "card-decoy" {
-				t.Fatalf("decoy card leaked through %s params=%#v", action.Tool, action.Params)
-			}
-		}
-		for _, id := range canvasActionPositionCardIDs(action) {
-			if id == "card-decoy" {
-				t.Fatalf("decoy position leaked through %s params=%#v", action.Tool, action.Params)
-			}
-		}
+	if secondStat["reason"] != canvasLoopReasonFocusOnlyNeedsAnswer {
+		t.Fatalf("second reason = %#v", secondStat["reason"])
 	}
 }
 
@@ -1518,64 +2266,6 @@ func TestRefineCanvasActionTargetsKeepsAmbiguousLayoutActions(t *testing.T) {
 	}
 }
 
-func TestCanvasHarnessFallbackCompletesMissingToolsAfterPartialNativeActions(t *testing.T) {
-	bootstrap := newCanvasToolUseHarness(t)
-	events, _ := runCanvasToolUseHarness(
-		t,
-		"把樹放大，然後樹下有一隻驢子。複製兩張也移到空的地方 旋轉封面是魚的書 把 family 鏡像處理",
-		canvasHarnessTreeDonkeySnapshot(bootstrap.assetA, bootstrap.assetB),
-		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-tree", "label": "Tree card"}),
-		canvasHarnessToolCalls(
-			llm.ChatToolCall{
-				Name: "select_cards",
-				Arguments: map[string]any{
-					"cardIds": []any{"card-tree", "card-donkey"},
-					"label":   "Tree and donkey group",
-				},
-			},
-			llm.ChatToolCall{
-				Name: "duplicate_cards",
-				Arguments: map[string]any{
-					"cardIds": []any{"card-tree", "card-donkey"},
-					"count":   float64(1),
-					"label":   "Duplicate confirmed group",
-				},
-			},
-			llm.ChatToolCall{
-				Name: "mirror_image",
-				Arguments: map[string]any{
-					"assetIds":     []any{"asset-family"},
-					"flip":         "horizontal",
-					"outputFormat": "png",
-				},
-			},
-		),
-	)
-
-	requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
-	requireCanvasHarnessEvent(t, events, "action_result", "mirror_image")
-	requireCanvasHarnessEvent(t, events, "action_result", "resize_card")
-	requireCanvasHarnessEvent(t, events, "action_result", "arrange_cards")
-	requireCanvasHarnessEvent(t, events, "action_result", "rotate_image")
-
-	duplicateCount := 0
-	mirrorCount := 0
-	for _, event := range events {
-		if event["type"] == "action_result" && event["tool"] == "duplicate_cards" {
-			duplicateCount++
-		}
-		if event["type"] == "action_result" && event["tool"] == "mirror_image" {
-			mirrorCount++
-		}
-	}
-	if duplicateCount != 1 {
-		t.Fatalf("duplicate_cards event count = %d", duplicateCount)
-	}
-	if mirrorCount != 1 {
-		t.Fatalf("mirror_image action_result count = %d", mirrorCount)
-	}
-}
-
 func TestCanvasHarnessUnknownNativeToolIsIgnored(t *testing.T) {
 	bootstrap := newCanvasToolUseHarness(t)
 	events, _ := runCanvasToolUseHarness(
@@ -1595,7 +2285,11 @@ func TestCanvasHarnessBlocksUnrequestedComment(t *testing.T) {
 		t,
 		"what is this image",
 		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB),
-		canvasHarnessToolCall("create_comment", canvasHarnessDefaultArgs("create_comment", bootstrap.assetA, bootstrap.assetB)),
+		canvasHarnessText(`[action: create_comment]
+description: Leave an unsolicited note.
+impact: Adds a canvas comment.
+anchorCardId: card-a
+text: This is an unsolicited comment.`),
 		canvasHarnessText("This image is a test asset."),
 	)
 	rejectCanvasHarnessEvent(t, events, "action_result", "create_comment")
@@ -1607,6 +2301,717 @@ func TestCanvasHarnessBlocksUnrequestedComment(t *testing.T) {
 	if stat["nextReason"] != canvasLoopReasonBlockedComment {
 		t.Fatalf("nextReason = %#v", stat["nextReason"])
 	}
+}
+
+func TestCanvasHarnessUsesHighImageDetailForCanvasVision(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	_, provider := runCanvasToolUseHarness(
+		t,
+		"Where is the peach in this image? Circle it.",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+	)
+	requests := provider.Requests()
+	if len(requests) == 0 {
+		t.Fatal("provider received no requests")
+	}
+	if requests[0].ImageDetail != "high" {
+		t.Fatalf("ImageDetail = %q, want high", requests[0].ImageDetail)
+	}
+}
+
+func TestCanvasHarnessEnglishFollowupCopyPeachesCommentsGetsTools(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"Copy this image and find the peachs and then add commends",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessToolCall("duplicate_cards", map[string]any{"cardIds": []any{"card-a"}, "count": float64(1), "layout": "nearby"}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "Peach is on the headband.",
+			"region":       map[string]any{"x": 0.4, "y": 0.22, "width": 0.2, "height": 0.12},
+		}),
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "duplicate_cards")
+	requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	requests := provider.Requests()
+	if len(requests) == 0 {
+		t.Fatal("provider received no requests")
+	}
+	requireCanvasHarnessRequestTools(t, requests[0], "duplicate_cards", "create_comment")
+}
+
+func TestCanvasHarnessAllowsNativeRequestedCommentWithoutBackendLanguageFallback(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"幫我在這張圖需要注意的地方留一個註解，標出可讀性問題。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessToolCall("focus_card", map[string]any{"cardId": "card-a"}),
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "Readability issue: text is too small against the background.",
+			"region":       map[string]any{"x": 0.2, "y": 0.2, "width": 0.5, "height": 0.3},
+		}),
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	textEvent := requireCanvasHarnessEvent(t, events, "text", "")
+	if !strings.Contains(fmt.Sprint(textEvent["content"]), "Added 1 comment.") {
+		t.Fatalf("comment answer text missing: %#v", textEvent)
+	}
+}
+
+func TestCanvasHarnessAllowsActionBlockRequestedCommentWithoutBackendLanguageFallback(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"請把圖片上桃子的地方圈起來，並在註解說桃子在哪裡",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+		canvasHarnessText(`[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The peach is on the headband.
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0`),
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+}
+
+func TestCanvasHarnessNormalizesPixelCommentRegion(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Width = 400
+	snapshot.Cards[0].Height = 300
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"幫我在這張圖需要注意的地方留一個註解，標出可讀性問題。",
+		snapshot,
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "Readability issue: text is too small against the background.",
+			"region":       map[string]any{"x": float64(300), "y": float64(150), "width": float64(200), "height": float64(90)},
+		}),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("comment result = %#v", event["result"])
+	}
+	region, ok := result["region"].(map[string]any)
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	if region["x"] != 0.5 || region["y"] != 0.5 || region["width"] != 0.5 || region["height"] != 0.3 {
+		t.Fatalf("normalized pixel region = %#v", region)
+	}
+}
+
+func TestCanvasHarnessRefinesCommentRegionWithVisualCueColor(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writeCanvasRegionFixturePNG(t, filepath.Join(bootstrap.root, "img", "a.png"))
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	probe := normalizeCanvasImageRegionAction(canvasAction{
+		Tool: "create_comment",
+		Params: map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband.",
+			"region":       map[string]any{"x": 0.42, "y": 0.18, "width": 0.06, "height": 0.05},
+			"visualCue": map[string]any{
+				"targetDescription": "small pink peach icon",
+				"colorHex":          "#f26aa0",
+			},
+		},
+	}, snapshot)
+	probe = bootstrap.server.refineCanvasImageRegionAction(context.Background(), probe, snapshot)
+	probeRegion, _ := canvasRegionFromValue(probe.Params["region"])
+	if probeRegion.X < 0.30 || probeRegion.X > 0.34 {
+		t.Fatalf("direct refined region = %#v", probe.Params["region"])
+	}
+	bootstrap.provider.responses = []llm.ChatResponse{
+		canvasHarnessToolCall("create_comment", map[string]any{
+			"anchorCardId": "card-a",
+			"text":         "The peach is on the headband.",
+			"region":       map[string]any{"x": 0.42, "y": 0.18, "width": 0.06, "height": 0.05},
+			"visualCue": map[string]any{
+				"targetDescription": "small pink peach icon",
+				"colorHex":          "#f26aa0",
+			},
+		}),
+	}
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Where is the small peach? Circle it.",
+		snapshot,
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("comment result = %#v", event["result"])
+	}
+	region, ok := result["region"].(map[string]any)
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	x := region["x"].(float64)
+	y := region["y"].(float64)
+	width := region["width"].(float64)
+	height := region["height"].(float64)
+	if x < 0.29 || x > 0.34 || y < 0.18 || y > 0.23 || width < 0.08 || height < 0.08 {
+		t.Fatalf("refined region = %#v, want near pink target", region)
+	}
+}
+
+func TestCanvasHarnessRefinesCommentRegionForNewAssetIDAnchor(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writeCanvasRegionFixturePNG(t, filepath.Join(bootstrap.root, "img", "a.png"))
+	probe := normalizeCanvasImageRegionAction(canvasAction{
+		Tool: "create_comment",
+		Params: map[string]any{
+			"anchorCardId": bootstrap.assetA,
+			"text":         "The peach is on the headband.",
+			"region":       map[string]any{"x": 0.42, "y": 0.18, "width": 0.06, "height": 0.05},
+			"visualCue": map[string]any{
+				"targetDescription": "small pink peach icon",
+				"colorHex":          "#f26aa0",
+			},
+		},
+	}, canvasSnapshot{})
+	probe = bootstrap.server.refineCanvasImageRegionAction(context.Background(), probe, canvasSnapshot{})
+	region, _ := canvasRegionFromValue(probe.Params["region"])
+	if region.X < 0.29 || region.X > 0.34 || region.Y < 0.18 || region.Y > 0.23 || region.Width < 0.08 || region.Height < 0.08 {
+		t.Fatalf("asset-id anchored refined region = %#v", probe.Params["region"])
+	}
+}
+
+func TestRefineCanvasRegionByColor(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fixture.png")
+	writeCanvasRegionFixturePNG(t, path)
+	region, ok := refineCanvasRegionByColor(
+		path,
+		canvasRegion{X: 0.42, Y: 0.18, Width: 0.06, Height: 0.05},
+		canvasRegionVisualCue{
+			TargetDescription: "small pink peach icon",
+			Color:             color.RGBA{R: 242, G: 106, B: 160, A: 255},
+			HasColor:          true,
+		},
+	)
+	if !ok {
+		t.Fatal("expected region refinement")
+	}
+	if region.X < 0.29 || region.X > 0.34 || region.Y < 0.18 || region.Y > 0.23 {
+		t.Fatalf("refined region = %#v", region)
+	}
+}
+
+func TestRefineCanvasTextRegionByColorSearchesFullImage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "text-fixture.png")
+	writeCanvasTextRegionFixturePNG(t, path)
+	region, ok := refineCanvasRegionByColor(
+		path,
+		canvasRegion{X: 0.2, Y: 0.4, Width: 0.2, Height: 0.2},
+		canvasRegionVisualCue{
+			TargetDescription: "white text characters",
+			Color:             color.RGBA{R: 255, G: 255, B: 255, A: 255},
+			HasColor:          true,
+		},
+	)
+	if !ok {
+		t.Fatal("expected text region refinement")
+	}
+	if region.X < 0.58 || region.X > 0.72 || region.Y > 0.2 || region.Height < 0.5 {
+		t.Fatalf("refined text region = %#v, want sign text cluster", region)
+	}
+}
+
+func TestRefineCanvasTextRegionInfersTextColorWhenCueColorIsWrong(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "red-text-fixture.png")
+	writeCanvasRedTextWithWhiteDistractorPNG(t, path)
+	region, ok := refineCanvasRegionByColor(
+		path,
+		canvasRegion{X: 0.1, Y: 0.2, Width: 0.2, Height: 0.1},
+		canvasRegionVisualCue{
+			TargetDescription: "white text characters",
+			Color:             color.RGBA{R: 255, G: 255, B: 255, A: 255},
+			HasColor:          true,
+		},
+	)
+	if !ok {
+		t.Fatal("expected text region refinement despite wrong cue color")
+	}
+	if canvasRegionLooksGenericPlaceholder(region) || region.Y > 0.25 || region.Width < 0.35 {
+		t.Fatalf("refined text region = %#v, want red title text cluster", region)
+	}
+}
+
+func TestCanvasHarnessUpdatesCommentRegionWithNativeToolCall(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "comment-a")
+	snapshot.Cards[0].Width = 400
+	snapshot.Cards[0].Height = 300
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"Correct the selected annotation region so it points to the target.",
+		snapshot,
+		canvasHarnessToolCall("update_comment", map[string]any{
+			"commentCardId": "comment-a",
+			"region":        map[string]any{"x": float64(300), "y": float64(150), "width": float64(80), "height": float64(45)},
+		}),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "update_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("update_comment result = %#v", event["result"])
+	}
+	region, ok := result["region"].(map[string]any)
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	if region["x"] != 0.75 || region["y"] != 0.5 || region["width"] != 0.2 || region["height"] != 0.15 {
+		t.Fatalf("normalized update_comment region = %#v", region)
+	}
+	if _, ok := result["text"]; !ok {
+		t.Fatalf("update_comment should preserve optional text key for frontend contract: %#v", result)
+	}
+}
+
+func TestCanvasHarnessAgentActionBlockSupportsUpdateCommentRegion(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	enabled := true
+	model := "gpt-fixture"
+	backend := "agent:codex"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{
+		AgentEnabled:     &enabled,
+		AgentModel:       &model,
+		VLMBackendCanvas: &backend,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	agentProvider := &canvasHarnessAgentProvider{result: agent.ChatResult{
+		Content:      "```action\n{\"tool\":\"update_comment\",\"params\":{\"commentCardId\":\"comment-a\",\"region\":{\"x\":110,\"y\":80,\"width\":55,\"height\":40},\"visualCue\":{\"targetDescription\":\"small pink target mark\",\"colorHex\":\"#f26aa0\"}},\"description\":\"Correct annotation region\",\"impact\":\"updates the visible annotation marker\"}\n```",
+		InputTokens:  7,
+		OutputTokens: 5,
+	}}
+	bootstrap.server.agentProviders["codex"] = agentProvider
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "comment-a")
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"把圈選區域改到真正的目標上。",
+		snapshot,
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "update_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("update_comment result = %#v", event["result"])
+	}
+	region, ok := result["region"].(map[string]any)
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	if region["x"] != 0.5 || region["y"] != 0.5 || region["width"] != 0.25 || region["height"] != 0.25 {
+		t.Fatalf("agent action-block region = %#v", region)
+	}
+	requests := agentProvider.Requests()
+	if len(requests) != 1 {
+		t.Fatalf("agent requests = %d, want 1", len(requests))
+	}
+	for _, want := range []string{"update_comment", "create_comment", "capture_selected", "copy_asset"} {
+		if !strings.Contains(requests[0].SystemPrompt, want) {
+			t.Fatalf("agent action-block prompt missing %s:\n%s", want, requests[0].SystemPrompt)
+		}
+	}
+	if strings.Contains(requests[0].SystemPrompt, "Chinese fallback") {
+		t.Fatalf("agent prompt should not mention fallback logic:\n%s", requests[0].SystemPrompt)
+	}
+}
+
+func TestCanvasHarnessAgentRepairsTextOnlyFalseCompletionForAnnotation(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	enabled := true
+	model := "gpt-fixture"
+	backend := "agent:codex"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{
+		AgentEnabled:     &enabled,
+		AgentModel:       &model,
+		VLMBackendCanvas: &backend,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	agentProvider := &canvasHarnessAgentProvider{results: []agent.ChatResult{
+		{
+			Content:      "Already circled it and added a comment. The peach is on the headband.",
+			InputTokens:  7,
+			OutputTokens: 5,
+		},
+		{
+			Content: `[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The peach is on the headband.
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0`,
+			InputTokens:  8,
+			OutputTokens: 6,
+		},
+	}}
+	bootstrap.server.agentProviders["codex"] = agentProvider
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Where is the peach in this image? Circle it and add a comment.",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+	)
+	requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	requests := agentProvider.Requests()
+	if len(requests) < 2 {
+		t.Fatalf("agent requests = %d, want repair request", len(requests))
+	}
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["nextReason"] != canvasLoopReasonTextOnlyDeferredWork {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	if !strings.Contains(requests[0].SystemPrompt, "[action: create_comment]") || !strings.Contains(requests[0].SystemPrompt, "regionX") {
+		t.Fatalf("agent prompt missing bracket region format:\n%s", requests[0].SystemPrompt)
+	}
+	if !strings.Contains(requests[1].Prompt, "Reply with only tool calls or action blocks") {
+		t.Fatalf("repair prompt missing action-only instruction:\n%s", requests[1].Prompt)
+	}
+}
+
+func TestCanvasHarnessAgentRepairsOCRTextWorkflowIntoComments(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writeCanvasRedTextWithWhiteDistractorPNG(t, filepath.Join(bootstrap.root, "img", "a.png"))
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE",
+	})
+	enabled := true
+	model := "gpt-fixture"
+	backend := "agent:codex"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{
+		AgentEnabled:     &enabled,
+		AgentModel:       &model,
+		VLMBackendCanvas: &backend,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	agentProvider := &canvasHarnessAgentProvider{results: []agent.ChatResult{
+		{
+			Content: `[action: search_assets]
+description: Find text-bearing assets.
+impact: Returns assets with readable OCR text.
+q:
+limit: 12
+hasText: true`,
+			InputTokens:  7,
+			OutputTokens: 5,
+		},
+		{
+			Content: fmt.Sprintf(`[action: add_assets_to_canvas]
+description: Add the text-bearing asset.
+impact: Shows the asset on the canvas.
+assetIds: %s`, bootstrap.assetA),
+			InputTokens:  8,
+			OutputTokens: 6,
+		},
+		{
+			Content: fmt.Sprintf(`[action: extract_ocr_text]
+description: Extract OCR text before annotating.
+impact: Returns OCR text for follow-up annotations.
+assetIds: %s
+mode: vlm
+saveToMetadata: false`, bootstrap.assetA),
+			InputTokens:  9,
+			OutputTokens: 7,
+		},
+		{
+			Content: fmt.Sprintf(`[action: create_comment]
+description: Annotate the visible OCR text.
+impact: Adds a pinned text comment.
+anchorCardId: %s
+text: SALE
+regionX: 0.1
+regionY: 0.2
+regionWidth: 0.2
+regionHeight: 0.1
+visualCueTargetDescription: white text characters
+visualCueColorHex: #ffffff`, bootstrap.assetA),
+			InputTokens:  10,
+			OutputTokens: 8,
+		},
+	}}
+	bootstrap.server.agentProviders["codex"] = agentProvider
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly on the canvas, and annotate the text area with what it says.",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "extract_ocr_text", "create_comment")
+	event := requireCanvasHarnessEvent(t, events, "action_result", "create_comment")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("comment result = %#v", event["result"])
+	}
+	region, ok := canvasRegionFromValue(result["region"])
+	if !ok {
+		t.Fatalf("region = %#v", result["region"])
+	}
+	if canvasRegionLooksGenericPlaceholder(region) || region.Y > 0.25 {
+		t.Fatalf("agent OCR text region was not refined: %#v", result["region"])
+	}
+	requests := agentProvider.Requests()
+	if len(requests) < 4 {
+		t.Fatalf("agent requests = %d, want OCR annotation loop", len(requests))
+	}
+	if !strings.Contains(requests[0].SystemPrompt, "[action: create_comment]") || strings.Contains(requests[0].SystemPrompt, "bare JSON") == false {
+		t.Fatalf("agent prompt missing strict bracket action format:\n%s", requests[0].SystemPrompt)
+	}
+	if !strings.Contains(requests[3].Prompt, "ocr_text_annotation") || !strings.Contains(requests[3].Prompt, "Reply with only tool calls or action blocks") {
+		t.Fatalf("agent OCR annotation repair prompt missing action-only instruction:\n%s", requests[3].Prompt)
+	}
+}
+
+func TestCanvasHarnessAgentFillsCopyProposalDestPathsFromOCR(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	writeCanvasRedTextWithWhiteDistractorPNG(t, filepath.Join(bootstrap.root, "img", "a.png"))
+	seedCanvasHarnessVLMOCR(t, bootstrap, map[string]string{
+		bootstrap.assetA: "SALE/50",
+	})
+	enabled := true
+	model := "gpt-fixture"
+	backend := "agent:codex"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{
+		AgentEnabled:     &enabled,
+		AgentModel:       &model,
+		VLMBackendCanvas: &backend,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	agentProvider := &canvasHarnessAgentProvider{results: []agent.ChatResult{
+		{
+			Content: `[action: search_assets]
+description: Find text-bearing assets.
+impact: Returns assets with readable OCR text.
+q:
+limit: 12
+hasText: true`,
+		},
+		{
+			Content: fmt.Sprintf(`[action: add_assets_to_canvas]
+description: Add the text-bearing asset.
+impact: Shows the asset on the canvas.
+assetIds: %s`, bootstrap.assetA),
+		},
+		{
+			Content: fmt.Sprintf(`[action: extract_ocr_text]
+description: Extract OCR text before annotating.
+impact: Returns OCR text for follow-up annotations.
+assetIds: %s
+mode: vlm
+saveToMetadata: false`, bootstrap.assetA),
+		},
+		{
+			Content: fmt.Sprintf(`[action: create_comment]
+description: Annotate the visible OCR text.
+impact: Adds a pinned text comment.
+anchorCardId: %s
+text: SALE/50
+regionX: 0.1
+regionY: 0.2
+regionWidth: 0.2
+regionHeight: 0.1
+visualCueTargetDescription: white text characters
+visualCueColorHex: #ffffff
+
+[action: copy_asset]
+description: Copy the text-bearing file.
+impact: Creates a proposal using OCR text as the filename.
+assetIds: %s`, bootstrap.assetA, bootstrap.assetA),
+		},
+	}}
+	bootstrap.server.agentProviders["codex"] = agentProvider
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Show every image that contains visible text, arrange them evenly, annotate the text area, then copy each file using the text content as the filename.",
+		canvasSnapshot{},
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "search_assets", "add_assets_to_canvas", "extract_ocr_text", "create_comment")
+	proposal := requireCanvasHarnessEvent(t, events, "proposal", "copy_asset")
+	targetIDs := canvasHarnessEventStringSlice(proposal["targetAssetIds"])
+	if !reflect.DeepEqual(targetIDs, []string{bootstrap.assetA}) {
+		t.Fatalf("copy proposal targetAssetIds = %#v", targetIDs)
+	}
+	params, ok := proposal["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("proposal params = %#v", proposal["params"])
+	}
+	rows, ok := params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("perAssetDestPaths = %#v", params["perAssetDestPaths"])
+	}
+	row, ok := rows[0].(map[string]any)
+	if !ok || row["destPath"] != "SALE_50.png" {
+		t.Fatalf("perAssetDestPaths row = %#v", rows[0])
+	}
+	rejectCanvasHarnessEvent(t, events, "action_result", "copy_asset")
+}
+
+func TestCanvasHarnessAgentRepairsImageRegionActionWithoutVisualCue(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	enabled := true
+	model := "gpt-fixture"
+	backend := "agent:codex"
+	if _, err := bootstrap.server.store.UpdateSettings(config.SettingsUpdate{
+		AgentEnabled:     &enabled,
+		AgentModel:       &model,
+		VLMBackendCanvas: &backend,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	agentProvider := &canvasHarnessAgentProvider{results: []agent.ChatResult{
+		{
+			Content: `[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The peach is on the headband.
+regionX: 0.38
+regionY: 0.28
+regionWidth: 0.16
+regionHeight: 0.17`,
+			InputTokens:  7,
+			OutputTokens: 5,
+		},
+		{
+			Content: `[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The peach is on the headband.
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0`,
+			InputTokens:  8,
+			OutputTokens: 6,
+		},
+	}}
+	bootstrap.server.agentProviders["codex"] = agentProvider
+	events := runCanvasToolUseHarnessWithHarness(
+		t,
+		bootstrap,
+		"Where is the peach in this image? Circle it and add a comment.",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a"),
+	)
+	commentResults := 0
+	for _, event := range events {
+		if event["type"] != "action_result" || event["tool"] != "create_comment" {
+			continue
+		}
+		commentResults++
+		result := event["result"].(map[string]any)
+		region := result["region"].(map[string]any)
+		if region["x"] == 0.38 && region["y"] == 0.28 {
+			t.Fatalf("missing-visualCue region should have been blocked before execution: %#v", result)
+		}
+	}
+	if commentResults != 1 {
+		t.Fatalf("create_comment results = %d, want only repaired action in %#v", commentResults, events)
+	}
+	firstStat := requireCanvasHarnessLoopStat(t, events, 0)
+	if firstStat["nextReason"] != canvasLoopReasonInvalidAction {
+		t.Fatalf("first nextReason = %#v", firstStat["nextReason"])
+	}
+	requests := agentProvider.Requests()
+	if len(requests) < 2 {
+		t.Fatalf("agent requests = %d, want repair request", len(requests))
+	}
+	if !strings.Contains(requests[1].Prompt, "visualCue.targetDescription") || !strings.Contains(requests[1].Prompt, "visualCue.colorHex") {
+		t.Fatalf("repair prompt missing visualCue issue:\n%s", requests[1].Prompt)
+	}
+}
+
+func TestCanvasHarnessDedupesFallbackTextCommentsForSameRegion(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	snapshot := canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a")
+	snapshot.Cards[0].Asset.OcrText = "日本一"
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"Circle the peach and the visible text, then explain both in comments.",
+		snapshot,
+		canvasHarnessText(`[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The peach is on the headband.
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0
+
+[action: create_comment]
+description: Add first text marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The visible text reads 日本一; this is the first character.
+regionX: 0.70
+regionY: 0.06
+regionWidth: 0.24
+regionHeight: 0.47
+visualCueTargetDescription: white text characters
+visualCueColorHex: #ffffff
+
+[action: create_comment]
+description: Add second text marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The visible text reads 日本一; this is the second character.
+regionX: 0.70
+regionY: 0.06
+regionWidth: 0.24
+regionHeight: 0.47
+visualCueTargetDescription: white text characters
+visualCueColorHex: #ffffff
+
+[action: create_comment]
+description: Add last text marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: The visible text reads 日本一; this is the last character.
+regionX: 0.70
+regionY: 0.06
+regionWidth: 0.24
+regionHeight: 0.47
+visualCueTargetDescription: white text characters
+visualCueColorHex: #ffffff`),
+	)
+	commentResults := 0
+	for _, event := range events {
+		if event["type"] == "action_result" && event["tool"] == "create_comment" {
+			commentResults++
+		}
+	}
+	if commentResults != 2 {
+		t.Fatalf("create_comment results = %d, want peach plus one text comment in %#v", commentResults, events)
+	}
+	requireCanvasHarnessToolEventOrder(t, events, "create_comment", "create_comment")
 }
 
 func TestCanvasHarnessBlocksUnrequestedUnsafeProposal(t *testing.T) {
@@ -1702,6 +3107,18 @@ func TestCanvasActionNormalizationCoercesCommonModelShapes(t *testing.T) {
 	cardIDs, ok = actions[0].Params["cardIds"].([]any)
 	if !ok || len(cardIDs) != 1 || cardIDs[0] != "card-a" {
 		t.Fatalf("aligned cardIds = %#v", actions[0].Params["cardIds"])
+	}
+
+	actions, issues = normalizeCanvasActions([]canvasAction{{
+		Tool:   "add_assets_to_canvas",
+		Params: map[string]any{"assetIds": "asset-a, asset-b\nasset-c"},
+	}}, true)
+	if len(issues) > 0 {
+		t.Fatalf("unexpected comma-separated assetIds issues: %#v", issues)
+	}
+	assetIDs, ok := actions[0].Params["assetIds"].([]any)
+	if !ok || !reflect.DeepEqual(assetIDs, []any{"asset-a", "asset-b", "asset-c"}) {
+		t.Fatalf("assetIds = %#v", actions[0].Params["assetIds"])
 	}
 }
 

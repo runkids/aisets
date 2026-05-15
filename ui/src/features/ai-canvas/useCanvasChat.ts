@@ -12,6 +12,7 @@ import {
   type CanvasCardLayoutMetrics,
   type CanvasChatEvent,
 } from "@/api/canvasChat";
+import { previewImageUrl, renderImageToolPreview } from "@/api/imageTools";
 import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
 import {
@@ -22,6 +23,7 @@ import {
   type ChatHistoryEntry,
   type ChatMentionPreview,
   type CommentCanvasCard,
+  type CanvasRegion,
   type PendingAttachment,
   type UploadCanvasCard,
   type VariantCanvasCard,
@@ -47,6 +49,9 @@ type AICursorState = {
   emoji?: string;
   status: "thinking" | "acting" | "idle";
 };
+
+const CAPTURE_QUEUE_GAP_MS = 1200;
+const TOOL_STATUS_CLEAR_DELAY_MS = 250;
 
 function isScreenStableCard(card: CanvasCard) {
   return (
@@ -89,6 +94,19 @@ function isCaptureTool(tool: string) {
     tool === "capture_viewport" ||
     tool === "capture_canvas" ||
     tool === "capture_selected"
+  );
+}
+
+function isCanvasRegion(value: unknown): value is CanvasRegion {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const region = value as Partial<CanvasRegion>;
+  return (
+    typeof region.x === "number" &&
+    typeof region.y === "number" &&
+    typeof region.width === "number" &&
+    typeof region.height === "number"
   );
 }
 
@@ -149,7 +167,75 @@ function duplicateCardCopiesFromActionResult(result: unknown) {
   );
 }
 
-function formatOCRActionText(result: unknown, t: TFunction) {
+function isImageVariantTool(tool: string) {
+  return (
+    tool === "compress_image" ||
+    tool === "resize_image" ||
+    tool === "convert_image" ||
+    tool === "mirror_image" ||
+    tool === "rotate_image"
+  );
+}
+
+function actionResultAssetIds(result: unknown) {
+  if (!result || typeof result !== "object") return [];
+  const r = result as { assetId?: unknown; assetIds?: unknown };
+  const ids: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value === "string" && value.trim() && !ids.includes(value)) {
+      ids.push(value);
+    }
+  };
+  add(r.assetId);
+  if (Array.isArray(r.assetIds)) {
+    for (const id of r.assetIds) add(id);
+  }
+  return ids;
+}
+
+function stringParam(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberParam(value: unknown, fallback: number) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+export function duplicateCardPositionsFromActionResult(result: unknown) {
+  const positions = new Map<string, { x: number; y: number }>();
+  if (!result || typeof result !== "object") return positions;
+  const rawPositions = (result as { positions?: unknown }).positions;
+  if (!Array.isArray(rawPositions)) return positions;
+  for (const raw of rawPositions) {
+    if (!raw || typeof raw !== "object") continue;
+    const position = raw as { cardId?: unknown; x?: unknown; y?: unknown };
+    if (
+      typeof position.cardId !== "string" ||
+      typeof position.x !== "number" ||
+      typeof position.y !== "number" ||
+      !Number.isFinite(position.x) ||
+      !Number.isFinite(position.y)
+    ) {
+      continue;
+    }
+    positions.set(position.cardId, { x: position.x, y: position.y });
+  }
+  return positions;
+}
+
+export function formatOCRActionText(result: unknown, t: TFunction) {
+  if (
+    result &&
+    typeof result === "object" &&
+    (result as { displayToUser?: unknown }).displayToUser === false
+  ) {
+    return "";
+  }
   const items = ocrItemsFromActionResult(result);
   if (items.length === 0) return "";
   const lines = [
@@ -175,18 +261,158 @@ function formatOCRActionText(result: unknown, t: TFunction) {
   return lines.join("\n");
 }
 
-function requestedSearchCardLimit(promptText: string): number | undefined {
-  if (
-    /多張|多個|一些|幾張|全部|所有|several|multiple|many|all/i.test(promptText)
-  ) {
-    return undefined;
+function imageCards(cards: CanvasCard[]) {
+  return cards.filter(
+    (card) =>
+      card.kind === "asset" ||
+      card.kind === "upload" ||
+      card.kind === "variant",
+  );
+}
+
+function visibleImageCards(
+  cards: CanvasCard[],
+  metrics: CanvasCardLayoutMetrics,
+  viewport?: { x: number; y: number; scale: number },
+  containerSize?: { width: number; height: number },
+) {
+  const candidates = imageCards(cards);
+  if (!viewport || !containerSize || viewport.scale <= 0) return candidates;
+  const viewLeft = -viewport.x / viewport.scale;
+  const viewTop = -viewport.y / viewport.scale;
+  const viewRight = viewLeft + containerSize.width / viewport.scale;
+  const viewBottom = viewTop + containerSize.height / viewport.scale;
+  const visible = candidates.filter((card) => {
+    const width = metrics[card.id]?.width ?? CARD_WIDTH;
+    const height = metrics[card.id]?.height ?? 240;
+    return (
+      card.x < viewRight &&
+      card.x + width > viewLeft &&
+      card.y < viewBottom &&
+      card.y + height > viewTop
+    );
+  });
+  return visible.length > 0 ? visible : candidates;
+}
+
+export function searchResultCardPosition(opts: {
+  cards: CanvasCard[];
+  metrics: CanvasCardLayoutMetrics;
+  index: number;
+  viewport?: { x: number; y: number; scale: number };
+  containerSize?: { width: number; height: number };
+}) {
+  const visible = visibleImageCards(
+    opts.cards,
+    opts.metrics,
+    opts.viewport,
+    opts.containerSize,
+  );
+  if (visible.length === 0) {
+    return nextCardPosition(opts.index, opts.viewport, opts.containerSize);
   }
-  if (
-    /(一張|1\s*張|一個|1\s*個|one|single|a\s+(new\s+)?image)/i.test(promptText)
-  ) {
-    return 1;
-  }
-  return undefined;
+  const maxRight = Math.max(
+    ...visible.map(
+      (card) => card.x + (opts.metrics[card.id]?.width ?? CARD_WIDTH),
+    ),
+  );
+  const minTop = Math.min(...visible.map((card) => card.y));
+  return {
+    x: Math.round(maxRight + 180 + opts.index * (CARD_WIDTH + 56)),
+    y: Math.round(minTop),
+  };
+}
+
+export function resolveCanvasActionCardId(rawId: string, cards: CanvasCard[]) {
+  if (cards.some((card) => card.id === rawId)) return rawId;
+  const assetCard = cards.find(
+    (card): card is AssetCanvasCard =>
+      card.kind === "asset" && card.asset.id === rawId,
+  );
+  return assetCard?.id ?? rawId;
+}
+
+export function uploadCardsFromAttachments(opts: {
+  attachments: PendingAttachment[];
+  cards: CanvasCard[];
+  metrics: CanvasCardLayoutMetrics;
+  viewport?: { x: number; y: number; scale: number };
+  containerSize?: { width: number; height: number };
+}) {
+  const visible = visibleImageCards(
+    opts.cards,
+    opts.metrics,
+    opts.viewport,
+    opts.containerSize,
+  );
+  return opts.attachments.map((att, index): UploadCanvasCard => {
+    const position =
+      visible.length > 0
+        ? searchResultCardPosition({
+            cards: visible,
+            metrics: opts.metrics,
+            index,
+            viewport: opts.viewport,
+            containerSize: opts.containerSize,
+          })
+        : nextCardPosition(index, opts.viewport, opts.containerSize);
+    return {
+      id: createCanvasCardId("upload"),
+      kind: "upload",
+      x: position.x,
+      y: position.y,
+      createdAt: nowISO(),
+      token: att.token,
+      thumbnailDataUrl: att.thumbnailDataUrl,
+      fileName: att.fileName,
+      uploadWidth: att.width,
+      uploadHeight: att.height,
+    };
+  });
+}
+
+export function canvasStatusCursorStatus(
+  phase?: string,
+): AICursorState["status"] {
+  if (phase === "confirming" || phase === "operation") return "acting";
+  if (phase === "blocked") return "idle";
+  return "thinking";
+}
+
+export function canvasStatusCursorLabel(
+  phase: string | undefined,
+  t: TFunction,
+) {
+  if (phase === "operation") return t("aiCanvas.statusApplying");
+  if (phase === "blocked") return t("aiCanvas.blocked");
+  if (phase === "confirming") return t("aiCanvas.currentTarget");
+  return t("aiCanvas.statusProcessing");
+}
+
+export function clearCanvasToolStatusCursor(
+  prev: AICursorState,
+): AICursorState {
+  return { ...prev, label: undefined, emoji: undefined, status: "idle" };
+}
+
+export function canvasActionResultCreatesAssetCards(tool: string) {
+  return tool === "add_assets_to_canvas";
+}
+
+export function canvasAnimationSettleDelay(opts: {
+  latestAnimationDueAt: number;
+  animationStartedAt: number;
+  animationEndMs: number;
+  now: number;
+}) {
+  if (opts.latestAnimationDueAt <= 0 && opts.animationEndMs <= 0) return 0;
+  const projectedDueAt = opts.animationStartedAt + opts.animationEndMs;
+  const dueAt = Math.max(opts.latestAnimationDueAt, projectedDueAt);
+  return Math.max(900, dueAt - opts.now + 180);
+}
+
+export function canvasCaptureQueueDelay(baseDelay: number, index: number) {
+  return baseDelay + Math.max(0, index) * CAPTURE_QUEUE_GAP_MS;
 }
 
 function mentionPreviewForCard(
@@ -245,7 +471,6 @@ export function useCanvasChat(opts: {
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachment[]>>;
 }) {
   const {
-    scanId,
     cards,
     selectedCardIds,
     viewport,
@@ -277,15 +502,24 @@ export function useCanvasChat(opts: {
   } = opts;
 
   const abortRef = useRef<AbortController | null>(null);
-  const searchResultsRef = useRef<AssetItem[]>([]);
+  const toolStatusClearTimerRef = useRef<number | undefined>(undefined);
 
-  function shouldAttachCanvasImage(promptText: string, selectedCount: number) {
-    return (
-      selectedCount >= 2 ||
-      /排版|擺放|布局|佈局|合照|散開|分散|靠近|對齊|移動|拖|放大|縮小|縮放|拍照|截圖|辨識|識別|認得|看得出|找得到|找不到|有沒有|畫布上|layout|arrange|spread|align|move|drag|resize|identify|recognize|match|find.*canvas|on canvas/i.test(
-        promptText,
-      )
-    );
+  function cancelToolStatusClear() {
+    if (toolStatusClearTimerRef.current === undefined) return;
+    window.clearTimeout(toolStatusClearTimerRef.current);
+    toolStatusClearTimerRef.current = undefined;
+  }
+
+  function scheduleToolStatusClear() {
+    cancelToolStatusClear();
+    toolStatusClearTimerRef.current = window.setTimeout(() => {
+      toolStatusClearTimerRef.current = undefined;
+      setAiCursor(clearCanvasToolStatusCursor);
+    }, TOOL_STATUS_CLEAR_DELAY_MS);
+  }
+
+  function shouldAttachCanvasImage(cardCount: number) {
+    return cardCount > 0;
   }
 
   async function handleAsk(overrides?: {
@@ -297,21 +531,54 @@ export function useCanvasChat(opts: {
     const promptText = (overrides?.prompt ?? prompt).trim();
     const sentAttachments = pendingAttachments;
     if (!promptText && sentAttachments.length === 0) return;
-    const canvasCards = overrides?.cards ?? cards;
-    const canvasSelectedCardIds = (
+    let canvasCards = overrides?.cards ?? cards;
+    let canvasSelectedCardIds = (
       overrides?.selectedCardId ? [overrides.selectedCardId] : selectedCardIds
     ).filter((id) => canvasCards.some((card) => card.id === id));
-    const canvasPrimarySelectedId = canvasSelectedCardIds[0];
-    const canvasMentionedCardIds = mentionedCardIds.filter((id) =>
+    let canvasMentionedCardIds = mentionedCardIds.filter((id) =>
       canvasCards.some((card) => card.id === id),
     );
-    const searchCardLimit = requestedSearchCardLimit(promptText);
-    searchResultsRef.current = [];
+    cancelToolStatusClear();
     setPrompt("");
     setMentionedCardIds([]);
     setPendingAttachments([]);
     setError("");
     setWorking("ai");
+
+    const rect = rootRef.current?.getBoundingClientRect();
+    const containerSize = rect
+      ? { width: rect.width, height: rect.height }
+      : undefined;
+    const uploadCards =
+      sentAttachments.length > 0
+        ? uploadCardsFromAttachments({
+            attachments: sentAttachments,
+            cards: canvasCards,
+            metrics: cardLayoutMetrics,
+            viewport,
+            containerSize,
+          })
+        : [];
+    if (uploadCards.length > 0) {
+      canvasCards = [...canvasCards, ...uploadCards];
+      canvasSelectedCardIds = uploadCards.map((card) => card.id);
+      canvasMentionedCardIds = [
+        ...new Set([...canvasMentionedCardIds, ...canvasSelectedCardIds]),
+      ];
+      setCards((current) => [...current, ...uploadCards]);
+      setSelectedCardIds(canvasSelectedCardIds);
+      setAiCursor({
+        ...focusCursorPosition(
+          uploadCards[0],
+          cardLayoutMetrics,
+          viewport.scale,
+        ),
+        label: uploadCards[0].fileName,
+        emoji: "image",
+        status: "acting",
+      });
+    }
+    const canvasPrimarySelectedId = canvasSelectedCardIds[0];
 
     const mentionPreviews = canvasMentionedCardIds
       .map((id) => canvasCards.find((card) => card.id === id))
@@ -333,10 +600,7 @@ export function useCanvasChat(opts: {
       cardLayoutMetrics,
     );
     let canvasImage: string | undefined;
-    if (
-      captureCanvasForAI &&
-      shouldAttachCanvasImage(promptText, canvasSelectedCardIds.length)
-    ) {
+    if (captureCanvasForAI && shouldAttachCanvasImage(canvasCards.length)) {
       try {
         canvasImage = await captureCanvasForAI();
       } catch {
@@ -364,13 +628,156 @@ export function useCanvasChat(opts: {
       },
     ]);
 
+    if (uploadCards.length > 0 && promptText === "") {
+      setChatHistory((prev) => [
+        ...prev.slice(-10),
+        {
+          role: "assistant",
+          content: t("aiCanvas.addedUploadImages", {
+            count: uploadCards.length,
+          }),
+        },
+      ]);
+      abortRef.current = null;
+      setWorking("idle");
+      return;
+    }
+
     let assistantText = "";
     let suppressModelTextAfterOCR = false;
     const newCards: CanvasCard[] = [];
     const animationTimers: number[] = [];
+    const animationStartedAt = window.performance.now();
     let latestAnimationDueAt = 0;
     let animationEndMs = 0;
-    let captureQueued = false;
+    let animationCursorClosed = false;
+    const queuedCaptureKeys = new Set<string>();
+    let queuedCaptureCount = 0;
+    const pendingVariantPreviews: Promise<void>[] = [];
+    const assetCardIds = new Map<string, string>();
+    for (const card of canvasCards) {
+      if (card.kind === "asset") {
+        assetCardIds.set(card.asset.id, card.id);
+      }
+    }
+
+    function resolveCanvasCardId(rawId: string) {
+      const cardId = resolveCanvasActionCardId(rawId, canvasCards);
+      if (cardId !== rawId) return cardId;
+      return assetCardIds.get(rawId) ?? rawId;
+    }
+
+    function addAssetCards(assets: AssetItem[]) {
+      if (assets.length === 0) return;
+      const addedCards: AssetCanvasCard[] = [];
+      for (const asset of assets) {
+        if (assetCardIds.has(asset.id)) continue;
+        const pos = searchResultCardPosition({
+          cards: [...canvasCards, ...addedCards],
+          metrics: cardLayoutMetrics,
+          index: addedCards.length,
+          viewport,
+          containerSize,
+        });
+        const card: AssetCanvasCard = {
+          id: createCanvasCardId("asset"),
+          kind: "asset",
+          x: pos.x,
+          y: pos.y,
+          createdAt: nowISO(),
+          asset,
+        };
+        addedCards.push(card);
+        assetCardIds.set(asset.id, card.id);
+      }
+      if (addedCards.length === 0) return;
+      newCards.push(...addedCards);
+      canvasCards = [...canvasCards, ...addedCards];
+      setCards((current) => {
+        const existingAssetIds = new Set(
+          current
+            .filter((card): card is AssetCanvasCard => card.kind === "asset")
+            .map((card) => card.asset.id),
+        );
+        const fresh = addedCards.filter(
+          (card) => !existingAssetIds.has(card.asset.id),
+        );
+        return fresh.length > 0 ? [...current, ...fresh] : current;
+      });
+      setSelectedCardIds(addedCards.map((card) => card.id));
+      setAiCursor({
+        ...focusCursorPosition(
+          addedCards[0],
+          cardLayoutMetrics,
+          viewport.scale,
+        ),
+        label: fileName(addedCards[0].asset.repoPath),
+        emoji: "image",
+        status: "acting",
+      });
+    }
+
+    async function addVariantCardsFromImageTool(tool: string, result: unknown) {
+      const assetIds = actionResultAssetIds(result);
+      if (assetIds.length === 0) return;
+      const r = result as {
+        outputFormat?: unknown;
+        quality?: unknown;
+        maxDimensionPx?: unknown;
+        flip?: unknown;
+        degrees?: unknown;
+        rotateDegrees?: unknown;
+      };
+      const isTransform = tool === "mirror_image" || tool === "rotate_image";
+      for (const assetId of assetIds) {
+        const sourceCard = canvasCards.find(
+          (card): card is AssetCanvasCard =>
+            card.kind === "asset" && card.asset.id === assetId,
+        );
+        if (!sourceCard) continue;
+        const preview = await renderImageToolPreview({
+          assetId,
+          operation: tool,
+          outputFormat: stringParam(r.outputFormat, isTransform ? "" : "webp"),
+          quality: numberParam(r.quality, 82),
+          maxDimensionPx: numberParam(r.maxDimensionPx, 1600),
+          flip:
+            tool === "mirror_image"
+              ? stringParam(r.flip, "horizontal")
+              : undefined,
+          rotateDegrees:
+            tool === "rotate_image"
+              ? numberParam(r.rotateDegrees ?? r.degrees, 90)
+              : undefined,
+        });
+        const position = adjacentCardPosition(sourceCard, cardLayoutMetrics, {
+          index: newCards.length,
+          verticalStep: 112,
+        });
+        const card: VariantCanvasCard = {
+          id: createCanvasCardId("variant"),
+          kind: "variant",
+          x: position.x,
+          y: position.y,
+          createdAt: nowISO(),
+          sourceAssetId: assetId,
+          sourceName: fileName(sourceCard.asset.repoPath),
+          previewUrl: previewImageUrl(preview.token),
+          token: preview.token,
+          inputBytes: preview.inputBytes,
+          outputBytes: preview.outputBytes,
+          inputFormat: preview.inputFormat,
+          outputFormat: preview.outputFormat,
+          width: preview.width,
+          height: preview.height,
+          alpha: preview.alpha,
+        };
+        newCards.push(card);
+        canvasCards = [...canvasCards, card];
+        setCards((current) => [...current, card]);
+        setSelectedCardIds([card.id]);
+      }
+    }
 
     function queueTimer(fn: () => void, delay: number) {
       const timer = window.setTimeout(fn, delay);
@@ -382,6 +789,19 @@ export function useCanvasChat(opts: {
       return timer;
     }
 
+    function trackProjectedAnimation(delay: number, duration: number) {
+      latestAnimationDueAt = Math.max(
+        latestAnimationDueAt,
+        window.performance.now() + delay + duration,
+      );
+      animationEndMs = Math.max(animationEndMs, delay + duration);
+    }
+
+    function setAnimationCursor(next: AICursorState) {
+      if (animationCursorClosed) return;
+      setAiCursor(next);
+    }
+
     function simulateAICardResize(cardId: string, width: number, delay = 0) {
       const card = canvasCards.find((c) => c.id === cardId);
       if (!card) return;
@@ -390,9 +810,9 @@ export function useCanvasChat(opts: {
       const height = cardLayoutMetrics[cardId]?.height ?? fromWidth * 0.75;
       const steps = 28;
       const stepMs = 36;
-      animationEndMs = Math.max(animationEndMs, delay + (steps + 1) * stepMs);
+      trackProjectedAnimation(delay, (steps + 1) * stepMs);
       queueTimer(() => {
-        setAiCursor({
+        setAnimationCursor({
           x: card.x + fromWidth,
           y: card.y + height,
           label: t("aiCanvas.resizingCard"),
@@ -408,7 +828,7 @@ export function useCanvasChat(opts: {
                 : 1 - Math.pow(-2 * progress + 2, 3) / 2;
             const nextWidth = fromWidth + (toWidth - fromWidth) * eased;
             setCardWidths((current) => ({ ...current, [cardId]: nextWidth }));
-            setAiCursor({
+            setAnimationCursor({
               x: card.x + nextWidth,
               y: card.y + height,
               label: t("aiCanvas.resizingCard"),
@@ -433,7 +853,7 @@ export function useCanvasChat(opts: {
       const cardWidth = cardLayoutMetrics[cardId]?.width ?? CARD_WIDTH;
       const steps = 30;
       const stepMs = 34;
-      animationEndMs = Math.max(animationEndMs, delay + (steps + 1) * stepMs);
+      trackProjectedAnimation(delay, (steps + 1) * stepMs);
       queueTimer(() => {
         const element = cardElementsRef.current.get(cardId);
         const previousWillChange = element?.style.willChange ?? "";
@@ -448,7 +868,7 @@ export function useCanvasChat(opts: {
             viewport.scale,
           );
         }
-        setAiCursor({
+        setAnimationCursor({
           x: from.x + cardWidth / 2,
           y: from.y + 18,
           label: t("aiCanvas.draggingCard"),
@@ -467,7 +887,7 @@ export function useCanvasChat(opts: {
               x: from.x + (to.x - from.x) * eased,
               y: from.y + (to.y - from.y) * eased,
             };
-            setAiCursor({
+            setAnimationCursor({
               x: next.x + cardWidth / 2,
               y: next.y + 18,
               label: t("aiCanvas.draggingCard"),
@@ -509,9 +929,14 @@ export function useCanvasChat(opts: {
     }
 
     function runCaptureTool(tool: string, transparent: boolean) {
-      if (captureQueued) return;
-      captureQueued = true;
-      const delay = Math.max(0, animationEndMs + 120);
+      const key = `${tool}:${transparent ? "transparent" : "opaque"}`;
+      if (queuedCaptureKeys.has(key)) return;
+      queuedCaptureKeys.add(key);
+      const delay = canvasCaptureQueueDelay(
+        Math.max(0, animationEndMs + 120),
+        queuedCaptureCount,
+      );
+      queuedCaptureCount += 1;
       queueTimer(() => {
         if (tool === "capture_viewport") void captureViewport(transparent);
         if (tool === "capture_canvas") void captureCanvas(transparent);
@@ -566,9 +991,10 @@ export function useCanvasChat(opts: {
     function duplicateCardsFromResult(result: unknown) {
       const copies = duplicateCardCopiesFromActionResult(result);
       if (copies.length === 0) return;
+      const positions = duplicateCardPositionsFromActionResult(result);
       const layout = (result as { layout?: unknown }).layout;
       const walking =
-        typeof layout === "string" && /walk|散步|走路|walking/i.test(layout);
+        typeof layout === "string" && /walk|walking/i.test(layout);
       const perSourceIndex = new Map<string, number>();
       const created: Array<
         AssetCanvasCard | UploadCanvasCard | VariantCanvasCard
@@ -592,11 +1018,12 @@ export function useCanvasChat(opts: {
         const sourceWidth = cardLayoutMetrics[source.id]?.width ?? CARD_WIDTH;
         const stepX = walking ? Math.max(108, sourceWidth * 0.46) : 36;
         const stepY = walking ? (index % 2 === 0 ? 18 : -12) : 36;
+        const position = positions.get(copy.cardId);
         const base = {
           ...source,
           id: copy.cardId,
-          x: source.x + (index + 1) * stepX,
-          y: source.y + (index + 1) * stepY,
+          x: position?.x ?? source.x + (index + 1) * stepX,
+          y: position?.y ?? source.y + (index + 1) * stepY,
           createdAt: nowISO(),
         };
         if (source.kind === "asset") created.push(base as AssetCanvasCard);
@@ -613,12 +1040,18 @@ export function useCanvasChat(opts: {
       if (Object.keys(nextWidths).length > 0) {
         setCardWidths((current) => ({ ...current, ...nextWidths }));
       }
+      const createdIds = new Set(created.map((card) => card.id));
+      let sourceMoveDelay = 0;
+      for (const [cardId, position] of positions) {
+        if (createdIds.has(cardId)) continue;
+        if (!canvasCards.some((card) => card.id === cardId)) continue;
+        simulateAICardDrag(cardId, position.x, position.y, sourceMoveDelay);
+        sourceMoveDelay += 220;
+      }
       const first = created[0];
       setAiCursor({
         ...focusCursorPosition(first, cardLayoutMetrics, viewport.scale),
-        label:
-          (result as { label?: string }).label ||
-          t("aiCanvas.duplicatedImages", { count: created.length }),
+        label: t("aiCanvas.duplicatedImages", { count: created.length }),
         emoji: "duplicate",
         status: "acting",
       });
@@ -724,21 +1157,33 @@ export function useCanvasChat(opts: {
 
     function handleEvent(event: CanvasChatEvent) {
       if (event.type === "focus" && event.cardId) {
+        cancelToolStatusClear();
         const target = canvasFocusCardFromEvent(event, canvasCards);
         if (target) {
           setAiCursor({
             ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
-            label: event.label,
+            label: t("aiCanvas.currentTarget"),
             emoji: "select",
             status: "acting",
           });
         }
       }
       if (event.type === "focus" && !event.cardId) {
+        cancelToolStatusClear();
         setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
       }
       if (event.type === "thinking") {
+        cancelToolStatusClear();
         setAiCursor((prev) => ({ ...prev, status: "thinking" }));
+      }
+      if (event.type === "status") {
+        cancelToolStatusClear();
+        setAiCursor((prev) => ({
+          ...prev,
+          label: canvasStatusCursorLabel(event.phase, t),
+          emoji: event.phase === "planning" ? "thinking" : "move",
+          status: canvasStatusCursorStatus(event.phase),
+        }));
       }
       if (event.type === "text") {
         if (suppressModelTextAfterOCR) return;
@@ -765,22 +1210,14 @@ export function useCanvasChat(opts: {
         addGeneratedImageCard(event);
       }
       if (event.type === "action_result" && event.tool === "select_cards") {
-        const result = event.result as { cardIds?: unknown; label?: string };
-        const ids = Array.isArray(result.cardIds)
-          ? result.cardIds.filter(
-              (id): id is string =>
-                typeof id === "string" && canvasCards.some((c) => c.id === id),
-            )
-          : [];
+        const ids = canvasActionResultCardIds(event.result, canvasCards);
         if (ids.length > 0) {
           setSelectedCardIds(ids);
           const target = canvasCards.find((c) => c.id === ids[0]);
           if (target) {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
-              label:
-                result.label ??
-                t("aiCanvas.selectedAssets", { count: ids.length }),
+              label: t("aiCanvas.selectedAssets", { count: ids.length }),
               emoji: "select",
               status: "acting",
             });
@@ -788,7 +1225,7 @@ export function useCanvasChat(opts: {
         }
       }
       if (event.type === "action_result" && event.tool === "remove_cards") {
-        const result = event.result as { cardIds?: unknown; label?: string };
+        const result = event.result as { cardIds?: unknown };
         const ids = Array.isArray(result.cardIds)
           ? result.cardIds.filter(
               (id): id is string =>
@@ -807,9 +1244,7 @@ export function useCanvasChat(opts: {
           if (target) {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
-              label:
-                result.label ??
-                t("aiCanvas.removedCards", { count: ids.length }),
+              label: t("aiCanvas.removedCards", { count: ids.length }),
               emoji: "remove",
               status: "acting",
             });
@@ -819,14 +1254,27 @@ export function useCanvasChat(opts: {
       if (event.type === "action_result" && event.tool === "duplicate_cards") {
         duplicateCardsFromResult(event.result);
       }
+      if (event.type === "action_result" && isImageVariantTool(event.tool)) {
+        pendingVariantPreviews.push(
+          addVariantCardsFromImageTool(event.tool, event.result).catch(
+            (err) => {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : t("aiCanvas.operationError"),
+              );
+            },
+          ),
+        );
+      }
       if (event.type === "action_result" && event.tool === "focus_card") {
-        const result = event.result as { cardId?: string; label?: string };
+        const result = event.result as { cardId?: string };
         if (result?.cardId) {
           const target = canvasCards.find((c) => c.id === result.cardId);
           if (target) {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
-              label: result.label,
+              label: t("aiCanvas.currentTarget"),
               emoji: "select",
               status: "acting",
             });
@@ -840,7 +1288,8 @@ export function useCanvasChat(opts: {
           region?: { x: number; y: number; width: number; height: number };
         };
         if (r?.anchorCardId && r?.text) {
-          const anchor = canvasCards.find((c) => c.id === r.anchorCardId);
+          const anchorCardId = resolveCanvasCardId(r.anchorCardId);
+          const anchor = canvasCards.find((c) => c.id === anchorCardId);
           const position = anchor
             ? adjacentCardPosition(anchor, cardLayoutMetrics, {
                 index: newCards.length,
@@ -853,7 +1302,7 @@ export function useCanvasChat(opts: {
             x: position.x,
             y: position.y,
             createdAt: nowISO(),
-            anchorId: r.anchorCardId,
+            anchorId: anchorCardId,
             text: r.text,
             region: r.region ?? { x: 0, y: 0, width: 1, height: 1 },
             isAi: true,
@@ -871,12 +1320,22 @@ export function useCanvasChat(opts: {
         }
       }
       if (event.type === "action_result" && event.tool === "update_comment") {
-        const r = event.result as { commentCardId?: string; text?: string };
-        if (r?.commentCardId && typeof r.text === "string") {
+        const r = event.result as {
+          commentCardId?: string;
+          text?: string;
+          region?: unknown;
+        };
+        const region = isCanvasRegion(r?.region) ? r.region : undefined;
+        const hasText = typeof r?.text === "string";
+        if (r?.commentCardId && (hasText || region)) {
           setCards((current) =>
             current.map((card) =>
               card.kind === "comment" && card.id === r.commentCardId
-                ? { ...card, text: r.text ?? "" }
+                ? {
+                    ...card,
+                    ...(hasText ? { text: r.text ?? "" } : {}),
+                    ...(region ? { region } : {}),
+                  }
                 : card,
             ),
           );
@@ -936,7 +1395,7 @@ export function useCanvasChat(opts: {
           if (target) {
             setAiCursor({
               ...focusCursorPosition(target, cardLayoutMetrics, viewport.scale),
-              label: r.label || t("aiCanvas.layerChanged"),
+              label: t("aiCanvas.layerChanged"),
               emoji: "layer",
               status: "acting",
             });
@@ -970,16 +1429,19 @@ export function useCanvasChat(opts: {
           positions?: Array<{ cardId?: string; x?: number; y?: number }>;
         };
         if (r?.positions?.length) {
-          const posMap = new Map(
-            r.positions
-              .filter(
-                (p): p is { cardId: string; x: number; y: number } =>
-                  typeof p.cardId === "string" &&
-                  typeof p.x === "number" &&
-                  typeof p.y === "number",
-              )
-              .map((p) => [p.cardId, { x: p.x, y: p.y }]),
-          );
+          const posMap = new Map<string, { x: number; y: number }>();
+          for (const p of r.positions) {
+            if (
+              typeof p.cardId !== "string" ||
+              typeof p.x !== "number" ||
+              typeof p.y !== "number"
+            ) {
+              continue;
+            }
+            const cardId = resolveCanvasCardId(p.cardId);
+            if (!canvasCards.some((card) => card.id === cardId)) continue;
+            posMap.set(cardId, { x: p.x, y: p.y });
+          }
           let delay = 0;
           for (const [cardId, pos] of posMap) {
             simulateAICardDrag(cardId, pos.x, pos.y, delay);
@@ -995,22 +1457,11 @@ export function useCanvasChat(opts: {
       }
       if (
         event.type === "action_result" &&
-        (event.tool === "search_assets" ||
-          event.tool === "add_assets_to_canvas")
+        canvasActionResultCreatesAssetCards(event.tool)
       ) {
         const assets = assetsFromActionResult(event.result);
         if (assets.length) {
-          for (const asset of assets) {
-            if (
-              searchCardLimit != null &&
-              searchResultsRef.current.length >= searchCardLimit
-            ) {
-              break;
-            }
-            if (!searchResultsRef.current.some((s) => s.id === asset.id)) {
-              searchResultsRef.current.push(asset);
-            }
-          }
+          addAssetCards(assets);
         }
       }
       if (event.type === "action_result" && event.tool === "extract_ocr_text") {
@@ -1049,6 +1500,9 @@ export function useCanvasChat(opts: {
           );
         }
       }
+      if (event.type === "action_result") {
+        scheduleToolStatusClear();
+      }
     }
 
     try {
@@ -1066,55 +1520,16 @@ export function useCanvasChat(opts: {
         signal: abort.signal,
       });
 
+      if (pendingVariantPreviews.length > 0) {
+        await Promise.allSettled(pendingVariantPreviews);
+      }
+
       assistantText = sanitizeCanvasChatContent(assistantText);
       if (assistantText) {
         setChatHistory((prev) => [
           ...prev.slice(-10),
           { role: "assistant", content: assistantText },
         ]);
-      }
-
-      if (searchResultsRef.current.length > 0 && scanId) {
-        try {
-          const wanted =
-            searchCardLimit == null
-              ? [...searchResultsRef.current]
-              : searchResultsRef.current.slice(0, searchCardLimit);
-          searchResultsRef.current = [];
-          const rect = rootRef.current?.getBoundingClientRect();
-          const containerSize = rect
-            ? { width: rect.width, height: rect.height }
-            : undefined;
-          const addedCards: AssetCanvasCard[] = [];
-          const existingAssetIds = new Set(
-            canvasCards
-              .filter((card): card is AssetCanvasCard => card.kind === "asset")
-              .map((card) => card.asset.id),
-          );
-          for (const asset of wanted) {
-            if (existingAssetIds.has(asset.id)) continue;
-            const pos = nextCardPosition(
-              canvasCards.length + newCards.length + addedCards.length,
-              viewport,
-              containerSize,
-            );
-            const card: AssetCanvasCard = {
-              id: createCanvasCardId("asset"),
-              kind: "asset",
-              x: pos.x + (addedCards.length % 3) * (CARD_WIDTH + 24),
-              y: pos.y + Math.floor(addedCards.length / 3) * 420,
-              createdAt: nowISO(),
-              asset,
-            };
-            addedCards.push(card);
-            existingAssetIds.add(asset.id);
-          }
-          if (addedCards.length > 0) {
-            setCards((cur) => [...cur, ...addedCards]);
-          }
-        } catch {
-          // search result fetch failed — non-critical
-        }
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
@@ -1123,14 +1538,18 @@ export function useCanvasChat(opts: {
         );
       }
     } finally {
-      const settleDelay =
-        latestAnimationDueAt > 0
-          ? Math.max(900, latestAnimationDueAt - window.performance.now() + 180)
-          : 0;
+      const settleDelay = canvasAnimationSettleDelay({
+        latestAnimationDueAt,
+        animationStartedAt,
+        animationEndMs,
+        now: window.performance.now(),
+      });
       if (settleDelay > 0) {
         setWorking("aiApplying");
       }
       window.setTimeout(() => {
+        cancelToolStatusClear();
+        animationCursorClosed = true;
         setWorking("idle");
         setAiCursor((prev) => ({ ...prev, status: "idle", label: undefined }));
         setDragPreview(null);

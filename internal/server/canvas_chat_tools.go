@@ -26,7 +26,7 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "search_assets",
-			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Returns full AssetItem objects that can be added directly to the canvas.",
+			Description: "Search the ENTIRE PROJECT CATALOG (not just canvas) for assets by filename, path, AI tags, description, or OCR text. Use hasText=true with q=\"\" to list text-bearing assets that already have ready OCR text. Returns full AssetItem objects that can be added directly to the canvas.",
 			Cardinality: "multi",
 			Safe:        true,
 		},
@@ -50,13 +50,13 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "create_comment",
-			Description: "Leave a comment on an asset card, optionally pinned to a region.",
+			Description: "Leave a visible canvas comment on an asset card, optionally pinned to a normalized image region. Use this to circle, mark, highlight, or point to a specific object/area in the image. The region is a tight bounding box around one target on the anchored card image: x/y are the top-left corner, not the center point, and y increases downward. If the request has multiple distinct targets, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.colorHex for the target pixels so the tool can refine the visible marker. Put the location answer in the comment text.",
 			Cardinality: "single",
 			Safe:        true,
 		},
 		{
 			Name:        "update_comment",
-			Description: "Update one existing comment card on the canvas. This changes canvas notes only, not project files.",
+			Description: "Update one existing comment card on the canvas, including its text and/or pinned normalized image region. Use this to correct a wrong circle, mark, highlight, or pointed area on an existing annotation. The region is relative to the existing comment anchor image and must tightly enclose the target itself. For small objects or text, include visualCue.colorHex for the target pixels so the tool can refine the visible marker. This changes canvas notes only, not project files.",
 			Cardinality: "single",
 			Safe:        true,
 		},
@@ -236,7 +236,7 @@ func canvasToolRegistry() []canvasToolDef {
 		},
 		{
 			Name:        "copy_asset",
-			Description: "Copy an asset to a new location.",
+			Description: "Copy one or more assets to a new location. For text-derived filenames across multiple assets, use perAssetDestPaths with one destPath per asset.",
 			Cardinality: "multi",
 			Safe:        false,
 		},
@@ -317,6 +317,14 @@ func canvasLLMTools() []llm.ChatTool {
 }
 
 func canvasLLMToolsForSkills(skillIDs []string) []llm.ChatTool {
+	return canvasLLMToolsForSkillsMode(skillIDs, false)
+}
+
+func canvasNativeLLMToolsForSkills(skillIDs []string) []llm.ChatTool {
+	return canvasLLMToolsForSkillsMode(skillIDs, true)
+}
+
+func canvasLLMToolsForSkillsMode(skillIDs []string, compact bool) []llm.ChatTool {
 	names := canvasSkillToolNames(skillIDs)
 	if len(names) == 0 {
 		names = canvasSkillToolNames(canvasAllSkillIDs())
@@ -330,13 +338,81 @@ func canvasLLMToolsForSkills(skillIDs []string) []llm.ChatTool {
 		if !allowed[t.Name] {
 			continue
 		}
+		parameters := t.Parameters
+		description := fmt.Sprintf("%s Params: %s Cardinality: %s Safety: %s.", t.Description, canvasToolParamsText(t.Parameters), t.Cardinality, canvasToolSafetyLabel(t.Safe))
+		if compact {
+			description = fmt.Sprintf("%s Cardinality: %s. Safety: %s.", canvasCompactToolDescription(t.Description), t.Cardinality, canvasToolSafetyLabel(t.Safe))
+			if t.Name == "create_comment" || t.Name == "update_comment" {
+				description = fmt.Sprintf("%s Cardinality: %s. Safety: %s.", t.Description, t.Cardinality, canvasToolSafetyLabel(t.Safe))
+			}
+			parameters = canvasCompactToolParameters(t.Parameters)
+		}
 		tools = append(tools, llm.ChatTool{
 			Name:        t.Name,
-			Description: fmt.Sprintf("%s Params: %s Cardinality: %s Safety: %s.", t.Description, canvasToolParamsText(t.Parameters), t.Cardinality, canvasToolSafetyLabel(t.Safe)),
-			Parameters:  t.Parameters,
+			Description: description,
+			Parameters:  parameters,
 		})
 	}
 	return tools
+}
+
+func canvasCompactToolDescription(description string) string {
+	description = strings.TrimSpace(description)
+	if before, _, ok := strings.Cut(description, "."); ok {
+		return strings.TrimSpace(before) + "."
+	}
+	return description
+}
+
+func canvasCompactToolParameters(schema map[string]any) map[string]any {
+	compact, _ := canvasCompactSchemaValue(schema).(map[string]any)
+	return compact
+}
+
+func canvasCompactSchemaValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, child := range typed {
+			if key == "description" && !canvasKeepCompactSchemaDescription(typed, child) {
+				continue
+			}
+			out[key] = canvasCompactSchemaValue(child)
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(typed))
+		for _, child := range typed {
+			out = append(out, canvasCompactSchemaValue(child))
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func canvasKeepCompactSchemaDescription(parent map[string]any, value any) bool {
+	description, ok := value.(string)
+	if !ok {
+		return false
+	}
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return false
+	}
+	lowerDescription := strings.ToLower(description)
+	return strings.Contains(lowerDescription, "anchored card image") ||
+		strings.Contains(lowerDescription, "anchor image") ||
+		strings.Contains(lowerDescription, "normalized bounding box") ||
+		strings.Contains(lowerDescription, "top-left corner") ||
+		strings.Contains(lowerDescription, "y increases downward") ||
+		strings.Contains(lowerDescription, "tight box around only the visible target") ||
+		strings.Contains(lowerDescription, "not the whole canvas screenshot") ||
+		strings.Contains(lowerDescription, "visual cue") ||
+		strings.Contains(lowerDescription, "target pixels") ||
+		strings.Contains(lowerDescription, "colorrgb") ||
+		strings.Contains(lowerDescription, "colorhex") ||
+		strings.Contains(lowerDescription, "#rrggbb")
 }
 
 func canvasToolSchemaBytes(tools []llm.ChatTool) int {
@@ -398,6 +474,9 @@ func canvasSystemPromptForSkillsMode(locale string, options canvasChatOptions, s
 	if len(skillIDs) == 0 {
 		skillIDs = canvasAllSkillIDs()
 	}
+	if nativeTools {
+		return canvasNativeSystemPromptCompact(lang, options, skillIDs)
+	}
 	skillRules := canvasSkillRulesBlock(skillIDs)
 	if strings.TrimSpace(skillRules) == "" {
 		skillRules = "No additional skill rules selected."
@@ -405,18 +484,29 @@ func canvasSystemPromptForSkillsMode(locale string, options canvasChatOptions, s
 
 	toolBlock := ""
 	responseFormat := fmt.Sprintf(`## Response Format
-Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVERY response MUST include at least one tool call. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action.`, lang, lang)
-	if nativeTools {
-		toolBlock = "Native tools are attached to this request. Use those native tool calls directly; do not print tool JSON, action fences, call:, <tool_call>, or bare JSON in assistant text."
-	} else {
-		toolBlock = fmt.Sprintf("## Available Tools\n%s", canvasToolsBlockForSkills(skillIDs))
-		responseFormat = fmt.Sprintf(`## Response Format
-Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVERY response MUST include at least one action block. Use exactly the action block format below. Do NOT use call, call:, <tool_call>, or bare JSON in assistant text. Prefer action blocks first; keep prose short and never spend many tokens before a large layout action. For each fallback content tool call, emit:
+Use English for all internal reasoning, tool names, tool arguments, labels, descriptions, impacts, status codes, and action metadata. Only natural-language assistant text should be written in %s. EVERY response MUST include at least one tool call. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action.`, lang)
+	toolBlock = fmt.Sprintf("## Available Tools\n%s", canvasToolsBlockForSkills(skillIDs))
+	responseFormat = fmt.Sprintf(`## Response Format
+Use English for all internal reasoning, tool names, tool arguments, labels, descriptions, impacts, status codes, and action metadata. Only natural-language assistant text should be written in %s. EVERY response MUST include at least one bracket action block. Do NOT use call, call:, <tool_call>, bare JSON, or prose-only completion claims in assistant text. Prefer action blocks first; keep prose short and never spend many tokens before a large layout action.
 
-%saction
-{"tool": "tool_name", "params": {...}, "description": "what this does", "impact": "expected effect"}
-%s`, lang, lang, "```", "```")
-	}
+Required bracket action-block format:
+[action: tool_name]
+description: what this does
+impact: expected effect
+paramName: value
+
+For image-region comments, use flat region and visual cue fields:
+[action: create_comment]
+description: Add a pinned annotation
+impact: Creates a visible comment marker
+anchorCardId: card-id
+text: Short visible explanation
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0`, lang)
 
 	return fmt.Sprintf(`You are a pair partner on a visual asset canvas. You WORK on the canvas — you don't just talk. The user can see your cursor moving and your actions appearing as cards.
 
@@ -424,7 +514,8 @@ Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVER
 - You are a collaborator, not a passive chatbot.
 - Move your cursor to relevant assets before speaking about them when a card exists.
 - Take concrete canvas actions that match the user's request.
-- Leave comments only when the user explicitly asks to annotate, mark, circle, highlight, or leave a note.
+- Leave comments only when the user explicitly asks to annotate, mark, circle, highlight, point to, or leave a note.
+- When the user asks where an object/area is and also asks to circle, mark, highlight, or point to it, use create_comment with a tight normalized region around the actual visible target and put the answer in the comment text. If the user asks for multiple distinct targets or areas, create one comment per target/region instead of one oversized combined region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. Never answer that you cannot directly annotate the canvas.
 - Always do something useful; pure text without a tool call is forbidden.
 
 ## Active Skill Families
@@ -442,7 +533,22 @@ Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVER
 5. For canvas tools, use card IDs. For file/catalog tools that require asset IDs, use the ASSET ID from the canvas state.
 6. Every tool has cardinality. With multiple selected/mentioned assets, default to ALL selected/mentioned assets and pass assetIds/cardIds.
 7. Destructive or file-writing multi-image tools must be one batch proposal with assetIds, not many separate proposal cards.
-8. Keep natural-language explanation short after tools. Do not write a long plan before concrete actions.
+8. Do not put display labels in tool params. The app renders localized status text from tool names and result codes.
+9. Keep natural-language explanation short after tools. Do not write a long plan before concrete actions.
+10. When an operation pattern names a tool chain and the arguments are known, call every required tool in that chain before stopping. Do not stop after only a partial chain.
+
+## Operation Patterns
+- Search and add N relevant assets: search_assets -> add_assets_to_canvas -> arrange_cards when a row/grid/layout is requested.
+- Search with metadata inspection: search_assets -> get_asset_detail for the chosen asset -> add_assets_to_canvas.
+- Current selection layout: select_cards with all selected card IDs -> distribute_cards -> align_cards when equal spacing and edge alignment are both requested.
+- Enlarge, move, and layer a hero/main image: focus_card -> resize_card -> move_card or arrange_cards -> bring_cards_to_front.
+- Duplicate selected images and clean up candidates: duplicate_cards -> arrange_cards for the source/new cards -> remove_cards only for clearly unrelated visible cards.
+- OCR readout: extract_ocr_text with saveToMetadata=false. Do not call metadata-writing tools unless the user explicitly asks to save OCR.
+- Annotation/comment: focus_card -> create_comment. Use create_comment.region to circle, mark, highlight, or point to a specific visual object/area. The region is relative to the anchored card image, x/y are the top-left of the target box, and the box should tightly enclose the actual target rather than nearby decoration, host objects, or surrounding context. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. If the user asks where something is and asks to circle/mark it, put the answer in comment text and create the region; do not answer that you cannot directly annotate.
+- Existing annotation correction: focus_card -> update_comment. Use update_comment.region to replace an incorrect circle/mark/highlight on an existing comment; include visualCue for small objects/text; do not create a duplicate comment when the user asks to fix the current annotation.
+- Capture workflow: capture_viewport for the visible area; capture_selected for selected cards. Set transparent=true when the user asks for transparent/no-background output.
+- Similarity, quality, and alt text workflow: compare_assets -> find_similar_assets or inspect_image_quality -> generate_alt_text for the requested target.
+- Image variants versus proposals: rotate_image, mirror_image, compress_image, resize_image, and convert_image create variant cards directly; rename_asset, move_asset, copy_asset, delete_asset, and metadata writes must be proposal cards only.
 
 ## Canvas Strategy Preset
 %s
@@ -459,6 +565,47 @@ Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVER
 		canvasProposalGuidance(options),
 		skillRules,
 	)
+}
+
+func canvasNativeSystemPromptCompact(lang string, options canvasChatOptions, skillIDs []string) string {
+	return fmt.Sprintf(`You are a pair partner on a visual asset canvas. Work by calling native tools, not by explaining plans.
+
+Native tools are attached to this request. Use native tool calls directly; do not print tool JSON, action fences, call:, <tool_call>, or bare JSON in assistant text.
+
+## Language Contract
+- Use English for internal reasoning, tool names, tool arguments, labels, descriptions, impacts, status codes, and action metadata.
+- Only natural-language assistant text should be written in %s.
+
+## Rules
+1. Initial and repair responses must include at least one native tool call. After a tool result, call the next needed tool or give a short final answer if the request is fulfilled.
+2. If a relevant card exists, focus it before modifying or commenting on it.
+3. Use card IDs for canvas tools and asset IDs for catalog/file tools.
+4. SAFE tools execute immediately; NEEDS_CONFIRMATION tools create proposal cards.
+5. Do not put display labels in tool params; the app localizes UI status itself.
+6. Keep prose short after tools.
+7. When the user asks where an object/area is and also asks to circle, mark, highlight, or point to it, use create_comment with a tight normalized region around the actual visible target and put the answer in the comment text. The region is relative to the anchored card image, x/y are the top-left of the target box, and y increases downward. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. Never answer that you cannot directly annotate the canvas.
+8. When an operation pattern names a tool chain and the arguments are known, call every required tool in that chain before stopping. Do not stop after only a partial chain.
+
+## Operation Patterns
+- Search and add N relevant assets: search_assets -> add_assets_to_canvas -> arrange_cards when a row/grid/layout is requested.
+- Search with metadata inspection: search_assets -> get_asset_detail for the chosen asset -> add_assets_to_canvas.
+- Current selection layout: select_cards with all selected card IDs -> distribute_cards -> align_cards when equal spacing and edge alignment are both requested.
+- Enlarge, move, and layer a hero/main image: focus_card -> resize_card -> move_card or arrange_cards -> bring_cards_to_front.
+- Duplicate selected images and clean up candidates: duplicate_cards -> arrange_cards for the source/new cards -> remove_cards only for clearly unrelated visible cards.
+- OCR readout: extract_ocr_text with saveToMetadata=false. Do not call metadata-writing tools unless the user explicitly asks to save OCR.
+- Annotation/comment: focus_card -> create_comment. Use create_comment.region to circle, mark, highlight, or point to a specific visual object/area. The region is relative to the anchored card image, x/y are the top-left of the target box, and the box should tightly enclose the actual target rather than nearby decoration, host objects, or surrounding context. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. If the user asks where something is and asks to circle/mark it, put the answer in comment text and create the region; do not answer that you cannot directly annotate.
+- Existing annotation correction: focus_card -> update_comment. Use update_comment.region to replace an incorrect circle/mark/highlight on an existing comment; include visualCue for small objects/text; do not create a duplicate comment when the user asks to fix the current annotation.
+- Capture workflow: capture_viewport for the visible area; capture_selected for selected cards. Set transparent=true when the user asks for transparent/no-background output.
+- Similarity, quality, and alt text workflow: compare_assets -> find_similar_assets or inspect_image_quality -> generate_alt_text for the requested target.
+- Image variants versus proposals: rotate_image, mirror_image, compress_image, resize_image, and convert_image create variant cards directly; rename_asset, move_asset, copy_asset, delete_asset, and metadata writes must be proposal cards only.
+
+## Canvas Strategy Preset
+%s
+
+## Proposal Discipline
+%s
+
+Active skill families: %s`, lang, options.CanvasStrategy, canvasProposalGuidance(options), strings.Join(skillIDs, ", "))
 }
 
 func canvasSystemPrompt(locale string, options canvasChatOptions) string {
@@ -497,7 +644,7 @@ For "place A to the right of B", use B.x + B.width + 80-160px and keep y close t
 ## Available Tools
 %s
 ## Response Format
-Respond in %s. Tool labels/descriptions/impacts must also be written in %s. EVERY response MUST include at least one tool call. Prefer native tool calls when the API exposes them; do not print tool JSON in normal assistant text when native tool calls are available. If native tool calls are unavailable, use exactly the action block format below. Do NOT use call, call:, <tool_call>, or bare JSON in assistant text. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action. For each fallback content tool call, emit:
+Use English for all internal reasoning, tool names, tool arguments, labels, descriptions, impacts, status codes, and action metadata. Only natural-language assistant text should be written in %s. EVERY response MUST include at least one tool call. Prefer native tool calls when the API exposes them; do not print tool JSON in normal assistant text when native tool calls are available. If native tool calls are unavailable, use exactly the action block format below. Do NOT use call, call:, <tool_call>, or bare JSON in assistant text. Prefer tool calls first; keep prose short and never spend many tokens before a large layout action. For each fallback content tool call, emit:
 
 %saction
 {"tool": "tool_name", "params": {...}, "description": "what this does", "impact": "expected effect"}
@@ -515,6 +662,7 @@ CRITICAL RULES:
 9. Every tool has cardinality. With multiple selected/mentioned image assets, default to ALL selected/mentioned assets and pass assetIds. Use assetId only for a clearly single target such as "this one", "first image", or "only this card".
 10. Destructive or file-writing multi-image tools must be one batch proposal with assetIds, not many separate proposal cards. The UI will show per-asset status.
 11. For OCR extraction, use extract_ocr_text with {"mode":"vlm","saveToMetadata":false}. For catalog assets, pass assetIds; for uploaded image cards, pass cardIds. This returns text to chat. Only use update_ocr_text to save OCR metadata after the user explicitly approves saving.
+12. Do not put display labels in tool params. The app renders localized status text from tool names and result codes.
 
 ## Canvas Strategy Preset
 %s
@@ -523,7 +671,7 @@ CRITICAL RULES:
 %s
 
 ## IMPORTANT: search_assets searches the ENTIRE PROJECT CATALOG
-search_assets is NOT limited to what's on the canvas. It searches ALL assets in the project by filename, path, AI tags, description, and OCR text. When the user asks to find, list, or show assets, ALWAYS use search_assets first. Match the user's requested count: if they ask for one or a single item, set limit: 1 and do not add multiple candidates. If the user mentions an exact filename or filename stem such as family_danran.png, search the exact stem first (family_danran) before broader visual terms; if that returns a result, use it and do NOT claim no match. Even if the canvas is empty, you can search the catalog. The results will be returned to you and you can then describe them.
+search_assets is NOT limited to what's on the canvas. It searches ALL assets in the project by filename, path, AI tags, description, and OCR text. When the user asks to find, list, or show assets, ALWAYS use search_assets first. Match the user's requested count: if they ask for one or a single item, set limit: 1 and do not add multiple candidates. If the user asks for images/assets that contain readable text, call search_assets with {"q":"","hasText":true}. If the user mentions an exact filename or filename stem such as family_danran.png, search the exact stem first (family_danran) before broader visual terms; if that returns a result, use it and do NOT claim no match. Even if the canvas is empty, you can search the catalog. The results will be returned to you and you can then describe them.
 
 get_asset_detail retrieves full metadata for a specific asset (project, local path, tags, description, OCR, references). Use it after search_assets to get details about specific items.
 
@@ -533,10 +681,12 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When the user asks to move a card in a direction** without a specific coordinate or distance: treat it as a nearby relative nudge, not a jump across the board. Move by about one card size plus a small gap. Keep the secondary axis close to the current position unless alignment, diagonal placement, or a nearby target card makes a small adjustment useful.
 - **When the user asks to arrange, lay out, compose, storyboard, or make selected images look like a scene:** operate on the canvas. Do not answer with only a written plan. Duplicate selected image cards if multiple beats or panels are needed, then use arrange_cards, resize_card, align_cards, or distribute_cards to create the layout. After duplicate_cards returns newCardIds, use those returned IDs in the follow-up arrange step.
 - **When the user asks to copy/clone an image visually on the canvas** (for example, "make five copies" or "clone this image"): Use duplicate_cards with the image card ID and count equal to the number of new copies. Then use arrange_cards, align_cards, or distribute_cards with the returned new card IDs to create the requested feeling or layout. This is canvas-level duplication, not pixel editing.
+- **When the user asks to show text-bearing assets, annotate the visible text, and copy files using the text as filenames:** complete the full chain: search_assets with {"q":"","hasText":true}, add_assets_to_canvas, arrange_cards, extract_ocr_text with saveToMetadata=false, create_comment once per OCR text target, then copy_asset with perAssetDestPaths. copy_asset creates a proposal only; it must not directly write files.
 - **When the user asks to find one asset/image:** Use search_assets with limit: 1. Do not dump all matches onto the canvas. If the request includes a filename, use the filename stem as the first query.
 - **When the user asks whether a target appears on the current canvas:** inspect the canvas visually and compare against visible card IDs first. Do not ask the user to identify the target again. Use inspect_canvas if visual matching is needed; use focus_card/select_cards to point at matches. Use search_assets/find_similar_assets only for searching the project catalog, not as a substitute for checking visible canvas cards.
 - **When the canvas is empty and the user asks to find/list assets:** Use search_assets with relevant keywords. You will receive the results. Then describe what you found.
-- **When creating comments/annotations:** Use create_comment ONLY when the user explicitly asks to annotate, mark, circle, highlight, comment, or leave a note. Place comment cards away from image content. Do not cover or overlap the asset being discussed; keep roughly 80px+ distance from the image/card when possible. Use the region field to point to the relevant image area instead of placing the comment on top of it.
+- **When creating comments/annotations:** Use create_comment ONLY when the user explicitly asks to annotate, mark, circle, highlight, comment, or leave a note. Place comment cards away from image content. Do not cover or overlap the asset being discussed; keep roughly 80px+ distance from the image/card when possible. Use the region field to point to the relevant image area instead of placing the comment on top of it. The region is relative to the anchored card image, x/y are the top-left of the target box, and the box should tightly enclose the actual target rather than nearby decoration, host objects, or surrounding context. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels.
+- **When correcting existing comments/annotations:** Use update_comment with commentCardId and region when the user says the circle, mark, highlight, or pointed area is wrong. update_comment.region is relative to the existing comment anchor image and replaces the visible marker. Include visualCue for small objects/text.
 - **When the user asks about a REGION (circled area, comment):** Focus on analyzing THAT specific region and answer in chat. Use create_comment only if the user asks you to add or update an annotation. Do NOT propose file-level operations unless explicitly asked.
 - **When arranging cards:** Use the current size=WIDTHxHEIGHT for every selected/visible card and place bounding boxes with clear whitespace. The canvas is large/unbounded, but only use far-away coordinates when the user asks for a broad layout or spread-out board. For ordinary move requests, stay near the current cluster. For 8+ cards, prefer a broad multi-row layout about 1600-2400px wide with 160px+ horizontal and 120px+ vertical gaps unless the user explicitly asks for a tight collage. Do not place large cards partly under smaller cards unless the user explicitly asks for overlap/collage. If the layout would improve with a focal image or smaller supporting images, use resize_card first/alongside arrange_cards; resize_card is visual only and safe. If you are unsure whether the layout visually overlaps or layers correctly, call inspect_canvas to see a hidden AI-only snapshot before finalizing.
 - **When the user asks to place an image on top / in front / above another image:** Use bring_cards_to_front for the card that should visually cover the others. Moving x/y is not enough to change stacking order. If the user says "put A in front of B" or "A above B", pass B as afterCardId so A is inserted directly above B instead of blindly moving A above every card.
@@ -546,11 +696,11 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When the user explicitly asks to mirror/flip/reverse or rotate an image:** Call mirror_image or rotate_image for the selected/mentioned catalog assets. These generate new image variants and preserve source files. Use flip=horizontal by default for mirror/flip/reverse unless the user clearly asks for vertical or top-bottom flipping. Use degrees=90 by default for rotate_image if the user does not specify a degree.
 - **When the user explicitly asks to tag or write/save a description:** Propose update_tags or update_description for every selected asset card, not just the first one.
 - **When the user asks a general question about an asset:** Analyze and answer in chat. Use focus_card or get_asset_detail when useful. Do NOT create comments, file proposals, or metadata proposals unless the user explicitly asks for that action.
-- **When you spot visual issues** (edges, contrast, artifacts, wrong crop), describe them in chat. Only use create_comment to circle/mark the issue if the user explicitly asks for annotation. Regions use normalized 0-1 coordinates: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.
+- **When you spot visual issues** (edges, contrast, artifacts, wrong crop), describe them in chat. Only use create_comment to circle/mark the issue if the user explicitly asks for annotation. Regions use normalized 0-1 coordinates relative to the anchored card image: {"x": 0.7, "y": 0.0, "width": 0.3, "height": 0.4} means the top-right 30%% area.
 
 ## Example 1: User asks a general question about an image
 %saction
-{"tool": "focus_card", "params": {"cardId": "asset-abc123", "label": "Reviewing icon.png..."}, "description": "Focus the selected image", "impact": "Shows what is being examined"}
+{"tool": "focus_card", "params": {"cardId": "asset-abc123"}, "description": "Focus the selected image", "impact": "Shows what is being examined"}
 %s
 This is a small UI icon. The top-right detail may have low contrast on light backgrounds.
 
@@ -561,7 +711,7 @@ This is a small UI icon. The top-right detail may have low contrast on light bac
 
 ## Example 3: User explicitly asks to optimize an image
 %saction
-{"tool": "focus_card", "params": {"cardId": "asset-xyz789", "label": "Checking hero-banner.png size..."}, "description": "Focus the target image", "impact": "Shows which asset will be optimized"}
+{"tool": "focus_card", "params": {"cardId": "asset-xyz789"}, "description": "Focus the target image", "impact": "Shows which asset will be optimized"}
 %s
 This 4096×3344 PNG at 13.5MB is too large for web use.
 %saction
@@ -570,7 +720,7 @@ This 4096×3344 PNG at 13.5MB is too large for web use.
 
 ## Example 4: User explicitly asks to tag and save a description
 %saction
-{"tool": "focus_card", "params": {"cardId": "asset-def456", "label": "Preparing tags for logo.svg..."}, "description": "Focus the target image", "impact": "Shows which asset will be edited"}
+{"tool": "focus_card", "params": {"cardId": "asset-def456"}, "description": "Focus the target image", "impact": "Shows which asset will be edited"}
 %s
 %saction
 {"tool": "update_tags", "params": {"assetId": "def456", "tags": ["logo", "brand", "vector", "header"]}, "description": "Set searchable tags", "impact": "Improves catalog searchability"}
@@ -587,7 +737,6 @@ This 4096×3344 PNG at 13.5MB is too large for web use.
 {"tool": "capture_canvas", "params": {"transparent": true}, "description": "Export the arranged canvas with transparent background", "impact": "Shows the normal screenshot preview"}
 %s`,
 		canvasToolsBlock(),
-		lang,
 		lang,
 		"```", "```",
 		options.CanvasStrategy,

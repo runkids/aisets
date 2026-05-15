@@ -39,9 +39,11 @@ import {
 import {
   AI_MENTION_TAG,
   CARD_WIDTH,
+  commentRegionDisplayOptions,
   compactImageAspectRatio,
   imageMeta,
   isImageCard,
+  normalizeCommentRegion,
   renderMarkdown,
   tagLabel,
 } from "./canvasUtils";
@@ -342,31 +344,40 @@ function useCommentOverlay(opts: {
 
 function CommentRegionButtons({
   comments,
+  basis,
   onSelect,
 }: {
   comments: CommentCanvasCard[];
+  basis?: { width: number; height: number };
   onSelect: (commentId: string) => void;
 }) {
   const { t } = useTranslation();
-  return comments.map((c) => (
-    <button
-      key={c.id}
-      type="button"
-      aria-label={c.text || t("aiCanvas.commentCard")}
-      className="absolute rounded-g-sm border-2 border-g-blue bg-g-blue/10 shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-blue/20 focus-visible:outline-none focus-visible:shadow-g-focus"
-      style={{
-        left: `${c.region.x * 100}%`,
-        top: `${c.region.y * 100}%`,
-        width: `${c.region.width * 100}%`,
-        height: `${c.region.height * 100}%`,
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(c.id);
-      }}
-    />
-  ));
+  return comments.map((c) => {
+    const region = normalizeCommentRegion(
+      c.region,
+      basis,
+      commentRegionDisplayOptions(c.isAi),
+    );
+    return (
+      <button
+        key={c.id}
+        type="button"
+        aria-label={c.text || t("aiCanvas.commentCard")}
+        className="absolute rounded-g-sm border-2 border-g-blue bg-g-blue/10 shadow-g-sm transition-colors duration-[120ms] ease-g hover:bg-g-blue/20 focus-visible:outline-none focus-visible:shadow-g-focus"
+        style={{
+          left: `${region.x * 100}%`,
+          top: `${region.y * 100}%`,
+          width: `${region.width * 100}%`,
+          height: `${region.height * 100}%`,
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(c.id);
+        }}
+      />
+    );
+  });
 }
 
 const ctxMenuContentCls =
@@ -807,7 +818,7 @@ export function CardShell({
             selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
           )
         : cn(
-            "overflow-hidden rounded-g-lg bg-g-surface/75 shadow-g-pop backdrop-blur-xl",
+            "overflow-hidden rounded-g-lg border border-transparent bg-g-surface/75 shadow-g-pop backdrop-blur-xl [[data-theme='dark']_&]:border-g-line [[data-theme='dark']_&]:bg-g-surface-3/80",
             selected && "ring-1 ring-g-active-bg",
           ),
   );
@@ -953,6 +964,7 @@ export function AssetCardBody({
   hideOverlays,
   commentEnabled,
   canvasScale = 1,
+  commentRegionBasis,
   onSelectComment,
   onCreateComment,
 }: {
@@ -961,6 +973,7 @@ export function AssetCardBody({
   hideOverlays?: boolean;
   commentEnabled?: boolean;
   canvasScale?: number;
+  commentRegionBasis?: { width: number; height: number };
   onSelectComment: (commentId: string) => void;
   onCreateComment: (
     anchorCard: CanvasCard,
@@ -1000,7 +1013,13 @@ export function AssetCardBody({
         loading="lazy"
       />
       {!hideOverlays && (
-        <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
+        <CommentRegionButtons
+          comments={comments}
+          basis={
+            commentRegionBasis ?? { width: CARD_WIDTH, height: CARD_WIDTH / ar }
+          }
+          onSelect={onSelectComment}
+        />
       )}
       {commentOverlay}
     </div>
@@ -1058,6 +1077,7 @@ export function UploadCardBody({
   hideOverlays,
   commentEnabled,
   canvasScale = 1,
+  commentRegionBasis,
   onSelectComment,
   onCreateComment,
 }: {
@@ -1066,6 +1086,7 @@ export function UploadCardBody({
   hideOverlays?: boolean;
   commentEnabled?: boolean;
   canvasScale?: number;
+  commentRegionBasis?: { width: number; height: number };
   onSelectComment: (commentId: string) => void;
   onCreateComment?: (
     anchorCard: CanvasCard,
@@ -1103,7 +1124,11 @@ export function UploadCardBody({
         }}
       />
       {!hideOverlays && (
-        <CommentRegionButtons comments={comments} onSelect={onSelectComment} />
+        <CommentRegionButtons
+          comments={comments}
+          basis={commentRegionBasis}
+          onSelect={onSelectComment}
+        />
       )}
       {commentOverlay}
     </div>
@@ -1310,17 +1335,6 @@ export function ProposalCardBody({ card }: { card: ProposalCanvasCard }) {
                   : t("aiCanvas.pending")}
         </Badge>
       </div>
-      <p
-        className={cn(
-          "text-g-body leading-[1.45] text-g-ink",
-          isRejected && "line-through opacity-50",
-        )}
-      >
-        {card.description}
-      </p>
-      {card.impact && (
-        <p className="text-g-caption text-g-ink-3">{card.impact}</p>
-      )}
       {proposalTags.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-g-md border border-g-line bg-g-surface-2 px-2.5 py-2">
           <div className="font-g-mono text-[10px] font-[590] tracking-g-mono text-g-ink-4">

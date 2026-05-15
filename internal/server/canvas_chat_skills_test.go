@@ -1,6 +1,7 @@
 package server
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -41,6 +42,7 @@ func TestClassifyCanvasSkillFamilies(t *testing.T) {
 		{name: "capture", message: "take a transparent screenshot of the canvas", want: []string{canvasSkillCapture}},
 		{name: "ocr", message: "read the visible text with OCR", want: []string{canvasSkillOCR}},
 		{name: "comments", message: "annotate and circle this area", want: []string{canvasSkillComments}},
+		{name: "comment typo", message: "Copy this image and find the peachs and then add commends", want: []string{canvasSkillComments, canvasSkillLayout}},
 		{name: "quality", message: "what is this image and any quality issue?", want: []string{canvasSkillQuality}, reject: []string{canvasSkillFileProposals}},
 		{name: "metadata", message: "save these tags and description", want: []string{canvasSkillMetadataProposals}},
 		{name: "file proposal", message: "rotate this asset and convert it to webp", want: []string{canvasSkillFileProposals}},
@@ -65,6 +67,29 @@ func TestClassifyCanvasSkillFamilies(t *testing.T) {
 				t.Fatalf("skill count = %d, skills=%v", len(got), got)
 			}
 		})
+	}
+}
+
+func TestClassifyCanvasSkillFamilies_SelectedFormatRequestUsesFileProposal(t *testing.T) {
+	got := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
+		Message: "selected image to WebP quality 82",
+		Canvas: canvasSnapshot{
+			Cards:           []canvasCardSnapshot{{ID: "card-a", Kind: "asset"}},
+			SelectedCardIDs: []string{"card-a"},
+		},
+	})
+	if !canvasStringSliceContains(got, canvasSkillFileProposals) {
+		t.Fatalf("skills = %v, missing %s", got, canvasSkillFileProposals)
+	}
+}
+
+func TestClassifyCanvasSkillFamilies_FilenameLookupDoesNotUseFileProposal(t *testing.T) {
+	got := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
+		Message: "find loading.webp",
+		Canvas:  canvasSnapshot{Cards: []canvasCardSnapshot{{ID: "card-a", Kind: "asset"}}},
+	})
+	if canvasStringSliceContains(got, canvasSkillFileProposals) {
+		t.Fatalf("skills = %v, should not include %s", got, canvasSkillFileProposals)
 	}
 }
 
@@ -95,6 +120,133 @@ func TestCanvasSkillGatedToolsAndPrompt(t *testing.T) {
 	toolBlock := canvasPromptSection(prompt, "## Available Tools", "## Response Format")
 	if !strings.Contains(toolBlock, "search_assets") || strings.Contains(toolBlock, "compress_image") {
 		t.Fatalf("prompt tool block is not gated:\n%s", toolBlock)
+	}
+}
+
+func TestCommentRegionSchemaDefinesImageRelativeBoundingBox(t *testing.T) {
+	tools := canvasNativeLLMToolsForSkills([]string{canvasSkillComments})
+	byName := map[string]int{}
+	for i := range tools {
+		byName[tools[i].Name] = i
+	}
+	for _, toolName := range []string{"create_comment", "update_comment"} {
+		t.Run(toolName, func(t *testing.T) {
+			index, ok := byName[toolName]
+			if !ok {
+				t.Fatalf("%s tool missing", toolName)
+			}
+			props, ok := tools[index].Parameters["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("properties = %#v", tools[index].Parameters["properties"])
+			}
+			region, ok := props["region"].(map[string]any)
+			if !ok {
+				t.Fatalf("region schema = %#v", props["region"])
+			}
+			visualCue, ok := props["visualCue"].(map[string]any)
+			if !ok {
+				t.Fatalf("visualCue schema = %#v", props["visualCue"])
+			}
+			visualCueDescription, _ := visualCue["description"].(string)
+			if !strings.Contains(strings.ToLower(visualCueDescription), "target pixels") {
+				t.Fatalf("visualCue description missing target pixels: %q", visualCueDescription)
+			}
+			visualCueProps, ok := visualCue["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("visualCue properties = %#v", visualCue["properties"])
+			}
+			colorHex, ok := visualCueProps["colorHex"].(map[string]any)
+			if !ok {
+				t.Fatalf("visualCue.colorHex = %#v", visualCueProps["colorHex"])
+			}
+			colorDescription, _ := colorHex["description"].(string)
+			if !strings.Contains(colorDescription, "#RRGGBB") {
+				t.Fatalf("colorHex description = %q", colorDescription)
+			}
+			regionDescription, _ := region["description"].(string)
+			regionDescription = strings.ToLower(regionDescription)
+			for _, want := range []string{"relative to", "normalized bounding box"} {
+				if !strings.Contains(regionDescription, want) {
+					t.Fatalf("region description missing %q: %q", want, regionDescription)
+				}
+			}
+			regionProps, ok := region["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("region properties = %#v", region["properties"])
+			}
+			xSchema := regionProps["x"].(map[string]any)
+			ySchema := regionProps["y"].(map[string]any)
+			widthSchema := regionProps["width"].(map[string]any)
+			xDescription, _ := xSchema["description"].(string)
+			yDescription, _ := ySchema["description"].(string)
+			widthDescription, _ := widthSchema["description"].(string)
+			for _, check := range []struct {
+				label string
+				text  string
+				want  string
+			}{
+				{"x", xDescription, "top-left corner, not the center point"},
+				{"y", yDescription, "Y increases downward"},
+				{"width", widthDescription, "tight box around only the visible target"},
+			} {
+				if !strings.Contains(check.text, check.want) {
+					t.Fatalf("%s description missing %q: %q", check.label, check.want, check.text)
+				}
+			}
+		})
+	}
+	updateIndex, ok := byName["update_comment"]
+	if !ok {
+		t.Fatal("update_comment tool missing")
+	}
+	required, ok := tools[updateIndex].Parameters["required"].([]string)
+	if !ok {
+		t.Fatalf("update_comment required = %#v", tools[updateIndex].Parameters["required"])
+	}
+	if !reflect.DeepEqual(required, []string{"commentCardId"}) {
+		t.Fatalf("update_comment required = %#v, want commentCardId only", required)
+	}
+	props, _ := tools[updateIndex].Parameters["properties"].(map[string]any)
+	if _, ok := props["text"]; !ok {
+		t.Fatal("update_comment should keep optional text field")
+	}
+	if _, ok := props["region"]; !ok {
+		t.Fatal("update_comment should expose optional region field")
+	}
+}
+
+func TestSelectedCommentUsesAnchorImageForRegionVision(t *testing.T) {
+	canvas := canvasHarnessSnapshot("asset-a", "asset-b", "comment-a")
+	ids := selectedCanvasImageCardIDs(canvas)
+	if !reflect.DeepEqual(ids, []string{"card-a"}) {
+		t.Fatalf("selected image card IDs = %#v, want anchor card-a", ids)
+	}
+	prompt := buildCanvasUserPrompt(
+		[]canvasChatMessage{{Role: "user", Content: "Correct the selected annotation region."}},
+		canvas,
+		canvasChatOptions{CanvasImageAttached: true},
+		"en",
+	)
+	for _, want := range []string{
+		"Selected comment anchors:",
+		"comment=comment-a anchor=card-a",
+		"update_comment.region",
+		"coordinate grid overlay",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCanvasCommentSkillPromptUsesOneRegionPerTarget(t *testing.T) {
+	for name, prompt := range map[string]string{
+		"native": canvasNativeSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, []string{canvasSkillComments}),
+		"action": canvasSystemPromptForSkills("en", canvasChatOptions{AutoLocale: true}, []string{canvasSkillComments}),
+	} {
+		if !strings.Contains(prompt, "once per target/region") {
+			t.Fatalf("%s prompt missing per-target comment rule:\n%s", name, prompt)
+		}
 	}
 }
 
@@ -139,6 +291,16 @@ func TestCanvasSkillGatedPromptReducesPromptAndToolBytes(t *testing.T) {
 	gatedBytes := len(canvasSystemPromptForSkills("en", options, []string{canvasSkillSearch})) + canvasToolSchemaBytes(gatedTools)
 	if gatedBytes >= fullBytes {
 		t.Fatalf("gated prompt+tool bytes = %d, want less than full %d", gatedBytes, fullBytes)
+	}
+}
+
+func TestCanvasNativeAllToolPromptStaysCompact(t *testing.T) {
+	options := canvasChatOptions{AutoLocale: true, ImageOptimizationAdvice: false}
+	tools := canvasNativeLLMToolsForSkills(canvasAllSkillIDs())
+	bytes := len(canvasNativeSystemPromptForSkills("zh-TW", options, canvasAllSkillIDs())) + canvasToolSchemaBytes(tools)
+	t.Logf("native all-tool prompt+schema bytes = %d", bytes)
+	if bytes > 30000 {
+		t.Fatalf("native all-tool prompt+schema bytes = %d, want <= 30000", bytes)
 	}
 }
 

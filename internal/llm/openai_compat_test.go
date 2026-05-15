@@ -184,6 +184,45 @@ func TestOpenAICompatChatWithVision(t *testing.T) {
 	if len(url) < 5 || url[:5] != "data:" {
 		t.Errorf("image_url.url should be a data URI, got prefix %q", url[:min(len(url), 30)])
 	}
+	if imageURL["detail"] != "low" {
+		t.Errorf("image_url.detail = %q, want low", imageURL["detail"])
+	}
+}
+
+func TestOpenAICompatChatWithVisionHonorsImageDetail(t *testing.T) {
+	var capturedBody map[string]interface{}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"ok"}}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	_, err := p.Chat(context.Background(), ChatRequest{
+		Model:       "gpt-vision",
+		ImageDetail: "high",
+		Messages: []ChatMessage{{
+			Role:    "user",
+			Content: "locate this object",
+			Images:  []string{"data:image/png;base64,AQID"},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	messages := capturedBody["messages"].([]interface{})
+	msg := messages[0].(map[string]interface{})
+	content := msg["content"].([]interface{})
+	imagePart := content[1].(map[string]interface{})
+	imageURL := imagePart["image_url"].(map[string]interface{})
+	if imageURL["detail"] != "high" {
+		t.Fatalf("image_url.detail = %q, want high", imageURL["detail"])
+	}
 }
 
 func TestOpenAICompatChatWithTools(t *testing.T) {
@@ -224,6 +263,7 @@ func TestOpenAICompatChatWithTools(t *testing.T) {
 		Messages: []ChatMessage{
 			{Role: "user", Content: "find a dog"},
 		},
+		ToolChoice: "required",
 		Tools: []ChatTool{{
 			Name:        "search_assets",
 			Description: "Search assets",
@@ -236,6 +276,9 @@ func TestOpenAICompatChatWithTools(t *testing.T) {
 	tools, ok := capturedBody["tools"].([]interface{})
 	if !ok || len(tools) != 1 {
 		t.Fatalf("tools missing from request: %#v", capturedBody["tools"])
+	}
+	if capturedBody["tool_choice"] != "required" {
+		t.Fatalf("tool_choice = %#v, want required", capturedBody["tool_choice"])
 	}
 	if len(resp.ToolCalls) != 1 {
 		t.Fatalf("expected 1 tool call, got %#v", resp.ToolCalls)
@@ -285,6 +328,115 @@ func TestOpenAICompatChatWithToolsFallsBackWhenUnsupported(t *testing.T) {
 	}
 	if resp.Content != "fallback" {
 		t.Fatalf("content = %q", resp.Content)
+	}
+}
+
+func TestOpenAICompatChatWithToolChoiceFallsBackWhenUnsupported(t *testing.T) {
+	attempts := 0
+	var bodies []map[string]interface{}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var capturedBody map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		bodies = append(bodies, capturedBody)
+		if _, hasToolChoice := capturedBody["tool_choice"]; hasToolChoice {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"error":{"message":"tool_choice is not supported"}}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"fallback"}}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Model:      "test-model",
+		Messages:   []ChatMessage{{Role: "user", Content: "hi"}},
+		Tools:      []ChatTool{{Name: "search_assets"}},
+		ToolChoice: "required",
+	})
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	if resp.Content != "fallback" {
+		t.Fatalf("content = %q", resp.Content)
+	}
+	if _, ok := bodies[0]["tool_choice"]; !ok {
+		t.Fatalf("first request missing tool_choice: %#v", bodies[0])
+	}
+	if _, ok := bodies[1]["tool_choice"]; ok {
+		t.Fatalf("second request should omit tool_choice: %#v", bodies[1])
+	}
+	if _, ok := bodies[1]["tools"]; !ok {
+		t.Fatalf("second request should keep tools: %#v", bodies[1])
+	}
+}
+
+func TestOpenAICompatChatDropsImagesWhenContextTooLarge(t *testing.T) {
+	attempts := 0
+	var bodies []map[string]interface{}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var capturedBody map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		bodies = append(bodies, capturedBody)
+		messages, _ := capturedBody["messages"].([]interface{})
+		if len(messages) > 0 {
+			msg, _ := messages[0].(map[string]interface{})
+			if _, hasVisionParts := msg["content"].([]interface{}); hasVisionParts {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(w, `{"error":{"message":"context length exceeded"}}`)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"text-only"}}]}`)
+	}))
+	defer srv.Close()
+
+	p := NewOpenAICompatProvider(srv.URL+"/v1", "")
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Model:      "test-model",
+		Messages:   []ChatMessage{{Role: "user", Content: "describe this", Images: []string{"data:image/png;base64,AAAA"}}},
+		Tools:      []ChatTool{{Name: "inspect_canvas"}},
+		ToolChoice: "required",
+	})
+	if err != nil {
+		t.Fatalf("Chat error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	if resp.Content != "text-only" {
+		t.Fatalf("content = %q", resp.Content)
+	}
+	firstMessages := bodies[0]["messages"].([]interface{})
+	firstMessage := firstMessages[0].(map[string]interface{})
+	if _, ok := firstMessage["content"].([]interface{}); !ok {
+		t.Fatalf("first request should use vision content parts: %#v", firstMessage["content"])
+	}
+	secondMessages := bodies[1]["messages"].([]interface{})
+	secondMessage := secondMessages[0].(map[string]interface{})
+	if secondMessage["content"] != "describe this" {
+		t.Fatalf("second request content = %#v", secondMessage["content"])
+	}
+	if bodies[1]["tool_choice"] != "required" {
+		t.Fatalf("second request tool_choice = %#v", bodies[1]["tool_choice"])
+	}
+	if _, ok := bodies[1]["tools"]; !ok {
+		t.Fatalf("second request should keep tools: %#v", bodies[1])
 	}
 }
 

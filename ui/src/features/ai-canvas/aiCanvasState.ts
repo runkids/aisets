@@ -594,28 +594,24 @@ export function cardDisplayName(card: CanvasCard) {
   }
   if (card.kind === "assistant") return card.prompt || "AI";
   if (card.kind === "variant") return card.sourceName;
-  if (card.kind === "proposal") return card.description || card.tool;
+  if (card.kind === "proposal") return card.tool;
   if (card.kind === "upload") return card.fileName;
   return card.prompt || "Preview";
 }
 
 export function inferPromptIntent(prompt: string): AICanvasPromptIntent {
   const lower = prompt.toLowerCase();
-  if (/comment|annotate|標記|註解|備註/.test(lower)) return "comment";
+  if (/comment|annotate/.test(lower)) return "comment";
   if (
-    /safe|variant|variants|batch|apply|convert|compress|webp|avif|壓縮|轉檔|變體|批次/.test(
-      lower,
-    )
+    /safe|variant|variants|batch|apply|convert|compress|webp|avif/.test(lower)
   ) {
     return "operationPreview";
   }
-  if (/preview|render|generate|image|預覽|生圖|生成|改圖|圖片/.test(lower)) {
+  if (/preview|render|generate|image/.test(lower)) {
     return "imagePreview";
   }
   if (
-    /edit|recolor|colour|remove|replace|改色|換色|改顏色|顏色|紅|藍|綠|移除|替換|去背|編輯|改成/.test(
-      lower,
-    ) ||
+    /edit|recolor|colour|remove|replace/.test(lower) ||
     /\b(color|red|blue|green)\b/.test(lower)
   ) {
     return "imageEdit";

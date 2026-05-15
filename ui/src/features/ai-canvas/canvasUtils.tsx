@@ -213,11 +213,56 @@ export function selectedAssetIds(cards: AssetCanvasCard[]) {
 }
 
 export const AI_MENTION_TAG = "@aisets";
-export const AI_MENTION_COMMENT_RE = /(^|\s)@aisets(?=\s|$|[,.，。!?！？])/i;
-export const AI_MENTION_COMMENT_RE_G = /(^|\s)@aisets(?=\s|$|[,.，。!?！？])/gi;
+export const AI_MENTION_COMMENT_RE = /(^|\s)@aisets(?=\s|$|\p{P})/iu;
+export const AI_MENTION_COMMENT_RE_G = /(^|\s)@aisets(?=\s|$|\p{P})/giu;
 
 export function commentIds(cards: CommentCanvasCard[]) {
   return cards.map((card) => card.id);
+}
+
+export function normalizeCommentRegion(
+  region: CommentCanvasCard["region"],
+  basis?: { width: number; height: number },
+  options?: { minWidth?: number; minHeight?: number },
+) {
+  const pixelBased =
+    region.x > 1 || region.y > 1 || region.width > 1 || region.height > 1;
+  const basisWidth = basis?.width && basis.width > 0 ? basis.width : CARD_WIDTH;
+  const basisHeight =
+    basis?.height && basis.height > 0 ? basis.height : CARD_WIDTH;
+  const raw = pixelBased
+    ? {
+        x: region.x / basisWidth,
+        y: region.y / basisHeight,
+        width: region.width / basisWidth,
+        height: region.height / basisHeight,
+      }
+    : region;
+  const rawWidth = Number(raw.width) || 0.02;
+  const rawHeight = Number(raw.height) || 0.02;
+  const minWidth = options?.minWidth ?? 0.02;
+  const minHeight = options?.minHeight ?? 0.02;
+  const width = Math.min(1, Math.max(minWidth, rawWidth));
+  const height = Math.min(1, Math.max(minHeight, rawHeight));
+  const centerX = (Number(raw.x) || 0) + rawWidth / 2;
+  const centerY = (Number(raw.y) || 0) + rawHeight / 2;
+  return {
+    x: Math.min(Math.max(centerX - width / 2, 0), 1 - width),
+    y: Math.min(Math.max(centerY - height / 2, 0), 1 - height),
+    width,
+    height,
+  };
+}
+
+export function commentRegionDisplayOptions(isAi?: boolean) {
+  return isAi ? { minWidth: 0.06, minHeight: 0.06 } : undefined;
+}
+
+export function imageFrameSize(card: CanvasCard, width = CARD_WIDTH) {
+  return {
+    width,
+    height: width / compactImageAspectRatio(card),
+  };
 }
 
 export function imageMeta(asset: AssetItem) {

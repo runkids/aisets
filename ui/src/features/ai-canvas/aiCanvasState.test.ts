@@ -200,12 +200,12 @@ describe("selectedAssetCards", () => {
 
 describe("inferPromptIntent", () => {
   it("routes common canvas prompts to preview actions", () => {
-    expect(inferPromptIntent("標記這個角落太暗")).toBe("comment");
+    expect(inferPromptIntent("annotate this corner")).toBe("comment");
     expect(inferPromptIntent("compress as webp safe variant")).toBe(
       "operationPreview",
     );
-    expect(inferPromptIntent("幫我改顏色 -> RED")).toBe("imageEdit");
-    expect(inferPromptIntent("幫我預覽改圖")).toBe("imagePreview");
+    expect(inferPromptIntent("recolor this -> RED")).toBe("imageEdit");
+    expect(inferPromptIntent("generate preview")).toBe("imagePreview");
     expect(inferPromptIntent("rendered preview")).toBe("imagePreview");
     expect(inferPromptIntent("describe background")).toBe("describe");
     expect(inferPromptIntent("describe context")).toBe("describe");

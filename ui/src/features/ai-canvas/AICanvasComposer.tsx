@@ -495,7 +495,7 @@ export function AICanvasComposer({
                     {proposalToolLabel(t, selectedProposal.tool)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">
-                    {selectedProposal.description}
+                    {t("aiCanvas.pending")}
                   </span>
                   <Button
                     size="sm"

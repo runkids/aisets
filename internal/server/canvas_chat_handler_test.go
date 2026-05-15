@@ -3,7 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"image"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -137,6 +140,23 @@ func TestCanvasToolSuppressesSameTurnText(t *testing.T) {
 	}
 }
 
+func TestFilterCanvasIncidentalCatalogSearchActionsKeepsImageOperation(t *testing.T) {
+	actions := filterCanvasIncidentalCatalogSearchActions([]canvasAction{
+		{Tool: "compress_image", Params: map[string]any{"assetIds": []any{"asset-a"}}},
+		{Tool: "search_assets", Params: map[string]any{"q": "png"}},
+	})
+	if len(actions) != 1 || actions[0].Tool != "compress_image" {
+		t.Fatalf("actions = %#v", actions)
+	}
+
+	actions = filterCanvasIncidentalCatalogSearchActions([]canvasAction{
+		{Tool: "search_assets", Params: map[string]any{"q": "cat"}},
+	})
+	if len(actions) != 1 || actions[0].Tool != "search_assets" {
+		t.Fatalf("search-only actions should be preserved: %#v", actions)
+	}
+}
+
 func TestCanvasSystemPrompt_ImageOptimizationAdviceOffRestrictsProposals(t *testing.T) {
 	prompt := canvasSystemPrompt("zh-TW", canvasChatOptions{ImageOptimizationAdvice: false})
 	for _, want := range []string{
@@ -162,11 +182,11 @@ func TestCanvasSystemPrompt_ImageOptimizationAdviceOffRestrictsProposals(t *test
 
 func TestCanvasSystemPrompt_AutoLocaleUsesBuiltInLanguages(t *testing.T) {
 	cases := map[string]string{
-		"en":    "Respond in English",
-		"zh-TW": "Respond in Traditional Chinese",
-		"zh-CN": "Respond in Simplified Chinese",
-		"ja":    "Respond in Japanese",
-		"ko":    "Respond in Korean",
+		"en":    "Only natural-language assistant text should be written in English",
+		"zh-TW": "Only natural-language assistant text should be written in Traditional Chinese",
+		"zh-CN": "Only natural-language assistant text should be written in Simplified Chinese",
+		"ja":    "Only natural-language assistant text should be written in Japanese",
+		"ko":    "Only natural-language assistant text should be written in Korean",
 	}
 	for locale, want := range cases {
 		prompt := canvasSystemPrompt(locale, canvasChatOptions{AutoLocale: true})
@@ -187,7 +207,7 @@ func TestCanvasSystemPrompt_EnglishInstructionsAvoidChineseAliases(t *testing.T)
 
 func TestCanvasSystemPrompt_AutoLocaleOffUsesEnglish(t *testing.T) {
 	prompt := canvasSystemPrompt("zh-TW", canvasChatOptions{AutoLocale: false})
-	if !strings.Contains(prompt, "Respond in English") {
+	if !strings.Contains(prompt, "Only natural-language assistant text should be written in English") {
 		t.Fatalf("prompt should default to English when auto locale is off:\n%s", prompt)
 	}
 }
@@ -228,7 +248,7 @@ func TestBuildCanvasUserPrompt_IncludesCanvasScale(t *testing.T) {
 
 func TestBuildCanvasUserPrompt_UsesLatestUserLanguage(t *testing.T) {
 	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "再幫我找一張類似家庭照的 family_danran.png"}}, canvasSnapshot{}, canvasChatOptions{}, "en")
-	if !strings.Contains(prompt, "Respond in Traditional Chinese") {
+	if !strings.Contains(prompt, "Use Traditional Chinese only for natural-language assistant text") {
 		t.Fatalf("prompt should override to latest user language:\n%s", prompt)
 	}
 }
@@ -250,9 +270,44 @@ func TestCanvasSearchQueryCandidates(t *testing.T) {
 		t.Fatalf("stem-only candidates = %#v", got)
 	}
 
-	got = canvasSearchQueryCandidates("搜尋 cat 或貓相關素材，加入最相關的 2 張到畫布，排成一列。")
-	if !stringSliceContains(got, "cat") || !stringSliceContains(got, "貓") {
+	got = canvasSearchQueryCandidates("search cat or kitten related assets, add the most relevant 2 cards to the canvas, then arrange them in a row.")
+	if !stringSliceContains(got, "cat") || !stringSliceContains(got, "kitten") {
 		t.Fatalf("catalog search candidates should include requested query terms: %#v", got)
+	}
+}
+
+func TestClassifyCanvasSkillFamilies_UnknownLanguageUsesCompactDefault(t *testing.T) {
+	got := classifyCanvasSkillFamilies(canvasSkillClassifyInput{Message: "請處理這些圖片"})
+	want := []string{
+		canvasSkillLayout,
+		canvasSkillSearch,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("default skills = %#v, want %#v", got, want)
+	}
+	for _, unwanted := range []string{canvasSkillCapture, canvasSkillFileProposals, canvasSkillComments, canvasSkillMetadataProposals} {
+		if canvasStringListContains(got, unwanted) {
+			t.Fatalf("default skills should stay compact; unexpected %s in %#v", unwanted, got)
+		}
+	}
+	tools := canvasSkillToolNames(got)
+	for _, wantTool := range []string{"search_assets", "add_assets_to_canvas"} {
+		if !canvasStringListContains(tools, wantTool) {
+			t.Fatalf("default tools = %#v, missing %s", tools, wantTool)
+		}
+	}
+}
+
+func TestCanvasNativeToolsDisabledForAgentBackends(t *testing.T) {
+	tools := canvasLLMToolsForSkills([]string{canvasSkillSearch})
+	if canvasNativeToolsEnabled("agent:codex", tools) {
+		t.Fatal("agent backends do not receive native tool schemas and should use action-block prompts")
+	}
+	if !canvasNativeToolsEnabled("ollama", tools) {
+		t.Fatal("non-agent backends with tools should use native tool schemas")
+	}
+	if canvasNativeToolsEnabled("ollama", nil) {
+		t.Fatal("empty tool list should not enable native tool mode")
 	}
 }
 
@@ -304,10 +359,10 @@ func stringSliceContains(values []string, want string) bool {
 }
 
 func TestCanvasProposalAllowed_BlocksUnsolicitedProposalsWhenAdviceOff(t *testing.T) {
-	latest := "幫我看看這張圖有什麼問題"
+	latest := "review this image for quality issues"
 	options := canvasChatOptions{ImageOptimizationAdvice: false}
 	for _, tool := range []string{"update_tags", "update_description"} {
-		if canvasProposalAllowed(tool, latest, options) {
+		if canvasProposalAllowed(tool, latest, options, false) {
 			t.Fatalf("%s should be blocked for a general request when advice is off", tool)
 		}
 	}
@@ -315,52 +370,56 @@ func TestCanvasProposalAllowed_BlocksUnsolicitedProposalsWhenAdviceOff(t *testin
 
 func TestCanvasProposalAllowed_AllowsExplicitMetadataRequests(t *testing.T) {
 	options := canvasChatOptions{ImageOptimizationAdvice: false}
-	if !canvasProposalAllowed("update_tags", "幫這張圖加上搜尋標籤", options) {
+	if !canvasProposalAllowed("update_tags", "add searchable tags to this image", options, false) {
 		t.Fatal("explicit tag update should be allowed")
 	}
-	if !canvasProposalAllowed("update_description", "幫這張圖補充描述並儲存", options) {
+	if !canvasProposalAllowed("update_description", "write and save a description for this image", options, false) {
 		t.Fatal("explicit description update should be allowed")
 	}
-	if canvasProposalAllowed("update_description", "描述這張圖給我聽", options) {
+	if canvasProposalAllowed("update_description", "describe this image to me", options, false) {
 		t.Fatal("plain describe request should not create a metadata proposal")
 	}
 }
 
+func TestCanvasProposalAllowed_AllowsNativeToolProposals(t *testing.T) {
+	options := canvasChatOptions{ImageOptimizationAdvice: false}
+	if !canvasProposalAllowed("copy_asset", "show text images and copy them with text-derived filenames", options, true) {
+		t.Fatal("native file-operation tool call should create a confirmation proposal")
+	}
+}
+
 func TestCanvasProposalAllowed_AllowsOptimizationWhenAdviceOnOrExplicit(t *testing.T) {
-	if !canvasProposalAllowed("compress_image", "幫我看看這張圖有沒有品質問題", canvasChatOptions{ImageOptimizationAdvice: true}) {
+	if !canvasProposalAllowed("compress_image", "review this image for quality issues", canvasChatOptions{ImageOptimizationAdvice: true}, false) {
 		t.Fatal("optimization advice on should allow review-driven image variants")
 	}
-	if !canvasProposalAllowed("compress_image", "給我建議吧", canvasChatOptions{ImageOptimizationAdvice: true}) {
+	if !canvasProposalAllowed("compress_image", "give me suggestions", canvasChatOptions{ImageOptimizationAdvice: true}, false) {
 		t.Fatal("optimization advice on should allow proactive optimization variants for general advice")
 	}
-	if !canvasProposalAllowed("compress_image", "幫我壓縮這張圖", canvasChatOptions{ImageOptimizationAdvice: false}) {
+	if !canvasProposalAllowed("compress_image", "compress this image", canvasChatOptions{ImageOptimizationAdvice: false}, false) {
 		t.Fatal("explicit optimization request should be allowed even when advice is off")
 	}
 }
 
 func TestCanvasProposalAllowed_AllowsExplicitImageTransforms(t *testing.T) {
 	options := canvasChatOptions{ImageOptimizationAdvice: false}
-	if !canvasProposalAllowed("mirror_image", "幫這張圖做水平鏡像", options) {
+	if !canvasProposalAllowed("mirror_image", "mirror this image horizontally", options, false) {
 		t.Fatal("explicit mirror request should be allowed")
 	}
-	if !canvasProposalAllowed("mirror_image", "幫這張圖左右反轉", options) {
+	if !canvasProposalAllowed("mirror_image", "flip this image", options, false) {
 		t.Fatal("explicit reverse request should be allowed")
 	}
-	if !canvasProposalAllowed("mirror_image", "幫這張圖靚相", options) {
-		t.Fatal("common mirror typo should be allowed")
-	}
-	if !canvasProposalAllowed("rotate_image", "把這張圖旋轉 90 度", options) {
+	if !canvasProposalAllowed("rotate_image", "rotate this image 90 degrees", options, false) {
 		t.Fatal("explicit rotate request should be allowed")
 	}
 }
 
 func TestCanvasUserAsksAnnotation(t *testing.T) {
-	for _, msg := range []string{"幫我圈出牙齒", "在這張圖加註解", "highlight the low contrast area"} {
+	for _, msg := range []string{"circle the tooth", "add an annotation to this image", "highlight the low contrast area"} {
 		if !canvasUserAsksAnnotation(msg) {
 			t.Fatalf("expected annotation request: %q", msg)
 		}
 	}
-	for _, msg := range []string{"放大我看不清楚他的牙齒", "有蛀牙嗎", "這是啥"} {
+	for _, msg := range []string{"zoom in because I cannot see the tooth", "does it have cavities", "what is this"} {
 		if canvasUserAsksAnnotation(msg) {
 			t.Fatalf("should not be annotation request: %q", msg)
 		}
@@ -404,6 +463,46 @@ func TestBuildCanvasUserPrompt_IncludesSelectedAssetTargets(t *testing.T) {
 	}
 }
 
+func TestBuildCanvasUserPrompt_ExplainsSelectedImageCoordinateFrame(t *testing.T) {
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{
+		SelectedCardIDs: []string{"asset-card-1"},
+		Cards: []canvasCardSnapshot{{
+			ID:    "asset-card-1",
+			Kind:  "asset",
+			Asset: &canvasAssetSnapshot{ID: "a1", RepoPath: "assets/a.png"},
+		}},
+	}, canvasChatOptions{CanvasImageAttached: true}, "en")
+	for _, want := range []string{"Attached visual inputs", "Image 1 is a selected card image with a coordinate grid overlay", "Image 2 is the plain selected card image", "final attached image is the canvas viewport screenshot", "not the full canvas screenshot", "normalized top-left bounding box"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCanvasCoordinateGridImage(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "source.png")
+	writePNG(t, src)
+
+	gridPath, cleanup, err := canvasCoordinateGridImage(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	f, err := os.Open(gridPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() < 512 || img.Bounds().Dy() < 512 {
+		t.Fatalf("grid image should be upscaled for VLM readability, got %dx%d", img.Bounds().Dx(), img.Bounds().Dy())
+	}
+}
+
 func TestBuildCanvasUserPrompt_IncludesSelectedUploadTargets(t *testing.T) {
 	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{
 		SelectedCardIDs: []string{"upload-card-1"},
@@ -418,10 +517,102 @@ func TestBuildCanvasUserPrompt_IncludesSelectedUploadTargets(t *testing.T) {
 	}
 }
 
+func TestBuildCanvasUserPrompt_IncludesAIReadableCanvasCardsJSON(t *testing.T) {
+	prompt := buildCanvasUserPrompt(nil, canvasSnapshot{
+		Cards: []canvasCardSnapshot{{
+			ID:     "asset-card-1",
+			Kind:   "asset",
+			X:      12,
+			Y:      34,
+			Width:  180,
+			Height: 120,
+			Asset: &canvasAssetSnapshot{
+				ID:                "asset-1",
+				FileName:          "cover.png",
+				ProjectName:       "Books",
+				RepoPath:          "books/cover.png",
+				Ext:               ".png",
+				Width:             201,
+				Height:            250,
+				ImageFormat:       "png",
+				Bytes:             45932,
+				URL:               "/api/assets/asset-1",
+				ThumbnailURL:      "/api/assets/asset-1/thumb",
+				SearchDescription: "Book cover with a lion illustration.",
+				SearchLanguages:   []string{"eng"},
+			},
+		}},
+	}, canvasChatOptions{}, "en")
+	for _, want := range []string{
+		"AI-Readable Canvas Cards JSON",
+		`"thumbnailUrl":"/api/assets/asset-1/thumb"`,
+		`"description":"Book cover with a lion illustration."`,
+		`"fileName":"cover.png"`,
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestBuildCanvasUserPrompt_LimitsLargeCanvasToRelevantCards(t *testing.T) {
+	cards := make([]canvasCardSnapshot, 0, 16)
+	for i := 0; i < 14; i++ {
+		cards = append(cards, canvasCardSnapshot{
+			ID:   fmt.Sprintf("card-decoy-%02d", i),
+			Kind: "asset",
+			Asset: &canvasAssetSnapshot{
+				ID:          fmt.Sprintf("asset-decoy-%02d", i),
+				RepoPath:    fmt.Sprintf("decoy-%02d.png", i),
+				Tags:        []string{"decoy"},
+				Description: "Unrelated filler card.",
+			},
+		})
+	}
+	cards = append(cards,
+		canvasCardSnapshot{
+			ID:   "card-tree",
+			Kind: "asset",
+			Asset: &canvasAssetSnapshot{
+				ID:          "asset-tree",
+				RepoPath:    "tree.png",
+				Tags:        []string{"tree"},
+				Description: "A tree card.",
+			},
+		},
+		canvasCardSnapshot{
+			ID:   "card-donkey",
+			Kind: "asset",
+			Asset: &canvasAssetSnapshot{
+				ID:          "asset-donkey",
+				RepoPath:    "donkey.png",
+				Tags:        []string{"donkey"},
+				Description: "A donkey card.",
+			},
+		},
+	)
+
+	prompt := buildCanvasUserPrompt(
+		[]canvasChatMessage{{Role: "user", Content: "make the tree larger and duplicate the donkey"}},
+		canvasSnapshot{Cards: cards},
+		canvasChatOptions{},
+		"en",
+	)
+
+	for _, want := range []string{"card-tree", "tree.png", "card-donkey", "donkey.png", "less relevant cards omitted"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "decoy-13.png") {
+		t.Fatalf("prompt should omit late unrelated decoy:\n%s", prompt)
+	}
+}
+
 func TestCanvasCaptureRequested(t *testing.T) {
 	for _, input := range []string{
-		"幫我排版後拍一張去背照",
-		"匯出畫布給我看",
+		"arrange this and take a transparent screenshot",
+		"export the canvas for preview",
 		"export the canvas",
 		"download this layout",
 	} {
@@ -429,24 +620,24 @@ func TestCanvasCaptureRequested(t *testing.T) {
 			t.Fatalf("expected capture intent for %q", input)
 		}
 	}
-	if canvasCaptureRequested("幫我排版") {
+	if canvasCaptureRequested("arrange this layout") {
 		t.Fatal("plain arrange request should not require capture")
 	}
 }
 
 func TestCanvasFollowupShouldRetainImages(t *testing.T) {
-	if !canvasFollowupShouldRetainImages(canvasLoopReasonMissingCapture, "幫我排版後拍一張") {
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonMissingCapture, "arrange this and capture it") {
 		t.Fatal("missing capture repair should retain images")
 	}
-	if !canvasFollowupShouldRetainImages(canvasLoopReasonCaptureOnlyWork, "安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉") {
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonCaptureOnlyWork, "arrange storyboard / fight / control / mirror / rotate") {
 		t.Fatal("capture-only manipulation repair should retain images")
 	}
-	if !canvasFollowupShouldRetainImages(canvasLoopReasonFocusOnlyNeedsAnswer, "安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉") {
+	if !canvasFollowupShouldRetainImages(canvasLoopReasonFocusOnlyNeedsAnswer, "arrange storyboard / fight / control / mirror / rotate") {
 		t.Fatal("focus-only manipulation repair should retain images")
 	}
 	for _, input := range []string{
-		"幫我看看這張圖有沒有品質問題",
-		"比較這兩張角色圖",
+		"review this image for quality issues",
+		"compare these two character images",
 		"analyze this image quality",
 	} {
 		if !canvasFollowupShouldRetainImages(canvasLoopReasonToolResults, input) {
@@ -454,8 +645,8 @@ func TestCanvasFollowupShouldRetainImages(t *testing.T) {
 		}
 	}
 	for _, input := range []string{
-		"安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉",
-		"把這張圖旋轉 90 度",
+		"arrange storyboard / fight / control / mirror / rotate",
+		"rotate this image 90 degrees",
 		"arrange these cards",
 	} {
 		if canvasFollowupShouldRetainImages(canvasLoopReasonToolResults, input) {
@@ -464,23 +655,8 @@ func TestCanvasFollowupShouldRetainImages(t *testing.T) {
 	}
 }
 
-func TestFallbackCanvasCaptureAction(t *testing.T) {
-	action := fallbackCanvasCaptureAction("幫我排版後拍一張去背照", canvasSnapshot{})
-	if action.Tool != "capture_canvas" {
-		t.Fatalf("tool = %s", action.Tool)
-	}
-	if action.Params["transparent"] != true {
-		t.Fatalf("transparent = %#v", action.Params["transparent"])
-	}
-
-	action = fallbackCanvasCaptureAction("截取選取範圍", canvasSnapshot{SelectedCardIDs: []string{"a"}})
-	if action.Tool != "capture_selected" {
-		t.Fatalf("selected tool = %s", action.Tool)
-	}
-}
-
 func TestCanvasCaptureRepairPrompt_AsksModelToChooseMode(t *testing.T) {
-	prompt := canvasCaptureRepairPrompt("幫我截取選取範圍")
+	prompt := canvasCaptureRepairPrompt("capture the selected cards")
 	for _, want := range []string{"capture_viewport", "capture_canvas", "capture_selected", "Reply with exactly one action block"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("repair prompt missing %q:\n%s", want, prompt)
@@ -504,7 +680,7 @@ func TestExpandCanvasMultiSelectedActions_BatchesSinglePerAssetAction(t *testing
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas, "幫這些圖片加標籤")
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "add tags to these images")
 	if len(expanded) != 1 {
 		t.Fatalf("expected 1 batch action, got %d", len(expanded))
 	}
@@ -528,7 +704,7 @@ func TestExpandCanvasMultiSelectedActions_DoesNotFanOutWhenModelAlreadyEmitsPerA
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas, "幫這些圖片加標籤")
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "add tags to these images")
 	if len(expanded) != 2 {
 		t.Fatalf("expected original 2 actions, got %d", len(expanded))
 	}
@@ -547,7 +723,7 @@ func TestExpandCanvasMultiSelectedActions_RespectsExplicitSingleTarget(t *testin
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas, "只處理第一張")
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "only process the first image")
 	if len(expanded) != 1 {
 		t.Fatalf("expected original single action, got %d", len(expanded))
 	}
@@ -569,7 +745,7 @@ func TestExpandCanvasMultiSelectedActions_DefaultsDuplicateCardsToSelectedImages
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas, "複製五隻小狗讓牠散步")
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "duplicate five puppies and make them walk")
 	if len(expanded) != 1 {
 		t.Fatalf("expected one duplicate action, got %d", len(expanded))
 	}
@@ -591,7 +767,7 @@ func TestExpandCanvasMultiSelectedActions_DefaultsOCRToSelectedUploadCards(t *te
 		},
 	}
 
-	expanded := expandCanvasMultiSelectedActions(actions, canvas, "擷取圖片文字")
+	expanded := expandCanvasMultiSelectedActions(actions, canvas, "extract the image text")
 	if len(expanded) != 1 {
 		t.Fatalf("expected one OCR action, got %d", len(expanded))
 	}
@@ -641,6 +817,13 @@ func TestCanvasOCRDisplayError_ExtractsProviderMessage(t *testing.T) {
 	want := `Failed to load model "qwen/qwen3.6-27b". Error: Model loading was stopped due to insufficient system resources.`
 	if got != want {
 		t.Fatalf("display error = %q, want %q", got, want)
+	}
+}
+
+func TestCanvasCreatedCommentsAnswerTextUsesSummaryWithoutLeakingCommentText(t *testing.T) {
+	answer := canvasCreatedCommentsAnswerText([]string{"Text reads: SALE", "Text reads: SALE", "Text reads: LOGO"}, "zh-TW")
+	if answer != "Added 3 comments." {
+		t.Fatalf("answer = %q", answer)
 	}
 }
 
@@ -741,11 +924,11 @@ func TestCanvasActionsOnlyFocus(t *testing.T) {
 }
 
 func TestCanvasTextOnlyResponseNeedsActionRepair(t *testing.T) {
-	planText := `我已定位到 P1 和 P2 的角色圖像，現在我將為您規劃幾個分鏡劇情。以下是建議的戰鬥場景構思：
+	planText := `I found the P1 and P2 character images. Now I will plan several storyboard beats. Here is the suggested battle scene:
 
-分鏡 1：近身格鬥
-• P1 從左側突襲
-• P2 在右側防守並反擊`
+Scene 1: close combat
+• P1 attacks from the left
+• P2 blocks on the right and counters`
 
 	if !canvasTextOnlyResponseNeedsActionRepair(planText, false, 0, 3) {
 		t.Fatal("deferred canvas work should request an action repair")
@@ -756,18 +939,48 @@ func TestCanvasTextOnlyResponseNeedsActionRepair(t *testing.T) {
 	if canvasTextOnlyResponseNeedsActionRepair(planText, false, 2, 3) {
 		t.Fatal("last loop should not request another action repair")
 	}
-	if canvasTextOnlyResponseNeedsActionRepair("這張圖是 P1 角色站立姿勢。", false, 0, 3) {
+	if canvasTextOnlyResponseNeedsActionRepair("This image shows P1 in a standing pose.", false, 0, 3) {
 		t.Fatal("plain visual answer should not request an action repair")
 	}
-	imagegenText := "我會用 imagegen 技能處理這次「真的打起來」的需求，先把目前圈選的 P1/P2 動作視為角色一致性參考，再產出真正有互動的戰鬥構圖。"
+	imagegenText := "I will use the imagegen skill for this fight request, first treating the selected P1/P2 poses as character consistency references, then generating an interactive battle composition."
 	if !canvasTextOnlyResponseNeedsActionRepair(imagegenText, false, 0, 3) {
 		t.Fatal("short imagegen promise should request an action repair")
 	}
 }
 
+func TestCanvasActionBlockTextNeedsActionRepair(t *testing.T) {
+	if !canvasActionBlockTextNeedsActionRepair(false, "initial", "Already circled it and added a comment.", 0, false, 0, 3) {
+		t.Fatal("agent text-only completion claim should request action-block repair")
+	}
+	if canvasActionBlockTextNeedsActionRepair(true, "initial", "The answer is here.", 0, false, 0, 3) {
+		t.Fatal("native tool mode is handled by native missing-tool logic")
+	}
+	if canvasActionBlockTextNeedsActionRepair(false, canvasLoopReasonBlockedComment, "This image is a test asset.", 0, false, 1, 3) {
+		t.Fatal("blocked-comment answer loop should allow plain explanatory text")
+	}
+	if canvasActionBlockTextNeedsActionRepair(false, "initial", "Already circled it.", 1, false, 0, 3) {
+		t.Fatal("existing action blocks should not request repair")
+	}
+}
+
+func TestCanvasRequiredNativeToolCallMissing(t *testing.T) {
+	if !canvasRequiredNativeToolCallMissing(true, "required", "The answer is here.", 0, false, 0, 3) {
+		t.Fatal("required native text-only response should request a repair")
+	}
+	if canvasRequiredNativeToolCallMissing(true, "", "The answer is here.", 0, false, 0, 3) {
+		t.Fatal("optional native text-only response should not request a repair")
+	}
+	if canvasRequiredNativeToolCallMissing(true, "required", "The answer is here.", 1, false, 0, 3) {
+		t.Fatal("existing actions should not request a missing-tool repair")
+	}
+	if canvasRequiredNativeToolCallMissing(true, "required", "The answer is here.", 0, true, 0, 3) {
+		t.Fatal("executed non-focus tools should not request another repair")
+	}
+}
+
 func TestCanvasActionRepairPromptRequiresGenericToolActions(t *testing.T) {
-	prompt := canvasActionRepairPrompt("幫我安排幾個分鏡")
-	for _, want := range []string{"without producing an executable non-focus action", "Use canvas layout tools", "built-in imagegen capability", "Reply with only tool calls or action blocks"} {
+	prompt := canvasActionRepairPrompt("arrange a few storyboard beats")
+	for _, want := range []string{"without producing an executable non-focus action", "Use canvas layout tools", "Use create_comment with region", "built-in imagegen capability", "Reply with only tool calls or action blocks"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("repair prompt missing %q:\n%s", want, prompt)
 		}
@@ -775,7 +988,7 @@ func TestCanvasActionRepairPromptRequiresGenericToolActions(t *testing.T) {
 }
 
 func TestCanvasFocusOnlyRepairPromptRequiresActionForManipulation(t *testing.T) {
-	prompt := canvasFocusOnlyRepairPrompt("安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉")
+	prompt := canvasFocusOnlyRepairPrompt("arrange storyboard / fight / control / mirror / rotate")
 	for _, want := range []string{"requires canvas work", "specific target/layout uncertainty", "Do not repeat the same focus_card", "concrete operation tools", "mirror_image/rotate_image", "no prose"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("focus-only repair prompt missing %q:\n%s", want, prompt)
@@ -787,7 +1000,7 @@ func TestCanvasFocusOnlyRepairPromptRequiresActionForManipulation(t *testing.T) 
 }
 
 func TestCanvasFocusOnlyRepairPromptAllowsProseForVisualQuestion(t *testing.T) {
-	prompt := canvasFocusOnlyRepairPrompt("這張圖是什麼？")
+	prompt := canvasFocusOnlyRepairPrompt("what is this image?")
 	for _, want := range []string{"did not answer", "answer the user's latest question in prose"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("focus-only answer prompt missing %q:\n%s", want, prompt)
@@ -796,7 +1009,7 @@ func TestCanvasFocusOnlyRepairPromptAllowsProseForVisualQuestion(t *testing.T) {
 }
 
 func TestCanvasCaptureOnlyRepairPromptRequiresNonCaptureAction(t *testing.T) {
-	prompt := canvasCaptureOnlyRepairPrompt("安排分鏡 / 對戰 / 操控 / 鏡像 / 旋轉")
+	prompt := canvasCaptureOnlyRepairPrompt("arrange storyboard / fight / control / mirror / rotate")
 	for _, want := range []string{"only captured the canvas", "Do NOT call capture_* again", "non-capture canvas tool action", "mirror_image/rotate_image", "no prose"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("capture-only repair prompt missing %q:\n%s", want, prompt)
@@ -913,13 +1126,49 @@ func TestBuildCanvasFollowupPromptUsesCompactState(t *testing.T) {
 		"cardIds":    []string{"card-1"},
 		"newCardIds": []string{"dup-1", "dup-2"},
 	})}
-	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "arrange these", canvas, nil, results, "I will arrange them.")
+	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "arrange these", canvas, nil, results, []string{"duplicate_cards"}, "I will arrange them.")
 	if strings.Contains(prompt, "## Canvas State") {
 		t.Fatalf("follow-up prompt should not include full canvas state:\n%s", prompt)
 	}
-	for _, want := range []string{"Original User Request", "arrange these", "card-1", "asset-1", "newCardIds", "dup-1", canvasLoopReasonToolResults} {
+	for _, want := range []string{"Original User Request", "arrange these", "card-1", "asset-1", "Completed Canvas Tools", "duplicate_cards", "newCardIds", "dup-1", canvasLoopReasonToolResults} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("follow-up prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestBuildCanvasFollowupPromptDuplicateWorkflowKeepsCleanupContext(t *testing.T) {
+	canvas := canvasSnapshot{
+		SelectedCardIDs: []string{"card-1"},
+		Cards: []canvasCardSnapshot{
+			{
+				ID:     "card-1",
+				Kind:   "asset",
+				X:      10,
+				Y:      20,
+				Width:  180,
+				Height: 120,
+				Asset:  &canvasAssetSnapshot{ID: "asset-1", RepoPath: "sprites/p1.png", Ext: ".png"},
+			},
+			{
+				ID:     "card-decoy",
+				Kind:   "asset",
+				X:      300,
+				Y:      20,
+				Width:  180,
+				Height: 120,
+				Asset:  &canvasAssetSnapshot{ID: "asset-decoy", RepoPath: "sprites/unrelated_candidate.png", Ext: ".png"},
+			},
+		},
+	}
+	results := []canvasCompactToolResult{compactCanvasToolResult("duplicate_cards", map[string]any{
+		"cardIds":    []string{"card-1"},
+		"newCardIds": []string{"dup-1", "dup-2"},
+	})}
+	prompt := buildCanvasFollowupPrompt(canvasLoopReasonToolResults, "duplicate selected images and remove unrelated candidates", canvas, nil, results, []string{"duplicate_cards"}, "")
+	for _, want := range []string{"card-decoy", "unrelated_candidate.png", "do not remove returned newCardIds", "pre-existing unrelated visible cards"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("duplicate follow-up prompt missing %q:\n%s", want, prompt)
 		}
 	}
 }
@@ -967,6 +1216,88 @@ func TestCompactCanvasToolResultSearchAssetsOmitsFullAssetItem(t *testing.T) {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("compact result leaked %q: %s", forbidden, body)
 		}
+	}
+}
+
+func TestCompactCanvasCardIncludesAIReadableAssetPayload(t *testing.T) {
+	compact := compactCanvasCard(canvasCardSnapshot{
+		ID:     "card-1",
+		Kind:   "asset",
+		X:      10,
+		Y:      20,
+		Width:  200,
+		Height: 150,
+		Asset: &canvasAssetSnapshot{
+			ID:                "asset-1",
+			FileName:          "cover.png",
+			RepoPath:          "books/cover.png",
+			ProjectName:       "Books",
+			Ext:               ".png",
+			Width:             201,
+			Height:            250,
+			ImageFormat:       "png",
+			Alpha:             true,
+			Pages:             1,
+			Bytes:             45932,
+			URL:               "/api/assets/asset-1",
+			ThumbnailURL:      "/api/assets/asset-1/thumb",
+			SearchCategory:    "illustration",
+			SearchTags:        []string{"book-cover", "lion"},
+			SearchDescription: "Book cover with a lion illustration.",
+			SearchLanguages:   []string{"eng"},
+		},
+	})
+
+	if compact["assetId"] != "asset-1" {
+		t.Fatalf("top-level assetId = %#v", compact["assetId"])
+	}
+	asset, ok := compact["asset"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing nested asset payload: %#v", compact)
+	}
+	visual, ok := asset["visual"].(map[string]any)
+	if !ok || visual["thumbnailUrl"] != "/api/assets/asset-1/thumb" {
+		t.Fatalf("visual payload = %#v", asset["visual"])
+	}
+	image, ok := asset["image"].(map[string]any)
+	if !ok || image["width"] != 201 || image["format"] != "png" {
+		t.Fatalf("image payload = %#v", asset["image"])
+	}
+	ai, ok := asset["ai"].(map[string]any)
+	if !ok || ai["description"] != "Book cover with a lion illustration." {
+		t.Fatalf("ai payload = %#v", asset["ai"])
+	}
+}
+
+func TestCanvasAddedAssetsAnswerTextUsesLocaleFallbacks(t *testing.T) {
+	got := canvasAddedAssetsAnswerText([]scanner.AssetItem{
+		{
+			ID:       "asset-1",
+			RepoPath: "books/cover.png",
+			AITag: &aitag.Result{
+				Description:     "A book cover with a lion.",
+				DescriptionI18n: map[string]string{"zh-Hant": "一本獅子封面的書。"},
+			},
+		},
+	}, "zh-TW")
+	if got != "- cover.png: 一本獅子封面的書。" {
+		t.Fatalf("answer text = %q", got)
+	}
+}
+
+func TestCanvasAddedAssetsAnswerTextPrefersRawDescriptionBeforeEnglishForNonEnglishLocale(t *testing.T) {
+	got := canvasAddedAssetsAnswerText([]scanner.AssetItem{
+		{
+			ID:       "asset-1",
+			RepoPath: "books/fish.png",
+			AITag: &aitag.Result{
+				Description:     "一張魚類封面的書。",
+				DescriptionI18n: map[string]string{"en": "A book cover with a fish."},
+			},
+		},
+	}, "zh-TW")
+	if got != "- fish.png: 一張魚類封面的書。" {
+		t.Fatalf("answer text = %q", got)
 	}
 }
 
@@ -1104,6 +1435,90 @@ After.`
 	}
 }
 
+func TestParseCanvasActions_BracketActionImageRegionFields(t *testing.T) {
+	input := `[action: create_comment]
+description: Add peach marker.
+impact: Adds a pinned comment.
+anchorCardId: card-a
+text: Peach is on the headband.
+regionX: 0.29
+regionY: 0.19
+regionWidth: 0.11
+regionHeight: 0.08
+visualCueTargetDescription: small pink peach icon
+visualCueColorHex: #f26aa0`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected no text, got %q", text)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(actions))
+	}
+	region, ok := canvasRegionFromValue(actions[0].Params["region"])
+	if !ok {
+		t.Fatalf("region = %#v", actions[0].Params["region"])
+	}
+	if region.X != 0.29 || region.Y != 0.19 || region.Width != 0.11 || region.Height != 0.08 {
+		t.Fatalf("region = %#v", region)
+	}
+	cue, ok := canvasRegionVisualCueFromParams(actions[0].Params)
+	if !ok || !cue.HasColor || cue.TargetDescription != "small pink peach icon" {
+		t.Fatalf("visual cue = %#v ok=%v", cue, ok)
+	}
+}
+
+func TestParseCanvasActions_BracketActionInlineJSONArray(t *testing.T) {
+	input := `[action: arrange_cards]
+description: Place text-bearing cards in one row.
+impact: Moves all cards into an even horizontal layout.
+positions: [{"cardId":"card-a","x":0,"y":0},{"cardId":"card-b","x":240,"y":0}]`
+	text, actions := parseCanvasActions(input)
+	if text != "" {
+		t.Fatalf("expected no text, got %q", text)
+	}
+	if len(actions) != 1 || actions[0].Tool != "arrange_cards" {
+		t.Fatalf("actions = %#v", actions)
+	}
+	actions, issues := normalizeCanvasActions(actions, true)
+	if len(issues) > 0 {
+		t.Fatalf("unexpected issues: %#v", issues)
+	}
+	positions, ok := actions[0].Params["positions"].([]any)
+	if !ok || len(positions) != 2 {
+		t.Fatalf("positions = %#v", actions[0].Params["positions"])
+	}
+	first, ok := positions[0].(map[string]any)
+	if !ok || first["cardId"] != "card-a" || first["x"] != float64(0) || first["y"] != float64(0) {
+		t.Fatalf("first position = %#v", first)
+	}
+}
+
+func TestCanvasActionTargetsTextRegionRequiresTextCueAndColor(t *testing.T) {
+	withTextButNoColor := canvasAction{
+		Tool: "create_comment",
+		Params: map[string]any{
+			"visualCue": map[string]any{
+				"targetDescription": "white text characters",
+			},
+		},
+	}
+	if canvasActionTargetsTextRegion(withTextButNoColor) {
+		t.Fatal("text repair should reject text cues without a target pixel color")
+	}
+	withWritingAndColor := canvasAction{
+		Tool: "create_comment",
+		Params: map[string]any{
+			"visualCue": map[string]any{
+				"targetDescription": "white writing on the banner",
+				"colorHex":          "#ffffff",
+			},
+		},
+	}
+	if !canvasActionTargetsTextRegion(withWritingAndColor) {
+		t.Fatal("text repair should accept writing cues with a target pixel color")
+	}
+}
+
 func TestParseCanvasActions_BracketActionIgnoresUnknownHeaders(t *testing.T) {
 	input := "[note: focus_card]\ncardId: asset-1\n\n## action: not real\nplain"
 	text, actions := parseCanvasActions(input)
@@ -1233,21 +1648,101 @@ func TestCanvasChatRequest_NoAttachmentTokens(t *testing.T) {
 	}
 }
 
-func TestCanvasFallbackRequestedCount(t *testing.T) {
+func TestCanvasRequestedCount(t *testing.T) {
 	cases := []struct {
 		in   string
 		want int
 	}{
-		{in: "複製 5 張", want: 5},
-		{in: "复制四个", want: 4},
+		{in: "duplicate 5 copies", want: 5},
+		{in: "duplicate four copies", want: 4},
 		{in: "duplicate seven copies", want: 7},
 	}
 	for _, tc := range cases {
-		if got := canvasFallbackRequestedCount(tc.in); got != tc.want {
-			t.Fatalf("canvasFallbackRequestedCount(%q) = %d, want %d", tc.in, got, tc.want)
+		if got := canvasRequestedCount(tc.in); got != tc.want {
+			t.Fatalf("canvasRequestedCount(%q) = %d, want %d", tc.in, got, tc.want)
 		}
 	}
-	if got := canvasFallbackDuplicateCount("複製兩張", 2); got != 1 {
-		t.Fatalf("two requested for two targets should create one copy per target, got %d", got)
+}
+
+func TestNormalizeCanvasCopyAssetDestPathsDedupesFilenames(t *testing.T) {
+	act := normalizeCanvasCopyAssetDestPaths(canvasAction{
+		Tool: "copy_asset",
+		Params: map[string]any{
+			"assetIds": []any{"a1", "a2", "a3"},
+			"perAssetDestPaths": []any{
+				map[string]any{"assetId": "a1", "destPath": "ずかん.png"},
+				map[string]any{"assetId": "a2", "destPath": "ずかん.png"},
+				map[string]any{"assetId": "a3", "destPath": "ずかん-2.png"},
+			},
+		},
+	})
+	rows, ok := act.Params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) != 3 {
+		t.Fatalf("perAssetDestPaths = %#v", act.Params["perAssetDestPaths"])
+	}
+	got := make([]string, 0, len(rows))
+	for _, row := range rows {
+		values := row.(map[string]any)
+		got = append(got, values["destPath"].(string))
+	}
+	want := []string{"ずかん.png", "ずかん-2.png", "ずかん-2-2.png"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dest paths = %#v, want %#v", got, want)
+	}
+}
+
+func TestFillCanvasCopyAssetDestPathsFromOCR(t *testing.T) {
+	act := fillCanvasCopyAssetDestPathsFromOCR(canvasAction{
+		Tool: "copy_asset",
+		Params: map[string]any{
+			"assetIds": []any{"a1", "a2"},
+			"destDir":  "exports",
+		},
+	}, []canvasOCRAnnotationItem{
+		{AssetID: "a1", FileName: "source.png", Text: "SALE/50"},
+		{AssetID: "a2", FileName: "book.webp", Text: "ずかん"},
+	})
+	act = normalizeCanvasCopyAssetDestPaths(act)
+	if !canvasCopyAssetProposalHasDestination(act) {
+		t.Fatalf("copy proposal should have derived destinations: %#v", act.Params)
+	}
+	rows, ok := act.Params["perAssetDestPaths"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("perAssetDestPaths = %#v", act.Params["perAssetDestPaths"])
+	}
+	got := make([]string, 0, len(rows))
+	for _, row := range rows {
+		values := row.(map[string]any)
+		got = append(got, values["destPath"].(string))
+	}
+	want := []string{"exports/SALE_50.png", "exports/ずかん.webp"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dest paths = %#v, want %#v", got, want)
+	}
+}
+
+func TestSanitizeCanvasCopyAssetDestPathsFromOCRKeepsIntentionalDirs(t *testing.T) {
+	items := []canvasOCRAnnotationItem{
+		{AssetID: "a1", FileName: "parking.png", Text: "PARKING 60min/●●●"},
+		{AssetID: "a2", FileName: "sale.png", Text: "SALE"},
+	}
+	act := sanitizeCanvasCopyAssetDestPathsFromOCR(canvasAction{
+		Tool: "copy_asset",
+		Params: map[string]any{
+			"assetIds": []any{"a1", "a2"},
+			"perAssetDestPaths": []any{
+				map[string]any{"assetId": "a1", "destPath": "PARKING 60min/●●●.png"},
+				map[string]any{"assetId": "a2", "destPath": "exports/SALE.png"},
+			},
+		},
+	}, items)
+	rows := act.Params["perAssetDestPaths"].([]any)
+	got := []string{
+		rows[0].(map[string]any)["destPath"].(string),
+		rows[1].(map[string]any)["destPath"].(string),
+	}
+	want := []string{"PARKING 60min_●●●.png", "exports/SALE.png"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dest paths = %#v, want %#v", got, want)
 	}
 }

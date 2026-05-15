@@ -91,17 +91,15 @@ func canvasToolParameters(name string) map[string]any {
 	case "focus_card":
 		return canvasObjectSchema([]string{"cardId"}, map[string]any{
 			"cardId": canvasStringSchema("Canvas card ID to focus."),
-			"label":  canvasStringSchema("Short cursor label."),
 		})
 	case "search_assets":
-		return canvasObjectSchema([]string{"q"}, map[string]any{
-			"q":     canvasStringSchema("Catalog search query."),
-			"limit": canvasIntegerSchema("Maximum result count."),
+		return canvasObjectSchema(nil, map[string]any{
+			"q":       canvasStringSchema("Catalog search query. Use an empty string with hasText=true to list all assets that already have readable OCR text."),
+			"limit":   canvasIntegerSchema("Maximum result count."),
+			"hasText": canvasBooleanSchema("When true, return assets that have ready non-empty OCR text."),
 		})
 	case "add_assets_to_canvas":
-		return canvasObjectSchema(nil, canvasAssetTargetProperties(map[string]any{
-			"label": canvasStringSchema("Short reason for adding the assets."),
-		}))
+		return canvasObjectSchema(nil, canvasAssetTargetProperties(nil))
 	case "extract_ocr_text":
 		return canvasObjectSchema(nil, canvasMixedImageTargetProperties(map[string]any{
 			"mode":           canvasStringEnumSchema("OCR mode.", "vlm"),
@@ -115,12 +113,15 @@ func canvasToolParameters(name string) map[string]any {
 		return canvasObjectSchema([]string{"anchorCardId", "text"}, map[string]any{
 			"anchorCardId": canvasStringSchema("Canvas card ID to attach the comment to."),
 			"text":         canvasStringSchema("Comment text."),
-			"region":       canvasRegionSchema(),
+			"region":       canvasRegionSchema("Normalized bounding box for one exact visual object or area being annotated, relative to the anchored card image, not the whole canvas screenshot. If the target sits on a host object, box only the requested target, not the host or surrounding context. For multiple targets, call create_comment once per target."),
+			"visualCue":    canvasVisualCueSchema("Optional English-only visual cue for region refinement. Use this for small objects or text so the tool can snap the region to the actual target pixels."),
 		})
 	case "update_comment":
-		return canvasObjectSchema([]string{"commentCardId", "text"}, map[string]any{
+		return canvasObjectSchema([]string{"commentCardId"}, map[string]any{
 			"commentCardId": canvasStringSchema("Comment card ID."),
-			"text":          canvasStringSchema("Replacement comment text."),
+			"text":          canvasStringSchema("Optional replacement comment text."),
+			"region":        canvasRegionSchema("Optional replacement normalized bounding box for the exact visual object or area being annotated, relative to the existing comment anchor image. If the target sits on a host object, box only the requested target, not the host or surrounding context."),
+			"visualCue":     canvasVisualCueSchema("Optional English-only visual cue for region refinement. Use this for small objects or text so the tool can snap the region to the actual target pixels."),
 		})
 	case "delete_comment":
 		return canvasObjectSchema([]string{"commentCardId"}, map[string]any{
@@ -129,13 +130,11 @@ func canvasToolParameters(name string) map[string]any {
 	case "select_cards", "remove_cards":
 		return canvasObjectSchema([]string{"cardIds"}, map[string]any{
 			"cardIds": canvasStringArraySchema("Canvas card IDs."),
-			"label":   canvasStringSchema("Short reason for the action."),
 		})
 	case "duplicate_cards":
 		return canvasObjectSchema(nil, canvasCardTargetProperties(map[string]any{
 			"count":  canvasIntegerSchema("Number of new copies per source card."),
 			"layout": canvasStringSchema("Optional layout hint such as row, walk, or scatter."),
-			"label":  canvasStringSchema("Short reason for duplicating cards."),
 		}))
 	case "move_card":
 		return canvasObjectSchema([]string{"cardId", "x", "y"}, map[string]any{
@@ -155,14 +154,12 @@ func canvasToolParameters(name string) map[string]any {
 		return canvasObjectSchema([]string{"cardIds", "axis"}, map[string]any{
 			"cardIds": canvasStringArraySchema("Canvas card IDs."),
 			"axis":    canvasStringEnumSchema("Alignment axis.", "left", "center", "right", "top", "middle", "bottom"),
-			"label":   canvasStringSchema("Short reason for aligning cards."),
 		})
 	case "distribute_cards":
 		return canvasObjectSchema([]string{"cardIds", "direction"}, map[string]any{
 			"cardIds":   canvasStringArraySchema("Canvas card IDs."),
 			"direction": canvasStringEnumSchema("Distribution direction.", "horizontal", "vertical"),
 			"gap":       canvasNumberSchema("Optional gap in canvas pixels."),
-			"label":     canvasStringSchema("Short reason for distributing cards."),
 		})
 	case "resize_card":
 		return canvasObjectSchema([]string{"cardId", "width"}, map[string]any{
@@ -173,7 +170,6 @@ func canvasToolParameters(name string) map[string]any {
 		return canvasObjectSchema([]string{"cardIds"}, map[string]any{
 			"cardIds":     canvasStringArraySchema("Canvas card IDs to bring forward."),
 			"afterCardId": canvasStringSchema("Optional target card ID these cards should be placed above."),
-			"label":       canvasStringSchema("Short reason for changing layer order."),
 		})
 	case "inspect_canvas":
 		return canvasObjectSchema([]string{"reason"}, map[string]any{
@@ -248,8 +244,9 @@ func canvasToolParameters(name string) map[string]any {
 		}))
 	case "copy_asset":
 		return canvasObjectSchema(nil, canvasAssetTargetProperties(map[string]any{
-			"destPath": canvasStringSchema("Full destination path including filename."),
-			"destDir":  canvasStringSchema("Destination directory for batch copy."),
+			"destPath":          canvasStringSchema("Full destination path including filename."),
+			"destDir":           canvasStringSchema("Destination directory for batch copy."),
+			"perAssetDestPaths": canvasPerAssetTextArraySchema("destPath", "Per-asset destination paths including filenames."),
 		}))
 	case "delete_asset":
 		return canvasObjectSchema(nil, canvasAssetTargetProperties(nil))
@@ -382,13 +379,34 @@ func canvasMixedImageTargetProperties(extra map[string]any) map[string]any {
 	return props
 }
 
-func canvasRegionSchema() map[string]any {
-	return canvasObjectSchema([]string{"x", "y", "width", "height"}, map[string]any{
-		"x":      canvasNumberSchema("Normalized region X, 0 to 1."),
-		"y":      canvasNumberSchema("Normalized region Y, 0 to 1."),
-		"width":  canvasNumberSchema("Normalized region width, 0 to 1."),
-		"height": canvasNumberSchema("Normalized region height, 0 to 1."),
+func canvasRegionSchema(description string) map[string]any {
+	normalizedNumber := func(description string) map[string]any {
+		schema := canvasNumberSchema(description)
+		schema["minimum"] = 0
+		schema["maximum"] = 1
+		return schema
+	}
+	schema := canvasObjectSchema([]string{"x", "y", "width", "height"}, map[string]any{
+		"x":      normalizedNumber("Normalized left edge of the target box, 0 to 1. This is the top-left corner, not the center point."),
+		"y":      normalizedNumber("Normalized top edge of the target box, 0 to 1. Y increases downward. This is the top-left corner, not the center point."),
+		"width":  normalizedNumber("Normalized target box width, 0 to 1. Use a tight box around only the visible target object or area. If the target sits on a host object, do not include the host or surrounding context. For text, box the glyphs/characters only, not the full sign, banner, label, or container."),
+		"height": normalizedNumber("Normalized target box height, 0 to 1. Use a tight box around only the visible target object or area. If the target sits on a host object, do not include the host or surrounding context. For text, box the glyphs/characters only, not the full sign, banner, label, or container."),
 	})
+	if description != "" {
+		schema["description"] = description
+	}
+	return schema
+}
+
+func canvasVisualCueSchema(description string) map[string]any {
+	schema := canvasObjectSchema(nil, map[string]any{
+		"targetDescription": canvasStringSchema("English-only description of the exact target pixels, not the host object."),
+		"colorHex":          canvasStringSchema("Optional dominant target pixel color as #RRGGBB, for example #f26aa0 for a small pink mark or #ffffff for white text."),
+	})
+	if description != "" {
+		schema["description"] = description
+	}
+	return schema
 }
 
 func canvasPerAssetTextArraySchema(field, description string) map[string]any {

@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { TFunction } from "i18next";
 import type { AssetCanvasCard, UploadCanvasCard } from "./aiCanvasState";
 import {
+  canvasActionResultCreatesAssetCards,
   canvasAnimationSettleDelay,
+  canvasCaptureQueueDelay,
+  clearCanvasToolStatusCursor,
+  duplicateCardPositionsFromActionResult,
   canvasStatusCursorLabel,
   canvasStatusCursorStatus,
   focusCursorPosition,
+  formatOCRActionText,
+  resolveCanvasActionCardId,
   searchResultCardPosition,
   uploadCardsFromAttachments,
 } from "./useCanvasChat";
@@ -130,6 +136,16 @@ describe("searchResultCardPosition", () => {
   });
 });
 
+describe("resolveCanvasActionCardId", () => {
+  it("allows layout actions to target newly added asset cards by asset id", () => {
+    const card = makeAssetCard("cat-card", 100, 120);
+
+    expect(resolveCanvasActionCardId(card.asset.id, [card])).toBe(card.id);
+    expect(resolveCanvasActionCardId(card.id, [card])).toBe(card.id);
+    expect(resolveCanvasActionCardId("missing", [card])).toBe("missing");
+  });
+});
+
 describe("uploadCardsFromAttachments", () => {
   it("turns pending image attachments into selected canvas image cards beside the cluster", () => {
     const cards = [makeAssetCard("existing", 120, 160)];
@@ -164,6 +180,22 @@ describe("uploadCardsFromAttachments", () => {
   });
 });
 
+describe("duplicateCardPositionsFromActionResult", () => {
+  it("reads explicit duplicate copy positions from action results", () => {
+    const positions = duplicateCardPositionsFromActionResult({
+      positions: [
+        { cardId: "copy-a", x: 1800, y: 1200 },
+        { cardId: "copy-b", x: 2160, y: 1200 },
+        { cardId: "bad", x: "nope", y: 1200 },
+      ],
+    });
+
+    expect(positions.get("copy-a")).toEqual({ x: 1800, y: 1200 });
+    expect(positions.get("copy-b")).toEqual({ x: 2160, y: 1200 });
+    expect(positions.has("bad")).toBe(false);
+  });
+});
+
 describe("canvasStatusCursorStatus", () => {
   it("keeps phase status on the cursor surface", () => {
     expect(canvasStatusCursorStatus("confirming")).toBe("acting");
@@ -176,12 +208,12 @@ describe("canvasStatusCursorStatus", () => {
 describe("canvasStatusCursorLabel", () => {
   const t = ((key: string) =>
     (
-      {
+      ({
         "aiCanvas.statusProcessing": "Processing",
         "aiCanvas.statusApplying": "Applying canvas actions",
         "aiCanvas.blocked": "Blocked",
         "aiCanvas.currentTarget": "Target",
-      } as Record<string, string>
+      }) as Record<string, string>
     )[key] ?? key) as TFunction;
 
   it("uses translated generic phase labels for the cursor bubble", () => {
@@ -191,6 +223,54 @@ describe("canvasStatusCursorLabel", () => {
       "Applying canvas actions",
     );
     expect(canvasStatusCursorLabel("blocked", t)).toBe("Blocked");
+  });
+});
+
+describe("clearCanvasToolStatusCursor", () => {
+  it("clears stale tool labels while preserving cursor position", () => {
+    expect(
+      clearCanvasToolStatusCursor({
+        x: 12,
+        y: 34,
+        label: "Added comment",
+        emoji: "comment",
+        status: "acting",
+      }),
+    ).toEqual({ x: 12, y: 34, status: "idle" });
+  });
+});
+
+describe("canvasActionResultCreatesAssetCards", () => {
+  it("keeps catalog search read-only and only materializes explicit add results", () => {
+    expect(canvasActionResultCreatesAssetCards("search_assets")).toBe(false);
+    expect(canvasActionResultCreatesAssetCards("add_assets_to_canvas")).toBe(
+      true,
+    );
+  });
+});
+
+describe("formatOCRActionText", () => {
+  const t = ((key: string, options?: Record<string, unknown>) => {
+    if (key === "aiCanvas.ocrResultTitle") {
+      return `OCR (${String(options?.count)})`;
+    }
+    if (key === "aiCanvas.ocrEmptyText") return "No visible text.";
+    if (key === "aiCanvas.ocrFailed") {
+      return `Failed: ${String(options?.error)}`;
+    }
+    return key;
+  }) as TFunction;
+
+  it("does not expose intermediate OCR tool results to chat", () => {
+    expect(
+      formatOCRActionText(
+        {
+          displayToUser: false,
+          items: [{ fileName: "text.png", status: "ready", text: "HELLO" }],
+        },
+        t,
+      ),
+    ).toBe("");
   });
 });
 
@@ -206,6 +286,17 @@ describe("canvasAnimationSettleDelay", () => {
     ).toBe(1_034);
   });
 
+  it("uses the absolute projected due time for animations scheduled after a long chat", () => {
+    expect(
+      canvasAnimationSettleDelay({
+        latestAnimationDueAt: 61_054,
+        animationStartedAt: 1_000,
+        animationEndMs: 1_054,
+        now: 60_000,
+      }),
+    ).toBe(1_234);
+  });
+
   it("clears immediately when no canvas animation was scheduled", () => {
     expect(
       canvasAnimationSettleDelay({
@@ -215,5 +306,12 @@ describe("canvasAnimationSettleDelay", () => {
         now: 1_200,
       }),
     ).toBe(0);
+  });
+});
+
+describe("canvasCaptureQueueDelay", () => {
+  it("staggers multiple capture previews within one AI response", () => {
+    expect(canvasCaptureQueueDelay(120, 0)).toBe(120);
+    expect(canvasCaptureQueueDelay(120, 1)).toBe(1320);
   });
 });

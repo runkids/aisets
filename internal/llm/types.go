@@ -26,10 +26,12 @@ type ChatMessage struct {
 }
 
 type ChatRequest struct {
-	Model      string        `json:"model"`
-	Messages   []ChatMessage `json:"messages"`
-	Tools      []ChatTool    `json:"tools,omitempty"`
-	TimeoutSec int           `json:"timeoutSec,omitempty"`
+	Model       string        `json:"model"`
+	Messages    []ChatMessage `json:"messages"`
+	Tools       []ChatTool    `json:"tools,omitempty"`
+	ToolChoice  string        `json:"toolChoice,omitempty"`
+	ImageDetail string        `json:"imageDetail,omitempty"`
+	TimeoutSec  int           `json:"timeoutSec,omitempty"`
 }
 
 type ChatTool struct {

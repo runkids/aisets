@@ -12,7 +12,7 @@ import { uploadCanvasImages } from "@/api/canvasChat";
 import { renderImageToolPreview } from "@/api/imageTools";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ConfirmDialog, PromptDialog } from "@/components/ui";
-import { getCanvasSession } from "@/api";
+import { getCanvasSession, isCanvasSessionNotFound } from "@/api";
 import {
   useCreateCanvasSessionMutation,
   useUpdateCanvasSessionMutation,
@@ -23,13 +23,16 @@ import {
   CARD_WIDTH,
   DEFAULT_IMAGE_TOOL_SETTINGS,
   commentIds,
+  commentRegionDisplayOptions,
   imageMeta,
   AI_MENTION_COMMENT_RE,
   AI_MENTION_COMMENT_RE_G,
   adjacentCardPosition,
   compactImageAspectRatio,
+  imageFrameSize,
   isImageCard,
   nextCardPosition,
+  normalizeCommentRegion,
   nowISO,
   selectedAssetIds,
   zoomViewportAtPoint,
@@ -472,15 +475,16 @@ export function AICanvasView({
           : card;
 
       const anchorWidth = cardWidths[anchor.id] ?? CARD_WIDTH;
-      const anchorImageTop = 0;
-      const anchorImageHeight = anchorWidth / compactImageAspectRatio(anchor);
+      const anchorFrame = imageFrameSize(anchor, anchorWidth);
+      const region = normalizeCommentRegion(
+        card.region,
+        anchorFrame,
+        commentRegionDisplayOptions(card.isAi),
+      );
       const targetX =
-        anchorPosition.x +
-        anchorWidth * (card.region.x + card.region.width / 2);
+        anchorPosition.x + anchorFrame.width * (region.x + region.width / 2);
       const targetY =
-        anchorPosition.y +
-        anchorImageTop +
-        anchorImageHeight * (card.region.y + card.region.height / 2);
+        anchorPosition.y + anchorFrame.height * (region.y + region.height / 2);
       const commentScale = viewport.scale > 0 ? 1 / viewport.scale : 1;
       const commentWidth = (cardWidths[card.id] ?? CARD_WIDTH) * commentScale;
       const fromX =
@@ -683,6 +687,18 @@ export function AICanvasView({
     }
   }, [currentSessionId, currentSessionName]);
 
+  function clearMissingSessionReference() {
+    suppressDirtyRef.current = true;
+    setCurrentSessionId(undefined);
+    setCurrentSessionName(undefined);
+    dirtyVersionRef.current = 0;
+    savedVersionRef.current = 0;
+    setIsDirty(false);
+    requestAnimationFrame(() => {
+      suppressDirtyRef.current = false;
+    });
+  }
+
   useEffect(() => {
     if (!urlSessionId) return;
     let cancelled = false;
@@ -706,8 +722,12 @@ export function AICanvasView({
           suppressDirtyRef.current = false;
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!cancelled) {
+          if (isCanvasSessionNotFound(err)) {
+            clearMissingSessionReference();
+            return;
+          }
           suppressDirtyRef.current = false;
           toast.error(t("aiCanvas.saveError"));
         }
@@ -1134,21 +1154,7 @@ export function AICanvasView({
     const thumbnail = await captureCanvasBlob();
     const stateJson = buildStateJson();
     const cardCount = cards.length;
-
-    if (currentSessionId && !asNew) {
-      updateSessionMut.mutate(
-        { id: currentSessionId, name, stateJson, thumbnail, cardCount },
-        {
-          onSuccess: (res) => {
-            savedVersionRef.current = dirtyVersionRef.current;
-            setIsDirty(false);
-            setCurrentSessionName(res.session.name);
-            if (!silent) toast.success(t("aiCanvas.saveSuccess"));
-          },
-          onError: () => toast.error(t("aiCanvas.saveError")),
-        },
-      );
-    } else {
+    const createNewSession = () => {
       createSessionMut.mutate(
         { name, stateJson, thumbnail, cardCount },
         {
@@ -1162,6 +1168,30 @@ export function AICanvasView({
           onError: () => toast.error(t("aiCanvas.saveError")),
         },
       );
+    };
+
+    if (currentSessionId && !asNew) {
+      updateSessionMut.mutate(
+        { id: currentSessionId, name, stateJson, thumbnail, cardCount },
+        {
+          onSuccess: (res) => {
+            savedVersionRef.current = dirtyVersionRef.current;
+            setIsDirty(false);
+            setCurrentSessionName(res.session.name);
+            if (!silent) toast.success(t("aiCanvas.saveSuccess"));
+          },
+          onError: (err) => {
+            if (isCanvasSessionNotFound(err)) {
+              clearMissingSessionReference();
+              createNewSession();
+              return;
+            }
+            toast.error(t("aiCanvas.saveError"));
+          },
+        },
+      );
+    } else {
+      createNewSession();
     }
   }
 

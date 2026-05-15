@@ -28,6 +28,7 @@ import {
 } from "./canvasCards";
 import {
   CARD_WIDTH,
+  imageFrameSize,
   isImageCard,
   selectionBounds,
   type CanvasSelection,
@@ -310,6 +311,10 @@ export function AICanvasStage({
               hideOverlays={hideNonImageCards}
               commentEnabled={commentMode}
               canvasScale={viewport.scale}
+              commentRegionBasis={imageFrameSize(
+                card,
+                cardWidths[card.id] ?? CARD_WIDTH,
+              )}
               onSelectComment={(id) => setSelectedCardIds([id])}
               onCreateComment={(anchorCard, text, region) =>
                 latestHandlersRef.current.onAddComment(anchorCard, text, region)
@@ -332,6 +337,10 @@ export function AICanvasStage({
               hideOverlays={hideNonImageCards}
               commentEnabled={commentMode}
               canvasScale={viewport.scale}
+              commentRegionBasis={imageFrameSize(
+                card,
+                cardWidths[card.id] ?? CARD_WIDTH,
+              )}
               onSelectComment={(id) => setSelectedCardIds([id])}
               onCreateComment={(anchorCard, text, region) =>
                 latestHandlersRef.current.onAddComment(anchorCard, text, region)

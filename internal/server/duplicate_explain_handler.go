@@ -150,7 +150,7 @@ Explain:
 2. The specific visual differences between them
 3. Which one to keep and why (consider: resolution, quality, file size)
 
-IMPORTANT: Always refer to each image by its filename ("{{leftFilename}}" or "{{rightFilename}}"). Never use generic labels like "image 1", "image 2", "left image", "圖像 1", etc.
+IMPORTANT: Always refer to each image by its filename ("{{leftFilename}}" or "{{rightFilename}}"). Never use generic labels like "image 1", "image 2", "left image", or localized variants of those labels.
 
 Respond ONLY with a JSON object:
 {

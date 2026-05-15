@@ -51,6 +51,30 @@ func TestStoreProjectsPersistInSQLite(t *testing.T) {
 	}
 }
 
+func TestCanvasSessionMissingUsesStableErrorCode(t *testing.T) {
+	root := resolvedTempDir(t)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+
+	store, err := OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if _, err := store.GetCanvasSession("missing"); apierr.From(err, "").Code != "canvas_session_not_found" {
+		t.Fatalf("GetCanvasSession error = %v", err)
+	}
+	if _, err := store.UpdateCanvasSession("missing", "name", "{}", nil, 0); apierr.From(err, "").Code != "canvas_session_not_found" {
+		t.Fatalf("UpdateCanvasSession error = %v", err)
+	}
+	if err := store.RenameCanvasSession("missing", "name"); apierr.From(err, "").Code != "canvas_session_not_found" {
+		t.Fatalf("RenameCanvasSession error = %v", err)
+	}
+	if err := store.DeleteCanvasSession("missing"); apierr.From(err, "").Code != "canvas_session_not_found" {
+		t.Fatalf("DeleteCanvasSession error = %v", err)
+	}
+}
+
 func TestStorePreservesProjectScanIntent(t *testing.T) {
 	root := resolvedTempDir(t)
 	project := filepath.Join(root, "assets")
@@ -717,6 +741,26 @@ func TestCatalogItemsFiltersAndFacetsUseFullSnapshot(t *testing.T) {
 		Languages:      []string{"jpn", "chi_tra"},
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if err := store.UpsertOCRResult(ocr.Result{
+		ProjectID:     car.ProjectID,
+		RepoPath:      car.RepoPath,
+		ContentHash:   car.ContentHash,
+		HashAlgorithm: car.HashAlgorithm,
+		EngineName:    "test-ocr",
+		EngineVersion: "test",
+		SettingsHash:  ocr.SettingsHash(OCRSettingsFromApp(DefaultAppSettings())),
+		Status:        ocr.StatusReady,
+		Text:          "",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page, err = store.CatalogItems(CatalogItemQuery{AIOcrStatus: "ocrTextReady", Sort: "path", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].RepoPath != "src/icons/logo.png" {
+		t.Fatalf("OCR text-ready page should exclude empty ready OCR before limit = %#v", page)
 	}
 	page, err = store.CatalogItems(CatalogItemQuery{Query: "BOWL", Limit: 10})
 	if err != nil {

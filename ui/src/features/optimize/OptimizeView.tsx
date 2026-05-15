@@ -1067,15 +1067,16 @@ export function OptimizeView({
     missingTools > 0
       ? t("optimize.toolsMissingMeta", {
           count: missingTools,
-          defaultValue: "{{count}} 個已啟用工具缺少",
+          defaultValue: "{{count}} enabled tools missing",
         })
       : imgtoolsRuntime?.detected
         ? t("optimize.toolsRuntimeReadyMeta", {
             count: enabledRuntimeTools.length,
-            defaultValue: "Imgtools 可用 · {{count}} 個外部工具已啟用",
+            defaultValue:
+              "Imgtools available · {{count}} external tools enabled",
           })
         : t("optimize.toolsRuntimeFallbackMeta", {
-            defaultValue: "Imgtools 缺少 · 使用內建備援",
+            defaultValue: "Imgtools missing · using built-in fallback",
           });
   const canAct = actionableActionIds.length > 0;
   const operationLabel = (id: string) =>

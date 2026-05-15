@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Task Execution Harness"
+  short_description: "Prompt and harness rules for reliable AI tool use"
+  default_prompt: "Use $ai-task-execution-harness to design a prompt, tool schema, and one-case-at-a-time validation harness for this AI workflow."

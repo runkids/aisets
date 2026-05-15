@@ -3,7 +3,10 @@ import type { AssetCanvasCard, UploadCanvasCard } from "./aiCanvasState";
 import {
   DEFAULT_IMAGE_ASPECT_RATIO,
   adjacentCardPosition,
+  commentRegionDisplayOptions,
   compactImageAspectRatio,
+  imageFrameSize,
+  normalizeCommentRegion,
 } from "./canvasUtils";
 
 function makeUploadCard(width: number, height: number): UploadCanvasCard {
@@ -98,5 +101,47 @@ describe("compactImageAspectRatio", () => {
     expect(compactImageAspectRatio(makeAssetCard())).toBe(
       DEFAULT_IMAGE_ASPECT_RATIO,
     );
+  });
+});
+
+describe("normalizeCommentRegion", () => {
+  it("converts pixel-style regions into normalized image coordinates", () => {
+    expect(
+      normalizeCommentRegion(
+        { x: 300, y: 150, width: 200, height: 90 },
+        { width: 400, height: 300 },
+      ),
+    ).toEqual({ x: 0.5, y: 0.5, width: 0.5, height: 0.3 });
+  });
+
+  it("keeps normalized regions inside the image", () => {
+    expect(
+      normalizeCommentRegion({ x: 0.9, y: 0.9, width: 0.4, height: 0.3 }),
+    ).toEqual({ x: 0.6, y: 0.7, width: 0.4, height: 0.3 });
+  });
+
+  it("keeps AI comment regions close to the model-provided target", () => {
+    const region = normalizeCommentRegion(
+      { x: 0.48, y: 0.12, width: 0.05, height: 0.08 },
+      undefined,
+      commentRegionDisplayOptions(true),
+    );
+    expect(region.x).toBeCloseTo(0.475);
+    expect(region.y).toBeCloseTo(0.12);
+    expect(region.width).toBe(0.06);
+    expect(region.height).toBe(0.08);
+  });
+});
+
+describe("imageFrameSize", () => {
+  it("uses the same rendered image dimensions for comment boxes and connectors", () => {
+    expect(imageFrameSize(makeAssetCard(), 400)).toEqual({
+      width: 400,
+      height: 300,
+    });
+    expect(imageFrameSize(makeUploadCard(1600, 900), 320)).toEqual({
+      width: 320,
+      height: 180,
+    });
   });
 });

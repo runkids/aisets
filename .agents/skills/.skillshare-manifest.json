@@ -1,7 +1,8 @@
 {
   "managed": {
+    "ai-task-execution-harness": "symlink",
     "capture-lessons": "symlink",
     "design-system": "symlink"
   },
-  "updated_at": "2026-05-13T03:29:51.089561+08:00"
+  "updated_at": "2026-05-15T14:27:22.334643+08:00"
 }

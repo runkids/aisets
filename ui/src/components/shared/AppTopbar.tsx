@@ -261,7 +261,9 @@ export function AppTopbar({
   const translateBusy = isTranslateActivityBusy(translateActivity);
   const translateStatusLabel = translateBusy
     ? translateActivity.locale
-      ? t("activity.translateRunningLocale", { locale: translateActivity.locale })
+      ? t("activity.translateRunningLocale", {
+          locale: translateActivity.locale,
+        })
       : t("activity.translateRunning")
     : translateActivity.phase === "done"
       ? translateActivity.skipped > 0 || translateActivity.warnings.length > 0
@@ -293,7 +295,7 @@ export function AppTopbar({
       : "";
   const translateLocaleList =
     translateActivity.locales.length > 0
-      ? translateActivity.locales.join("、")
+      ? translateActivity.locales.join(", ")
       : translateActivity.locale;
   const translateDetail =
     translateBusy && translateLocaleList
@@ -580,7 +582,9 @@ export function AppTopbar({
             countsLabel={translateCounts}
             detailLabel={translateDetail}
             errorMessage={translateActivity.errorMessage}
-            errors={translateWarnings.length > 0 ? translateWarnings : undefined}
+            errors={
+              translateWarnings.length > 0 ? translateWarnings : undefined
+            }
             errorsLabel={
               translateWarnings.length > 0
                 ? t("activity.warningCount", {
@@ -588,7 +592,9 @@ export function AppTopbar({
                   })
                 : undefined
             }
-            progressPercent={translateActivityProgressPercent(translateActivity)}
+            progressPercent={translateActivityProgressPercent(
+              translateActivity,
+            )}
             startedAt={translateActivity.startedAt}
             primaryAction={{
               label: t("activity.viewAISettings"),

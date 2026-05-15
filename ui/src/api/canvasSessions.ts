@@ -1,4 +1,8 @@
-import type { CanvasSessionFull, CanvasSessionMeta } from "@/types";
+import type {
+  APIErrorBody,
+  CanvasSessionFull,
+  CanvasSessionMeta,
+} from "@/types";
 import { APIError, basePath, request } from "./client";
 
 export function listCanvasSessions(workspaceId?: string) {
@@ -10,6 +14,13 @@ export function listCanvasSessions(workspaceId?: string) {
 
 export function getCanvasSession(id: string) {
   return request<{ session: CanvasSessionFull }>(`/api/canvas/sessions/${id}`);
+}
+
+export function isCanvasSessionNotFound(error: unknown) {
+  return (
+    error instanceof APIError &&
+    (error.code === "canvas_session_not_found" || error.params?.status === 404)
+  );
 }
 
 export function canvasSessionThumbnailUrl(id: string) {
@@ -63,9 +74,18 @@ export async function updateCanvasSession(
     body: form,
   });
   if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Partial<APIErrorBody>;
+    const error = body.error;
+    if (error?.code) {
+      throw new APIError(error.code, error.message, {
+        ...(error.params ?? {}),
+        status: res.status,
+      });
+    }
     throw new APIError(
       "canvas_session_update_failed",
       `Update failed: HTTP ${res.status}`,
+      { status: res.status },
     );
   }
   return (await res.json()) as { session: CanvasSessionMeta };

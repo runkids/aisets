@@ -96,7 +96,8 @@ type openAIContentPart struct {
 
 // openAIImageURLPart holds the data URI for an image content part.
 type openAIImageURLPart struct {
-	URL string `json:"url"`
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // openAIChatMessage is the wire format for a single chat message sent to the API.
@@ -119,10 +120,11 @@ type openAIChatFunction struct {
 
 // openAIChatRequest is the body sent to POST /v1/chat/completions.
 type openAIChatRequest struct {
-	Model    string              `json:"model"`
-	Messages []openAIChatMessage `json:"messages"`
-	Stream   bool                `json:"stream"`
-	Tools    []openAIChatTool    `json:"tools,omitempty"`
+	Model      string              `json:"model"`
+	Messages   []openAIChatMessage `json:"messages"`
+	Stream     bool                `json:"stream"`
+	Tools      []openAIChatTool    `json:"tools,omitempty"`
+	ToolChoice any                 `json:"tool_choice,omitempty"`
 }
 
 // openAIChatResponse is the shape returned by POST /v1/chat/completions.
@@ -155,6 +157,10 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 	defer cancel()
 
 	msgs := make([]openAIChatMessage, len(req.Messages))
+	imageDetail := strings.TrimSpace(req.ImageDetail)
+	if imageDetail == "" {
+		imageDetail = "low"
+	}
 	for i, m := range req.Messages {
 		if len(m.Images) == 0 {
 			msgs[i] = openAIChatMessage{Role: m.Role, Content: m.Content}
@@ -164,7 +170,7 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 			for _, img := range m.Images {
 				parts = append(parts, openAIContentPart{
 					Type:     "image_url",
-					ImageURL: &openAIImageURLPart{URL: img},
+					ImageURL: &openAIImageURLPart{URL: img, Detail: imageDetail},
 				})
 			}
 			msgs[i] = openAIChatMessage{Role: m.Role, Content: parts}
@@ -188,10 +194,22 @@ func (p *OpenAICompatProvider) Chat(ctx context.Context, req ChatRequest) (ChatR
 				},
 			})
 		}
+		if req.ToolChoice != "" {
+			body.ToolChoice = req.ToolChoice
+		}
 	}
 	raw, durationMs, err := p.postChat(ctx, body)
+	if err != nil && body.ToolChoice != nil && len(body.Tools) > 0 && isOpenAICompatToolChoiceUnsupported(err.Error()) {
+		body.ToolChoice = nil
+		raw, durationMs, err = p.postChat(ctx, body)
+	}
+	if err != nil && openAIChatRequestHasImages(body) && isOpenAICompatContextLengthError(err.Error()) {
+		body = openAIChatRequestWithoutImages(body)
+		raw, durationMs, err = p.postChat(ctx, body)
+	}
 	if err != nil && len(body.Tools) > 0 && isOpenAICompatToolUnsupported(err.Error()) {
 		body.Tools = nil
+		body.ToolChoice = nil
 		raw, durationMs, err = p.postChat(ctx, body)
 	}
 	if err != nil {
@@ -247,6 +265,55 @@ func (p *OpenAICompatProvider) postChat(ctx context.Context, body openAIChatRequ
 func isOpenAICompatToolUnsupported(msg string) bool {
 	msg = strings.ToLower(msg)
 	return strings.Contains(msg, "tool") || strings.Contains(msg, "function")
+}
+
+func isOpenAICompatToolChoiceUnsupported(msg string) bool {
+	msg = strings.ToLower(msg)
+	return strings.Contains(msg, "tool_choice") || strings.Contains(msg, "tool choice")
+}
+
+func isOpenAICompatContextLengthError(msg string) bool {
+	msg = strings.ToLower(msg)
+	return strings.Contains(msg, "context length") ||
+		strings.Contains(msg, "context window") ||
+		strings.Contains(msg, "too many tokens") ||
+		strings.Contains(msg, "prompt is too long")
+}
+
+func openAIChatRequestHasImages(body openAIChatRequest) bool {
+	for _, msg := range body.Messages {
+		parts, ok := msg.Content.([]openAIContentPart)
+		if !ok {
+			continue
+		}
+		for _, part := range parts {
+			if part.Type == "image_url" && part.ImageURL != nil && part.ImageURL.URL != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func openAIChatRequestWithoutImages(body openAIChatRequest) openAIChatRequest {
+	next := body
+	next.Messages = make([]openAIChatMessage, 0, len(body.Messages))
+	for _, msg := range body.Messages {
+		parts, ok := msg.Content.([]openAIContentPart)
+		if !ok {
+			next.Messages = append(next.Messages, msg)
+			continue
+		}
+		var textParts []string
+		for _, part := range parts {
+			if part.Type == "text" && strings.TrimSpace(part.Text) != "" {
+				textParts = append(textParts, part.Text)
+			}
+		}
+		msg.Content = strings.Join(textParts, "\n")
+		next.Messages = append(next.Messages, msg)
+	}
+	return next
 }
 
 func openAIToolCalls(raw []struct {

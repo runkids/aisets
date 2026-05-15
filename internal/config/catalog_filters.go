@@ -962,6 +962,14 @@ func (s *Store) catalogItemWhere(scanID int64, query CatalogItemQuery) (string, 
 				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
 				AND ocr.status = 'ready'
 		)`)
+	case "ocrTextReady":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM ocr_results ocr
+			WHERE ocr.project_id = a.project_id AND ocr.repo_path = a.repo_path
+				AND ocr.content_hash = a.content_hash AND ocr.hash_algorithm = a.hash_algorithm
+				AND ocr.status = 'ready'
+				AND TRIM(COALESCE(NULLIF(ocr.normalized_text, ''), ocr.text, '')) <> ''
+		)`)
 	case "ocrPending":
 		clauses = append(clauses, `NOT EXISTS (
 			SELECT 1 FROM ocr_results ocr

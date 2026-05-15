@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCaptureRequestFromFrames,
+  capturePreviewSignature,
   sessionThumbnailOutputScale,
   type CaptureFrame,
 } from "./useCanvasCapture";
@@ -73,5 +74,20 @@ describe("sessionThumbnailOutputScale", () => {
     expect(
       sessionThumbnailOutputScale({ x: 0, y: 0, width: 400, height: 320 }),
     ).toBe(0.5);
+  });
+});
+
+describe("capturePreviewSignature", () => {
+  it("matches identical blobs and separates different image bytes", async () => {
+    const first = new Blob(["same-image"], { type: "image/png" });
+    const duplicate = new Blob(["same-image"], { type: "image/png" });
+    const different = new Blob(["other-image"], { type: "image/png" });
+
+    await expect(capturePreviewSignature(duplicate)).resolves.toBe(
+      await capturePreviewSignature(first),
+    );
+    await expect(capturePreviewSignature(different)).resolves.not.toBe(
+      await capturePreviewSignature(first),
+    );
   });
 });

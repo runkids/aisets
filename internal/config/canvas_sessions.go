@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"aisets/internal/apierr"
+
 	"github.com/google/uuid"
 )
 
@@ -86,7 +88,7 @@ func (s *Store) GetCanvasSession(id string) (CanvasSessionFull, error) {
 	var f CanvasSessionFull
 	if err := row.Scan(&f.ID, &f.WorkspaceID, &f.Name, &f.CardCount, &f.HasThumbnail, &f.CreatedAt, &f.UpdatedAt, &f.StateJSON); err != nil {
 		if err == sql.ErrNoRows {
-			return f, fmt.Errorf("canvas session not found")
+			return f, apierr.New("canvas_session_not_found", "canvas session not found")
 		}
 		return f, fmt.Errorf("GetCanvasSession: %w", err)
 	}
@@ -191,7 +193,7 @@ func (s *Store) RenameCanvasSession(id, name string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("canvas session not found")
+		return apierr.New("canvas_session_not_found", "canvas session not found")
 	}
 	return nil
 }
@@ -203,7 +205,7 @@ func (s *Store) DeleteCanvasSession(id string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("canvas session not found")
+		return apierr.New("canvas_session_not_found", "canvas session not found")
 	}
 	return nil
 }

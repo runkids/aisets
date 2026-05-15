@@ -54,6 +54,16 @@ const IMAGE_FALLBACK_PADDING = 12;
 const AUTO_DISMISS_MS = 15000;
 const SESSION_THUMBNAIL_MAX_PX = 640;
 
+export async function capturePreviewSignature(blob: Blob) {
+  const data = new Uint8Array(await blob.arrayBuffer());
+  let hash = 0x811c9dc5;
+  for (const byte of data) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${blob.type}:${blob.size}:${(hash >>> 0).toString(16)}`;
+}
+
 function px(value: string | undefined, fallback = 0) {
   const parsed = Number.parseFloat(value ?? "");
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -250,12 +260,24 @@ function drawCanvasBackground(
   }
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement) {
+type CanvasBlobOptions = {
+  type?: string;
+  quality?: number;
+};
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  options: CanvasBlobOptions = {},
+) {
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("capture failed"));
-    }, "image/png");
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("capture failed"));
+      },
+      options.type ?? "image/png",
+      options.quality,
+    );
   });
 }
 
@@ -274,6 +296,7 @@ async function captureRenderedFrames(
   crop: CaptureCrop,
   outputScale: number,
   transparent: boolean,
+  blobOptions?: CanvasBlobOptions,
 ) {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.ceil(crop.width * outputScale));
@@ -294,7 +317,7 @@ async function captureRenderedFrames(
     );
   }
 
-  return canvasToBlob(canvas);
+  return canvasToBlob(canvas, blobOptions);
 }
 
 export async function copyBlobToClipboard(blob: Blob) {
@@ -342,17 +365,22 @@ export function useCanvasCapture(opts: CaptureOpts) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const prevUrlRef = useRef<string | null>(null);
+  const prevSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
       if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+      prevSignatureRef.current = null;
     };
   }, []);
 
-  const showPreview = useCallback((blob: Blob) => {
+  const showPreview = useCallback(async (blob: Blob) => {
+    const signature = await capturePreviewSignature(blob);
+    if (prevSignatureRef.current === signature) return;
     if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
     const url = URL.createObjectURL(blob);
     prevUrlRef.current = url;
+    prevSignatureRef.current = signature;
     setPreview({ blob, url });
   }, []);
 
@@ -362,6 +390,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
       URL.revokeObjectURL(prevUrlRef.current);
       prevUrlRef.current = null;
     }
+    prevSignatureRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -399,7 +428,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
           outputScale,
           transparent,
         );
-        showPreview(blob);
+        await showPreview(blob);
       } finally {
         setIsCapturing(false);
       }
@@ -466,7 +495,18 @@ export function useCanvasCapture(opts: CaptureOpts) {
     if (frames.length === 0) return undefined;
     const crop = captureCropForFrames(frames);
     if (!crop) return undefined;
-    const blob = await captureRenderedFrames(root, frames, crop, 1, false);
+    const outputScale = Math.min(1, 512 / Math.max(crop.width, crop.height));
+    const blob = await captureRenderedFrames(
+      root,
+      frames,
+      crop,
+      outputScale,
+      false,
+      {
+        type: "image/jpeg",
+        quality: 0.72,
+      },
+    );
     return blobToDataURL(blob);
   }, [rootRef, cards, cardElementsRef, viewport]);
 
