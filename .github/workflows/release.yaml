@@ -12,17 +12,11 @@ jobs:
   test:
     uses: ./.github/workflows/test.yaml
 
-  release:
+  ui-dist:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
 
       - uses: pnpm/action-setup@v4
 
@@ -41,11 +35,110 @@ jobs:
       - name: Package UI dist
         run: tar czf aisets-ui-dist.tar.gz -C ui/dist .
 
-      - uses: goreleaser/goreleaser-action@v6
+      - name: Upload UI dist artifact
+        uses: actions/upload-artifact@v4
         with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean --skip=validate
+          name: aisets-ui-dist
+          path: aisets-ui-dist.tar.gz
+          if-no-files-found: error
+
+  package:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+          - goos: darwin
+            goarch: amd64
+            runner: macos-13
+          - goos: darwin
+            goarch: arm64
+            runner: macos-14
+          - goos: windows
+            goarch: amd64
+            runner: windows-latest
+          - goos: windows
+            goarch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install NASM
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux)
+              sudo apt-get update
+              sudo apt-get install -y nasm
+              ;;
+            macOS)
+              brew list nasm >/dev/null 2>&1 || brew install nasm
+              ;;
+            Windows)
+              choco install nasm -y
+              ;;
+          esac
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/imgtools/target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('tools/imgtools/Cargo.lock') }}
+
+      - name: Build release archive
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          OUT_DIR: dist/release
+        run: bash scripts/package-release.sh
+
+      - name: Upload release archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisets-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/release/aisets_*
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - ui-dist
+      - package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -maxdepth 3 -type f -print -exec cp {} release-assets/ \;
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name checksums.txt -print | sort | while read -r file; do
+            sha256sum "$file" | awk -v name="${file#./}" '{ print $1 "  " name }'
+          done > checksums.txt
+          cat checksums.txt
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*

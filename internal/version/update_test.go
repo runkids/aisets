@@ -157,17 +157,67 @@ func TestUpgradeDownloadsAndReplacesBinary(t *testing.T) {
 	}
 }
 
+func TestUpgradeDownloadsAndReplacesImgtools(t *testing.T) {
+	archive := buildTestArchiveWithImgtools(t, []byte("new binary"), []byte("new imgtools"))
+	sum := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(sum[:])
+	assetName := BuildBinaryAssetName("1.0.1", runtime.GOOS, runtime.GOARCH)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.String() {
+		case githubAPIURL:
+			return jsonResponse(http.StatusOK, `{"tag_name":"v1.0.1"}`), nil
+		case BuildChecksumsURL("1.0.1"):
+			return jsonResponse(http.StatusOK, checksum+"  "+assetName+"\n"), nil
+		case BuildBinaryDownloadURL("1.0.1", runtime.GOOS, runtime.GOARCH):
+			return bytesResponse(http.StatusOK, archive), nil
+		default:
+			t.Fatalf("unexpected URL: %s", r.URL.String())
+			return nil, nil
+		}
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	dir := t.TempDir()
+	execPath := filepath.Join(dir, executableName())
+	imgtoolsPath := filepath.Join(dir, imgtoolsBinaryName(runtime.GOOS))
+	if err := os.WriteFile(execPath, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imgtoolsPath, []byte("old imgtools"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Upgrade(t.Context(), UpgradeOptions{CurrentVersion: "1.0.0", ExecPath: execPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Updated {
+		t.Fatalf("Upgrade() = %#v", result)
+	}
+	content, err := os.ReadFile(imgtoolsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "new imgtools" {
+		t.Fatalf("imgtools content = %q", content)
+	}
+}
+
 func buildTestArchive(t *testing.T, content []byte) []byte {
+	t.Helper()
+	return buildTestArchiveWithImgtools(t, content, nil)
+}
+
+func buildTestArchiveWithImgtools(t *testing.T, content, imgtoolsContent []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	if runtime.GOOS == "windows" {
 		zw := zip.NewWriter(&buf)
-		w, err := zw.Create("aisets.exe")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := w.Write(content); err != nil {
-			t.Fatal(err)
+		writeZipMember(t, zw, executableName(), content)
+		if imgtoolsContent != nil {
+			writeZipMember(t, zw, imgtoolsBinaryName(runtime.GOOS), imgtoolsContent)
 		}
 		if err := zw.Close(); err != nil {
 			t.Fatal(err)
@@ -176,11 +226,9 @@ func buildTestArchive(t *testing.T, content []byte) []byte {
 	}
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
-	if err := tw.WriteHeader(&tar.Header{Name: "aisets", Mode: 0o755, Size: int64(len(content))}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tw.Write(content); err != nil {
-		t.Fatal(err)
+	writeTarMember(t, tw, executableName(), content)
+	if imgtoolsContent != nil {
+		writeTarMember(t, tw, imgtoolsBinaryName(runtime.GOOS), imgtoolsContent)
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatal(err)
@@ -189,6 +237,27 @@ func buildTestArchive(t *testing.T, content []byte) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func writeZipMember(t *testing.T, zw *zip.Writer, name string, content []byte) {
+	t.Helper()
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(content); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTarMember(t *testing.T, tw *tar.Writer, name string, content []byte) {
+	t.Helper()
+	if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(content))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func executableName() string {

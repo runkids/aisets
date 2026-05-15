@@ -256,19 +256,33 @@ func downloadAndReplaceBinary(ctx context.Context, ver, destPath string) error {
 	if _, err := tmpArchive.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	tmpBinary, err := extractBinary(tmpArchive.Name(), tmpArchive, runtime.GOOS)
+	extracted, err := extractBinaries(tmpArchive.Name(), tmpArchive, runtime.GOOS)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpBinary)
+	defer os.Remove(extracted.binary)
+	if extracted.imgtools != "" {
+		defer os.Remove(extracted.imgtools)
+		imgtoolsPath := filepath.Join(filepath.Dir(destPath), imgtoolsBinaryName(runtime.GOOS))
+		imgtoolsMode := os.FileMode(0o755)
+		if stat, err := os.Stat(imgtoolsPath); err == nil {
+			imgtoolsMode = stat.Mode()
+		}
+		if err := os.Chmod(extracted.imgtools, imgtoolsMode); err != nil {
+			return err
+		}
+		if err := replaceBinary(imgtoolsPath, extracted.imgtools); err != nil {
+			return err
+		}
+	}
 	mode := os.FileMode(0o755)
 	if stat, err := os.Stat(destPath); err == nil {
 		mode = stat.Mode()
 	}
-	if err := os.Chmod(tmpBinary, mode); err != nil {
+	if err := os.Chmod(extracted.binary, mode); err != nil {
 		return err
 	}
-	return replaceBinary(destPath, tmpBinary)
+	return replaceBinary(destPath, extracted.binary)
 }
 
 func replaceBinary(destPath, tmpBinary string) error {
@@ -279,6 +293,12 @@ func replaceBinary(destPath, tmpBinary string) error {
 		return nil
 	}
 
+	if _, err := os.Stat(destPath); os.IsNotExist(err) {
+		if err := os.Rename(tmpBinary, destPath); err != nil {
+			return fmt.Errorf("replace binary: %w", err)
+		}
+		return nil
+	}
 	backup := destPath + ".old"
 	_ = os.Remove(backup)
 	if err := os.Rename(destPath, backup); err != nil {
@@ -334,47 +354,106 @@ func fetchChecksumForAsset(ctx context.Context, ver, assetName string) (string, 
 	return "", fmt.Errorf("checksum for %s not found", assetName)
 }
 
-func extractBinary(name string, r io.ReaderAt, goos string) (string, error) {
+type extractedBinaries struct {
+	binary   string
+	imgtools string
+}
+
+func mainBinaryName(goos string) string {
 	if goos == "windows" {
-		stat, err := os.Stat(name)
-		if err != nil {
-			return "", err
-		}
-		zr, err := zip.NewReader(r, stat.Size())
-		if err != nil {
-			return "", err
-		}
-		for _, file := range zr.File {
-			if filepath.Base(file.Name) != "aisets.exe" {
-				continue
-			}
-			rc, err := file.Open()
-			if err != nil {
-				return "", err
-			}
-			defer rc.Close()
-			return writeTempBinary(rc)
-		}
-		return "", fmt.Errorf("aisets.exe not found in archive")
+		return "aisets.exe"
 	}
-	gz, err := gzip.NewReader(io.NewSectionReader(r, 0, 1<<63-1))
+	return "aisets"
+}
+
+func imgtoolsBinaryName(goos string) string {
+	if goos == "windows" {
+		return "aisets-imgtools.exe"
+	}
+	return "aisets-imgtools"
+}
+
+func extractBinaries(name string, r io.ReaderAt, goos string) (extractedBinaries, error) {
+	if goos == "windows" {
+		return extractZipBinaries(name, r, goos)
+	}
+	return extractTarBinaries(r, goos)
+}
+
+func extractZipBinaries(name string, r io.ReaderAt, goos string) (extractedBinaries, error) {
+	stat, err := os.Stat(name)
+	if err != nil {
+		return extractedBinaries{}, err
+	}
+	zr, err := zip.NewReader(r, stat.Size())
+	if err != nil {
+		return extractedBinaries{}, err
+	}
+	extracted := extractedBinaries{}
+	for _, file := range zr.File {
+		base := filepath.Base(file.Name)
+		if base != mainBinaryName(goos) && base != imgtoolsBinaryName(goos) {
+			continue
+		}
+		path, err := extractZipMember(file)
+		if err != nil {
+			return extractedBinaries{}, err
+		}
+		if base == mainBinaryName(goos) {
+			extracted.binary = path
+		} else {
+			extracted.imgtools = path
+		}
+	}
+	if extracted.binary == "" {
+		return extractedBinaries{}, fmt.Errorf("%s not found in archive", mainBinaryName(goos))
+	}
+	return extracted, nil
+}
+
+func extractZipMember(file *zip.File) (string, error) {
+	rc, err := file.Open()
 	if err != nil {
 		return "", err
 	}
+	defer rc.Close()
+	return writeTempBinary(rc)
+}
+
+func extractTarBinaries(r io.ReaderAt, goos string) (extractedBinaries, error) {
+	gz, err := gzip.NewReader(io.NewSectionReader(r, 0, 1<<63-1))
+	if err != nil {
+		return extractedBinaries{}, err
+	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
+	extracted := extractedBinaries{}
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			return "", fmt.Errorf("aisets not found in archive")
+			break
 		}
 		if err != nil {
-			return "", err
+			return extractedBinaries{}, err
 		}
-		if header.Typeflag == tar.TypeReg && filepath.Base(header.Name) == "aisets" {
-			return writeTempBinary(tr)
+		base := filepath.Base(header.Name)
+		if header.Typeflag != tar.TypeReg || (base != mainBinaryName(goos) && base != imgtoolsBinaryName(goos)) {
+			continue
+		}
+		path, err := writeTempBinary(tr)
+		if err != nil {
+			return extractedBinaries{}, err
+		}
+		if base == mainBinaryName(goos) {
+			extracted.binary = path
+		} else {
+			extracted.imgtools = path
 		}
 	}
+	if extracted.binary == "" {
+		return extractedBinaries{}, fmt.Errorf("%s not found in archive", mainBinaryName(goos))
+	}
+	return extracted, nil
 }
 
 func writeTempBinary(r io.Reader) (string, error) {
