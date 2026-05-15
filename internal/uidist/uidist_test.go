@@ -106,6 +106,7 @@ func TestFetchChecksumHandlesStatusAndMissingAsset(t *testing.T) {
 func TestExtractTarGzWritesFilesAndRejectsUnsupportedEntries(t *testing.T) {
 	dest := t.TempDir()
 	archive := tarGz(t,
+		tarEntry{Name: "./", Type: tar.TypeDir},
 		tarEntry{Name: "assets", Type: tar.TypeDir},
 		tarEntry{Name: "assets/index.html", Body: "ok"},
 	)

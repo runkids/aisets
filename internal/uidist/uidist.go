@@ -113,6 +113,9 @@ func extractTarGz(r io.Reader, dest string) error {
 			return err
 		}
 		name := filepath.Clean(header.Name)
+		if name == "." && header.Typeflag == tar.TypeDir {
+			continue
+		}
 		if name == "." || strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 			return fmt.Errorf("unsafe archive path: %s", header.Name)
 		}

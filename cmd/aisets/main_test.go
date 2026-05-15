@@ -684,6 +684,41 @@ func TestParseUIOptionsAcceptsFlagsAfterProjects(t *testing.T) {
 	}
 }
 
+func TestCurrentUIStateRemembersPortAndRespectsExplicitFlags(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+
+	remembered := uiOptions{host: "127.0.0.1", port: 3003, basePath: "/studio"}
+	if err := writeCurrentUIState(remembered); err != nil {
+		t.Fatal(err)
+	}
+
+	opts, err := parseUIOptions(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved := resolveRememberedUIOptions(opts)
+	if resolved.host != "127.0.0.1" || resolved.port != 3003 || resolved.basePath != "/studio" {
+		t.Fatalf("remembered opts = %#v", resolved)
+	}
+
+	explicit, err := parseUIOptions([]string{"--port", "4004"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved = resolveRememberedUIOptions(explicit)
+	if resolved.port != 4004 {
+		t.Fatalf("explicit port was not respected: %#v", resolved)
+	}
+
+	if err := clearCurrentUIStateIfMatches(remembered); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCurrentUIState(); err == nil {
+		t.Fatal("expected current UI state to be cleared")
+	}
+}
+
 func TestUIModeURLAndBackgroundChildArgs(t *testing.T) {
 	mode, rest := splitUIMode([]string{"once", "--port", "20555"})
 	if mode != uiOnceMode || strings.Join(rest, " ") != "--port 20555" {
@@ -726,6 +761,9 @@ func TestUIModeURLAndBackgroundChildArgs(t *testing.T) {
 }
 
 func TestCmdUIReusesRunningServerWithJSON(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/health" {
 			http.NotFound(w, r)
@@ -933,7 +971,60 @@ func TestOpenUIWindowDefaultsToBrowser(t *testing.T) {
 	}
 }
 
+func TestUINeedsDownloadDetectsReleaseCache(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	oldVersion := version
+	t.Cleanup(func() { version = oldVersion })
+
+	version = "1.2.3"
+	if !uiNeedsDownload() {
+		t.Fatal("expected release without cache to need download")
+	}
+	cacheDir := filepath.Join(root, "cache", "aisets", "ui", "1.2.3")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cacheDir, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if uiNeedsDownload() {
+		t.Fatal("expected cached release to skip download")
+	}
+	version = "dev"
+	if uiNeedsDownload() {
+		t.Fatal("expected dev version to skip release download")
+	}
+	version = ""
+	if uiNeedsDownload() {
+		t.Fatal("expected empty version to skip release download")
+	}
+}
+
+func TestWithUISpinnerWritesNonTerminalStatus(t *testing.T) {
+	var err error
+	stderr := captureStderr(t, func() {
+		err = withUISpinner("Downloading UI assets", func() error { return nil })
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr, "Downloading UI assets...") || !strings.Contains(stderr, "UI assets ready.") {
+		t.Fatalf("spinner stderr = %q", stderr)
+	}
+}
+
+func TestUISpinnerFrameUsesDotMatrixStyle(t *testing.T) {
+	got := uiSpinnerFrame("Downloading UI assets", 1)
+	if !strings.Contains(got, "⠂⠂") || !strings.Contains(got, "Downloading UI assets.") {
+		t.Fatalf("spinner frame = %q", got)
+	}
+}
+
 func TestEnvironmentAndUIDistHelpers(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+
 	if got := envOrDefault("AISETS_TEST_MISSING", "fallback"); got != "fallback" {
 		t.Fatalf("env fallback = %q", got)
 	}
@@ -947,6 +1038,16 @@ func TestEnvironmentAndUIDistHelpers(t *testing.T) {
 	t.Cleanup(func() { version = oldVersion })
 	if dir, err := ensureUIAvailable(); err != nil || dir != "" {
 		t.Fatalf("ensureUIAvailable dev = %q, %v", dir, err)
+	}
+	devCacheDir := filepath.Join(root, "cache", "aisets", "ui", "dev")
+	if err := os.MkdirAll(devCacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(devCacheDir, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if dir, err := ensureUIAvailable(); err != nil || dir != devCacheDir {
+		t.Fatalf("ensureUIAvailable cached dev = %q, %v", dir, err)
 	}
 	version = ""
 	if dir, err := ensureUIAvailable(); err != nil || dir != "" {

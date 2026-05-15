@@ -65,11 +65,20 @@ iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | ie
 ## Quick Start
 
 ```bash
-# Open the dashboard for a project
+# Open the dashboard on the default local port (19520)
 aisets ui
+
+# Or choose a port; Aisets remembers it for later UI commands
+aisets ui --port 3003
+
+# Stop the remembered UI instance
+aisets ui stop
+
+# Stop a specific port explicitly
+aisets ui stop --port 3003
 ```
 
-The dashboard opens locally in your browser.
+The dashboard opens locally in your browser. If you start it with a custom `--port`, later `aisets ui` and `aisets ui stop` commands reuse that remembered local UI instance unless you pass another `--port`.
 
 Update anytime:
 

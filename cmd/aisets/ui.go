@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -28,13 +29,22 @@ const (
 )
 
 type uiOptions struct {
-	host       string
-	port       int
-	basePath   string
-	noOpen     bool
-	appWindow  bool
-	clearCache bool
-	projects   []string
+	host               string
+	port               int
+	basePath           string
+	noOpen             bool
+	appWindow          bool
+	clearCache         bool
+	projects           []string
+	hostConfigured     bool
+	portConfigured     bool
+	basePathConfigured bool
+}
+
+type currentUIState struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	BasePath string `json:"basePath"`
 }
 
 func cmdUI(args []string, jsonModes ...bool) error {
@@ -51,8 +61,10 @@ func cmdUI(args []string, jsonModes ...bool) error {
 	if err != nil {
 		return err
 	}
+	opts = resolveRememberedUIOptions(opts)
 
 	if uiServerReady(opts) {
+		_ = writeCurrentUIState(opts)
 		url := uiURL(opts)
 		if jsonOut {
 			return writeJSON(os.Stdout, map[string]any{"ok": true, "url": url, "status": "running"})
@@ -124,6 +136,7 @@ func cmdUIStop(args []string, jsonOut bool) error {
 	if len(opts.projects) > 0 {
 		return fmt.Errorf("ui stop does not accept project paths")
 	}
+	opts = resolveRememberedUIOptions(opts)
 
 	stopped, err := stopUI(opts)
 	if err != nil {
@@ -153,9 +166,12 @@ func splitUIMode(args []string) (string, []string) {
 
 func parseUIOptions(args []string) (uiOptions, error) {
 	opts := uiOptions{
-		host:     envOrDefault("AISETS_UI_HOST", defaultUIHost),
-		port:     envIntOrDefault("AISETS_PORT", defaultUIPort),
-		basePath: envOrDefault("AISETS_UI_BASE_PATH", ""),
+		host:               envOrDefault("AISETS_UI_HOST", defaultUIHost),
+		port:               envIntOrDefault("AISETS_PORT", defaultUIPort),
+		basePath:           envOrDefault("AISETS_UI_BASE_PATH", ""),
+		hostConfigured:     os.Getenv("AISETS_UI_HOST") != "",
+		portConfigured:     os.Getenv("AISETS_PORT") != "",
+		basePathConfigured: os.Getenv("AISETS_UI_BASE_PATH") != "",
 	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -166,9 +182,11 @@ func parseUIOptions(args []string) (uiOptions, error) {
 				return uiOptions{}, err
 			}
 			opts.host = value
+			opts.hostConfigured = true
 			i = next
 		case strings.HasPrefix(arg, "--host="):
 			opts.host = strings.TrimPrefix(arg, "--host=")
+			opts.hostConfigured = true
 		case arg == "--port":
 			value, next, err := requireUIFlagValue(args, i, "--port")
 			if err != nil {
@@ -179,6 +197,7 @@ func parseUIOptions(args []string) (uiOptions, error) {
 				return uiOptions{}, err
 			}
 			opts.port = port
+			opts.portConfigured = true
 			i = next
 		case strings.HasPrefix(arg, "--port="):
 			port, err := parseUIPort(strings.TrimPrefix(arg, "--port="))
@@ -186,17 +205,21 @@ func parseUIOptions(args []string) (uiOptions, error) {
 				return uiOptions{}, err
 			}
 			opts.port = port
+			opts.portConfigured = true
 		case arg == "--base-path" || arg == "-b":
 			value, next, err := requireUIFlagValue(args, i, arg)
 			if err != nil {
 				return uiOptions{}, err
 			}
 			opts.basePath = value
+			opts.basePathConfigured = true
 			i = next
 		case strings.HasPrefix(arg, "--base-path="):
 			opts.basePath = strings.TrimPrefix(arg, "--base-path=")
+			opts.basePathConfigured = true
 		case strings.HasPrefix(arg, "-b="):
 			opts.basePath = strings.TrimPrefix(arg, "-b=")
+			opts.basePathConfigured = true
 		case arg == "--no-open":
 			opts.noOpen = true
 		case arg == "--app":
@@ -232,6 +255,9 @@ func startUIInBackground(opts uiOptions, jsonOut bool) error {
 	if err := ensureUIPortAvailable(opts); err != nil {
 		return err
 	}
+	if err := prepareUIForBackground(jsonOut); err != nil {
+		return err
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -255,6 +281,9 @@ func startUIInBackground(opts uiOptions, jsonOut bool) error {
 		return err
 	}
 	if err := writeUIPidFile(opts, pid); err != nil {
+		return err
+	}
+	if err := writeCurrentUIState(opts); err != nil {
 		return err
 	}
 
@@ -298,6 +327,7 @@ func uiChildArgs(opts uiOptions) []string {
 func stopUI(opts uiOptions) (bool, error) {
 	if !uiServerReady(opts) {
 		_ = os.Remove(uiPidFile(opts))
+		_ = clearCurrentUIStateIfMatches(opts)
 		return false, nil
 	}
 	pids := uiPIDs(opts)
@@ -312,6 +342,7 @@ func stopUI(opts uiOptions) (bool, error) {
 	}
 	if waitForUIServerDown(opts, 3*time.Second) {
 		_ = os.Remove(uiPidFile(opts))
+		_ = clearCurrentUIStateIfMatches(opts)
 		return true, killErr
 	}
 	for _, pid := range pids {
@@ -326,6 +357,7 @@ func stopUI(opts uiOptions) (bool, error) {
 	}
 	if waitForUIServerDown(opts, 2*time.Second) {
 		_ = os.Remove(uiPidFile(opts))
+		_ = clearCurrentUIStateIfMatches(opts)
 		return true, killErr
 	}
 	return false, errors.Join(killErr, fmt.Errorf("UI server did not stop: %s", uiURL(opts)))
@@ -383,6 +415,61 @@ func readUIPidFile(opts uiOptions) (int, error) {
 func uiPidFile(opts uiOptions) string {
 	name := strings.NewReplacer(":", "_", ".", "_").Replace(uiAddr(opts))
 	return filepath.Join(config.CacheDir(), "ui-"+name+".pid")
+}
+
+func resolveRememberedUIOptions(opts uiOptions) uiOptions {
+	if opts.hostConfigured || opts.portConfigured || opts.basePathConfigured {
+		return opts
+	}
+	state, err := readCurrentUIState()
+	if err != nil {
+		return opts
+	}
+	opts.host = state.Host
+	opts.port = state.Port
+	opts.basePath = state.BasePath
+	return opts
+}
+
+func writeCurrentUIState(opts uiOptions) error {
+	if err := os.MkdirAll(config.CacheDir(), 0o755); err != nil {
+		return err
+	}
+	body, err := json.Marshal(currentUIState{Host: opts.host, Port: opts.port, BasePath: opts.basePath})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(currentUIStateFile(), append(body, '\n'), 0o644)
+}
+
+func readCurrentUIState() (currentUIState, error) {
+	bytes, err := os.ReadFile(currentUIStateFile())
+	if err != nil {
+		return currentUIState{}, err
+	}
+	var state currentUIState
+	if err := json.Unmarshal(bytes, &state); err != nil {
+		return currentUIState{}, err
+	}
+	if state.Host == "" || state.Port <= 0 || state.Port > 65535 {
+		return currentUIState{}, fmt.Errorf("invalid UI state")
+	}
+	return state, nil
+}
+
+func clearCurrentUIStateIfMatches(opts uiOptions) error {
+	state, err := readCurrentUIState()
+	if err != nil {
+		return nil
+	}
+	if state.Host == opts.host && state.Port == opts.port && state.BasePath == opts.basePath {
+		return os.Remove(currentUIStateFile())
+	}
+	return nil
+}
+
+func currentUIStateFile() string {
+	return filepath.Join(config.CacheDir(), "ui-current.json")
 }
 
 func pidsListeningOnPort(port int) []int {
@@ -472,17 +559,89 @@ func uiServerReady(opts uiOptions) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-func ensureUIAvailable() (string, error) {
-	if version == "" || version == "dev" {
-		return "", nil
+func prepareUIForBackground(jsonOut bool) error {
+	if jsonOut || !uiNeedsDownload() {
+		_, err := ensureUIAvailable()
+		return err
 	}
+	return withUISpinner("Downloading UI assets", func() error {
+		_, err := ensureUIAvailable()
+		return err
+	})
+}
+
+func uiNeedsDownload() bool {
+	return version != "" && version != "dev" && !uidist.IsCached(version)
+}
+
+func ensureUIAvailable() (string, error) {
 	if uidist.IsCached(version) {
 		return uidist.CacheDir(version), nil
+	}
+	if version == "" || version == "dev" {
+		return "", nil
 	}
 	if err := uidist.Download(version); err != nil {
 		return "", err
 	}
 	return uidist.CacheDir(version), nil
+}
+
+func withUISpinner(message string, fn func() error) error {
+	if !isTerminal(os.Stderr) {
+		fmt.Fprintf(os.Stderr, "%s...\n", message)
+		err := fn()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "UI asset download failed.")
+			return err
+		}
+		fmt.Fprintln(os.Stderr, "UI assets ready.")
+		return nil
+	}
+
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(180 * time.Millisecond)
+		defer ticker.Stop()
+		index := 0
+		for {
+			fmt.Fprintf(os.Stderr, "\r%s", uiSpinnerFrame(message, index))
+			index++
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+
+	err := fn()
+	close(done)
+	<-stopped
+	clearUISpinnerLine()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "✕ UI asset download failed.\n")
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "⋮ UI assets ready.\n")
+	return nil
+}
+
+func uiSpinnerFrame(message string, index int) string {
+	patterns := []string{"⠂  ", "⠂⠂ ", " ⠂⠂", "  ⠂", "   "}
+	dots := strings.Repeat(".", index%4)
+	return fmt.Sprintf("%s %s%s", patterns[index%len(patterns)], message, dots)
+}
+
+func clearUISpinnerLine() {
+	fmt.Fprint(os.Stderr, "\r\033[2K")
+}
+
+func isTerminal(file *os.File) bool {
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 func envOrDefault(key, fallback string) string {
