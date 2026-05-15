@@ -15,6 +15,7 @@ import { Tooltip } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { ChatActivityEntry, ChatRunUsage } from "./aiCanvasState";
 import { formatCanvasRunDuration } from "./canvasRunFormat";
+import { canvasRunToolCount } from "./canvasRunUsage";
 
 type AICanvasActivityPanelProps = {
   t: TFunction;
@@ -29,12 +30,6 @@ type AICanvasActivityPanelProps = {
 function formatTokenCount(value: number | undefined) {
   if (!Number.isFinite(value)) return "";
   return new Intl.NumberFormat("en-US").format(Math.round(value ?? 0));
-}
-
-export function canvasRunToolCount(usage?: ChatRunUsage) {
-  const executed = usage?.executedActionCount;
-  if (Number.isFinite(executed)) return Math.round(executed ?? 0);
-  return (usage?.toolCallCount ?? 0) + (usage?.fallbackActionCount ?? 0);
 }
 
 export function AICanvasRunUsageChips({

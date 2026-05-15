@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use image::imageops::FilterType;
 use image::{GenericImageView, RgbaImage};
 use serde::Deserialize;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasRunToolCount } from "./AICanvasActivityPanel";
+import { canvasRunToolCount } from "./canvasRunUsage";
 
 describe("canvasRunToolCount", () => {
   it("uses executed actions when native and fallback transports are summarized", () => {

@@ -1470,8 +1470,8 @@ func TestCanvasHarnessPhotoStagingMovesFromInspectToLayoutBeforeCapture(t *testi
 			finalText += fmt.Sprint(event["content"])
 		}
 	}
-	if !strings.Contains(finalText, "擺拍") || !strings.Contains(finalText, "截圖") {
-		t.Fatalf("missing localized staging rationale text: %q", finalText)
+	if !strings.Contains(finalText, "Completed the staged layout") || !strings.Contains(finalText, "screenshot") {
+		t.Fatalf("missing staging rationale text: %q", finalText)
 	}
 	requests := bootstrap.provider.Requests()
 	if len(requests) < 2 {
@@ -1645,7 +1645,7 @@ func TestCanvasHarnessPhotoStagingDefersCaptureUntilAfterStaging(t *testing.T) {
 			finalText += fmt.Sprint(event["content"])
 		}
 	}
-	if !strings.Contains(finalText, "擺拍") || !strings.Contains(finalText, "截圖") {
+	if !strings.Contains(finalText, "Completed the staged layout") || !strings.Contains(finalText, "screenshot") {
 		t.Fatalf("missing staging rationale text: %q", finalText)
 	}
 }

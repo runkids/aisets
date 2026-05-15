@@ -125,6 +125,8 @@ func allowedProductionCJKLine(rel string, line string, inSemanticPhases bool) bo
 		return strings.Contains(line, "label:")
 	case "internal/server/canvas_chat_handler.go":
 		return strings.Contains(line, "regexp.MustCompile")
+	case "internal/server/canvas_chat_types.go":
+		return strings.Contains(line, "TextRe = regexp.MustCompile")
 	default:
 		return false
 	}

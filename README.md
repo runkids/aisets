@@ -66,16 +66,10 @@ iwr https://raw.githubusercontent.com/runkids/aisets/main/install.ps1 -UseB | ie
 
 ```bash
 # Open the dashboard for a project
-aisets ui /path/to/your/project
+aisets ui
 ```
 
-The dashboard opens locally in your browser. Use `--app` if you prefer a desktop-style window.
-
-You can also scan from the CLI:
-
-```bash
-aisets scan /path/to/your/project --json
-```
+The dashboard opens locally in your browser.
 
 Update anytime:
 
