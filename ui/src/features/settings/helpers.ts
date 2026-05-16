@@ -501,6 +501,27 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
   };
 }
 
+export function changedUpdateFromDraft(
+  draft: SettingsDraft,
+  settings?: SettingsInfo,
+): SettingsUpdate {
+  const next = updateFromDraft(draft);
+  if (!settings) return next;
+
+  const current = updateFromDraft(draftFromSettings(settings));
+  const changed: Partial<Record<keyof SettingsUpdate, unknown>> = {};
+  for (const key of Object.keys(next) as (keyof SettingsUpdate)[]) {
+    if (!settingsUpdateValuesEqual(next[key], current[key])) {
+      changed[key] = next[key];
+    }
+  }
+  return changed as SettingsUpdate;
+}
+
+function settingsUpdateValuesEqual(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function resetSectionDraft(
   current: SettingsDraft,
   section: Section | "catalogScanning" | "ocr",

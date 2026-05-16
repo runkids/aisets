@@ -40,8 +40,8 @@ import { useToast } from "@/components/shared/ToastProvider";
 import type { SettingsViewProps, Section, SettingsDraft } from "./types";
 import { sectionMeta, defaultSettings } from "./constants";
 import {
+  changedUpdateFromDraft,
   draftFromSettings,
-  updateFromDraft,
   ocrProgressLabel,
   resetSectionDraft,
 } from "./helpers";
@@ -236,6 +236,21 @@ export function SettingsView({
     );
   }
 
+  async function saveDraftSettings(nextDraft: SettingsDraft) {
+    const update = changedUpdateFromDraft(
+      nextDraft,
+      settingsQuery.data?.settings,
+    );
+    if (Object.keys(update).length === 0) {
+      if (settingsQuery.data?.settings) {
+        setDraftOverride(draftFromSettings(settingsQuery.data.settings));
+      }
+      return;
+    }
+    const result = await updateMutation.mutateAsync(update);
+    setDraftOverride(draftFromSettings(result.settings));
+  }
+
   async function onToggleTool(toolId: string, enabled: boolean) {
     const next: SettingsDraft = {
       ...draft,
@@ -245,8 +260,7 @@ export function SettingsView({
     };
     setDraftOverride(next);
     try {
-      const result = await updateMutation.mutateAsync(updateFromDraft(next));
-      setDraftOverride(draftFromSettings(result.settings));
+      await saveDraftSettings(next);
     } catch (error) {
       toast.error(errorMessage(error), {
         title: t("toast.settingsSaveFailed"),
@@ -256,8 +270,7 @@ export function SettingsView({
 
   async function onSaveSettings(options?: { silent?: boolean }) {
     try {
-      const result = await updateMutation.mutateAsync(updateFromDraft(draft));
-      setDraftOverride(draftFromSettings(result.settings));
+      await saveDraftSettings(draft);
       if (!options?.silent) toast.success(t("toast.settingsSaved"));
     } catch (error) {
       toast.error(errorMessage(error), {
@@ -291,8 +304,7 @@ export function SettingsView({
 
   function onRunOCRConfirmed() {
     onStartOCR(async () => {
-      const result = await updateMutation.mutateAsync(updateFromDraft(draft));
-      setDraftOverride(draftFromSettings(result.settings));
+      await saveDraftSettings(draft);
     });
   }
 

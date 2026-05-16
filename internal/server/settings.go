@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"time"
 
 	"aisets/internal/agent"
@@ -71,15 +72,20 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if body.ActiveWorkspaceID != nil {
-		s.clearCatalog()
+	previous, err := s.store.Settings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
 	}
-	if body.OptimizationThresholds != nil || body.OptimizationStrategies != nil || body.ExcludePatterns != nil || body.ExcludePatternsByIntent != nil || body.LintRules != nil {
-		s.markCatalogStale()
-	}
-	if _, err := s.store.UpdateSettings(body); err != nil {
+	updated, err := s.store.UpdateSettings(body)
+	if err != nil {
 		writeError(w, settingsErrorStatus(err), err)
 		return
+	}
+	if previous.ActiveWorkspaceID != updated.ActiveWorkspaceID {
+		s.clearCatalog()
+	} else if settingsCatalogInputsChanged(body, previous, updated) {
+		s.markCatalogStale()
 	}
 	if body.LLMEnabled != nil || body.LLMProvider != nil || body.LLMEndpoint != nil {
 		s.initLLMProvider()
@@ -97,6 +103,14 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+}
+
+func settingsCatalogInputsChanged(update config.SettingsUpdate, previous, updated config.AppSettings) bool {
+	return (update.OptimizationThresholds != nil && !reflect.DeepEqual(previous.OptimizationThresholds, updated.OptimizationThresholds)) ||
+		(update.OptimizationStrategies != nil && !reflect.DeepEqual(previous.OptimizationStrategies, updated.OptimizationStrategies)) ||
+		(update.ExcludePatterns != nil && !reflect.DeepEqual(previous.ExcludePatterns, updated.ExcludePatterns)) ||
+		(update.ExcludePatternsByIntent != nil && !reflect.DeepEqual(previous.ExcludePatternsByIntent, updated.ExcludePatternsByIntent)) ||
+		(update.LintRules != nil && !reflect.DeepEqual(previous.LintRules, updated.LintRules))
 }
 
 func (s *Server) handleSettingsExport(w http.ResponseWriter, _ *http.Request) {

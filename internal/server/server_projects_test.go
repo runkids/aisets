@@ -320,6 +320,108 @@ func TestSettingsPatchPersistsAndReturnsInfo(t *testing.T) {
 	}
 }
 
+func TestSettingsPatchWithUnchangedCatalogFieldsDoesNotRescan(t *testing.T) {
+	root := resolvedTempDir(t)
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "logo.png"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialScanID := catalogScanIDForSettingsTest(t, s)
+	settings, err := store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(map[string]any{
+		"excludePatterns": settings.ExcludePatterns,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/settings", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("settings patch = %d %s", rec.Code, rec.Body.String())
+	}
+	if nextScanID := catalogScanIDForSettingsTest(t, s); nextScanID != initialScanID {
+		t.Fatalf("unchanged catalog settings triggered rescan: before=%d after=%d", initialScanID, nextScanID)
+	}
+}
+
+func TestProjectRenameWithoutIntentChangeDoesNotRescan(t *testing.T) {
+	root := resolvedTempDir(t)
+	project := filepath.Join(root, "project")
+	writePNG(t, filepath.Join(project, "logo.png"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	store, err := config.OpenStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddProjects([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Store: store, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialScanID := catalogScanIDForSettingsTest(t, s)
+	projectInfo := store.Projects()[0]
+	payload, err := json.Marshal(map[string]any{
+		"id":         projectInfo.ID,
+		"name":       "Renamed Project",
+		"iconImage":  projectInfo.IconImage,
+		"scanIntent": projectInfo.ScanIntent,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/rename", bytes.NewReader(payload))
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("project rename = %d %s", rec.Code, rec.Body.String())
+	}
+	if nextScanID := catalogScanIDForSettingsTest(t, s); nextScanID != initialScanID {
+		t.Fatalf("metadata-only project rename triggered rescan: before=%d after=%d", initialScanID, nextScanID)
+	}
+}
+
+func catalogScanIDForSettingsTest(t *testing.T, s *Server) int64 {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog", nil)
+	s.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catalog = %d %s", rec.Code, rec.Body.String())
+	}
+	var summary struct {
+		ScanID int64 `json:"scanId"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.ScanID == 0 {
+		t.Fatalf("missing scan id in catalog response: %s", rec.Body.String())
+	}
+	return summary.ScanID
+}
+
 func TestSettingsExportImportResetDatabase(t *testing.T) {
 	root := resolvedTempDir(t)
 	project := filepath.Join(root, "project")

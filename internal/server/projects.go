@@ -183,12 +183,26 @@ func (s *Server) handleRenameProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	previousIntent, _ := projectIntentByID(s.store.Projects(), body.ID)
 	if err := s.store.RenameProject(body.ID, body.Name, body.IconImage, body.ScanIntent); err != nil {
 		writeError(w, projectErrorStatus(err), err)
 		return
 	}
-	s.clearCatalog()
-	writeJSON(w, http.StatusOK, map[string]any{"projects": s.store.Projects()})
+	projects := s.store.Projects()
+	updatedIntent, _ := projectIntentByID(projects, body.ID)
+	if previousIntent != updatedIntent {
+		s.markCatalogStale()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
+}
+
+func projectIntentByID(projects []config.Project, id string) (scanner.ProjectScanIntent, bool) {
+	for _, project := range projects {
+		if project.ID == id {
+			return scanner.NormalizeProjectScanIntent(project.ScanIntent), true
+		}
+	}
+	return "", false
 }
 
 func (s *Server) projectByID(id string) (scanner.Project, error) {
