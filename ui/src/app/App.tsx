@@ -270,6 +270,7 @@ function canvasBackendOptions(
       ? `${labels.defaultOption} · ${inherited}`
       : labels.defaultOption,
     group: labels.canvas,
+    disabled: inherited === labels.unavailable,
   });
 
   const localDefault =

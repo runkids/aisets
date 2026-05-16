@@ -75,6 +75,7 @@ type AICanvasComposerProps = {
   height: number;
   setHeight: StateSetter<number>;
   isWorking: boolean;
+  aiEnabled: boolean;
   composerStatusLabel: string;
   composerStatusText: string;
   elapsedLabel?: string | null;
@@ -134,6 +135,7 @@ export function AICanvasComposer({
   height,
   setHeight,
   isWorking,
+  aiEnabled,
   composerStatusLabel,
   composerStatusText,
   elapsedLabel,
@@ -185,9 +187,16 @@ export function AICanvasComposer({
   handleAddSearchCandidate,
   handleDismissSearchCandidates,
 }: AICanvasComposerProps) {
+  const selectedBackendValue = aiBackendValue ?? "";
+  const selectedBackendOption =
+    aiBackendOptions.find((option) => option.value === selectedBackendValue) ??
+    (selectedBackendValue.startsWith("agent:")
+      ? aiBackendOptions.find(
+          (option) => option.value === selectedBackendValue.split("/")[0],
+        )
+      : undefined);
   const aiUnavailable =
-    aiBackendOptions.length === 0 ||
-    aiBackendOptions.every((option) => option.disabled);
+    !aiEnabled || !selectedBackendOption || !!selectedBackendOption.disabled;
 
   const composerDragRef = useRef<{ startY: number; startH: number } | null>(
     null,

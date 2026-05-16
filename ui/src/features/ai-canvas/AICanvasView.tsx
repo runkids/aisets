@@ -1694,6 +1694,7 @@ export function AICanvasView({
         height={composerHeight}
         setHeight={setComposerHeight}
         isWorking={isWorking}
+        aiEnabled={aiEnabled}
         composerStatusLabel={composerStatusLabel}
         composerStatusText={composerStatusText}
         elapsedLabel={elapsedLabel}
