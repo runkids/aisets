@@ -260,6 +260,9 @@ export type UpdateAppResult = {
   privileged?: boolean;
   uiCached: boolean;
   uiCacheError?: string;
+  uiHost?: string;
+  uiPort?: string;
+  uiBasePath?: string;
   message: string;
 };
 

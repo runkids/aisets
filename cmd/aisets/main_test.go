@@ -740,7 +740,7 @@ func TestUIModeURLAndBackgroundChildArgs(t *testing.T) {
 	if got := uiURL(opts); got != "http://0.0.0.0:20555/studio" {
 		t.Fatalf("uiURL() = %q", got)
 	}
-	if got := uiHealthURL(opts); got != "http://0.0.0.0:20555/studio/api/health" {
+	if got := uiHealthURL(opts); got != "http://127.0.0.1:20555/studio/api/health" {
 		t.Fatalf("uiHealthURL() = %q", got)
 	}
 	got := strings.Join(uiChildArgs(opts), "\n")

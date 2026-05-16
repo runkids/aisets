@@ -48,6 +48,9 @@ type UpgradeResult struct {
 	Privileged     bool   `json:"privileged,omitempty"`
 	UICached       bool   `json:"uiCached"`
 	UICacheError   string `json:"uiCacheError,omitempty"`
+	UIHost         string `json:"uiHost,omitempty"`
+	UIPort         string `json:"uiPort,omitempty"`
+	UIBasePath     string `json:"uiBasePath,omitempty"`
 	Message        string `json:"message"`
 }
 

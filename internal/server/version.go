@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -51,17 +52,27 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 				result.Updated = true
 				result.Privileged = true
 				result.Message = "Updated. Restart Aisets to use the new version."
-				cacheUpdatedUI(&result)
+				s.decorateUpdateResult(&result)
 				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "update": result})
 				return
 			}
 		}
 		status, updateErr := updateAPIError(err)
+		s.decorateUpdateAPIError(&updateErr)
 		writeJSON(w, status, map[string]any{"error": updateErr})
 		return
 	}
-	cacheUpdatedUI(&result)
+	s.decorateUpdateResult(&result)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "update": result})
+}
+
+func (s *Server) decorateUpdateResult(result *versionpkg.UpgradeResult) {
+	if host, port, err := net.SplitHostPort(s.addr); err == nil {
+		result.UIHost = host
+		result.UIPort = port
+	}
+	result.UIBasePath = s.basePath
+	cacheUpdatedUI(result)
 }
 
 func cacheUpdatedUI(result *versionpkg.UpgradeResult) {
@@ -73,6 +84,22 @@ func cacheUpdatedUI(result *versionpkg.UpgradeResult) {
 		return
 	}
 	result.UICached = true
+}
+
+func (s *Server) decorateUpdateAPIError(updateErr *apierr.Error) {
+	if updateErr.Code != "update_elevated_permission_required" {
+		return
+	}
+	if updateErr.Params == nil {
+		updateErr.Params = map[string]any{}
+	}
+	if host, port, err := net.SplitHostPort(s.addr); err == nil {
+		updateErr.Params["uiHost"] = host
+		updateErr.Params["uiPort"] = port
+	}
+	if s.basePath != "" {
+		updateErr.Params["uiBasePath"] = s.basePath
+	}
 }
 
 func updateAPIError(err error) (int, apierr.Error) {

@@ -62,7 +62,7 @@ func TestCacheUpdatedUIDownloadsLatestDist(t *testing.T) {
 }
 
 func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
-	s, err := New(Options{Addr: "127.0.0.1:3003", BasePath: "/studio", Store: nil})
+	s, err := New(Options{Addr: "0.0.0.0:3003", BasePath: "/studio", Store: nil})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"__restart-ui", "--host 127.0.0.1", "--port 3003", "--base-path /studio", "--clear-cache", "--no-open"} {
+	for _, want := range []string{"__restart-ui", "--host 0.0.0.0", "--port 3003", "--base-path /studio", "--clear-cache", "--no-open"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("restart args %q missing %q", joined, want)
 		}
@@ -83,6 +83,27 @@ func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(args, " "), "--clear-cache") {
 		t.Fatalf("restart args should omit --clear-cache when UI is cached: %#v", args)
+	}
+}
+
+func TestRestartAllowsRemoteSameOriginWhenBoundToWildcard(t *testing.T) {
+	remote := httptest.NewRequest(http.MethodPost, "/api/restart", strings.NewReader(`{}`))
+	remote.RemoteAddr = "192.168.1.20:43210"
+	remote.Host = "192.168.1.10:3003"
+	remote.Header.Set("Origin", "http://192.168.1.10:3003")
+	if !restartRequestAllowed(remote, "0.0.0.0:3003") {
+		t.Fatal("wildcard-bound UI should allow same-origin remote restart")
+	}
+	if restartRequestAllowed(remote, "127.0.0.1:3003") {
+		t.Fatal("loopback-bound UI should reject remote restart")
+	}
+
+	crossSite := httptest.NewRequest(http.MethodPost, "/api/restart", strings.NewReader(`{}`))
+	crossSite.RemoteAddr = "192.168.1.20:43210"
+	crossSite.Host = "192.168.1.10:3003"
+	crossSite.Header.Set("Origin", "http://evil.example")
+	if restartRequestAllowed(crossSite, "0.0.0.0:3003") {
+		t.Fatal("cross-site remote restart should be rejected")
 	}
 }
 

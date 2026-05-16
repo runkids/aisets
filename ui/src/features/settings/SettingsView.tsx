@@ -122,6 +122,9 @@ export function SettingsView({
   const [elevatedUpdate, setElevatedUpdate] = useState<{
     path: string;
     command: string;
+    uiHost?: string;
+    uiPort?: string;
+    uiBasePath?: string;
   } | null>(null);
   const ocrWorking = isOCRActivityBusy(ocrActivity);
 
@@ -440,6 +443,18 @@ export function SettingsView({
           command: String(
             error.params?.command ?? "sudo aisets update --force",
           ),
+          uiHost:
+            typeof error.params?.uiHost === "string"
+              ? error.params.uiHost
+              : undefined,
+          uiPort:
+            typeof error.params?.uiPort === "string"
+              ? error.params.uiPort
+              : undefined,
+          uiBasePath:
+            typeof error.params?.uiBasePath === "string"
+              ? error.params.uiBasePath
+              : undefined,
         });
         return;
       }
@@ -803,6 +818,9 @@ export function SettingsView({
         <ElevatedUpdateModal
           path={elevatedUpdate.path}
           command={elevatedUpdate.command}
+          uiHost={elevatedUpdate.uiHost}
+          uiPort={elevatedUpdate.uiPort}
+          uiBasePath={elevatedUpdate.uiBasePath}
           onClose={() => setElevatedUpdate(null)}
         />
       )}
@@ -823,10 +841,10 @@ function UpdateRestartModal({
 }) {
   const { t } = useTranslation();
   const version = update.latestVersion ?? update.currentVersion;
-  const port = currentUIPort();
+  const restartFlags = updateRestartFlags(update);
   const clearCacheFlag = update.uiCached ? "" : " --clear-cache";
-  const backgroundCommand = `aisets ui stop --port ${port}\naisets ui --port ${port}${clearCacheFlag} --no-open`;
-  const foregroundCommand = `Ctrl+C\naisets ui once --port ${port}${clearCacheFlag} --no-open`;
+  const backgroundCommand = `aisets ui stop${restartFlags}\naisets ui${restartFlags}${clearCacheFlag} --no-open`;
+  const foregroundCommand = `Ctrl+C\naisets ui once${restartFlags}${clearCacheFlag} --no-open`;
 
   return (
     <Modal
@@ -879,15 +897,21 @@ function UpdateRestartModal({
 function ElevatedUpdateModal({
   path,
   command,
+  uiHost,
+  uiPort,
+  uiBasePath,
   onClose,
 }: {
   path: string;
   command: string;
+  uiHost?: string;
+  uiPort?: string;
+  uiBasePath?: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const port = currentUIPort();
-  const restartCommand = `aisets ui stop --port ${port}\naisets ui --port ${port} --clear-cache --no-open`;
+  const restartFlags = updateRestartFlags({ uiHost, uiPort, uiBasePath });
+  const restartCommand = `aisets ui stop${restartFlags}\naisets ui${restartFlags} --clear-cache --no-open`;
 
   return (
     <Modal
@@ -959,10 +983,15 @@ async function reloadWhenServerReady() {
   }
 }
 
-function currentUIPort() {
-  return window.location.port || "19520";
+function updateRestartFlags(
+  update?: Pick<UpdateAppResult, "uiHost" | "uiPort" | "uiBasePath">,
+) {
+  const host = update?.uiHost || window.location.hostname || "127.0.0.1";
+  const port = update?.uiPort || window.location.port || "19520";
+  const basePath = update?.uiBasePath || window.__BASE_PATH__ || "";
+  const basePathFlag = basePath ? ` --base-path ${basePath}` : "";
+  return ` --host ${host} --port ${port}${basePathFlag}`;
 }
-
 function sectionFromParam(value: string | null): Section | null {
   return sectionMeta.some((section) => section.id === value)
     ? (value as Section)

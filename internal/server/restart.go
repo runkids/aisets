@@ -19,7 +19,7 @@ var (
 )
 
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
-	if !restartRequestAllowed(r) {
+	if !restartRequestAllowed(r, s.addr) {
 		writeError(w, http.StatusForbidden, apierr.New("restart_forbidden", "restart is only available from the local Aisets UI"))
 		return
 	}
@@ -57,8 +57,8 @@ func (s *Server) uiRestartHelperArgs(clearCache bool) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restart unavailable for server address %q: %w", s.addr, err)
 	}
-	if host == "" || host == "0.0.0.0" || host == "::" {
-		host = "127.0.0.1"
+	if host == "" {
+		host = "0.0.0.0"
 	}
 	args := []string{"__restart-ui", "--no-open", "--host", host, "--port", port}
 	if clearCache {
@@ -85,16 +85,29 @@ func defaultStartUIRestartHelper(args []string) error {
 	return cmd.Process.Release()
 }
 
-func restartRequestAllowed(r *http.Request) bool {
-	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+func restartRequestAllowed(r *http.Request, serverAddr string) bool {
+	fetchSite := r.Header.Get("Sec-Fetch-Site")
+	if fetchSite == "cross-site" {
 		return false
 	}
+	originOK := false
 	if origin := r.Header.Get("Origin"); origin != "" {
 		originHost, err := hostFromURL(origin)
 		if err != nil || !sameHost(originHost, r.Host) {
 			return false
 		}
+		originOK = true
 	}
+	if requestFromLoopback(r) {
+		return true
+	}
+	if !serverBindAcceptsRemote(serverAddr) {
+		return false
+	}
+	return originOK || fetchSite == "same-origin" || fetchSite == "same-site"
+}
+
+func requestFromLoopback(r *http.Request) bool {
 	if r.RemoteAddr == "" {
 		return true
 	}
@@ -104,6 +117,21 @@ func restartRequestAllowed(r *http.Request) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+func serverBindAcceptsRemote(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return true
+	}
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip == nil || !ip.IsLoopback()
 }
 
 func hostFromURL(raw string) (string, error) {

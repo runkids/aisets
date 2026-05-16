@@ -535,11 +535,20 @@ func uiURL(opts uiOptions) string {
 }
 
 func uiHealthURL(opts uiOptions) string {
-	url := uiURL(opts)
+	connectOpts := opts
+	connectOpts.host = uiConnectHost(opts.host)
+	url := uiURL(connectOpts)
 	if strings.HasSuffix(url, "/") {
 		return url + "api/health"
 	}
 	return url + "/api/health"
+}
+
+func uiConnectHost(host string) string {
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return "127.0.0.1"
+	}
+	return host
 }
 
 func waitForUIServer(opts uiOptions, timeout time.Duration) bool {
