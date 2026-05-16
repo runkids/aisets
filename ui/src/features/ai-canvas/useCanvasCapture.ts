@@ -8,6 +8,8 @@ import {
 import type { CanvasCard } from "./aiCanvasState";
 import { isImageCard } from "./canvasUtils";
 
+export type CapturePadding = { x: number; y: number };
+
 type CaptureOpts = {
   rootRef: React.RefObject<HTMLDivElement | null>;
   cardElementsRef: React.MutableRefObject<Map<string, HTMLElement>>;
@@ -15,6 +17,7 @@ type CaptureOpts = {
   cards: CanvasCard[];
   selectedCardIds: string[];
   viewport: { x: number; y: number; scale: number };
+  capturePadding: CapturePadding;
 };
 
 export type CapturePreview = {
@@ -53,12 +56,20 @@ type CaptureRequest = {
 type RenderFrame = FrameGeometry & { img: HTMLImageElement };
 
 const CAPTURE_PADDING = 24;
+const ZERO_CAPTURE_PADDING: CapturePadding = { x: 0, y: 0 };
+export const DEFAULT_CAPTURE_PADDING: CapturePadding = {
+  x: CAPTURE_PADDING,
+  y: CAPTURE_PADDING,
+};
 const AUTO_DISMISS_MS = 15000;
 const SESSION_THUMBNAIL_MAX_PX = 640;
 const RENDER_FRAME_RETRY_COUNT = 8;
 const IMAGE_READY_TIMEOUT_MS = 2000;
 
-type CaptureState = Pick<CaptureOpts, "cards" | "selectedCardIds" | "viewport">;
+type CaptureState = Pick<
+  CaptureOpts,
+  "cards" | "selectedCardIds" | "viewport" | "capturePadding"
+>;
 
 export function captureImageCards(cards: CanvasCard[], ids: Set<string>) {
   return cards.filter((card) => isImageCard(card) && ids.has(card.id));
@@ -253,6 +264,7 @@ export function buildCaptureRequestFromFrames(
   crop?: CaptureCrop,
   outputScale = 1,
   transparent = false,
+  padding: CapturePadding = DEFAULT_CAPTURE_PADDING,
 ): CaptureRequest | null {
   const visibleFrames = crop
     ? frames.filter((frame) => frameIntersectsCrop(frame, crop))
@@ -276,16 +288,16 @@ export function buildCaptureRequestFromFrames(
     }, null);
   if (!captureCrop) return null;
 
-  const inset = crop ? 0 : CAPTURE_PADDING;
+  const inset = padding;
   return {
     scanId,
     transparent,
-    outputWidth: Math.ceil(captureCrop.width * outputScale + inset * 2),
-    outputHeight: Math.ceil(captureCrop.height * outputScale + inset * 2),
+    outputWidth: Math.ceil(captureCrop.width * outputScale + inset.x * 2),
+    outputHeight: Math.ceil(captureCrop.height * outputScale + inset.y * 2),
     cards: visibleFrames.map((frame) => ({
       assetId: frame.assetId,
-      x: (frame.x - captureCrop.x) * outputScale + inset,
-      y: (frame.y - captureCrop.y) * outputScale + inset,
+      x: (frame.x - captureCrop.x) * outputScale + inset.x,
+      y: (frame.y - captureCrop.y) * outputScale + inset.y,
       width: frame.width * outputScale,
       height: frame.height * outputScale,
     })),
@@ -381,11 +393,18 @@ async function captureRenderedFrames(
   crop: CaptureCrop,
   outputScale: number,
   transparent: boolean,
+  padding: CapturePadding = ZERO_CAPTURE_PADDING,
   blobOptions?: CanvasBlobOptions,
 ) {
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.ceil(crop.width * outputScale));
-  canvas.height = Math.max(1, Math.ceil(crop.height * outputScale));
+  canvas.width = Math.max(
+    1,
+    Math.ceil(crop.width * outputScale + padding.x * 2),
+  );
+  canvas.height = Math.max(
+    1,
+    Math.ceil(crop.height * outputScale + padding.y * 2),
+  );
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("capture canvas unavailable");
 
@@ -396,8 +415,8 @@ async function captureRenderedFrames(
     if (!(await waitForImageReady(frame.img))) continue;
     ctx.drawImage(
       frame.img,
-      (frame.x - crop.x) * outputScale,
-      (frame.y - crop.y) * outputScale,
+      (frame.x - crop.x) * outputScale + padding.x,
+      (frame.y - crop.y) * outputScale + padding.y,
       frame.width * outputScale,
       frame.height * outputScale,
     );
@@ -447,7 +466,14 @@ export async function saveToProject(
 }
 
 export function useCanvasCapture(opts: CaptureOpts) {
-  const { rootRef, cardElementsRef, cards, selectedCardIds, viewport } = opts;
+  const {
+    rootRef,
+    cardElementsRef,
+    cards,
+    selectedCardIds,
+    viewport,
+    capturePadding,
+  } = opts;
   const [isCapturing, setIsCapturing] = useState(false);
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const prevUrlRef = useRef<string | null>(null);
@@ -456,11 +482,17 @@ export function useCanvasCapture(opts: CaptureOpts) {
     cards,
     selectedCardIds,
     viewport,
+    capturePadding,
   });
 
   useLayoutEffect(() => {
-    latestStateRef.current = { cards, selectedCardIds, viewport };
-  }, [cards, selectedCardIds, viewport]);
+    latestStateRef.current = {
+      cards,
+      selectedCardIds,
+      viewport,
+      capturePadding,
+    };
+  }, [cards, selectedCardIds, viewport, capturePadding]);
 
   useEffect(() => {
     return () => {
@@ -532,6 +564,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
           captureCrop,
           outputScale,
           transparent,
+          state.capturePadding,
         );
         await showPreview(blob);
       } finally {
@@ -611,6 +644,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
       crop,
       outputScale,
       false,
+      ZERO_CAPTURE_PADDING,
       {
         type: "image/jpeg",
         quality: 0.72,
@@ -639,6 +673,7 @@ export function useCanvasCapture(opts: CaptureOpts) {
       crop,
       sessionThumbnailOutputScale(crop),
       false,
+      ZERO_CAPTURE_PADDING,
     );
   }, [rootRef, cardElementsRef]);
 

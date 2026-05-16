@@ -38,7 +38,11 @@ import {
   selectedAssetIds,
   zoomViewportAtPoint,
 } from "./canvasUtils";
-import { useCanvasCapture } from "./useCanvasCapture";
+import {
+  DEFAULT_CAPTURE_PADDING,
+  useCanvasCapture,
+  type CapturePadding,
+} from "./useCanvasCapture";
 import {
   buildAssistantBullets,
   cardDisplayName,
@@ -85,6 +89,8 @@ import type { AIBackendOption, WorkingState } from "./aiCanvasTypes";
 const COMPOSER_HEIGHT_STORAGE_KEY = "aisets.canvas.composerHeight";
 const IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY =
   "aisets.canvas.imageOptimizationAdvice";
+const CAPTURE_PADDING_X_STORAGE_KEY = "aisets.canvas.capturePaddingX";
+const CAPTURE_PADDING_Y_STORAGE_KEY = "aisets.canvas.capturePaddingY";
 const DEFAULT_COMPOSER_HEIGHT = 320;
 
 function isTypingTarget(target: EventTarget | null) {
@@ -95,6 +101,25 @@ function isTypingTarget(target: EventTarget | null) {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement
   );
+}
+
+function readCapturePadding(): CapturePadding {
+  try {
+    const storedX = localStorage.getItem(CAPTURE_PADDING_X_STORAGE_KEY);
+    const storedY = localStorage.getItem(CAPTURE_PADDING_Y_STORAGE_KEY);
+    const x = storedX === null ? NaN : Number(storedX);
+    const y = storedY === null ? NaN : Number(storedY);
+    return {
+      x: Number.isFinite(x)
+        ? Math.max(0, Math.min(512, x))
+        : DEFAULT_CAPTURE_PADDING.x,
+      y: Number.isFinite(y)
+        ? Math.max(0, Math.min(512, y))
+        : DEFAULT_CAPTURE_PADDING.y,
+    };
+  } catch {
+    return DEFAULT_CAPTURE_PADDING;
+  }
 }
 
 type Props = {
@@ -223,6 +248,7 @@ export function AICanvasView({
       return false;
     }
   });
+  const [capturePadding, setCapturePadding] = useState(readCapturePadding);
   const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -331,6 +357,7 @@ export function AICanvasView({
     cards,
     selectedCardIds,
     viewport,
+    capturePadding,
   });
 
   const [cardElementSizes, setCardElementSizes] = useState<
@@ -818,6 +845,21 @@ export function AICanvasView({
       // localStorage unavailable
     }
   }, [captureTransparent]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        CAPTURE_PADDING_X_STORAGE_KEY,
+        String(capturePadding.x),
+      );
+      localStorage.setItem(
+        CAPTURE_PADDING_Y_STORAGE_KEY,
+        String(capturePadding.y),
+      );
+    } catch {
+      // localStorage unavailable
+    }
+  }, [capturePadding]);
 
   useEffect(() => {
     searchOpenRef.current = searchOpen;
@@ -1726,6 +1768,8 @@ export function AICanvasView({
         isCapturing={isCapturing}
         captureTransparent={captureTransparent}
         setCaptureTransparent={setCaptureTransparent}
+        capturePadding={capturePadding}
+        setCapturePadding={setCapturePadding}
         captureViewport={captureViewport}
         captureCanvas={captureCanvas}
         captureSelected={captureSelected}

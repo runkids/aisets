@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BoxSelect,
   Bug,
   Camera,
   Eye,
@@ -8,15 +9,28 @@ import {
   FolderOpen,
   LoaderCircle,
   LocateFixed,
+  Monitor,
+  RotateCcw,
   Save,
+  Square,
   Trash2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import type { TFunction } from "i18next";
-import { Badge, Button, IconButton, Switch } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  IconButton,
+  Range,
+  Switch,
+} from "@/components/ui";
 import type { StateSetter } from "./aiCanvasTypes";
+import {
+  DEFAULT_CAPTURE_PADDING,
+  type CapturePadding,
+} from "./useCanvasCapture";
 
 type AICanvasToolbarProps = {
   t: TFunction;
@@ -27,6 +41,8 @@ type AICanvasToolbarProps = {
   isCapturing: boolean;
   captureTransparent: boolean;
   setCaptureTransparent: StateSetter<boolean>;
+  capturePadding: CapturePadding;
+  setCapturePadding: StateSetter<CapturePadding>;
   captureViewport: (transparent: boolean) => void | Promise<void>;
   captureCanvas: (transparent: boolean) => void | Promise<void>;
   captureSelected: (transparent: boolean) => void | Promise<void>;
@@ -47,6 +63,12 @@ type AICanvasToolbarProps = {
   sessionName?: string;
 };
 
+function parseCapturePadding(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(512, parsed));
+}
+
 export function AICanvasToolbar({
   t,
   onExitCanvas,
@@ -56,6 +78,8 @@ export function AICanvasToolbar({
   isCapturing,
   captureTransparent,
   setCaptureTransparent,
+  capturePadding,
+  setCapturePadding,
   captureViewport,
   captureCanvas,
   captureSelected,
@@ -166,39 +190,53 @@ export function AICanvasToolbar({
           <DropdownMenuPrimitive.Content
             align="end"
             sideOffset={8}
-            className="z-[80] min-w-[200px] rounded-g-lg border border-g-line bg-g-surface p-1 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
+            className="z-[80] min-w-[260px] rounded-g-lg border border-g-line bg-g-surface p-1.5 shadow-g-pop animate-[modalIn_120ms_var(--g-ease-out)]"
           >
+            <div className="px-2 pt-1 pb-1 font-g text-[10px] font-[600] uppercase tracking-[0.08em] text-g-ink-4">
+              {t("aiCanvas.captureSection")}
+            </div>
             <DropdownMenuPrimitive.Item
               onSelect={() => {
                 void captureViewport(captureTransparent);
               }}
-              className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
+              className="flex min-h-8 cursor-pointer items-center gap-2.5 rounded-g-sm px-2 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
             >
-              {t("aiCanvas.captureViewport")}
+              <Monitor className="size-4 text-g-ink-3" />
+              <span className="flex-1">{t("aiCanvas.captureViewport")}</span>
             </DropdownMenuPrimitive.Item>
             <DropdownMenuPrimitive.Item
               onSelect={() => {
                 void captureCanvas(captureTransparent);
               }}
-              className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
+              className="flex min-h-8 cursor-pointer items-center gap-2.5 rounded-g-sm px-2 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-g-surface-2"
             >
-              {t("aiCanvas.captureCanvas")}
+              <Square className="size-4 text-g-ink-3" />
+              <span className="flex-1">{t("aiCanvas.captureCanvas")}</span>
             </DropdownMenuPrimitive.Item>
             <DropdownMenuPrimitive.Item
               disabled={selectedCardCount === 0}
               onSelect={() => {
                 void captureSelected(captureTransparent);
               }}
-              className="flex min-h-8 cursor-pointer items-center gap-2 rounded-g-sm px-3 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-g-surface-2"
+              className="flex min-h-8 cursor-pointer items-center gap-2.5 rounded-g-sm px-2 py-1.5 font-g text-g-ui text-g-ink outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-g-surface-2"
             >
-              {t("aiCanvas.captureSelected")}
+              <BoxSelect className="size-4 text-g-ink-3" />
+              <span className="flex-1">{t("aiCanvas.captureSelected")}</span>
+              {selectedCardCount > 0 && (
+                <span className="rounded-full bg-g-surface-2 px-1.5 font-g text-g-chip tabular-nums text-g-ink-3">
+                  {selectedCardCount}
+                </span>
+              )}
             </DropdownMenuPrimitive.Item>
-            <DropdownMenuPrimitive.Separator className="mx-2 my-1 h-px bg-g-line" />
+            <div className="mx-2 my-1.5 h-px bg-g-line" />
+            <div className="px-2 pb-1 font-g text-[10px] font-[600] uppercase tracking-[0.08em] text-g-ink-4">
+              {t("aiCanvas.captureOptionsSection")}
+            </div>
             <div
-              className="flex min-h-8 items-center justify-between gap-3 rounded-g-sm px-3 py-1.5"
+              className="flex min-h-8 items-center justify-between gap-3 rounded-g-sm px-2 py-1.5"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="font-g text-g-ui text-g-ink-2">
+              <span className="font-g text-g-ui text-g-ink">
                 {t("aiCanvas.transparentBg")}
               </span>
               <Switch
@@ -206,6 +244,88 @@ export function AICanvasToolbar({
                 onCheckedChange={setCaptureTransparent}
                 aria-label={t("aiCanvas.transparentBg")}
               />
+            </div>
+            <div
+              className="px-2 py-1.5"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="flex-1 font-g text-g-ui text-g-ink">
+                  {t("aiCanvas.capturePadding")}
+                </span>
+                <span className="font-g text-g-chip tabular-nums text-g-ink-4">
+                  {capturePadding.x} × {capturePadding.y} px
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("aiCanvas.capturePaddingReset")}
+                  onClick={() => setCapturePadding(DEFAULT_CAPTURE_PADDING)}
+                  className="-mr-1 flex size-6 items-center justify-center rounded-g-sm text-g-ink-4 outline-none transition-colors duration-[120ms] ease-g hover:bg-g-surface-2 hover:text-g-ink focus-visible:ring-2 focus-visible:ring-g-active-bg/40"
+                >
+                  <RotateCcw className="size-3.5" />
+                </button>
+              </div>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-[12px_1fr_44px] items-center gap-2.5">
+                  <span className="text-center font-g text-g-chip font-[560] text-g-ink-4">
+                    {t("aiCanvas.capturePaddingX")}
+                  </span>
+                  <Range
+                    min={0}
+                    max={128}
+                    step={1}
+                    aria-label={t("aiCanvas.capturePaddingX")}
+                    value={capturePadding.x}
+                    onChange={(event) => {
+                      const x = parseCapturePadding(event.currentTarget.value);
+                      setCapturePadding((padding) => ({ ...padding, x }));
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={512}
+                    step={1}
+                    aria-label={t("aiCanvas.capturePaddingX")}
+                    value={capturePadding.x}
+                    onChange={(event) => {
+                      const x = parseCapturePadding(event.currentTarget.value);
+                      setCapturePadding((padding) => ({ ...padding, x }));
+                    }}
+                    className="h-6 w-full rounded-g-sm bg-g-surface-2 px-1.5 text-right font-g text-g-chip tabular-nums text-g-ink outline-none transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 focus-visible:bg-g-surface focus-visible:shadow-g-focus [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="grid grid-cols-[12px_1fr_44px] items-center gap-2.5">
+                  <span className="text-center font-g text-g-chip font-[560] text-g-ink-4">
+                    {t("aiCanvas.capturePaddingY")}
+                  </span>
+                  <Range
+                    min={0}
+                    max={128}
+                    step={1}
+                    aria-label={t("aiCanvas.capturePaddingY")}
+                    value={capturePadding.y}
+                    onChange={(event) => {
+                      const y = parseCapturePadding(event.currentTarget.value);
+                      setCapturePadding((padding) => ({ ...padding, y }));
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={512}
+                    step={1}
+                    aria-label={t("aiCanvas.capturePaddingY")}
+                    value={capturePadding.y}
+                    onChange={(event) => {
+                      const y = parseCapturePadding(event.currentTarget.value);
+                      setCapturePadding((padding) => ({ ...padding, y }));
+                    }}
+                    className="h-6 w-full rounded-g-sm bg-g-surface-2 px-1.5 text-right font-g text-g-chip tabular-nums text-g-ink outline-none transition-colors duration-[120ms] ease-g hover:bg-g-surface-3 focus-visible:bg-g-surface focus-visible:shadow-g-focus [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
             </div>
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>

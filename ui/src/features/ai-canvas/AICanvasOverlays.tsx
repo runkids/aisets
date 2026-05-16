@@ -107,11 +107,11 @@ export function AICanvasCapturePreview({
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="group relative max-w-[360px] min-w-[160px] overflow-hidden rounded-[16px] bg-[rgba(31,31,31,0.92)] shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-        <div className="relative bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-[length:12px_12px] p-2.5">
+        <div className="relative">
           <img
             src={preview.url}
             alt={t("aiCanvas.screenshot")}
-            className="block max-h-[280px] rounded-[10px]"
+            className="block max-h-[280px] bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-[length:12px_12px]"
             draggable={false}
           />
         </div>

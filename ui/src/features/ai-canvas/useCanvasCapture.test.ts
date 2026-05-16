@@ -34,6 +34,8 @@ describe("buildCaptureRequestFromFrames", () => {
       [frame("a", 100, 50, 200, 150), frame("b", 800, 50, 100, 100)],
       { x: 50, y: 20, width: 500, height: 300 },
       2,
+      false,
+      { x: 0, y: 0 },
     );
 
     expect(request).toMatchObject({
@@ -41,6 +43,23 @@ describe("buildCaptureRequestFromFrames", () => {
       outputWidth: 1000,
       outputHeight: 600,
       cards: [{ assetId: "a", x: 100, y: 60, width: 400, height: 300 }],
+    });
+  });
+
+  it("applies padding around viewport captures", () => {
+    const request = buildCaptureRequestFromFrames(
+      7,
+      [frame("a", 100, 50, 200, 150)],
+      { x: 50, y: 20, width: 500, height: 300 },
+      2,
+      false,
+      { x: 10, y: 16 },
+    );
+
+    expect(request).toMatchObject({
+      outputWidth: 1020,
+      outputHeight: 632,
+      cards: [{ assetId: "a", x: 110, y: 76, width: 400, height: 300 }],
     });
   });
 
@@ -74,6 +93,23 @@ describe("buildCaptureRequestFromFrames", () => {
         { assetId: "child-a", x: 74, y: 74, width: 80, height: 60 },
         { assetId: "child-b", x: 344, y: 234, width: 90, height: 70 },
       ],
+    });
+  });
+
+  it("supports separate x and y padding for cropped canvas captures", () => {
+    const request = buildCaptureRequestFromFrames(
+      7,
+      [frame("a", 10, 20, 200, 150)],
+      undefined,
+      1,
+      false,
+      { x: 12, y: 32 },
+    );
+
+    expect(request).toMatchObject({
+      outputWidth: 224,
+      outputHeight: 214,
+      cards: [{ assetId: "a", x: 12, y: 32, width: 200, height: 150 }],
     });
   });
 });
