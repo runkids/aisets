@@ -3,6 +3,7 @@ set -eu
 
 REPO="${AISETS_REPO:-runkids/aisets}"
 BINARY_NAME="aisets"
+IMGTOOLS_BINARY_NAME="aisets-imgtools"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -54,10 +55,17 @@ if [ ! -d "$INSTALL_DIR" ]; then
   run_privileged mkdir -p "$INSTALL_DIR"
 fi
 
+if [ ! -f "$tmp/$IMGTOOLS_BINARY_NAME" ]; then
+  echo "Release archive did not include $IMGTOOLS_BINARY_NAME." >&2
+  exit 1
+fi
+
 if [ -w "$INSTALL_DIR" ]; then
   install -m 0755 "$tmp/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+  install -m 0755 "$tmp/$IMGTOOLS_BINARY_NAME" "$INSTALL_DIR/$IMGTOOLS_BINARY_NAME"
 else
   run_privileged install -m 0755 "$tmp/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+  run_privileged install -m 0755 "$tmp/$IMGTOOLS_BINARY_NAME" "$INSTALL_DIR/$IMGTOOLS_BINARY_NAME"
 fi
 
 echo "Installed $($INSTALL_DIR/$BINARY_NAME version) to $INSTALL_DIR/$BINARY_NAME"

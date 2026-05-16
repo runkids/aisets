@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $BinaryName = "aisets"
 $ExeName = "$BinaryName.exe"
+$ImgtoolsExeName = "aisets-imgtools.exe"
 
 function Add-DirectoryToUserPath {
   param([string]$Directory)
@@ -80,8 +81,14 @@ try {
   Invoke-WebRequest -Uri $url -OutFile $archivePath
   Expand-Archive -Path $archivePath -DestinationPath $tmp -Force
 
+  $imgtoolsPath = Join-Path $tmp $ImgtoolsExeName
+  if (-not (Test-Path $imgtoolsPath)) {
+    throw "Release archive did not include $ImgtoolsExeName."
+  }
+
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Path (Join-Path $tmp $ExeName) -Destination (Join-Path $InstallDir $ExeName) -Force
+  Copy-Item -Path $imgtoolsPath -Destination (Join-Path $InstallDir $ImgtoolsExeName) -Force
   Add-DirectoryToUserPath $InstallDir
 
   $installed = Join-Path $InstallDir $ExeName
