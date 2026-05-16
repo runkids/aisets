@@ -36,7 +36,7 @@
 
 ## AI Canvas Demo
 
-AI Canvas lets agents work visually with image assets: stage references, move the camera, zoom into details, arrange cards, capture the result, and explain the composition.
+AI Canvas turns asset review into a shared visual workspace, not just a list of files. Ask an agent to gather related images, compare candidates, zoom into details, arrange evidence, mark what matters, capture the board, and explain the decision so cleanup, design review, and content audits are easier to trust.
 
 <p align="center">
   <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4">
@@ -149,19 +149,22 @@ If you installed to a custom `INSTALL_DIR`, remove `aisets` from that directory 
 
 ## Why Aisets
 
-Image debt sneaks into every codebase: duplicate icons, mystery screenshots, forgotten marketing exports, giant PNGs, unused files, broken naming, GPS metadata, and assets no one wants to touch because cleanup feels risky.
+Images look harmless until they become product debt.
 
-Aisets turns that pile into a visual, AI-assisted workflow:
+They get copied between repos, renamed without context, exported at the wrong size, checked in “just for now”, referenced from code no one remembers, and kept forever because deleting them feels unsafe. After a few releases, your asset folder is no longer a folder — it is an undocumented dependency graph.
 
-- **See the whole mess at once** — browse every image with size, format, dimensions, duplicates, usage, optimization hints, OCR, tags, and project context.
-- **Search by meaning, not filenames** — find “login screen”, “invoice screenshot”, “food photo”, or text inside images even when file names are useless.
-- **Let AI label the boring stuff** — generate categories, tags, descriptions, OCR text, translations, and semantic search data.
-- **Clean safely** — preview renames, duplicate merges, and unused-file deletion before anything changes.
-- **Fix asset bloat before users feel it** — spot giant images, missing responsive variants, lazy-loading issues, and format-conversion wins.
-- **Work across multiple repos** — great for design systems, app suites, asset packs, marketing sites, and long-lived projects.
-- **Stay local-first** — run the dashboard on your machine and choose when AI uses local models or external tools.
+Aisets exists to make that graph visible and actionable:
 
-If you have ever asked “can we delete this image?” and nobody knew the answer, Aisets is for you.
+- **Know what you have** — scan every project and see size, format, dimensions, usage, duplicates, optimization hints, OCR text, AI tags, and source context in one place.
+- **Find images the way humans remember them** — search for “login screen”, “receipt photo”, “old hero banner”, or text inside screenshots even when filenames say nothing.
+- **Turn unknown files into labeled inventory** — use AI to describe images, extract text, group themes, translate labels, and build semantic search data.
+- **Make cleanup reviewable** — inspect duplicate groups, unused candidates, rename plans, and optimization opportunities before touching the filesystem.
+- **Use AI Canvas for visual decisions** — gather related assets onto a board, compare variants, mark evidence, stage before/after cleanup plans, and capture a reviewable explanation.
+- **Reduce bloat with evidence** — prioritize oversized rasters, heavy GIFs, missing responsive variants, lazy-loading issues, and high-impact format conversions.
+- **Handle real codebases, not toy folders** — work across apps, design systems, asset packs, marketing sites, and long-lived monorepos.
+- **Stay local-first** — run the dashboard on your machine and choose whether AI runs locally, through installed agent CLIs, or through compatible providers.
+
+If your team has ever asked “can we delete this image?” and the honest answer was “I don’t know”, Aisets is built for that moment.
 
 ## AI That Actually Helps
 

@@ -25,7 +25,6 @@ import {
   type ChatMentionPreview,
   type ChatRunUsage,
   type CommentCanvasCard,
-  type CanvasRegion,
   type GroupCanvasCard,
   type GroupChildCanvasCard,
   type PendingAttachment,
@@ -36,7 +35,6 @@ import {
   CARD_WIDTH,
   adjacentCardPosition,
   compactImageAspectRatio,
-  imageMeta,
   nextCardPosition,
   nowISO,
 } from "./canvasUtils";
@@ -78,7 +76,6 @@ import {
   type AICursorState,
 } from "./canvasChatHelpers";
 import type { WorkingState } from "./aiCanvasTypes";
-
 
 export function useCanvasChat(opts: {
   scanId: number | undefined;

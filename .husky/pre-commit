@@ -1,3 +1,4 @@
+set -e
 pnpm exec lint-staged
 ./scripts/precommit-go.sh
 ./scripts/precommit-rust.sh

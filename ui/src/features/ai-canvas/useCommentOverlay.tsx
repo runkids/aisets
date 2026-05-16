@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { ArrowUp, Bot } from "lucide-react";
 import {
   useRef,
