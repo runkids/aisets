@@ -55,9 +55,6 @@ const composerActionClass =
   "border-white/[0.08] bg-white/[0.07] text-white/72 hover:bg-white/[0.12] hover:text-white";
 const composerIconClass =
   "rounded-full border-transparent bg-transparent text-white/52 hover:bg-white/[0.08] hover:text-white";
-const composerConfirmClass =
-  "border-white/80 bg-white text-black hover:bg-white/90";
-
 type GroupedBackendOptions = Array<{
   group: string;
   options: AIBackendOption[];
