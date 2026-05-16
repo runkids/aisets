@@ -1,7 +1,6 @@
 import {
   ArrowUp,
   AtSign,
-  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -9,13 +8,8 @@ import {
   MessageCircle,
   Layers,
   Paperclip,
-  Plus,
-  ScanText,
   Square,
-  Trash2,
-  WandSparkles,
   X,
-  XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import type { TFunction } from "i18next";
@@ -26,7 +20,6 @@ import {
   Button,
   CopyButton,
   IconButton,
-  Switch,
   Tooltip,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -49,7 +42,9 @@ import {
   type CanvasPromptHistoryState,
 } from "./canvasPromptHistory";
 import { renderMarkdown } from "./canvasUtils";
-import { proposalToolLabel } from "./proposalLabels";
+import { ComposerAddMenu } from "./ComposerAddMenu";
+import { ComposerChipRows } from "./ComposerChipRows";
+import { ComposerProposalPanel } from "./ComposerProposalPanel";
 import type {
   AIBackendOption,
   MentionableImageCard,
@@ -617,273 +612,37 @@ export function AICanvasComposer({
               )}
             </div>
           )}
-          {(selectedProposal?.status === "pending" ||
-            pendingProposals.length > 0) && (
-            <div className="mb-2 flex items-center gap-2 border-b border-white/[0.06] px-3 pb-2">
-              {selectedProposal?.status === "pending" ? (
-                <>
-                  <Badge tone="amber">
-                    {proposalToolLabel(t, selectedProposal.tool)}
-                  </Badge>
-                  <span className="min-w-0 flex-1 truncate text-g-caption text-white/70">
-                    {t("aiCanvas.pending")}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
-                    leadingIcon={<XCircle />}
-                    onClick={() => handleRejectProposal(selectedProposal)}
-                  >
-                    {t("aiCanvas.reject")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    leadingIcon={<Check />}
-                    className={composerConfirmClass}
-                    onClick={() => handleApproveProposal(selectedProposal)}
-                  >
-                    {t("aiCanvas.approve")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="min-w-0 flex-1 text-g-caption text-white/50">
-                    {t("aiCanvas.pendingProposals", {
-                      count: pendingProposals.length,
-                    })}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border-white/[0.08] text-white/58 hover:bg-white/[0.08] hover:text-white"
-                    onClick={() => {
-                      for (const p of pendingProposals) handleRejectProposal(p);
-                    }}
-                  >
-                    {t("aiCanvas.rejectAll")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    className={composerConfirmClass}
-                    onClick={() => {
-                      for (const p of pendingProposals)
-                        handleApproveProposal(p);
-                    }}
-                  >
-                    {t("aiCanvas.approveAll")}
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-          {mentionedImageCards.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2 px-1">
-              {mentionedImageCards.map((card) => (
-                <span
-                  key={card.id}
-                  className="inline-flex max-w-[220px] items-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.07] py-1 pl-1 pr-1.5 text-white/78"
-                >
-                  <AssetThumbnail
-                    src={card.src}
-                    size="sm"
-                    className="size-7 rounded-[10px] border-white/[0.1] bg-white/[0.06]"
-                    imageClassName="max-h-5 max-w-5"
-                    draggable={false}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-g-mono text-g-chip font-[510] tracking-g-mono">
-                      @{card.name}
-                    </span>
-                    <span className="block truncate text-[9px] leading-3 text-white/38">
-                      {card.meta}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={t("aiCanvas.removeMention")}
-                    className="grid size-5 shrink-0 place-items-center rounded-full text-white/42 transition-colors duration-[120ms] ease-g hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:shadow-g-focus"
-                    onClick={() =>
-                      setMentionedCardIds((current) =>
-                        current.filter((id) => id !== card.id),
-                      )
-                    }
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          {pendingAttachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2 px-1">
-              {pendingAttachments.map((att) => (
-                <span
-                  key={att.id}
-                  className="relative inline-flex flex-col items-center rounded-[14px] border border-white/[0.08] bg-white/[0.07] p-1"
-                >
-                  <img
-                    src={att.thumbnailDataUrl}
-                    alt={att.fileName}
-                    className="max-h-20 max-w-[120px] rounded-[10px] object-contain"
-                    draggable={false}
-                  />
-                  <span className="mt-0.5 max-w-[120px] truncate px-1 text-[10px] text-white/58">
-                    {att.fileName}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={t("aiCanvas.removeAttachment")}
-                    className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-white/[0.12] text-white/60 hover:bg-white/[0.2] hover:text-white"
-                    onClick={() =>
-                      setPendingAttachments((prev) =>
-                        prev.filter((a) => a.id !== att.id),
-                      )
-                    }
-                  >
-                    <X size={10} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
+          <ComposerProposalPanel
+            t={t}
+            selectedProposal={selectedProposal}
+            pendingProposals={pendingProposals}
+            handleApproveProposal={handleApproveProposal}
+            handleRejectProposal={handleRejectProposal}
+          />
+
+          <ComposerChipRows
+            t={t}
+            mentionedImageCards={mentionedImageCards}
+            setMentionedCardIds={setMentionedCardIds}
+            pendingAttachments={pendingAttachments}
+            setPendingAttachments={setPendingAttachments}
+          />
           <div className="flex min-h-10 items-center gap-2 pl-1 pr-0.5">
-            <DropdownMenuPrimitive.Root>
-              <DropdownMenuPrimitive.Trigger asChild>
-                <IconButton
-                  size="md"
-                  aria-label={t("aiCanvas.addAttachment")}
-                  className={composerIconClass}
-                >
-                  <Plus />
-                </IconButton>
-              </DropdownMenuPrimitive.Trigger>
-              <DropdownMenuPrimitive.Portal>
-                <DropdownMenuPrimitive.Content
-                  align="start"
-                  sideOffset={10}
-                  className="z-[80] min-w-[220px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.96)] p-2 shadow-g-pop backdrop-blur-xl animate-[modalIn_120ms_var(--g-ease-out)]"
-                >
-                  <DropdownMenuPrimitive.Item
-                    onSelect={handleAttachImage}
-                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[highlighted]:bg-white/[0.1]"
-                  >
-                    <Paperclip size={14} className="shrink-0 text-white/54" />
-                    <span>{t("aiCanvas.attachImage")}</span>
-                  </DropdownMenuPrimitive.Item>
-                  <DropdownMenuPrimitive.Item
-                    disabled={extractTextDisabled || isWorking}
-                    title={
-                      extractTextDisabled
-                        ? t("aiCanvas.extractTextDisabled")
-                        : undefined
-                    }
-                    onSelect={(event) => {
-                      if (extractTextDisabled || isWorking) {
-                        event.preventDefault();
-                        return;
-                      }
-                      void handleExtractText();
-                    }}
-                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
-                  >
-                    <ScanText size={14} className="shrink-0 text-white/54" />
-                    <span className="min-w-0 flex-1">
-                      {t("aiCanvas.extractText")}
-                    </span>
-                    {extractTextTargetCount > 0 && (
-                      <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-g-mono text-[10px] text-white/50">
-                        {extractTextTargetCount}
-                      </span>
-                    )}
-                  </DropdownMenuPrimitive.Item>
-                  <DropdownMenuPrimitive.Item
-                    disabled={mentionableImageCards.length === 0 || isWorking}
-                    title={
-                      mentionableImageCards.length === 0
-                        ? t("aiCanvas.photoStageDisabled")
-                        : undefined
-                    }
-                    onSelect={(event) => {
-                      if (mentionableImageCards.length === 0 || isWorking) {
-                        event.preventDefault();
-                        return;
-                      }
-                      handlePreparePhotoStaging();
-                      window.requestAnimationFrame(() => {
-                        promptInputRef.current?.focus();
-                      });
-                    }}
-                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
-                  >
-                    <Camera size={14} className="shrink-0 text-white/54" />
-                    <span className="min-w-0 flex-1">
-                      {t("aiCanvas.photoStage")}
-                    </span>
-                    {mentionableImageCards.length > 0 && (
-                      <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-g-mono text-[10px] text-white/50">
-                        {mentionableImageCards.length}
-                      </span>
-                    )}
-                  </DropdownMenuPrimitive.Item>
-                  <div
-                    className={cn(
-                      "flex min-h-12 items-center gap-3 rounded-[12px] px-3 py-2 font-g text-white outline-none transition-[background,box-shadow] duration-[120ms] ease-g",
-                      imageOptimizationAdvice
-                        ? "bg-[color-mix(in_srgb,var(--g-amber)_16%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--g-amber)_34%,transparent)] hover:bg-[color-mix(in_srgb,var(--g-amber)_22%,transparent)]"
-                        : "hover:bg-white/[0.06]",
-                    )}
-                  >
-                    <WandSparkles
-                      size={14}
-                      className={cn(
-                        "shrink-0",
-                        imageOptimizationAdvice
-                          ? "text-g-amber"
-                          : "text-white/54",
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          "text-g-ui font-[510]",
-                          imageOptimizationAdvice && "text-g-amber",
-                        )}
-                      >
-                        {t("aiCanvas.imageOptimizationAdvice")}
-                      </div>
-                      <div
-                        className={cn(
-                          "mt-0.5 text-g-caption",
-                          imageOptimizationAdvice
-                            ? "text-white/60"
-                            : "text-white/42",
-                        )}
-                      >
-                        {t("aiCanvas.imageOptimizationAdviceDesc")}
-                      </div>
-                    </div>
-                    <Switch
-                      checked={imageOptimizationAdvice}
-                      onCheckedChange={setImageOptimizationAdvice}
-                      aria-label={t("aiCanvas.imageOptimizationAdvice")}
-                      className="data-[state=checked]:!bg-[color-mix(in_srgb,var(--g-amber)_72%,var(--g-surface-3))]"
-                    />
-                  </div>
-                  <DropdownMenuPrimitive.Separator className="mx-2 my-2 h-px bg-white/[0.1]" />
-                  <DropdownMenuPrimitive.Item
-                    disabled={chatHistory.length === 0}
-                    onSelect={clearChatHistory}
-                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-1.5 font-g text-g-ui font-[510] text-white outline-none transition-colors duration-[120ms] ease-g data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.38] data-[highlighted]:bg-white/[0.1]"
-                  >
-                    <Trash2 size={14} className="shrink-0 text-white/54" />
-                    <span>{t("aiCanvas.clearChat")}</span>
-                  </DropdownMenuPrimitive.Item>
-                </DropdownMenuPrimitive.Content>
-              </DropdownMenuPrimitive.Portal>
-            </DropdownMenuPrimitive.Root>
+            <ComposerAddMenu
+              t={t}
+              handleAttachImage={handleAttachImage}
+              handleExtractText={handleExtractText}
+              handlePreparePhotoStaging={handlePreparePhotoStaging}
+              extractTextDisabled={extractTextDisabled}
+              extractTextTargetCount={extractTextTargetCount}
+              isWorking={isWorking}
+              mentionableImageCards={mentionableImageCards}
+              promptInputRef={promptInputRef}
+              imageOptimizationAdvice={imageOptimizationAdvice}
+              setImageOptimizationAdvice={setImageOptimizationAdvice}
+              chatHistory={chatHistory}
+              clearChatHistory={clearChatHistory}
+            />
             <IconButton
               size="sm"
               aria-label={t("aiCanvas.attachImage")}
