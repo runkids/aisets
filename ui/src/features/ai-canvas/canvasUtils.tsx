@@ -6,6 +6,7 @@ import type {
   AssetCanvasCard,
   CanvasCard,
   CommentCanvasCard,
+  GroupCanvasCard,
   UploadCanvasCard,
   VariantCanvasCard,
 } from "./aiCanvasState";
@@ -370,9 +371,16 @@ export function intersects(
 
 export function isImageCard(
   card: CanvasCard,
-): card is AssetCanvasCard | UploadCanvasCard | VariantCanvasCard {
+): card is
+  | AssetCanvasCard
+  | UploadCanvasCard
+  | VariantCanvasCard
+  | GroupCanvasCard {
   return (
-    card.kind === "asset" || card.kind === "upload" || card.kind === "variant"
+    card.kind === "asset" ||
+    card.kind === "upload" ||
+    card.kind === "variant" ||
+    card.kind === "group"
   );
 }
 
@@ -388,6 +396,9 @@ export function compactImageAspectRatio(card: CanvasCard) {
     if (width > 0 && height > 0) return width / height;
   }
   if (card.kind === "variant" && card.width && card.height) {
+    return card.width / card.height;
+  }
+  if (card.kind === "group" && card.width > 0 && card.height > 0) {
     return card.width / card.height;
   }
   return DEFAULT_IMAGE_ASPECT_RATIO;
@@ -414,6 +425,7 @@ export function cardTone(card: CanvasCard) {
   if (card.kind === "assistant") return "border-g-line-strong";
   if (card.kind === "variant") return "border-g-blue/50";
   if (card.kind === "upload") return "border-g-purple/50";
+  if (card.kind === "group") return "border-g-line-strong";
   return "border-g-green/50";
 }
 

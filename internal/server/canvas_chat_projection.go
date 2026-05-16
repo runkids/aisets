@@ -227,6 +227,69 @@ func applyCanvasActionResultToSnapshot(canvas canvasSnapshot, tool string, resul
 			}
 		}
 		next.SelectedCardIDs = selected
+	case "group_cards":
+		ids := canvasParamStringSlice(values["cardIds"])
+		boxes := canvasProjectedCardBoxes(next, ids)
+		if len(boxes) >= 2 {
+			minX, minY := boxes[0].X, boxes[0].Y
+			maxRight, maxBottom := boxes[0].right(), boxes[0].bottom()
+			for _, box := range boxes[1:] {
+				minX = min(minX, box.X)
+				minY = min(minY, box.Y)
+				maxRight = max(maxRight, box.right())
+				maxBottom = max(maxBottom, box.bottom())
+			}
+			remove := map[string]bool{}
+			for _, id := range ids {
+				remove[id] = true
+			}
+			filtered := next.Cards[:0]
+			for _, card := range next.Cards {
+				if !remove[card.ID] {
+					filtered = append(filtered, card)
+				}
+			}
+			groupID := canvasValueString(values["groupId"])
+			if groupID == "" {
+				groupID = "group-projected"
+			}
+			filtered = append(filtered, canvasCardSnapshot{
+				ID:      groupID,
+				Kind:    "group",
+				Name:    canvasValueString(values["name"]),
+				CardIDs: ids,
+				X:       minX,
+				Y:       minY,
+				Width:   max(1, maxRight-minX),
+				Height:  max(1, maxBottom-minY),
+			})
+			next.Cards = filtered
+			next.SelectedCardIDs = []string{groupID}
+		}
+	case "ungroup_card":
+		id := canvasValueString(values["cardId"])
+		if id != "" {
+			filtered := next.Cards[:0]
+			for _, card := range next.Cards {
+				if card.ID != id {
+					filtered = append(filtered, card)
+				}
+			}
+			next.Cards = filtered
+			next.SelectedCardIDs = nil
+		}
+	case "rename_group":
+		id := canvasValueString(values["cardId"])
+		name := canvasValueString(values["name"])
+		if id != "" && name != "" {
+			for i := range next.Cards {
+				if next.Cards[i].ID == id && next.Cards[i].Kind == "group" {
+					next.Cards[i].Name = name
+					break
+				}
+			}
+			next.SelectedCardIDs = []string{id}
+		}
 	case "duplicate_cards":
 		positions := canvasPositionsByCardID(values["positions"])
 		var createdIDs []string

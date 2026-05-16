@@ -33,15 +33,16 @@ func canvasSkillCatalog() []canvasSkillFamily {
 		{
 			ID:          canvasSkillLayout,
 			Description: "Canvas card focus, selection, movement, arrangement, visual sizing, grouping, and layer order.",
-			Triggers:    []string{"move", "arrange", "layout", "select", "remove", "duplicate", "copy", "clone", "align", "distribute", "resize card", "front", "storyboard", "compose"},
+			Triggers:    []string{"move", "arrange", "layout", "select", "remove", "duplicate", "copy", "clone", "group", "ungroup", "rename group", "align", "distribute", "resize card", "front", "storyboard", "compose"},
 			Tools: []string{
-				"focus_card", "select_cards", "remove_cards", "duplicate_cards", "move_card", "arrange_cards",
+				"focus_card", "select_cards", "remove_cards", "duplicate_cards", "group_cards", "ungroup_card", "rename_group", "move_card", "arrange_cards",
 				"align_cards", "distribute_cards", "resize_card", "bring_cards_to_front", "inspect_canvas",
 			},
 			Rules: `## Layout Skill
 - Card positions are top-left canvas coordinates. Use each card's size when spacing items.
 - Directional requests like right/left/up/down usually mean a nearby relative move, not a jump across the board.
 - For arrange, storyboard, compose, or scene requests, operate on the canvas with duplicate_cards, arrange_cards, resize_card, align_cards, or distribute_cards; do not answer with only a written plan.
+- For grouping requests, use group_cards with the intended image card IDs and optional name. Use rename_group for a group label change and ungroup_card to break a group back into image cards.
 - For 8+ cards, prefer a broad multi-row layout about 1600-2400px wide with 160px+ horizontal and 120px+ vertical gaps unless the user asks for a tight collage.
 - To put one image in front of another, use bring_cards_to_front; changing x/y does not change layer order.
 - If visual overlap or spacing is uncertain, use inspect_canvas before finalizing.`,

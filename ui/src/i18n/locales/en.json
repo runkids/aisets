@@ -85,6 +85,12 @@
     "convertAuto": "Auto",
     "duplicateImage": "Duplicate image",
     "duplicatedImages": "Duplicated {{count}} images",
+    "groupSelected": "Group selected images",
+    "renameGroup": "Rename group",
+    "renameGroupTitle": "Name group",
+    "groupNamePlaceholder": "Group name",
+    "ungroup": "Ungroup",
+    "groupLabel": "Group ({{count}} images)",
     "describePrompt": "Describe the selected canvas context.",
     "describe": "Describe",
     "openAsset": "Open asset",
@@ -137,6 +143,8 @@
     "clearChat": "Clear chat",
     "commentCard": "Comment",
     "deleteCard": "Delete card",
+    "deleteGroup": "Delete group",
+    "deleteGroupConfirmMessage": "This group and its {{count}} images will be removed from the canvas. Source files will not be deleted. This cannot be undone.",
     "closeSearch": "Collapse search",
     "openSearch": "Open asset search",
     "noSearchResults": "No matching assets found",
@@ -234,7 +242,8 @@
       "comment": "Comment",
       "assistant": "AI card",
       "proposal": "Proposal",
-      "operation": "Preview"
+      "operation": "Preview",
+      "group": "Group"
     },
     "stopChat": "Stop AI",
     "assetRemovedError": "This asset is no longer on the canvas.",
@@ -273,7 +282,8 @@
       "proposal": "Proposal",
       "operation": "Operation",
       "asset": "Asset",
-      "upload": "Upload"
+      "upload": "Upload",
+      "group": "Group"
     },
     "save": "Save",
     "saveAs": "Save as",

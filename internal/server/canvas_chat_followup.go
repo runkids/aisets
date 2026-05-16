@@ -455,7 +455,7 @@ func canvasVisibleImageCards(canvas canvasSnapshot, limit int) []canvasCardSnaps
 			continue
 		}
 		switch card.Kind {
-		case "asset", "upload", "variant":
+		case "asset", "upload", "variant", "group":
 			seen[card.ID] = true
 			cards = append(cards, card)
 			if limit > 0 && len(cards) >= limit {
@@ -542,6 +542,10 @@ func compactCanvasPhotoStagingCard(card canvasCardSnapshot) map[string]any {
 		out["uploadWidth"] = card.UploadWidth
 		out["uploadHeight"] = card.UploadHeight
 	}
+	if card.Kind == "group" {
+		out["name"] = card.Name
+		out["cardIds"] = card.CardIDs
+	}
 	return out
 }
 
@@ -617,6 +621,10 @@ func compactCanvasCard(card canvasCardSnapshot) map[string]any {
 		out["fileName"] = card.UploadFileName
 		out["uploadWidth"] = card.UploadWidth
 		out["uploadHeight"] = card.UploadHeight
+	}
+	if card.Kind == "group" {
+		out["name"] = card.Name
+		out["cardIds"] = card.CardIDs
 	}
 	return out
 }

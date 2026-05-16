@@ -136,6 +136,20 @@ func canvasToolParameters(name string) map[string]any {
 			"count":  canvasIntegerSchema("Number of new copies per source card."),
 			"layout": canvasStringSchema("Optional layout hint such as row, walk, or scatter."),
 		}))
+	case "group_cards":
+		return canvasObjectSchema([]string{"cardIds"}, map[string]any{
+			"cardIds": canvasStringArraySchema("Two or more image canvas card IDs to group."),
+			"name":    canvasStringSchema("Optional group name/label."),
+		})
+	case "ungroup_card":
+		return canvasObjectSchema([]string{"cardId"}, map[string]any{
+			"cardId": canvasStringSchema("Canvas group card ID to ungroup."),
+		})
+	case "rename_group":
+		return canvasObjectSchema([]string{"cardId", "name"}, map[string]any{
+			"cardId": canvasStringSchema("Canvas group card ID to rename."),
+			"name":   canvasStringSchema("New group name/label."),
+		})
 	case "move_card":
 		return canvasObjectSchema([]string{"cardId", "x", "y"}, map[string]any{
 			"cardId": canvasStringSchema("Canvas card ID."),

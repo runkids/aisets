@@ -85,6 +85,12 @@
     "convertAuto": "自動",
     "duplicateImage": "複製圖片",
     "duplicatedImages": "已複製 {{count}} 張圖片",
+    "groupSelected": "群組選取圖片",
+    "renameGroup": "重新命名群組",
+    "renameGroupTitle": "命名群組",
+    "groupNamePlaceholder": "群組名稱",
+    "ungroup": "解除群組",
+    "groupLabel": "群組（{{count}} 張圖片）",
     "describePrompt": "描述目前選取的畫布上下文",
     "describe": "描述",
     "openAsset": "開啟素材",
@@ -137,6 +143,8 @@
     "clearChat": "清空對話",
     "commentCard": "註解",
     "deleteCard": "刪除卡片",
+    "deleteGroup": "刪除群組",
+    "deleteGroupConfirmMessage": "此群組及其中 {{count}} 張圖片會從畫布移除，來源檔案不會被刪除。此操作無法復原。",
     "closeSearch": "收合搜尋",
     "openSearch": "開啟素材搜尋",
     "noSearchResults": "找不到相符的素材",
@@ -234,7 +242,8 @@
       "comment": "註解",
       "assistant": "AI 卡片",
       "proposal": "提案",
-      "operation": "預覽"
+      "operation": "預覽",
+      "group": "群組"
     },
     "stopChat": "停止 AI",
     "assetRemovedError": "此 asset 已不在畫布上",
@@ -273,7 +282,8 @@
       "proposal": "提案",
       "operation": "操作",
       "asset": "素材",
-      "upload": "上傳"
+      "upload": "上傳",
+      "group": "群組"
     },
     "save": "儲存",
     "saveAs": "另存新檔",

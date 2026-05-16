@@ -60,6 +60,8 @@ import {
   type ChatActivityEntry,
   type ChatAttachment,
   type CommentCanvasCard,
+  type GroupCanvasCard,
+  type GroupChildCanvasCard,
   type ChatHistoryEntry,
   type ChatMentionPreview,
   type ChatRunUsage,
@@ -868,6 +870,27 @@ export function AICanvasView({
   }, []);
 
   useEffect(() => {
+    function onSelectAllImageCardsShortcut(e: KeyboardEvent) {
+      if (e.isComposing || isTypingTarget(e.target)) return;
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "a") return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      setSelectedCardIds(cards.filter(isImageCard).map((card) => card.id));
+    }
+
+    document.addEventListener("keydown", onSelectAllImageCardsShortcut, {
+      capture: true,
+    });
+    return () => {
+      document.removeEventListener("keydown", onSelectAllImageCardsShortcut, {
+        capture: true,
+      });
+    };
+  }, [cards]);
+
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key === "D") {
         e.preventDefault();
@@ -952,6 +975,95 @@ export function AICanvasView({
       setSelectedCardIds([]);
     },
     [cards],
+  );
+
+  const groupSelectedCards = useCallback(() => {
+    const selected = new Set(selectedCardIds);
+    const groupableCards = cards.filter(
+      (card): card is GroupChildCanvasCard =>
+        selected.has(card.id) &&
+        (card.kind === "asset" ||
+          card.kind === "upload" ||
+          card.kind === "variant"),
+    );
+    if (groupableCards.length < 2 || groupableCards.length !== selected.size) {
+      return;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const childWidths: Record<string, number> = {};
+    for (const card of groupableCards) {
+      const metrics = cardLayoutMetrics[card.id];
+      const width = metrics?.width ?? cardWidths[card.id] ?? CARD_WIDTH;
+      const height = metrics?.height ?? width / compactImageAspectRatio(card);
+      childWidths[card.id] = width;
+      minX = Math.min(minX, card.x);
+      minY = Math.min(minY, card.y);
+      maxX = Math.max(maxX, card.x + width);
+      maxY = Math.max(maxY, card.y + height);
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
+
+    const groupId = createCanvasCardId("group");
+    const group: GroupCanvasCard = {
+      id: groupId,
+      kind: "group",
+      x: minX,
+      y: minY,
+      createdAt: nowISO(),
+      cards: groupableCards.map((card) => ({
+        ...card,
+        x: card.x - minX,
+        y: card.y - minY,
+      })),
+      cardWidths: childWidths,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    };
+
+    setCards((current) => [
+      ...current.filter((card) => !selected.has(card.id)),
+      group,
+    ]);
+    setCardWidths((current) => {
+      const next = { ...current, [groupId]: group.width };
+      for (const id of selected) delete next[id];
+      return next;
+    });
+    setSelectedCardIds([groupId]);
+  }, [cardLayoutMetrics, cardWidths, cards, selectedCardIds]);
+
+  const ungroupCard = useCallback(
+    (target: GroupCanvasCard) => {
+      const renderedWidth = cardWidths[target.id] ?? target.width;
+      const scale = target.width > 0 ? renderedWidth / target.width : 1;
+      const childWidths = target.cardWidths ?? {};
+      const restoredCards = target.cards.map((card) => ({
+        ...card,
+        x: target.x + card.x * scale,
+        y: target.y + card.y * scale,
+      }));
+
+      setCards((current) =>
+        current.flatMap((card) =>
+          card.id === target.id ? restoredCards : [card],
+        ),
+      );
+      setCardWidths((current) => {
+        const next = { ...current };
+        delete next[target.id];
+        for (const card of target.cards) {
+          const width = childWidths[card.id];
+          if (width) next[card.id] = width * scale;
+        }
+        return next;
+      });
+      setSelectedCardIds(target.cards.map((card) => card.id));
+    },
+    [cardWidths],
   );
 
   const duplicateCard = useCallback(
@@ -1559,6 +1671,8 @@ export function AICanvasView({
         onDeleteCard={deleteCard}
         onDeleteSelectedCards={deleteSelectedCards}
         onDuplicateCard={duplicateCard}
+        onGroupSelectedCards={groupSelectedCards}
+        onUngroupCard={ungroupCard}
         onRegisterCard={registerMeasuredCardElement}
         onAddComment={addComment}
         onCreateImagePreview={createImagePreview}

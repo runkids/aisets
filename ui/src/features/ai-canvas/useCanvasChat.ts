@@ -26,6 +26,8 @@ import {
   type ChatRunUsage,
   type CommentCanvasCard,
   type CanvasRegion,
+  type GroupCanvasCard,
+  type GroupChildCanvasCard,
   type PendingAttachment,
   type UploadCanvasCard,
   type VariantCanvasCard,
@@ -33,6 +35,7 @@ import {
 import {
   CARD_WIDTH,
   adjacentCardPosition,
+  compactImageAspectRatio,
   imageMeta,
   nextCardPosition,
   nowISO,
@@ -363,7 +366,8 @@ function imageCards(cards: CanvasCard[]) {
     (card) =>
       card.kind === "asset" ||
       card.kind === "upload" ||
-      card.kind === "variant",
+      card.kind === "variant" ||
+      card.kind === "group",
   );
 }
 
@@ -1164,6 +1168,156 @@ export function useCanvasChat(opts: {
       });
     }
 
+    function groupCardsFromResult(result: unknown) {
+      const r = result as {
+        cardIds?: unknown;
+        groupId?: unknown;
+        name?: unknown;
+      };
+      const ids = Array.isArray(r.cardIds)
+        ? r.cardIds.filter(
+            (id): id is string =>
+              typeof id === "string" &&
+              canvasCards.some((card) => card.id === id),
+          )
+        : [];
+      const groupableCards = ids
+        .map((id) => canvasCards.find((card) => card.id === id))
+        .filter(
+          (card): card is GroupChildCanvasCard =>
+            card?.kind === "asset" ||
+            card?.kind === "upload" ||
+            card?.kind === "variant",
+        );
+      if (groupableCards.length < 2) return;
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      const childWidths: Record<string, number> = {};
+      for (const card of groupableCards) {
+        const width = cardLayoutMetrics[card.id]?.width ?? CARD_WIDTH;
+        const height =
+          cardLayoutMetrics[card.id]?.height ??
+          width / compactImageAspectRatio(card);
+        childWidths[card.id] = width;
+        minX = Math.min(minX, card.x);
+        minY = Math.min(minY, card.y);
+        maxX = Math.max(maxX, card.x + width);
+        maxY = Math.max(maxY, card.y + height);
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
+
+      const groupId =
+        typeof r.groupId === "string" ? r.groupId : createCanvasCardId("group");
+      const group: GroupCanvasCard = {
+        id: groupId,
+        kind: "group",
+        name:
+          typeof r.name === "string" && r.name.trim()
+            ? r.name.trim()
+            : undefined,
+        x: minX,
+        y: minY,
+        createdAt: nowISO(),
+        cards: groupableCards.map((card) => ({
+          ...card,
+          x: card.x - minX,
+          y: card.y - minY,
+        })),
+        cardWidths: childWidths,
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY),
+      };
+      const removeSet = new Set(groupableCards.map((card) => card.id));
+      canvasCards = [
+        ...canvasCards.filter((card) => !removeSet.has(card.id)),
+        group,
+      ];
+      newCards.push(group);
+      setCards((current) => [
+        ...current.filter((card) => !removeSet.has(card.id)),
+        group,
+      ]);
+      setCardWidths((current) => {
+        const next = { ...current, [group.id]: group.width };
+        for (const id of removeSet) delete next[id];
+        return next;
+      });
+      setSelectedCardIds([group.id]);
+      setAiCursor({
+        ...focusCursorPosition(
+          group,
+          {
+            ...cardLayoutMetrics,
+            [group.id]: { width: group.width, height: group.height },
+          },
+          viewport.scale,
+        ),
+        label:
+          group.name || t("aiCanvas.groupLabel", { count: group.cards.length }),
+        emoji: "layer",
+        status: "acting",
+      });
+    }
+
+    function ungroupCardFromResult(result: unknown) {
+      const r = result as { cardId?: unknown };
+      if (typeof r.cardId !== "string") return;
+      const group = canvasCards.find(
+        (card): card is GroupCanvasCard =>
+          card.kind === "group" && card.id === r.cardId,
+      );
+      if (!group) return;
+      const renderedWidth = cardLayoutMetrics[group.id]?.width ?? group.width;
+      const scale = group.width > 0 ? renderedWidth / group.width : 1;
+      const childWidths = group.cardWidths ?? {};
+      const restoredCards = group.cards.map((card) => ({
+        ...card,
+        x: group.x + card.x * scale,
+        y: group.y + card.y * scale,
+      }));
+      canvasCards = canvasCards.flatMap((card) =>
+        card.id === group.id ? restoredCards : [card],
+      );
+      setCards((current) =>
+        current.flatMap((card) =>
+          card.id === group.id ? restoredCards : [card],
+        ),
+      );
+      setCardWidths((current) => {
+        const next = { ...current };
+        delete next[group.id];
+        for (const card of group.cards) {
+          const width = childWidths[card.id];
+          if (width) next[card.id] = width * scale;
+        }
+        return next;
+      });
+      setSelectedCardIds(group.cards.map((card) => card.id));
+    }
+
+    function renameGroupFromResult(result: unknown) {
+      const r = result as { cardId?: unknown; name?: unknown };
+      if (typeof r.cardId !== "string" || typeof r.name !== "string") return;
+      const name = r.name.trim();
+      if (!name) return;
+      canvasCards = canvasCards.map((card) =>
+        card.kind === "group" && card.id === r.cardId
+          ? { ...card, name }
+          : card,
+      );
+      setCards((current) =>
+        current.map((card) =>
+          card.kind === "group" && card.id === r.cardId
+            ? { ...card, name }
+            : card,
+        ),
+      );
+      setSelectedCardIds([r.cardId]);
+    }
+
     function duplicateCardsFromResult(result: unknown) {
       const copies = duplicateCardCopiesFromActionResult(result);
       if (copies.length === 0) return;
@@ -1478,6 +1632,15 @@ export function useCanvasChat(opts: {
             });
           }
         }
+      }
+      if (event.type === "action_result" && event.tool === "group_cards") {
+        groupCardsFromResult(event.result);
+      }
+      if (event.type === "action_result" && event.tool === "ungroup_card") {
+        ungroupCardFromResult(event.result);
+      }
+      if (event.type === "action_result" && event.tool === "rename_group") {
+        renameGroupFromResult(event.result);
       }
       if (event.type === "action_result" && event.tool === "duplicate_cards") {
         duplicateCardsFromResult(event.result);

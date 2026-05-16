@@ -67,6 +67,55 @@ func TestCanvasHarnessNativeToolResultsCanContinueCaptureChain(t *testing.T) {
 	}
 }
 
+func TestCanvasHarnessGroupToolsCreateRenameAndUngroupCanvasGroup(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, provider := runCanvasToolUseHarness(
+		t,
+		"把目前選取的兩張圖片群組成一組，命名為主視覺，然後改名成封面組，最後解除群組。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a", "card-b"),
+		canvasHarnessToolCall("group_cards", map[string]any{"cardIds": []any{"card-a", "card-b"}, "name": "Hero group"}),
+		canvasHarnessToolCall("rename_group", map[string]any{"cardId": "group-test", "name": "Cover group"}),
+		canvasHarnessToolCall("ungroup_card", map[string]any{"cardId": "group-test"}),
+	)
+	requireCanvasHarnessToolEventOrder(t, events, "group_cards", "rename_group", "ungroup_card")
+	groupEvent := requireCanvasHarnessEvent(t, events, "action_result", "group_cards")
+	groupResult, ok := groupEvent["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("group result = %#v", groupEvent["result"])
+	}
+	if got := canvasHarnessEventStringSlice(groupResult["cardIds"]); !reflect.DeepEqual(got, []string{"card-a", "card-b"}) {
+		t.Fatalf("group cardIds = %#v", got)
+	}
+	if strings.TrimSpace(fmt.Sprint(groupResult["groupId"])) == "" {
+		t.Fatalf("groupId missing in result: %#v", groupResult)
+	}
+	requests := provider.Requests()
+	if len(requests) < 3 {
+		t.Fatalf("expected group follow-up loop, got %d requests", len(requests))
+	}
+	if prompt := requests[1].Messages[len(requests[1].Messages)-1].Content; !strings.Contains(prompt, `"kind":"group"`) || !strings.Contains(prompt, `"name":"Hero group"`) {
+		t.Fatalf("group follow-up prompt did not project group state:\n%s", prompt)
+	}
+}
+
+func TestCanvasHarnessGroupCardsUsesSelectedImagesWhenCardIdsOmitted(t *testing.T) {
+	bootstrap := newCanvasToolUseHarness(t)
+	events, _ := runCanvasToolUseHarness(
+		t,
+		"把目前選取的圖片群組起來。",
+		canvasHarnessSnapshot(bootstrap.assetA, bootstrap.assetB, "card-a", "card-b"),
+		canvasHarnessToolCall("group_cards", map[string]any{"name": "Selected group"}),
+	)
+	event := requireCanvasHarnessEvent(t, events, "action_result", "group_cards")
+	result, ok := event["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("group result = %#v", event["result"])
+	}
+	if got := canvasHarnessEventStringSlice(result["cardIds"]); !reflect.DeepEqual(got, []string{"card-a", "card-b"}) {
+		t.Fatalf("expanded group cardIds = %#v", got)
+	}
+}
+
 func TestCanvasHarnessDuplicateCleanupProtectsSelectedOriginals(t *testing.T) {
 	snapshot := canvasHarnessGenericRecoverySnapshot()
 	snapshot.SelectedCardIDs = []string{"card-primary", "card-secondary"}

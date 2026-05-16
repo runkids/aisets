@@ -11,7 +11,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import type { TFunction } from "i18next";
-import { ConfirmDialog } from "@/components/ui";
+import { ConfirmDialog, PromptDialog } from "@/components/ui";
 import {
   AICursor,
   AssetCardBody,
@@ -19,6 +19,8 @@ import {
   AssistantCardBody,
   CardShell,
   CommentCardBody,
+  GroupCardBody,
+  GroupContextMenu,
   OperationCardBody,
   ProposalCardBody,
   SelectionContextMenu,
@@ -38,6 +40,7 @@ import type {
   AssetCanvasCard,
   CanvasCard,
   CommentCanvasCard,
+  GroupCanvasCard,
 } from "./aiCanvasState";
 
 type CommentConnector = {
@@ -95,6 +98,8 @@ type AICanvasStageProps = {
   onDeleteCard: (target: CanvasCard) => void;
   onDeleteSelectedCards: (ids: string[]) => void;
   onDuplicateCard: (target: CanvasCard) => void;
+  onGroupSelectedCards: () => void;
+  onUngroupCard: (target: GroupCanvasCard) => void;
   onRegisterCard: (cardId: string, node: HTMLElement | null) => void;
   onAddComment: (
     anchorCard: CanvasCard,
@@ -141,6 +146,8 @@ export function AICanvasStage({
   onDeleteCard,
   onDeleteSelectedCards,
   onDuplicateCard,
+  onGroupSelectedCards,
+  onUngroupCard,
   onRegisterCard,
   onAddComment,
   onCreateImagePreview,
@@ -151,6 +158,13 @@ export function AICanvasStage({
   const [deleteConfirmSelectedIds, setDeleteConfirmSelectedIds] = useState<
     string[] | null
   >(null);
+  const [renameGroupTarget, setRenameGroupTarget] =
+    useState<GroupCanvasCard | null>(null);
+  const [selectionMenuPos, setSelectionMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const selectionContextMenuRef = useRef<HTMLDivElement | null>(null);
   const latestHandlersRef = useRef({
     onAddComment,
     onCreateImagePreview,
@@ -160,8 +174,10 @@ export function AICanvasStage({
     onDragMove,
     onDragStart,
     onDuplicateCard,
+    onGroupSelectedCards,
     onOpenAsset,
     onRegisterCard,
+    onUngroupCard,
   });
   useEffect(() => {
     latestHandlersRef.current = {
@@ -173,8 +189,10 @@ export function AICanvasStage({
       onDragMove,
       onDragStart,
       onDuplicateCard,
+      onGroupSelectedCards,
       onOpenAsset,
       onRegisterCard,
+      onUngroupCard,
     };
   }, [
     onAddComment,
@@ -185,10 +203,54 @@ export function AICanvasStage({
     onDragMove,
     onDragStart,
     onDuplicateCard,
+    onGroupSelectedCards,
     onOpenAsset,
     onRegisterCard,
+    onUngroupCard,
   ]);
   const hasOpenAssetHandler = Boolean(onOpenAsset);
+
+  useEffect(() => {
+    if (!selectionMenuPos) return;
+    function dismiss(event: PointerEvent) {
+      const menu = selectionContextMenuRef.current;
+      if (menu && event.target instanceof Node && menu.contains(event.target)) {
+        return;
+      }
+      setSelectionMenuPos(null);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setSelectionMenuPos(null);
+    }
+    const frame = requestAnimationFrame(() => {
+      document.addEventListener("pointerdown", dismiss);
+      document.addEventListener("keydown", onKeyDown);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectionMenuPos]);
+
+  const selectedCards = useMemo(
+    () =>
+      selectedCardIds
+        .map((id) => cards.find((card) => card.id === id))
+        .filter((card): card is CanvasCard => Boolean(card)),
+    [cards, selectedCardIds],
+  );
+  const canGroupSelection = useMemo(
+    () =>
+      selectedCards.length > 1 &&
+      selectedCards.every(
+        (card) =>
+          card.kind === "asset" ||
+          card.kind === "upload" ||
+          card.kind === "variant",
+      ),
+    [selectedCards],
+  );
 
   const renderedCards = useMemo(() => {
     return cards.map((card) => {
@@ -260,6 +322,11 @@ export function AICanvasStage({
             selectedCardIds.length > 1 && selectedCardIds.includes(card.id) ? (
               <SelectionContextMenu
                 count={selectedCardIds.length}
+                onGroup={
+                  canGroupSelection
+                    ? () => latestHandlersRef.current.onGroupSelectedCards()
+                    : undefined
+                }
                 onDelete={() =>
                   setDeleteConfirmSelectedIds([...selectedCardIds])
                 }
@@ -314,6 +381,13 @@ export function AICanvasStage({
                 }
                 onDelete={() => setDeleteConfirmCard(card)}
               />
+            ) : card.kind === "group" ? (
+              <GroupContextMenu
+                card={card}
+                onRename={() => setRenameGroupTarget(card)}
+                onUngroup={() => latestHandlersRef.current.onUngroupCard(card)}
+                onDelete={() => setDeleteConfirmCard(card)}
+              />
             ) : undefined
           }
         >
@@ -343,6 +417,8 @@ export function AICanvasStage({
             <ProposalCardBody card={card} />
           ) : card.kind === "operation" ? (
             <OperationCardBody card={card} />
+          ) : card.kind === "group" ? (
+            <GroupCardBody card={card} />
           ) : card.kind === "upload" ? (
             <UploadCardBody
               card={card}
@@ -372,6 +448,7 @@ export function AICanvasStage({
     hideNonImageCards,
     hasOpenAssetHandler,
     isWorking,
+    canGroupSelection,
     selectedCardIds,
     setCards,
     setCardWidths,
@@ -454,14 +531,56 @@ export function AICanvasStage({
           {renderedCards}
           {groupBounds && !hideNonImageCards && (
             <div
-              className="pointer-events-none absolute z-[38] rounded-g-sm border-2 border-dashed border-[#0d99ff]"
+              className="absolute z-[38] rounded-g-sm border-2 border-dashed border-[#0d99ff]"
               style={{
                 left: groupBounds.x - 8,
                 top: groupBounds.y - 8,
                 width: groupBounds.w + 16,
                 height: groupBounds.h + 16,
               }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const innerBounds =
+                  canvasInnerRef.current?.getBoundingClientRect();
+                const scale = Math.max(0.01, viewport.scale);
+                setSelectionMenuPos(
+                  innerBounds
+                    ? {
+                        x: (event.clientX - innerBounds.left) / scale,
+                        y: (event.clientY - innerBounds.top) / scale,
+                      }
+                    : { x: groupBounds.x, y: groupBounds.y },
+                );
+              }}
             />
+          )}
+          {selectionMenuPos && selectedCardIds.length > 1 && (
+            <div
+              ref={selectionContextMenuRef}
+              className="z-[1300] min-w-[220px] max-w-[320px] rounded-[18px] border border-white/[0.08] bg-[rgba(31,31,31,0.98)] p-1.5 shadow-g-md"
+              style={{
+                position: "absolute",
+                left: selectionMenuPos.x,
+                top: selectionMenuPos.y,
+                transform: `scale(${1 / Math.max(0.01, viewport.scale)})`,
+                transformOrigin: "left top",
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setSelectionMenuPos(null)}
+            >
+              <SelectionContextMenu
+                count={selectedCardIds.length}
+                onGroup={
+                  canGroupSelection
+                    ? () => latestHandlersRef.current.onGroupSelectedCards()
+                    : undefined
+                }
+                onDelete={() =>
+                  setDeleteConfirmSelectedIds([...selectedCardIds])
+                }
+              />
+            </div>
           )}
           {!hideNonImageCards && (
             <AICursor
@@ -483,6 +602,27 @@ export function AICanvasStage({
         />
       )}
 
+      <PromptDialog
+        open={!!renameGroupTarget}
+        onConfirm={(name) => {
+          if (!renameGroupTarget) return;
+          setCards((current) =>
+            current.map((card) =>
+              card.id === renameGroupTarget.id && card.kind === "group"
+                ? { ...card, name }
+                : card,
+            ),
+          );
+          setRenameGroupTarget(null);
+        }}
+        onCancel={() => setRenameGroupTarget(null)}
+        title={t("aiCanvas.renameGroupTitle")}
+        placeholder={t("aiCanvas.groupNamePlaceholder")}
+        defaultValue={renameGroupTarget?.name ?? ""}
+        confirmText={t("aiCanvas.renameGroup")}
+        cancelText={t("common.cancel")}
+      />
+
       <ConfirmDialog
         open={!!deleteConfirmCard}
         onConfirm={() => {
@@ -490,9 +630,23 @@ export function AICanvasStage({
           setDeleteConfirmCard(null);
         }}
         onCancel={() => setDeleteConfirmCard(null)}
-        title={t("aiCanvas.deleteCard")}
-        message={t("aiCanvas.deleteConfirmMessage")}
-        confirmText={t("aiCanvas.deleteCard")}
+        title={
+          deleteConfirmCard?.kind === "group"
+            ? t("aiCanvas.deleteGroup")
+            : t("aiCanvas.deleteCard")
+        }
+        message={
+          deleteConfirmCard?.kind === "group"
+            ? t("aiCanvas.deleteGroupConfirmMessage", {
+                count: deleteConfirmCard.cards.length,
+              })
+            : t("aiCanvas.deleteConfirmMessage")
+        }
+        confirmText={
+          deleteConfirmCard?.kind === "group"
+            ? t("aiCanvas.deleteGroup")
+            : t("aiCanvas.deleteCard")
+        }
         cancelText={t("common.cancel")}
         variant="danger"
       />

@@ -11,8 +11,10 @@ import {
   LoaderCircle,
   MessageCircle,
   MousePointer2,
+  Pencil,
   Sparkles,
   Trash2,
+  Ungroup,
 } from "lucide-react";
 import {
   useEffect,
@@ -31,6 +33,8 @@ import {
   type AssetCanvasCard,
   type CanvasCard,
   type CommentCanvasCard,
+  type GroupCanvasCard,
+  type GroupChildCanvasCard,
   type OperationCanvasCard,
   type ProposalCanvasCard,
   type UploadCanvasCard,
@@ -62,6 +66,8 @@ function cardKindIcon(kind: CanvasCard["kind"], size = 13) {
     case "proposal":
       return <Lightbulb size={size} />;
     case "operation":
+      return <Layers3 size={size} />;
+    case "group":
       return <Layers3 size={size} />;
     default:
       return <Sparkles size={size} />;
@@ -99,6 +105,12 @@ function cardKindAccent(kind: CanvasCard["kind"]) {
         text: "text-g-green",
         bg: "bg-g-green/10",
         border: "border-g-green/20",
+      };
+    case "group":
+      return {
+        text: "text-g-ink-3",
+        bg: "bg-g-surface-2",
+        border: "border-g-line",
       };
     default:
       return {
@@ -650,11 +662,57 @@ export function VariantContextMenu({
   );
 }
 
+export function GroupContextMenu({
+  card,
+  onRename,
+  onUngroup,
+  onDelete,
+}: {
+  card: GroupCanvasCard;
+  onRename: () => void;
+  onUngroup: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">
+          {card.name || t("aiCanvas.groupLabel", { count: card.cards.length })}
+        </div>
+        <div className="mt-0.5 text-[11px] text-white/36">
+          {Math.round(card.width)}×{Math.round(card.height)}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      <button type="button" className={ctxMenuItemCls} onClick={onRename}>
+        <Pencil size={14} className="shrink-0 text-white/46" />
+        {t("aiCanvas.renameGroup")}
+      </button>
+      <button type="button" className={ctxMenuItemCls} onClick={onUngroup}>
+        <Ungroup size={14} className="shrink-0 text-white/46" />
+        {t("aiCanvas.ungroup")}
+      </button>
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
 export function SelectionContextMenu({
   count,
+  onGroup,
   onDelete,
 }: {
   count: number;
+  onGroup?: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
@@ -666,6 +724,12 @@ export function SelectionContextMenu({
         </div>
       </div>
       <div className={ctxMenuSepCls} />
+      {onGroup && (
+        <button type="button" className={ctxMenuItemCls} onClick={onGroup}>
+          <Layers3 size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.groupSelected")}
+        </button>
+      )}
       <button
         type="button"
         className={cn(ctxMenuItemCls, "text-[#ff453a]")}
@@ -787,7 +851,12 @@ export function CardShell({
       ? fileName(card.asset.repoPath)
       : card.kind === "upload"
         ? card.fileName
-        : card.sourceName
+        : card.kind === "variant"
+          ? card.sourceName
+          : card.kind === "group"
+            ? card.name ||
+              t("aiCanvas.groupLabel", { count: card.cards.length })
+            : undefined
     : undefined;
 
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -1204,6 +1273,60 @@ export function VariantCardBody({ card }: { card: VariantCanvasCard }) {
         draggable={false}
         loading="lazy"
       />
+    </div>
+  );
+}
+
+function groupChildImageSource(card: GroupChildCanvasCard) {
+  if (card.kind === "asset") return card.asset.thumbnailUrl || card.asset.url;
+  if (card.kind === "upload")
+    return `${basePath}/api/image-tools/preview/${card.token}`;
+  return card.previewUrl;
+}
+
+function groupChildImageAlt(card: GroupChildCanvasCard) {
+  if (card.kind === "asset") return fileName(card.asset.repoPath);
+  if (card.kind === "upload") return card.fileName;
+  return card.sourceName;
+}
+
+export function GroupCardBody({ card }: { card: GroupCanvasCard }) {
+  const groupWidth = Math.max(1, card.width);
+  const groupHeight = Math.max(1, card.height);
+  return (
+    <div
+      data-ai-canvas-image-frame="true"
+      className="relative overflow-visible"
+      style={{ aspectRatio: groupWidth / groupHeight }}
+    >
+      {card.cards.map((child) => {
+        const width = card.cardWidths?.[child.id] ?? CARD_WIDTH;
+        return (
+          <div
+            key={child.id}
+            className="absolute rounded-[inherit]"
+            style={{
+              left: `${(child.x / groupWidth) * 100}%`,
+              top: `${(child.y / groupHeight) * 100}%`,
+              width: `${(width / groupWidth) * 100}%`,
+              aspectRatio: compactImageAspectRatio(child),
+            }}
+          >
+            <img
+              src={groupChildImageSource(child)}
+              alt={groupChildImageAlt(child)}
+              className="size-full select-none rounded-[inherit] object-contain"
+              draggable={false}
+              loading="lazy"
+              onError={(e) => {
+                if (child.kind === "upload" && child.thumbnailDataUrl) {
+                  (e.target as HTMLImageElement).src = child.thumbnailDataUrl;
+                }
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

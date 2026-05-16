@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { CanvasCard } from "./aiCanvasState";
 import { isImageCard } from "./canvasUtils";
 
@@ -47,7 +53,6 @@ type CaptureRequest = {
 type RenderFrame = FrameGeometry & { img: HTMLImageElement };
 
 const CAPTURE_PADDING = 24;
-const IMAGE_FALLBACK_PADDING = 12;
 const AUTO_DISMISS_MS = 15000;
 const SESSION_THUMBNAIL_MAX_PX = 640;
 const RENDER_FRAME_RETRY_COUNT = 8;
@@ -128,36 +133,35 @@ function imageRenderFrames(
     const img = frameEl?.querySelector<HTMLImageElement>("img");
     if (!cardEl || !frameEl || !img) return [];
 
-    const frame = screenRectToWorld(
-      frameEl.getBoundingClientRect(),
-      rootRect,
-      viewport,
-    );
     const bounds = screenRectToWorld(
       cardEl.getBoundingClientRect(),
       rootRect,
       viewport,
     );
-    const styles = window.getComputedStyle(img);
-    const contentBox = {
-      x: frame.x + px(styles.paddingLeft, IMAGE_FALLBACK_PADDING),
-      y: frame.y + px(styles.paddingTop, IMAGE_FALLBACK_PADDING),
-      width: Math.max(
-        1,
-        frame.width -
-          px(styles.paddingLeft, IMAGE_FALLBACK_PADDING) -
-          px(styles.paddingRight, IMAGE_FALLBACK_PADDING),
-      ),
-      height: Math.max(
-        1,
-        frame.height -
-          px(styles.paddingTop, IMAGE_FALLBACK_PADDING) -
-          px(styles.paddingBottom, IMAGE_FALLBACK_PADDING),
-      ),
-    };
-    const rect = containRect(contentBox, img.naturalWidth, img.naturalHeight);
+    const imgs = Array.from(frameEl.querySelectorAll<HTMLImageElement>("img"));
+    return imgs.map((img) => {
+      const frame = screenRectToWorld(
+        img.getBoundingClientRect(),
+        rootRect,
+        viewport,
+      );
+      const styles = window.getComputedStyle(img);
+      const contentBox = {
+        x: frame.x + px(styles.paddingLeft, 0),
+        y: frame.y + px(styles.paddingTop, 0),
+        width: Math.max(
+          1,
+          frame.width - px(styles.paddingLeft, 0) - px(styles.paddingRight, 0),
+        ),
+        height: Math.max(
+          1,
+          frame.height - px(styles.paddingTop, 0) - px(styles.paddingBottom, 0),
+        ),
+      };
+      const rect = containRect(contentBox, img.naturalWidth, img.naturalHeight);
 
-    return [{ ...rect, bounds, img }];
+      return { ...rect, bounds, img };
+    });
   });
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AssetItem } from "@/types";
 import {
   buildAssistantBullets,
+  cardDisplayName,
   cardIdsForBulkDeletion,
   compactAICanvasSessionForStorage,
   cardIdsForDeletion,
@@ -13,6 +14,7 @@ import {
   writeAICanvasSession,
   type AssetCanvasCard,
   type CommentCanvasCard,
+  type GroupCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
@@ -159,6 +161,61 @@ describe("normalizeAICanvasSession", () => {
     });
 
     expect(session.selectedCardIds).toEqual([asset.id]);
+  });
+
+  it("keeps grouped image children when restoring a session", () => {
+    const asset = makeAssetCard("hero");
+    const variant = makeVariantCard("alt");
+    const session = normalizeAICanvasSession({
+      cards: [
+        {
+          id: "group-1",
+          kind: "group",
+          x: 10,
+          y: 20,
+          createdAt: "2026-05-13T00:00:00.000Z",
+          cards: [
+            { ...asset, x: 0, y: 0 },
+            { ...variant, x: 120, y: 12 },
+          ],
+          name: "Hero set",
+          cardWidths: { [asset.id]: 100, [variant.id]: 80 },
+          width: 220,
+          height: 140,
+        },
+      ],
+      selectedCardIds: ["group-1"],
+      viewport: { x: 0, y: 0, scale: 1 },
+    });
+
+    const group = session.cards[0] as GroupCanvasCard;
+    expect(group.kind).toBe("group");
+    expect(group.cards.map((card) => card.id)).toEqual([asset.id, variant.id]);
+    expect(group.name).toBe("Hero set");
+    expect(group.cardWidths?.[asset.id]).toBe(100);
+    expect(session.selectedCardIds).toEqual(["group-1"]);
+  });
+
+  it("drops empty groups when restoring a session", () => {
+    const session = normalizeAICanvasSession({
+      cards: [
+        {
+          id: "group-1",
+          kind: "group",
+          x: 0,
+          y: 0,
+          createdAt: "2026-05-13T00:00:00.000Z",
+          cards: [],
+          width: 100,
+          height: 100,
+        },
+      ],
+      selectedCardIds: ["group-1"],
+      viewport: { x: 0, y: 0, scale: 1 },
+    });
+
+    expect(session.cards).toEqual([]);
+    expect(session.selectedCardIds).toBeUndefined();
   });
 
   it("preserves chat entries with only attachments", () => {
@@ -314,6 +371,27 @@ describe("selectedAssetCards", () => {
 
     expect(selectedAssetCards([asset, comment], [comment.id])).toEqual([asset]);
     expect(commentsForAssets([asset, comment], [asset.id])).toEqual([comment]);
+  });
+
+  it("returns asset children from a selected group", () => {
+    const asset = makeAssetCard("hero");
+    const variant = makeVariantCard("alt");
+    const group: GroupCanvasCard = {
+      id: "group-1",
+      kind: "group",
+      x: 0,
+      y: 0,
+      createdAt: "2026-05-13T00:00:00.000Z",
+      cards: [asset, variant],
+      cardWidths: { [asset.id]: 120, [variant.id]: 90 },
+      width: 240,
+      height: 160,
+    };
+
+    expect(selectedAssetCards([group], [group.id])).toEqual([asset]);
+    expect(cardDisplayName({ ...group, name: "Named group" })).toBe(
+      "Named group",
+    );
   });
 });
 

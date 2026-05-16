@@ -436,7 +436,7 @@ func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnaps
 			expanded = append(expanded, clone)
 			continue
 		}
-		if act.Tool == "duplicate_cards" && len(canvasActionCardIDs(act)) == 0 && len(selectedImageCardIDs) > 0 {
+		if (act.Tool == "duplicate_cards" || act.Tool == "group_cards") && len(canvasActionCardIDs(act)) == 0 && len(selectedImageCardIDs) > 0 {
 			clone := act
 			cardIDs := selectedImageCardIDs
 			if limitToSingle {

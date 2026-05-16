@@ -85,6 +85,24 @@ func canvasToolRegistry() []canvasToolDef {
 			Safe:        true,
 		},
 		{
+			Name:        "group_cards",
+			Description: "Group two or more image cards into one canvas group card. Use when the user asks to group, combine, collect, or treat selected images as one movable/resizable unit. This changes canvas structure only and does not merge or edit source files.",
+			Cardinality: "multi",
+			Safe:        true,
+		},
+		{
+			Name:        "ungroup_card",
+			Description: "Ungroup one existing canvas group card back into its child image cards. This changes canvas structure only and does not edit source files.",
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "rename_group",
+			Description: "Rename an existing canvas group card. Use when the user asks to name, label, or rename a group. This changes the canvas group label only.",
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
 			Name:        "move_card",
 			Description: "Move a single card to a new position on the canvas.",
 			Cardinality: "single",
@@ -546,6 +564,7 @@ visualCueColorHex: #f26aa0`, lang)
 - Current selection layout: select_cards with all selected card IDs -> distribute_cards -> align_cards when equal spacing and edge alignment are both requested.
 - Enlarge, move, and layer a hero/main image: focus_card -> resize_card -> move_card or arrange_cards -> bring_cards_to_front.
 - Duplicate selected images and clean up candidates: duplicate_cards -> arrange_cards for the source/new cards -> remove_cards only for clearly unrelated visible cards.
+- Group selected images: select_cards with the intended image card IDs if needed -> group_cards with those cardIds and optional name. Rename or undo a group with rename_group or ungroup_card.
 - Professional photo staging / art direction: act as a professional photographer and use focus_card or select_cards -> inspect_canvas when composition is uncertain -> resize_card for hero/supporting scale -> arrange_cards with polished spacing -> optional mirror_image/rotate_image for a few deliberate PNG variants (rotate_image supports any integer-degree angle) -> capture_canvas or capture_viewport.
 - OCR readout: extract_ocr_text with saveToMetadata=false. Do not call metadata-writing tools unless the user explicitly asks to save OCR.
 - Annotation/comment: focus_card -> create_comment. Use create_comment.region to circle, mark, highlight, or point to a specific visual object/area. The region is relative to the anchored card image, x/y are the top-left of the target box, and the box should tightly enclose the actual target rather than nearby decoration, host objects, or surrounding context. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. If the user asks where something is and asks to circle/mark it, put the answer in comment text and create the region; do not answer that you cannot directly annotate.
@@ -628,6 +647,7 @@ Native tools are attached to this request. Use native tool calls directly; do no
 - Current selection layout: select_cards with all selected card IDs -> distribute_cards -> align_cards when equal spacing and edge alignment are both requested.
 - Enlarge, move, and layer a hero/main image: focus_card -> resize_card -> move_card or arrange_cards -> bring_cards_to_front.
 - Duplicate selected images and clean up candidates: duplicate_cards -> arrange_cards for the source/new cards -> remove_cards only for clearly unrelated visible cards.
+- Group selected images: select_cards with the intended image card IDs if needed -> group_cards with those cardIds and optional name. Rename or undo a group with rename_group or ungroup_card.
 - Professional photo staging / art direction: act as a professional photographer and use focus_card or select_cards -> inspect_canvas when composition is uncertain -> resize_card for hero/supporting scale -> arrange_cards with polished spacing -> optional mirror_image/rotate_image for a few deliberate PNG variants (rotate_image supports any integer-degree angle) -> capture_canvas or capture_viewport.
 - OCR readout: extract_ocr_text with saveToMetadata=false. Do not call metadata-writing tools unless the user explicitly asks to save OCR.
 - Annotation/comment: focus_card -> create_comment. Use create_comment.region to circle, mark, highlight, or point to a specific visual object/area. The region is relative to the anchored card image, x/y are the top-left of the target box, and the box should tightly enclose the actual target rather than nearby decoration, host objects, or surrounding context. If multiple distinct objects/areas must be circled, call create_comment once per target/region. Treat one visible text word, phrase, line, or OCR string as one target unless the user explicitly asks for per-character annotations. For small objects or text, include visualCue.targetDescription in English and visualCue.colorHex for the target pixels. If the user asks where something is and asks to circle/mark it, put the answer in comment text and create the region; do not answer that you cannot directly annotate.
@@ -714,7 +734,7 @@ CRITICAL RULES:
 3. SAFE tools execute immediately and you will receive their results. You can then act on the results in a follow-up turn.
 4. NEEDS_CONFIRMATION tools become proposal cards the user must approve.
 5. Include "description" and "impact" in every action block.
-6. For canvas tools (focus_card, select_cards, remove_cards, move_card, arrange_cards, resize_card, bring_cards_to_front, create_comment), use the card ID. For file/catalog tools that require assetId, use the ASSET ID from the canvas state (the "id" field inside "asset").
+6. For canvas tools (focus_card, select_cards, remove_cards, group_cards, ungroup_card, rename_group, move_card, arrange_cards, resize_card, bring_cards_to_front, create_comment), use the card ID. For file/catalog tools that require assetId, use the ASSET ID from the canvas state (the "id" field inside "asset").
 7. Never say you cannot take a screenshot/photo or export the canvas. You CAN trigger the real frontend screenshot/export preview by calling capture_viewport, capture_canvas, or capture_selected.
 8. For large layouts, output compact JSON action blocks first and keep natural-language explanation to one short sentence after tools. Do not write a long plan before arrange_cards.
 9. Every tool has cardinality. With multiple selected/mentioned image assets, default to ALL selected/mentioned assets and pass assetIds. Use assetId only for a clearly single target such as "this one", "first image", or "only this card".
@@ -737,6 +757,7 @@ get_asset_detail retrieves full metadata for a specific asset (project, local pa
 - **When the user asks to select one or more cards:** Use select_cards with the exact card IDs. Single-card and multi-card selection are both supported.
 - **When the user asks to remove/delete extra cards from the canvas:** Use remove_cards. This only cleans the canvas and does not delete files. Do NOT use delete_asset unless the user explicitly asks to delete source files from the project.
 - **When the user asks to move a card in a direction** without a specific coordinate or distance: treat it as a nearby relative nudge, not a jump across the board. Move by about one card size plus a small gap. Keep the secondary axis close to the current position unless alignment, diagonal placement, or a nearby target card makes a small adjustment useful.
+- **When the user asks to group selected images, make them one group/unit, name a group, or ungroup:** use group_cards, rename_group, or ungroup_card. Grouping changes canvas structure only; it does not merge pixels or modify source files.
 - **When the user asks to arrange, lay out, compose, storyboard, or make selected images look like a scene:** operate on the canvas. Do not answer with only a written plan. Duplicate selected image cards if multiple beats or panels are needed, then use arrange_cards, resize_card, align_cards, or distribute_cards to create the layout. After duplicate_cards returns newCardIds, use those returned IDs in the follow-up arrange step.
 - **When the user asks you to act like a photographer, art-direct a photo shoot, stage photos, or make the canvas images look beautiful before taking a picture:** use all visible image cards unless the user narrows the target set. Inspect the canvas if composition is uncertain, resize hero/supporting cards as needed, arrange_cards with polished whitespace and focal balance, then call capture_canvas for the staged board or capture_viewport for the current viewport.
 - **When the user asks to copy/clone an image visually on the canvas** (for example, "make five copies" or "clone this image"): Use duplicate_cards with the image card ID and count equal to the number of new copies. Then use arrange_cards, align_cards, or distribute_cards with the returned new card IDs to create the requested feeling or layout. This is canvas-level duplication, not pixel editing.

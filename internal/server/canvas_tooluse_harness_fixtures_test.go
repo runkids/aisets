@@ -164,6 +164,12 @@ func canvasHarnessDefaultArgs(tool, assetA, assetB string) map[string]any {
 		return map[string]any{"cardIds": []any{"card-a", "card-b"}, "label": "Target both cards"}
 	case "duplicate_cards":
 		return map[string]any{"cardIds": []any{"card-a"}, "count": float64(2), "layout": "row", "label": "Duplicate asset A"}
+	case "group_cards":
+		return map[string]any{"cardIds": []any{"card-a", "card-b"}, "name": "Test group"}
+	case "ungroup_card":
+		return map[string]any{"cardId": "group-a"}
+	case "rename_group":
+		return map[string]any{"cardId": "group-a", "name": "Renamed group"}
 	case "move_card":
 		return map[string]any{"cardId": "card-a", "x": float64(400), "y": float64(120)}
 	case "arrange_cards":
@@ -243,6 +249,12 @@ func canvasHarnessMessageForTool(tool string) string {
 		return "mirror this asset"
 	case "rotate_image":
 		return "rotate this asset"
+	case "group_cards":
+		return "group selected images"
+	case "ungroup_card":
+		return "ungroup this group"
+	case "rename_group":
+		return "rename this group"
 	case "update_tags", "batch_update_tags":
 		return "update tags on these assets"
 	case "update_description":

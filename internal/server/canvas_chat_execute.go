@@ -395,6 +395,24 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"cardIds": act.Params["cardIds"],
 		}
+	case "group_cards":
+		groupID := fmt.Sprintf("group-%x", time.Now().UnixNano())
+		name, _ := act.Params["name"].(string)
+		return map[string]any{
+			"cardIds": act.Params["cardIds"],
+			"groupId": groupID,
+			"name":    strings.TrimSpace(name),
+		}
+	case "ungroup_card":
+		return map[string]any{
+			"cardId": act.Params["cardId"],
+		}
+	case "rename_group":
+		name, _ := act.Params["name"].(string)
+		return map[string]any{
+			"cardId": act.Params["cardId"],
+			"name":   strings.TrimSpace(name),
+		}
 	case "duplicate_cards":
 		sourceCardIDs := canvasActionCardIDs(act)
 		count := 1

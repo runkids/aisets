@@ -15,6 +15,7 @@ function frame(
   y: number,
   width: number,
   height: number,
+  bounds = { x, y, width, height },
 ): CaptureFrame {
   return {
     assetId,
@@ -22,7 +23,7 @@ function frame(
     y,
     width,
     height,
-    bounds: { x, y, width, height },
+    bounds,
   };
 }
 
@@ -55,6 +56,23 @@ describe("buildCaptureRequestFromFrames", () => {
       cards: [
         { assetId: "a", x: 24, y: 24, width: 200, height: 150 },
         { assetId: "b", x: 274, y: 84, width: 100, height: 90 },
+      ],
+    });
+  });
+
+  it("crops grouped image captures around the whole group bounds", () => {
+    const groupBounds = { x: 100, y: 120, width: 500, height: 360 };
+    const request = buildCaptureRequestFromFrames(7, [
+      frame("child-a", 150, 170, 80, 60, groupBounds),
+      frame("child-b", 420, 330, 90, 70, groupBounds),
+    ]);
+
+    expect(request).toMatchObject({
+      outputWidth: 548,
+      outputHeight: 408,
+      cards: [
+        { assetId: "child-a", x: 74, y: 74, width: 80, height: 60 },
+        { assetId: "child-b", x: 344, y: 234, width: 90, height: 70 },
       ],
     });
   });

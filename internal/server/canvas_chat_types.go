@@ -68,6 +68,8 @@ type canvasCardSnapshot struct {
 	UploadFileName string               `json:"uploadFileName,omitempty"`
 	UploadWidth    int                  `json:"uploadWidth,omitempty"`
 	UploadHeight   int                  `json:"uploadHeight,omitempty"`
+	Name           string               `json:"name,omitempty"`
+	CardIDs        []string             `json:"cardIds,omitempty"`
 }
 
 type canvasViewport struct {

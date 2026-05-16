@@ -2,6 +2,7 @@ import type { ActionPreview, AssetItem } from "@/types";
 import { fileName, formatBytes } from "@/ui";
 
 export const AI_CANVAS_STORAGE_KEY = "aisets.aiCanvas.v1";
+const DEFAULT_GROUP_SIZE = 320;
 
 export type CanvasViewport = {
   x: number;
@@ -98,6 +99,20 @@ export type ProposalCanvasCard = CanvasCardBase & {
   sourceAssetIds?: string[];
 };
 
+export type GroupChildCanvasCard =
+  | AssetCanvasCard
+  | UploadCanvasCard
+  | VariantCanvasCard;
+
+export type GroupCanvasCard = CanvasCardBase & {
+  kind: "group";
+  name?: string;
+  cards: GroupChildCanvasCard[];
+  cardWidths?: Record<string, number>;
+  width: number;
+  height: number;
+};
+
 export type CanvasCard =
   | AssetCanvasCard
   | CommentCanvasCard
@@ -105,7 +120,8 @@ export type CanvasCard =
   | VariantCanvasCard
   | OperationCanvasCard
   | ProposalCanvasCard
-  | UploadCanvasCard;
+  | UploadCanvasCard
+  | GroupCanvasCard;
 
 export type ChatMentionPreview = {
   id: string;
@@ -183,10 +199,7 @@ export function shouldScheduleAICanvasAutoSave(opts: {
   isDragging: boolean;
 }) {
   return (
-    opts.isDirty &&
-    opts.cardsLength > 0 &&
-    !opts.isSaving &&
-    !opts.isDragging
+    opts.isDirty && opts.cardsLength > 0 && !opts.isSaving && !opts.isDragging
   );
 }
 
@@ -204,6 +217,14 @@ export function sanitizeCanvasChatContent(content: string) {
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 function compactUploadCardForStorage(card: CanvasCard): CanvasCard {
+  if (card.kind === "group") {
+    return {
+      ...card,
+      cards: card.cards.map((child) =>
+        compactUploadCardForStorage(child),
+      ) as GroupChildCanvasCard[],
+    };
+  }
   if (card.kind !== "upload" || !card.thumbnailDataUrl) return card;
   return { ...card, thumbnailDataUrl: "" };
 }
@@ -445,6 +466,41 @@ function normalizeCard(value: unknown): CanvasCard | null {
     };
   }
 
+  if (kind === "group" && Array.isArray(value.cards)) {
+    const childCards = value.cards
+      .map(normalizeCard)
+      .filter(
+        (card): card is GroupChildCanvasCard =>
+          card?.kind === "asset" ||
+          card?.kind === "upload" ||
+          card?.kind === "variant",
+      );
+    if (childCards.length === 0) return null;
+    const cardWidths = isRecord(value.cardWidths)
+      ? Object.fromEntries(
+          Object.entries(value.cardWidths)
+            .map(([key, width]) => [key, Number(width)] as const)
+            .filter((entry): entry is [string, number] => entry[1] > 0),
+        )
+      : undefined;
+    return {
+      id,
+      kind,
+      x,
+      y,
+      createdAt,
+      name:
+        typeof value.name === "string" && value.name.trim()
+          ? value.name.trim()
+          : undefined,
+      cards: childCards,
+      cardWidths,
+      width: Number(value.width) > 0 ? Number(value.width) : DEFAULT_GROUP_SIZE,
+      height:
+        Number(value.height) > 0 ? Number(value.height) : DEFAULT_GROUP_SIZE,
+    };
+  }
+
   return null;
 }
 
@@ -654,7 +710,13 @@ export function selectedAssetCards(
   for (const card of cards) {
     if (!idSet.has(card.id)) continue;
     if (card.kind === "asset") result.push(card);
-    else if (card.kind === "comment") anchorIds.add(card.anchorId);
+    else if (card.kind === "group") {
+      result.push(
+        ...card.cards.filter(
+          (child): child is AssetCanvasCard => child.kind === "asset",
+        ),
+      );
+    } else if (card.kind === "comment") anchorIds.add(card.anchorId);
   }
 
   if (anchorIds.size > 0) {
@@ -725,6 +787,7 @@ export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "variant") return card.sourceName;
   if (card.kind === "proposal") return card.tool;
   if (card.kind === "upload") return card.fileName;
+  if (card.kind === "group") return card.name || `Group (${card.cards.length})`;
   return card.prompt || "Preview";
 }
 

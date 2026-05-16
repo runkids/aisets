@@ -185,6 +185,10 @@ export function serializeCanvasSnapshot(
         base.uploadWidth = card.uploadWidth;
         base.uploadHeight = card.uploadHeight;
       }
+      if (card.kind === "group") {
+        base.name = card.name;
+        base.cardIds = card.cards.map((child) => child.id);
+      }
       return base;
     }),
   };
