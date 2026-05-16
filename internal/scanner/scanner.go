@@ -252,6 +252,13 @@ func (s *Scanner) Thumbnail(ctx context.Context, catalog Catalog, id string, siz
 			contentHash = sum
 		}
 		key := item.ProjectID + "\x00" + item.RepoPath + "\x00" + contentHash
+		if strings.EqualFold(item.Ext, ".webp") && item.Image.Animated {
+			info, err := os.Stat(item.LocalPath)
+			if err != nil {
+				return imageproc.ThumbnailResult{}, err
+			}
+			return imageproc.ThumbnailResult{Path: item.LocalPath, MimeType: "image/webp", CacheKey: key, SizeBytes: info.Size()}, nil
+		}
 		return imageproc.Thumbnail(item.LocalPath, cacheDir, key, size)
 	}
 	return imageproc.ThumbnailResult{}, os.ErrNotExist

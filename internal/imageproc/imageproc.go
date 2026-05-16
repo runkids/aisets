@@ -138,6 +138,9 @@ func Probe(path string) (Metadata, error) {
 
 	var meta Metadata
 	if err := runImgtoolsJSON(&meta, "probe", path); err == nil {
+		if ext == ".webp" {
+			meta = augmentWebPMetadata(path, meta)
+		}
 		return meta, nil
 	}
 
@@ -161,7 +164,70 @@ func Probe(path string) (Metadata, error) {
 	if decodeErr == nil {
 		meta.Alpha = imageHasAlpha(img)
 	}
+	if ext == ".webp" {
+		meta = augmentWebPMetadata(path, meta)
+	}
 	return meta, nil
+}
+
+func augmentWebPMetadata(path string, meta Metadata) Metadata {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return meta
+	}
+	animated, pages, alpha, ok := parseWebPContainerMetadata(data)
+	if !ok {
+		return meta
+	}
+	meta.Format = "webp"
+	if pages > 0 {
+		meta.Pages = pages
+	} else if meta.Pages == 0 {
+		meta.Pages = 1
+	}
+	if animated {
+		meta.Animated = true
+	}
+	if alpha {
+		meta.Alpha = true
+	}
+	return meta
+}
+
+func parseWebPContainerMetadata(data []byte) (animated bool, pages int, alpha bool, ok bool) {
+	if len(data) < 12 || string(data[0:4]) != "RIFF" || string(data[8:12]) != "WEBP" {
+		return false, 0, false, false
+	}
+	for offset := 12; offset+8 <= len(data); {
+		chunkID := string(data[offset : offset+4])
+		chunkSize := int(binary.LittleEndian.Uint32(data[offset+4 : offset+8]))
+		dataStart := offset + 8
+		dataEnd := dataStart + chunkSize
+		if chunkSize < 0 || dataEnd > len(data) {
+			break
+		}
+		switch chunkID {
+		case "VP8X":
+			if chunkSize > 0 {
+				flags := data[dataStart]
+				alpha = alpha || flags&0x10 != 0
+				animated = animated || flags&0x02 != 0
+			}
+		case "ANIM":
+			animated = true
+		case "ANMF":
+			pages++
+			animated = true
+		}
+		offset = dataEnd
+		if chunkSize%2 == 1 {
+			offset++
+		}
+	}
+	if pages == 0 {
+		pages = 1
+	}
+	return animated, pages, alpha, true
 }
 
 func probeHEIC(path, ext string) (Metadata, error) {
@@ -220,16 +286,6 @@ const (
 )
 
 func VisualDistance(pathA, pathB string, flipB bool) (int, error) {
-	args := []string{"visual-distance", pathA, pathB}
-	if flipB {
-		args = append(args, "--flip-b")
-	}
-	var result struct {
-		Distance int `json:"distance"`
-	}
-	if err := runImgtoolsJSON(&result, args...); err == nil {
-		return result.Distance, nil
-	}
 	sA, err := VisualSample(pathA)
 	if err != nil {
 		return 0, err
