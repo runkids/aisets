@@ -3,11 +3,18 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"aisets/internal/apierr"
+	"aisets/internal/uidist"
 	versionpkg "aisets/internal/version"
+)
+
+var (
+	downloadUpdateUIDist = uidist.Download
+	runElevatedUpdate    = defaultRunElevatedUpdate
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -38,11 +45,34 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Force:          body.Force,
 	})
 	if err != nil {
+		var elevated versionpkg.ElevatedPermissionError
+		if !body.DryRun && errors.As(err, &elevated) {
+			if elevatedErr := runElevatedUpdate(elevated.Path); elevatedErr == nil {
+				result.Updated = true
+				result.Privileged = true
+				result.Message = "Updated. Restart Aisets to use the new version."
+				cacheUpdatedUI(&result)
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "update": result})
+				return
+			}
+		}
 		status, updateErr := updateAPIError(err)
 		writeJSON(w, status, map[string]any{"error": updateErr})
 		return
 	}
+	cacheUpdatedUI(&result)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "update": result})
+}
+
+func cacheUpdatedUI(result *versionpkg.UpgradeResult) {
+	if !result.Updated || result.DryRun || result.DevMode || result.LatestVersion == "" {
+		return
+	}
+	if err := downloadUpdateUIDist(result.LatestVersion); err != nil {
+		result.UICacheError = err.Error()
+		return
+	}
+	result.UICached = true
 }
 
 func updateAPIError(err error) (int, apierr.Error) {
@@ -51,7 +81,10 @@ func updateAPIError(err error) (int, apierr.Error) {
 		return http.StatusForbidden, apierr.WithParams(
 			"update_elevated_permission_required",
 			err.Error(),
-			map[string]any{"path": elevated.Path},
+			map[string]any{
+				"path":    elevated.Path,
+				"command": fmt.Sprintf("sudo %s update --force", elevated.Path),
+			},
 		)
 	}
 	return http.StatusInternalServerError, apierr.WithParams(

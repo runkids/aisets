@@ -17,7 +17,9 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
 
   return (
     <Modal
-      title={`${preview.type} preview`}
+      title={t(`preview.type.${preview.type}`, {
+        defaultValue: `${preview.type} preview`,
+      })}
       description={
         preview.canApply ? t("preview.canApplyDesc") : t("preview.blockedDesc")
       }
@@ -25,7 +27,11 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
       footer={
         <>
           <div className="text-g-body text-g-ink-4">
-            {changes.length} changes · {deletes.length} deletes
+            {t("preview.footerSummary", {
+              changes: changes.length,
+              deletes: deletes.length,
+              defaultValue: "{{changes}} changes · {{deletes}} deletes",
+            })}
           </div>
           <div className="ml-auto flex gap-2">
             <Button variant="secondary" onClick={onCancel}>
@@ -42,7 +48,7 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
         </>
       }
     >
-      <div className="flex flex-col gap-2 font-g-mono text-g-caption">
+      <div className="flex flex-col gap-2 font-g-mono text-g-caption break-all">
         {changes.map((change) => (
           <div key={`${change.file}:${change.line}:${change.oldSpecifier}`}>
             <code>
@@ -53,7 +59,8 @@ export function PreviewModal({ preview, working, onCancel, onApply }: Props) {
         ))}
         {deletes.map((path) => (
           <div key={path}>
-            Delete <code>{path}</code>
+            {t("preview.deleteLabel", { defaultValue: "Delete" })}{" "}
+            <code>{path}</code>
           </div>
         ))}
         {blockers.map((blocker) => (

@@ -23,7 +23,20 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, apierr.New("restart_forbidden", "restart is only available from the local Aisets UI"))
 		return
 	}
-	args, err := s.uiRestartHelperArgs()
+	body := struct {
+		ClearCache *bool `json:"clearCache"`
+	}{}
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := readJSON(r, &body); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	clearCache := true
+	if body.ClearCache != nil {
+		clearCache = *body.ClearCache
+	}
+	args, err := s.uiRestartHelperArgs(clearCache)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, apierr.From(err, "restart_failed"))
 		return
@@ -39,7 +52,7 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func (s *Server) uiRestartHelperArgs() ([]string, error) {
+func (s *Server) uiRestartHelperArgs(clearCache bool) ([]string, error) {
 	host, port, err := net.SplitHostPort(s.addr)
 	if err != nil {
 		return nil, fmt.Errorf("restart unavailable for server address %q: %w", s.addr, err)
@@ -47,7 +60,10 @@ func (s *Server) uiRestartHelperArgs() ([]string, error) {
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = "127.0.0.1"
 	}
-	args := []string{"__restart-ui", "--no-open", "--host", host, "--port", port, "--clear-cache"}
+	args := []string{"__restart-ui", "--no-open", "--host", host, "--port", port}
+	if clearCache {
+		args = append(args, "--clear-cache")
+	}
 	if s.basePath != "" {
 		args = append(args, "--base-path", s.basePath)
 	}

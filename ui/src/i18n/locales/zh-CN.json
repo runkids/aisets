@@ -564,7 +564,18 @@
     "blockedDesc": "此操作有阻塞项，需先处理后才能套用",
     "apply": "应用变更",
     "noChanges": "没有可预览的文件变更",
-    "output": "输出"
+    "output": "输出",
+    "type": {
+      "rename": "重命名预览",
+      "merge": "合并预览",
+      "delete-unused": "删除未使用文件预览",
+      "batch-move": "批量移动预览",
+      "batch-merge": "批量合并预览",
+      "batch-rename": "批量重命名预览",
+      "optimization": "优化预览"
+    },
+    "deleteLabel": "删除",
+    "footerSummary": "{{changes}} 项变更 · {{deletes}} 项删除"
   },
   "assetList": {
     "empty": "没有匹配的素材",

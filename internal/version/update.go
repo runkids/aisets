@@ -45,6 +45,9 @@ type UpgradeResult struct {
 	Updated        bool   `json:"updated"`
 	DryRun         bool   `json:"dryRun"`
 	DevMode        bool   `json:"devMode"`
+	Privileged     bool   `json:"privileged,omitempty"`
+	UICached       bool   `json:"uiCached"`
+	UICacheError   string `json:"uiCacheError,omitempty"`
 	Message        string `json:"message"`
 }
 

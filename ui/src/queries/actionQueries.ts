@@ -15,7 +15,6 @@ import {
   batchRenamePreview,
   deleteUnusedPreview,
   renamePreview,
-  scanCatalog,
 } from "@/api";
 import type {
   AssetItem,
@@ -51,16 +50,8 @@ export function useDeleteUnusedPreviewMutation() {
 export function useApplyPreviewMutation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      endpoint,
-      token,
-    }: {
-      endpoint: string;
-      token: string;
-    }) => {
-      await applyPreview(endpoint, token);
-      return scanCatalog();
-    },
+    mutationFn: ({ endpoint, token }: { endpoint: string; token: string }) =>
+      applyPreview(endpoint, token),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKey });
     },

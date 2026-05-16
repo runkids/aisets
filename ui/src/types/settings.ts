@@ -257,6 +257,9 @@ export type UpdateAppResult = {
   updated: boolean;
   dryRun: boolean;
   devMode: boolean;
+  privileged?: boolean;
+  uiCached: boolean;
+  uiCacheError?: string;
   message: string;
 };
 

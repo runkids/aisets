@@ -36,10 +36,10 @@ export function updateApp() {
   });
 }
 
-export function restartApp() {
+export function restartApp(options?: { clearCache?: boolean }) {
   return request<{ ok: boolean; restarting: boolean }>("/api/restart", {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify(options ?? {}),
   });
 }
 

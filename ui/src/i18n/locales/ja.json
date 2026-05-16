@@ -564,7 +564,18 @@
     "blockedDesc": "この操作にはブロッカーがあります。適用前に解決が必要です",
     "apply": "変更を適用",
     "noChanges": "プレビューするファイル変更がありません",
-    "output": "出力"
+    "output": "出力",
+    "type": {
+      "rename": "リネームプレビュー",
+      "merge": "マージプレビュー",
+      "delete-unused": "未使用ファイル削除プレビュー",
+      "batch-move": "一括移動プレビュー",
+      "batch-merge": "一括マージプレビュー",
+      "batch-rename": "一括リネームプレビュー",
+      "optimization": "最適化プレビュー"
+    },
+    "deleteLabel": "削除",
+    "footerSummary": "{{changes}} 件の変更 · {{deletes}} 件の削除"
   },
   "assetList": {
     "empty": "該当するアセットなし",

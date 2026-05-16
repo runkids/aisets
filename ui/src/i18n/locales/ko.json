@@ -564,7 +564,18 @@
     "blockedDesc": "이 작업에는 차단 항목이 있어 먼저 해결해야 적용할 수 있습니다.",
     "apply": "변경 적용",
     "noChanges": "미리볼 파일 변경 사항이 없습니다.",
-    "output": "출력"
+    "output": "출력",
+    "type": {
+      "rename": "이름 변경 미리보기",
+      "merge": "병합 미리보기",
+      "delete-unused": "미사용 파일 삭제 미리보기",
+      "batch-move": "일괄 이동 미리보기",
+      "batch-merge": "일괄 병합 미리보기",
+      "batch-rename": "일괄 이름 변경 미리보기",
+      "optimization": "최적화 미리보기"
+    },
+    "deleteLabel": "삭제",
+    "footerSummary": "{{changes}}건 변경 · {{deletes}}건 삭제"
   },
   "assetList": {
     "empty": "일치하는 에셋 없음",

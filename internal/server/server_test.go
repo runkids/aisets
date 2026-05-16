@@ -35,7 +35,7 @@ func resolvedTempDir(t *testing.T) string {
 
 func TestUpdateAPIErrorUsesActionableCodes(t *testing.T) {
 	status, body := updateAPIError(versionpkg.ElevatedPermissionError{Path: "/usr/local/bin/aisets"})
-	if status != http.StatusForbidden || body.Code != "update_elevated_permission_required" || body.Params["path"] != "/usr/local/bin/aisets" {
+	if status != http.StatusForbidden || body.Code != "update_elevated_permission_required" || body.Params["path"] != "/usr/local/bin/aisets" || body.Params["command"] != "sudo /usr/local/bin/aisets update --force" {
 		t.Fatalf("elevated update error = status %d body %#v", status, body)
 	}
 
@@ -45,12 +45,28 @@ func TestUpdateAPIErrorUsesActionableCodes(t *testing.T) {
 	}
 }
 
+func TestCacheUpdatedUIDownloadsLatestDist(t *testing.T) {
+	oldDownload := downloadUpdateUIDist
+	var downloaded string
+	downloadUpdateUIDist = func(version string) error {
+		downloaded = version
+		return nil
+	}
+	t.Cleanup(func() { downloadUpdateUIDist = oldDownload })
+
+	result := versionpkg.UpgradeResult{Updated: true, LatestVersion: "1.2.3"}
+	cacheUpdatedUI(&result)
+	if downloaded != "1.2.3" || !result.UICached || result.UICacheError != "" {
+		t.Fatalf("cacheUpdatedUI result = %#v downloaded=%q", result, downloaded)
+	}
+}
+
 func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
 	s, err := New(Options{Addr: "127.0.0.1:3003", BasePath: "/studio", Store: nil})
 	if err != nil {
 		t.Fatal(err)
 	}
-	args, err := s.uiRestartHelperArgs()
+	args, err := s.uiRestartHelperArgs(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +75,14 @@ func TestRestartPreservesCurrentUIAddressOptions(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("restart args %q missing %q", joined, want)
 		}
+	}
+
+	args, err = s.uiRestartHelperArgs(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(args, " "), "--clear-cache") {
+		t.Fatalf("restart args should omit --clear-cache when UI is cached: %#v", args)
 	}
 }
 

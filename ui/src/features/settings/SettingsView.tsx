@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { exportSettings } from "@/api";
+import { APIError, exportSettings } from "@/api";
 import { errorMessage } from "@/i18n";
 import { isOCRActivityBusy } from "@/activity/ocrActivity";
 import {
@@ -119,6 +119,10 @@ export function SettingsView({
     null,
   );
   const [updatedApp, setUpdatedApp] = useState<UpdateAppResult | null>(null);
+  const [elevatedUpdate, setElevatedUpdate] = useState<{
+    path: string;
+    command: string;
+  } | null>(null);
   const ocrWorking = isOCRActivityBusy(ocrActivity);
 
   const settingsQuery = useSettingsQuery();
@@ -427,6 +431,18 @@ export function SettingsView({
       }
       toast.info(t("settings.updateAlreadyCurrent"));
     } catch (error) {
+      if (
+        error instanceof APIError &&
+        error.code === "update_elevated_permission_required"
+      ) {
+        setElevatedUpdate({
+          path: String(error.params?.path ?? "/usr/local/bin/aisets"),
+          command: String(
+            error.params?.command ?? "sudo aisets update --force",
+          ),
+        });
+        return;
+      }
       toast.error(errorMessage(error), {
         title: t("settings.updateFailed"),
       });
@@ -435,7 +451,9 @@ export function SettingsView({
 
   async function onRestartApp() {
     try {
-      await restartAppMutation.mutateAsync();
+      await restartAppMutation.mutateAsync({
+        clearCache: !updatedApp?.uiCached,
+      });
       toast.info(t("settings.updateRestarting"));
       void reloadWhenServerReady();
     } catch (error) {
@@ -780,6 +798,14 @@ export function SettingsView({
           onClose={() => setUpdatedApp(null)}
         />
       )}
+
+      {elevatedUpdate && (
+        <ElevatedUpdateModal
+          path={elevatedUpdate.path}
+          command={elevatedUpdate.command}
+          onClose={() => setElevatedUpdate(null)}
+        />
+      )}
     </>
   );
 }
@@ -798,8 +824,9 @@ function UpdateRestartModal({
   const { t } = useTranslation();
   const version = update.latestVersion ?? update.currentVersion;
   const port = currentUIPort();
-  const backgroundCommand = `aisets ui stop --port ${port}\naisets ui --port ${port} --clear-cache --no-open`;
-  const foregroundCommand = `Ctrl+C\naisets ui once --port ${port} --clear-cache --no-open`;
+  const clearCacheFlag = update.uiCached ? "" : " --clear-cache";
+  const backgroundCommand = `aisets ui stop --port ${port}\naisets ui --port ${port}${clearCacheFlag} --no-open`;
+  const foregroundCommand = `Ctrl+C\naisets ui once --port ${port}${clearCacheFlag} --no-open`;
 
   return (
     <Modal
@@ -812,7 +839,11 @@ function UpdateRestartModal({
           <Button variant="secondary" onClick={onClose}>
             {t("common.close")}
           </Button>
-          <Button variant="primary" onClick={onRestart} disabled={restartPending}>
+          <Button
+            variant="primary"
+            onClick={onRestart}
+            disabled={restartPending}
+          >
             {restartPending
               ? t("settings.updateRestarting")
               : t("settings.updateRestartAction")}
@@ -821,7 +852,14 @@ function UpdateRestartModal({
       }
     >
       <div className="flex flex-col gap-4 text-g-body text-g-ink-2">
-        <p>{t("settings.updateRestartBody", { version })}</p>
+        <p>
+          {t(
+            update.uiCached
+              ? "settings.updateRestartBodyCached"
+              : "settings.updateRestartBody",
+            { version },
+          )}
+        </p>
         <RestartCommandBlock
           title={t("settings.updateRestartBackgroundTitle")}
           command={backgroundCommand}
@@ -832,6 +870,49 @@ function UpdateRestartModal({
         />
         <p className="text-g-caption text-g-ink-4">
           {t("settings.updateRestartKeepFlags")}
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+function ElevatedUpdateModal({
+  path,
+  command,
+  onClose,
+}: {
+  path: string;
+  command: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const port = currentUIPort();
+  const restartCommand = `aisets ui stop --port ${port}\naisets ui --port ${port} --clear-cache --no-open`;
+
+  return (
+    <Modal
+      title={t("settings.updateElevatedTitle")}
+      description={t("settings.updateElevatedDesc")}
+      onClose={onClose}
+      size="md"
+      footer={
+        <Button variant="secondary" onClick={onClose}>
+          {t("common.close")}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-4 text-g-body text-g-ink-2">
+        <p>{t("settings.updateElevatedBody", { path })}</p>
+        <RestartCommandBlock
+          title={t("settings.updateElevatedCommandTitle")}
+          command={command}
+        />
+        <RestartCommandBlock
+          title={t("settings.updateElevatedRestartTitle")}
+          command={restartCommand}
+        />
+        <p className="text-g-caption text-g-ink-4">
+          {t("settings.updateElevatedAfter")}
         </p>
       </div>
     </Modal>
