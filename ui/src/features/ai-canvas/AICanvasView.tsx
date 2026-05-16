@@ -1,29 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import {
-  embeddingStats,
-  getCatalogItems,
-  previewImageUrl,
-  semanticSearch,
-} from "@/api";
 import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
-import { uploadCanvasImages } from "@/api/canvasChat";
-import { renderImageToolPreview } from "@/api/imageTools";
 import { aisetsAppIconUrl } from "@/brandAssets";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ConfirmDialog, PromptDialog } from "@/components/ui";
-import { getCanvasSession, isCanvasSessionNotFound } from "@/api";
-import {
-  useCreateCanvasSessionMutation,
-  useUpdateCanvasSessionMutation,
-} from "@/queries";
-import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
 import {
   CARD_WIDTH,
-  DEFAULT_IMAGE_TOOL_SETTINGS,
-  commentIds,
   commentRegionDisplayOptions,
   imageMeta,
   AI_MENTION_COMMENT_RE,
@@ -35,7 +19,6 @@ import {
   nextCardPosition,
   normalizeCommentRegion,
   nowISO,
-  selectedAssetIds,
   zoomViewportAtPoint,
 } from "./canvasUtils";
 import {
@@ -44,38 +27,31 @@ import {
   type CapturePadding,
 } from "./useCanvasCapture";
 import {
-  buildAssistantBullets,
   cardDisplayName,
-  cardIdsForBulkDeletion,
-  cardIdsForDeletion,
   clampCanvasScale,
   DEFAULT_CANVAS_VIEWPORT,
-  commentsForAssets,
   createCanvasCardId,
   emptyAICanvasSession,
-  normalizeAICanvasSession,
   readAICanvasSession,
   selectedAssetCards,
-  shouldScheduleAICanvasAutoSave,
   writeAICanvasSession,
   type AICanvasSession,
-  type AssetCanvasCard,
   type CanvasCard,
   type ChatActivityEntry,
   type ChatAttachment,
   type CommentCanvasCard,
-  type GroupCanvasCard,
-  type GroupChildCanvasCard,
   type ChatHistoryEntry,
   type ChatMentionPreview,
   type ChatRunUsage,
-  type PendingAttachment,
   type ProposalCanvasCard,
   type UploadCanvasCard,
-  type VariantCanvasCard,
 } from "./aiCanvasState";
+import { useCanvasCards } from "./useCanvasCards";
 import { useCanvasChat } from "./useCanvasChat";
+import { useCanvasComposer } from "./useCanvasComposer";
 import { useCanvasDrag } from "./useCanvasDrag";
+import { useCanvasSearch } from "./useCanvasSearch";
+import { useCanvasSession } from "./useCanvasSession";
 import { useProposalExecution } from "./useProposalExecution";
 import { formatCanvasRunDuration } from "./canvasRunFormat";
 import { AICanvasComposer } from "./AICanvasComposer";
@@ -92,7 +68,6 @@ const IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY =
   "aisets.canvas.imageOptimizationAdvice";
 const CAPTURE_PADDING_X_STORAGE_KEY = "aisets.canvas.capturePaddingX";
 const CAPTURE_PADDING_Y_STORAGE_KEY = "aisets.canvas.capturePaddingY";
-const DEFAULT_COMPOSER_HEIGHT = 320;
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -162,27 +137,27 @@ export function AICanvasView({
   );
   const primarySelectedId = selectedCardIds[0] as string | undefined;
   const [viewport, setViewport] = useState(initialSession.viewport);
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<AssetItem[]>([]);
-  const [searchTotal, setSearchTotal] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(true);
-  const [searchError, setSearchError] = useState("");
-  const [searchMode, setSearchMode] = useState<"catalog" | "semantic">(
-    "catalog",
-  );
-  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
-  const [searchBusy, setSearchBusy] = useState(false);
-  const [searchSelectedIds, setSearchSelectedIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [semanticAvailable, setSemanticAvailable] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [preparedSkillIds, setPreparedSkillIds] = useState<string[]>([]);
-  const [mentionedCardIds, setMentionedCardIds] = useState<string[]>([]);
-  const [pendingAttachments, setPendingAttachments] = useState<
-    PendingAttachment[]
-  >([]);
-  const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
+  const {
+    query,
+    setQuery,
+    searchResults,
+    setSearchResults,
+    searchTotal,
+    setSearchTotal,
+    searchOpen,
+    setSearchOpen,
+    searchError,
+    searchMode,
+    setSearchMode,
+    searchActiveIndex,
+    setSearchActiveIndex,
+    searchBusy,
+    searchSelectedIds,
+    setSearchSelectedIds,
+    semanticAvailable,
+    searchInputRef,
+    runSearch,
+  } = useCanvasSearch({ scanId, aiEnabled, t });
   const [error, setError] = useState("");
   const [working, setWorking] = useState<WorkingState>("idle");
   const [activeChatActivity, setActiveChatActivity] = useState<
@@ -195,23 +170,7 @@ export function AICanvasView({
     number | null
   >(null);
   const [activeChatElapsedMs, setActiveChatElapsedMs] = useState(0);
-  const [composerCollapsed, setComposerCollapsed] = useState(() => {
-    try {
-      return sessionStorage.getItem("aisets.canvas.collapsed") === "true";
-    } catch {
-      return true;
-    }
-  });
   const [composerAdvancedOpen] = useState(false);
-  const [imageOptimizationAdvice, setImageOptimizationAdvice] = useState(() => {
-    try {
-      return (
-        localStorage.getItem(IMAGE_OPTIMIZATION_ADVICE_STORAGE_KEY) === "true"
-      );
-    } catch {
-      return false;
-    }
-  });
   const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
     initialSession.chatHistory ?? [],
   );
@@ -253,47 +212,14 @@ export function AICanvasView({
   const [commentMode, setCommentMode] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(
-    () =>
-      urlSessionId ??
-      sessionStorage.getItem("aisets.canvas.sessionId") ??
-      undefined,
-  );
-  const [currentSessionName, setCurrentSessionName] = useState<
-    string | undefined
-  >(() => sessionStorage.getItem("aisets.canvas.sessionName") ?? undefined);
-  const [isDirty, setIsDirty] = useState(false);
   const [aiGreeting] = useState(() => t("aiCanvas.greeting"));
-  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
-  const [newCanvasConfirmOpen, setNewCanvasConfirmOpen] = useState(false);
-  const [saveNameDialogOpen, setSaveNameDialogOpen] = useState(false);
-  const [saveNameDefault, setSaveNameDefault] = useState("");
-  const [saveAsMode, setSaveAsMode] = useState(false);
-  const dirtyVersionRef = useRef(0);
-  const savedVersionRef = useRef(0);
-  const createSessionMut = useCreateCanvasSessionMutation();
-  const updateSessionMut = useUpdateCanvasSessionMutation();
-  const isSaving = createSessionMut.isPending || updateSessionMut.isPending;
   const lastToastedErrorRef = useRef("");
-  const [composerHeight, setComposerHeight] = useState(() => {
-    try {
-      const saved = Number(localStorage.getItem(COMPOSER_HEIGHT_STORAGE_KEY));
-      return Number.isFinite(saved) && saved >= 200
-        ? saved
-        : DEFAULT_COMPOSER_HEIGHT;
-    } catch {
-      return DEFAULT_COMPOSER_HEIGHT;
-    }
-  });
   const [dragPreview, setDragPreview] = useState<{
     cardId: string;
     x: number;
     y: number;
   } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const focusSearchAfterOpenRef = useRef(false);
-  const searchOpenRef = useRef(searchOpen);
 
   useEffect(() => {
     if (!error || lastToastedErrorRef.current === error) return;
@@ -301,22 +227,6 @@ export function AICanvasView({
     toast.error(error, { title: t("aiCanvas.statusError") });
   }, [error, t, toast]);
 
-  useEffect(() => {
-    if (!aiEnabled) return;
-    let cancelled = false;
-    embeddingStats()
-      .then((stats) => {
-        if (!cancelled) {
-          setSemanticAvailable(
-            (stats.textCount ?? 0) > 0 || (stats.imageCount ?? 0) > 0,
-          );
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [aiEnabled]);
   const {
     canvasSelection,
     cardElementsRef,
@@ -359,6 +269,50 @@ export function AICanvasView({
     selectedCardIds,
     viewport,
     capturePadding,
+  });
+
+  const {
+    currentSessionId,
+    currentSessionName,
+    setCurrentSessionName,
+    isDirty,
+    isSaving,
+    handleSave,
+    handleSaveRef,
+    handleSaveAsRef,
+    handleLoadSession,
+    clearCanvas,
+    doSave,
+    sessionsDialogOpen,
+    setSessionsDialogOpen,
+    newCanvasConfirmOpen,
+    setNewCanvasConfirmOpen,
+    saveNameDialogOpen,
+    setSaveNameDialogOpen,
+    saveNameDefault,
+    saveAsMode,
+  } = useCanvasSession({
+    cards,
+    selectedCardIds,
+    viewport,
+    chatHistory,
+    cardWidths,
+    viewMode,
+    setCards,
+    setSelectedCardIds,
+    setViewport,
+    setChatHistory,
+    setCardWidths,
+    setHideNonImageCards,
+    setError,
+    setClearConfirmOpen,
+    isDragging,
+    isDraggingRef,
+    captureCanvasBlob,
+    urlSessionId,
+    setSearchParams,
+    t,
+    toast,
   });
 
   const [cardElementSizes, setCardElementSizes] = useState<
@@ -436,65 +390,39 @@ export function AICanvasView({
     () => selectedAssetCards(cards, selectedCardIds),
     [cards, selectedCardIds],
   );
-  const mentionableImageCards = useMemo(
-    () =>
-      cards.flatMap((card) => {
-        if (card.kind === "asset") {
-          return [
-            {
-              id: card.id,
-              name: fileName(card.asset.repoPath),
-              meta: imageMeta(card.asset),
-              src: card.asset.thumbnailUrl || card.asset.url,
-            },
-          ];
-        }
-        if (card.kind === "variant") {
-          return [
-            {
-              id: card.id,
-              name: card.sourceName,
-              meta: `${card.inputFormat.toUpperCase()} → ${card.outputFormat.toUpperCase()}`,
-              src: card.previewUrl,
-            },
-          ];
-        }
-        if (card.kind === "upload") {
-          return [
-            {
-              id: card.id,
-              name: card.fileName,
-              meta: `${card.uploadWidth}×${card.uploadHeight} · upload`,
-              src: card.thumbnailDataUrl,
-            },
-          ];
-        }
-        return [];
-      }),
-    [cards],
-  );
-  const mentionedImageCards = useMemo(
-    () =>
-      mentionedCardIds
-        .map((id) => mentionableImageCards.find((card) => card.id === id))
-        .filter((card): card is (typeof mentionableImageCards)[number] =>
-          Boolean(card),
-        ),
-    [mentionableImageCards, mentionedCardIds],
-  );
-  const extractTextTargetCount = useMemo(() => {
-    const targetIds = new Set<string>();
-    for (const card of cards) {
-      if (card.kind !== "asset" && card.kind !== "upload") continue;
-      if (
-        selectedCardIds.includes(card.id) ||
-        mentionedCardIds.includes(card.id)
-      ) {
-        targetIds.add(card.id);
-      }
-    }
-    return targetIds.size;
-  }, [cards, mentionedCardIds, selectedCardIds]);
+  const {
+    prompt,
+    setPrompt,
+    preparedSkillIds,
+    setPreparedSkillIds,
+    mentionedCardIds,
+    setMentionedCardIds,
+    pendingAttachments,
+    setPendingAttachments,
+    mentionMenuOpen,
+    setMentionMenuOpen,
+    composerCollapsed,
+    setComposerCollapsed,
+    imageOptimizationAdvice,
+    setImageOptimizationAdvice,
+    composerHeight,
+    setComposerHeight,
+    mentionableImageCards,
+    mentionedImageCards,
+    extractTextTargetCount,
+    mentionImageCard,
+    mentionAllImageCards,
+    mentionSelectedAsset,
+    handleAttachImage,
+  } = useCanvasComposer({
+    cards,
+    selectedCardIds,
+    selectedAssets,
+    setSelectedCardIds,
+    setWorking,
+    setError,
+    t,
+  });
   const commentsByAnchor = useMemo(() => {
     const map = new Map<string, CommentCanvasCard[]>();
     cards.forEach((card) => {
@@ -736,88 +664,6 @@ export function AICanvasView({
   }, [composerCollapsed]);
 
   useEffect(() => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (currentSessionId) {
-          next.set("session", currentSessionId);
-        } else {
-          next.delete("session");
-        }
-        return next;
-      },
-      { replace: true },
-    );
-  }, [currentSessionId, setSearchParams]);
-
-  useEffect(() => {
-    try {
-      if (currentSessionId) {
-        sessionStorage.setItem("aisets.canvas.sessionId", currentSessionId);
-      } else {
-        sessionStorage.removeItem("aisets.canvas.sessionId");
-      }
-      if (currentSessionName) {
-        sessionStorage.setItem("aisets.canvas.sessionName", currentSessionName);
-      } else {
-        sessionStorage.removeItem("aisets.canvas.sessionName");
-      }
-    } catch {
-      // sessionStorage unavailable
-    }
-  }, [currentSessionId, currentSessionName]);
-
-  function clearMissingSessionReference() {
-    suppressDirtyRef.current = true;
-    setCurrentSessionId(undefined);
-    setCurrentSessionName(undefined);
-    dirtyVersionRef.current = 0;
-    savedVersionRef.current = 0;
-    setIsDirty(false);
-    requestAnimationFrame(() => {
-      suppressDirtyRef.current = false;
-    });
-  }
-
-  useEffect(() => {
-    if (!urlSessionId) return;
-    let cancelled = false;
-    getCanvasSession(urlSessionId)
-      .then(({ session }) => {
-        if (cancelled) return;
-        const parsed = normalizeAICanvasSession(JSON.parse(session.stateJson));
-        suppressDirtyRef.current = true;
-        setCards(parsed.cards);
-        setSelectedCardIds(parsed.selectedCardIds ?? []);
-        setViewport(parsed.viewport);
-        setChatHistory(parsed.chatHistory ?? []);
-        setCardWidths(parsed.cardWidths ?? {});
-        setHideNonImageCards(parsed.viewMode === "hidden");
-        setCurrentSessionId(session.id);
-        setCurrentSessionName(session.name);
-        dirtyVersionRef.current = 0;
-        savedVersionRef.current = 0;
-        setIsDirty(false);
-        requestAnimationFrame(() => {
-          suppressDirtyRef.current = false;
-        });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          if (isCanvasSessionNotFound(err)) {
-            clearMissingSessionReference();
-            return;
-          }
-          suppressDirtyRef.current = false;
-          toast.error(t("aiCanvas.saveError"));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     try {
       localStorage.setItem(COMPOSER_HEIGHT_STORAGE_KEY, String(composerHeight));
     } catch {
@@ -863,17 +709,6 @@ export function AICanvasView({
   }, [capturePadding]);
 
   useEffect(() => {
-    searchOpenRef.current = searchOpen;
-    if (!searchOpen || !focusSearchAfterOpenRef.current) return;
-    focusSearchAfterOpenRef.current = false;
-    const frame = window.requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [searchOpen]);
-
-  useEffect(() => {
     function onSaveShortcut(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
       e.preventDefault();
@@ -887,29 +722,6 @@ export function AICanvasView({
     window.addEventListener("keydown", onSaveShortcut, { capture: true });
     return () =>
       window.removeEventListener("keydown", onSaveShortcut, { capture: true });
-  }, []);
-
-  useEffect(() => {
-    function onCanvasSearchShortcut(e: KeyboardEvent) {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "p") return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      const nextOpen = !searchOpenRef.current;
-      searchOpenRef.current = nextOpen;
-      focusSearchAfterOpenRef.current = nextOpen;
-      setSearchOpen(nextOpen);
-    }
-
-    window.addEventListener("keydown", onCanvasSearchShortcut, {
-      capture: true,
-    });
-    return () => {
-      window.removeEventListener("keydown", onCanvasSearchShortcut, {
-        capture: true,
-      });
-    };
   }, []);
 
   useEffect(() => {
@@ -971,259 +783,30 @@ export function AICanvasView({
       document.removeEventListener("keydown", onKeyDown, { capture: true });
   }, []);
 
-  const uploadRef = useRef<(files: File[]) => void>(handleUploadToComposer);
-  useEffect(() => {
-    uploadRef.current = handleUploadToComposer;
+  const {
+    deleteCard,
+    deleteSelectedCards,
+    groupSelectedCards,
+    ungroupCard,
+    duplicateCard,
+    addAsset,
+    addAssistantCard,
+    createImagePreview,
+  } = useCanvasCards({
+    cards,
+    setCards,
+    selectedCardIds,
+    setSelectedCardIds,
+    cardWidths,
+    setCardWidths,
+    viewport,
+    cardLayoutMetrics,
+    rootRef,
+    aiEnabled,
+    t,
+    setWorking,
+    setError,
   });
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const files: File[] = [];
-      for (const item of items) {
-        if (item.kind !== "file") continue;
-        const file = item.getAsFile();
-        if (!file) continue;
-        if (
-          file.type.startsWith("image/") ||
-          file.name?.toLowerCase().endsWith(".svg")
-        ) {
-          files.push(file);
-        }
-      }
-      if (files.length === 0) return;
-      e.preventDefault();
-      uploadRef.current(files);
-    }
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-  }, []);
-
-  const deleteCard = useCallback(
-    (target: CanvasCard) => {
-      const removedIds = cardIdsForDeletion(cards, target.id);
-
-      setCards((current) => current.filter((card) => !removedIds.has(card.id)));
-      setSelectedCardIds((current) =>
-        current.filter((id) => !removedIds.has(id)),
-      );
-    },
-    [cards],
-  );
-
-  const deleteSelectedCards = useCallback(
-    (ids: string[]) => {
-      const removedIds = cardIdsForBulkDeletion(cards, ids);
-      setCards((current) => current.filter((c) => !removedIds.has(c.id)));
-      setSelectedCardIds([]);
-    },
-    [cards],
-  );
-
-  const groupSelectedCards = useCallback(() => {
-    const selected = new Set(selectedCardIds);
-    const groupableCards = cards.filter(
-      (card): card is GroupChildCanvasCard =>
-        selected.has(card.id) &&
-        (card.kind === "asset" ||
-          card.kind === "upload" ||
-          card.kind === "variant"),
-    );
-    if (groupableCards.length < 2 || groupableCards.length !== selected.size) {
-      return;
-    }
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    const childWidths: Record<string, number> = {};
-    for (const card of groupableCards) {
-      const metrics = cardLayoutMetrics[card.id];
-      const width = metrics?.width ?? cardWidths[card.id] ?? CARD_WIDTH;
-      const height = metrics?.height ?? width / compactImageAspectRatio(card);
-      childWidths[card.id] = width;
-      minX = Math.min(minX, card.x);
-      minY = Math.min(minY, card.y);
-      maxX = Math.max(maxX, card.x + width);
-      maxY = Math.max(maxY, card.y + height);
-    }
-    if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;
-
-    const groupId = createCanvasCardId("group");
-    const group: GroupCanvasCard = {
-      id: groupId,
-      kind: "group",
-      x: minX,
-      y: minY,
-      createdAt: nowISO(),
-      cards: groupableCards.map((card) => ({
-        ...card,
-        x: card.x - minX,
-        y: card.y - minY,
-      })),
-      cardWidths: childWidths,
-      width: Math.max(1, maxX - minX),
-      height: Math.max(1, maxY - minY),
-    };
-
-    setCards((current) => [
-      ...current.filter((card) => !selected.has(card.id)),
-      group,
-    ]);
-    setCardWidths((current) => {
-      const next = { ...current, [groupId]: group.width };
-      for (const id of selected) delete next[id];
-      return next;
-    });
-    setSelectedCardIds([groupId]);
-  }, [cardLayoutMetrics, cardWidths, cards, selectedCardIds]);
-
-  const ungroupCard = useCallback(
-    (target: GroupCanvasCard) => {
-      const renderedWidth = cardWidths[target.id] ?? target.width;
-      const scale = target.width > 0 ? renderedWidth / target.width : 1;
-      const childWidths = target.cardWidths ?? {};
-      const restoredCards = target.cards.map((card) => ({
-        ...card,
-        x: target.x + card.x * scale,
-        y: target.y + card.y * scale,
-      }));
-
-      setCards((current) =>
-        current.flatMap((card) =>
-          card.id === target.id ? restoredCards : [card],
-        ),
-      );
-      setCardWidths((current) => {
-        const next = { ...current };
-        delete next[target.id];
-        for (const card of target.cards) {
-          const width = childWidths[card.id];
-          if (width) next[card.id] = width * scale;
-        }
-        return next;
-      });
-      setSelectedCardIds(target.cards.map((card) => card.id));
-    },
-    [cardWidths],
-  );
-
-  const duplicateCard = useCallback(
-    (target: CanvasCard) => {
-      if (
-        target.kind !== "asset" &&
-        target.kind !== "upload" &&
-        target.kind !== "variant"
-      ) {
-        return;
-      }
-      const cloneId = createCanvasCardId("copy");
-      const clone = {
-        ...target,
-        id: cloneId,
-        x: target.x + 42,
-        y: target.y + 42,
-        createdAt: nowISO(),
-      } as AssetCanvasCard | UploadCanvasCard | VariantCanvasCard;
-      setCards((current) => [...current, clone]);
-      setSelectedCardIds([cloneId]);
-      const width = cardWidths[target.id];
-      if (width) {
-        setCardWidths((current) => ({ ...current, [cloneId]: width }));
-      }
-    },
-    [cardWidths],
-  );
-
-  async function runSearch() {
-    const q = query.trim();
-    if (!q) return;
-    if (searchMode === "catalog" && !scanId) {
-      setSearchError(t("aiCanvas.missingScan"));
-      return;
-    }
-    setSearchBusy(true);
-    setSearchError("");
-    setSearchActiveIndex(-1);
-    setSearchSelectedIds(new Set());
-    try {
-      if (searchMode === "semantic") {
-        const result = await semanticSearch({
-          q,
-          includeItems: true,
-          limit: 200,
-        });
-        const items = result.results
-          .map((r) => r.item)
-          .filter((item): item is AssetItem => item != null);
-        setSearchResults(items);
-        setSearchTotal(result.results.length);
-      } else {
-        const page = await getCatalogItems({ scanId: scanId!, q, limit: 200 });
-        setSearchResults(page.items);
-        setSearchTotal(page.total);
-      }
-    } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : t("aiCanvas.searchError"),
-      );
-    } finally {
-      setSearchBusy(false);
-    }
-  }
-
-  function addAsset(asset: AssetItem, options?: { select?: boolean }) {
-    const id = createCanvasCardId("asset");
-    const rect = rootRef.current?.getBoundingClientRect();
-    const containerSize = rect
-      ? { width: rect.width, height: rect.height }
-      : undefined;
-    const position = nextCardPosition(cards.length, viewport, containerSize);
-    const card: AssetCanvasCard = {
-      id,
-      kind: "asset",
-      x: position.x,
-      y: position.y,
-      createdAt: nowISO(),
-      asset,
-    };
-    setCards((current) => [...current, card]);
-    if (options?.select !== false) {
-      setSelectedCardIds([id]);
-    }
-  }
-
-  function addAssistantCard(promptText: string, message?: string) {
-    const assetCards = selectedAssetCards(cards, selectedCardIds);
-    const commentCards = commentsForAssets(
-      cards,
-      assetCards.map((card) => card.id),
-    );
-    const rect = rootRef.current?.getBoundingClientRect();
-    const containerSize = rect
-      ? { width: rect.width, height: rect.height }
-      : undefined;
-    const position = assetCards[0]
-      ? adjacentCardPosition(assetCards[0], cardLayoutMetrics)
-      : nextCardPosition(cards.length, viewport, containerSize);
-    const card: CanvasCard = {
-      id: createCanvasCardId("ai"),
-      kind: "assistant",
-      x: position.x,
-      y: position.y,
-      createdAt: nowISO(),
-      prompt: promptText,
-      message:
-        message ??
-        (aiEnabled ? t("aiCanvas.aiResponse") : t("aiCanvas.aiContextOnly")),
-      bullets: buildAssistantBullets(promptText, cards, selectedCardIds),
-      assetIds: selectedAssetIds(assetCards),
-      commentIds: commentIds(commentCards),
-    };
-    setCards((current) => [...current, card]);
-    setSelectedCardIds([card.id]);
-  }
 
   function commentRequestsAi(text: string) {
     return AI_MENTION_COMMENT_RE.test(text);
@@ -1259,210 +842,6 @@ export function AICanvasView({
         selectedCardId: id,
         cards: nextCards,
       });
-    }
-  }
-
-  async function createImagePreview(
-    assetCard: AssetCanvasCard,
-    promptText: string,
-    outputFormat = DEFAULT_IMAGE_TOOL_SETTINGS.outputFormat,
-  ) {
-    setWorking("imagePreview");
-    setError("");
-    try {
-      const preview = await renderImageToolPreview({
-        assetId: assetCard.asset.id,
-        outputFormat,
-        quality: DEFAULT_IMAGE_TOOL_SETTINGS.quality,
-        maxDimensionPx: DEFAULT_IMAGE_TOOL_SETTINGS.maxDimensionPx,
-      });
-      const card: VariantCanvasCard = {
-        id: createCanvasCardId("variant"),
-        kind: "variant",
-        ...adjacentCardPosition(assetCard, cardLayoutMetrics),
-        createdAt: nowISO(),
-        sourceAssetId: assetCard.asset.id,
-        sourceName: fileName(assetCard.asset.repoPath),
-        previewUrl: previewImageUrl(preview.token),
-        token: preview.token,
-        inputBytes: preview.inputBytes,
-        outputBytes: preview.outputBytes,
-        inputFormat: preview.inputFormat,
-        outputFormat: preview.outputFormat,
-      };
-      setCards((current) => [...current, card]);
-      setSelectedCardIds([card.id]);
-      if (promptText) {
-        addAssistantCard(promptText, t("aiCanvas.previewGenerated"));
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("aiCanvas.operationError"),
-      );
-    } finally {
-      setWorking("idle");
-    }
-  }
-
-  function clearCanvas() {
-    suppressDirtyRef.current = true;
-    setCards([]);
-    setSelectedCardIds([]);
-    setChatHistory([]);
-    setError("");
-    setClearConfirmOpen(false);
-    setCurrentSessionId(undefined);
-    setCurrentSessionName(undefined);
-    setIsDirty(false);
-    dirtyVersionRef.current = 0;
-    savedVersionRef.current = 0;
-    requestAnimationFrame(() => {
-      suppressDirtyRef.current = false;
-    });
-  }
-
-  const suppressDirtyRef = useRef(true);
-  useEffect(() => {
-    if (suppressDirtyRef.current) return;
-    dirtyVersionRef.current += 1;
-    setIsDirty(dirtyVersionRef.current !== savedVersionRef.current);
-  }, [cards, chatHistory, cardWidths, viewport]);
-  useEffect(() => {
-    if (urlSessionId) return;
-    requestAnimationFrame(() => {
-      suppressDirtyRef.current = false;
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function autoSessionName() {
-    const firstAsset = cards.find((c) => c.kind === "asset");
-    if (firstAsset && firstAsset.kind === "asset") {
-      const name = fileName(firstAsset.asset.repoPath);
-      const extra = cards.length - 1;
-      return extra > 0 ? `${name} +${extra}` : name;
-    }
-    return `Canvas ${new Date().toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
-  }
-
-  function buildStateJson(): string {
-    const session: AICanvasSession = {
-      version: 1,
-      cards,
-      selectedCardIds: selectedCardIds.length > 0 ? selectedCardIds : undefined,
-      viewport,
-      chatHistory: chatHistory.slice(-10),
-      cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
-      viewMode: viewMode !== "normal" ? viewMode : undefined,
-    };
-    return JSON.stringify(session);
-  }
-
-  async function doSave(name: string, asNew: boolean, silent = false) {
-    const thumbnail = await captureCanvasBlob();
-    const stateJson = buildStateJson();
-    const cardCount = cards.length;
-    const createNewSession = () => {
-      createSessionMut.mutate(
-        { name, stateJson, thumbnail, cardCount },
-        {
-          onSuccess: (res) => {
-            savedVersionRef.current = dirtyVersionRef.current;
-            setIsDirty(false);
-            setCurrentSessionId(res.session.id);
-            setCurrentSessionName(res.session.name);
-            if (!silent) toast.success(t("aiCanvas.saveSuccess"));
-          },
-          onError: () => toast.error(t("aiCanvas.saveError")),
-        },
-      );
-    };
-
-    if (currentSessionId && !asNew) {
-      updateSessionMut.mutate(
-        { id: currentSessionId, name, stateJson, thumbnail, cardCount },
-        {
-          onSuccess: (res) => {
-            savedVersionRef.current = dirtyVersionRef.current;
-            setIsDirty(false);
-            setCurrentSessionName(res.session.name);
-            if (!silent) toast.success(t("aiCanvas.saveSuccess"));
-          },
-          onError: (err) => {
-            if (isCanvasSessionNotFound(err)) {
-              clearMissingSessionReference();
-              createNewSession();
-              return;
-            }
-            toast.error(t("aiCanvas.saveError"));
-          },
-        },
-      );
-    } else {
-      createNewSession();
-    }
-  }
-
-  function handleSave() {
-    void doSave(currentSessionName ?? autoSessionName(), false);
-  }
-
-  function handleSaveAs() {
-    setSaveAsMode(true);
-    setSaveNameDefault(autoSessionName());
-    setSaveNameDialogOpen(true);
-  }
-
-  const handleSaveRef = useRef(handleSave);
-  const handleSaveAsRef = useRef(handleSaveAs);
-  useEffect(() => {
-    handleSaveRef.current = handleSave;
-    handleSaveAsRef.current = handleSaveAs;
-  });
-
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  useEffect(() => {
-    if (
-      !shouldScheduleAICanvasAutoSave({
-        isDirty,
-        cardsLength: cards.length,
-        isSaving,
-        isDragging: isDragging || isDraggingRef.current,
-      })
-    ) {
-      return;
-    }
-    clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (cards.length === 0 || isDraggingRef.current) return;
-      void doSave(currentSessionName ?? autoSessionName(), false, true);
-    }, 3000);
-    return () => clearTimeout(autoSaveTimerRef.current);
-  });
-
-  async function handleLoadSession(sessionId: string) {
-    setSessionsDialogOpen(false);
-    try {
-      const { session } = await getCanvasSession(sessionId);
-      const parsed = normalizeAICanvasSession(JSON.parse(session.stateJson));
-      suppressDirtyRef.current = true;
-      setCards(parsed.cards);
-      setSelectedCardIds(parsed.selectedCardIds ?? []);
-      setViewport(parsed.viewport);
-      setChatHistory(parsed.chatHistory ?? []);
-      setCardWidths(parsed.cardWidths ?? {});
-      setHideNonImageCards(parsed.viewMode === "hidden");
-      setCurrentSessionId(session.id);
-      setCurrentSessionName(session.name);
-      dirtyVersionRef.current = 0;
-      savedVersionRef.current = 0;
-      setIsDirty(false);
-      requestAnimationFrame(() => {
-        suppressDirtyRef.current = false;
-      });
-    } catch {
-      toast.error(t("aiCanvas.saveError"));
     }
   }
 
@@ -1525,83 +904,6 @@ export function AICanvasView({
     });
   }
 
-  function appendPromptToken(token: string) {
-    appendPromptTokens([token]);
-  }
-
-  function appendPromptTokens(tokens: string[]) {
-    const clean = tokens.filter(Boolean);
-    if (clean.length === 0) return;
-    setPrompt((current) => {
-      const trimmed = current.trimEnd();
-      const suffix = clean.join(" ");
-      return trimmed ? `${trimmed} ${suffix}` : suffix;
-    });
-  }
-
-  function mentionImageCard(cardId: string) {
-    const target = mentionableImageCards.find((card) => card.id === cardId);
-    if (!target) return;
-    setMentionedCardIds((current) =>
-      current.includes(cardId) ? current : [...current, cardId],
-    );
-    setSelectedCardIds([cardId]);
-    appendPromptToken(`@${target.name}`);
-  }
-
-  function mentionAllImageCards() {
-    const ids = mentionableImageCards.map((card) => card.id);
-    setMentionedCardIds((current) => [
-      ...current,
-      ...ids.filter((id) => !current.includes(id)),
-    ]);
-    appendPromptToken("@all");
-  }
-
-  function mentionSelectedAsset() {
-    const targets = selectedAssets
-      .map((asset) =>
-        mentionableImageCards.find((card) => card.id === asset.id),
-      )
-      .filter((card): card is (typeof mentionableImageCards)[number] =>
-        Boolean(card),
-      );
-    if (targets.length > 0) {
-      const ids = targets.map((target) => target.id);
-      setMentionedCardIds((current) => [
-        ...current,
-        ...ids.filter((id) => !current.includes(id)),
-      ]);
-      setSelectedCardIds(ids);
-      appendPromptTokens(targets.map((target) => `@${target.name}`));
-      return;
-    }
-    appendPromptToken("@" + t("aiCanvas.selectedMention"));
-  }
-
-  async function handleUploadToComposer(files: File[]) {
-    setWorking("ai");
-    try {
-      const results = await uploadCanvasImages(files);
-      const attachments: PendingAttachment[] = results.map((r) => ({
-        id: createCanvasCardId("attach"),
-        token: r.token,
-        thumbnailDataUrl: r.thumbnailDataUrl,
-        fileName: r.fileName,
-        width: r.width,
-        height: r.height,
-      }));
-      setPendingAttachments((prev) => [...prev, ...attachments]);
-      setComposerCollapsed(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("aiCanvas.operationError"),
-      );
-    } finally {
-      setWorking("idle");
-    }
-  }
-
   const handlePlaceOnCanvas = useCallback(
     (att: ChatAttachment) => {
       const rect = rootRef.current?.getBoundingClientRect();
@@ -1643,18 +945,6 @@ export function AICanvasView({
         };
       }),
     );
-  }
-
-  function handleAttachImage() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*,.svg,.avif,.heic,.heif,.webp";
-    input.multiple = true;
-    input.onchange = () => {
-      const files = Array.from(input.files ?? []);
-      if (files.length > 0) handleUploadToComposer(files);
-    };
-    input.click();
   }
 
   function handleExtractText() {
