@@ -76,19 +76,22 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install NASM
+      - name: Install native image dependencies
         shell: bash
         run: |
           case "$RUNNER_OS" in
             Linux)
               sudo apt-get update
-              sudo apt-get install -y nasm
+              sudo apt-get install -y nasm libdav1d-dev
               ;;
             macOS)
               brew list nasm >/dev/null 2>&1 || brew install nasm
+              brew list dav1d >/dev/null 2>&1 || brew install dav1d
               ;;
             Windows)
-              choco install nasm -y
+              choco install nasm ninja -y
+              python -m pip install meson
+              echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=always" >> "$GITHUB_ENV"
               ;;
           esac
 

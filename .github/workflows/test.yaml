@@ -78,8 +78,8 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - name: Install NASM
-        run: sudo apt-get update && sudo apt-get install -y nasm
+      - name: Install native image dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm libdav1d-dev
 
       - name: Cache cargo
         uses: actions/cache@v4
