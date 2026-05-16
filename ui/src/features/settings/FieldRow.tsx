@@ -19,8 +19,8 @@ export function FieldRow({
     <div
       className={
         align === "start"
-          ? "grid grid-cols-1 items-start gap-3 py-4 min-[1200px]:grid-cols-[minmax(0,1fr)_auto] min-[1200px]:gap-8"
-          : "grid grid-cols-1 items-center gap-3 py-4 min-[1200px]:grid-cols-[minmax(0,1fr)_auto] min-[1200px]:gap-8"
+          ? "grid grid-cols-1 items-start gap-3 py-4 min-[1200px]:grid-cols-[minmax(220px,1fr)_minmax(280px,520px)] min-[1200px]:gap-8"
+          : "grid grid-cols-1 items-center gap-3 py-4 min-[1200px]:grid-cols-[minmax(220px,1fr)_minmax(280px,520px)] min-[1200px]:gap-8"
       }
     >
       <div className="min-w-0">
@@ -33,7 +33,7 @@ export function FieldRow({
           </p>
         )}
       </div>
-      <div className="flex min-w-0 justify-start min-[1200px]:min-w-[280px] min-[1200px]:justify-end">
+      <div className="flex min-w-0 justify-start min-[1200px]:w-full min-[1200px]:min-w-[280px] min-[1200px]:justify-end">
         {children}
       </div>
     </div>
