@@ -18,7 +18,7 @@ import {
   searchResultCardPosition,
   searchResultNeedsUserConfirmation,
   uploadCardsFromAttachments,
-} from "./useCanvasChat";
+} from "./canvasChatHelpers";
 
 function makeUploadCard(): UploadCanvasCard {
   return {

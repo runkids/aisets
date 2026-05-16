@@ -11,7 +11,7 @@ import {
   canvasFocusCardFromEvent,
   canvasProposalCardFromEvent,
 } from "./canvasChatEventContract";
-import { focusCursorPosition } from "./useCanvasChat";
+import { focusCursorPosition } from "./canvasChatHelpers";
 
 function streamFromChunks(chunks: string[]) {
   const encoder = new TextEncoder();

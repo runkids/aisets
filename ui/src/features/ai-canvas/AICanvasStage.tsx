@@ -12,23 +12,24 @@ import {
 } from "react";
 import type { TFunction } from "i18next";
 import { ConfirmDialog, PromptDialog } from "@/components/ui";
+import { AICursor, CardShell } from "./canvasCards";
 import {
-  AICursor,
   AssetCardBody,
-  AssetContextMenu,
   AssistantCardBody,
-  CardShell,
   CommentCardBody,
   GroupCardBody,
-  GroupContextMenu,
   OperationCardBody,
   ProposalCardBody,
-  SelectionContextMenu,
   UploadCardBody,
-  UploadContextMenu,
   VariantCardBody,
+} from "./CanvasCardBodies";
+import {
+  AssetContextMenu,
+  GroupContextMenu,
+  SelectionContextMenu,
+  UploadContextMenu,
   VariantContextMenu,
-} from "./canvasCards";
+} from "./CanvasContextMenus";
 import {
   CARD_WIDTH,
   imageFrameSize,
