@@ -185,6 +185,10 @@ export function AICanvasComposer({
   handleAddSearchCandidate,
   handleDismissSearchCandidates,
 }: AICanvasComposerProps) {
+  const aiUnavailable =
+    aiBackendOptions.length === 0 ||
+    aiBackendOptions.every((option) => option.disabled);
+
   const composerDragRef = useRef<{ startY: number; startH: number } | null>(
     null,
   );
@@ -1003,8 +1007,13 @@ export function AICanvasComposer({
             <textarea
               ref={promptInputRef}
               value={prompt}
-              placeholder={t("aiCanvas.composerPlaceholder")}
-              className="max-h-20 min-h-5 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-5 text-white outline-none placeholder:text-white/35"
+              disabled={aiUnavailable}
+              placeholder={
+                aiUnavailable
+                  ? t("aiCanvas.composerPlaceholderUnavailable")
+                  : t("aiCanvas.composerPlaceholder")
+              }
+              className="max-h-20 min-h-5 flex-1 resize-none border-0 bg-transparent py-0 font-g-mono text-g-body leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed disabled:opacity-50"
               rows={1}
               onChange={(event) => {
                 promptHistoryNavigationRef.current = {
@@ -1078,7 +1087,7 @@ export function AICanvasComposer({
                   !event.nativeEvent.isComposing
                 ) {
                   event.preventDefault();
-                  if (!isWorking) void handleAsk();
+                  if (!isWorking && !aiUnavailable) void handleAsk();
                 }
               }}
             />
@@ -1158,7 +1167,8 @@ export function AICanvasComposer({
                 type="button"
                 aria-label={t("aiCanvas.ask")}
                 disabled={
-                  prompt.trim() === "" && pendingAttachments.length === 0
+                  aiUnavailable ||
+                  (prompt.trim() === "" && pendingAttachments.length === 0)
                 }
                 className="grid size-10 shrink-0 place-items-center rounded-full border border-white/70 bg-white/[0.82] text-black transition-colors duration-[120ms] ease-g hover:bg-white focus-visible:outline-none focus-visible:shadow-g-focus disabled:cursor-not-allowed disabled:opacity-[0.38]"
                 onClick={() => void handleAsk()}
