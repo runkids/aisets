@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"aisets/internal/apierr"
+	"aisets/internal/imgtools"
 )
 
 var version = "dev"
@@ -18,6 +19,7 @@ func main() {
 }
 
 func run(rawArgs []string) int {
+	imgtools.SetAppVersion(version)
 	args, jsonOut := stripJSONFlag(rawArgs)
 	if len(args) == 0 {
 		if jsonOut {

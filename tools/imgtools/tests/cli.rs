@@ -218,6 +218,38 @@ fn convert_resizes_and_writes_requested_format() {
 }
 
 #[test]
+fn convert_decodes_avif_input_when_writing_webp() {
+    let temp = TempDir::new();
+    let source = temp.path("source.png");
+    let avif = temp.path("source.avif");
+    let output = temp.path("output.webp");
+    write_rgba_png(&source, 18, 10, Rgba([80, 120, 200, 180]));
+
+    assert_success(run(&[
+        "convert",
+        "--format",
+        "avif",
+        "--quality",
+        "80",
+        source.to_str().expect("path utf-8"),
+        avif.to_str().expect("path utf-8"),
+    ]));
+
+    assert_success(run(&[
+        "convert",
+        "--format",
+        "webp",
+        "--quality",
+        "80",
+        avif.to_str().expect("path utf-8"),
+        output.to_str().expect("path utf-8"),
+    ]));
+
+    let converted = image::open(&output).expect("open converted webp");
+    assert_eq!((converted.width(), converted.height()), (18, 10));
+}
+
+#[test]
 fn convert_preserves_animated_gif_when_writing_webp() {
     let temp = TempDir::new();
     let input = temp.path("animated.gif");

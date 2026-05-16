@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sync"
 )
 
@@ -16,7 +15,21 @@ var (
 	resolvedPath string
 	resolvedErr  error
 	resolvedOnce bool
+	appVersion   = "dev"
 )
+
+func SetAppVersion(ver string) {
+	resolveMu.Lock()
+	defer resolveMu.Unlock()
+	ver = normalizeAppVersion(ver)
+	if appVersion == ver {
+		return
+	}
+	appVersion = ver
+	resolvedPath = ""
+	resolvedErr = nil
+	resolvedOnce = false
+}
 
 func Binary() (string, error) {
 	resolveMu.Lock()
@@ -49,6 +62,9 @@ func resolve() (string, error) {
 			return p, nil
 		}
 	}
+	if p, err := cachedBinary(); err == nil {
+		return p, nil
+	}
 	if p, err := findNextToExe(); err == nil {
 		return p, nil
 	}
@@ -66,10 +82,7 @@ func findNextToExe() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	candidate := filepath.Join(filepath.Dir(exe), binaryName)
-	if runtime.GOOS == "windows" {
-		candidate += ".exe"
-	}
+	candidate := filepath.Join(filepath.Dir(exe), platformBinaryName())
 	if _, err := os.Stat(candidate); err != nil {
 		return "", err
 	}
@@ -77,10 +90,7 @@ func findNextToExe() (string, error) {
 }
 
 func findInBinDir() (string, error) {
-	candidate := filepath.Join("bin", binaryName)
-	if runtime.GOOS == "windows" {
-		candidate += ".exe"
-	}
+	candidate := filepath.Join("bin", platformBinaryName())
 	abs, err := filepath.Abs(candidate)
 	if err != nil {
 		return "", err
@@ -100,10 +110,7 @@ func extractToCache() (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	name := binaryName
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
+	name := platformBinaryName()
 	target := filepath.Join(dir, name)
 	info, err := os.Stat(target)
 	if err == nil && info.Size() == int64(len(embeddedBinary)) {
