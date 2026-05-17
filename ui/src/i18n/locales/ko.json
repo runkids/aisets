@@ -134,6 +134,46 @@
     "selectedMention": "선택 이미지",
     "uploadPending": "이미지 업로드 백엔드는 아직 연결되지 않았습니다.",
     "addAttachment": "첨부 추가",
+    "planMode": "계획",
+    "planDialogTitle": "계획 모드",
+    "planDialogDesc": "필요한 AI 캔버스 작업을 순서대로 실행하고 각 단계를 실행 증거로 검증합니다.",
+    "planTaskLabel": "작업 {{count}}",
+    "planTaskPlaceholder": "구체적인 캔버스 작업 하나를 입력",
+    "planAddTask": "작업 추가",
+    "planRemoveTask": "작업 제거",
+    "planStart": "계획 시작",
+    "planConfirmTitle": "이 계획을 시작할까요?",
+    "planConfirmBody": "AI가 캔버스 작업 {{count}}개를 순서대로 실행하며 현재 캔버스를 변경할 수 있습니다.",
+    "planConfirmStart": "시작",
+    "planRestart": "계획 다시 시작",
+    "planRestartConfirmTitle": "이 계획을 다시 시작할까요?",
+    "planRestartConfirmBody": "AI가 현재 작업 내용으로 새 실행을 만들고 캔버스 작업 {{count}}개를 순서대로 실행합니다.",
+    "planRestartConfirmStart": "다시 시작",
+    "planStop": "계획 중지",
+    "planStepStatus": {
+      "pending": "대기 중",
+      "running": "실행 중",
+      "completed": "완료",
+      "failed": "실패",
+      "canceled": "취소됨"
+    },
+    "planStepWarning": {
+      "invalid_actions_repaired": "AI 가 잘못된 작업 이후 복구했습니다."
+    },
+    "planStepReason": {
+      "canceled": "이 단계는 완료되기 전에 취소되었습니다.",
+      "failed": "AI 실행에 실패했습니다.",
+      "text_only": "AI가 텍스트만 반환했고 검증 가능한 실행 증거를 만들지 않았습니다.",
+      "missing_required_evidence": "필수 실행 증거가 부족합니다.",
+      "invalid_actions_repaired": "이 단계에서 잘못된 작업이 발생해 수정이 필요했습니다.",
+      "completed_with_evidence": "필수 실행 증거와 함께 완료되었습니다."
+    },
+    "planStepScore": "점수 {{score}}/5",
+    "planStepImprovement": "개선: {{improvement}}",
+    "planStepError": {
+      "no_execution_evidence": "실행 증거가 생성되지 않았습니다.",
+      "score_below_five": "이 단계는 5/5 미만입니다."
+    },
     "mentionAsset": "이미지 멘션",
     "mentionCanvasImage": "캔버스 이미지 멘션",
     "noMentionImages": "캔버스에 아직 이미지가 없습니다.",

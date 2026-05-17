@@ -127,9 +127,11 @@ func canvasUserLimitsToSingleAsset(latestUserMessage string) bool {
 
 func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnapshot, latestUserMessage string) []canvasAction {
 	selectedAssetIDs := selectedCanvasAssetIDs(canvas)
+	visibleAssetIDs := visibleCanvasAssetIDs(canvas)
 	selectedImageCardIDs := selectedCanvasImageCardIDs(canvas)
 	selectedOCRCardIDs := selectedCanvasOCRCardIDs(canvas)
 	limitToSingle := canvasUserLimitsToSingleAsset(latestUserMessage)
+	targetsVisibleAssets := canvasUserTargetsVisibleAssets(latestUserMessage)
 
 	toolCounts := map[string]int{}
 	for _, act := range actions {
@@ -166,6 +168,21 @@ func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnaps
 			continue
 		}
 		if !canvasToolCanUseSelectedAssetIDs(act.Tool) || toolCounts[act.Tool] != 1 || len(targetAssetIDs) > 1 || len(selectedAssetIDs) == 0 {
+			if canvasToolCanUseSelectedAssetIDs(act.Tool) &&
+				toolCounts[act.Tool] == 1 &&
+				len(targetAssetIDs) == 0 &&
+				len(selectedAssetIDs) == 0 &&
+				len(visibleAssetIDs) > 0 &&
+				targetsVisibleAssets {
+				clone := act
+				if limitToSingle {
+					setCanvasActionAssetIDs(&clone, visibleAssetIDs[:1])
+				} else {
+					setCanvasActionAssetIDs(&clone, visibleAssetIDs)
+				}
+				expanded = append(expanded, clone)
+				continue
+			}
 			expanded = append(expanded, act)
 			continue
 		}
@@ -188,6 +205,12 @@ func expandCanvasMultiSelectedActions(actions []canvasAction, canvas canvasSnaps
 		expanded = append(expanded, clone)
 	}
 	return expanded
+}
+
+func canvasUserTargetsVisibleAssets(latestUserMessage string) bool {
+	return containsAnyText(latestUserMessage,
+		"visible", "existing", "current", "on the canvas", "all image", "all asset", "both", "each", "every",
+	)
 }
 
 func canvasToolPreservesExplicitAssetTargets(tool string) bool {

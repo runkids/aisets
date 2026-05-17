@@ -26,6 +26,19 @@ func selectedCanvasAssetIDs(canvas canvasSnapshot) []string {
 	return ids
 }
 
+func visibleCanvasAssetIDs(canvas canvasSnapshot) []string {
+	var ids []string
+	seen := map[string]bool{}
+	for _, card := range canvas.Cards {
+		if card.Asset == nil || card.Asset.ID == "" || seen[card.Asset.ID] {
+			continue
+		}
+		seen[card.Asset.ID] = true
+		ids = append(ids, card.Asset.ID)
+	}
+	return ids
+}
+
 func selectedCanvasImageCardIDs(canvas canvasSnapshot) []string {
 	byID := map[string]canvasCardSnapshot{}
 	for _, card := range canvas.Cards {
@@ -289,4 +302,3 @@ func canvasCardImageDisplaySize(card canvasCardSnapshot) (float64, float64) {
 	}
 	return width, 240
 }
-

@@ -19,6 +19,7 @@ import {
   type CanvasCard,
   type ChatHistoryEntry,
 } from "./aiCanvasState";
+import type { CanvasPlanState } from "./canvasPlanState";
 import type { TFunction } from "i18next";
 
 interface UseCanvasSessionOpts {
@@ -27,6 +28,7 @@ interface UseCanvasSessionOpts {
   viewport: { x: number; y: number; scale: number };
   chatHistory: ChatHistoryEntry[];
   cardWidths: Record<string, number>;
+  plan?: CanvasPlanState;
   viewMode: "normal" | "compact" | "hidden";
   setCards: Dispatch<SetStateAction<CanvasCard[]>>;
   setSelectedCardIds: Dispatch<SetStateAction<string[]>>;
@@ -35,6 +37,7 @@ interface UseCanvasSessionOpts {
   >;
   setChatHistory: Dispatch<SetStateAction<ChatHistoryEntry[]>>;
   setCardWidths: Dispatch<SetStateAction<Record<string, number>>>;
+  setPlan: Dispatch<SetStateAction<CanvasPlanState | undefined>>;
   setHideNonImageCards: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string>>;
   setClearConfirmOpen: Dispatch<SetStateAction<boolean>>;
@@ -60,12 +63,14 @@ export function useCanvasSession(opts: UseCanvasSessionOpts) {
     viewport,
     chatHistory,
     cardWidths,
+    plan,
     viewMode,
     setCards,
     setSelectedCardIds,
     setViewport,
     setChatHistory,
     setCardWidths,
+    setPlan,
     setHideNonImageCards,
     setError,
     setClearConfirmOpen,
@@ -191,7 +196,7 @@ export function useCanvasSession(opts: UseCanvasSessionOpts) {
     if (suppressDirtyRef.current) return;
     dirtyVersionRef.current += 1;
     setIsDirty(dirtyVersionRef.current !== savedVersionRef.current);
-  }, [cards, chatHistory, cardWidths, viewport]);
+  }, [cards, chatHistory, cardWidths, plan, viewport]);
 
   useEffect(() => {
     if (urlSessionId) return;
@@ -205,6 +210,7 @@ export function useCanvasSession(opts: UseCanvasSessionOpts) {
     setCards([]);
     setSelectedCardIds([]);
     setChatHistory([]);
+    setPlan(undefined);
     setError("");
     setClearConfirmOpen(false);
     setCurrentSessionId(undefined);
@@ -235,6 +241,7 @@ export function useCanvasSession(opts: UseCanvasSessionOpts) {
       viewport,
       chatHistory: chatHistory.slice(-10),
       cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
+      plan,
       viewMode: viewMode !== "normal" ? viewMode : undefined,
     };
     return JSON.stringify(session);
@@ -332,6 +339,7 @@ export function useCanvasSession(opts: UseCanvasSessionOpts) {
       setViewport(parsed.viewport);
       setChatHistory(parsed.chatHistory ?? []);
       setCardWidths(parsed.cardWidths ?? {});
+      setPlan(parsed.plan);
       setHideNonImageCards(parsed.viewMode === "hidden");
       setCurrentSessionId(session.id);
       setCurrentSessionName(session.name);

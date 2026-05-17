@@ -14,13 +14,9 @@ import {
   type ChatRunUsage,
   type PendingAttachment,
   type UploadCanvasCard,
+  type VariantCanvasCard,
 } from "./aiCanvasState";
-import {
-  CARD_WIDTH,
-  imageMeta,
-  nextCardPosition,
-  nowISO,
-} from "./canvasUtils";
+import { CARD_WIDTH, imageMeta, nextCardPosition, nowISO } from "./canvasUtils";
 
 export type AICursorState = {
   x: number;
@@ -301,6 +297,67 @@ export function duplicateCardPositionsFromActionResult(result: unknown) {
     positions.set(position.cardId, { x: position.x, y: position.y });
   }
   return positions;
+}
+
+export type DuplicatableCanvasCard =
+  | AssetCanvasCard
+  | UploadCanvasCard
+  | VariantCanvasCard;
+
+function isDuplicatableCanvasCard(
+  card: CanvasCard,
+): card is DuplicatableCanvasCard {
+  return (
+    card.kind === "asset" || card.kind === "upload" || card.kind === "variant"
+  );
+}
+
+export function duplicateCanvasCardsFromActionResult({
+  result,
+  canvasCards,
+  cardLayoutMetrics,
+}: {
+  result: unknown;
+  canvasCards: CanvasCard[];
+  cardLayoutMetrics: CanvasCardLayoutMetrics;
+}) {
+  const copies = duplicateCardCopiesFromActionResult(result);
+  const positions = duplicateCardPositionsFromActionResult(result);
+  const layout = (result as { layout?: unknown })?.layout;
+  const walking = typeof layout === "string" && /walk|walking/i.test(layout);
+  const perSourceIndex = new Map<string, number>();
+  const cards: DuplicatableCanvasCard[] = [];
+  const widths: Record<string, number> = {};
+
+  for (const copy of copies) {
+    if (!copy.sourceCardId || !copy.cardId) continue;
+    const source = canvasCards.find(
+      (card): card is DuplicatableCanvasCard =>
+        card.id === copy.sourceCardId && isDuplicatableCanvasCard(card),
+    );
+    if (!source) continue;
+
+    const index = perSourceIndex.get(source.id) ?? 0;
+    perSourceIndex.set(source.id, index + 1);
+    const sourceWidth = cardLayoutMetrics[source.id]?.width ?? CARD_WIDTH;
+    const stepX = walking ? Math.max(108, sourceWidth * 0.46) : 36;
+    const stepY = walking ? (index % 2 === 0 ? 18 : -12) : 36;
+    const position = positions.get(copy.cardId);
+    const card = {
+      ...source,
+      id: copy.cardId,
+      x: position?.x ?? source.x + (index + 1) * stepX,
+      y: position?.y ?? source.y + (index + 1) * stepY,
+      createdAt: nowISO(),
+    };
+
+    cards.push(card);
+    if (sourceWidth) {
+      widths[copy.cardId] = sourceWidth;
+    }
+  }
+
+  return { cards, widths };
 }
 
 export function formatOCRActionText(result: unknown, t: TFunction) {

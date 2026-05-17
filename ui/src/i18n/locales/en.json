@@ -161,6 +161,46 @@
     "selectedMention": "selected image",
     "uploadPending": "Image upload is not wired to the backend yet.",
     "addAttachment": "Add attachment",
+    "planMode": "Plan",
+    "planDialogTitle": "Plan mode",
+    "planDialogDesc": "Run required AI canvas tasks in order and verify each step with execution evidence.",
+    "planTaskLabel": "Task {{count}}",
+    "planTaskPlaceholder": "Describe one concrete canvas task",
+    "planAddTask": "Add task",
+    "planRemoveTask": "Remove task",
+    "planStart": "Start plan",
+    "planConfirmTitle": "Start this plan?",
+    "planConfirmBody": "The AI will run {{count}} canvas tasks in order. It may modify the current canvas.",
+    "planConfirmStart": "Start plan",
+    "planRestart": "Restart plan",
+    "planRestartConfirmTitle": "Restart this plan?",
+    "planRestartConfirmBody": "The AI will create a new run from the current tasks and execute {{count}} canvas tasks in order.",
+    "planRestartConfirmStart": "Restart plan",
+    "planStop": "Stop plan",
+    "planStepStatus": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Done",
+      "failed": "Failed",
+      "canceled": "Canceled"
+    },
+    "planStepWarning": {
+      "invalid_actions_repaired": "The AI recovered after an invalid action."
+    },
+    "planStepReason": {
+      "canceled": "The step was canceled before completion.",
+      "failed": "The AI run failed.",
+      "text_only": "The AI only returned text and produced no executable evidence.",
+      "missing_required_evidence": "Missing required execution evidence.",
+      "invalid_actions_repaired": "The step produced invalid actions that had to be repaired.",
+      "completed_with_evidence": "Completed with required execution evidence."
+    },
+    "planStepScore": "Score {{score}}/5",
+    "planStepImprovement": "Improve: {{improvement}}",
+    "planStepError": {
+      "no_execution_evidence": "No execution evidence was produced.",
+      "score_below_five": "This step scored below 5/5."
+    },
     "mentionAsset": "Mention image",
     "mentionCanvasImage": "Mention canvas image",
     "noMentionImages": "No images on the canvas yet.",

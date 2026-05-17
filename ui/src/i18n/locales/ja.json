@@ -134,6 +134,46 @@
     "selectedMention": "選択画像",
     "uploadPending": "画像アップロードのバックエンドはまだ接続されていません。",
     "addAttachment": "添付を追加",
+    "planMode": "計画",
+    "planDialogTitle": "計画モード",
+    "planDialogDesc": "必要な AI キャンバスタスクを順番に実行し、各ステップを実行証拠で検証します。",
+    "planTaskLabel": "タスク {{count}}",
+    "planTaskPlaceholder": "具体的なキャンバスタスクを 1 つ入力",
+    "planAddTask": "タスクを追加",
+    "planRemoveTask": "タスクを削除",
+    "planStart": "計画を開始",
+    "planConfirmTitle": "この計画を開始しますか？",
+    "planConfirmBody": "AI が {{count}} 件のキャンバスタスクを順番に実行し、現在のキャンバスを変更する可能性があります。",
+    "planConfirmStart": "開始",
+    "planRestart": "計画を再実行",
+    "planRestartConfirmTitle": "この計画を再実行しますか？",
+    "planRestartConfirmBody": "AI は現在のタスク内容から新しい実行を作成し、{{count}} 件のキャンバスタスクを順番に実行します。",
+    "planRestartConfirmStart": "再実行",
+    "planStop": "計画を停止",
+    "planStepStatus": {
+      "pending": "待機中",
+      "running": "実行中",
+      "completed": "完了",
+      "failed": "失敗",
+      "canceled": "キャンセル"
+    },
+    "planStepWarning": {
+      "invalid_actions_repaired": "AI は無効なアクションから回復しました。"
+    },
+    "planStepReason": {
+      "canceled": "このステップは完了前にキャンセルされました。",
+      "failed": "AI の実行に失敗しました。",
+      "text_only": "AI はテキストのみを返し、検証可能な実行証拠を生成しませんでした。",
+      "missing_required_evidence": "必要な実行証拠が不足しています。",
+      "invalid_actions_repaired": "このステップでは無効なアクションが発生し、修正が必要でした。",
+      "completed_with_evidence": "必要な実行証拠とともに完了しました。"
+    },
+    "planStepScore": "スコア {{score}}/5",
+    "planStepImprovement": "改善: {{improvement}}",
+    "planStepError": {
+      "no_execution_evidence": "実行証拠が生成されませんでした。",
+      "score_below_five": "このステップは 5/5 未満です。"
+    },
     "mentionAsset": "画像をメンション",
     "mentionCanvasImage": "キャンバス画像をメンション",
     "noMentionImages": "キャンバス上に画像はまだありません。",

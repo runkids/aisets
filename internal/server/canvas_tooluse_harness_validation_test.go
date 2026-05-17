@@ -130,6 +130,45 @@ func TestCanvasActionValidationRejectsMissingAndInvalidArgs(t *testing.T) {
 	if len(issues) != 1 || !strings.Contains(issues[0].Reason, "outputFormat") {
 		t.Fatalf("invalid enum issues = %#v", issues)
 	}
+
+	_, issues = normalizeCanvasActions([]canvasAction{{
+		Tool:   "add_assets_to_canvas",
+		Params: map[string]any{},
+	}}, true)
+	if len(issues) != 1 || !strings.Contains(issues[0].Reason, "add_assets_to_canvas.assetIds is required") {
+		t.Fatalf("missing add assetIds issues = %#v", issues)
+	}
+
+	_, issues = normalizeCanvasActions([]canvasAction{{
+		Tool:   "inspect_image_quality",
+		Params: map[string]any{},
+	}}, true)
+	if len(issues) != 1 || !strings.Contains(issues[0].Reason, "inspect_image_quality.assetIds is required") {
+		t.Fatalf("missing inspect assetIds issues = %#v", issues)
+	}
+}
+
+func TestCanvasActionExpansionTargetsVisibleAssets(t *testing.T) {
+	canvas := canvasSnapshot{
+		Cards: []canvasCardSnapshot{
+			{ID: "card-a", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "asset-a", RepoPath: "a.png"}},
+			{ID: "card-b", Kind: "asset", Asset: &canvasAssetSnapshot{ID: "asset-b", RepoPath: "b.png"}},
+		},
+	}
+	actions := expandCanvasMultiSelectedActions([]canvasAction{{
+		Tool:   "inspect_image_quality",
+		Params: map[string]any{},
+	}}, canvas, "Call inspect_image_quality for both visible catalog image assets.")
+	actions, issues := normalizeCanvasActions(actions, true)
+	if len(issues) > 0 {
+		t.Fatalf("unexpected visible asset expansion issues: %#v", issues)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("actions = %#v", actions)
+	}
+	if got := canvasHarnessEventStringSlice(actions[0].Params["assetIds"]); !reflect.DeepEqual(got, []string{"asset-a", "asset-b"}) {
+		t.Fatalf("assetIds = %#v", got)
+	}
 }
 
 func TestCanvasHarnessInvalidArgsTriggerRepairLoop(t *testing.T) {

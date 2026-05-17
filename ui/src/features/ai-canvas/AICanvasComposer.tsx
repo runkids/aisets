@@ -4,6 +4,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ListChecks,
   LoaderCircle,
   MessageCircle,
   Layers,
@@ -32,6 +33,8 @@ import {
   type ProposalCanvasCard,
   type ChatRunUsage,
 } from "./aiCanvasState";
+import type { CanvasChatRunResult } from "./canvasChatRunResult";
+import type { CanvasPlanState } from "./canvasPlanState";
 import {
   AICanvasActivityPanel,
   AICanvasRunUsageChips,
@@ -52,7 +55,7 @@ import type {
 } from "./aiCanvasTypes";
 
 const composerActionClass =
-  "border-white/[0.08] bg-white/[0.07] text-white/72 hover:bg-white/[0.12] hover:text-white";
+  "border-white/[0.08] bg-white/[0.07] text-white/72 [&:hover:not(:disabled)]:!bg-white/[0.12] [&:hover:not(:disabled)]:!text-white";
 const composerIconClass =
   "rounded-full border-transparent bg-transparent text-white/52 hover:bg-white/[0.08] hover:text-white";
 type GroupedBackendOptions = Array<{
@@ -104,8 +107,10 @@ type AICanvasComposerProps = {
   mentionAllImageCards: () => void;
   prompt: string;
   setPrompt: StateSetter<string>;
-  handleAsk: () => void | Promise<void>;
+  handleAsk: () => Promise<CanvasChatRunResult>;
   handleStop: () => void;
+  plan?: CanvasPlanState;
+  onOpenPlan: () => void;
   aiBackendLabel?: string;
   aiBackendValue?: string;
   aiBackendOptions: AIBackendOption[];
@@ -166,6 +171,8 @@ export function AICanvasComposer({
   setPrompt,
   handleAsk,
   handleStop,
+  plan,
+  onOpenPlan,
   aiBackendLabel,
   aiBackendValue,
   aiBackendOptions,
@@ -640,6 +647,23 @@ export function AICanvasComposer({
               chatHistory={chatHistory}
               clearChatHistory={clearChatHistory}
             />
+            <Tooltip label={t("aiCanvas.planMode")} placement="top">
+              <Button
+                size="sm"
+                variant="chip"
+                leadingIcon={<ListChecks />}
+                className={cn(
+                  composerActionClass,
+                  plan &&
+                    plan.status !== "completed" &&
+                    plan.status !== "canceled" &&
+                    "!bg-white/[0.15] !text-white",
+                )}
+                onClick={onOpenPlan}
+              >
+                {t("aiCanvas.planMode")}
+              </Button>
+            </Tooltip>
             <IconButton
               size="sm"
               aria-label={t("aiCanvas.attachImage")}

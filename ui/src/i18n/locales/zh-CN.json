@@ -134,6 +134,46 @@
     "selectedMention": "选取图片",
     "uploadPending": "图片上传后端尚未接上。",
     "addAttachment": "新增附件",
+    "planMode": "规划",
+    "planDialogTitle": "计划模式",
+    "planDialogDesc": "依序执行必要的 AI 画布任务，并用执行证据验证每一步。",
+    "planTaskLabel": "任务 {{count}}",
+    "planTaskPlaceholder": "描述一件明确的画布任务",
+    "planAddTask": "新增任务",
+    "planRemoveTask": "移除任务",
+    "planStart": "开始计划",
+    "planConfirmTitle": "开始执行计划？",
+    "planConfirmBody": "AI 会依序执行 {{count}} 件画布任务，并可能修改当前画布。",
+    "planConfirmStart": "确认开始",
+    "planRestart": "重新计划",
+    "planRestartConfirmTitle": "重新执行计划？",
+    "planRestartConfirmBody": "AI 会用当前表单内容重新建立计划，并依序执行 {{count}} 件画布任务。",
+    "planRestartConfirmStart": "确认重新计划",
+    "planStop": "停止计划",
+    "planStepStatus": {
+      "pending": "待执行",
+      "running": "执行中",
+      "completed": "完成",
+      "failed": "失败",
+      "canceled": "已取消"
+    },
+    "planStepWarning": {
+      "invalid_actions_repaired": "AI 曾产生无效动作，但后续已修正。"
+    },
+    "planStepReason": {
+      "canceled": "这一步尚未完成就被取消。",
+      "failed": "AI 执行失败。",
+      "text_only": "AI 只回复文字，没有产生可验证的执行证据。",
+      "missing_required_evidence": "缺少必要的执行证据。",
+      "invalid_actions_repaired": "这一步曾产生无效动作，后续需要修正。",
+      "completed_with_evidence": "已用必要的执行证据完成。"
+    },
+    "planStepScore": "评分 {{score}}/5",
+    "planStepImprovement": "改善：{{improvement}}",
+    "planStepError": {
+      "no_execution_evidence": "没有产生执行证据。",
+      "score_below_five": "这一步低于 5/5。"
+    },
     "mentionAsset": "提及图片",
     "mentionCanvasImage": "提及画布图片",
     "noMentionImages": "画布上还没有图片。",

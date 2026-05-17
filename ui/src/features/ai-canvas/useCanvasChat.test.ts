@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { TFunction } from "i18next";
+import type { CanvasChatEvent } from "@/api/canvasChat";
 import type { AssetCanvasCard, UploadCanvasCard } from "./aiCanvasState";
+import {
+  dispatchCanvasChatEvent,
+  type ChatEventMutableState,
+} from "./canvasChatEventDispatch";
 import {
   canvasActionResultCreatesAssetCards,
   canvasAnimationSettleDelay,
   canvasCaptureQueueDelay,
   canvasRunUsageFromDone,
   clearCanvasToolStatusCursor,
+  duplicateCanvasCardsFromActionResult,
   duplicateCardPositionsFromActionResult,
   canvasStatusCursorLabel,
   canvasStatusCursorStatus,
@@ -212,6 +218,89 @@ describe("duplicateCardPositionsFromActionResult", () => {
     expect(positions.get("copy-a")).toEqual({ x: 1800, y: 1200 });
     expect(positions.get("copy-b")).toEqual({ x: 2160, y: 1200 });
     expect(positions.has("bad")).toBe(false);
+  });
+});
+
+describe("duplicateCanvasCardsFromActionResult", () => {
+  it("keeps duplicate cards targetable by a later arrange event in the same run", () => {
+    const source = makeAssetCard("logo-card", 100, 120);
+    const { cards: created } = duplicateCanvasCardsFromActionResult({
+      result: {
+        copies: [{ sourceCardId: "logo-card", cardId: "logo-copy" }],
+      },
+      canvasCards: [source],
+      cardLayoutMetrics: { "logo-card": { width: 320, height: 120 } },
+    });
+    const canvasCards = [source, ...created];
+    const drags: Array<{
+      cardId: string;
+      x: number;
+      y: number;
+      delay?: number;
+    }> = [];
+    const state: ChatEventMutableState = {
+      assistantText: "",
+      suppressModelTextAfterOCR: false,
+      searchConfirmationNeeded: false,
+      runUsage: undefined,
+      newCards: [],
+      assistantMentionById: new Map(),
+      pendingVariantPreviews: [],
+    };
+    const t = ((key: string) => key) as TFunction;
+
+    dispatchCanvasChatEvent(
+      {
+        type: "action_result",
+        tool: "arrange_cards",
+        result: {
+          positions: [
+            { cardId: "logo-card", x: 100, y: 120 },
+            { cardId: "logo-copy", x: 520, y: 120 },
+          ],
+        },
+      } satisfies CanvasChatEvent,
+      {
+        state,
+        canvasCards,
+        canvasPrimarySelectedId: "",
+        cardLayoutMetrics: {
+          "logo-card": { width: 320, height: 120 },
+          "logo-copy": { width: 320, height: 120 },
+        },
+        viewportScale: 1,
+        cancelToolStatusClear: () => {},
+        scheduleToolStatusClear: () => {},
+        pushChatActivity: () => {},
+        compactActivityDetail: (value) => value,
+        resolveCanvasCardId: (rawId) => rawId,
+        simulateAICardDrag: (cardId, x, y, delay) => {
+          drags.push({ cardId, x, y, delay });
+        },
+        simulateAICardResize: () => {},
+        runCaptureTool: () => {},
+        addGeneratedImageCard: () => {},
+        groupCardsFromResult: () => {},
+        ungroupCardFromResult: () => {},
+        renameGroupFromResult: () => {},
+        duplicateCardsFromResult: () => {},
+        addAssetCards: () => {},
+        addVariantCardsFromImageTool: async () => {},
+        runAlignTool: () => {},
+        runDistributeTool: () => {},
+        setAiCursor: () => {},
+        setCards: () => {},
+        setSelectedCardIds: () => {},
+        setError: () => {},
+        t,
+      },
+    );
+
+    expect(created).toHaveLength(1);
+    expect(drags).toEqual([
+      { cardId: "logo-card", x: 100, y: 120, delay: 0 },
+      { cardId: "logo-copy", x: 520, y: 120, delay: 1100 },
+    ]);
   });
 });
 

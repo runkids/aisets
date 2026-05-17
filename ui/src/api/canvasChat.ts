@@ -3,6 +3,7 @@ import type {
   CanvasViewport,
   ChatHistoryEntry,
 } from "@/features/ai-canvas/aiCanvasState";
+import type { CanvasPlanContext } from "@/features/ai-canvas/canvasPlanState";
 import { APIError, basePath, streamNDJSON } from "./client";
 
 export type CanvasChatEvent =
@@ -85,8 +86,9 @@ type CanvasSnapshotPayload = {
   cards: Array<Record<string, unknown>>;
 };
 
-type CanvasChatOptions = {
+export type CanvasChatOptions = {
   imageOptimizationAdvice?: boolean;
+  planContext?: CanvasPlanContext;
 };
 
 function baseName(path: string) {

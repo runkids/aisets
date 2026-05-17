@@ -102,6 +102,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 	}
 	fmt.Fprintf(&b, "Total cards: %d\n", len(canvas.Cards))
 	fmt.Fprintf(&b, "Viewport: pan=(%.0f,%.0f) scale=%.2f\n\n", canvas.Viewport.X, canvas.Viewport.Y, canvas.Viewport.Scale)
+	if options.PlanContext != nil {
+		b.WriteString(canvasPlanContextPrompt(*options.PlanContext))
+	}
 	if options.PhotoStagingWorkflow {
 		if ids := canvasVisibleImageCardIDs(canvas); len(ids) > 0 {
 			fmt.Fprintf(&b, "Photo staging target image cards (%d): %s\n", len(ids), strings.Join(ids, ", "))
@@ -243,6 +246,49 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "…"
+}
+
+func canvasPlanContextPrompt(ctx canvasPlanContext) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Plan Mode Context\n")
+	fmt.Fprintf(&b, "Plan ID: %s\n", truncateCanvasPromptLine(ctx.PlanID, 120))
+	fmt.Fprintf(&b, "Current step: %d of %d\n", ctx.StepIndex, ctx.TotalSteps)
+	fmt.Fprintf(&b, "Current task: %s\n", truncateCanvasPromptLine(ctx.CurrentTask, 500))
+	b.WriteString("You are executing exactly this current task. Use previous completed steps only as memory, not as work to repeat. Do not mark work as complete with prose alone when a canvas action, proposal, generated image, or other executable result is required.\n")
+	b.WriteString("Plan Mode is strict: if the current task specifies a count, the executable tool result must satisfy that count before you stop. For search-and-add tasks, search with the requested limit first, then call add_assets_to_canvas with every required assetId returned by search_assets.\n")
+	if len(ctx.CompletedSteps) > 0 {
+		b.WriteString("Completed steps:\n")
+		for _, step := range ctx.CompletedSteps {
+			fmt.Fprintf(&b, "- Step %d: %s\n", step.Index, truncateCanvasPromptLine(step.Task, 260))
+			if strings.TrimSpace(step.Summary) != "" {
+				fmt.Fprintf(&b, "  Summary: %s\n", truncateCanvasPromptLine(step.Summary, 260))
+			}
+			if len(step.Evidence) > 0 {
+				var evidence []string
+				for _, item := range step.Evidence {
+					if text := strings.TrimSpace(item); text != "" {
+						evidence = append(evidence, truncateCanvasPromptLine(text, 120))
+					}
+				}
+				if len(evidence) > 0 {
+					fmt.Fprintf(&b, "  Evidence: %s\n", strings.Join(evidence, "; "))
+				}
+			}
+		}
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+func truncateCanvasPromptLine(value string, limit int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if len(value) <= limit {
+		return value
+	}
+	if limit <= 1 {
+		return value[:limit]
+	}
+	return value[:limit-1] + "…"
 }
 
 func latestCanvasUserMessage(messages []canvasChatMessage) string {

@@ -8,6 +8,8 @@ import (
 	"fmt"
 )
 
+const canvasCompactAssetItemLimit = canvasCatalogMaxRequestedCount
+
 func canvasNextLoopReason(input canvasNextLoopInput) string {
 	if input.Loop >= input.MaxLoops-1 {
 		return ""
@@ -101,7 +103,7 @@ func compactCanvasValue(key string, value any) any {
 }
 
 func compactCanvasAssetItems(items []scanner.AssetItem) []map[string]any {
-	limit := min(len(items), 8)
+	limit := min(len(items), canvasCompactAssetItemLimit)
 	out := make([]map[string]any, 0, limit)
 	for _, item := range items[:limit] {
 		out = append(out, compactCanvasAssetItem(item))

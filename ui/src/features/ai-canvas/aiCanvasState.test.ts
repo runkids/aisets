@@ -18,6 +18,7 @@ import {
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
+import { canStartCanvasPlanTasks, normalizePlanTasks } from "./canvasPlanState";
 
 function makeAsset(id: string): AssetItem {
   return {
@@ -163,6 +164,52 @@ describe("normalizeAICanvasSession", () => {
     expect(session.selectedCardIds).toEqual([asset.id]);
   });
 
+  it("preserves canvas plan state in stored sessions", () => {
+    const session = normalizeAICanvasSession({
+      cards: [],
+      viewport: { x: 0, y: 0, scale: 1 },
+      plan: {
+        id: "plan-1",
+        status: "running",
+        activeStepId: "step-1",
+        createdAt: "2026-05-17T00:00:00.000Z",
+        updatedAt: "2026-05-17T00:00:00.000Z",
+        steps: [
+          {
+            id: "step-1",
+            task: "Arrange cards",
+            status: "running",
+            evidence: ["executed actions: 1"],
+          },
+          {
+            id: "step-2",
+            task: "Capture canvas",
+            status: "pending",
+          },
+        ],
+      },
+    });
+
+    expect(session.plan).toMatchObject({
+      id: "plan-1",
+      status: "running",
+      activeStepId: "step-1",
+      steps: [
+        {
+          id: "step-1",
+          task: "Arrange cards",
+          status: "running",
+          evidence: ["executed actions: 1"],
+        },
+        {
+          id: "step-2",
+          task: "Capture canvas",
+          status: "pending",
+        },
+      ],
+    });
+  });
+
   it("keeps grouped image children when restoring a session", () => {
     const asset = makeAssetCard("hero");
     const variant = makeVariantCard("alt");
@@ -292,6 +339,18 @@ describe("normalizeAICanvasSession", () => {
       toolCallCount: 1,
       executedActionCount: 1,
     });
+  });
+});
+
+describe("canvas plan task validation", () => {
+  it("requires at least two non-empty tasks before starting", () => {
+    expect(canStartCanvasPlanTasks(["One task"])).toBe(false);
+    expect(canStartCanvasPlanTasks(["One task", ""])).toBe(false);
+    expect(canStartCanvasPlanTasks([" One task ", " Two task "])).toBe(true);
+    expect(normalizePlanTasks([" One task ", "", " Two task "])).toEqual([
+      "One task",
+      "Two task",
+    ]);
   });
 });
 

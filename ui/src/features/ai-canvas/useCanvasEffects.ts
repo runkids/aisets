@@ -9,6 +9,7 @@ import {
   type CanvasCard,
   type ChatHistoryEntry,
 } from "./aiCanvasState";
+import type { CanvasPlanState } from "./canvasPlanState";
 import { isImageCard } from "./canvasUtils";
 import type { CapturePadding } from "./useCanvasCapture";
 
@@ -34,6 +35,7 @@ interface UseCanvasEffectsOpts {
   viewport: { x: number; y: number; scale: number };
   chatHistory: ChatHistoryEntry[];
   cardWidths: Record<string, number>;
+  plan?: CanvasPlanState;
   hideNonImageCards: boolean;
   composerCollapsed: boolean;
   composerHeight: number;
@@ -56,6 +58,7 @@ export function useCanvasEffects(opts: UseCanvasEffectsOpts) {
     viewport,
     chatHistory,
     cardWidths,
+    plan,
     hideNonImageCards,
     composerCollapsed,
     composerHeight,
@@ -80,6 +83,7 @@ export function useCanvasEffects(opts: UseCanvasEffectsOpts) {
       viewport,
       chatHistory: chatHistory.slice(-10),
       cardWidths: Object.keys(cardWidths).length > 0 ? cardWidths : undefined,
+      plan,
       viewMode: hideNonImageCards ? "hidden" : undefined,
     });
   }, [
@@ -88,6 +92,7 @@ export function useCanvasEffects(opts: UseCanvasEffectsOpts) {
     viewport,
     chatHistory,
     cardWidths,
+    plan,
     hideNonImageCards,
   ]);
 

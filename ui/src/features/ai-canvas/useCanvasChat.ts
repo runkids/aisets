@@ -51,6 +51,7 @@ import {
   canvasCaptureQueueDelay,
   canvasRunUsageFromDone,
   clearCanvasToolStatusCursor,
+  duplicateCanvasCardsFromActionResult,
   duplicateCardCopiesFromActionResult,
   duplicateCardPositionsFromActionResult,
   focusCursorPosition,
@@ -63,6 +64,11 @@ import {
   uploadCardsFromAttachments,
   type AICursorState,
 } from "./canvasChatHelpers";
+import {
+  emptyCanvasChatRunEvidence,
+  type CanvasChatRunResult,
+} from "./canvasChatRunResult";
+import type { CanvasPlanContext } from "./canvasPlanState";
 import type { WorkingState } from "./aiCanvasTypes";
 
 export function useCanvasChat(opts: {
@@ -165,14 +171,31 @@ export function useCanvasChat(opts: {
     selectedCardId?: string;
     cards?: CanvasCard[];
     selectedSkillIds?: string[];
-  }) {
-    if (abortRef.current) return;
+    planContext?: CanvasPlanContext;
+  }): Promise<CanvasChatRunResult> {
+    if (abortRef.current) {
+      return {
+        status: "failed",
+        assistantText: "",
+        activity: [],
+        evidence: emptyCanvasChatRunEvidence(),
+        error: "busy",
+      };
+    }
     const promptText = (overrides?.prompt ?? prompt).trim();
     const sentSelectedSkillIds = overrides
       ? (overrides.selectedSkillIds ?? [])
       : preparedSkillIds;
     const sentAttachments = pendingAttachments;
-    if (!promptText && sentAttachments.length === 0) return;
+    if (!promptText && sentAttachments.length === 0) {
+      return {
+        status: "failed",
+        assistantText: "",
+        activity: [],
+        evidence: emptyCanvasChatRunEvidence(),
+        error: "empty_prompt",
+      };
+    }
     let canvasCards = overrides?.cards ?? cards;
     let canvasSelectedCardIds = (
       overrides?.selectedCardId ? [overrides.selectedCardId] : selectedCardIds
@@ -272,19 +295,26 @@ export function useCanvasChat(opts: {
       },
     ]);
 
+    const evidence = emptyCanvasChatRunEvidence();
     if (uploadCards.length > 0 && promptText === "") {
+      const assistantText = t("aiCanvas.addedUploadImages", {
+        count: uploadCards.length,
+      });
       setChatHistory((prev) => [
         ...prev.slice(-10),
         {
           role: "assistant",
-          content: t("aiCanvas.addedUploadImages", {
-            count: uploadCards.length,
-          }),
+          content: assistantText,
         },
       ]);
       abortRef.current = null;
       setWorking("idle");
-      return;
+      return {
+        status: "completed",
+        assistantText,
+        activity: [],
+        evidence,
+      };
     }
 
     const assistantMentionById = new Map<string, ChatMentionPreview>();
@@ -842,52 +872,17 @@ export function useCanvasChat(opts: {
     }
 
     function duplicateCardsFromResult(result: unknown) {
-      const copies = duplicateCardCopiesFromActionResult(result);
-      if (copies.length === 0) return;
+      if (duplicateCardCopiesFromActionResult(result).length === 0) return;
       const positions = duplicateCardPositionsFromActionResult(result);
-      const layout = (result as { layout?: unknown }).layout;
-      const walking =
-        typeof layout === "string" && /walk|walking/i.test(layout);
-      const perSourceIndex = new Map<string, number>();
-      const created: Array<
-        AssetCanvasCard | UploadCanvasCard | VariantCanvasCard
-      > = [];
-      const nextWidths: Record<string, number> = {};
-      for (const copy of copies) {
-        if (!copy.sourceCardId || !copy.cardId) continue;
-        const source = canvasCards.find(
-          (card) => card.id === copy.sourceCardId,
-        );
-        if (
-          !source ||
-          (source.kind !== "asset" &&
-            source.kind !== "upload" &&
-            source.kind !== "variant")
-        ) {
-          continue;
-        }
-        const index = perSourceIndex.get(source.id) ?? 0;
-        perSourceIndex.set(source.id, index + 1);
-        const sourceWidth = cardLayoutMetrics[source.id]?.width ?? CARD_WIDTH;
-        const stepX = walking ? Math.max(108, sourceWidth * 0.46) : 36;
-        const stepY = walking ? (index % 2 === 0 ? 18 : -12) : 36;
-        const position = positions.get(copy.cardId);
-        const base = {
-          ...source,
-          id: copy.cardId,
-          x: position?.x ?? source.x + (index + 1) * stepX,
-          y: position?.y ?? source.y + (index + 1) * stepY,
-          createdAt: nowISO(),
-        };
-        if (source.kind === "asset") created.push(base as AssetCanvasCard);
-        if (source.kind === "upload") created.push(base as UploadCanvasCard);
-        if (source.kind === "variant") created.push(base as VariantCanvasCard);
-        if (sourceWidth) {
-          nextWidths[copy.cardId] = sourceWidth;
-        }
-      }
+      const { cards: created, widths: nextWidths } =
+        duplicateCanvasCardsFromActionResult({
+          result,
+          canvasCards,
+          cardLayoutMetrics,
+        });
       if (created.length === 0) return;
       newCards.push(...created);
+      canvasCards = [...canvasCards, ...created];
       setCards((current) => [...current, ...created]);
       setSelectedCardIds(created.map((card) => card.id));
       if (Object.keys(nextWidths).length > 0) {
@@ -1019,6 +1014,18 @@ export function useCanvasChat(opts: {
     };
 
     function handleEvent(event: CanvasChatEvent) {
+      if (event.type === "action_result" && !event.error) {
+        evidence.actionResultTools.push(event.tool);
+        evidence.actionResultCounts[event.tool] =
+          (evidence.actionResultCounts[event.tool] ?? 0) +
+          canvasActionResultEvidenceCount(event.tool, event.result);
+      }
+      if (event.type === "proposal") {
+        evidence.proposalTools.push(event.tool);
+      }
+      if (event.type === "generated_image") {
+        evidence.generatedImageCount += 1;
+      }
       dispatchCanvasChatEvent(event, {
         state: eventState,
         canvasCards,
@@ -1056,7 +1063,10 @@ export function useCanvasChat(opts: {
         messages,
         canvas: snapshot,
         locale,
-        options: { imageOptimizationAdvice },
+        options: {
+          imageOptimizationAdvice,
+          planContext: overrides?.planContext,
+        },
         selectedSkillIds:
           sentSelectedSkillIds.length > 0 ? sentSelectedSkillIds : undefined,
         canvasImage,
@@ -1071,6 +1081,10 @@ export function useCanvasChat(opts: {
         eventState.runUsage = canvasRunUsageFromDone(done);
         setActiveChatUsage?.(eventState.runUsage);
       }
+      evidence.executedActionCount =
+        eventState.runUsage?.executedActionCount ?? 0;
+      evidence.invalidActionCount =
+        eventState.runUsage?.invalidActionCount ?? 0;
 
       if (eventState.pendingVariantPreviews.length > 0) {
         await Promise.allSettled(eventState.pendingVariantPreviews);
@@ -1107,12 +1121,28 @@ export function useCanvasChat(opts: {
           },
         ]);
       }
+      return {
+        status: "completed",
+        assistantText,
+        activity,
+        usage: eventState.runUsage,
+        evidence,
+      };
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setError(
-          err instanceof Error ? err.message : t("aiCanvas.operationError"),
-        );
+      const canceled = (err as Error).name === "AbortError";
+      const message =
+        err instanceof Error ? err.message : t("aiCanvas.operationError");
+      if (!canceled) {
+        setError(message);
       }
+      return {
+        status: canceled ? "canceled" : "failed",
+        assistantText: sanitizeCanvasChatContent(eventState.assistantText),
+        activity: activityEntries.slice(-CHAT_ACTIVITY_LIMIT),
+        usage: eventState.runUsage,
+        evidence,
+        error: canceled ? "aborted" : message,
+      };
     } finally {
       const settleDelay = canvasAnimationSettleDelay({
         latestAnimationDueAt,
@@ -1139,4 +1169,25 @@ export function useCanvasChat(opts: {
   }
 
   return { handleAsk, handleStop };
+}
+
+function canvasActionResultEvidenceCount(tool: string, result: unknown) {
+  if (!result || typeof result !== "object") return 1;
+  const record = result as Record<string, unknown>;
+  if (typeof record.count === "number" && Number.isFinite(record.count)) {
+    return Math.max(0, record.count);
+  }
+  for (const key of [
+    "items",
+    "assetIds",
+    "newCardIds",
+    "copies",
+    "positions",
+    "cardIds",
+  ]) {
+    const value = record[key];
+    if (Array.isArray(value)) return value.length;
+  }
+  if (tool === "create_comment" || tool === "update_comment") return 1;
+  return 1;
 }

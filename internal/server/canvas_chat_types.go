@@ -85,11 +85,27 @@ type canvasSnapshot struct {
 }
 
 type canvasChatOptions struct {
-	ImageOptimizationAdvice bool   `json:"imageOptimizationAdvice"`
-	CanvasImageAttached     bool   `json:"-"`
-	AutoLocale              bool   `json:"-"`
-	CanvasStrategy          string `json:"-"`
-	PhotoStagingWorkflow    bool   `json:"-"`
+	ImageOptimizationAdvice bool               `json:"imageOptimizationAdvice"`
+	PlanContext             *canvasPlanContext `json:"planContext,omitempty"`
+	CanvasImageAttached     bool               `json:"-"`
+	AutoLocale              bool               `json:"-"`
+	CanvasStrategy          string             `json:"-"`
+	PhotoStagingWorkflow    bool               `json:"-"`
+}
+
+type canvasPlanContext struct {
+	PlanID         string                    `json:"planId"`
+	StepIndex      int                       `json:"stepIndex"`
+	TotalSteps     int                       `json:"totalSteps"`
+	CurrentTask    string                    `json:"currentTask"`
+	CompletedSteps []canvasPlanCompletedStep `json:"completedSteps"`
+}
+
+type canvasPlanCompletedStep struct {
+	Index    int      `json:"index"`
+	Task     string   `json:"task"`
+	Summary  string   `json:"summary"`
+	Evidence []string `json:"evidence"`
 }
 
 type canvasChatRequest struct {

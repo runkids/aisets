@@ -60,7 +60,10 @@ import { AICanvasDebugPanel } from "./AICanvasDebugPanel";
 import { AICanvasSearchPanel } from "./AICanvasSearchPanel";
 import { AICanvasStage } from "./AICanvasStage";
 import { AICanvasToolbar } from "./AICanvasToolbar";
+import { AICanvasPlanDialog } from "./AICanvasPlanDialog";
 import { CanvasSessionsDialog } from "./CanvasSessionsDialog";
+import { createCanvasPlanState, type CanvasPlanState } from "./canvasPlanState";
+import { useCanvasPlanRunner } from "./useCanvasPlanRunner";
 import type { AIBackendOption, WorkingState } from "./aiCanvasTypes";
 
 const CAPTURE_PADDING_X_STORAGE_KEY = "aisets.canvas.capturePaddingX";
@@ -161,6 +164,10 @@ export function AICanvasView({
   const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>(
     initialSession.chatHistory ?? [],
   );
+  const [plan, setPlan] = useState<CanvasPlanState | undefined>(
+    initialSession.plan,
+  );
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [aiCursor, setAiCursor] = useState<{
     x: number;
     y: number;
@@ -284,12 +291,14 @@ export function AICanvasView({
     viewport,
     chatHistory,
     cardWidths,
+    plan,
     viewMode,
     setCards,
     setSelectedCardIds,
     setViewport,
     setChatHistory,
     setCardWidths,
+    setPlan,
     setHideNonImageCards,
     setError,
     setClearConfirmOpen,
@@ -522,6 +531,13 @@ export function AICanvasView({
     setActiveChatActivity,
     setActiveChatUsage,
   });
+  const { cancelPlan } = useCanvasPlanRunner({
+    plan,
+    setPlan,
+    handleAsk,
+    handleStop,
+    isWorking: working !== "idle",
+  });
   const isWorking = working !== "idle";
   useEffect(() => {
     if (!isWorking || activeChatRunStartedAt === null) return undefined;
@@ -537,6 +553,7 @@ export function AICanvasView({
   const canClearCanvas =
     cards.length > 0 ||
     chatHistory.length > 0 ||
+    Boolean(plan) ||
     Boolean(currentSessionId) ||
     isDirty;
   const assistantMessages = useMemo(
@@ -625,6 +642,7 @@ export function AICanvasView({
     viewport,
     chatHistory,
     cardWidths,
+    plan,
     hideNonImageCards,
     composerCollapsed,
     composerHeight,
@@ -1039,6 +1057,8 @@ export function AICanvasView({
         setPrompt={setPrompt}
         handleAsk={handleAsk}
         handleStop={handleStop}
+        plan={plan}
+        onOpenPlan={() => setPlanDialogOpen(true)}
         aiBackendLabel={aiBackendLabel}
         aiBackendValue={aiBackendValue}
         aiBackendOptions={aiBackendOptions}
@@ -1051,6 +1071,16 @@ export function AICanvasView({
         handlePlaceOnCanvas={handlePlaceOnCanvas}
         handleAddSearchCandidate={handleAddSearchCandidate}
         handleDismissSearchCandidates={handleDismissSearchCandidates}
+      />
+
+      <AICanvasPlanDialog
+        open={planDialogOpen}
+        plan={plan}
+        isWorking={working !== "idle"}
+        onClose={() => setPlanDialogOpen(false)}
+        onStart={(tasks) => setPlan(createCanvasPlanState(tasks))}
+        onCancel={cancelPlan}
+        t={t}
       />
 
       {capturePreview && (

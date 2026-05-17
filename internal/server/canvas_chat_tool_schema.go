@@ -99,7 +99,7 @@ func canvasToolParameters(name string) map[string]any {
 			"hasText": canvasBooleanSchema("When true, return assets that have ready non-empty OCR text."),
 		})
 	case "add_assets_to_canvas":
-		return canvasObjectSchema(nil, canvasAssetTargetProperties(nil))
+		return canvasObjectSchema([]string{"assetIds"}, canvasAssetTargetProperties(nil))
 	case "extract_ocr_text":
 		return canvasObjectSchema(nil, canvasMixedImageTargetProperties(map[string]any{
 			"mode":           canvasStringEnumSchema("OCR mode.", "vlm"),
@@ -200,22 +200,22 @@ func canvasToolParameters(name string) map[string]any {
 			"limit": canvasIntegerSchema("Maximum result count."),
 		}))
 	case "inspect_image_quality":
-		return canvasObjectSchema(nil, canvasAssetTargetProperties(nil))
+		return canvasObjectSchema([]string{"assetIds"}, canvasAssetTargetProperties(nil))
 	case "generate_alt_text":
 		return canvasObjectSchema(nil, canvasAssetTargetProperties(map[string]any{
 			"style": canvasStringEnumSchema("Alt text style.", "concise", "descriptive"),
 		}))
 	case "compress_image":
-		return canvasObjectSchema([]string{"outputFormat"}, canvasAssetTargetProperties(map[string]any{
+		return canvasObjectSchema([]string{"assetIds", "outputFormat"}, canvasAssetTargetProperties(map[string]any{
 			"outputFormat": canvasStringEnumSchema("Output image format.", "webp", "avif", "png"),
 			"quality":      canvasIntegerSchema("Output quality from 1 to 100."),
 		}))
 	case "resize_image":
-		return canvasObjectSchema([]string{"maxDimensionPx"}, canvasAssetTargetProperties(map[string]any{
+		return canvasObjectSchema([]string{"assetIds", "maxDimensionPx"}, canvasAssetTargetProperties(map[string]any{
 			"maxDimensionPx": canvasIntegerSchema("Maximum longest-side dimension in pixels."),
 		}))
 	case "convert_image":
-		return canvasObjectSchema([]string{"outputFormat"}, canvasAssetTargetProperties(map[string]any{
+		return canvasObjectSchema([]string{"assetIds", "outputFormat"}, canvasAssetTargetProperties(map[string]any{
 			"outputFormat": canvasStringEnumSchema("Output image format.", "webp", "avif", "png", "jpg"),
 		}))
 	case "mirror_image":

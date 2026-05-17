@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"aisets/internal/aitag"
+	"aisets/internal/imageproc"
 	"aisets/internal/llm"
 	"aisets/internal/scanner"
 )
@@ -250,6 +251,43 @@ func TestBuildCanvasUserPrompt_UsesLatestUserLanguage(t *testing.T) {
 	prompt := buildCanvasUserPrompt([]canvasChatMessage{{Role: "user", Content: "再幫我找一張類似家庭照的 family_danran.png"}}, canvasSnapshot{}, canvasChatOptions{}, "en")
 	if !strings.Contains(prompt, "Use Traditional Chinese only for natural-language assistant text") {
 		t.Fatalf("prompt should override to latest user language:\n%s", prompt)
+	}
+}
+
+func TestBuildCanvasUserPrompt_IncludesPlanContext(t *testing.T) {
+	prompt := buildCanvasUserPrompt(
+		[]canvasChatMessage{{Role: "user", Content: "arrange the cards"}},
+		canvasSnapshot{},
+		canvasChatOptions{
+			PlanContext: &canvasPlanContext{
+				PlanID:      "plan-1",
+				StepIndex:   2,
+				TotalSteps:  3,
+				CurrentTask: "Arrange the cards into a row",
+				CompletedSteps: []canvasPlanCompletedStep{
+					{
+						Index:    1,
+						Task:     "Add two images",
+						Summary:  "Added two cards",
+						Evidence: []string{"action results: add_assets_to_canvas"},
+					},
+				},
+			},
+		},
+		"en",
+	)
+	for _, want := range []string{
+		"## Plan Mode Context",
+		"Current step: 2 of 3",
+		"Current task: Arrange the cards into a row",
+		"Use previous completed steps only as memory",
+		"Plan Mode is strict",
+		"Step 1: Add two images",
+		"Evidence: action results: add_assets_to_canvas",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
 	}
 }
 
@@ -1267,6 +1305,36 @@ func TestCompactCanvasToolResultSearchAssetsOmitsFullAssetItem(t *testing.T) {
 	for _, forbidden := range []string{"LocalPath", "localPath", "/private/project", "ContentHash", "contentHash", "hash-should-not-leak"} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("compact result leaked %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestCompactCanvasToolResultSearchAssetsPreservesRequestedBulkIDs(t *testing.T) {
+	items := make([]scanner.AssetItem, 0, 10)
+	for i := 1; i <= 10; i++ {
+		items = append(items, scanner.AssetItem{
+			ID:       fmt.Sprintf("asset-%02d", i),
+			RepoPath: fmt.Sprintf("images/asset-%02d.png", i),
+			Ext:      ".png",
+			Image: imageproc.Metadata{
+				Width:  120,
+				Height: 80,
+				Format: "png",
+			},
+		})
+	}
+	compact := compactCanvasToolResult("search_assets", map[string]any{
+		"total": float64(10),
+		"items": items,
+	})
+	raw, err := json.Marshal(compact)
+	if err != nil {
+		t.Fatalf("marshal compact result: %v", err)
+	}
+	body := string(raw)
+	for _, want := range []string{"asset-01", "asset-08", "asset-09", "asset-10"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("compact result missing %q: %s", want, body)
 		}
 	}
 }

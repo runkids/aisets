@@ -1,5 +1,9 @@
 import type { ActionPreview, AssetItem } from "@/types";
 import { fileName, formatBytes } from "@/ui";
+import {
+  normalizeCanvasPlanState,
+  type CanvasPlanState,
+} from "./canvasPlanState";
 
 export const AI_CANVAS_STORAGE_KEY = "aisets.aiCanvas.v1";
 const DEFAULT_GROUP_SIZE = 320;
@@ -183,6 +187,7 @@ export type AICanvasSession = {
   chatHistory?: ChatHistoryEntry[];
   cardWidths?: Record<string, number>;
   viewMode?: "normal" | "compact" | "hidden";
+  plan?: CanvasPlanState;
 };
 
 export type AICanvasPromptIntent =
@@ -658,6 +663,7 @@ export function normalizeAICanvasSession(value: unknown): AICanvasSession {
       value.viewMode === "compact" || value.viewMode === "hidden"
         ? value.viewMode
         : undefined,
+    plan: normalizeCanvasPlanState(value.plan),
   };
 }
 
