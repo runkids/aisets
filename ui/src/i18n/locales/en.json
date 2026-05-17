@@ -23,7 +23,9 @@
     "navigationAria": "Aisets navigation",
     "projects": "Projects",
     "prompts": "Prompts",
-    "tags": "Tags & Categories"
+    "tags": "Tags & Categories",
+    "updateAvailable": "Update to {{version}}",
+    "updateAvailableAria": "Update available: version {{version}}. Click to open settings."
   },
   "mode": {
     "dashboard": "Dashboard",

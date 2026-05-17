@@ -23,7 +23,9 @@
     "prompts": "提示词",
     "tags": "标签与分类",
     "footerProjects": "个项目",
-    "footerAssets": "个素材"
+    "footerAssets": "个素材",
+    "updateAvailable": "可更新至 {{version}}",
+    "updateAvailableAria": "有可用更新：版本 {{version}}。点击前往设置"
   },
   "mode": {
     "dashboard": "总览",

@@ -23,7 +23,9 @@
     "prompts": "プロンプト",
     "tags": "タグとカテゴリ",
     "footerProjects": "プロジェクト",
-    "footerAssets": "アセット"
+    "footerAssets": "アセット",
+    "updateAvailable": "{{version}} に更新可能",
+    "updateAvailableAria": "アップデートがあります：バージョン {{version}}。クリックして設定を開く"
   },
   "mode": {
     "dashboard": "概要",

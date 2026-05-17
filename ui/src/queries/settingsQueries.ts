@@ -39,6 +39,15 @@ export function useVersionQuery() {
   });
 }
 
+export function useVersionPollQuery() {
+  return useQuery({
+    queryKey: versionQueryKey,
+    queryFn: getVersionCheck,
+    refetchInterval: 30 * 60_000,
+    staleTime: 10 * 60_000,
+  });
+}
+
 export function useUpdateAppMutation() {
   const client = useQueryClient();
   return useMutation({

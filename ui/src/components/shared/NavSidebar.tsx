@@ -1,4 +1,6 @@
 import {
+  ArrowUp,
+  ChevronRight,
   FileWarning,
   FolderKanban,
   FolderOpen,
@@ -42,6 +44,9 @@ type Props = {
   totalAssets: number;
   lastScanAt?: string;
   lastScanStartedAt?: string;
+  currentVersion?: string;
+  updateAvailable?: boolean;
+  latestVersion?: string;
   workspaceSwitchDisabled?: boolean;
   workspaceSwitchDisabledTooltip?: string;
   onSelectWorkspace: (workspaceId: string) => void;
@@ -88,6 +93,9 @@ export function NavSidebar({
   totalAssets,
   lastScanAt,
   lastScanStartedAt,
+  currentVersion,
+  updateAvailable = false,
+  latestVersion,
   workspaceSwitchDisabled = false,
   workspaceSwitchDisabledTooltip,
   onSelectWorkspace,
@@ -261,8 +269,36 @@ export function NavSidebar({
         ))}
       </nav>
 
-      <div className="order-3 flex shrink-0 flex-col gap-1 rounded-g-md border border-g-line bg-g-surface px-3 py-2 shadow-g-sm max-[960px]:items-center max-[960px]:px-2">
-        <div className="flex flex-col gap-0.5 text-g-chip text-g-ink-4 max-[960px]:hidden">
+      <div className="order-3 flex shrink-0 flex-col rounded-g-md border border-g-line bg-g-surface shadow-g-sm max-[960px]:items-center">
+        {updateAvailable && latestVersion && (
+          <>
+            <button
+              type="button"
+              className="group/upd flex w-full items-center gap-1.5 rounded-t-g-md px-3 py-1.5 text-g-chip transition-colors bg-g-green-soft/60 hover:bg-g-green-soft max-[960px]:justify-center max-[960px]:px-2"
+              onClick={() => onSelect("settings")}
+              aria-label={t("nav.updateAvailableAria", {
+                version: latestVersion,
+              })}
+            >
+              <ArrowUp size={12} className="shrink-0 text-g-green" />
+              <span className="flex min-w-0 flex-1 items-center gap-1 max-[960px]:hidden">
+                <span className="font-g-mono tabular-nums text-g-ink-4">
+                  {currentVersion}
+                </span>
+                <span className="text-g-ink-4">→</span>
+                <span className="truncate font-g-mono tabular-nums font-[510] text-g-green">
+                  {latestVersion}
+                </span>
+              </span>
+              <ChevronRight
+                size={12}
+                className="shrink-0 text-g-ink-4 transition-transform group-hover/upd:translate-x-0.5 max-[960px]:hidden"
+              />
+            </button>
+            <div className="border-t border-g-line" />
+          </>
+        )}
+        <div className="flex flex-col gap-0.5 px-3 py-2 text-g-chip text-g-ink-4 max-[960px]:hidden">
           <span>{t("nav.lastScan")}</span>
           <div className="flex items-center gap-1.5">
             <span className="truncate font-g-mono tabular-nums text-g-ink-3">

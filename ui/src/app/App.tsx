@@ -61,6 +61,7 @@ import {
   useScanStatusQuery,
   useSettingsQuery,
   useUpdateSettingsMutation,
+  useVersionPollQuery,
 } from "@/queries";
 import {
   APIError,
@@ -628,6 +629,7 @@ export function App() {
     };
   }, [scanStatusQuery.data, scanMutation.isPending, queryClient]);
   const settingsQuery = useSettingsQuery();
+  const versionPollQuery = useVersionPollQuery();
   const updateSettingsMutation = useUpdateSettingsMutation();
   const addProjectMutation = useAddProjectMutation();
   const switchWorkspaceMutation = useSwitchWorkspaceMutation();
@@ -1351,6 +1353,9 @@ export function App() {
           totalAssets={catalogSummary?.stats.totalFiles ?? 0}
           lastScanAt={catalogSummary?.generatedAt}
           lastScanStartedAt={catalogSummary?.startedAt}
+          currentVersion={versionPollQuery.data?.currentVersion}
+          updateAvailable={versionPollQuery.data?.updateAvailable}
+          latestVersion={versionPollQuery.data?.latestVersion}
           workspaceSwitchDisabled={workspaceSwitchDisabled}
           workspaceSwitchDisabledTooltip={workspaceSwitchDisabledTooltip}
           onSelectWorkspace={onSwitchWorkspace}

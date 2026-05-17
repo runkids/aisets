@@ -23,7 +23,9 @@
     "navigationAria": "Aisets 導覽",
     "projects": "專案",
     "prompts": "提示詞",
-    "tags": "標籤與分類"
+    "tags": "標籤與分類",
+    "updateAvailable": "可更新至 {{version}}",
+    "updateAvailableAria": "有可用更新：版本 {{version}}。點擊前往設定"
   },
   "mode": {
     "dashboard": "總覽",

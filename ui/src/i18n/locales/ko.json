@@ -23,7 +23,9 @@
     "prompts": "프롬프트",
     "tags": "태그 및 카테고리",
     "footerProjects": "프로젝트",
-    "footerAssets": "에셋"
+    "footerAssets": "에셋",
+    "updateAvailable": "{{version}}(으)로 업데이트 가능",
+    "updateAvailableAria": "업데이트 가능: 버전 {{version}}. 클릭하여 설정 열기"
   },
   "mode": {
     "dashboard": "개요",
