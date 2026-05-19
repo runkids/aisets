@@ -14,29 +14,20 @@
 </p>
 
 <p align="center">
-  <strong>AI-powered asset intelligence for codebases.</strong><br>
-  Audit image assets across projects: find duplicates, unused files, oversized images, OCR text, AI tags, and safe next actions — locally and visually.
+  <strong>The local-first image library auditor.</strong><br>
+  Drop in any folder of assets — find duplicates, optimize sizes, search by meaning, and stage them on an AI canvas.
 </p>
 
 <p align="center">
-  <img src=".github/assets/readme-browse.png" alt="Aisets asset browser with AI tags, OCR state, optimization status, and project facets" width="960">
-</p>
-
-<p align="center">
+  <a href="#ai-canvas">AI Canvas</a> •
+  <a href="#features">Features</a> •
   <a href="#install">Install</a> •
-  <a href="#quick-start">Run UI</a> •
-  <a href="#ai-canvas-demo">AI Canvas Demo</a> •
-  <a href="#why-aisets">Why Aisets</a> •
-  <a href="#ai-that-actually-helps">AI</a> •
-  <a href="#what-were-building-next">Roadmap</a>
+  <a href="#product-tour">Tour</a>
 </p>
 
-> [!IMPORTANT]
-> Aisets is in active development. Expect fast iteration and review the release notes before updating.
+## AI Canvas
 
-## AI Canvas Demo
-
-AI Canvas turns asset review into a shared visual workspace, not just a list of files. Ask an agent to gather related images, compare candidates, zoom into details, arrange evidence, mark what matters, capture the board, and explain the decision so cleanup, design review, and content audits are easier to trust.
+Asset review as a shared visual workspace, not a list of files. Ask an agent to gather related images, compare candidates, zoom into details, arrange evidence, mark what matters, capture the board, and explain the decision — so cleanup, design review, and content audits become easier to trust.
 
 <p align="center">
   <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4">
@@ -45,8 +36,36 @@ AI Canvas turns asset review into a shared visual workspace, not just a list of 
 </p>
 
 <p align="center">
-  <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4"><strong>Watch the AI Canvas toy-shop staging demo</strong></a>
+  <a href=".github/assets/readme-ai-canvas-toy-shop-demo.mp4"><strong>Watch the full AI Canvas demo</strong></a>
 </p>
+
+## Features
+
+### Audit & cleanup
+
+- **Duplicate detection** — exact and visually-similar groups across any folder hierarchy.
+- **Safe optimization** — preview savings before converting; spot oversized rasters, heavy GIFs, missing responsive variants, and high-impact format conversions.
+- **Unused-file detection** — for code projects, find assets nothing references, with project-type awareness so asset packs and libraries are not misjudged.
+- **Preview → confirm → apply** — every destructive action is reviewable; apply rechecks files so stale previews are rejected.
+
+### AI metadata
+
+- **AI tagging** — categories, descriptive tags, scene hints, face/language signals, and translated labels.
+- **AI OCR** — extract text from screenshots, memes, product shots, documents, and mixed-language images.
+- **Semantic search** — find images by intent ("login screen", "receipt photo", "old hero banner"), not just filenames.
+- **Content-aware filters** — combine size, OCR text, AI category, tags, duplicate status, and optimization potential into reusable filters.
+
+### AI Canvas
+
+- **Visual workspace** — gather, compare, mark, and stage assets on an infinite canvas.
+- **Agent-driven layout** — ask Codex CLI, Claude Code, Pi, Cursor, Gemini, or Copilot CLI to arrange assets, annotate regions, and create variants.
+- **Reviewable output** — capture the board as evidence for cleanup, design review, or content audits.
+
+### Local-first by design
+
+- **Runs on your machine** — your assets never leave unless you explicitly point AI at an external provider.
+- **Bring your own AI** — local OpenAI-compatible runtimes (Ollama, LM Studio), installed agent CLIs, or compatible cloud providers.
+- **No login, no telemetry, no SaaS lock-in.**
 
 ## Install
 
@@ -129,16 +148,13 @@ handle_path /aisets/* {
 
 > **Note:** The dashboard reads files from the host filesystem. Anyone with the URL can browse scanned project assets.
 
-Update anytime:
+### Update & Uninstall
 
 ```bash
+# Update anytime
 aisets update
-```
 
-Uninstall the CLI:
-
-```bash
-# Remove the installed binary
+# Uninstall the CLI
 sudo rm -f /usr/local/bin/aisets
 
 # Optional: remove local data and cache
@@ -147,109 +163,30 @@ rm -rf ~/.local/share/aisets ~/.cache/aisets
 
 If you installed to a custom `INSTALL_DIR`, remove `aisets` from that directory instead of `/usr/local/bin`.
 
-## Why Aisets
-
-Images look harmless until they become product debt.
-
-They get copied between repos, renamed without context, exported at the wrong size, checked in “just for now”, referenced from code no one remembers, and kept forever because deleting them feels unsafe. After a few releases, your asset folder is no longer a folder — it is an undocumented dependency graph.
-
-Aisets exists to make that graph visible and actionable:
-
-- **Know what you have** — scan every project and see size, format, dimensions, usage, duplicates, optimization hints, OCR text, AI tags, and source context in one place.
-- **Find images the way humans remember them** — search for “login screen”, “receipt photo”, “old hero banner”, or text inside screenshots even when filenames say nothing.
-- **Turn unknown files into labeled inventory** — use AI to describe images, extract text, group themes, translate labels, and build semantic search data.
-- **Make cleanup reviewable** — inspect duplicate groups, unused candidates, rename plans, and optimization opportunities before touching the filesystem.
-- **Use AI Canvas for visual decisions** — gather related assets onto a board, compare variants, mark evidence, stage before/after cleanup plans, and capture a reviewable explanation.
-- **Reduce bloat with evidence** — prioritize oversized rasters, heavy GIFs, missing responsive variants, lazy-loading issues, and high-impact format conversions.
-- **Handle real codebases, not toy folders** — work across apps, design systems, asset packs, marketing sites, and long-lived monorepos.
-- **Stay local-first** — run the dashboard on your machine and choose whether AI runs locally, through installed agent CLIs, or through compatible providers.
-
-If your team has ever asked “can we delete this image?” and the honest answer was “I don’t know”, Aisets is built for that moment.
-
-## AI That Actually Helps
-
-Aisets is not just another file browser with an AI badge. AI is used where it makes asset maintenance faster:
-
-- **AI tagging** — categories, descriptive tags, scene hints, face/language signals, and translated labels.
-- **AI OCR** — extract text from screenshots, memes, product shots, documents, and mixed-language images.
-- **Semantic search** — search assets by intent, visual meaning, tags, descriptions, and OCR text.
-- **AI cleanup planning** — use agent CLIs to help turn scan findings into practical cleanup plans.
-- **Content-aware workflows** — build filters around AI category, OCR content, tags, duplicate status, and optimization potential.
-
-Supported AI paths include:
-
-- **Local AI** — connect local / OpenAI-compatible runtimes such as Ollama or LM Studio for private workflows.
-- **Agent CLIs** — integrate with coding agents including **Codex CLI** and **Pi**, plus Claude Code, Cursor Agent, Gemini CLI, and Copilot CLI.
-- **Your choice** — keep everything local, use agent tools already installed on your machine, or connect compatible providers when you want them.
-
 ## Product Tour
 
 | Track workspace health                                                                                                                                                                              | Search by meaning, not filenames                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-projects.png" alt="Aisets Projects view showing scanned assets, optimization opportunities, lint findings, duplicates, OCR, AI tags, and GPS metadata" width="480"> | <img src=".github/assets/readme-command-palette.png" alt="Aisets command palette showing semantic matches for elderly salesperson fraud" width="480"> |
 
-| Turn metadata into reusable workflows                                                                                                                                    | Audit tags and categories                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src=".github/assets/readme-custom-filters.png" alt="Aisets custom filters combining size, OCR, AI category, AI tag, duplicate, and optimization rules" width="480"> | <img src=".github/assets/readme-tags.png" alt="Aisets tag manager showing AI-generated categories and tag coverage across assets" width="480"> |
-
 | Compare similar images side by side                                                                                                | Estimate optimization work                                                                                                                                           |
 | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-duplicates.png" alt="Aisets duplicate analysis comparing similar PNG and WebP assets" width="480"> | <img src=".github/assets/readme-optimize.png" alt="Aisets optimization view with critical size findings, format conversion, and resize recommendations" width="480"> |
+
+<details>
+<summary><strong>More screenshots</strong> — custom filters, tag manager, image tools, AI settings</summary>
+
+<br>
+
+| Turn metadata into reusable workflows                                                                                                                                    | Audit tags and categories                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src=".github/assets/readme-custom-filters.png" alt="Aisets custom filters combining size, OCR, AI category, AI tag, duplicate, and optimization rules" width="480"> | <img src=".github/assets/readme-tags.png" alt="Aisets tag manager showing AI-generated categories and tag coverage across assets" width="480"> |
 
 | Check one-off images before import                                                                                                              | Tune local AI and agent CLIs                                                                                                                                                    |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src=".github/assets/readme-image-tools.png" alt="Aisets image tools view for checking images before adding them to a project" width="480"> | <img src=".github/assets/readme-ai-settings.png" alt="Aisets AI settings with local LLM, embedding model, agent CLI, tagging, OCR, and semantic indexing controls" width="480"> |
 
-## What You Can Do With It
-
-### Find duplicates before they become permanent
-
-- Detect exact duplicate files across projects.
-- Compare visually similar images side by side.
-- Pick what to keep, preview the merge, and update references safely.
-
-### Delete with confidence
-
-- Find assets that code no longer references.
-- Separate code projects from asset packs and libraries so “unused” does not become reckless.
-- Preview every destructive action before applying it.
-
-### Make images smaller without guessing
-
-- Estimate savings before converting anything.
-- Find oversized rasters, heavy GIFs, large inline imports, missing dimensions, and lazy-loading issues.
-- Generate practical optimization scripts when you are ready.
-
-### Turn image chaos into searchable knowledge
-
-- OCR screenshots and design exports.
-- Tag images automatically with AI.
-- Save filters for cleanup candidates, huge files, OCR matches, AI categories, duplicated assets, and review queues.
-
-### Check files before adding them
-
-- Drop in new images before import.
-- Catch duplicates, naming issues, and optimization opportunities early.
-- Avoid adding asset debt in the first place.
-
-## What We're Building Next
-
-Aisets already has scanning, AI metadata, OCR, embeddings, semantic search, safe actions, Image Tools, and an AI Canvas foundation. The next work is about turning those pieces into a more trustworthy AI asset workflow:
-
-- **AI operation safety contract** — every AI-originated file or metadata change should be typed, validated by the backend, previewable, and auditable.
-- **Embedding index health** — semantic search should clearly show whether text/image vectors are ready, stale, missing, or generated by a different provider/model.
-- **Assistant asset operations** — natural-language requests should return grounded asset cards, comparison previews, cleanup plans, and safe operation cards instead of text-only answers.
-- **AI Canvas hardening** — keep the visual workspace focused on asset work: arrange images, inspect context, create variants, annotate regions, and review operations before applying anything.
-- **Agent cleanup plans** — use Codex CLI, Pi, and other agent CLIs to generate structured cleanup plans with preview commands, blockers, verification checks, and Aisets-side validation.
-
-## Safety First
-
-Aisets is designed for repos you care about:
-
-- File-changing actions use **preview → confirm → apply**.
-- Apply rechecks files before writing, so stale previews are rejected.
-- Project type controls how aggressive unused detection should be.
-- Local-first workflows keep your assets on your machine unless you choose an external AI provider or agent.
+</details>
 
 ## License
 
