@@ -144,7 +144,7 @@ function floatingCardLayer(card: CanvasCard, selected: boolean) {
 }
 
 function isChromelessImageCard(card: CanvasCard) {
-  return isImageCard(card) || card.kind === "text";
+  return isImageCard(card) || card.kind === "text" || card.kind === "drawing";
 }
 
 export function CardShell({
@@ -290,6 +290,8 @@ export function CardShell({
   }, [ctxMenuPos]);
 
   const isTextKind = card.kind === "text";
+  const isDrawingKind = card.kind === "drawing";
+  const isMinimalChromeKind = isTextKind || isDrawingKind;
   const sectionCls = cn(
     "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow,filter] duration-[120ms] ease-g",
     isNewCard &&
@@ -297,7 +299,7 @@ export function CardShell({
     floatingCardLayer(card, selected),
     ctxMenuPos && "!z-[1300]",
     chromeless
-      ? isTextKind
+      ? isMinimalChromeKind
         ? cn(
             "overflow-visible border border-transparent shadow-none",
             selected && "border-dashed border-g-accent/70 [box-shadow:none]",

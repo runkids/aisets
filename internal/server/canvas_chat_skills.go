@@ -12,6 +12,8 @@ const (
 	canvasSkillQuality           = "quality"
 	canvasSkillMetadataProposals = "metadata-proposals"
 	canvasSkillFileProposals     = "file-proposals"
+	canvasSkillAnnotation        = "annotation"
+	canvasSkillDrawing           = "drawing"
 )
 
 type canvasSkillFamily struct {
@@ -152,12 +154,23 @@ func canvasSkillCatalog() []canvasSkillFamily {
 - For mirror/flip, default to horizontal unless the user clearly asks for vertical. For rotate, default to 90 degrees when unspecified.`,
 		},
 		{
-			ID:          "annotation",
+			ID:          canvasSkillAnnotation,
 			Description: "Create and edit text annotations on the canvas.",
 			Triggers:    []string{"text", "label", "title", "caption", "heading", "annotate text", "add text", "write text"},
 			Tools:       []string{"focus_card", "create_text_card", "update_text_card", "remove_cards"},
 			Rules: `## Annotation Skill
 - Create text cards for annotations, labels, and titles. Use appropriate font sizes (24-32 for titles, 14-18 for labels). Place text near related content.`,
+		},
+		{
+			ID:          canvasSkillDrawing,
+			Description: "Create vector drawings and add shapes (rect, ellipse, line, arrow, path) on the canvas.",
+			Triggers:    []string{"draw", "drawing", "sketch", "scribble", "circle", "rectangle", "arrow", "line", "shape", "highlight", "mark"},
+			Tools:       []string{"focus_card", "create_drawing", "add_shape", "clear_drawing_shapes", "remove_cards"},
+			Rules: `## Drawing Skill
+- Use create_drawing to add a new drawing card, then add_shape repeatedly to place vector marks (rect/ellipse/line/arrow/path) inside it.
+- Shape coordinates are in the drawing card's viewBox (0,0 = card top-left, up to width/height).
+- Prefer red (#ef4444) or amber (#f59e0b) strokes when highlighting attention. Use strokeWidth 4-6 for normal marks and 2 for fine annotations.
+- Do not call create_drawing repeatedly when an existing empty drawing card is selected; reuse it via add_shape.`,
 		},
 	}
 }

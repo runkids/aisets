@@ -14,6 +14,7 @@ import {
   Save,
   Square,
   Trash2,
+  Pencil,
   Type,
   ZoomIn,
   ZoomOut,
@@ -57,6 +58,7 @@ type AICanvasToolbarProps = {
   hasSession: boolean;
   sessionName?: string;
   onAddTextCard?: () => void;
+  onAddDrawingCard?: () => void;
 };
 
 function parseCapturePadding(value: string) {
@@ -95,6 +97,7 @@ export function AICanvasToolbar({
   hasSession,
   sessionName,
   onAddTextCard,
+  onAddDrawingCard,
 }: AICanvasToolbarProps) {
   return (
     <div
@@ -140,6 +143,15 @@ export function AICanvasToolbar({
           onClick={onAddTextCard}
         >
           <Type />
+        </IconButton>
+      )}
+      {onAddDrawingCard && (
+        <IconButton
+          size="sm"
+          aria-label={t("aiCanvas.addDrawing")}
+          onClick={onAddDrawingCard}
+        >
+          <Pencil />
         </IconButton>
       )}
       <span className="mx-0.5 h-4 w-px bg-g-line" />

@@ -105,6 +105,20 @@
       "color": "색상",
       "placeholder": "텍스트 입력…"
     },
+    "addDrawing": "그림 추가",
+    "drawing": {
+      "pen": "펜",
+      "rect": "사각형",
+      "ellipse": "타원",
+      "line": "선",
+      "arrow": "화살표",
+      "eraser": "지우개",
+      "color": "색상",
+      "strokeWidth": "선 굵기",
+      "fill": "채우기",
+      "clearShapes": "모든 도형 지우기",
+      "shapeCount_other": "도형 {{count}}개"
+    },
     "duplicateImage": "이미지 복제",
     "duplicatedImages": "이미지 {{count}}개 복제됨",
     "describePrompt": "선택한 캔버스 컨텍스트를 설명합니다.",
@@ -258,7 +272,8 @@
       "proposal": "제안",
       "upload": "업로드",
       "variant": "미리보기",
-      "text": "텍스트"
+      "text": "텍스트",
+      "drawing": "그림"
     },
     "clearConfirmAction": "모두 지우기",
     "clearConfirmMessage": "모든 카드, 댓글, 제안, 채팅 기록이 제거되며 되돌릴 수 없습니다",

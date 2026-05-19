@@ -366,6 +366,24 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 			result["textAlign"] = v
 		}
 		return result
+	case "create_drawing":
+		result := map[string]any{}
+		for _, key := range []string{"x", "y", "width", "height"} {
+			if v, ok := act.Params[key]; ok {
+				result[key] = v
+			}
+		}
+		return result
+	case "add_shape":
+		cardId, _ := act.Params["cardId"].(string)
+		result := map[string]any{"cardId": cardId}
+		if v, ok := act.Params["shape"]; ok {
+			result["shape"] = v
+		}
+		return result
+	case "clear_drawing_shapes":
+		cardId, _ := act.Params["cardId"].(string)
+		return map[string]any{"cardId": cardId}
 	case "compare_assets":
 		assetIDs := canvasActionAssetIDs(act)
 		scanID := s.latestScanID()

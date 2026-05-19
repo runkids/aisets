@@ -192,6 +192,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 				if card.Kind == "text" {
 					fmt.Fprintf(&b, " content=%q", truncate(card.Content, 60))
 				}
+				if card.Kind == "drawing" {
+					fmt.Fprintf(&b, " shapes=%d", card.ShapeCount)
+				}
 				b.WriteByte('\n')
 			}
 			if omitted := len(canvas.Cards) - len(promptCards); omitted > 0 {

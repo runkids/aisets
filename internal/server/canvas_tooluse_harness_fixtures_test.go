@@ -234,6 +234,23 @@ func canvasHarnessDefaultArgs(tool, assetA, assetB string) map[string]any {
 		return map[string]any{"content": "Harness text", "fontSize": float64(24), "color": "#0f172a", "textAlign": "left"}
 	case "update_text_card":
 		return map[string]any{"cardId": "card-a", "content": "Updated harness text", "fontSize": float64(32), "color": "#ff0000"}
+	case "create_drawing":
+		return map[string]any{"x": float64(120), "y": float64(80), "width": float64(480), "height": float64(320)}
+	case "add_shape":
+		return map[string]any{
+			"cardId": "card-a",
+			"shape": map[string]any{
+				"kind":        "rect",
+				"color":       "#ef4444",
+				"strokeWidth": float64(4),
+				"x":           float64(20),
+				"y":           float64(30),
+				"width":       float64(120),
+				"height":      float64(80),
+			},
+		}
+	case "clear_drawing_shapes":
+		return map[string]any{"cardId": "card-a"}
 	default:
 		return map[string]any{}
 	}
@@ -281,6 +298,12 @@ func canvasHarnessMessageForTool(tool string) string {
 		return "add text annotation to this canvas"
 	case "update_text_card":
 		return "update the text label on this card"
+	case "create_drawing":
+		return "create a new drawing canvas to sketch on"
+	case "add_shape":
+		return "add a rectangle shape to highlight this drawing"
+	case "clear_drawing_shapes":
+		return "clear the drawing shapes from this sketch"
 	default:
 		return "use the canvas tool"
 	}

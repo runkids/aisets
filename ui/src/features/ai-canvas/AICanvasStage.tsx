@@ -25,8 +25,12 @@ import {
   VariantCardBody,
 } from "./CanvasCardBodies";
 import { CanvasTextToolbar } from "./CanvasTextToolbar";
+import { CanvasDrawingToolbar } from "./CanvasDrawingToolbar";
+import { DrawingCardBody } from "./DrawingCardBody";
+import { shapeHitTest, useCanvasDrawing } from "./useCanvasDrawing";
 import {
   AssetContextMenu,
+  DrawingContextMenu,
   GroupContextMenu,
   SelectionContextMenu,
   TextContextMenu,
@@ -44,6 +48,8 @@ import type {
   AssetCanvasCard,
   CanvasCard,
   CommentCanvasCard,
+  DrawingCanvasCard,
+  DrawingShape,
   GroupCanvasCard,
   TextCanvasCard,
   TextStyle,
@@ -60,7 +66,85 @@ type CommentConnector = {
 };
 
 function isVisibleImageCard(card: CanvasCard) {
-  return isImageCard(card) || card.kind === "text";
+  return isImageCard(card) || card.kind === "text" || card.kind === "drawing";
+}
+
+function DrawingSurface({
+  card,
+  isSelected,
+  cardWidth,
+  previewShape,
+  tool,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  card: DrawingCanvasCard;
+  isSelected: boolean;
+  cardWidth: number;
+  previewShape: DrawingShape | null;
+  tool: ReturnType<typeof useCanvasDrawing>["tool"];
+  onPointerDown: (p: { x: number; y: number }) => void;
+  onPointerMove: (p: { x: number; y: number }) => void;
+  onPointerUp: (p: { x: number; y: number }) => void;
+}) {
+  const drawingRef = useRef<{ active: boolean }>({ active: false });
+  const renderedScale = card.width > 0 ? cardWidth / card.width : 1;
+
+  const toViewBox = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const scaleX = card.width / Math.max(1, rect.width);
+    const scaleY = card.height / Math.max(1, rect.height);
+    return {
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY,
+    };
+  };
+
+  return (
+    <div className="relative h-full w-full">
+      <DrawingCardBody card={card} previewShape={previewShape} />
+      {isSelected ? (
+        <div
+          className="absolute inset-0"
+          style={{
+            cursor: tool === "eraser" ? "cell" : "crosshair",
+            touchAction: "none",
+          }}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.stopPropagation();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            drawingRef.current.active = true;
+            onPointerDown(toViewBox(event));
+          }}
+          onPointerMove={(event) => {
+            if (!drawingRef.current.active) return;
+            event.stopPropagation();
+            onPointerMove(toViewBox(event));
+          }}
+          onPointerUp={(event) => {
+            if (!drawingRef.current.active) return;
+            drawingRef.current.active = false;
+            event.stopPropagation();
+            try {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            } catch {
+              /* noop */
+            }
+            onPointerUp(toViewBox(event));
+          }}
+          onPointerCancel={(event) => {
+            if (!drawingRef.current.active) return;
+            drawingRef.current.active = false;
+            event.stopPropagation();
+            onPointerUp(toViewBox(event));
+          }}
+          data-drawing-surface-scale={renderedScale}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 type AICanvasStageProps = {
@@ -291,6 +375,54 @@ export function AICanvasStage({
     return only.kind === "text" ? only : null;
   }, [selectedCards]);
 
+  const selectedDrawingCard = useMemo<DrawingCanvasCard | null>(() => {
+    if (selectedCards.length !== 1) return null;
+    const only = selectedCards[0];
+    return only.kind === "drawing" ? only : null;
+  }, [selectedCards]);
+
+  const selectedDrawingCardIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedDrawingCardIdRef.current = selectedDrawingCard?.id ?? null;
+  }, [selectedDrawingCard]);
+
+  const drawingResizeStartRef = useRef<{
+    id: string;
+    startW: number;
+    height: number;
+  } | null>(null);
+
+  const drawingHook = useCanvasDrawing({
+    onCommitShape: (shape: DrawingShape) => {
+      const targetId = selectedDrawingCardIdRef.current;
+      if (!targetId) return;
+      setCards((current) =>
+        current.map((c) =>
+          c.id === targetId && c.kind === "drawing"
+            ? { ...c, shapes: [...c.shapes, shape] }
+            : c,
+        ),
+      );
+    },
+    onEraseAt: (point) => {
+      const targetId = selectedDrawingCardIdRef.current;
+      if (!targetId) return;
+      const tolerance = 8;
+      setCards((current) =>
+        current.map((c) =>
+          c.id === targetId && c.kind === "drawing"
+            ? {
+                ...c,
+                shapes: c.shapes.filter(
+                  (shape) => !shapeHitTest(shape, point, tolerance),
+                ),
+              }
+            : c,
+        ),
+      );
+    },
+  });
+
   const updateTextStyle = (id: string, patch: Partial<TextStyle>) => {
     setCards((current) =>
       current.map((c) =>
@@ -328,15 +460,42 @@ export function AICanvasStage({
             });
           }}
           onDragStart={(event, target) =>
+            // eslint-disable-next-line react-hooks/refs
             latestHandlersRef.current.onDragStart(event, target)
           }
           onDragMove={(event) => latestHandlersRef.current.onDragMove(event)}
           onDragEnd={(event) => latestHandlersRef.current.onDragEnd(event)}
           onDelete={(target) => latestHandlersRef.current.onDeleteCard(target)}
           onResize={
-            isImageCard(card) || card.kind === "text"
+            isImageCard(card) || card.kind === "text" || card.kind === "drawing"
               ? (id, w, startW) => {
+                  if (card.kind === "drawing") {
+                    // eslint-disable-next-line react-hooks/refs
+                    const start = drawingResizeStartRef.current;
+                    const isNewGesture =
+                      !start || start.id !== id || start.startW !== startW;
+                    if (isNewGesture) {
+                      drawingResizeStartRef.current = {
+                        id,
+                        startW,
+                        height: card.height,
+                      };
+                    }
+                    const baseline = drawingResizeStartRef.current!;
+                    const ratio = w / Math.max(1, baseline.startW);
+                    const nextHeight = Math.max(40, baseline.height * ratio);
+                    setCards((current) =>
+                      current.map((c) =>
+                        c.id === id && c.kind === "drawing"
+                          ? { ...c, width: w, height: nextHeight }
+                          : c,
+                      ),
+                    );
+                    setCardWidths((prev) => ({ ...prev, [id]: w }));
+                    return;
+                  }
                   if (card.kind === "text") {
+                    // eslint-disable-next-line react-hooks/refs
                     const start = textResizeStartRef.current;
                     const isNewGesture =
                       !start || start.id !== id || start.startW !== startW;
@@ -505,6 +664,23 @@ export function AICanvasStage({
                 }
                 onDelete={() => setDeleteConfirmCard(card)}
               />
+            ) : card.kind === "drawing" ? (
+              <DrawingContextMenu
+                card={card}
+                onClear={() =>
+                  setCards((current) =>
+                    current.map((c) =>
+                      c.id === card.id && c.kind === "drawing"
+                        ? { ...c, shapes: [] }
+                        : c,
+                    ),
+                  )
+                }
+                onDuplicate={() =>
+                  latestHandlersRef.current.onDuplicateCard(card)
+                }
+                onDelete={() => setDeleteConfirmCard(card)}
+              />
             ) : undefined
           }
         >
@@ -557,6 +733,24 @@ export function AICanvasStage({
                 setEditingTextCardId(null);
               }}
             />
+          ) : card.kind === "drawing" ? (
+            <DrawingSurface
+              card={card}
+              isSelected={
+                selectedCardIds.includes(card.id) &&
+                selectedCardIds.length === 1
+              }
+              cardWidth={cardWidths[card.id] ?? card.width}
+              previewShape={
+                selectedDrawingCard?.id === card.id
+                  ? drawingHook.previewShape
+                  : null
+              }
+              tool={drawingHook.tool}
+              onPointerDown={drawingHook.onPointerDown}
+              onPointerMove={drawingHook.onPointerMove}
+              onPointerUp={drawingHook.onPointerUp}
+            />
           ) : card.kind === "upload" ? (
             <UploadCardBody
               card={card}
@@ -596,6 +790,8 @@ export function AICanvasStage({
     setCommentMode,
     setSelectedCardIds,
     viewport.scale,
+    drawingHook,
+    selectedDrawingCard?.id,
   ]);
 
   return (
@@ -687,6 +883,30 @@ export function AICanvasStage({
                 onUpdate={(patch) =>
                   updateTextStyle(selectedTextCard.id, patch)
                 }
+              />
+            </div>
+          )}
+          {selectedDrawingCard && !hideNonImageCards && (
+            <div
+              className="pointer-events-auto absolute z-[1250]"
+              style={{
+                left: selectedDrawingCard.x,
+                top: selectedDrawingCard.y,
+                transform: `translate(0, -8px) translateY(-100%) scale(${
+                  viewport.scale > 0 ? 1 / viewport.scale : 1
+                })`,
+                transformOrigin: "left bottom",
+              }}
+            >
+              <CanvasDrawingToolbar
+                tool={drawingHook.tool}
+                onToolChange={drawingHook.setTool}
+                color={drawingHook.color}
+                onColorChange={drawingHook.setColor}
+                strokeWidth={drawingHook.strokeWidth}
+                onStrokeWidthChange={drawingHook.setStrokeWidth}
+                filled={drawingHook.filled}
+                onFilledChange={drawingHook.setFilled}
               />
             </div>
           )}

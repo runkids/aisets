@@ -110,6 +110,20 @@
       "color": "顏色",
       "placeholder": "輸入文字…"
     },
+    "addDrawing": "新增繪畫",
+    "drawing": {
+      "pen": "畫筆",
+      "rect": "矩形",
+      "ellipse": "橢圓",
+      "line": "直線",
+      "arrow": "箭頭",
+      "eraser": "橡皮擦",
+      "color": "顏色",
+      "strokeWidth": "筆觸寬度",
+      "fill": "填滿",
+      "clearShapes": "清除所有圖形",
+      "shapeCount_other": "{{count}} 個圖形"
+    },
     "duplicateImage": "複製圖片",
     "duplicatedImages": "已複製 {{count}} 張圖片",
     "groupSelected": "群組選取圖片",
@@ -358,7 +372,8 @@
       "asset": "素材",
       "upload": "上傳",
       "group": "群組",
-      "text": "文字"
+      "text": "文字",
+      "drawing": "繪畫"
     },
     "save": "儲存",
     "saveAs": "另存新檔",

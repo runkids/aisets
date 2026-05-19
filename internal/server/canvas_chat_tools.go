@@ -294,6 +294,24 @@ func canvasToolRegistry() []canvasToolDef {
 			Cardinality: "single",
 			Safe:        true,
 		},
+		{
+			Name:        "create_drawing",
+			Description: "Create a new drawing card on the canvas with optional initial shapes. Returns cardId, shapes, dimensions, position.",
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "add_shape",
+			Description: "Append a shape (rect, ellipse, line, arrow, or path) to an existing drawing card. Useful for highlighting or annotating with vector marks.",
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "clear_drawing_shapes",
+			Description: "Remove all shapes from a drawing card while keeping the card itself.",
+			Cardinality: "single",
+			Safe:        true,
+		},
 	})
 }
 

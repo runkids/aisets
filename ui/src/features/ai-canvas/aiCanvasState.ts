@@ -191,6 +191,87 @@ export type TextCanvasCard = CanvasCardBase & {
   height: number;
 };
 
+export const CANVAS_DRAWING_COLORS: string[] = [
+  "#0f172a",
+  "#ffffff",
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+
+export const DRAWING_STROKE_WIDTHS = [2, 4, 6, 10, 16] as const;
+export type DrawingStrokeWidth = (typeof DRAWING_STROKE_WIDTHS)[number];
+
+export const DEFAULT_DRAWING_COLOR = CANVAS_DRAWING_COLORS[0];
+export const DEFAULT_DRAWING_STROKE: DrawingStrokeWidth = 4;
+export const DEFAULT_DRAWING_WIDTH = 480;
+export const DEFAULT_DRAWING_HEIGHT = 320;
+
+export type DrawingPoint = { x: number; y: number };
+
+export type DrawingShapeBase = {
+  id: string;
+  color: string;
+  strokeWidth: number;
+};
+
+export type DrawingPathShape = DrawingShapeBase & {
+  kind: "path";
+  points: DrawingPoint[];
+};
+
+export type DrawingRectShape = DrawingShapeBase & {
+  kind: "rect";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill?: string | null;
+};
+
+export type DrawingEllipseShape = DrawingShapeBase & {
+  kind: "ellipse";
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  fill?: string | null;
+};
+
+export type DrawingLineShape = DrawingShapeBase & {
+  kind: "line";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+export type DrawingArrowShape = DrawingShapeBase & {
+  kind: "arrow";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+export type DrawingShape =
+  | DrawingPathShape
+  | DrawingRectShape
+  | DrawingEllipseShape
+  | DrawingLineShape
+  | DrawingArrowShape;
+
+export type DrawingCanvasCard = CanvasCardBase & {
+  kind: "drawing";
+  shapes: DrawingShape[];
+  width: number;
+  height: number;
+};
+
 export type CanvasCard =
   | AssetCanvasCard
   | CommentCanvasCard
@@ -200,7 +281,14 @@ export type CanvasCard =
   | ProposalCanvasCard
   | UploadCanvasCard
   | GroupCanvasCard
-  | TextCanvasCard;
+  | TextCanvasCard
+  | DrawingCanvasCard;
+
+export function createDrawingShapeId(kind: DrawingShape["kind"]) {
+  return `shape-${kind}-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
 
 export type ChatMentionPreview = {
   id: string;
@@ -615,7 +703,104 @@ function normalizeCard(value: unknown): CanvasCard | null {
     };
   }
 
+  if (kind === "drawing") {
+    const rawShapes = Array.isArray(value.shapes) ? value.shapes : [];
+    const shapes: DrawingShape[] = [];
+    for (const raw of rawShapes) {
+      if (!isRecord(raw)) continue;
+      const shape = normalizeDrawingShape(raw);
+      if (shape) shapes.push(shape);
+    }
+    return {
+      id,
+      kind,
+      x,
+      y,
+      createdAt,
+      shapes,
+      width:
+        Number(value.width) > 0 ? Number(value.width) : DEFAULT_DRAWING_WIDTH,
+      height:
+        Number(value.height) > 0
+          ? Number(value.height)
+          : DEFAULT_DRAWING_HEIGHT,
+    };
+  }
+
   return null;
+}
+
+function normalizeDrawingShape(
+  raw: Record<string, unknown>,
+): DrawingShape | null {
+  const id =
+    typeof raw.id === "string" && raw.id
+      ? raw.id
+      : createDrawingShapeId(
+          (raw.kind as DrawingShape["kind"] | undefined) ?? "path",
+        );
+  const color =
+    typeof raw.color === "string" && raw.color
+      ? raw.color
+      : DEFAULT_DRAWING_COLOR;
+  const strokeWidth =
+    Number(raw.strokeWidth) > 0
+      ? Number(raw.strokeWidth)
+      : DEFAULT_DRAWING_STROKE;
+  const base = { id, color, strokeWidth };
+  switch (raw.kind) {
+    case "path": {
+      const points = Array.isArray(raw.points)
+        ? raw.points
+            .map((p) =>
+              isRecord(p) &&
+              Number.isFinite(Number(p.x)) &&
+              Number.isFinite(Number(p.y))
+                ? { x: Number(p.x), y: Number(p.y) }
+                : null,
+            )
+            .filter((p): p is DrawingPoint => Boolean(p))
+        : [];
+      if (points.length < 2) return null;
+      return { ...base, kind: "path", points };
+    }
+    case "rect": {
+      const x = Number(raw.x);
+      const y = Number(raw.y);
+      const width = Number(raw.width);
+      const height = Number(raw.height);
+      if (![x, y, width, height].every(Number.isFinite)) return null;
+      const fill = typeof raw.fill === "string" && raw.fill ? raw.fill : null;
+      return { ...base, kind: "rect", x, y, width, height, fill };
+    }
+    case "ellipse": {
+      const cx = Number(raw.cx);
+      const cy = Number(raw.cy);
+      const rx = Number(raw.rx);
+      const ry = Number(raw.ry);
+      if (![cx, cy, rx, ry].every(Number.isFinite)) return null;
+      const fill = typeof raw.fill === "string" && raw.fill ? raw.fill : null;
+      return { ...base, kind: "ellipse", cx, cy, rx, ry, fill };
+    }
+    case "line": {
+      const x1 = Number(raw.x1);
+      const y1 = Number(raw.y1);
+      const x2 = Number(raw.x2);
+      const y2 = Number(raw.y2);
+      if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+      return { ...base, kind: "line", x1, y1, x2, y2 };
+    }
+    case "arrow": {
+      const x1 = Number(raw.x1);
+      const y1 = Number(raw.y1);
+      const x2 = Number(raw.x2);
+      const y2 = Number(raw.y2);
+      if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+      return { ...base, kind: "arrow", x1, y1, x2, y2 };
+    }
+    default:
+      return null;
+  }
 }
 
 function safeChatString(value: unknown, maxLength: number) {
@@ -904,6 +1089,7 @@ export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "upload") return card.fileName;
   if (card.kind === "group") return card.name || `Group (${card.cards.length})`;
   if (card.kind === "text") return card.content.slice(0, 30) || "Text";
+  if (card.kind === "drawing") return `Drawing (${card.shapes.length})`;
   return card.prompt || "Preview";
 }
 

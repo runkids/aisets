@@ -30,6 +30,8 @@ import {
   cardDisplayName,
   clampCanvasScale,
   DEFAULT_CANVAS_VIEWPORT,
+  DEFAULT_DRAWING_HEIGHT,
+  DEFAULT_DRAWING_WIDTH,
   DEFAULT_TEXT_STYLE,
   createCanvasCardId,
   emptyAICanvasSession,
@@ -43,6 +45,7 @@ import {
   type ChatHistoryEntry,
   type ChatMentionPreview,
   type ChatRunUsage,
+  type DrawingCanvasCard,
   type ProposalCanvasCard,
   type TextCanvasCard,
   type UploadCanvasCard,
@@ -758,6 +761,26 @@ export function AICanvasView({
     setSelectedCardIds((prev) => prev.filter((id) => id !== cardId));
   }
 
+  function addDrawingCard() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    const containerSize = rect
+      ? { width: rect.width, height: rect.height }
+      : undefined;
+    const pos = nextCardPosition(cards.length, viewport, containerSize);
+    const card: DrawingCanvasCard = {
+      id: createCanvasCardId("drawing"),
+      kind: "drawing",
+      x: pos.x,
+      y: pos.y,
+      createdAt: nowISO(),
+      shapes: [],
+      width: DEFAULT_DRAWING_WIDTH,
+      height: DEFAULT_DRAWING_HEIGHT,
+    };
+    setCards((current) => [...current, card]);
+    setSelectedCardIds([card.id]);
+  }
+
   function clearChatHistory() {
     setChatHistory([]);
     setError("");
@@ -1002,6 +1025,7 @@ export function AICanvasView({
         hasSession={!!currentSessionId}
         sessionName={currentSessionName}
         onAddTextCard={addTextCard}
+        onAddDrawingCard={addDrawingCard}
       />
 
       <ConfirmDialog

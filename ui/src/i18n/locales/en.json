@@ -110,6 +110,21 @@
       "color": "Color",
       "placeholder": "Type something…"
     },
+    "addDrawing": "Add drawing",
+    "drawing": {
+      "pen": "Pen",
+      "rect": "Rectangle",
+      "ellipse": "Ellipse",
+      "line": "Line",
+      "arrow": "Arrow",
+      "eraser": "Eraser",
+      "color": "Color",
+      "strokeWidth": "Stroke width",
+      "fill": "Fill",
+      "clearShapes": "Clear all shapes",
+      "shapeCount_one": "{{count}} shape",
+      "shapeCount_other": "{{count}} shapes"
+    },
     "duplicateImage": "Duplicate image",
     "duplicatedImages": "Duplicated {{count}} images",
     "groupSelected": "Group selected images",
@@ -358,7 +373,8 @@
       "asset": "Asset",
       "upload": "Upload",
       "group": "Group",
-      "text": "Text"
+      "text": "Text",
+      "drawing": "Drawing"
     },
     "save": "Save",
     "saveAs": "Save as",

@@ -300,6 +300,47 @@ func canvasToolParameters(name string) map[string]any {
 			"color":      canvasStringSchema("New text color hex."),
 			"textAlign":  canvasStringEnumSchema("New text alignment.", "left", "center", "right"),
 		})
+	case "create_drawing":
+		return canvasObjectSchema(nil, map[string]any{
+			"x":      canvasNumberSchema("X position on canvas."),
+			"y":      canvasNumberSchema("Y position on canvas."),
+			"width":  canvasNumberSchema("Drawing card width in pixels (default 480)."),
+			"height": canvasNumberSchema("Drawing card height in pixels (default 320)."),
+		})
+	case "add_shape":
+		return canvasObjectSchema([]string{"cardId", "shape"}, map[string]any{
+			"cardId": canvasStringSchema("ID of the drawing card to add a shape to."),
+			"shape": canvasObjectSchema([]string{"kind", "color", "strokeWidth"}, map[string]any{
+				"kind":        canvasStringEnumSchema("Shape kind.", "rect", "ellipse", "line", "arrow", "path"),
+				"color":       canvasStringSchema("Stroke color hex (e.g. #ef4444)."),
+				"strokeWidth": canvasNumberSchema("Stroke width in pixels."),
+				"fill":        canvasStringSchema("Optional fill color hex (rect/ellipse only)."),
+				"x":           canvasNumberSchema("Rect top-left X (rect only)."),
+				"y":           canvasNumberSchema("Rect top-left Y (rect only)."),
+				"width":       canvasNumberSchema("Rect width (rect only)."),
+				"height":      canvasNumberSchema("Rect height (rect only)."),
+				"cx":          canvasNumberSchema("Ellipse center X (ellipse only)."),
+				"cy":          canvasNumberSchema("Ellipse center Y (ellipse only)."),
+				"rx":          canvasNumberSchema("Ellipse X radius (ellipse only)."),
+				"ry":          canvasNumberSchema("Ellipse Y radius (ellipse only)."),
+				"x1":          canvasNumberSchema("Line/arrow start X (line/arrow only)."),
+				"y1":          canvasNumberSchema("Line/arrow start Y (line/arrow only)."),
+				"x2":          canvasNumberSchema("Line/arrow end X (line/arrow only)."),
+				"y2":          canvasNumberSchema("Line/arrow end Y (line/arrow only)."),
+				"points": canvasObjectArraySchema(
+					"Polyline points for path shapes.",
+					[]string{"x", "y"},
+					map[string]any{
+						"x": canvasNumberSchema("X coordinate."),
+						"y": canvasNumberSchema("Y coordinate."),
+					},
+				),
+			}),
+		})
+	case "clear_drawing_shapes":
+		return canvasObjectSchema([]string{"cardId"}, map[string]any{
+			"cardId": canvasStringSchema("ID of the drawing card to clear."),
+		})
 	default:
 		return canvasObjectSchema(nil, map[string]any{})
 	}

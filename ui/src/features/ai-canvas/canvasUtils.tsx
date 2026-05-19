@@ -6,6 +6,7 @@ import type {
   AssetCanvasCard,
   CanvasCard,
   CommentCanvasCard,
+  DrawingCanvasCard,
   GroupCanvasCard,
   TextCanvasCard,
   UploadCanvasCard,
@@ -423,6 +424,10 @@ export function isTextCard(card: CanvasCard): card is TextCanvasCard {
   return card.kind === "text";
 }
 
+export function isDrawingCard(card: CanvasCard): card is DrawingCanvasCard {
+  return card.kind === "drawing";
+}
+
 export function cardTone(card: CanvasCard) {
   if (card.kind === "asset") return "border-g-line";
   if (card.kind === "comment")
@@ -432,6 +437,7 @@ export function cardTone(card: CanvasCard) {
   if (card.kind === "upload") return "border-g-purple/50";
   if (card.kind === "group") return "border-g-line-strong";
   if (card.kind === "text") return "border-g-cyan/50";
+  if (card.kind === "drawing") return "border-g-amber/50";
   return "border-g-green/50";
 }
 

@@ -5,7 +5,11 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CanvasCard, TextCanvasCard } from "./aiCanvasState";
+import type {
+  CanvasCard,
+  DrawingCanvasCard,
+  TextCanvasCard,
+} from "./aiCanvasState";
 import { isImageCard } from "./canvasUtils";
 
 export type CapturePadding = { x: number; y: number };
@@ -262,6 +266,79 @@ function rasterizeTextToImage(
   });
 }
 
+function rasterizeDrawingToImage(
+  svgEl: SVGSVGElement,
+  cssPxWidth: number,
+  cssPxHeight: number,
+): Promise<HTMLImageElement> {
+  const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+  cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  cloned.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  cloned.setAttribute("width", String(Math.max(1, Math.round(cssPxWidth))));
+  cloned.setAttribute("height", String(Math.max(1, Math.round(cssPxHeight))));
+  if (!cloned.getAttribute("viewBox")) {
+    cloned.setAttribute(
+      "viewBox",
+      `0 0 ${Math.max(1, Math.round(cssPxWidth))} ${Math.max(1, Math.round(cssPxHeight))}`,
+    );
+  }
+
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(cloned);
+  const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("drawing svg image load failed"));
+    };
+    img.src = url;
+  });
+}
+
+async function drawingRenderFrames(
+  cards: CanvasCard[],
+  ids: Set<string>,
+  cardElements: Map<string, HTMLElement>,
+  root: HTMLElement,
+  viewport: { x: number; y: number; scale: number },
+): Promise<RenderFrame[]> {
+  const rootRect = root.getBoundingClientRect();
+  const drawingCards = cards.filter(
+    (card): card is DrawingCanvasCard =>
+      card.kind === "drawing" && ids.has(card.id) && card.shapes.length > 0,
+  );
+  const frames: RenderFrame[] = [];
+  for (const card of drawingCards) {
+    const cardEl = cardElements.get(card.id);
+    const frameEl = cardEl?.querySelector<HTMLElement>(
+      "[data-ai-canvas-drawing-frame='true']",
+    );
+    const svgEl = frameEl?.querySelector<SVGSVGElement>("svg");
+    if (!cardEl || !svgEl) continue;
+    const bounds = screenRectToWorld(
+      cardEl.getBoundingClientRect(),
+      rootRect,
+      viewport,
+    );
+    const w = Math.max(1, Math.round(bounds.width));
+    const h = Math.max(1, Math.round(bounds.height));
+    try {
+      const img = await rasterizeDrawingToImage(svgEl, w, h);
+      frames.push({ ...bounds, bounds, img });
+    } catch {
+      // skip unrenderable drawing cards
+    }
+  }
+  return frames;
+}
+
 async function textRenderFrames(
   cards: CanvasCard[],
   ids: Set<string>,
@@ -372,7 +449,14 @@ async function waitForRenderableFrames(
     root,
     viewport,
   );
-  return [...frames, ...textFrames];
+  const drawingFrames = await drawingRenderFrames(
+    cards,
+    ids,
+    cardElements,
+    root,
+    viewport,
+  );
+  return [...frames, ...textFrames, ...drawingFrames];
 }
 
 function frameIntersectsCrop(frame: FrameGeometry, crop: CaptureCrop) {

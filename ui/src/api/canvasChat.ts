@@ -201,6 +201,12 @@ export function serializeCanvasSnapshot(
         base.width = card.width;
         base.height = card.height;
       }
+      if (card.kind === "drawing") {
+        base.width = card.width;
+        base.height = card.height;
+        base.shapes = card.shapes;
+        base.shapeCount = card.shapes.length;
+      }
       return base;
     }),
   };

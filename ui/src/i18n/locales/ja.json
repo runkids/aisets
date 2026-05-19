@@ -105,6 +105,20 @@
       "color": "色",
       "placeholder": "テキストを入力…"
     },
+    "addDrawing": "描画を追加",
+    "drawing": {
+      "pen": "ペン",
+      "rect": "矩形",
+      "ellipse": "楕円",
+      "line": "直線",
+      "arrow": "矢印",
+      "eraser": "消しゴム",
+      "color": "色",
+      "strokeWidth": "線の太さ",
+      "fill": "塗りつぶし",
+      "clearShapes": "すべての図形を消去",
+      "shapeCount_other": "{{count}} 個の図形"
+    },
     "duplicateImage": "画像を複製",
     "duplicatedImages": "{{count}} 枚の画像を複製しました",
     "describePrompt": "選択中のキャンバスコンテキストを説明します。",
@@ -258,7 +272,8 @@
       "proposal": "提案",
       "upload": "アップロード",
       "variant": "プレビュー",
-      "text": "テキスト"
+      "text": "テキスト",
+      "drawing": "描画"
     },
     "clearConfirmAction": "すべてクリア",
     "clearConfirmMessage": "すべてのカード、コメント、提案、チャット履歴が削除され、元に戻せません",

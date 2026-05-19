@@ -21,6 +21,7 @@ import { cn } from "@/lib/cn";
 import { fileName, formatExt } from "@/ui";
 import type {
   AssetCanvasCard,
+  DrawingCanvasCard,
   GroupCanvasCard,
   TextCanvasCard,
   UploadCanvasCard,
@@ -542,6 +543,52 @@ export function TextContextMenu({
       <button type="button" className={ctxMenuItemCls} onClick={onEdit}>
         <Pencil size={14} className="shrink-0 text-white/46" />
         {t("aiCanvas.editText")}
+      </button>
+      {onDuplicate && (
+        <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
+          <Copy size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.duplicateImage")}
+        </button>
+      )}
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
+export function DrawingContextMenu({
+  card,
+  onClear,
+  onDuplicate,
+  onDelete,
+}: {
+  card: DrawingCanvasCard;
+  onClear: () => void;
+  onDuplicate?: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">
+          {t("aiCanvas.cardKind.drawing")}
+        </div>
+        <div className="mt-0.5 text-[11px] text-white/36">
+          {t("aiCanvas.drawing.shapeCount", { count: card.shapes.length })}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      <button type="button" className={ctxMenuItemCls} onClick={onClear}>
+        <Trash2 size={14} className="shrink-0 text-white/46" />
+        {t("aiCanvas.drawing.clearShapes")}
       </button>
       {onDuplicate && (
         <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
