@@ -194,6 +194,31 @@ func TestClassifyCanvasSkillFamilies_SelectedFormatRequestUsesFileProposal(t *te
 	}
 }
 
+func TestClassifyCanvasSkillFamilies_UnclassifiedMessageWithSelectionBroadensFallback(t *testing.T) {
+	got := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
+		Message: "請幫我做出這隻魚在深海快速游的感覺",
+		Canvas: canvasSnapshot{
+			Cards:           []canvasCardSnapshot{{ID: "card-a", Kind: "asset"}},
+			SelectedCardIDs: []string{"card-a"},
+		},
+	})
+	for _, wantSkill := range []string{
+		canvasSkillPhotoStaging,
+		canvasSkillFileProposals,
+		canvasSkillDrawing,
+	} {
+		if !canvasStringSliceContains(got, wantSkill) {
+			t.Fatalf("skills = %v, missing %s", got, wantSkill)
+		}
+	}
+	tools := canvasSkillToolNames(got)
+	for _, wantTool := range []string{"create_drawing", "add_shape", "mirror_image", "rotate_image"} {
+		if !canvasStringSliceContains(tools, wantTool) {
+			t.Fatalf("tools = %v, missing %s", tools, wantTool)
+		}
+	}
+}
+
 func TestClassifyCanvasSkillFamilies_FilenameLookupDoesNotUseFileProposal(t *testing.T) {
 	got := classifyCanvasSkillFamilies(canvasSkillClassifyInput{
 		Message: "find loading.webp",

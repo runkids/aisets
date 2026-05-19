@@ -267,7 +267,16 @@ export function AICanvasSearchPanel({
               ? t("toolbar.semanticSearch")
               : t("aiCanvas.searchPlaceholder")
           }
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            const value = event.target.value;
+            setQuery(value);
+            setSearchActiveIndex(-1);
+            if (!value.trim()) {
+              setSearchResults([]);
+              setSearchTotal(0);
+              setSearchSelectedIds(new Set());
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Tab" && !e.shiftKey && semanticAvailable) {
               e.preventDefault();
@@ -298,24 +307,6 @@ export function AICanvasSearchPanel({
                 );
               }
               return;
-            }
-            if (e.key === "Enter") {
-              e.stopPropagation();
-              if (searchActiveIndex >= 0 && searchResults[searchActiveIndex]) {
-                e.preventDefault();
-                const asset = searchResults[searchActiveIndex];
-                if (batchMode) {
-                  setSearchSelectedIds((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(asset.id)) next.delete(asset.id);
-                    else next.add(asset.id);
-                    return next;
-                  });
-                } else if (!addedIds.has(asset.id)) {
-                  addAsset(asset);
-                  setAddedIds((prev) => new Set(prev).add(asset.id));
-                }
-              }
             }
             if (e.key === " " && batchMode && searchActiveIndex >= 0) {
               e.preventDefault();

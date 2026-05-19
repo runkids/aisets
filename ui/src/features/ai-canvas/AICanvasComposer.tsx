@@ -648,12 +648,11 @@ export function AICanvasComposer({
               clearChatHistory={clearChatHistory}
             />
             <Tooltip label={t("aiCanvas.planMode")} placement="top">
-              <Button
+              <IconButton
                 size="sm"
-                variant="chip"
-                leadingIcon={<ListChecks />}
+                aria-label={t("aiCanvas.planMode")}
                 className={cn(
-                  composerActionClass,
+                  composerIconClass,
                   plan &&
                     plan.status !== "completed" &&
                     plan.status !== "canceled" &&
@@ -661,8 +660,8 @@ export function AICanvasComposer({
                 )}
                 onClick={onOpenPlan}
               >
-                {t("aiCanvas.planMode")}
-              </Button>
+                <ListChecks />
+              </IconButton>
             </Tooltip>
             <IconButton
               size="sm"

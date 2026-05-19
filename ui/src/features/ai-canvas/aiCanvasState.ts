@@ -730,7 +730,7 @@ function normalizeCard(value: unknown): CanvasCard | null {
   return null;
 }
 
-function normalizeDrawingShape(
+export function normalizeDrawingShape(
   raw: Record<string, unknown>,
 ): DrawingShape | null {
   const id =

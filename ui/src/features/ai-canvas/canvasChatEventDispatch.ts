@@ -7,13 +7,18 @@ import type { TFunction } from "i18next";
 import type { AssetItem } from "@/types";
 import {
   createCanvasCardId,
+  DEFAULT_DRAWING_HEIGHT,
+  DEFAULT_DRAWING_WIDTH,
   DEFAULT_TEXT_STYLE,
+  normalizeDrawingShape,
   sanitizeCanvasChatContent,
   type CanvasCard,
   type ChatActivityEntry,
   type ChatMentionPreview,
   type ChatRunUsage,
   type CommentCanvasCard,
+  type DrawingCanvasCard,
+  type DrawingShape,
   type TextCanvasCard,
 } from "./aiCanvasState";
 import { adjacentCardPosition, nowISO } from "./canvasUtils";
@@ -609,6 +614,103 @@ export function dispatchCanvasChatEvent(
               ...(r.textAlign ? { textAlign: r.textAlign } : {}),
             },
           };
+        }),
+      );
+    }
+  }
+  if (event.type === "action_result" && event.tool === "create_drawing") {
+    const r = event.result as {
+      cardId?: string;
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+      shapes?: unknown;
+    };
+    let defaultX = 100;
+    let defaultY = 100;
+    if (canvasCards.length > 0) {
+      let sumX = 0;
+      let sumY = 0;
+      for (const c of canvasCards) {
+        sumX += c.x;
+        sumY += c.y;
+      }
+      defaultX = Math.round(sumX / canvasCards.length);
+      defaultY = Math.round(sumY / canvasCards.length);
+    }
+    const offset = state.newCards.length * 40;
+    const rawShapes = Array.isArray(r?.shapes) ? r.shapes : [];
+    const shapes: DrawingShape[] = [];
+    for (const raw of rawShapes) {
+      if (raw && typeof raw === "object") {
+        const shape = normalizeDrawingShape(raw as Record<string, unknown>);
+        if (shape) shapes.push(shape);
+      }
+    }
+    const card: DrawingCanvasCard = {
+      id:
+        typeof r?.cardId === "string" && r.cardId
+          ? r.cardId
+          : createCanvasCardId("drawing"),
+      kind: "drawing",
+      x: typeof r?.x === "number" ? r.x : defaultX + offset,
+      y: typeof r?.y === "number" ? r.y : defaultY + offset,
+      createdAt: nowISO(),
+      shapes,
+      width:
+        typeof r?.width === "number" && r.width > 0
+          ? r.width
+          : DEFAULT_DRAWING_WIDTH,
+      height:
+        typeof r?.height === "number" && r.height > 0
+          ? r.height
+          : DEFAULT_DRAWING_HEIGHT,
+    };
+    state.newCards.push(card);
+    setCards((current) => [...current, card]);
+    setAiCursor({
+      ...focusCursorPosition(card, cardLayoutMetrics, viewportScale),
+      label: t("aiCanvas.activityToolCompleted"),
+      emoji: "select",
+      status: "acting",
+    });
+  }
+  if (event.type === "action_result" && event.tool === "add_shape") {
+    const r = event.result as {
+      cardId?: string;
+      shape?: unknown;
+    };
+    if (r?.cardId && r.shape && typeof r.shape === "object") {
+      const shape = normalizeDrawingShape(r.shape as Record<string, unknown>);
+      const targetId = resolveCanvasCardId(r.cardId);
+      if (shape) {
+        setCards((current) =>
+          current.map((card) => {
+            if (card.kind !== "drawing" || card.id !== targetId) return card;
+            return { ...card, shapes: [...card.shapes, shape] };
+          }),
+        );
+        const target = canvasCards.find((c) => c.id === targetId);
+        if (target) {
+          setAiCursor({
+            ...focusCursorPosition(target, cardLayoutMetrics, viewportScale),
+            label: t("aiCanvas.activityToolCompleted"),
+            emoji: "select",
+            status: "acting",
+          });
+        }
+      }
+    }
+  }
+  if (event.type === "action_result" && event.tool === "clear_drawing_shapes") {
+    const r = event.result as { cardId?: string };
+    if (r?.cardId) {
+      const targetId = resolveCanvasCardId(r.cardId);
+      setCards((current) =>
+        current.map((card) => {
+          if (card.kind !== "drawing" || card.id !== targetId) return card;
+          return { ...card, shapes: [] };
         }),
       );
     }

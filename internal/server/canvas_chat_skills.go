@@ -209,6 +209,19 @@ func canvasDefaultSkillIDs() []string {
 	}
 }
 
+func canvasBroadFallbackSkillIDs() []string {
+	return []string{
+		canvasSkillLayout,
+		canvasSkillSearch,
+		canvasSkillPhotoStaging,
+		canvasSkillFileProposals,
+		canvasSkillDrawing,
+		canvasSkillAnnotation,
+		canvasSkillComments,
+		canvasSkillCapture,
+	}
+}
+
 func classifyCanvasSkillFamilies(input canvasSkillClassifyInput) []string {
 	message := strings.ToLower(strings.TrimSpace(input.Message))
 	if message == "" {
@@ -227,6 +240,9 @@ func classifyCanvasSkillFamilies(input canvasSkillClassifyInput) []string {
 		ids = append(ids, canvasSkillFileProposals)
 	}
 	if len(ids) == 0 {
+		if len(input.Canvas.SelectedCardIDs) > 0 {
+			return canvasBroadFallbackSkillIDs()
+		}
 		return canvasDefaultSkillIDs()
 	}
 	return ids
