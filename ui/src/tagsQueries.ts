@@ -15,6 +15,8 @@ import {
   mergeTags,
   renameCategory,
   renameTag,
+  setAssetDescription,
+  setAssetOcrText,
   setAssetTags,
 } from "./api";
 import { catalogQueryKey } from "./queries";
@@ -193,6 +195,39 @@ export function useAssetTagsMutation() {
     }) => setAssetTags(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tagKeys.all });
+      qc.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useAssetDescriptionMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      projectId: string;
+      repoPath: string;
+      contentHash: string;
+      hashAlgorithm: string;
+      description: string;
+    }) => setAssetDescription(params),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tagKeys.all });
+      qc.invalidateQueries({ queryKey: catalogQueryKey });
+    },
+  });
+}
+
+export function useAssetOcrTextMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      projectId: string;
+      repoPath: string;
+      contentHash: string;
+      hashAlgorithm: string;
+      text: string;
+    }) => setAssetOcrText(params),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogQueryKey });
     },
   });
