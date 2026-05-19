@@ -738,6 +738,7 @@ export function AssetDrawer({
               {aiTagVisible && (
                 <div className={tab !== "ai" ? "hidden" : undefined}>
                   <AssetDrawerAI
+                    key={asset.id}
                     asset={asset}
                     scanId={scanId}
                     aiTag={asset.aiTag}

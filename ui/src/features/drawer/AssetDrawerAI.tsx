@@ -170,7 +170,7 @@ export function AssetDrawerAI({
     "inline-flex items-center gap-1.5 rounded-g-md px-2.5 py-1.5 font-g text-g-caption font-[590] text-g-purple transition-[background,color] duration-[120ms] ease-g hover:bg-g-purple/[0.08] disabled:opacity-[0.38] disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col gap-5" key={asset.id}>
+    <div className="flex flex-col gap-5">
       {(hasAiTag || llmEnabled) && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -576,7 +576,7 @@ function EditableTextField({
         if (disabled) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onEditStart();
+          handleEditStart();
         }
       }}
       className={`${displayClassName} ${disabled ? "opacity-[0.38] cursor-not-allowed" : ""}`}
