@@ -20,13 +20,16 @@ import {
   GroupCardBody,
   OperationCardBody,
   ProposalCardBody,
+  TextCardBody,
   UploadCardBody,
   VariantCardBody,
 } from "./CanvasCardBodies";
+import { CanvasTextToolbar } from "./CanvasTextToolbar";
 import {
   AssetContextMenu,
   GroupContextMenu,
   SelectionContextMenu,
+  TextContextMenu,
   UploadContextMenu,
   VariantContextMenu,
 } from "./CanvasContextMenus";
@@ -42,6 +45,8 @@ import type {
   CanvasCard,
   CommentCanvasCard,
   GroupCanvasCard,
+  TextCanvasCard,
+  TextStyle,
 } from "./aiCanvasState";
 
 type CommentConnector = {
@@ -55,7 +60,7 @@ type CommentConnector = {
 };
 
 function isVisibleImageCard(card: CanvasCard) {
-  return isImageCard(card);
+  return isImageCard(card) || card.kind === "text";
 }
 
 type AICanvasStageProps = {
@@ -112,6 +117,14 @@ type AICanvasStageProps = {
     promptText: string,
     outputFormat?: string,
   ) => void | Promise<void>;
+  onMirrorImage: (
+    card: CanvasCard,
+    flip: "horizontal" | "vertical" | "both",
+  ) => void | Promise<void>;
+  onRotateImage: (card: CanvasCard, degrees: number) => void | Promise<void>;
+  editingTextCardId: string | null;
+  setEditingTextCardId: Dispatch<SetStateAction<string | null>>;
+  onDiscardEmptyTextCard: (cardId: string) => void;
 };
 
 export function AICanvasStage({
@@ -152,6 +165,11 @@ export function AICanvasStage({
   onRegisterCard,
   onAddComment,
   onCreateImagePreview,
+  onMirrorImage,
+  onRotateImage,
+  editingTextCardId,
+  setEditingTextCardId,
+  onDiscardEmptyTextCard,
 }: AICanvasStageProps) {
   const [deleteConfirmCard, setDeleteConfirmCard] = useState<CanvasCard | null>(
     null,
@@ -161,6 +179,14 @@ export function AICanvasStage({
   >(null);
   const [renameGroupTarget, setRenameGroupTarget] =
     useState<GroupCanvasCard | null>(null);
+  const [rotateCustomCard, setRotateCustomCard] = useState<CanvasCard | null>(
+    null,
+  );
+  const textResizeStartRef = useRef<{
+    id: string;
+    startW: number;
+    fontSize: number;
+  } | null>(null);
   const [selectionMenuPos, setSelectionMenuPos] = useState<{
     x: number;
     y: number;
@@ -176,8 +202,10 @@ export function AICanvasStage({
     onDragStart,
     onDuplicateCard,
     onGroupSelectedCards,
+    onMirrorImage,
     onOpenAsset,
     onRegisterCard,
+    onRotateImage,
     onUngroupCard,
   });
   useEffect(() => {
@@ -191,8 +219,10 @@ export function AICanvasStage({
       onDragStart,
       onDuplicateCard,
       onGroupSelectedCards,
+      onMirrorImage,
       onOpenAsset,
       onRegisterCard,
+      onRotateImage,
       onUngroupCard,
     };
   }, [
@@ -205,8 +235,10 @@ export function AICanvasStage({
     onDragStart,
     onDuplicateCard,
     onGroupSelectedCards,
+    onMirrorImage,
     onOpenAsset,
     onRegisterCard,
+    onRotateImage,
     onUngroupCard,
   ]);
   const hasOpenAssetHandler = Boolean(onOpenAsset);
@@ -253,6 +285,22 @@ export function AICanvasStage({
     [selectedCards],
   );
 
+  const selectedTextCard = useMemo<TextCanvasCard | null>(() => {
+    if (selectedCards.length !== 1) return null;
+    const only = selectedCards[0];
+    return only.kind === "text" ? only : null;
+  }, [selectedCards]);
+
+  const updateTextStyle = (id: string, patch: Partial<TextStyle>) => {
+    setCards((current) =>
+      current.map((c) =>
+        c.id === id && c.kind === "text"
+          ? { ...c, style: { ...c.style, ...patch } }
+          : c,
+      ),
+    );
+  };
+
   const renderedCards = useMemo(() => {
     return cards.map((card) => {
       if (hideNonImageCards && !isVisibleImageCard(card)) return null;
@@ -286,8 +334,39 @@ export function AICanvasStage({
           onDragEnd={(event) => latestHandlersRef.current.onDragEnd(event)}
           onDelete={(target) => latestHandlersRef.current.onDeleteCard(target)}
           onResize={
-            isImageCard(card)
-              ? (id, w) => {
+            isImageCard(card) || card.kind === "text"
+              ? (id, w, startW) => {
+                  if (card.kind === "text") {
+                    const start = textResizeStartRef.current;
+                    const isNewGesture =
+                      !start || start.id !== id || start.startW !== startW;
+                    if (isNewGesture) {
+                      textResizeStartRef.current = {
+                        id,
+                        startW,
+                        fontSize: card.style.fontSize,
+                      };
+                    }
+                    const baseline = textResizeStartRef.current!;
+                    const ratio = w / Math.max(1, baseline.startW);
+                    const nextFontSize = Math.max(
+                      8,
+                      Math.min(400, baseline.fontSize * ratio),
+                    );
+                    setCards((current) =>
+                      current.map((c) =>
+                        c.id === id && c.kind === "text"
+                          ? {
+                              ...c,
+                              width: w,
+                              style: { ...c.style, fontSize: nextFontSize },
+                            }
+                          : c,
+                      ),
+                    );
+                    setCardWidths((prev) => ({ ...prev, [id]: w }));
+                    return;
+                  }
                   if (
                     selectedCardIds.length > 1 &&
                     selectedCardIds.includes(id)
@@ -313,6 +392,11 @@ export function AICanvasStage({
           }
           onRegister={(id, node) =>
             latestHandlersRef.current.onRegisterCard(id, node)
+          }
+          onTextEdit={
+            card.kind === "text"
+              ? () => setEditingTextCardId(card.id)
+              : undefined
           }
           position={
             dragPreview?.cardId === card.id
@@ -348,6 +432,13 @@ export function AICanvasStage({
                     outputFormat,
                   )
                 }
+                onMirror={(flip) =>
+                  void latestHandlersRef.current.onMirrorImage(card, flip)
+                }
+                onRotate={(degrees) =>
+                  void latestHandlersRef.current.onRotateImage(card, degrees)
+                }
+                onRotateCustom={() => setRotateCustomCard(card)}
                 onAddComment={() => {
                   setSelectedCardIds([card.id]);
                   setCommentMode(true);
@@ -361,6 +452,13 @@ export function AICanvasStage({
             ) : card.kind === "upload" ? (
               <UploadContextMenu
                 card={card}
+                onMirror={(flip) =>
+                  void latestHandlersRef.current.onMirrorImage(card, flip)
+                }
+                onRotate={(degrees) =>
+                  void latestHandlersRef.current.onRotateImage(card, degrees)
+                }
+                onRotateCustom={() => setRotateCustomCard(card)}
                 onAddComment={() => {
                   setSelectedCardIds([card.id]);
                   setCommentMode(true);
@@ -369,10 +467,18 @@ export function AICanvasStage({
                   latestHandlersRef.current.onDuplicateCard(card)
                 }
                 onDelete={() => setDeleteConfirmCard(card)}
+                working={isWorking}
               />
             ) : card.kind === "variant" ? (
               <VariantContextMenu
                 card={card}
+                onMirror={(flip) =>
+                  void latestHandlersRef.current.onMirrorImage(card, flip)
+                }
+                onRotate={(degrees) =>
+                  void latestHandlersRef.current.onRotateImage(card, degrees)
+                }
+                onRotateCustom={() => setRotateCustomCard(card)}
                 onAddComment={() => {
                   setSelectedCardIds([card.id]);
                   setCommentMode(true);
@@ -381,12 +487,22 @@ export function AICanvasStage({
                   latestHandlersRef.current.onDuplicateCard(card)
                 }
                 onDelete={() => setDeleteConfirmCard(card)}
+                working={isWorking}
               />
             ) : card.kind === "group" ? (
               <GroupContextMenu
                 card={card}
                 onRename={() => setRenameGroupTarget(card)}
                 onUngroup={() => latestHandlersRef.current.onUngroupCard(card)}
+                onDelete={() => setDeleteConfirmCard(card)}
+              />
+            ) : card.kind === "text" ? (
+              <TextContextMenu
+                card={card}
+                onEdit={() => setEditingTextCardId(card.id)}
+                onDuplicate={() =>
+                  latestHandlersRef.current.onDuplicateCard(card)
+                }
                 onDelete={() => setDeleteConfirmCard(card)}
               />
             ) : undefined
@@ -420,6 +536,27 @@ export function AICanvasStage({
             <OperationCardBody card={card} />
           ) : card.kind === "group" ? (
             <GroupCardBody card={card} />
+          ) : card.kind === "text" ? (
+            <TextCardBody
+              card={card}
+              editing={editingTextCardId === card.id}
+              onConfirmEdit={(content, width, height) => {
+                const trimmed = content.trim();
+                if (!trimmed) {
+                  onDiscardEmptyTextCard(card.id);
+                  setEditingTextCardId(null);
+                  return;
+                }
+                setCards((current) =>
+                  current.map((c) =>
+                    c.id === card.id && c.kind === "text"
+                      ? { ...c, content, width, height }
+                      : c,
+                  ),
+                );
+                setEditingTextCardId(null);
+              }}
+            />
           ) : card.kind === "upload" ? (
             <UploadCardBody
               card={card}
@@ -446,6 +583,9 @@ export function AICanvasStage({
     commentsByAnchor,
     commentMode,
     dragPreview,
+    editingTextCardId,
+    setEditingTextCardId,
+    onDiscardEmptyTextCard,
     hideNonImageCards,
     hasOpenAssetHandler,
     isWorking,
@@ -530,6 +670,26 @@ export function AICanvasStage({
             </svg>
           )}
           {renderedCards}
+          {selectedTextCard && !hideNonImageCards && (
+            <div
+              className="pointer-events-auto absolute z-[1250]"
+              style={{
+                left: selectedTextCard.x,
+                top: selectedTextCard.y,
+                transform: `translate(0, -8px) translateY(-100%) scale(${
+                  viewport.scale > 0 ? 1 / viewport.scale : 1
+                })`,
+                transformOrigin: "left bottom",
+              }}
+            >
+              <CanvasTextToolbar
+                card={selectedTextCard}
+                onUpdate={(patch) =>
+                  updateTextStyle(selectedTextCard.id, patch)
+                }
+              />
+            </div>
+          )}
           {groupBounds && !hideNonImageCards && (
             <div
               className="absolute z-[38] rounded-g-sm border-2 border-dashed border-[#0d99ff]"
@@ -621,6 +781,27 @@ export function AICanvasStage({
         placeholder={t("aiCanvas.groupNamePlaceholder")}
         defaultValue={renameGroupTarget?.name ?? ""}
         confirmText={t("aiCanvas.renameGroup")}
+        cancelText={t("common.cancel")}
+      />
+
+      <PromptDialog
+        open={!!rotateCustomCard}
+        onConfirm={(value) => {
+          if (!rotateCustomCard) return;
+          const degrees = Number.parseInt(value, 10);
+          if (Number.isFinite(degrees) && degrees !== 0) {
+            void latestHandlersRef.current.onRotateImage(
+              rotateCustomCard,
+              degrees,
+            );
+          }
+          setRotateCustomCard(null);
+        }}
+        onCancel={() => setRotateCustomCard(null)}
+        title={t("aiCanvas.rotateCustomTitle")}
+        placeholder={t("aiCanvas.rotateCustomPlaceholder")}
+        defaultValue=""
+        confirmText={t("aiCanvas.rotate")}
         cancelText={t("common.cancel")}
       />
 

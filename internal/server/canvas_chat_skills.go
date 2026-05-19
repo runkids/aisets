@@ -151,6 +151,14 @@ func canvasSkillCatalog() []canvasSkillFamily {
 - For copy_asset with a different filename per source asset, use perAssetDestPaths with one destPath per asset.
 - For mirror/flip, default to horizontal unless the user clearly asks for vertical. For rotate, default to 90 degrees when unspecified.`,
 		},
+		{
+			ID:          "annotation",
+			Description: "Create and edit text annotations on the canvas.",
+			Triggers:    []string{"text", "label", "title", "caption", "heading", "annotate text", "add text", "write text"},
+			Tools:       []string{"focus_card", "create_text_card", "update_text_card", "remove_cards"},
+			Rules: `## Annotation Skill
+- Create text cards for annotations, labels, and titles. Use appropriate font sizes (24-32 for titles, 14-18 for labels). Place text near related content.`,
+		},
 	}
 }
 

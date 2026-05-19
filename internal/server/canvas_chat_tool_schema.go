@@ -277,6 +277,29 @@ func canvasToolParameters(name string) map[string]any {
 		return canvasObjectSchema([]string{"outputDir"}, canvasAssetTargetProperties(map[string]any{
 			"outputDir": canvasStringSchema("Output directory path."),
 		}))
+	case "create_text_card":
+		return canvasObjectSchema([]string{"content"}, map[string]any{
+			"content":    canvasStringSchema("Text content for the card."),
+			"fontSize":   canvasIntegerSchema("Font size in pixels (default 16)."),
+			"fontWeight": canvasStringEnumSchema("Font weight.", "normal", "bold"),
+			"fontStyle":  canvasStringEnumSchema("Font style.", "normal", "italic"),
+			"color":      canvasStringSchema("Text color hex (default #e0e0e0)."),
+			"textAlign":  canvasStringEnumSchema("Text alignment.", "left", "center", "right"),
+			"x":          canvasNumberSchema("X position on canvas."),
+			"y":          canvasNumberSchema("Y position on canvas."),
+			"width":      canvasNumberSchema("Card width in pixels (default 200)."),
+			"height":     canvasNumberSchema("Card height in pixels (default 40)."),
+		})
+	case "update_text_card":
+		return canvasObjectSchema([]string{"cardId"}, map[string]any{
+			"cardId":     canvasStringSchema("ID of the text card to update."),
+			"content":    canvasStringSchema("New text content."),
+			"fontSize":   canvasIntegerSchema("New font size in pixels."),
+			"fontWeight": canvasStringEnumSchema("New font weight.", "normal", "bold"),
+			"fontStyle":  canvasStringEnumSchema("New font style.", "normal", "italic"),
+			"color":      canvasStringSchema("New text color hex."),
+			"textAlign":  canvasStringEnumSchema("New text alignment.", "left", "center", "right"),
+		})
 	default:
 		return canvasObjectSchema(nil, map[string]any{})
 	}

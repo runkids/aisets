@@ -7,6 +7,7 @@ import type {
   CanvasCard,
   CommentCanvasCard,
   GroupCanvasCard,
+  TextCanvasCard,
   UploadCanvasCard,
   VariantCanvasCard,
 } from "./aiCanvasState";
@@ -418,6 +419,10 @@ export function suggestedPreviewLabel(
   return `${src.toUpperCase()} → ${target.toUpperCase()}`;
 }
 
+export function isTextCard(card: CanvasCard): card is TextCanvasCard {
+  return card.kind === "text";
+}
+
 export function cardTone(card: CanvasCard) {
   if (card.kind === "asset") return "border-g-line";
   if (card.kind === "comment")
@@ -426,6 +431,7 @@ export function cardTone(card: CanvasCard) {
   if (card.kind === "variant") return "border-g-blue/50";
   if (card.kind === "upload") return "border-g-purple/50";
   if (card.kind === "group") return "border-g-line-strong";
+  if (card.kind === "text") return "border-g-cyan/50";
   return "border-g-green/50";
 }
 

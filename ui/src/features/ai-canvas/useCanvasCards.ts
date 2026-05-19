@@ -5,7 +5,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { CanvasCardLayoutMetrics } from "@/api/canvasChat";
-import { renderImageToolPreview } from "@/api/imageTools";
+import { renderImageToolPreview, renderUploadPreview } from "@/api/imageTools";
 import { previewImageUrl } from "@/api";
 import type { AssetItem } from "@/types";
 import { fileName } from "@/ui";
@@ -31,6 +31,7 @@ import {
   type CanvasCard,
   type GroupCanvasCard,
   type GroupChildCanvasCard,
+  type TextCanvasCard,
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
@@ -191,7 +192,8 @@ export function useCanvasCards(opts: UseCanvasCardsOpts) {
       if (
         target.kind !== "asset" &&
         target.kind !== "upload" &&
-        target.kind !== "variant"
+        target.kind !== "variant" &&
+        target.kind !== "text"
       ) {
         return;
       }
@@ -202,7 +204,11 @@ export function useCanvasCards(opts: UseCanvasCardsOpts) {
         x: target.x + 42,
         y: target.y + 42,
         createdAt: nowISO(),
-      } as AssetCanvasCard | UploadCanvasCard | VariantCanvasCard;
+      } as
+        | AssetCanvasCard
+        | UploadCanvasCard
+        | VariantCanvasCard
+        | TextCanvasCard;
       setCards((current) => [...current, clone]);
       setSelectedCardIds([cloneId]);
       const width = cardWidths[target.id];
@@ -307,6 +313,145 @@ export function useCanvasCards(opts: UseCanvasCardsOpts) {
     }
   }
 
+  async function mirrorImage(
+    sourceCard: CanvasCard,
+    flip: "horizontal" | "vertical" | "both",
+  ) {
+    if (
+      sourceCard.kind !== "asset" &&
+      sourceCard.kind !== "upload" &&
+      sourceCard.kind !== "variant"
+    )
+      return;
+    setWorking("imagePreview");
+    setError("");
+    try {
+      const preview =
+        sourceCard.kind === "upload"
+          ? await renderUploadPreview({
+              token: sourceCard.token,
+              operation: "mirror_image",
+              flip,
+            })
+          : await renderImageToolPreview({
+              assetId:
+                sourceCard.kind === "asset"
+                  ? sourceCard.asset.id
+                  : sourceCard.sourceAssetId,
+              operation: "mirror_image",
+              outputFormat: "",
+              quality: DEFAULT_IMAGE_TOOL_SETTINGS.quality,
+              maxDimensionPx: DEFAULT_IMAGE_TOOL_SETTINGS.maxDimensionPx,
+              flip,
+            });
+      const sourceName =
+        sourceCard.kind === "asset"
+          ? fileName(sourceCard.asset.repoPath)
+          : sourceCard.kind === "upload"
+            ? sourceCard.fileName
+            : sourceCard.sourceName;
+      const sourceAssetId =
+        sourceCard.kind === "asset"
+          ? sourceCard.asset.id
+          : sourceCard.kind === "variant"
+            ? sourceCard.sourceAssetId
+            : sourceCard.id;
+      const card: VariantCanvasCard = {
+        id: createCanvasCardId("variant"),
+        kind: "variant",
+        ...adjacentCardPosition(sourceCard, cardLayoutMetrics),
+        createdAt: nowISO(),
+        sourceAssetId,
+        sourceName,
+        previewUrl: previewImageUrl(preview.token),
+        token: preview.token,
+        inputBytes: preview.inputBytes,
+        outputBytes: preview.outputBytes,
+        inputFormat: preview.inputFormat,
+        outputFormat: preview.outputFormat,
+        width: preview.width,
+        height: preview.height,
+        alpha: preview.alpha,
+      };
+      setCards((current) => [...current, card]);
+      setSelectedCardIds([card.id]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("aiCanvas.operationError"),
+      );
+    } finally {
+      setWorking("idle");
+    }
+  }
+
+  async function rotateImage(sourceCard: CanvasCard, degrees: number) {
+    if (
+      sourceCard.kind !== "asset" &&
+      sourceCard.kind !== "upload" &&
+      sourceCard.kind !== "variant"
+    )
+      return;
+    setWorking("imagePreview");
+    setError("");
+    try {
+      const preview =
+        sourceCard.kind === "upload"
+          ? await renderUploadPreview({
+              token: sourceCard.token,
+              operation: "rotate_image",
+              rotateDegrees: degrees,
+            })
+          : await renderImageToolPreview({
+              assetId:
+                sourceCard.kind === "asset"
+                  ? sourceCard.asset.id
+                  : sourceCard.sourceAssetId,
+              operation: "rotate_image",
+              outputFormat: "",
+              quality: DEFAULT_IMAGE_TOOL_SETTINGS.quality,
+              maxDimensionPx: DEFAULT_IMAGE_TOOL_SETTINGS.maxDimensionPx,
+              rotateDegrees: degrees,
+            });
+      const sourceName =
+        sourceCard.kind === "asset"
+          ? fileName(sourceCard.asset.repoPath)
+          : sourceCard.kind === "upload"
+            ? sourceCard.fileName
+            : sourceCard.sourceName;
+      const sourceAssetId =
+        sourceCard.kind === "asset"
+          ? sourceCard.asset.id
+          : sourceCard.kind === "variant"
+            ? sourceCard.sourceAssetId
+            : sourceCard.id;
+      const card: VariantCanvasCard = {
+        id: createCanvasCardId("variant"),
+        kind: "variant",
+        ...adjacentCardPosition(sourceCard, cardLayoutMetrics),
+        createdAt: nowISO(),
+        sourceAssetId,
+        sourceName,
+        previewUrl: previewImageUrl(preview.token),
+        token: preview.token,
+        inputBytes: preview.inputBytes,
+        outputBytes: preview.outputBytes,
+        inputFormat: preview.inputFormat,
+        outputFormat: preview.outputFormat,
+        width: preview.width,
+        height: preview.height,
+        alpha: preview.alpha,
+      };
+      setCards((current) => [...current, card]);
+      setSelectedCardIds([card.id]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("aiCanvas.operationError"),
+      );
+    } finally {
+      setWorking("idle");
+    }
+  }
+
   return {
     deleteCard,
     deleteSelectedCards,
@@ -316,5 +461,7 @@ export function useCanvasCards(opts: UseCanvasCardsOpts) {
     addAsset,
     addAssistantCard,
     createImagePreview,
+    mirrorImage,
+    rotateImage,
   };
 }

@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CanvasCard } from "./aiCanvasState";
+import type { CanvasCard, TextCanvasCard } from "./aiCanvasState";
 import { isImageCard } from "./canvasUtils";
 
 export type CapturePadding = { x: number; y: number };
@@ -176,6 +176,125 @@ function imageRenderFrames(
   });
 }
 
+function wrapTextLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  const lines: string[] = [];
+  for (const paragraph of text.split(/\r?\n/)) {
+    if (!paragraph) {
+      lines.push("");
+      continue;
+    }
+    const tokens = paragraph.split(/(\s+|(?<=[一-鿿぀-ヿ])|(?=[一-鿿぀-ヿ]))/);
+    let current = "";
+    for (const token of tokens) {
+      if (!token) continue;
+      const candidate = current + token;
+      if (ctx.measureText(candidate).width <= maxWidth || !current) {
+        current = candidate;
+      } else {
+        lines.push(current);
+        current = token.trimStart();
+      }
+    }
+    if (current) lines.push(current);
+  }
+  return lines.length > 0 ? lines : [""];
+}
+
+function rasterizeTextToImage(
+  card: TextCanvasCard,
+  cssPxWidth: number,
+  cssPxHeight: number,
+): Promise<HTMLImageElement> {
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(cssPxWidth * dpr));
+  canvas.height = Math.max(1, Math.round(cssPxHeight * dpr));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.reject(new Error("text raster: no 2d ctx"));
+  ctx.scale(dpr, dpr);
+
+  const { fontFamily, fontSize, fontWeight, fontStyle, color, textAlign } =
+    card.style;
+  ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+  ctx.fillStyle = color;
+  ctx.textBaseline = "top";
+  ctx.textAlign = textAlign as CanvasTextAlign;
+
+  const padX = 2;
+  const padY = 1;
+  const lineHeight = fontSize * 1.2;
+  const xAnchor =
+    textAlign === "center"
+      ? cssPxWidth / 2
+      : textAlign === "right"
+        ? cssPxWidth - padX
+        : padX;
+
+  const lines = wrapTextLines(ctx, card.content, cssPxWidth - padX * 2);
+  let y = padY;
+  for (const line of lines) {
+    ctx.fillText(line, xAnchor, y);
+    y += lineHeight;
+  }
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("text toBlob failed"));
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("text image load failed"));
+      };
+      img.src = url;
+    }, "image/png");
+  });
+}
+
+async function textRenderFrames(
+  cards: CanvasCard[],
+  ids: Set<string>,
+  cardElements: Map<string, HTMLElement>,
+  root: HTMLElement,
+  viewport: { x: number; y: number; scale: number },
+): Promise<RenderFrame[]> {
+  const rootRect = root.getBoundingClientRect();
+  const textCards = cards.filter(
+    (card): card is TextCanvasCard =>
+      card.kind === "text" && ids.has(card.id) && !!card.content.trim(),
+  );
+  const frames: RenderFrame[] = [];
+  for (const card of textCards) {
+    const cardEl = cardElements.get(card.id);
+    if (!cardEl) continue;
+    const bounds = screenRectToWorld(
+      cardEl.getBoundingClientRect(),
+      rootRect,
+      viewport,
+    );
+    const w = Math.max(1, Math.round(bounds.width));
+    const h = Math.max(1, Math.round(bounds.height));
+    try {
+      const img = await rasterizeTextToImage(card, w, h);
+      frames.push({ ...bounds, bounds, img });
+    } catch {
+      // skip unrenderable text cards
+    }
+  }
+  return frames;
+}
+
 function nextPaint() {
   return new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => {
@@ -234,7 +353,7 @@ async function waitForRenderableFrames(
       frames.length >= expectedImageCount &&
       visibleFrames.every((frame) => imageElementReady(frame.img))
     ) {
-      return frames;
+      break;
     }
 
     if (visibleFrames.length > 0) {
@@ -246,7 +365,14 @@ async function waitForRenderableFrames(
     frames = imageRenderFrames(cards, ids, cardElements, root, viewport);
   }
 
-  return frames;
+  const textFrames = await textRenderFrames(
+    cards,
+    ids,
+    cardElements,
+    root,
+    viewport,
+  );
+  return [...frames, ...textFrames];
 }
 
 function frameIntersectsCrop(frame: FrameGeometry, crop: CaptureCrop) {

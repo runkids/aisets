@@ -14,18 +14,13 @@ import {
   Save,
   Square,
   Trash2,
+  Type,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import type { TFunction } from "i18next";
-import {
-  Badge,
-  Button,
-  IconButton,
-  Range,
-  Switch,
-} from "@/components/ui";
+import { Badge, Button, IconButton, Range, Switch } from "@/components/ui";
 import type { StateSetter } from "./aiCanvasTypes";
 import {
   DEFAULT_CAPTURE_PADDING,
@@ -61,6 +56,7 @@ type AICanvasToolbarProps = {
   isDirty: boolean;
   hasSession: boolean;
   sessionName?: string;
+  onAddTextCard?: () => void;
 };
 
 function parseCapturePadding(value: string) {
@@ -98,6 +94,7 @@ export function AICanvasToolbar({
   isDirty,
   hasSession,
   sessionName,
+  onAddTextCard,
 }: AICanvasToolbarProps) {
   return (
     <div
@@ -136,6 +133,15 @@ export function AICanvasToolbar({
       >
         <LocateFixed />
       </IconButton>
+      {onAddTextCard && (
+        <IconButton
+          size="sm"
+          aria-label={t("aiCanvas.addText")}
+          onClick={onAddTextCard}
+        >
+          <Type />
+        </IconButton>
+      )}
       <span className="mx-0.5 h-4 w-px bg-g-line" />
       {hasSession && (
         <IconButton

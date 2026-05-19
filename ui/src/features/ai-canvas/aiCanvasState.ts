@@ -117,6 +117,80 @@ export type GroupCanvasCard = CanvasCardBase & {
   height: number;
 };
 
+export type TextStyle = {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: "normal" | "bold";
+  fontStyle: "normal" | "italic";
+  color: string;
+  textAlign: "left" | "center" | "right";
+};
+
+export const CANVAS_TEXT_FONTS: { id: string; label: string; stack: string }[] =
+  [
+    {
+      id: "sans",
+      label: "Sans",
+      stack:
+        "ui-sans-serif, system-ui, -apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    },
+    {
+      id: "serif",
+      label: "Serif",
+      stack:
+        "ui-serif, 'New York', 'Iowan Old Style', 'Apple Garamond', Georgia, 'Times New Roman', serif",
+    },
+    {
+      id: "mono",
+      label: "Mono",
+      stack:
+        "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
+    },
+    {
+      id: "rounded",
+      label: "Rounded",
+      stack:
+        "ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', 'Quicksand', sans-serif",
+    },
+    {
+      id: "display",
+      label: "Display",
+      stack:
+        "'SF Pro Display', 'Helvetica Neue', 'Hiragino Sans', 'PingFang TC', sans-serif",
+    },
+  ];
+
+export const DEFAULT_TEXT_FONT = CANVAS_TEXT_FONTS[0].stack;
+
+export const CANVAS_TEXT_COLORS: string[] = [
+  "#e0e0e0",
+  "#ffffff",
+  "#0f172a",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+
+export const DEFAULT_TEXT_STYLE: TextStyle = {
+  fontFamily: DEFAULT_TEXT_FONT,
+  fontSize: 24,
+  fontWeight: "normal",
+  fontStyle: "normal",
+  color: "#0f172a",
+  textAlign: "left",
+};
+
+export type TextCanvasCard = CanvasCardBase & {
+  kind: "text";
+  content: string;
+  style: TextStyle;
+  width: number;
+  height: number;
+};
+
 export type CanvasCard =
   | AssetCanvasCard
   | CommentCanvasCard
@@ -125,7 +199,8 @@ export type CanvasCard =
   | OperationCanvasCard
   | ProposalCanvasCard
   | UploadCanvasCard
-  | GroupCanvasCard;
+  | GroupCanvasCard
+  | TextCanvasCard;
 
 export type ChatMentionPreview = {
   id: string;
@@ -506,6 +581,40 @@ function normalizeCard(value: unknown): CanvasCard | null {
     };
   }
 
+  if (kind === "text") {
+    const style = isRecord(value.style) ? value.style : {};
+    return {
+      id,
+      kind,
+      x,
+      y,
+      createdAt,
+      content: typeof value.content === "string" ? value.content : "",
+      style: {
+        fontFamily:
+          typeof style.fontFamily === "string" && style.fontFamily.trim()
+            ? style.fontFamily
+            : DEFAULT_TEXT_FONT,
+        fontSize:
+          Number(style.fontSize) > 0
+            ? Number(style.fontSize)
+            : DEFAULT_TEXT_STYLE.fontSize,
+        fontWeight: style.fontWeight === "bold" ? "bold" : "normal",
+        fontStyle: style.fontStyle === "italic" ? "italic" : "normal",
+        color:
+          typeof style.color === "string" && style.color
+            ? style.color
+            : DEFAULT_TEXT_STYLE.color,
+        textAlign:
+          style.textAlign === "center" || style.textAlign === "right"
+            ? style.textAlign
+            : "left",
+      },
+      width: Number(value.width) > 0 ? Number(value.width) : 200,
+      height: Number(value.height) > 0 ? Number(value.height) : 40,
+    };
+  }
+
   return null;
 }
 
@@ -794,6 +903,7 @@ export function cardDisplayName(card: CanvasCard) {
   if (card.kind === "proposal") return card.tool;
   if (card.kind === "upload") return card.fileName;
   if (card.kind === "group") return card.name || `Group (${card.cards.length})`;
+  if (card.kind === "text") return card.content.slice(0, 30) || "Text";
   return card.prompt || "Preview";
 }
 

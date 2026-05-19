@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { basePath } from "@/api/client";
@@ -11,6 +12,7 @@ import type {
   GroupChildCanvasCard,
   OperationCanvasCard,
   ProposalCanvasCard,
+  TextCanvasCard,
   UploadCanvasCard,
   VariantCanvasCard,
 } from "./aiCanvasState";
@@ -271,6 +273,107 @@ export function GroupCardBody({ card }: { card: GroupCanvasCard }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function TextCardBody({
+  card,
+  editing,
+  onConfirmEdit,
+}: {
+  card: TextCanvasCard;
+  editing?: boolean;
+  onConfirmEdit?: (content: string, width: number, height: number) => void;
+}) {
+  const { t } = useTranslation();
+  const isEmpty = !card.content.trim();
+  const placeholderColor =
+    card.style.color === "#0f172a" ? "#94a3b8" : "rgba(160,160,160,0.55)";
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      const el = textareaRef.current;
+      el.focus();
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    function handleOutsidePointer(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target.closest("[data-ai-canvas-text-frame='true']") ||
+        target.closest("[data-ai-canvas-text-toolbar='true']")
+      ) {
+        return;
+      }
+      textareaRef.current?.blur();
+    }
+    document.addEventListener("pointerdown", handleOutsidePointer, true);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointer, true);
+    };
+  }, [editing]);
+
+  return (
+    <div
+      className="relative min-h-[24px] px-0.5 py-px"
+      data-ai-canvas-text-frame="true"
+      style={{ cursor: editing ? "text" : "pointer" }}
+    >
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          className="w-full resize-none border-none bg-transparent p-0 outline-none"
+          style={{
+            fontFamily: card.style.fontFamily,
+            fontSize: card.style.fontSize,
+            fontWeight: card.style.fontWeight,
+            fontStyle: card.style.fontStyle,
+            color: card.style.color,
+            textAlign: card.style.textAlign,
+            lineHeight: 1.2,
+          }}
+          defaultValue={card.content}
+          placeholder={t("aiCanvas.text.placeholder")}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={(e) => {
+            const el = e.currentTarget;
+            onConfirmEdit?.(
+              el.value,
+              card.width,
+              Math.max(24, el.scrollHeight + 4),
+            );
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.currentTarget.blur();
+            }
+          }}
+        />
+      ) : (
+        <div
+          className="whitespace-pre-wrap break-words"
+          style={{
+            fontFamily: card.style.fontFamily,
+            fontSize: card.style.fontSize,
+            fontWeight: card.style.fontWeight,
+            fontStyle: card.style.fontStyle,
+            color: isEmpty ? placeholderColor : card.style.color,
+            textAlign: card.style.textAlign,
+            lineHeight: 1.2,
+            minHeight: 24,
+          }}
+        >
+          {isEmpty ? t("aiCanvas.text.placeholder") : card.content}
+        </div>
+      )}
     </div>
   );
 }

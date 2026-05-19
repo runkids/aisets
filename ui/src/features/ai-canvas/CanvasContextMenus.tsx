@@ -3,10 +3,15 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  FlipHorizontal,
+  FlipHorizontal2,
+  FlipVertical,
   ImagePlus,
   Layers3,
   MessageCircle,
   Pencil,
+  RotateCcw,
+  RotateCw,
   Trash2,
   Ungroup,
 } from "lucide-react";
@@ -17,6 +22,7 @@ import { fileName, formatExt } from "@/ui";
 import type {
   AssetCanvasCard,
   GroupCanvasCard,
+  TextCanvasCard,
   UploadCanvasCard,
   VariantCanvasCard,
 } from "./aiCanvasState";
@@ -43,17 +49,164 @@ function autoConvertFormat(asset: AssetCanvasCard["asset"]) {
   return "avif";
 }
 
+export type MirrorRotateProps = {
+  onMirror?: (flip: "horizontal" | "vertical" | "both") => void;
+  onRotate?: (degrees: number) => void;
+  onRotateCustom?: () => void;
+  working?: boolean;
+};
+
+function MirrorRotateMenuItems({
+  onMirror,
+  onRotate,
+  onRotateCustom,
+  working,
+}: MirrorRotateProps) {
+  const { t } = useTranslation();
+  const [mirrorOpen, setMirrorOpen] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
+  if (!onMirror && !onRotate) return null;
+  return (
+    <>
+      {onMirror && (
+        <div className="px-1 py-1">
+          <button
+            type="button"
+            className={ctxMenuItemCls}
+            disabled={working}
+            aria-expanded={mirrorOpen}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMirrorOpen((o) => !o);
+            }}
+          >
+            <FlipHorizontal size={14} className="shrink-0 text-white/46" />
+            <span className="min-w-0 flex-1 text-left font-[590]">
+              {t("aiCanvas.mirror")}
+            </span>
+            <ChevronDown
+              size={14}
+              className={cn(
+                "shrink-0 text-white/42 transition-transform duration-[120ms] ease-g",
+                mirrorOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {mirrorOpen && (
+            <div className="mt-1 border-t border-white/[0.08] pt-1">
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onMirror("horizontal")}
+              >
+                <FlipHorizontal size={14} className="shrink-0 text-white/46" />
+                {t("aiCanvas.mirrorHorizontal")}
+              </button>
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onMirror("vertical")}
+              >
+                <FlipVertical size={14} className="shrink-0 text-white/46" />
+                {t("aiCanvas.mirrorVertical")}
+              </button>
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onMirror("both")}
+              >
+                <FlipHorizontal2 size={14} className="shrink-0 text-white/46" />
+                {t("aiCanvas.mirrorBoth")}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {onRotate && (
+        <div className="px-1 py-1">
+          <button
+            type="button"
+            className={ctxMenuItemCls}
+            disabled={working}
+            aria-expanded={rotateOpen}
+            onClick={(e) => {
+              e.stopPropagation();
+              setRotateOpen((o) => !o);
+            }}
+          >
+            <RotateCw size={14} className="shrink-0 text-white/46" />
+            <span className="min-w-0 flex-1 text-left font-[590]">
+              {t("aiCanvas.rotate")}
+            </span>
+            <ChevronDown
+              size={14}
+              className={cn(
+                "shrink-0 text-white/42 transition-transform duration-[120ms] ease-g",
+                rotateOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {rotateOpen && (
+            <div className="mt-1 border-t border-white/[0.08] pt-1">
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onRotate(90)}
+              >
+                <RotateCw size={14} className="shrink-0 text-white/46" />
+                {t("aiCanvas.rotate90cw")}
+              </button>
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onRotate(270)}
+              >
+                <RotateCcw size={14} className="shrink-0 text-white/46" />
+                {t("aiCanvas.rotate90ccw")}
+              </button>
+              <button
+                type="button"
+                className={ctxMenuItemCls}
+                disabled={working}
+                onClick={() => onRotate(180)}
+              >
+                <span className="w-3.5 shrink-0" />
+                {t("aiCanvas.rotate180")}
+              </button>
+              {onRotateCustom && (
+                <button
+                  type="button"
+                  className={ctxMenuItemCls}
+                  disabled={working}
+                  onClick={onRotateCustom}
+                >
+                  <span className="w-3.5 shrink-0" />
+                  {t("aiCanvas.rotateCustom")}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 export type ImageCardContextMenuProps = {
   onAddComment?: () => void;
   onDuplicate?: () => void;
   onDelete: () => void;
-};
+} & MirrorRotateProps;
 
 export type AssetContextMenuProps = ImageCardContextMenuProps & {
   card: AssetCanvasCard;
   onOpenAsset?: () => void;
   onRenderPreview?: (outputFormat?: string) => void;
-  working?: boolean;
 };
 
 export function AssetContextMenu({
@@ -63,6 +216,9 @@ export function AssetContextMenu({
   onAddComment,
   onDuplicate,
   onDelete,
+  onMirror,
+  onRotate,
+  onRotateCustom,
   working,
 }: AssetContextMenuProps) {
   const { t } = useTranslation();
@@ -169,6 +325,12 @@ export function AssetContextMenu({
           )}
         </div>
       )}
+      <MirrorRotateMenuItems
+        onMirror={onMirror}
+        onRotate={onRotate}
+        onRotateCustom={onRotateCustom}
+        working={working}
+      />
       {onAddComment && (
         <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
           <MessageCircle size={14} className="shrink-0 text-white/46" />
@@ -209,6 +371,10 @@ export function UploadContextMenu({
   onAddComment,
   onDuplicate,
   onDelete,
+  onMirror,
+  onRotate,
+  onRotateCustom,
+  working,
 }: UploadContextMenuProps) {
   const { t } = useTranslation();
   return (
@@ -220,6 +386,12 @@ export function UploadContextMenu({
         </div>
       </div>
       <div className={ctxMenuSepCls} />
+      <MirrorRotateMenuItems
+        onMirror={onMirror}
+        onRotate={onRotate}
+        onRotateCustom={onRotateCustom}
+        working={working}
+      />
       {onAddComment && (
         <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
           <MessageCircle size={14} className="shrink-0 text-white/46" />
@@ -254,6 +426,10 @@ export function VariantContextMenu({
   onAddComment,
   onDuplicate,
   onDelete,
+  onMirror,
+  onRotate,
+  onRotateCustom,
+  working,
 }: VariantContextMenuProps) {
   const { t } = useTranslation();
   return (
@@ -265,6 +441,12 @@ export function VariantContextMenu({
         </div>
       </div>
       <div className={ctxMenuSepCls} />
+      <MirrorRotateMenuItems
+        onMirror={onMirror}
+        onRotate={onRotate}
+        onRotateCustom={onRotateCustom}
+        working={working}
+      />
       {onAddComment && (
         <button type="button" className={ctxMenuItemCls} onClick={onAddComment}>
           <MessageCircle size={14} className="shrink-0 text-white/46" />
@@ -321,6 +503,52 @@ export function GroupContextMenu({
         <Ungroup size={14} className="shrink-0 text-white/46" />
         {t("aiCanvas.ungroup")}
       </button>
+      <div className={ctxMenuSepCls} />
+      <button
+        type="button"
+        className={cn(ctxMenuItemCls, "text-[#ff453a]")}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} className="shrink-0" />
+        {t("aiCanvas.deleteCard")}
+      </button>
+    </>
+  );
+}
+
+export function TextContextMenu({
+  card,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  card: TextCanvasCard;
+  onEdit: () => void;
+  onDuplicate?: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={ctxMenuLabelCls}>
+        <div className="truncate font-[590] text-white">
+          {card.content.slice(0, 30) || t("aiCanvas.textCardLabel")}
+        </div>
+        <div className="mt-0.5 text-[11px] text-white/36">
+          {t("aiCanvas.cardKind.text")}
+        </div>
+      </div>
+      <div className={ctxMenuSepCls} />
+      <button type="button" className={ctxMenuItemCls} onClick={onEdit}>
+        <Pencil size={14} className="shrink-0 text-white/46" />
+        {t("aiCanvas.editText")}
+      </button>
+      {onDuplicate && (
+        <button type="button" className={ctxMenuItemCls} onClick={onDuplicate}>
+          <Copy size={14} className="shrink-0 text-white/46" />
+          {t("aiCanvas.duplicateImage")}
+        </button>
+      )}
       <div className={ctxMenuSepCls} />
       <button
         type="button"

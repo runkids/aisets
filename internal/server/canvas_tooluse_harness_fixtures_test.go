@@ -230,6 +230,10 @@ func canvasHarnessDefaultArgs(tool, assetA, assetB string) map[string]any {
 		return map[string]any{"assetIds": []any{assetA, assetB}, "favorite": true}
 	case "export_asset":
 		return map[string]any{"assetIds": []any{assetA}, "outputDir": "exports"}
+	case "create_text_card":
+		return map[string]any{"content": "Harness text", "fontSize": float64(24), "color": "#0f172a", "textAlign": "left"}
+	case "update_text_card":
+		return map[string]any{"cardId": "card-a", "content": "Updated harness text", "fontSize": float64(32), "color": "#ff0000"}
 	default:
 		return map[string]any{}
 	}
@@ -273,6 +277,10 @@ func canvasHarnessMessageForTool(tool string) string {
 		return "favorite this asset"
 	case "export_asset":
 		return "export this asset"
+	case "create_text_card":
+		return "add text annotation to this canvas"
+	case "update_text_card":
+		return "update the text label on this card"
 	default:
 		return "use the canvas tool"
 	}

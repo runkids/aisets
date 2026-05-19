@@ -191,6 +191,16 @@ export function serializeCanvasSnapshot(
         base.name = card.name;
         base.cardIds = card.cards.map((child) => child.id);
       }
+      if (card.kind === "text") {
+        base.content = card.content;
+        base.fontSize = card.style.fontSize;
+        base.fontWeight = card.style.fontWeight;
+        base.fontStyle = card.style.fontStyle;
+        base.textColor = card.style.color;
+        base.textAlign = card.style.textAlign;
+        base.width = card.width;
+        base.height = card.height;
+      }
       return base;
     }),
   };

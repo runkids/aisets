@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type { TFunction } from "i18next";
-import { ListChecks, Plus, Trash2, X } from "lucide-react";
+import { ListChecks, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import {
   Badge,
   Button,
@@ -22,6 +22,8 @@ import {
 import { cn } from "@/lib/cn";
 import {
   canStartCanvasPlanTasks,
+  createBlankCanvasPlanTasks,
+  createCanvasPlanTaskDraft,
   MIN_CANVAS_PLAN_STEPS,
   normalizePlanTasks,
   type CanvasPlanState,
@@ -35,20 +37,11 @@ type Props = {
   onClose: () => void;
   onStart: (tasks: string[]) => void;
   onCancel: () => void;
+  onReset: () => void;
   t: TFunction;
 };
 
 type ContentProps = Omit<Props, "open">;
-
-function defaultTasks(plan?: CanvasPlanState) {
-  const tasks = plan?.steps.map((step) => step.task) ?? [];
-  return tasks.length >= MIN_CANVAS_PLAN_STEPS
-    ? tasks
-    : Array.from(
-        { length: MIN_CANVAS_PLAN_STEPS },
-        (_, index) => tasks[index] ?? "",
-      );
-}
 
 function badgeTone(status: CanvasPlanStepStatus) {
   if (status === "completed") return "green";
@@ -71,6 +64,7 @@ export function AICanvasPlanDialog({
   onClose,
   onStart,
   onCancel,
+  onReset,
   t,
 }: Props) {
   if (!open) return null;
@@ -83,6 +77,7 @@ export function AICanvasPlanDialog({
       onClose={onClose}
       onStart={onStart}
       onCancel={onCancel}
+      onReset={onReset}
       t={t}
     />
   );
@@ -94,9 +89,12 @@ function AICanvasPlanDialogContent({
   onClose,
   onStart,
   onCancel,
+  onReset,
   t,
 }: ContentProps) {
-  const [tasks, setTasks] = useState<string[]>(() => defaultTasks(plan));
+  const [tasks, setTasks] = useState<string[]>(() =>
+    createCanvasPlanTaskDraft(plan),
+  );
   const [attemptedStart, setAttemptedStart] = useState(false);
   const [confirmTasks, setConfirmTasks] = useState<string[] | null>(null);
   const isRunning = plan?.status === "running";
@@ -104,6 +102,16 @@ function AICanvasPlanDialogContent({
     Boolean(plan) && plan?.status !== "draft" && plan?.status !== "running";
   const canStart = canStartCanvasPlanTasks(tasks) && !isRunning && !isWorking;
   const stepByIndex = plan?.steps ?? [];
+
+  function resetDraft() {
+    setAttemptedStart(false);
+    setConfirmTasks(null);
+    if (plan) {
+      onReset();
+      return;
+    }
+    setTasks(createBlankCanvasPlanTasks());
+  }
 
   return (
     <>
@@ -250,15 +258,26 @@ function AICanvasPlanDialogContent({
                 </DialogBody>
 
                 <DialogFooter className="items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leadingIcon={<Plus />}
-                    disabled={isRunning}
-                    onClick={() => setTasks((current) => [...current, ""])}
-                  >
-                    {t("aiCanvas.planAddTask")}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Plus />}
+                      disabled={isRunning}
+                      onClick={() => setTasks((current) => [...current, ""])}
+                    >
+                      {t("aiCanvas.planAddTask")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<RotateCcw />}
+                      disabled={isRunning}
+                      onClick={resetDraft}
+                    >
+                      {t("aiCanvas.planReset")}
+                    </Button>
+                  </div>
                   <div className="flex items-center gap-2">
                     {isRunning && (
                       <Button variant="danger" size="sm" onClick={onCancel}>

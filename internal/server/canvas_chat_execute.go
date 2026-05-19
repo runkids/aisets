@@ -313,6 +313,59 @@ func (s *Server) executeCanvasSafeAction(r *http.Request, act canvasAction, sett
 		return map[string]any{
 			"transparent": act.Params["transparent"],
 		}
+	case "create_text_card":
+		content, _ := act.Params["content"].(string)
+		result := map[string]any{"content": content}
+		if v, ok := act.Params["fontSize"]; ok {
+			result["fontSize"] = v
+		}
+		if v, ok := act.Params["fontWeight"]; ok {
+			result["fontWeight"] = v
+		}
+		if v, ok := act.Params["fontStyle"]; ok {
+			result["fontStyle"] = v
+		}
+		if v, ok := act.Params["color"]; ok {
+			result["color"] = v
+		}
+		if v, ok := act.Params["textAlign"]; ok {
+			result["textAlign"] = v
+		}
+		if v, ok := act.Params["x"]; ok {
+			result["x"] = v
+		}
+		if v, ok := act.Params["y"]; ok {
+			result["y"] = v
+		}
+		if v, ok := act.Params["width"]; ok {
+			result["width"] = v
+		}
+		if v, ok := act.Params["height"]; ok {
+			result["height"] = v
+		}
+		return result
+	case "update_text_card":
+		cardId, _ := act.Params["cardId"].(string)
+		result := map[string]any{"cardId": cardId}
+		if v, ok := act.Params["content"]; ok {
+			result["content"] = v
+		}
+		if v, ok := act.Params["fontSize"]; ok {
+			result["fontSize"] = v
+		}
+		if v, ok := act.Params["fontWeight"]; ok {
+			result["fontWeight"] = v
+		}
+		if v, ok := act.Params["fontStyle"]; ok {
+			result["fontStyle"] = v
+		}
+		if v, ok := act.Params["color"]; ok {
+			result["color"] = v
+		}
+		if v, ok := act.Params["textAlign"]; ok {
+			result["textAlign"] = v
+		}
+		return result
 	case "compare_assets":
 		assetIDs := canvasActionAssetIDs(act)
 		scanID := s.latestScanID()

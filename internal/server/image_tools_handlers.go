@@ -418,6 +418,97 @@ func imageToolTransformDownloadName(name, outputFormat string, opts imageproc.Tr
 	return strings.Join(parts, "-") + "." + outputFormat
 }
 
+type imageToolUploadRenderPreviewRequest struct {
+	Token         string `json:"token"`
+	Operation     string `json:"operation"`
+	OutputFormat  string `json:"outputFormat"`
+	Quality       int    `json:"quality"`
+	Flip          string `json:"flip"`
+	RotateDegrees int    `json:"rotateDegrees"`
+}
+
+func (s *Server) handleImageToolUploadRenderPreview(w http.ResponseWriter, r *http.Request) {
+	var body imageToolUploadRenderPreviewRequest
+	if err := readJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.Token == "" {
+		writeError(w, http.StatusBadRequest, apierr.New("empty_token", "token is required"))
+		return
+	}
+	download, ok := s.peekImageToolDownload(body.Token)
+	if !ok {
+		writeError(w, http.StatusNotFound, apierr.New("token_not_found", "upload token not found or expired"))
+		return
+	}
+	sourcePath := download.Path
+	sourceMeta, _ := imageproc.Probe(sourcePath)
+	sourceInfo, _ := os.Stat(sourcePath)
+	sourceBytes := int64(0)
+	if sourceInfo != nil {
+		sourceBytes = sourceInfo.Size()
+	}
+	sourceDisplay := download.Name
+	if sourceDisplay == "" {
+		sourceDisplay = filepath.Base(sourcePath)
+	}
+
+	renderBody := imageToolRenderPreviewRequest{
+		Operation:     body.Operation,
+		OutputFormat:  body.OutputFormat,
+		Quality:       body.Quality,
+		Flip:          body.Flip,
+		RotateDegrees: body.RotateDegrees,
+	}
+	opts, err := imageToolTransformOptions(renderBody)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, apierr.New("image_transform_invalid", err.Error()))
+		return
+	}
+	outputFormat := imageToolTransformOutputFormat(body.OutputFormat, sourceDisplay, sourceMeta.Alpha)
+	tmp, err := os.CreateTemp("", "aisets-upload-transform-*."+outputFormat)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	targetPath := tmp.Name()
+	_ = tmp.Close()
+	if err := imageproc.TransformImage(sourcePath, targetPath, opts); err != nil {
+		_ = os.Remove(targetPath)
+		writeError(w, http.StatusBadRequest, apierr.New("image_transform_failed", err.Error()))
+		return
+	}
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		_ = os.Remove(targetPath)
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	outputMeta, _ := imageproc.Probe(targetPath)
+
+	token := imageToolToken(fmt.Sprintf("upload-render-preview:%s:%s:%s:%d:%s", body.Token, body.Operation, opts.Flip, opts.RotateDegrees, outputFormat))
+	downloadName := imageToolTransformDownloadName(sourceDisplay, outputFormat, opts)
+	s.storeImageToolDownload(token, imageToolDownload{
+		Path:             targetPath,
+		Name:             downloadName,
+		ContentType:      contentTypeForName(downloadName),
+		DeleteAfterServe: true,
+		CreatedAt:        time.Now(),
+	})
+
+	writeJSON(w, http.StatusOK, imageToolRenderPreviewResponse{
+		Token:        token,
+		InputBytes:   sourceBytes,
+		OutputBytes:  info.Size(),
+		InputFormat:  strings.TrimPrefix(strings.ToLower(filepath.Ext(sourceDisplay)), "."),
+		OutputFormat: outputFormat,
+		Width:        outputMeta.Width,
+		Height:       outputMeta.Height,
+		Alpha:        outputMeta.Alpha,
+	})
+}
+
 func (s *Server) handleImageToolMetadata(w http.ResponseWriter, r *http.Request) {
 	assetID := r.PathValue("assetId")
 	if _, err := s.ensureLatestScan(r.Context()); err != nil {

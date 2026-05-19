@@ -30,6 +30,7 @@ import {
   cardDisplayName,
   clampCanvasScale,
   DEFAULT_CANVAS_VIEWPORT,
+  DEFAULT_TEXT_STYLE,
   createCanvasCardId,
   emptyAICanvasSession,
   readAICanvasSession,
@@ -43,6 +44,7 @@ import {
   type ChatMentionPreview,
   type ChatRunUsage,
   type ProposalCanvasCard,
+  type TextCanvasCard,
   type UploadCanvasCard,
 } from "./aiCanvasState";
 import { useCanvasCards } from "./useCanvasCards";
@@ -124,6 +126,9 @@ export function AICanvasView({
   const [cards, setCards] = useState<CanvasCard[]>(initialSession.cards);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>(
     initialSession.selectedCardIds ?? [],
+  );
+  const [editingTextCardId, setEditingTextCardId] = useState<string | null>(
+    null,
   );
   const primarySelectedId = selectedCardIds[0] as string | undefined;
   const [viewport, setViewport] = useState(initialSession.viewport);
@@ -667,6 +672,8 @@ export function AICanvasView({
     addAsset,
     addAssistantCard,
     createImagePreview,
+    mirrorImage,
+    rotateImage,
   } = useCanvasCards({
     cards,
     setCards,
@@ -718,6 +725,37 @@ export function AICanvasView({
         cards: nextCards,
       });
     }
+  }
+
+  function addTextCard() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    const containerSize = rect
+      ? { width: rect.width, height: rect.height }
+      : undefined;
+    const pos = nextCardPosition(cards.length, viewport, containerSize);
+    const card: TextCanvasCard = {
+      id: createCanvasCardId("text"),
+      kind: "text",
+      x: pos.x,
+      y: pos.y,
+      createdAt: nowISO(),
+      content: "",
+      style: { ...DEFAULT_TEXT_STYLE },
+      width: 240,
+      height: 48,
+    };
+    setCards((current) => [...current, card]);
+    setSelectedCardIds([card.id]);
+    setEditingTextCardId(card.id);
+  }
+
+  function discardEmptyTextCard(cardId: string) {
+    setCards((current) =>
+      current.filter(
+        (c) => !(c.id === cardId && c.kind === "text" && !c.content.trim()),
+      ),
+    );
+    setSelectedCardIds((prev) => prev.filter((id) => id !== cardId));
   }
 
   function clearChatHistory() {
@@ -884,6 +922,11 @@ export function AICanvasView({
         onRegisterCard={registerMeasuredCardElement}
         onAddComment={addComment}
         onCreateImagePreview={createImagePreview}
+        onMirrorImage={mirrorImage}
+        onRotateImage={rotateImage}
+        editingTextCardId={editingTextCardId}
+        setEditingTextCardId={setEditingTextCardId}
+        onDiscardEmptyTextCard={discardEmptyTextCard}
       />
 
       <AICanvasSearchPanel
@@ -958,6 +1001,7 @@ export function AICanvasView({
         isDirty={isDirty}
         hasSession={!!currentSessionId}
         sessionName={currentSessionName}
+        onAddTextCard={addTextCard}
       />
 
       <ConfirmDialog
@@ -1080,6 +1124,7 @@ export function AICanvasView({
         onClose={() => setPlanDialogOpen(false)}
         onStart={(tasks) => setPlan(createCanvasPlanState(tasks))}
         onCancel={cancelPlan}
+        onReset={() => setPlan(undefined)}
         t={t}
       />
 

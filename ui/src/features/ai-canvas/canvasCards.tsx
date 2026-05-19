@@ -7,6 +7,7 @@ import {
   MousePointer2,
   Sparkles,
   Trash2,
+  Type,
 } from "lucide-react";
 import {
   useEffect,
@@ -38,6 +39,8 @@ function cardKindIcon(kind: CanvasCard["kind"], size = 13) {
       return <Layers3 size={size} />;
     case "group":
       return <Layers3 size={size} />;
+    case "text":
+      return <Type size={size} />;
     default:
       return <Sparkles size={size} />;
   }
@@ -80,6 +83,12 @@ function cardKindAccent(kind: CanvasCard["kind"]) {
         text: "text-g-ink-3",
         bg: "bg-g-surface-2",
         border: "border-g-line",
+      };
+    case "text":
+      return {
+        text: "text-g-cyan",
+        bg: "bg-g-cyan/10",
+        border: "border-g-cyan/20",
       };
     default:
       return {
@@ -135,7 +144,7 @@ function floatingCardLayer(card: CanvasCard, selected: boolean) {
 }
 
 function isChromelessImageCard(card: CanvasCard) {
-  return isImageCard(card);
+  return isImageCard(card) || card.kind === "text";
 }
 
 export function CardShell({
@@ -152,6 +161,7 @@ export function CardShell({
   onDelete,
   onResize,
   onRegister,
+  onTextEdit,
   position,
   canvasScale = 1,
 }: {
@@ -171,8 +181,9 @@ export function CardShell({
   onDragMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDelete: (card: CanvasCard) => void;
-  onResize?: (id: string, width: number) => void;
+  onResize?: (id: string, width: number, startWidth: number) => void;
   onRegister: (id: string, node: HTMLElement | null) => void;
+  onTextEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const resizeRef = useRef<{
@@ -180,6 +191,7 @@ export function CardShell({
     startW: number;
     scale: number;
   } | null>(null);
+  const textTapRef = useRef<{ x: number; y: number } | null>(null);
   const [isNewCard] = useState(
     () => Date.now() - Date.parse(card.createdAt) < 1200,
   );
@@ -207,7 +219,9 @@ export function CardShell({
           : card.kind === "group"
             ? card.name ||
               t("aiCanvas.groupLabel", { count: card.cards.length })
-            : undefined
+            : card.kind === "text"
+              ? cardDisplayName(card)
+              : undefined
     : undefined;
 
   function handleResizeDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -227,7 +241,7 @@ export function CardShell({
     const delta =
       (e.clientX - resizeRef.current.startX) / resizeRef.current.scale;
     const next = Math.max(80, resizeRef.current.startW + delta);
-    onResize(card.id, next);
+    onResize(card.id, next, resizeRef.current.startW);
   }
 
   function handleResizeUp() {
@@ -275,6 +289,7 @@ export function CardShell({
     };
   }, [ctxMenuPos]);
 
+  const isTextKind = card.kind === "text";
   const sectionCls = cn(
     "absolute touch-none select-none rounded-g-md transition-[border-color,box-shadow,filter] duration-[120ms] ease-g",
     isNewCard &&
@@ -282,11 +297,16 @@ export function CardShell({
     floatingCardLayer(card, selected),
     ctxMenuPos && "!z-[1300]",
     chromeless
-      ? cn(
-          "overflow-visible border-2 border-transparent shadow-none transition-[border-color,box-shadow,filter]",
-          hovered && !selected && "brightness-[1.04] shadow-g-md",
-          selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
-        )
+      ? isTextKind
+        ? cn(
+            "overflow-visible border border-transparent shadow-none",
+            selected && "border-dashed border-g-accent/70 [box-shadow:none]",
+          )
+        : cn(
+            "overflow-visible border-2 border-transparent shadow-none transition-[border-color,box-shadow,filter]",
+            hovered && !selected && "brightness-[1.04] shadow-g-md",
+            selected && "border-g-accent shadow-[0_0_0_1px_var(--g-accent)]",
+          )
       : compact
         ? cn(
             "border-2 border-transparent shadow-none",
@@ -312,6 +332,22 @@ export function CardShell({
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         onSelect(card.id, e.shiftKey);
+        if (isTextKind && onTextEdit) {
+          textTapRef.current = { x: e.clientX, y: e.clientY };
+        }
+      }}
+      onPointerUp={(e) => {
+        if (e.button !== 0) return;
+        if (!isTextKind || !onTextEdit) return;
+        const start = textTapRef.current;
+        textTapRef.current = null;
+        if (!start) return;
+        if (
+          Math.abs(e.clientX - start.x) < 4 &&
+          Math.abs(e.clientY - start.y) < 4
+        ) {
+          onTextEdit();
+        }
       }}
       onContextMenu={handleContextMenu}
     >
@@ -326,7 +362,7 @@ export function CardShell({
           onMouseLeave={() => setHovered(false)}
         >
           {children}
-          {imageLabel && (
+          {imageLabel && !isTextKind && (
             <div
               className={cn(
                 "pointer-events-none absolute inset-x-0 bottom-0 rounded-b-[inherit] bg-gradient-to-t from-black/50 to-transparent px-2.5 pb-2 pt-6 transition-opacity duration-150 ease-g",
@@ -338,7 +374,7 @@ export function CardShell({
               </div>
             </div>
           )}
-          {!hintDismissed && <ContextMenuHint />}
+          {!hintDismissed && !isTextKind && <ContextMenuHint />}
         </div>
       ) : compact ? (
         <div
@@ -401,8 +437,14 @@ export function CardShell({
       {selected && onResize && (
         <div
           className={cn(
-            "absolute -bottom-1.5 -right-1.5 z-50 size-3 cursor-nwse-resize rounded-full border-2 bg-g-surface shadow-g-sm",
-            chromeless || compact ? "border-[#0d99ff]" : "border-g-active-bg",
+            "absolute z-50 cursor-nwse-resize rounded-full border-2 bg-g-surface shadow-g-sm",
+            isTextKind
+              ? "-bottom-1 -right-1 size-2.5 border border-g-accent/80 opacity-80"
+              : "-bottom-1.5 -right-1.5 size-3 border-2",
+            !isTextKind &&
+              (chromeless || compact
+                ? "border-[#0d99ff]"
+                : "border-g-active-bg"),
           )}
           onPointerDown={handleResizeDown}
           onPointerMove={handleResizeMove}

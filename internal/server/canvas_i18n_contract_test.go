@@ -127,6 +127,8 @@ func allowedProductionCJKLine(rel string, line string, inSemanticPhases bool) bo
 		return strings.Contains(line, "regexp.MustCompile")
 	case "internal/server/canvas_chat_types.go":
 		return strings.Contains(line, "TextRe = regexp.MustCompile")
+	case "ui/src/features/ai-canvas/useCanvasCapture.ts":
+		return strings.Contains(line, "paragraph.split(")
 	default:
 		return false
 	}

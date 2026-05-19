@@ -7,12 +7,14 @@ import type { TFunction } from "i18next";
 import type { AssetItem } from "@/types";
 import {
   createCanvasCardId,
+  DEFAULT_TEXT_STYLE,
   sanitizeCanvasChatContent,
   type CanvasCard,
   type ChatActivityEntry,
   type ChatMentionPreview,
   type ChatRunUsage,
   type CommentCanvasCard,
+  type TextCanvasCard,
 } from "./aiCanvasState";
 import { adjacentCardPosition, nowISO } from "./canvasUtils";
 import {
@@ -36,6 +38,10 @@ import {
   searchResultNeedsUserConfirmation,
   type AICursorState,
 } from "./canvasChatHelpers";
+
+function unescapeTextLiteralNewlines(value: string): string {
+  return value.replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\\t/g, "\t");
+}
 
 export interface ChatEventMutableState {
   assistantText: string;
@@ -512,6 +518,95 @@ export function dispatchCanvasChatEvent(
                 text: item.text ?? "",
                 languages: item.languages ?? [],
               },
+            },
+          };
+        }),
+      );
+    }
+  }
+  if (event.type === "action_result" && event.tool === "create_text_card") {
+    const r = event.result as {
+      content?: string;
+      fontSize?: number;
+      fontWeight?: "normal" | "bold";
+      fontStyle?: "normal" | "italic";
+      color?: string;
+      textAlign?: "left" | "center" | "right";
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+    };
+    const cardWidth = typeof r?.width === "number" ? r.width : 240;
+    const cardHeight = typeof r?.height === "number" ? r.height : 80;
+    let defaultX = 100;
+    let defaultY = 100;
+    if (canvasCards.length > 0) {
+      let sumX = 0;
+      let sumY = 0;
+      for (const c of canvasCards) {
+        sumX += c.x;
+        sumY += c.y;
+      }
+      defaultX = Math.round(sumX / canvasCards.length);
+      defaultY = Math.round(sumY / canvasCards.length);
+    }
+    const offset = state.newCards.length * 40;
+    const card: TextCanvasCard = {
+      id: createCanvasCardId("text"),
+      kind: "text",
+      x: typeof r?.x === "number" ? r.x : defaultX + offset,
+      y: typeof r?.y === "number" ? r.y : defaultY + offset,
+      createdAt: nowISO(),
+      content: unescapeTextLiteralNewlines(r?.content ?? ""),
+      style: {
+        fontFamily:
+          (r as { fontFamily?: string })?.fontFamily ??
+          DEFAULT_TEXT_STYLE.fontFamily,
+        fontSize: r?.fontSize ?? DEFAULT_TEXT_STYLE.fontSize,
+        fontWeight: r?.fontWeight ?? DEFAULT_TEXT_STYLE.fontWeight,
+        fontStyle: r?.fontStyle ?? DEFAULT_TEXT_STYLE.fontStyle,
+        color: r?.color ?? DEFAULT_TEXT_STYLE.color,
+        textAlign: r?.textAlign ?? DEFAULT_TEXT_STYLE.textAlign,
+      },
+      width: cardWidth,
+      height: cardHeight,
+    };
+    state.newCards.push(card);
+    setCards((current) => [...current, card]);
+  }
+  if (event.type === "action_result" && event.tool === "update_text_card") {
+    const r = event.result as {
+      cardId?: string;
+      content?: string;
+      fontSize?: number;
+      fontWeight?: "normal" | "bold";
+      fontStyle?: "normal" | "italic";
+      color?: string;
+      textAlign?: "left" | "center" | "right";
+      width?: number;
+      height?: number;
+    };
+    if (r?.cardId) {
+      setCards((current) =>
+        current.map((card) => {
+          if (card.kind !== "text" || card.id !== r.cardId) return card;
+          return {
+            ...card,
+            ...(typeof r.content === "string"
+              ? { content: unescapeTextLiteralNewlines(r.content) }
+              : {}),
+            ...(typeof r.width === "number" ? { width: r.width } : {}),
+            ...(typeof r.height === "number" ? { height: r.height } : {}),
+            style: {
+              ...card.style,
+              ...(typeof r.fontSize === "number"
+                ? { fontSize: r.fontSize }
+                : {}),
+              ...(r.fontWeight ? { fontWeight: r.fontWeight } : {}),
+              ...(r.fontStyle ? { fontStyle: r.fontStyle } : {}),
+              ...(typeof r.color === "string" ? { color: r.color } : {}),
+              ...(r.textAlign ? { textAlign: r.textAlign } : {}),
             },
           };
         }),

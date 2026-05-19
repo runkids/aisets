@@ -70,6 +70,12 @@ type canvasCardSnapshot struct {
 	UploadHeight   int                  `json:"uploadHeight,omitempty"`
 	Name           string               `json:"name,omitempty"`
 	CardIDs        []string             `json:"cardIds,omitempty"`
+	Content        string               `json:"content,omitempty"`
+	FontSize       int                  `json:"fontSize,omitempty"`
+	FontWeight     string               `json:"fontWeight,omitempty"`
+	FontStyle      string               `json:"fontStyle,omitempty"`
+	TextColor      string               `json:"textColor,omitempty"`
+	TextAlign      string               `json:"textAlign,omitempty"`
 }
 
 type canvasViewport struct {

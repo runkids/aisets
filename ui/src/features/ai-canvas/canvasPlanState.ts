@@ -117,6 +117,17 @@ function normalizeScore(value: unknown) {
   return value >= 1 && value <= 5 ? value : undefined;
 }
 
+export function createBlankCanvasPlanTasks() {
+  return Array.from({ length: MIN_CANVAS_PLAN_STEPS }, () => "");
+}
+
+export function createCanvasPlanTaskDraft(plan?: CanvasPlanState) {
+  const tasks = plan?.steps.map((step) => step.task) ?? [];
+  return tasks.length >= MIN_CANVAS_PLAN_STEPS
+    ? tasks
+    : createBlankCanvasPlanTasks().map((_, index) => tasks[index] ?? "");
+}
+
 export function normalizePlanTasks(tasks: string[]) {
   return tasks.map((task) => task.trim()).filter(Boolean);
 }

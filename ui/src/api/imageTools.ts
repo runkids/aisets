@@ -70,6 +70,23 @@ export function renderImageToolPreview(params: {
   );
 }
 
+export function renderUploadPreview(params: {
+  token: string;
+  operation?: string;
+  outputFormat?: string;
+  quality?: number;
+  flip?: string;
+  rotateDegrees?: number;
+}) {
+  return request<RenderPreviewResponse>(
+    "/api/image-tools/uploads/render-preview",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+  );
+}
+
 export type ImageToolMetadata = {
   hasExif: boolean;
   gpsLatitude?: number;

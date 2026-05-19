@@ -189,6 +189,9 @@ func buildCanvasUserPrompt(messages []canvasChatMessage, canvas canvasSnapshot, 
 				if card.Kind == "upload" {
 					fmt.Fprintf(&b, " file=%s %dx%d", card.UploadFileName, card.UploadWidth, card.UploadHeight)
 				}
+				if card.Kind == "text" {
+					fmt.Fprintf(&b, " content=%q", truncate(card.Content, 60))
+				}
 				b.WriteByte('\n')
 			}
 			if omitted := len(canvas.Cards) - len(promptCards); omitted > 0 {

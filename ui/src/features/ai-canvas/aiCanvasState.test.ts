@@ -18,7 +18,13 @@ import {
   type UploadCanvasCard,
   type VariantCanvasCard,
 } from "./aiCanvasState";
-import { canStartCanvasPlanTasks, normalizePlanTasks } from "./canvasPlanState";
+import {
+  canStartCanvasPlanTasks,
+  createBlankCanvasPlanTasks,
+  createCanvasPlanTaskDraft,
+  normalizePlanTasks,
+  type CanvasPlanState,
+} from "./canvasPlanState";
 
 function makeAsset(id: string): AssetItem {
   return {
@@ -351,6 +357,23 @@ describe("canvas plan task validation", () => {
       "One task",
       "Two task",
     ]);
+  });
+
+  it("creates blank tasks for plan reset drafts", () => {
+    expect(createBlankCanvasPlanTasks()).toEqual(["", ""]);
+    expect(createCanvasPlanTaskDraft()).toEqual(["", ""]);
+  });
+
+  it("pads restored plan drafts to the minimum task count", () => {
+    const plan = {
+      id: "plan-1",
+      status: "completed",
+      steps: [{ id: "step-1", task: "Keep this", status: "completed" }],
+      createdAt: "2026-05-18T00:00:00.000Z",
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } satisfies CanvasPlanState;
+
+    expect(createCanvasPlanTaskDraft(plan)).toEqual(["Keep this", ""]);
   });
 });
 

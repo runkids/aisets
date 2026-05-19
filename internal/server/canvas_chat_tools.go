@@ -282,6 +282,18 @@ func canvasToolRegistry() []canvasToolDef {
 			Cardinality: "multi",
 			Safe:        false,
 		},
+		{
+			Name:        "create_text_card",
+			Description: "Create a new text card on the canvas with styled content. Returns cardId, content, style, position.",
+			Cardinality: "single",
+			Safe:        true,
+		},
+		{
+			Name:        "update_text_card",
+			Description: "Update the content or style of an existing text card on the canvas.",
+			Cardinality: "single",
+			Safe:        true,
+		},
 	})
 }
 
@@ -450,4 +462,3 @@ func canvasToolSafetyLabel(safe bool) string {
 	}
 	return "NEEDS_CONFIRMATION"
 }
-
