@@ -117,3 +117,29 @@ export function getTagSuggestions(q: string, limit = 10) {
     `/api/tags/suggest?${searchParams.toString()}`,
   );
 }
+
+export function setAssetDescription(params: {
+  projectId: string;
+  repoPath: string;
+  contentHash: string;
+  hashAlgorithm: string;
+  description: string;
+}) {
+  return request<{ ok: boolean }>("/api/assets/description", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function setAssetOcrText(params: {
+  projectId: string;
+  repoPath: string;
+  contentHash: string;
+  hashAlgorithm: string;
+  text: string;
+}) {
+  return request<{ ok: boolean }>("/api/assets/ocr-text", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
