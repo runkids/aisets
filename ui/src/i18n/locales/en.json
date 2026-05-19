@@ -2792,6 +2792,16 @@
       "ocrHint": "Run AI OCR to extract text from this image",
       "busyHint": "Please wait for the AI task to finish"
     },
+    "aiEdit": {
+      "descriptionPlaceholder": "Click to add description",
+      "ocrPlaceholder": "Click to add OCR text",
+      "saveHint": "⌘+Enter to save · Esc to cancel",
+      "save": "Save",
+      "cancel": "Cancel",
+      "descriptionSaved": "Description updated",
+      "ocrSaved": "OCR text updated",
+      "busyTooltip": "Finish editing first"
+    },
     "exif": {
       "title": "EXIF Metadata",
       "gps": "Location",

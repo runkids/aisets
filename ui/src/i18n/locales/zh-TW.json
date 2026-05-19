@@ -2791,6 +2791,16 @@
       "ocrHint": "執行 AI OCR 以提取圖片文字",
       "busyHint": "請等待 AI 任務完成"
     },
+    "aiEdit": {
+      "descriptionPlaceholder": "點擊以新增描述",
+      "ocrPlaceholder": "點擊以輸入 OCR 文字",
+      "saveHint": "⌘+Enter 儲存 · Esc 取消",
+      "save": "儲存",
+      "cancel": "取消",
+      "descriptionSaved": "描述已更新",
+      "ocrSaved": "OCR 文字已更新",
+      "busyTooltip": "請先完成編輯"
+    },
     "exif": {
       "title": "EXIF 後設資料",
       "gps": "位置",

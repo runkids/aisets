@@ -2687,6 +2687,16 @@
       "ocrHint": "AI OCR을 실행하여 텍스트 추출",
       "busyHint": "AI 작업이 완료될 때까지 기다려 주세요"
     },
+    "aiEdit": {
+      "descriptionPlaceholder": "클릭하여 설명 추가",
+      "ocrPlaceholder": "클릭하여 OCR 텍스트 입력",
+      "saveHint": "⌘+Enter 저장 · Esc 취소",
+      "save": "저장",
+      "cancel": "취소",
+      "descriptionSaved": "설명이 업데이트됨",
+      "ocrSaved": "OCR 텍스트가 업데이트됨",
+      "busyTooltip": "먼저 편집을 완료하세요"
+    },
     "exif": {
       "title": "EXIF 메타데이터",
       "gps": "위치",
