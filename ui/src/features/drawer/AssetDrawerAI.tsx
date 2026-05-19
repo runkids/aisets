@@ -182,7 +182,8 @@ export function AssetDrawerAI({
             </div>
             {llmEnabled && (
               <Tooltip
-                label={editing ? t("drawer.aiEdit.busyTooltip") : ""}
+                disabled={!editing}
+                label={t("drawer.aiEdit.busyTooltip")}
                 placement="top"
               >
                 <button
@@ -304,7 +305,8 @@ export function AssetDrawerAI({
             </div>
             {llmEnabled && (
               <Tooltip
-                label={editing ? t("drawer.aiEdit.busyTooltip") : ""}
+                disabled={!editing}
+                label={t("drawer.aiEdit.busyTooltip")}
                 placement="top"
               >
                 <button
@@ -331,7 +333,11 @@ export function AssetDrawerAI({
 
           <EditableTextField
             value={displayOcrText}
-            placeholder={t("drawer.aiEdit.ocrPlaceholder")}
+            placeholder={
+              hasVlmOcr && ocr?.emptyText
+                ? t("assetDrawer.ocrEmptyText")
+                : t("drawer.aiEdit.ocrPlaceholder")
+            }
             disabled={busy}
             saving={ocrMutation.isPending}
             editing={editingOcr}
