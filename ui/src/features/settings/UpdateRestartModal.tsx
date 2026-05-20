@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { UpdateAppResult } from "@/types";
 import { Button, CopyButton, Modal } from "@/components/ui";
@@ -42,6 +43,11 @@ export function UpdateRestartModal({
           </Button>
           <Button
             variant="primary"
+            leadingIcon={
+              restartPending ? (
+                <LoaderCircle size={15} className="animate-spin" />
+              ) : undefined
+            }
             onClick={onRestart}
             disabled={restartPending}
           >

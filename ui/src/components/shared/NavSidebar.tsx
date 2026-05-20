@@ -52,6 +52,7 @@ type Props = {
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelect: (mode: Mode) => void;
+  onOpenUpdateSettings: () => void;
 };
 
 function formatLastScanTime(value: string | undefined, locale: string) {
@@ -101,6 +102,7 @@ export function NavSidebar({
   onSelectWorkspace,
   onSelectProject,
   onSelect,
+  onOpenUpdateSettings,
 }: Props) {
   const { t, i18n } = useTranslation();
   const lastScan = formatLastScanTime(lastScanAt, i18n.language);
@@ -275,7 +277,7 @@ export function NavSidebar({
             <button
               type="button"
               className="group/upd flex w-full items-center gap-1.5 rounded-t-g-md px-3 py-1.5 text-g-chip transition-colors bg-g-green-soft/60 hover:bg-g-green-soft max-[960px]:justify-center max-[960px]:px-2"
-              onClick={() => onSelect("settings")}
+              onClick={onOpenUpdateSettings}
               aria-label={t("nav.updateAvailableAria", {
                 version: latestVersion,
               })}

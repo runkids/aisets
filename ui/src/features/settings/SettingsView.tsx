@@ -115,6 +115,7 @@ export function SettingsView({
   );
   const [updatedApp, setUpdatedApp] = useState<UpdateAppResult | null>(null);
   const [devRestartPending, setDevRestartPending] = useState(false);
+  const [restartRequested, setRestartRequested] = useState(false);
   const [elevatedUpdate, setElevatedUpdate] = useState<{
     path: string;
     command: string;
@@ -195,6 +196,7 @@ export function SettingsView({
     updateAppMutation.isPending ||
     restartAppMutation.isPending ||
     devRestartPending ||
+    restartRequested ||
     updateMutation.isPending;
   const settingsActionDisabled =
     settingsQuery.isLoading || working || ocrWorking;
@@ -484,13 +486,15 @@ export function SettingsView({
       toast.success(t("settings.updateDevSuccess"));
       return;
     }
+    setRestartRequested(true);
+    toast.info(t("settings.updateRestarting"));
     try {
       await restartAppMutation.mutateAsync({
         clearCache: !updatedApp?.uiCached,
       });
-      toast.info(t("settings.updateRestarting"));
       void reloadWhenServerReady();
     } catch (error) {
+      setRestartRequested(false);
       toast.error(errorMessage(error), {
         title: t("settings.updateRestartFailed"),
       });
@@ -827,7 +831,11 @@ export function SettingsView({
       {updatedApp && (
         <UpdateRestartModal
           update={updatedApp}
-          restartPending={restartAppMutation.isPending || devRestartPending}
+          restartPending={
+            restartAppMutation.isPending ||
+            devRestartPending ||
+            restartRequested
+          }
           onRestart={() => void onRestartApp()}
           onClose={() => setUpdatedApp(null)}
         />

@@ -1361,6 +1361,12 @@ export function App() {
           onSelectWorkspace={onSwitchWorkspace}
           onSelectProject={setSelectedProjectId}
           onSelect={changeMode}
+          onOpenUpdateSettings={() => {
+            navigate({
+              pathname: pathForMode("settings"),
+              search: "?section=about",
+            });
+          }}
         />
       </div>
       <section className="flex flex-col overflow-hidden bg-transparent">
