@@ -22,7 +22,7 @@ import (
 var validAgentAdapters = map[string]bool{
 	"": true, "auto": true,
 	agent.AdapterCodex: true, agent.AdapterClaude: true,
-	agent.AdapterCursorAgent: true, agent.AdapterGemini: true,
+	agent.AdapterCursorAgent: true, agent.AdapterAntigravity: true,
 	agent.AdapterCopilot: true, agent.AdapterPi: true,
 	agent.AdapterLocalLLM: true,
 }

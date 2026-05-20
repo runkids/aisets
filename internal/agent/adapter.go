@@ -10,7 +10,7 @@ const (
 	AdapterClaude      = "claude"
 	AdapterCodex       = "codex"
 	AdapterCursorAgent = "cursor-agent"
-	AdapterGemini      = "gemini"
+	AdapterAntigravity = "antigravity"
 	AdapterCopilot     = "copilot"
 	AdapterPi          = "pi"
 	AdapterLocalLLM    = "local-llm"

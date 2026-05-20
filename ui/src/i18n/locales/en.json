@@ -1537,7 +1537,7 @@
     "agentAdapterHint": "Which coding agent CLI to use. Auto detects the first available.",
     "agentAdapterAuto": "Auto (recommended)",
     "agentModel": "Agent model",
-    "agentModelHint": "Model name for the agent CLI (e.g. gpt-5.5, claude-sonnet-4-6, gemini-3-pro). Leave empty for CLI default.",
+    "agentModelHint": "Model name for the agent CLI (e.g. gpt-5.5, claude-sonnet-4-6, gemini-3.5-flash). Leave empty for CLI default.",
     "agentAvailable": "Available",
     "agentNoneDetected": "None detected",
     "agentDetect": "Detect",

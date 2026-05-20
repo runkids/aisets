@@ -27,7 +27,7 @@ func (m *mockProvider) Chat(ctx context.Context, req llm.ChatRequest) (llm.ChatR
 }
 
 func TestNewChatProvider_CLIAdapters(t *testing.T) {
-	for _, id := range []string{"claude", "codex", "gemini", "copilot", "cursor-agent", "pi"} {
+	for _, id := range []string{"claude", "codex", "antigravity", "copilot", "cursor-agent", "pi"} {
 		p, err := NewChatProvider(id, AdapterInfo{Path: "/usr/bin/" + id}, nil, nil)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", id, err)

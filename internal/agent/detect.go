@@ -9,7 +9,7 @@ var defaultAdapters = []Adapter{
 	&CLIAdapter{AdapterCodex, "Codex CLI", "codex"},
 	&CLIAdapter{AdapterClaude, "Claude Code", "claude"},
 	&CLIAdapter{AdapterCursorAgent, "Cursor Agent", "cursor-agent"},
-	&CLIAdapter{AdapterGemini, "Gemini CLI", "gemini"},
+	&CLIAdapter{AdapterAntigravity, "Antigravity 2.0", "antigravity"},
 	&CLIAdapter{AdapterCopilot, "Copilot CLI", "copilot"},
 	&CLIAdapter{AdapterPi, "Pi", "pi"},
 }

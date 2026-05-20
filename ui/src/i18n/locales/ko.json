@@ -2145,7 +2145,7 @@
     "agentAdapterHint": "사용할 코딩 에이전트 CLI. Auto는 사용 가능한 첫 번째 CLI를 자동 감지",
     "agentAdapterAuto": "자동 (권장)",
     "agentModel": "Agent 모델",
-    "agentModelHint": "Agent CLI 모델 이름 (예: gpt-5.5, claude-sonnet-4-6, gemini-3-pro). 비워두면 CLI 기본값 사용",
+    "agentModelHint": "Agent CLI 모델 이름 (예: gpt-5.5, claude-sonnet-4-6, gemini-3.5-flash). 비워두면 CLI 기본값 사용",
     "agentAvailable": "사용 가능",
     "agentNoneDetected": "감지되지 않음",
     "agentDetect": "감지",

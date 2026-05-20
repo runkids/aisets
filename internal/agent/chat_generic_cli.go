@@ -189,8 +189,8 @@ func newCodexChatProvider(binPath string, prepareImage PrepareImageFunc) *CLICha
 	return p
 }
 
-func newGeminiChatProvider(binPath string, prepareImage PrepareImageFunc) *CLIChatProvider {
-	return newCLIChatProvider(binPath, "gemini", prepareImage, func(req ChatRequest) []string {
+func newAntigravityChatProvider(binPath string, prepareImage PrepareImageFunc) *CLIChatProvider {
+	return newCLIChatProvider(binPath, "antigravity", prepareImage, func(req ChatRequest) []string {
 		args := []string{"--output-format", "text", "--yolo"}
 		if req.Model != "" {
 			args = append(args, "--model", req.Model)

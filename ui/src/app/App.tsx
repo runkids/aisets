@@ -191,8 +191,8 @@ function agentAdapterLabel(id: string) {
       return "Codex";
     case "cursor-agent":
       return "Cursor Agent";
-    case "gemini":
-      return "Gemini";
+    case "antigravity":
+      return "Antigravity 2.0";
     case "copilot":
       return "Copilot";
     case "pi":

@@ -46,11 +46,11 @@ func TestResolveActive_Empty(t *testing.T) {
 
 func TestResolveActive_EmptyPreference(t *testing.T) {
 	adapters := []AdapterInfo{
-		{ID: "gemini", Name: "Gemini CLI"},
+		{ID: "antigravity", Name: "Antigravity 2.0"},
 	}
 	got := ResolveActive(adapters, "")
-	if got != "gemini" {
-		t.Errorf("empty pref: expected gemini, got %s", got)
+	if got != "antigravity" {
+		t.Errorf("empty pref: expected antigravity, got %s", got)
 	}
 }
 

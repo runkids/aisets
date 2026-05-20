@@ -515,7 +515,7 @@ export function AISettingsCard({
                   { value: "codex", label: "Codex CLI" },
                   { value: "claude", label: "Claude Code" },
                   { value: "cursor-agent", label: "Cursor Agent" },
-                  { value: "gemini", label: "Gemini CLI" },
+                  { value: "antigravity", label: "Antigravity 2.0" },
                   { value: "copilot", label: "Copilot CLI" },
                   { value: "pi", label: "Pi" },
                 ]}

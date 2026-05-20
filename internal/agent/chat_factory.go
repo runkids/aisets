@@ -11,8 +11,8 @@ func NewChatProvider(adapterID string, info AdapterInfo, llmProvider llm.Provide
 		return newClaudeChatProvider(info.Path, prepareImage), nil
 	case AdapterCodex:
 		return newCodexChatProvider(info.Path, prepareImage), nil
-	case AdapterGemini:
-		return newGeminiChatProvider(info.Path, prepareImage), nil
+	case AdapterAntigravity:
+		return newAntigravityChatProvider(info.Path, prepareImage), nil
 	case AdapterCopilot:
 		return newCopilotChatProvider(info.Path, prepareImage), nil
 	case AdapterCursorAgent:
