@@ -64,6 +64,20 @@ func TestBuildRuntimeStatus(t *testing.T) {
 	}
 }
 
+func TestDefaultAntigravityAdapterUsesAgyCLI(t *testing.T) {
+	for _, adapter := range defaultAdapters {
+		cli, ok := adapter.(*CLIAdapter)
+		if !ok || cli.id != AdapterAntigravity {
+			continue
+		}
+		if cli.bin != "agy" {
+			t.Fatalf("expected Antigravity CLI binary agy, got %s", cli.bin)
+		}
+		return
+	}
+	t.Fatal("expected Antigravity adapter")
+}
+
 func TestLocalLLMDetect_Enabled(t *testing.T) {
 	a := NewLocalLLMAdapter(LLMInfo{Enabled: true, Provider: "ollama", Model: "llava:7b"})
 	info, err := a.Detect(context.Background())

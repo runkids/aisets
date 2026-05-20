@@ -191,11 +191,7 @@ func newCodexChatProvider(binPath string, prepareImage PrepareImageFunc) *CLICha
 
 func newAntigravityChatProvider(binPath string, prepareImage PrepareImageFunc) *CLIChatProvider {
 	return newCLIChatProvider(binPath, "antigravity", prepareImage, func(req ChatRequest) []string {
-		args := []string{"--output-format", "text", "--yolo"}
-		if req.Model != "" {
-			args = append(args, "--model", req.Model)
-		}
-		return args
+		return []string{"--print", "--dangerously-skip-permissions"}
 	})
 }
 

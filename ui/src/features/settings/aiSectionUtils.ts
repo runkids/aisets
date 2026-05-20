@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { AITagActivityState } from "@/activity/aiTagActivity";
 import type { VLMOcrActivityState } from "@/activity/vlmOcrActivity";
 import type { EmbedActivityState } from "@/activity/embedActivity";
-import type { SettingsInfo, Workspace } from "@/types";
+import type { AgentAdapterInfo, SettingsInfo, Workspace } from "@/types";
 import type { Mode } from "@/ui";
 import type { ScopeProject } from "./AIScopePicker";
 import type { SettingsDraft } from "./types";
@@ -105,6 +105,12 @@ export function deriveHost(endpoint: string | undefined): string {
   } catch {
     return "localhost";
   }
+}
+
+export function agentCliAdapters(
+  adapters: AgentAdapterInfo[] | undefined,
+): AgentAdapterInfo[] {
+  return adapters?.filter((adapter) => adapter.id !== "local-llm") ?? [];
 }
 
 // ── Locale helpers ─────────────────────────────────────────────────

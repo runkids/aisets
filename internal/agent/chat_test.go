@@ -65,6 +65,15 @@ func TestNewChatProvider_Unsupported(t *testing.T) {
 	}
 }
 
+func TestAntigravityChatProviderUsesAgyPrintMode(t *testing.T) {
+	p := newAntigravityChatProvider("/usr/bin/agy", nil)
+	args := p.buildArgs(ChatRequest{Model: "ignored"})
+	want := []string{"--print", "--dangerously-skip-permissions"}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("args = %#v, want %#v", args, want)
+	}
+}
+
 func TestLocalLLMChatBatch(t *testing.T) {
 	called := 0
 	mp := &mockProvider{

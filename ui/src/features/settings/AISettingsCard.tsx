@@ -48,7 +48,11 @@ import {
 import type { Mode } from "@/ui";
 import { FieldRow } from "./index";
 import type { SettingsDraft } from "./types";
-import { deriveHost, sortedTranslationLocales } from "./aiSectionUtils";
+import {
+  agentCliAdapters,
+  deriveHost,
+  sortedTranslationLocales,
+} from "./aiSectionUtils";
 
 type AISettingsCardProps = {
   draft: SettingsDraft;
@@ -83,6 +87,7 @@ export function AISettingsCard({
     "local" | "agent" | "backend" | "prompts" | "search"
   >("local");
 
+  const agentAdapters = agentCliAdapters(settings?.agentRuntime?.adapters);
   const host = deriveHost(settings?.llmEndpoint);
   const defaultEndpoints: Record<string, string> = {
     ollama: `http://${host}:11434`,
@@ -171,10 +176,8 @@ export function AISettingsCard({
                 value: "agent" as const,
                 label: t("settings.aiTabAgent"),
                 icon: <Bot />,
-                badge: settings?.agentRuntime?.adapters?.length ? (
-                  <Badge tone="green">
-                    {settings.agentRuntime.adapters.length}
-                  </Badge>
+                badge: agentAdapters.length ? (
+                  <Badge tone="green">{agentAdapters.length}</Badge>
                 ) : undefined,
               },
               {
@@ -454,20 +457,18 @@ export function AISettingsCard({
             <FieldRow
               label={t("settings.agentAvailable")}
               description={
-                settings?.agentRuntime?.adapters?.length
+                agentAdapters.length
                   ? undefined
                   : t("settings.agentNoneDetected")
               }
             >
               <div className="flex flex-wrap items-center gap-1.5">
-                {settings?.agentRuntime?.adapters
-                  ?.filter((a) => a.id !== "local-llm")
-                  .map((a) => (
-                    <Badge key={a.id} tone="green">
-                      {a.name}
-                      {a.version ? ` ${a.version}` : ""}
-                    </Badge>
-                  ))}
+                {agentAdapters.map((a) => (
+                  <Badge key={a.id} tone="green">
+                    {a.name}
+                    {a.version ? ` ${a.version}` : ""}
+                  </Badge>
+                ))}
                 <Tooltip label={t("settings.agentDetectTooltip")}>
                   <IconButton
                     size="sm"
@@ -476,10 +477,9 @@ export function AISettingsCard({
                     onClick={() =>
                       detectMutation.mutate(undefined, {
                         onSuccess: (data) => {
-                          const count =
-                            data.settings.agentRuntime?.adapters?.filter(
-                              (a) => a.id !== "local-llm",
-                            ).length ?? 0;
+                          const count = agentCliAdapters(
+                            data.settings.agentRuntime?.adapters,
+                          ).length;
                           toast.success(
                             t("settings.agentDetectDone", { count }),
                           );

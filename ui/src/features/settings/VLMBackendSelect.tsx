@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { Badge, TextInput } from "@/components/ui";
 import type { AgentRuntime, LLMModel, LLMRuntime } from "@/types";
+import { agentCliAdapters } from "./aiSectionUtils";
 
 type ParsedBackend =
   | { type: "inherit" }
@@ -76,8 +77,7 @@ export function VLMBackendSelect({
     setAgentModel(agentModelFromValue);
   }
 
-  const adapters =
-    agentRuntime?.adapters?.filter((a) => a.id !== "local-llm") ?? [];
+  const adapters = agentCliAdapters(agentRuntime?.adapters);
   const localModels = Array.isArray(models) ? models : [];
   const isConnected = !!llmRuntime?.connected;
   const hasLocalGroup = localModels.length > 0 || isConnected;
