@@ -24,10 +24,12 @@ func TransformImage(inputPath, outputPath string, opts TransformOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := transformViaImgtools(inputPath, outputPath, normalized); err == nil {
-		return nil
+	if err := transformViaImgtools(inputPath, outputPath, normalized); err != nil {
+		if err := transformGoFallback(inputPath, outputPath, normalized); err != nil {
+			return err
+		}
 	}
-	return transformGoFallback(inputPath, outputPath, normalized)
+	return os.Chmod(outputPath, 0o644)
 }
 
 func normalizeTransformOptions(opts TransformOptions) (TransformOptions, error) {

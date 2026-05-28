@@ -13,6 +13,7 @@ import (
 var version = "dev"
 
 func main() {
+	normalizeProcessUmask()
 	if code := run(os.Args[1:]); code != 0 {
 		os.Exit(code)
 	}

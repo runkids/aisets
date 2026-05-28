@@ -5,3 +5,5 @@ package main
 import "os/exec"
 
 func detachUICommand(_ *exec.Cmd) {}
+
+func normalizeProcessUmask() {}

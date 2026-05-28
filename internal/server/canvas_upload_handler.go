@@ -82,7 +82,14 @@ func (s *Server) processCanvasUpload(header *multipart.FileHeader) (canvasUpload
 		os.Remove(uploadPath)
 		return canvasUploadResult{}, err
 	}
-	dst.Close()
+	if err := dst.Close(); err != nil {
+		os.Remove(uploadPath)
+		return canvasUploadResult{}, err
+	}
+	if err := os.Chmod(uploadPath, 0o644); err != nil {
+		os.Remove(uploadPath)
+		return canvasUploadResult{}, err
+	}
 
 	meta, _ := imageproc.Probe(uploadPath)
 
@@ -146,6 +153,10 @@ func (s *Server) processGeneratedCanvasImage(sourcePath string) (canvasUploadRes
 		return canvasUploadResult{}, err
 	}
 	if err := dst.Close(); err != nil {
+		os.Remove(uploadPath)
+		return canvasUploadResult{}, err
+	}
+	if err := os.Chmod(uploadPath, 0o644); err != nil {
 		os.Remove(uploadPath)
 		return canvasUploadResult{}, err
 	}

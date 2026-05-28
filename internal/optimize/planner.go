@@ -848,6 +848,9 @@ func Apply(project scanner.Project, preview actions.Preview) (actions.ApplyResul
 			_ = os.Remove(tmpPath)
 			return actions.ApplyResult{}, err
 		}
+		if err := os.Chmod(targetAbs, 0o644); err != nil {
+			return actions.ApplyResult{}, err
+		}
 		result.MovedFiles++
 	}
 	if result.MovedFiles == 0 && result.SkippedFiles == 0 {
@@ -989,6 +992,10 @@ func buildImgtoolsCandidate(source string, op Operation, req Request) (string, i
 		}
 		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": "aisets-imgtools", "output": string(out)})
 	}
+	if err := os.Chmod(targetPath, 0o644); err != nil {
+		_ = os.Remove(targetPath)
+		return "", 0, err
+	}
 	info, err := os.Stat(targetPath)
 	if err != nil {
 		return "", 0, err
@@ -1028,6 +1035,10 @@ func buildExternalCandidate(source string, op Operation, req Request) (string, i
 			_ = os.Remove(targetPath)
 			return "", 0, err
 		}
+		if err := os.Chmod(targetPath, 0o644); err != nil {
+			_ = os.Remove(targetPath)
+			return "", 0, err
+		}
 		cmd = exec.Command("oxipng", "-o", "4", "--strip", "safe", targetPath)
 	case "ffmpeg":
 		cmd = exec.Command("ffmpeg", "-y", "-i", source, targetPath)
@@ -1038,6 +1049,10 @@ func buildExternalCandidate(source string, op Operation, req Request) (string, i
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(targetPath)
 		return "", 0, apierr.WithParams("optimizer_tool_failed", "optimizer tool failed", map[string]any{"tool": op.Tool, "output": string(out)})
+	}
+	if err := os.Chmod(targetPath, 0o644); err != nil {
+		_ = os.Remove(targetPath)
+		return "", 0, err
 	}
 	info, err := os.Stat(targetPath)
 	if err != nil {
@@ -1058,6 +1073,10 @@ func writeCandidate(source, ext string, bytes []byte) (string, int64, error) {
 		return "", 0, err
 	}
 	if err := target.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", 0, err
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
 		_ = os.Remove(path)
 		return "", 0, err
 	}

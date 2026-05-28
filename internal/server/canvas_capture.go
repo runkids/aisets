@@ -182,6 +182,10 @@ func (s *Server) handleCanvasCaptureSave(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	if err := os.Chmod(targetAbs, 0o644); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	s.markCatalogStale()
 

@@ -411,6 +411,9 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 		// Prefer imgtools (resvg) for broad SVG spec coverage; fall back to oksvg when unavailable
 		if err := runImgtoolsExec("svg-to-png", "--max-size", strconv.Itoa(size), path, target); err == nil {
 			if info, err := os.Stat(target); err == nil {
+				if chmodErr := os.Chmod(target, 0o644); chmodErr != nil {
+					return ThumbnailResult{}, chmodErr
+				}
 				return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
 			}
 		}
@@ -425,6 +428,9 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 		if err := os.WriteFile(target, buf.Bytes(), 0o644); err != nil {
 			return ThumbnailResult{}, err
 		}
+		if err := os.Chmod(target, 0o644); err != nil {
+			return ThumbnailResult{}, err
+		}
 		return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: int64(buf.Len())}, nil
 	}
 
@@ -434,6 +440,9 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 	}
 	if err := runImgtoolsExec("thumbnail", "--size", strconv.Itoa(size), path, target); err == nil {
 		if info, err := os.Stat(target); err == nil {
+			if chmodErr := os.Chmod(target, 0o644); chmodErr != nil {
+				return ThumbnailResult{}, chmodErr
+			}
 			return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: info.Size()}, nil
 		}
 	}
@@ -450,6 +459,9 @@ func Thumbnail(path, cacheDir, cacheKey string, size int) (ThumbnailResult, erro
 		return ThumbnailResult{}, err
 	}
 	if err := os.WriteFile(target, buf.Bytes(), 0o644); err != nil {
+		return ThumbnailResult{}, err
+	}
+	if err := os.Chmod(target, 0o644); err != nil {
 		return ThumbnailResult{}, err
 	}
 	return ThumbnailResult{Path: target, MimeType: "image/png", CacheKey: cacheKey, SizeBytes: int64(buf.Len())}, nil

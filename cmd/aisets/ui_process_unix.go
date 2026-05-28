@@ -10,3 +10,7 @@ import (
 func detachUICommand(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }
+
+func normalizeProcessUmask() {
+	syscall.Umask(0o022)
+}
