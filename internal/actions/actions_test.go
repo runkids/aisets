@@ -275,6 +275,22 @@ func TestPathAndSpecifierHelpers(t *testing.T) {
 	if got := relativeSpecifier("src/components/App.tsx", "src/assets/icon.png"); got != "../assets/icon.png" {
 		t.Fatalf("relativeSpecifier nested = %q", got)
 	}
+	// rewriteSpecifier preserves @/ alias
+	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/src/assets/logo.avif"); got != "@/assets/logo.avif" {
+		t.Fatalf("rewriteSpecifier @/ = %q", got)
+	}
+	// rewriteSpecifier preserves ~/ alias
+	if got := rewriteSpecifier("~/assets/icon.svg", "packages/ui/src/components/Card.tsx", "packages/ui/src/assets/icon.avif"); got != "~/assets/icon.avif" {
+		t.Fatalf("rewriteSpecifier ~/ = %q", got)
+	}
+	// rewriteSpecifier preserves query string
+	if got := rewriteSpecifier("@/assets/bg.png?raw", "src/App.tsx", "src/assets/bg.avif"); got != "@/assets/bg.avif?raw" {
+		t.Fatalf("rewriteSpecifier query = %q", got)
+	}
+	// rewriteSpecifier falls back to relative for non-alias paths
+	if got := rewriteSpecifier("./assets/logo.png", "src/components/App.tsx", "src/assets/logo.avif"); got != "../assets/logo.avif" {
+		t.Fatalf("rewriteSpecifier relative = %q", got)
+	}
 	for _, invalid := range []string{"", "../escape.png", "/absolute.png", "."} {
 		if got := cleanRepoPath(invalid); got != "" {
 			t.Fatalf("cleanRepoPath(%q) = %q", invalid, got)
