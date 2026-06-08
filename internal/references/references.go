@@ -307,7 +307,8 @@ func Resolve(projectRoot, importerRepoPath, specifier string) string {
 		return ""
 	}
 	if strings.HasPrefix(spec, "@/") {
-		return cleanRepoPath(filepath.ToSlash(filepath.Join("src", strings.TrimPrefix(spec, "@/"))))
+		srcBase := findSrcAncestor(importerRepoPath)
+		return cleanRepoPath(filepath.ToSlash(filepath.Join(srcBase, strings.TrimPrefix(spec, "@/"))))
 	}
 	if strings.HasPrefix(spec, "/") {
 		assetPath := strings.TrimPrefix(spec, "/")
@@ -321,6 +322,17 @@ func Resolve(projectRoot, importerRepoPath, specifier string) string {
 		return cleanRepoPath(filepath.ToSlash(filepath.Join(base, filepath.FromSlash(spec))))
 	}
 	return cleanRepoPath(spec)
+}
+
+func findSrcAncestor(importerRepoPath string) string {
+	dir := pathpkg.Dir(importerRepoPath)
+	for dir != "." && dir != "/" {
+		if pathpkg.Base(dir) == "src" {
+			return dir
+		}
+		dir = pathpkg.Dir(dir)
+	}
+	return "src"
 }
 
 func resolvePublicAsset(projectRoot, importerRepoPath, assetPath string) string {
@@ -366,7 +378,16 @@ func key(projectID, repoPath string) string {
 func referenceMayPointTo(repoPath, specifier string) bool {
 	clean := stripQuery(filepath.ToSlash(specifier))
 	clean = strings.TrimPrefix(clean, "./")
-	return clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+clean)
+	if clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+clean) {
+		return true
+	}
+	if strings.HasPrefix(clean, "@/") || strings.HasPrefix(clean, "~/") {
+		stripped := clean[2:]
+		if stripped == repoPath || strings.HasSuffix(repoPath, "/"+stripped) {
+			return true
+		}
+	}
+	return false
 }
 
 func isPattern(spec string) bool {
