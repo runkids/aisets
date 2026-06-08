@@ -109,6 +109,25 @@ func TestBuildMapResolvesAbsolutePublicReferences(t *testing.T) {
 	}
 }
 
+func TestBuildMapResolvesAbsolutePathInMonorepo(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "dashboard", "src", "assets", "hero.webp"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "dashboard", "index.html"),
+		`<img src="/src/assets/hero.webp" alt="hero" />`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{{ProjectID: "p", RepoPath: "apps/dashboard/src/assets/hero.webp"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := refs["p\x00apps/dashboard/src/assets/hero.webp"]
+	if len(got) != 1 || got[0].File != "apps/dashboard/index.html" {
+		t.Fatalf("absolute path monorepo refs = %#v, want 1 ref from index.html", got)
+	}
+}
+
 func TestBuildMapResolvesMonorepoAtAliasImports(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "apps", "web", "src", "assets", "images", "banner.png"), "image")
