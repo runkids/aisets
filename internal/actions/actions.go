@@ -227,10 +227,39 @@ func referenceChanges(project scanner.Project, item scanner.AssetItem, targetPat
 			File:         ref.File,
 			Line:         ref.Line,
 			OldSpecifier: ref.Specifier,
-			NewSpecifier: relativeSpecifier(ref.File, targetPath),
+			NewSpecifier: rewriteSpecifier(ref.Specifier, ref.File, targetPath),
 		})
 	}
 	return changes, blockers
+}
+
+func rewriteSpecifier(oldSpec, importerRepoPath, targetRepoPath string) string {
+	spec := strings.Split(oldSpec, "?")[0]
+	query := ""
+	if i := strings.IndexByte(oldSpec, '?'); i >= 0 {
+		query = oldSpec[i:]
+	}
+	for _, prefix := range []string{"@/", "~/"} {
+		if strings.HasPrefix(spec, prefix) {
+			newSpec := prefix + strings.TrimPrefix(targetRepoPath, findSrcBase(importerRepoPath)+"/")
+			return newSpec + query
+		}
+	}
+	if strings.HasPrefix(spec, "/") {
+		return "/" + targetRepoPath + query
+	}
+	return relativeSpecifier(importerRepoPath, targetRepoPath) + query
+}
+
+func findSrcBase(importerRepoPath string) string {
+	dir := filepath.ToSlash(filepath.Dir(importerRepoPath))
+	parts := strings.Split(dir, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "src" {
+			return strings.Join(parts[:i+1], "/")
+		}
+	}
+	return "src"
 }
 
 func relativeSpecifier(importerRepoPath, targetRepoPath string) string {
