@@ -19,6 +19,11 @@ func TestResolveReferenceKinds(t *testing.T) {
 		{"src/components/App.tsx", "@/assets/logo.png", "src/assets/logo.png"},
 		{"src/components/App.tsx", "/src/assets/logo.png", "src/assets/logo.png"},
 		{"src/components/App.tsx", "src/assets/logo.png?raw", "src/assets/logo.png"},
+		// Monorepo: @/ resolves relative to nearest src/ ancestor
+		{"apps/mobile/src/views/Page.vue", "@/assets/logo.png", "apps/mobile/src/assets/logo.png"},
+		{"packages/ui/src/components/Card.tsx", "@/assets/icon.svg", "packages/ui/src/assets/icon.svg"},
+		// No src/ ancestor falls back to bare src/
+		{"lib/util.ts", "@/assets/logo.png", "src/assets/logo.png"},
 	}
 	for _, tt := range tests {
 		if got := Resolve(root, tt.importer, tt.spec); got != tt.want {
@@ -104,6 +109,30 @@ func TestBuildMapResolvesAbsolutePublicReferences(t *testing.T) {
 	}
 }
 
+func TestBuildMapResolvesMonorepoAtAliasImports(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "assets", "images", "banner.png"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "views", "Home.vue"),
+		`import Banner from '@/assets/images/banner.png'`)
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "views", "About.vue"),
+		`.hero { background-image: url('@/assets/images/banner.png'); }`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{{ProjectID: "p", RepoPath: "apps/web/src/assets/images/banner.png"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := refs["p\x00apps/web/src/assets/images/banner.png"]
+	if len(got) != 2 {
+		t.Fatalf("monorepo @/ refs = %#v, want 2 refs", got)
+	}
+	if got[0].File != "apps/web/src/views/About.vue" || got[1].File != "apps/web/src/views/Home.vue" {
+		t.Fatalf("monorepo @/ refs files = [%s, %s], want About.vue and Home.vue", got[0].File, got[1].File)
+	}
+}
+
 func TestBuildMapWithProgressExcludesMatchedCodeFiles(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "src", "assets", "logo.png"), "image")
@@ -161,6 +190,12 @@ func TestReferenceHelperFunctions(t *testing.T) {
 	}
 	if !referenceMayPointTo("demo/icons/a.png", "a.png") {
 		t.Fatal("exact filename should match via path boundary")
+	}
+	if !referenceMayPointTo("apps/web/src/assets/images/banner.png", "@/assets/images/banner.png") {
+		t.Fatal("@/ alias stripped suffix should match monorepo asset path")
+	}
+	if !referenceMayPointTo("packages/ui/src/assets/icon.svg", "~/assets/icon.svg") {
+		t.Fatal("~/ alias stripped suffix should match monorepo asset path")
 	}
 	if cleanRepoPath("../escape.png") != "" || cleanRepoPath("./src/a.png") != "src/a.png" {
 		t.Fatal("cleanRepoPath did not normalize safely")
