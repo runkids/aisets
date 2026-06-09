@@ -1773,6 +1773,10 @@
     },
     "excludePatterns": "排除規則",
     "excludePatternsHint": "規則以專案根目錄為基準；選擇 Global，或只追加到特定專案類型",
+    "importAliases": "匯入別名",
+    "importAliasesHint": "將套件名稱對應到 repo 內的實際路徑，讓 @scope/pkg/image.png 形式的引用能正確解析",
+    "importAliasAdd": "新增別名",
+    "importAliasRemove": "移除別名",
     "excludeScopeLabel": "排除規則範圍",
     "excludeScope": {
       "global": "Global",

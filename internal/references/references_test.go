@@ -36,6 +36,55 @@ func TestResolveReferenceKinds(t *testing.T) {
 	}
 }
 
+func TestResolveWithImportAliases(t *testing.T) {
+	root := t.TempDir()
+	aliases := map[string]string{
+		"@acme/shared-ui":  "packages/shared-ui",
+		"@acme/design-tokens": "packages/design-tokens",
+	}
+	tests := []struct {
+		importer string
+		spec     string
+		want     string
+	}{
+		{"src/App.tsx", "@acme/shared-ui/images/icon.svg", "packages/shared-ui/images/icon.svg"},
+		{"src/App.tsx", "@acme/shared-ui/images/icon.svg?component", "packages/shared-ui/images/icon.svg"},
+		{"src/App.tsx", "@acme/design-tokens/images/logo.png", "packages/design-tokens/images/logo.png"},
+		// No alias match falls through to existing behavior
+		{"src/App.tsx", "@/assets/logo.png", "src/assets/logo.png"},
+		{"src/App.tsx", "./assets/logo.png", "src/assets/logo.png"},
+	}
+	for _, tt := range tests {
+		if got := ResolveWithAliases(root, tt.importer, tt.spec, aliases); got != tt.want {
+			t.Fatalf("ResolveWithAliases(%q, %q) = %q, want %q", tt.importer, tt.spec, got, tt.want)
+		}
+	}
+	// Nil aliases = same as Resolve
+	if got := ResolveWithAliases(root, "src/App.tsx", "@/assets/logo.png", nil); got != "src/assets/logo.png" {
+		t.Fatalf("ResolveWithAliases nil aliases = %q", got)
+	}
+}
+
+func TestBuildMapResolvesImportAliases(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "packages", "shared-assets", "images", "icon.svg"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "views", "Home.vue"),
+		`import Icon from '@acme/shared-ui/images/icon.svg'`)
+
+	aliases := map[string]string{"@acme/shared-ui": "packages/shared-ui"}
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root, ImportAliases: aliases}},
+		[]Asset{{ProjectID: "p", RepoPath: "packages/shared-ui/images/icon.svg"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := refs["p\x00packages/shared-ui/images/icon.svg"]
+	if len(got) != 1 || got[0].File != "apps/web/src/views/Home.vue" {
+		t.Fatalf("alias refs = %#v, want 1 ref from Home.vue", got)
+	}
+}
+
 func TestExtractCSSStringAndPatternReferences(t *testing.T) {
 	content := `
 const a = "./assets/a.png"

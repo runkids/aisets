@@ -448,6 +448,9 @@ func (s *Store) UpdateSettings(update SettingsUpdate) (AppSettings, error) {
 	if update.ExcludePatternsByIntent != nil {
 		settings.ExcludePatternsByIntent = normalizeExcludePatternsByIntent(update.ExcludePatternsByIntent)
 	}
+	if update.ImportAliases != nil {
+		settings.ImportAliases = update.ImportAliases
+	}
 	if update.OptimizationDefaultQuality != nil {
 		settings.OptimizationDefaultQuality = *update.OptimizationDefaultQuality
 	}

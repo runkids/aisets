@@ -276,24 +276,33 @@ func TestPathAndSpecifierHelpers(t *testing.T) {
 		t.Fatalf("relativeSpecifier nested = %q", got)
 	}
 	// rewriteSpecifier preserves @/ alias
-	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/src/assets/logo.avif"); got != "@/assets/logo.avif" {
+	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/src/assets/logo.avif", nil); got != "@/assets/logo.avif" {
 		t.Fatalf("rewriteSpecifier @/ = %q", got)
 	}
 	// rewriteSpecifier preserves ~/ alias
-	if got := rewriteSpecifier("~/assets/icon.svg", "packages/ui/src/components/Card.tsx", "packages/ui/src/assets/icon.avif"); got != "~/assets/icon.avif" {
+	if got := rewriteSpecifier("~/assets/icon.svg", "packages/ui/src/components/Card.tsx", "packages/ui/src/assets/icon.avif", nil); got != "~/assets/icon.avif" {
 		t.Fatalf("rewriteSpecifier ~/ = %q", got)
 	}
 	// rewriteSpecifier preserves query string
-	if got := rewriteSpecifier("@/assets/bg.png?raw", "src/App.tsx", "src/assets/bg.avif"); got != "@/assets/bg.avif?raw" {
+	if got := rewriteSpecifier("@/assets/bg.png?raw", "src/App.tsx", "src/assets/bg.avif", nil); got != "@/assets/bg.avif?raw" {
 		t.Fatalf("rewriteSpecifier query = %q", got)
 	}
 	// rewriteSpecifier falls back when the target leaves the alias base
-	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/public/logo.avif"); got != "../../public/logo.avif" {
+	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/public/logo.avif", nil); got != "../../public/logo.avif" {
 		t.Fatalf("rewriteSpecifier outside alias base = %q", got)
 	}
 	// rewriteSpecifier falls back to relative for non-alias paths
-	if got := rewriteSpecifier("./assets/logo.png", "src/components/App.tsx", "src/assets/logo.avif"); got != "../assets/logo.avif" {
+	if got := rewriteSpecifier("./assets/logo.png", "src/components/App.tsx", "src/assets/logo.avif", nil); got != "../assets/logo.avif" {
 		t.Fatalf("rewriteSpecifier relative = %q", got)
+	}
+	// rewriteSpecifier with custom import alias
+	aliases := map[string]string{"@acme/shared-ui": "packages/shared-ui"}
+	if got := rewriteSpecifier("@acme/shared-ui/images/icon.png", "src/App.tsx", "packages/shared-ui/images/icon.avif", aliases); got != "@acme/shared-ui/images/icon.avif" {
+		t.Fatalf("rewriteSpecifier alias = %q", got)
+	}
+	// rewriteSpecifier with alias + query string
+	if got := rewriteSpecifier("@acme/shared-ui/images/icon.svg?component", "src/App.tsx", "packages/shared-ui/images/icon.avif", aliases); got != "@acme/shared-ui/images/icon.avif?component" {
+		t.Fatalf("rewriteSpecifier alias+query = %q", got)
 	}
 	for _, invalid := range []string{"", "../escape.png", "/absolute.png", "."} {
 		if got := cleanRepoPath(invalid); got != "" {

@@ -1,11 +1,14 @@
 import {
   Download,
   Globe2,
+  Link,
   LoaderCircle,
+  Plus,
   ScanText,
   Sliders,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -263,6 +266,84 @@ export function ScanningSection({
                         intent: projectScanIntentLabel(t, excludeScope),
                       })}
                 </p>
+              </div>
+            </FieldRow>
+            <FieldRow
+              label={t("settings.importAliases")}
+              description={t("settings.importAliasesHint")}
+              icon={<Link size={15} />}
+              align="start"
+            >
+              <div className="grid w-full gap-2 min-[1200px]:w-[420px]">
+                {draft.importAliases.map((alias, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <TextInput
+                      disabled={settingsLoading || updatePending}
+                      value={alias.key}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        onUpdateDraft((prev) => ({
+                          ...prev,
+                          importAliases: prev.importAliases.map((a, i) =>
+                            i === index ? { ...a, key: value } : a,
+                          ),
+                        }));
+                      }}
+                      placeholder="@scope/package"
+                      className="flex-1"
+                      inputClassName="font-g-mono text-g-ui tracking-g-mono"
+                    />
+                    <span className="shrink-0 text-g-ink-3">&rarr;</span>
+                    <TextInput
+                      disabled={settingsLoading || updatePending}
+                      value={alias.value}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        onUpdateDraft((prev) => ({
+                          ...prev,
+                          importAliases: prev.importAliases.map((a, i) =>
+                            i === index ? { ...a, value } : a,
+                          ),
+                        }));
+                      }}
+                      placeholder="packages/package"
+                      className="flex-1"
+                      inputClassName="font-g-mono text-g-ui tracking-g-mono"
+                    />
+                    <button
+                      type="button"
+                      className="shrink-0 rounded p-1 text-g-ink-3 hover:bg-g-hover hover:text-g-ink"
+                      onClick={() =>
+                        onUpdateDraft((prev) => ({
+                          ...prev,
+                          importAliases: prev.importAliases.filter(
+                            (_, i) => i !== index,
+                          ),
+                        }))
+                      }
+                      aria-label={t("settings.importAliasRemove")}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={settingsLoading || updatePending}
+                  onClick={() =>
+                    onUpdateDraft((prev) => ({
+                      ...prev,
+                      importAliases: [
+                        ...prev.importAliases,
+                        { key: "", value: "" },
+                      ],
+                    }))
+                  }
+                >
+                  <Plus size={14} />
+                  {t("settings.importAliasAdd")}
+                </Button>
               </div>
             </FieldRow>
             {updateError && (

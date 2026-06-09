@@ -14,6 +14,7 @@ type Project struct {
 	ID              string
 	Path            string
 	ExcludePatterns []string
+	ImportAliases   map[string]string
 }
 
 type Asset struct {
@@ -85,10 +86,10 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 		}
 		for _, ref := range Extract(string(bytes)) {
 			ref.File = file.repo
-			resolved := Resolve(file.project.Path, file.repo, ref.Specifier)
+			resolved := ResolveWithAliases(file.project.Path, file.repo, ref.Specifier, file.project.ImportAliases)
 			if ref.Kind == "pattern" {
 				for candidate := range assetSets[file.project.ID] {
-					if referenceMayPointTo(file.project.Path, candidate, file.repo, ref.Specifier) {
+					if referenceMayPointToWithAliases(file.project.Path, candidate, file.repo, ref.Specifier, file.project.ImportAliases) {
 						ref.ProjectID = file.project.ID
 						ref.AssetPath = candidate
 						out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
@@ -103,7 +104,7 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 				continue
 			}
 			for candidate := range assetSets[file.project.ID] {
-				if referenceMayPointTo(file.project.Path, candidate, file.repo, ref.Specifier) {
+				if referenceMayPointToWithAliases(file.project.Path, candidate, file.repo, ref.Specifier, file.project.ImportAliases) {
 					ref.ProjectID = file.project.ID
 					ref.AssetPath = candidate
 					out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
@@ -302,9 +303,16 @@ func spanCovered(start, end int, spans [][2]int) bool {
 }
 
 func Resolve(projectRoot, importerRepoPath, specifier string) string {
+	return ResolveWithAliases(projectRoot, importerRepoPath, specifier, nil)
+}
+
+func ResolveWithAliases(projectRoot, importerRepoPath, specifier string, aliases map[string]string) string {
 	spec := stripQuery(filepath.ToSlash(strings.TrimSpace(specifier)))
 	if spec == "" || strings.Contains(spec, "${") || strings.ContainsAny(spec, "*{}") {
 		return ""
+	}
+	if resolved := resolveAlias(spec, aliases); resolved != "" {
+		return cleanRepoPath(resolved)
 	}
 	if strings.HasPrefix(spec, "@/") || strings.HasPrefix(spec, "~/") {
 		srcBase := findSrcAncestor(importerRepoPath)
@@ -325,6 +333,22 @@ func Resolve(projectRoot, importerRepoPath, specifier string) string {
 		return cleanRepoPath(filepath.ToSlash(filepath.Join(base, filepath.FromSlash(spec))))
 	}
 	return cleanRepoPath(spec)
+}
+
+func resolveAlias(spec string, aliases map[string]string) string {
+	if len(aliases) == 0 {
+		return ""
+	}
+	bestKey := ""
+	for key := range aliases {
+		if (spec == key || strings.HasPrefix(spec, key+"/")) && len(key) > len(bestKey) {
+			bestKey = key
+		}
+	}
+	if bestKey == "" {
+		return ""
+	}
+	return aliases[bestKey] + strings.TrimPrefix(spec, bestKey)
 }
 
 func findSrcAncestor(importerRepoPath string) string {
@@ -414,6 +438,20 @@ func referenceMayPointTo(projectRoot, repoPath, importerRepoPath, specifier stri
 	}
 	if clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+clean) {
 		return true
+	}
+	return false
+}
+
+func referenceMayPointToWithAliases(projectRoot, repoPath, importerRepoPath, specifier string, aliases map[string]string) bool {
+	if referenceMayPointTo(projectRoot, repoPath, importerRepoPath, specifier) {
+		return true
+	}
+	resolved := resolveAlias(stripQuery(filepath.ToSlash(specifier)), aliases)
+	if resolved != "" {
+		resolved = cleanRepoPath(resolved)
+		if resolved == repoPath || strings.HasSuffix(resolved, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+resolved) {
+			return true
+		}
 	}
 	return false
 }

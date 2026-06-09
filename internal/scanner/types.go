@@ -97,6 +97,7 @@ type ScanOptions struct {
 	Profile                 ScanProfile                      `json:"profile"`
 	ExcludePatterns         []string                         `json:"excludePatterns,omitempty"`
 	ExcludePatternsByIntent ExcludePatternsByIntent          `json:"excludePatternsByIntent,omitempty"`
+	ImportAliases           map[string]string                `json:"importAliases,omitempty"`
 	Analyses                AnalysisOptions                  `json:"analyses"`
 	OptimizationThresholds  imageproc.OptimizationThresholds `json:"optimizationThresholds,omitempty"`
 	LintSettings            lint.Settings                    `json:"lintSettings,omitempty"`
@@ -120,12 +121,13 @@ type ScanProgress struct {
 type ProgressFunc func(ScanProgress)
 
 type Project struct {
-	ID          string            `json:"id"`
-	WorkspaceID string            `json:"workspaceId,omitempty"`
-	Name        string            `json:"name"`
-	Path        string            `json:"path"`
-	ScanIntent  ProjectScanIntent `json:"scanIntent"`
-	CreatedAt   string            `json:"createdAt,omitempty"`
+	ID            string            `json:"id"`
+	WorkspaceID   string            `json:"workspaceId,omitempty"`
+	Name          string            `json:"name"`
+	Path          string            `json:"path"`
+	ScanIntent    ProjectScanIntent `json:"scanIntent"`
+	CreatedAt     string            `json:"createdAt,omitempty"`
+	ImportAliases map[string]string `json:"-"`
 }
 
 type Catalog struct {

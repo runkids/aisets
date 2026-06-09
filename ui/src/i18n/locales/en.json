@@ -852,6 +852,10 @@
     },
     "excludePatterns": "Exclude patterns",
     "excludePatternsHint": "Patterns are project-relative. Choose Global rules or rules appended for one project type.",
+    "importAliases": "Import aliases",
+    "importAliasesHint": "Map package names to repo paths so references like @scope/pkg/image.png resolve correctly.",
+    "importAliasAdd": "Add alias",
+    "importAliasRemove": "Remove alias",
     "excludeScopeLabel": "Exclude pattern scope",
     "excludeScope": {
       "global": "Global",

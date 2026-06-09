@@ -14,6 +14,7 @@ func buildReferenceMap(ctx context.Context, projects []Project, items []AssetIte
 			ID:              project.ID,
 			Path:            project.Path,
 			ExcludePatterns: EffectiveExcludePatterns(project, options),
+			ImportAliases:   options.ImportAliases,
 		})
 	}
 	assets := make([]references.Asset, 0, len(items))

@@ -49,6 +49,9 @@ func (s *Server) handleOptimizationPreview(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if settings, err := s.store.Settings(); err == nil {
+		project.ImportAliases = settings.ImportAliases
+	}
 	for _, item := range items {
 		if item.ProjectID != project.ID {
 			writeError(w, http.StatusBadRequest, apierr.New("optimization_project_mixed", "optimization preview can only apply one project at a time"))
@@ -456,6 +459,9 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if settings, err := s.store.Settings(); err == nil {
+		project.ImportAliases = settings.ImportAliases
+	}
 	var result actions.ApplyResult
 	if preview.Type == "optimization" {
 		result, err = optimize.Apply(project, preview)
@@ -506,6 +512,10 @@ func (s *Server) projectAndItem(ctx context.Context, assetID string) (scanner.Pr
 	project, err := s.projectByID(detail.Item.ProjectID)
 	if err != nil {
 		return scanner.Project{}, scanner.AssetItem{}, err
+	}
+	settings, err := s.store.Settings()
+	if err == nil {
+		project.ImportAliases = settings.ImportAliases
 	}
 	return project, detail.Item, nil
 }
