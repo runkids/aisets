@@ -116,7 +116,7 @@ export type SettingsDraft = {
   aiNickname: string;
   excludePatternsText: string;
   excludePatternsByIntentText: Record<ProjectScanIntent, string>;
-  importAliases: Array<{ key: string; value: string }>;
+  importAliases: Array<{ id: string; key: string; value: string }>;
   optimizationDefaultQuality: number;
   optimizationWorkers: number;
   optimizationAvifSpeed: number;
