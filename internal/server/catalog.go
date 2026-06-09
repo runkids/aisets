@@ -610,6 +610,7 @@ func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOpti
 		Analyses:                settings.ScanAnalyses,
 		ExcludePatterns:         settings.ExcludePatterns,
 		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
+		ImportAliases:           settings.ImportAliases,
 		OptimizationThresholds:  settings.OptimizationThresholds,
 		LintSettings:            settings.LintRules,
 	})
@@ -619,6 +620,7 @@ func (s *Server) scanWithProgress(ctx context.Context, override scanner.ScanOpti
 		options = scanner.NormalizeScanOptions(options)
 		options.ExcludePatterns = settings.ExcludePatterns
 		options.ExcludePatternsByIntent = settings.ExcludePatternsByIntent
+		options.ImportAliases = settings.ImportAliases
 		options.LintSettings = settings.LintRules
 	}
 	catalog, err := s.scanner.ScanWithOptions(ctx, projects, options, progress)
@@ -695,6 +697,7 @@ func (s *Server) analysisIncomplete(summary config.CatalogSummary) bool {
 		Analyses:                settings.ScanAnalyses,
 		ExcludePatterns:         settings.ExcludePatterns,
 		ExcludePatternsByIntent: settings.ExcludePatternsByIntent,
+		ImportAliases:           settings.ImportAliases,
 	})
 	want := options.Analyses
 	if want.References && a.References != scanner.AnalysisComputed {

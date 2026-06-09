@@ -227,27 +227,32 @@ func referenceChanges(project scanner.Project, item scanner.AssetItem, targetPat
 			File:         ref.File,
 			Line:         ref.Line,
 			OldSpecifier: ref.Specifier,
-			NewSpecifier: rewriteSpecifier(ref.Specifier, ref.File, targetPath),
+			NewSpecifier: rewriteSpecifier(ref.Specifier, ref.File, targetPath, project.ImportAliases),
 		})
 	}
 	return changes, blockers
 }
 
-func rewriteSpecifier(oldSpec, importerRepoPath, targetRepoPath string) string {
+func rewriteSpecifier(oldSpec, importerRepoPath, targetRepoPath string, aliases map[string]string) string {
 	spec := strings.Split(oldSpec, "?")[0]
 	query := ""
 	if i := strings.IndexByte(oldSpec, '?'); i >= 0 {
 		query = oldSpec[i:]
 	}
-	for _, prefix := range []string{"@/", "~/"} {
-		if strings.HasPrefix(spec, prefix) {
-			srcBase := findSrcBase(importerRepoPath)
-			if strings.HasPrefix(targetRepoPath, srcBase+"/") {
-				newSpec := prefix + strings.TrimPrefix(targetRepoPath, srcBase+"/")
-				return newSpec + query
+	for aliasKey, aliasPath := range aliases {
+		if spec == aliasKey || strings.HasPrefix(spec, aliasKey+"/") {
+			if strings.HasPrefix(targetRepoPath, aliasPath+"/") || targetRepoPath == aliasPath {
+				return aliasKey + strings.TrimPrefix(targetRepoPath, aliasPath) + query
 			}
-			return relativeSpecifier(importerRepoPath, targetRepoPath) + query
 		}
+	}
+	if strings.HasPrefix(spec, "@/") || strings.HasPrefix(spec, "~/") {
+		prefix := spec[:2]
+		srcBase := findSrcBase(importerRepoPath)
+		if strings.HasPrefix(targetRepoPath, srcBase+"/") {
+			return prefix + strings.TrimPrefix(targetRepoPath, srcBase+"/") + query
+		}
+		return relativeSpecifier(importerRepoPath, targetRepoPath) + query
 	}
 	if strings.HasPrefix(spec, "/") {
 		return "/" + targetRepoPath + query

@@ -39,6 +39,7 @@ type AppSettings struct {
 	OCRFuzzySearch             bool                                 `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string                             `json:"excludePatterns"`
 	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent      `json:"excludePatternsByIntent"`
+	ImportAliases              map[string]string                    `json:"importAliases"`
 	OptimizationDefaultQuality int                                  `json:"optimizationDefaultQuality"`
 	OptimizationWorkers        int                                  `json:"optimizationWorkers"`
 	OptimizationAvifSpeed      int                                  `json:"optimizationAvifSpeed"`
@@ -101,6 +102,7 @@ type SettingsUpdate struct {
 	OCRFuzzySearch             *bool                                `json:"ocrFuzzySearch"`
 	ExcludePatterns            []string                             `json:"excludePatterns"`
 	ExcludePatternsByIntent    scanner.ExcludePatternsByIntent      `json:"excludePatternsByIntent"`
+	ImportAliases              map[string]string                    `json:"importAliases"`
 	OptimizationDefaultQuality *int                                 `json:"optimizationDefaultQuality"`
 	OptimizationWorkers        *int                                 `json:"optimizationWorkers"`
 	OptimizationAvifSpeed      *int                                 `json:"optimizationAvifSpeed"`

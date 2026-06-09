@@ -397,6 +397,9 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     vlmBackendTranslate: settings?.vlmBackendTranslate ?? "",
     vlmBackendCanvas: settings?.vlmBackendCanvas ?? "",
     aiNickname: settings?.aiNickname ?? "",
+    importAliases: Object.entries(settings?.importAliases ?? {}).map(
+      ([key, value]) => ({ key, value }),
+    ),
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -475,6 +478,11 @@ export function updateFromDraft(draft: SettingsDraft): SettingsUpdate {
     vlmBackendTranslate: draft.vlmBackendTranslate,
     vlmBackendCanvas: draft.vlmBackendCanvas,
     aiNickname: draft.aiNickname,
+    importAliases: Object.fromEntries(
+      draft.importAliases
+        .filter((a) => a.key.trim() && a.value.trim())
+        .map((a) => [a.key.trim(), a.value.trim()]),
+    ),
     excludePatterns: splitPatterns(draft.excludePatternsText),
     excludePatternsByIntent: Object.fromEntries(
       projectScanIntentValues.map((intent) => [
@@ -544,6 +552,7 @@ export function resetSectionDraft(
         scanAnalyses: defaults.scanAnalyses,
         excludePatternsText: defaults.excludePatternsText,
         excludePatternsByIntentText: defaults.excludePatternsByIntentText,
+        importAliases: defaults.importAliases,
       };
     case "ocr":
       return {

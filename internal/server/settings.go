@@ -110,6 +110,7 @@ func settingsCatalogInputsChanged(update config.SettingsUpdate, previous, update
 		(update.OptimizationStrategies != nil && !reflect.DeepEqual(previous.OptimizationStrategies, updated.OptimizationStrategies)) ||
 		(update.ExcludePatterns != nil && !reflect.DeepEqual(previous.ExcludePatterns, updated.ExcludePatterns)) ||
 		(update.ExcludePatternsByIntent != nil && !reflect.DeepEqual(previous.ExcludePatternsByIntent, updated.ExcludePatternsByIntent)) ||
+		(update.ImportAliases != nil && !reflect.DeepEqual(previous.ImportAliases, updated.ImportAliases)) ||
 		(update.LintRules != nil && !reflect.DeepEqual(previous.LintRules, updated.LintRules))
 }
 

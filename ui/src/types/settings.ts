@@ -18,6 +18,7 @@ export type AppSettings = {
   ocrFuzzySearch: boolean;
   excludePatterns: string[];
   excludePatternsByIntent: ExcludePatternsByIntent;
+  importAliases: Record<string, string> | null;
   optimizationDefaultQuality: number;
   optimizationWorkers: number;
   optimizationAvifSpeed: number;
