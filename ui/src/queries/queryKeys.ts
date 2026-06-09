@@ -9,6 +9,7 @@ import type {
 export const catalogQueryKey = ["catalog"] as const;
 export const scansQueryKey = ["scans"] as const;
 export const settingsQueryKey = ["settings"] as const;
+export const detectedAliasesQueryKey = ["detected-aliases"] as const;
 export const versionQueryKey = ["version"] as const;
 export const embedStatsQueryKey = ["embed-stats"] as const;
 export const embedRepairCheckQueryKey = ["embed-repair-check"] as const;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 
+	"aisets/internal/aliasdetect"
 	"aisets/internal/references"
 )
 
@@ -14,7 +15,9 @@ func buildReferenceMap(ctx context.Context, projects []Project, items []AssetIte
 			ID:              project.ID,
 			Path:            project.Path,
 			ExcludePatterns: EffectiveExcludePatterns(project, options),
-			ImportAliases:   options.ImportAliases,
+			// Auto-detected aliases (tsconfig/vite) are the base; manual
+			// importAliases override them on key collision.
+			ImportAliases: aliasdetect.Merge(aliasdetect.Detect(project.Path), options.ImportAliases),
 		})
 	}
 	assets := make([]references.Asset, 0, len(items))

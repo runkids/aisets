@@ -14,6 +14,7 @@ import (
 
 	"aisets/internal/actions"
 	"aisets/internal/agent"
+	"aisets/internal/aliasdetect"
 	"aisets/internal/apierr"
 	"aisets/internal/config"
 	"aisets/internal/imageproc"
@@ -50,7 +51,7 @@ func (s *Server) handleOptimizationPreview(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if settings, err := s.store.Settings(); err == nil {
-		project.ImportAliases = settings.ImportAliases
+		project.ImportAliases = aliasdetect.Merge(aliasdetect.Detect(project.Path), settings.ImportAliases)
 	}
 	for _, item := range items {
 		if item.ProjectID != project.ID {
@@ -460,7 +461,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if settings, err := s.store.Settings(); err == nil {
-		project.ImportAliases = settings.ImportAliases
+		project.ImportAliases = aliasdetect.Merge(aliasdetect.Detect(project.Path), settings.ImportAliases)
 	}
 	var result actions.ApplyResult
 	if preview.Type == "optimization" {
@@ -515,7 +516,7 @@ func (s *Server) projectAndItem(ctx context.Context, assetID string) (scanner.Pr
 	}
 	settings, err := s.store.Settings()
 	if err == nil {
-		project.ImportAliases = settings.ImportAliases
+		project.ImportAliases = aliasdetect.Merge(aliasdetect.Detect(project.Path), settings.ImportAliases)
 	}
 	return project, detail.Item, nil
 }

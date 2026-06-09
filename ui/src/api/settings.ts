@@ -12,6 +12,19 @@ export function getSettings() {
   return request<{ settings: SettingsInfo }>("/api/settings");
 }
 
+export type DetectedAlias = { key: string; value: string };
+export type DetectedAliasProject = {
+  projectId: string;
+  projectName: string;
+  aliases: DetectedAlias[];
+};
+
+export function getDetectedAliases() {
+  return request<{ projects: DetectedAliasProject[] }>(
+    "/api/settings/detected-aliases",
+  );
+}
+
 export function updateSettings(data: SettingsUpdate) {
   return request<{ settings: SettingsInfo }>("/api/settings", {
     method: "PATCH",

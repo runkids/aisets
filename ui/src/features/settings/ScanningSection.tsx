@@ -13,6 +13,8 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/cn";
+import { useDetectedAliasesQuery } from "@/queries";
 import { errorMessage } from "@/i18n";
 import { projectScanIntentLabel } from "@/projectScanIntent";
 import type { ProjectScanIntent } from "@/types";
@@ -95,6 +97,11 @@ export function ScanningSection({
   removeOCRPending,
 }: ScanningSectionProps) {
   const { t } = useTranslation();
+  const detectedAliasesQuery = useDetectedAliasesQuery();
+  const detectedAliasProjects = detectedAliasesQuery.data?.projects ?? [];
+  const manualAliasKeys = new Set(
+    draft.importAliases.map((alias) => alias.key.trim()).filter(Boolean),
+  );
   const [ocrLimitsOpen, setOCRLimitsOpen] = useState(false);
   const [runOCRConfirmOpen, setRunOCRConfirmOpen] = useState(false);
   const [removeOCRConfirmOpen, setRemoveOCRConfirmOpen] = useState(false);
@@ -327,25 +334,70 @@ export function ScanningSection({
                     </button>
                   </div>
                 ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={settingsLoading || updatePending}
-                  onClick={() =>
-                    onUpdateDraft((prev) => ({
-                      ...prev,
-                      importAliases: [
-                        ...prev.importAliases,
-                        { id: `alias-${Date.now()}`, key: "", value: "" },
-                      ],
-                    }))
-                  }
-                >
-                  <Plus size={14} />
-                  {t("settings.importAliasAdd")}
-                </Button>
+                <div className="flex">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={settingsLoading || updatePending}
+                    onClick={() =>
+                      onUpdateDraft((prev) => ({
+                        ...prev,
+                        importAliases: [
+                          ...prev.importAliases,
+                          { id: `alias-${Date.now()}`, key: "", value: "" },
+                        ],
+                      }))
+                    }
+                  >
+                    <Plus size={14} />
+                    {t("settings.importAliasAdd")}
+                  </Button>
+                </div>
               </div>
             </FieldRow>
+            {detectedAliasProjects.length > 0 && (
+              <FieldRow
+                label={t("settings.importAliasesDetected")}
+                description={t("settings.importAliasesDetectedHint")}
+                icon={<Link size={15} />}
+                align="start"
+              >
+                <div className="grid w-full gap-3 min-[1200px]:w-[420px]">
+                  {detectedAliasProjects.map((project) => (
+                    <div key={project.projectId} className="grid gap-1.5">
+                      <span className="font-g text-g-caption font-[510] tracking-g-ui text-g-ink-4">
+                        {project.projectName}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {project.aliases.map((alias) => {
+                          const overridden = manualAliasKeys.has(alias.key);
+                          return (
+                            <span
+                              key={alias.key}
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-g-sm border border-g-line bg-g-surface-2 px-2 py-0.5 font-g-mono text-g-chip tracking-g-mono text-g-ink-3",
+                                overridden && "opacity-60",
+                              )}
+                            >
+                              <span
+                                className={cn(overridden && "line-through")}
+                              >
+                                {alias.key} &rarr; {alias.value}
+                              </span>
+                              {overridden && (
+                                <span className="font-g text-g-chip text-g-amber">
+                                  {t("settings.importAliasOverridden")}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </FieldRow>
+            )}
             {updateError && (
               <Notice tone="danger">{errorMessage(updateError)}</Notice>
             )}

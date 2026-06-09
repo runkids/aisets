@@ -124,6 +124,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/settings/export", s.handleSettingsExport)
 	s.mux.HandleFunc("POST /api/settings/import", s.handleSettingsImport)
 	s.mux.HandleFunc("POST /api/settings/reset-database", s.handleSettingsResetDatabase)
+	s.mux.HandleFunc("GET /api/settings/detected-aliases", s.handleDetectedAliases)
 	s.mux.HandleFunc("GET /api/catalog", s.handleCatalog)
 	s.mux.HandleFunc("GET /api/catalog/items", s.handleCatalogItems)
 	s.mux.HandleFunc("POST /api/catalog/favorites", s.handleCatalogFavorites)

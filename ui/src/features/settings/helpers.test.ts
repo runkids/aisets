@@ -29,6 +29,7 @@ describe("settings draft helpers", () => {
       ocrBatchSize: 25,
       ocrConcurrency: 1,
       ocrFuzzySearch: true,
+      importAliases: null,
       excludePatterns: ["dist/**"],
       excludePatternsByIntent: {
         code: ["**/*.test.*"],
@@ -147,6 +148,7 @@ describe("settings draft helpers", () => {
       ocrBatchSize: 9,
       ocrConcurrency: 2,
       ocrFuzzySearch: false,
+      importAliases: null,
       excludePatterns: ["aisets-logo.png"],
       excludePatternsByIntent: {
         code: ["custom-code/**"],

@@ -3,6 +3,7 @@ import {
   addProject,
   addWorkspace,
   detectAgentCLIs,
+  getDetectedAliases,
   getSettings,
   getVersionCheck,
   importSettings,
@@ -19,6 +20,7 @@ import {
 import type { ExportData, ProjectScanIntent, SettingsUpdate } from "@/types";
 import {
   catalogQueryKey,
+  detectedAliasesQueryKey,
   embedStatsQueryKey,
   scansQueryKey,
   settingsQueryKey,
@@ -29,6 +31,13 @@ export function useSettingsQuery() {
   return useQuery({
     queryKey: settingsQueryKey,
     queryFn: getSettings,
+  });
+}
+
+export function useDetectedAliasesQuery() {
+  return useQuery({
+    queryKey: detectedAliasesQueryKey,
+    queryFn: getDetectedAliases,
   });
 }
 
@@ -74,6 +83,7 @@ export function useAddProjectMutation() {
     }) => addProject(path, scanIntent),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsQueryKey });
+      void client.invalidateQueries({ queryKey: detectedAliasesQueryKey });
     },
   });
 }
@@ -82,6 +92,7 @@ function invalidateWorkspaceScope(client: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     client.invalidateQueries({ queryKey: catalogQueryKey }),
     client.invalidateQueries({ queryKey: settingsQueryKey }),
+    client.invalidateQueries({ queryKey: detectedAliasesQueryKey }),
     client.invalidateQueries({ queryKey: embedStatsQueryKey }),
     client.invalidateQueries({ queryKey: ["tags"] }),
   ]);
@@ -211,6 +222,7 @@ export function useRemoveProjectMutation() {
       await Promise.all([
         client.invalidateQueries({ queryKey: catalogQueryKey }),
         client.invalidateQueries({ queryKey: settingsQueryKey }),
+        client.invalidateQueries({ queryKey: detectedAliasesQueryKey }),
       ]);
     },
   });

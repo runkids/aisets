@@ -853,9 +853,12 @@
     "excludePatterns": "Exclude patterns",
     "excludePatternsHint": "Patterns are project-relative. Choose Global rules or rules appended for one project type.",
     "importAliases": "Import aliases",
-    "importAliasesHint": "Map package names to repo paths so references like @scope/pkg/image.png resolve correctly.",
+    "importAliasesHint": "tsconfig and vite aliases are detected automatically — add entries here only to override detection or map packages it can't resolve.",
     "importAliasAdd": "Add alias",
     "importAliasRemove": "Remove alias",
+    "importAliasesDetected": "Detected aliases",
+    "importAliasesDetectedHint": "Aliases found in each project's tsconfig and vite config — these resolve automatically.",
+    "importAliasOverridden": "overridden",
     "excludeScopeLabel": "Exclude pattern scope",
     "excludeScope": {
       "global": "Global",
