@@ -88,7 +88,7 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 			resolved := Resolve(file.project.Path, file.repo, ref.Specifier)
 			if ref.Kind == "pattern" {
 				for candidate := range assetSets[file.project.ID] {
-					if referenceMayPointTo(candidate, ref.Specifier) {
+					if referenceMayPointTo(file.project.Path, candidate, file.repo, ref.Specifier) {
 						ref.ProjectID = file.project.ID
 						ref.AssetPath = candidate
 						out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
@@ -103,7 +103,7 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 				continue
 			}
 			for candidate := range assetSets[file.project.ID] {
-				if referenceMayPointTo(candidate, ref.Specifier) {
+				if referenceMayPointTo(file.project.Path, candidate, file.repo, ref.Specifier) {
 					ref.ProjectID = file.project.ID
 					ref.AssetPath = candidate
 					out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
@@ -306,14 +306,17 @@ func Resolve(projectRoot, importerRepoPath, specifier string) string {
 	if spec == "" || strings.Contains(spec, "${") || strings.ContainsAny(spec, "*{}") {
 		return ""
 	}
-	if strings.HasPrefix(spec, "@/") {
+	if strings.HasPrefix(spec, "@/") || strings.HasPrefix(spec, "~/") {
 		srcBase := findSrcAncestor(importerRepoPath)
-		return cleanRepoPath(filepath.ToSlash(filepath.Join(srcBase, strings.TrimPrefix(spec, "@/"))))
+		return cleanRepoPath(filepath.ToSlash(filepath.Join(srcBase, spec[2:])))
 	}
 	if strings.HasPrefix(spec, "/") {
 		assetPath := strings.TrimPrefix(spec, "/")
 		if publicPath := resolvePublicAsset(projectRoot, importerRepoPath, assetPath); publicPath != "" {
 			return publicPath
+		}
+		if projectPath := resolveProjectAbsoluteAsset(projectRoot, importerRepoPath, assetPath); projectPath != "" {
+			return projectPath
 		}
 		return cleanRepoPath(assetPath)
 	}
@@ -355,6 +358,26 @@ func resolvePublicAsset(projectRoot, importerRepoPath, assetPath string) string 
 	return ""
 }
 
+func resolveProjectAbsoluteAsset(projectRoot, importerRepoPath, assetPath string) string {
+	assetPath = cleanRepoPath(assetPath)
+	if assetPath == "" {
+		return ""
+	}
+	for dir := filepath.ToSlash(filepath.Dir(filepath.FromSlash(importerRepoPath))); ; dir = parentRepoDir(dir) {
+		candidate := cleanRepoPath(filepath.ToSlash(filepath.Join(filepath.FromSlash(dir), filepath.FromSlash(assetPath))))
+		if candidate != "" {
+			info, err := os.Stat(filepath.Join(projectRoot, filepath.FromSlash(candidate)))
+			if err == nil && !info.IsDir() {
+				return candidate
+			}
+		}
+		if dir == "." || dir == "" {
+			break
+		}
+	}
+	return ""
+}
+
 func parentRepoDir(dir string) string {
 	parent := filepath.ToSlash(filepath.Dir(filepath.FromSlash(dir)))
 	if parent == dir {
@@ -375,18 +398,22 @@ func key(projectID, repoPath string) string {
 	return projectID + "\x00" + repoPath
 }
 
-func referenceMayPointTo(repoPath, specifier string) bool {
+func referenceMayPointTo(projectRoot, repoPath, importerRepoPath, specifier string) bool {
 	clean := stripQuery(filepath.ToSlash(specifier))
 	clean = strings.TrimPrefix(clean, "./")
-	clean = strings.TrimPrefix(clean, "/")
+	if strings.HasPrefix(clean, "@/") || strings.HasPrefix(clean, "~/") {
+		expected := cleanRepoPath(filepath.ToSlash(filepath.Join(findSrcAncestor(importerRepoPath), clean[2:])))
+		return expected != "" && repoPath == expected
+	}
+	if strings.HasPrefix(clean, "/") {
+		assetPath := strings.TrimPrefix(clean, "/")
+		if scoped := resolveProjectAbsoluteAsset(projectRoot, importerRepoPath, assetPath); scoped != "" {
+			return repoPath == scoped
+		}
+		clean = assetPath
+	}
 	if clean == repoPath || strings.HasSuffix(clean, "/"+repoPath) || strings.HasSuffix(repoPath, "/"+clean) {
 		return true
-	}
-	if strings.HasPrefix(clean, "@/") || strings.HasPrefix(clean, "~/") {
-		stripped := clean[2:]
-		if stripped == repoPath || strings.HasSuffix(repoPath, "/"+stripped) {
-			return true
-		}
 	}
 	return false
 }

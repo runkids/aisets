@@ -21,6 +21,7 @@ func TestResolveReferenceKinds(t *testing.T) {
 		{"src/components/App.tsx", "src/assets/logo.png?raw", "src/assets/logo.png"},
 		// Monorepo: @/ resolves relative to nearest src/ ancestor
 		{"apps/mobile/src/views/Page.vue", "@/assets/logo.png", "apps/mobile/src/assets/logo.png"},
+		{"apps/mobile/src/views/Page.vue", "~/assets/logo.png", "apps/mobile/src/assets/logo.png"},
 		{"packages/ui/src/components/Card.tsx", "@/assets/icon.svg", "packages/ui/src/assets/icon.svg"},
 		// No src/ ancestor falls back to bare src/
 		{"lib/util.ts", "@/assets/logo.png", "src/assets/logo.png"},
@@ -128,6 +129,30 @@ func TestBuildMapResolvesAbsolutePathInMonorepo(t *testing.T) {
 	}
 }
 
+func TestBuildMapAbsoluteSrcPathDoesNotMatchSiblingAppAssets(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "assets", "hero.webp"), "web")
+	mustWrite(t, filepath.Join(root, "apps", "admin", "src", "assets", "hero.webp"), "admin")
+	mustWrite(t, filepath.Join(root, "apps", "web", "index.html"), `<img src="/src/assets/hero.webp" />`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{
+			{ProjectID: "p", RepoPath: "apps/web/src/assets/hero.webp"},
+			{ProjectID: "p", RepoPath: "apps/admin/src/assets/hero.webp"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := refs["p\x00apps/web/src/assets/hero.webp"]; len(got) != 1 {
+		t.Fatalf("web refs = %#v, want 1", got)
+	}
+	if got := refs["p\x00apps/admin/src/assets/hero.webp"]; len(got) != 0 {
+		t.Fatalf("admin refs = %#v, want none", got)
+	}
+}
+
 func TestBuildMapResolvesMonorepoAtAliasImports(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "apps", "web", "src", "assets", "images", "banner.png"), "image")
@@ -149,6 +174,30 @@ func TestBuildMapResolvesMonorepoAtAliasImports(t *testing.T) {
 	}
 	if got[0].File != "apps/web/src/views/About.vue" || got[1].File != "apps/web/src/views/Home.vue" {
 		t.Fatalf("monorepo @/ refs files = [%s, %s], want About.vue and Home.vue", got[0].File, got[1].File)
+	}
+}
+
+func TestBuildMapTildeAliasDoesNotMatchSiblingAppAssets(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "assets", "logo.png"), "web")
+	mustWrite(t, filepath.Join(root, "apps", "admin", "src", "assets", "logo.png"), "admin")
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "App.tsx"), `import logo from "~/assets/logo.png"`)
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{
+			{ProjectID: "p", RepoPath: "apps/web/src/assets/logo.png"},
+			{ProjectID: "p", RepoPath: "apps/admin/src/assets/logo.png"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := refs["p\x00apps/web/src/assets/logo.png"]; len(got) != 1 {
+		t.Fatalf("web refs = %#v, want 1", got)
+	}
+	if got := refs["p\x00apps/admin/src/assets/logo.png"]; len(got) != 0 {
+		t.Fatalf("admin refs = %#v, want none", got)
 	}
 }
 
@@ -190,6 +239,7 @@ func TestMatchExcludePatternTreatsPlainFileNameAsAnyDepth(t *testing.T) {
 }
 
 func TestReferenceHelperFunctions(t *testing.T) {
+	root := t.TempDir()
 	exts := CodeExtensions()
 	if !exts[".tsx"] || !exts[".css"] {
 		t.Fatalf("CodeExtensions = %#v", exts)
@@ -198,22 +248,22 @@ func TestReferenceHelperFunctions(t *testing.T) {
 	if !CodeExtensions()[".tsx"] {
 		t.Fatal("CodeExtensions returned shared map")
 	}
-	if !referenceMayPointTo("src/assets/logo.png", "./assets/logo.png?raw") {
+	if !referenceMayPointTo(root, "src/assets/logo.png", "src/App.tsx", "./assets/logo.png?raw") {
 		t.Fatal("expected suffix reference to point to asset")
 	}
-	if referenceMayPointTo("src/assets/logo.png", "./other.png") {
+	if referenceMayPointTo(root, "src/assets/logo.png", "src/App.tsx", "./other.png") {
 		t.Fatal("unexpected reference match")
 	}
-	if referenceMayPointTo("demo/英/电子/PTG2029_choy sun doa.png", "a.png") {
+	if referenceMayPointTo(root, "demo/英/电子/PTG2029_choy sun doa.png", "src/App.tsx", "a.png") {
 		t.Fatal("partial filename suffix should not match")
 	}
-	if !referenceMayPointTo("demo/icons/a.png", "a.png") {
+	if !referenceMayPointTo(root, "demo/icons/a.png", "src/App.tsx", "a.png") {
 		t.Fatal("exact filename should match via path boundary")
 	}
-	if !referenceMayPointTo("apps/web/src/assets/images/banner.png", "@/assets/images/banner.png") {
+	if !referenceMayPointTo(root, "apps/web/src/assets/images/banner.png", "apps/web/src/views/Home.vue", "@/assets/images/banner.png") {
 		t.Fatal("@/ alias stripped suffix should match monorepo asset path")
 	}
-	if !referenceMayPointTo("packages/ui/src/assets/icon.svg", "~/assets/icon.svg") {
+	if !referenceMayPointTo(root, "packages/ui/src/assets/icon.svg", "packages/ui/src/components/Card.tsx", "~/assets/icon.svg") {
 		t.Fatal("~/ alias stripped suffix should match monorepo asset path")
 	}
 	if cleanRepoPath("../escape.png") != "" || cleanRepoPath("./src/a.png") != "src/a.png" {

@@ -241,8 +241,12 @@ func rewriteSpecifier(oldSpec, importerRepoPath, targetRepoPath string) string {
 	}
 	for _, prefix := range []string{"@/", "~/"} {
 		if strings.HasPrefix(spec, prefix) {
-			newSpec := prefix + strings.TrimPrefix(targetRepoPath, findSrcBase(importerRepoPath)+"/")
-			return newSpec + query
+			srcBase := findSrcBase(importerRepoPath)
+			if strings.HasPrefix(targetRepoPath, srcBase+"/") {
+				newSpec := prefix + strings.TrimPrefix(targetRepoPath, srcBase+"/")
+				return newSpec + query
+			}
+			return relativeSpecifier(importerRepoPath, targetRepoPath) + query
 		}
 	}
 	if strings.HasPrefix(spec, "/") {

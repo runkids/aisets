@@ -287,6 +287,10 @@ func TestPathAndSpecifierHelpers(t *testing.T) {
 	if got := rewriteSpecifier("@/assets/bg.png?raw", "src/App.tsx", "src/assets/bg.avif"); got != "@/assets/bg.avif?raw" {
 		t.Fatalf("rewriteSpecifier query = %q", got)
 	}
+	// rewriteSpecifier falls back when the target leaves the alias base
+	if got := rewriteSpecifier("@/assets/logo.png", "apps/web/src/views/Home.vue", "apps/web/public/logo.avif"); got != "../../public/logo.avif" {
+		t.Fatalf("rewriteSpecifier outside alias base = %q", got)
+	}
 	// rewriteSpecifier falls back to relative for non-alias paths
 	if got := rewriteSpecifier("./assets/logo.png", "src/components/App.tsx", "src/assets/logo.avif"); got != "../assets/logo.avif" {
 		t.Fatalf("rewriteSpecifier relative = %q", got)
