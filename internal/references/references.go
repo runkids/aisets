@@ -374,15 +374,20 @@ func resolveAlias(spec string, aliases map[string]string) string {
 		return ""
 	}
 	bestKey := ""
+	bestClean := ""
 	for key := range aliases {
-		if (spec == key || strings.HasPrefix(spec, key+"/")) && len(key) > len(bestKey) {
+		clean := strings.Trim(key, "/")
+		if (spec == clean || strings.HasPrefix(spec, clean+"/")) && len(clean) > len(bestClean) {
 			bestKey = key
+			bestClean = clean
 		}
 	}
 	if bestKey == "" {
 		return ""
 	}
-	return aliases[bestKey] + strings.TrimPrefix(spec, bestKey)
+	aliasPath := strings.Trim(aliases[bestKey], "/")
+	suffix := strings.TrimPrefix(spec, bestClean)
+	return filepath.ToSlash(filepath.Clean(aliasPath + "/" + suffix))
 }
 
 func findSrcAncestor(importerRepoPath string) string {

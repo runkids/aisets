@@ -398,7 +398,7 @@ export function draftFromSettings(settings?: SettingsInfo): SettingsDraft {
     vlmBackendCanvas: settings?.vlmBackendCanvas ?? "",
     aiNickname: settings?.aiNickname ?? "",
     importAliases: Object.entries(settings?.importAliases ?? {}).map(
-      ([key, value]) => ({ key, value }),
+      ([key, value], index) => ({ id: `alias-${index}`, key, value }),
     ),
     excludePatternsText: (settings?.excludePatterns ?? []).join("\n"),
     excludePatternsByIntentText: Object.fromEntries(

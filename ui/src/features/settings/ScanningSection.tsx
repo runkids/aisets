@@ -275,8 +275,8 @@ export function ScanningSection({
               align="start"
             >
               <div className="grid w-full gap-2 min-[1200px]:w-[420px]">
-                {draft.importAliases.map((alias, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                {draft.importAliases.map((alias) => (
+                  <div key={alias.id} className="flex items-center gap-2">
                     <TextInput
                       disabled={settingsLoading || updatePending}
                       value={alias.key}
@@ -284,8 +284,8 @@ export function ScanningSection({
                         const value = event.target.value;
                         onUpdateDraft((prev) => ({
                           ...prev,
-                          importAliases: prev.importAliases.map((a, i) =>
-                            i === index ? { ...a, key: value } : a,
+                          importAliases: prev.importAliases.map((a) =>
+                            a.id === alias.id ? { ...a, key: value } : a,
                           ),
                         }));
                       }}
@@ -301,8 +301,8 @@ export function ScanningSection({
                         const value = event.target.value;
                         onUpdateDraft((prev) => ({
                           ...prev,
-                          importAliases: prev.importAliases.map((a, i) =>
-                            i === index ? { ...a, value } : a,
+                          importAliases: prev.importAliases.map((a) =>
+                            a.id === alias.id ? { ...a, value } : a,
                           ),
                         }));
                       }}
@@ -317,7 +317,7 @@ export function ScanningSection({
                         onUpdateDraft((prev) => ({
                           ...prev,
                           importAliases: prev.importAliases.filter(
-                            (_, i) => i !== index,
+                            (a) => a.id !== alias.id,
                           ),
                         }))
                       }
@@ -336,7 +336,7 @@ export function ScanningSection({
                       ...prev,
                       importAliases: [
                         ...prev.importAliases,
-                        { key: "", value: "" },
+                        { id: `alias-${Date.now()}`, key: "", value: "" },
                       ],
                     }))
                   }

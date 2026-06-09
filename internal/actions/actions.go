@@ -240,9 +240,15 @@ func rewriteSpecifier(oldSpec, importerRepoPath, targetRepoPath string, aliases 
 		query = oldSpec[i:]
 	}
 	for aliasKey, aliasPath := range aliases {
-		if spec == aliasKey || strings.HasPrefix(spec, aliasKey+"/") {
-			if strings.HasPrefix(targetRepoPath, aliasPath+"/") || targetRepoPath == aliasPath {
-				return aliasKey + strings.TrimPrefix(targetRepoPath, aliasPath) + query
+		cleanKey := strings.Trim(aliasKey, "/")
+		cleanPath := strings.Trim(aliasPath, "/")
+		if spec == cleanKey || strings.HasPrefix(spec, cleanKey+"/") {
+			if strings.HasPrefix(targetRepoPath, cleanPath+"/") || targetRepoPath == cleanPath {
+				suffix := strings.TrimPrefix(targetRepoPath, cleanPath)
+				if suffix == "" {
+					return cleanKey + query
+				}
+				return cleanKey + "/" + strings.TrimPrefix(suffix, "/") + query
 			}
 		}
 	}
