@@ -159,6 +159,33 @@ func TestBuildMapResolvesAbsolutePublicReferences(t *testing.T) {
 	}
 }
 
+func TestBuildMapResolvesGlobPattern(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "components", "Card", "images", "icons", "star.avif"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "components", "Card", "images", "icons", "heart.avif"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "web", "src", "components", "Card", "index.vue"),
+		"const imgs = import.meta.glob('./images/icons/**/*.avif', { eager: true })")
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{
+			{ProjectID: "p", RepoPath: "apps/web/src/components/Card/images/icons/star.avif"},
+			{ProjectID: "p", RepoPath: "apps/web/src/components/Card/images/icons/heart.avif"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	star := refs["p\x00apps/web/src/components/Card/images/icons/star.avif"]
+	if len(star) != 1 || star[0].File != "apps/web/src/components/Card/index.vue" {
+		t.Fatalf("glob star refs = %#v", star)
+	}
+	heart := refs["p\x00apps/web/src/components/Card/images/icons/heart.avif"]
+	if len(heart) != 1 || heart[0].File != "apps/web/src/components/Card/index.vue" {
+		t.Fatalf("glob heart refs = %#v", heart)
+	}
+}
+
 func TestBuildMapResolvesAbsolutePathInMonorepo(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "apps", "dashboard", "src", "assets", "hero.webp"), "image")
