@@ -88,8 +88,16 @@ func BuildMapWithProgress(ctx context.Context, projects []Project, assets []Asse
 			ref.File = file.repo
 			resolved := ResolveWithAliases(file.project.Path, file.repo, ref.Specifier, file.project.ImportAliases)
 			if ref.Kind == "pattern" {
+				globPattern := resolvePattern(file.repo, ref.Specifier, file.project.ImportAliases)
 				for candidate := range assetSets[file.project.ID] {
-					if referenceMayPointToWithAliases(file.project.Path, candidate, file.repo, ref.Specifier, file.project.ImportAliases) {
+					matched := false
+					if globPattern != "" {
+						matched = globMatchRepoPath(globPattern, candidate)
+					}
+					if !matched {
+						matched = referenceMayPointToWithAliases(file.project.Path, candidate, file.repo, ref.Specifier, file.project.ImportAliases)
+					}
+					if matched {
 						ref.ProjectID = file.project.ID
 						ref.AssetPath = candidate
 						out[key(file.project.ID, candidate)] = append(out[key(file.project.ID, candidate)], ref)
@@ -333,6 +341,32 @@ func ResolveWithAliases(projectRoot, importerRepoPath, specifier string, aliases
 		return cleanRepoPath(filepath.ToSlash(filepath.Join(base, filepath.FromSlash(spec))))
 	}
 	return cleanRepoPath(spec)
+}
+
+func resolvePattern(importerRepoPath, specifier string, aliases map[string]string) string {
+	spec := stripQuery(filepath.ToSlash(strings.TrimSpace(specifier)))
+	if spec == "" {
+		return ""
+	}
+	if resolved := resolveAlias(spec, aliases); resolved != "" {
+		return resolved
+	}
+	if strings.HasPrefix(spec, "@/") || strings.HasPrefix(spec, "~/") {
+		srcBase := findSrcAncestor(importerRepoPath)
+		return filepath.ToSlash(filepath.Join(srcBase, spec[2:]))
+	}
+	if strings.HasPrefix(spec, "/") {
+		return strings.TrimPrefix(spec, "/")
+	}
+	if strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "../") {
+		base := filepath.Dir(filepath.FromSlash(importerRepoPath))
+		return filepath.ToSlash(filepath.Join(base, filepath.FromSlash(spec)))
+	}
+	return spec
+}
+
+func globMatchRepoPath(pattern, repoPath string) bool {
+	return matchPathParts(splitPathPattern(pattern), splitPathPattern(repoPath))
 }
 
 func resolveAlias(spec string, aliases map[string]string) string {
