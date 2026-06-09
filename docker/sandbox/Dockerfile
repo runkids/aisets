@@ -9,8 +9,14 @@ FROM golang:${GO_VERSION}-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash ca-certificates curl git procps tini tesseract-ocr \
     ffmpeg webp libavif-bin gifsicle imagemagick libheif-examples \
+    nasm meson ninja-build pkg-config \
   && ln -sf /usr/bin/convert /usr/local/bin/magick \
   && rm -rf /var/lib/apt/lists/*
+
+# imgtools' avif-native feature pulls dav1d-sys, which needs libdav1d >= 1.3.0.
+# Debian bookworm only ships 1.0.0, so let system-deps build dav1d 1.5.0 from
+# source (via the meson/ninja/nasm toolchain above) instead of the apt package.
+ENV SYSTEM_DEPS_BUILD_INTERNAL=auto
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/
 COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
