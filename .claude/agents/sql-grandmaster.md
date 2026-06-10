@@ -1,1 +1,1 @@
-/Users/williehung/Developer/Apps/github/aisets/.skillshare/agents/sql-grandmaster.md
+../../.skillshare/agents/sql-grandmaster.md
