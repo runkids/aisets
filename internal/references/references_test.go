@@ -350,6 +350,33 @@ func TestReferenceHelperFunctions(t *testing.T) {
 	}
 }
 
+func TestBuildMapResolvesTemplateLiteralPattern(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "apps", "myapp", "src", "views", "Dashboard", "icons", "apple.webp"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "myapp", "src", "views", "Dashboard", "icons", "banana.webp"), "image")
+	mustWrite(t, filepath.Join(root, "apps", "myapp", "src", "views", "Dashboard", "CategoryIcon.tsx"),
+		"function getIcon(code: string) {\n  return new URL(`./icons/${code}.webp`, import.meta.url).href\n}")
+
+	refs, err := BuildMap(context.Background(),
+		[]Project{{ID: "p", Path: root}},
+		[]Asset{
+			{ProjectID: "p", RepoPath: "apps/myapp/src/views/Dashboard/icons/apple.webp"},
+			{ProjectID: "p", RepoPath: "apps/myapp/src/views/Dashboard/icons/banana.webp"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := refs["p\x00apps/myapp/src/views/Dashboard/icons/apple.webp"]
+	if len(a) != 1 || a[0].File != "apps/myapp/src/views/Dashboard/CategoryIcon.tsx" {
+		t.Fatalf("template literal apple refs = %#v, want 1 ref from CategoryIcon.tsx", a)
+	}
+	b := refs["p\x00apps/myapp/src/views/Dashboard/icons/banana.webp"]
+	if len(b) != 1 || b[0].File != "apps/myapp/src/views/Dashboard/CategoryIcon.tsx" {
+		t.Fatalf("template literal banana refs = %#v, want 1 ref from CategoryIcon.tsx", b)
+	}
+}
+
 func TestBuildMapHonorsContextCancellation(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "src", "App.tsx"), `import logo from "./logo.png"`)

@@ -54,6 +54,7 @@ var codeExts = map[string]bool{
 }
 
 var quotedSpecRe = regexp.MustCompile(`(?i)['"\x60]([^'"\x60]*(?:\$\{[^'"\x60]*\}|[*{}])?[^'"\x60]*\.(?:avif|gif|heic|heif|jpe?g|png|svg|webp)(?:\?[^'"\x60]*)?)['"\x60]`)
+var templateExprRe = regexp.MustCompile(`\$\{[^}]*\}`)
 var cssSpecRe = regexp.MustCompile(`(?i)url\(\s*['"]?([^'")\s]+\.(?:avif|gif|heic|heif|jpe?g|png|svg|webp)(?:\?[^'")\s]*)?)['"]?\s*\)`)
 
 func BuildMap(ctx context.Context, projects []Project, assets []Asset) (map[string][]Reference, error) {
@@ -348,6 +349,7 @@ func resolvePattern(importerRepoPath, specifier string, aliases map[string]strin
 	if spec == "" {
 		return ""
 	}
+	spec = templateExprRe.ReplaceAllString(spec, "*")
 	if resolved := resolveAlias(spec, aliases); resolved != "" {
 		return resolved
 	}
