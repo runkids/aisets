@@ -278,6 +278,47 @@ fn convert_preserves_animated_gif_when_writing_webp() {
 }
 
 #[test]
+fn convert_preserves_animation_when_recompressing_animated_webp() {
+    let temp = TempDir::new();
+    let gif = temp.path("animated.gif");
+    let animated_webp = temp.path("animated.webp");
+    let recompressed = temp.path("recompressed.webp");
+    write_animated_gif(&gif);
+    assert_success(run(&[
+        "convert",
+        "--format",
+        "webp",
+        "--quality",
+        "80",
+        gif.to_str().expect("path utf-8"),
+        animated_webp.to_str().expect("path utf-8"),
+    ]));
+
+    assert_success(run(&[
+        "convert",
+        "--format",
+        "webp",
+        "--quality",
+        "60",
+        animated_webp.to_str().expect("path utf-8"),
+        recompressed.to_str().expect("path utf-8"),
+    ]));
+
+    let bytes = fs::read(&recompressed).expect("read recompressed webp");
+    let anim = webp::AnimDecoder::new(&bytes)
+        .decode()
+        .expect("decode recompressed webp");
+    assert!(
+        anim.has_animation(),
+        "recompressed output should stay animated"
+    );
+    assert_eq!(anim.len(), 2);
+    assert_eq!(anim.loop_count, 0);
+    let frame = anim.get_frame(0).expect("first frame");
+    assert_eq!((frame.width(), frame.height()), (4, 2));
+}
+
+#[test]
 fn convert_rejects_unsupported_format() {
     let temp = TempDir::new();
     let input = temp.path("input.png");

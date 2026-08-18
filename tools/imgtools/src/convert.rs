@@ -11,8 +11,13 @@ pub fn run(
     speed: u8,
     resize: Option<u32>,
 ) -> Result<()> {
-    if format == "webp" && is_animated_gif(input) {
-        return encode_animated_gif_as_webp(input, output, quality, resize);
+    if format == "webp" {
+        if is_animated_gif(input) {
+            return encode_animated_gif_as_webp(input, output, quality, resize);
+        }
+        if is_animated_webp(input) {
+            return recompress_animated_webp(input, output, quality, resize);
+        }
     }
 
     let mut img = image::open(input).with_context(|| format!("failed to open {input}"))?;
@@ -59,6 +64,24 @@ fn is_animated_gif(path: &str) -> bool {
     decoder.into_frames().take(2).count() > 1
 }
 
+fn is_animated_webp(path: &str) -> bool {
+    use image::codecs::webp::WebPDecoder;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    let is_webp_path = Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("webp"));
+    if !is_webp_path {
+        return false;
+    }
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    WebPDecoder::new(BufReader::new(file)).is_ok_and(|decoder| decoder.has_animation())
+}
+
 fn encode_webp(img: &DynamicImage, output: &str, quality: u8) -> Result<()> {
     let rgba = img.to_rgba8();
     let (w, h) = (rgba.width(), rgba.height());
@@ -83,17 +106,92 @@ fn encode_animated_gif_as_webp(
     let file = File::open(input).with_context(|| format!("failed to open {input}"))?;
     let decoder = GifDecoder::new(BufReader::new(file)).with_context(|| "failed to decode GIF")?;
     let (source_w, source_h) = decoder.dimensions();
-    let (target_w, target_h) = fit_dimensions(source_w, source_h, resize);
     let loop_count = match decoder.loop_count() {
         LoopCount::Infinite => 0,
         LoopCount::Finite(count) => count.get().min(i32::MAX as u32) as i32,
     };
+    encode_animation_as_webp(
+        decoder.into_frames(),
+        source_w,
+        source_h,
+        loop_count,
+        output,
+        quality,
+        resize,
+    )
+}
 
+fn recompress_animated_webp(
+    input: &str,
+    output: &str,
+    quality: u8,
+    resize: Option<u32>,
+) -> Result<()> {
+    use image::codecs::webp::WebPDecoder;
+    use image::{AnimationDecoder, ImageDecoder};
+    use std::fs::File;
+    use std::io::BufReader;
+
+    let loop_count = webp_loop_count(input);
+    let file = File::open(input).with_context(|| format!("failed to open {input}"))?;
+    let decoder =
+        WebPDecoder::new(BufReader::new(file)).with_context(|| "failed to decode WebP")?;
+    let (source_w, source_h) = decoder.dimensions();
+    encode_animation_as_webp(
+        decoder.into_frames(),
+        source_w,
+        source_h,
+        loop_count,
+        output,
+        quality,
+        resize,
+    )
+}
+
+// ANIM chunk payload: 4-byte background color + u16 LE loop count (0 = infinite).
+fn webp_loop_count(path: &str) -> i32 {
+    let Ok(data) = fs::read(path) else { return 0 };
+    if data.len() < 12 || &data[0..4] != b"RIFF" || &data[8..12] != b"WEBP" {
+        return 0;
+    }
+    let mut offset = 12usize;
+    while offset + 8 <= data.len() {
+        let size = u32::from_le_bytes([
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]) as usize;
+        let start = offset + 8;
+        let Some(end) = start.checked_add(size) else {
+            return 0;
+        };
+        if end > data.len() {
+            return 0;
+        }
+        if &data[offset..offset + 4] == b"ANIM" && size >= 6 {
+            return i32::from(u16::from_le_bytes([data[start + 4], data[start + 5]]));
+        }
+        offset = end + (size & 1);
+    }
+    0
+}
+
+fn encode_animation_as_webp(
+    frames: image::Frames<'_>,
+    source_w: u32,
+    source_h: u32,
+    loop_count: i32,
+    output: &str,
+    quality: u8,
+    resize: Option<u32>,
+) -> Result<()> {
+    let (target_w, target_h) = fit_dimensions(source_w, source_h, resize);
     let mut encoder = AnimatedWebPEncoder::new(target_w, target_h, quality, loop_count)?;
     let mut frame_count = 0usize;
 
-    for frame in decoder.into_frames() {
-        let frame = frame.with_context(|| "failed to decode GIF frame")?;
+    for frame in frames {
+        let frame = frame.with_context(|| "failed to decode animation frame")?;
         let delay_ms = frame_delay_ms(frame.delay());
         let mut rgba = frame.into_buffer();
         if (rgba.width(), rgba.height()) != (target_w, target_h) {
@@ -106,7 +204,7 @@ fn encode_animated_gif_as_webp(
     }
 
     if frame_count == 0 {
-        bail!("animated GIF has no frames");
+        bail!("animated input has no frames");
     }
 
     encoder.write(output)
