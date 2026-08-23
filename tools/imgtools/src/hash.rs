@@ -174,7 +174,7 @@ fn pixmap_to_dynamic_image(pixmap: &tiny_skia::Pixmap) -> DynamicImage {
     let h = pixmap.height();
     let data = pixmap.data();
     let mut rgba = Vec::with_capacity(data.len());
-    for chunk in data.chunks_exact(4) {
+    for chunk in data.as_chunks::<4>().0 {
         let a = chunk[3];
         if a == 0 {
             rgba.extend_from_slice(&[0, 0, 0, 0]);
